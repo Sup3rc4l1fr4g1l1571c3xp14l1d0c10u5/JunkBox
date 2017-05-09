@@ -5,74 +5,112 @@ using System.Linq;
 
 namespace SugiyamaCS {
     public class Digraph {
-        private readonly List<List<int>> _matrix = new List<List<int>>();
-
-        private IEnumerable<int> Nodes => _matrix.Count.Times();
-
-        public void AddEdge(int from, int to) {
-            _matrix.Get(from, () => new List<int>()).Add(to);
-            _matrix.Get(to, () => new List<int>());
+        private class NodeData {
+            // そのうち何か入れる
         }
 
-        public void RemoveEdge(int from, int to) {
-            var e = _matrix.Get(from);
-            if (e != null) {
-                e.Remove(to);
-            }
-        }
-
-        public IEnumerable<Tuple<int, int>> Edges {
-            get {
-                for (int f = 0; f < _matrix.Count; f++) {
-                    for (int t = 0; t < _matrix[f].Count; t++) {
-                        yield return Tuple.Create(f, _matrix[f][t]);
-                    }
-                }
-            }
-        }
+        private readonly Dictionary<int, NodeData> _nodeMap;
+        private readonly HashSet<Tuple<int, int>> _edgeMap;
+        private int _idGen;
 
         public Digraph() {
-            _matrix = new List<List<int>>();
-            DummyNodes = new List<int>();
+            _nodeMap = new Dictionary<int, NodeData>();
+            _edgeMap = new HashSet<Tuple<int, int>>();
+            _idGen = 0;
         }
 
-        public Digraph inverse() {
+        public IEnumerable<int> Nodes => _nodeMap.Keys;
+        public IEnumerable<Tuple<int, int>> Edges => _edgeMap;
+
+        public Digraph Clone() {
             var g = new Digraph();
-#if false
-            for (var a = 0; a < _matrix.Count; a++)
-            {
-                g._matrix.Add(new List<int>());
+            foreach (var kv in _nodeMap) {
+                g._nodeMap.Add(kv.Key, kv.Value);
             }
-            for (var a = 0; a < _matrix.Count; a++)
-            {
-                var arc = _matrix[a];
-                foreach (int t in arc)
-                {
-                    g._matrix.Get(t, () => new List<int>()).Add(a);
-                }
+            foreach (var edge in _edgeMap) {
+                g._edgeMap.Add(edge);
             }
-#else
-            foreach (var e in Edges) {
-                g.AddEdge(e.Item2, e.Item1);
-            }
-#endif
+            g._idGen = _idGen;
             return g;
         }
 
+        public Digraph Inverse() {
+            var g = new Digraph();
+            foreach (var kv in _nodeMap) {
+                g._nodeMap.Add(kv.Key, kv.Value);
+            }
+            foreach (var e in this.Edges) {
+                g.AddEdge(e.Item2, e.Item1);
+            }
+            return g;
+        }
 
-        private List<List<int>> layerize() {
+        public int AddNode() {
+            var id = _idGen++;
+            _nodeMap.Add(id, new NodeData());
+            return id;
+        }
 
-            var g = this.inverse();
+        public void RemoveNode(int id) {
+            if (_nodeMap.ContainsKey(id) == false) {
+                throw new Exception($"node id:{id} not found");
+            }
+            _nodeMap.Remove(id);
+        }
+
+        public void AddEdge(Tuple<int, int> edge) {
+            if (_nodeMap.ContainsKey(edge.Item1) == false) {
+                throw new Exception($"node id:{edge.Item1} not found");
+            } else if (_nodeMap.ContainsKey(edge.Item2) == false) {
+                throw new Exception($"node id:{edge.Item2} not found");
+            } else {
+                _edgeMap.Add(edge);
+            }
+        }
+
+        public void AddEdge(int from, int to) {
+            AddEdge(Tuple.Create(from, to));
+        }
+
+        public void RemoveEdge(Tuple<int, int> edge) {
+            if (_nodeMap.ContainsKey(edge.Item1) == false) {
+                throw new Exception($"node id:{edge.Item1} not found");
+            } else if (_nodeMap.ContainsKey(edge.Item2) == false) {
+                throw new Exception($"node id:{edge.Item2} not found");
+            } else {
+                _edgeMap.Remove(edge);
+            }
+        }
+
+        public void RemoveEdge(int from, int to) {
+            RemoveEdge(Tuple.Create(from, to));
+        }
+
+        public IEnumerable<int> To(int from) {
+            return _edgeMap.Where(x => x.Item1 == from).Select(x => x.Item2);
+        }
+
+        public IEnumerable<int> From(int to) {
+            return _edgeMap.Where(x => x.Item2 == to).Select(x => x.Item1);
+        }
+
+    }
+
+    public static class DigraphExt {
+
+
+        private static List<List<int>> layerize(this Digraph self) {
+
+            var g = self.Inverse();
 
             var taken = new HashSet<int>();
             var layers = new List<List<int>>();
 
-            //            while (g._matrix.Count.Times().Any(i => taken.Contains(i) == false)) {
-            while (Nodes.Any(i => taken.Contains(i) == false)) {
+            while (g.Nodes.Any(i => taken.Contains(i) == false)) {
                 // 
                 var sinks = new List<int>();    // 沈点（sink vertex）：出次数がゼロの頂点
-                foreach (var j in Nodes) {
-                    var arc = g._matrix[j];
+                foreach (var j in g.Nodes) {
+                    var arc = g.To(j);
                     if (taken.Contains(j) == false && arc.All(i => taken.Contains(i))) {
                         // ノード j は沈点ではないが、ノード j から出ている辺が全て沈点に繋がっている場合、
                         // ノード j も沈点とする
@@ -98,15 +136,17 @@ namespace SugiyamaCS {
          *    for each node X is the free layer, get the barycenter of all the node that are connected to X in the fixed layer
          *    sort node with this value
          */
-        private List<int> initLayer(List<int> freeLayer, List<int> fixedLayer) {
+        private static List<int> initLayer(this Digraph self, List<int> freeLayer, List<int> fixedLayer) {
 
-            return freeLayer.Select(x => new {
-                p = (_matrix[x] == null || _matrix[x].Count == 0)
-                            ? 0.5
-                            : _matrix[x].Aggregate(0.0, (sum, i) => sum + fixedLayer.IndexOf(i)) / _matrix[x].Count,
-                x = x
-            }
-                )
+            return freeLayer.Select(x => {
+                var arc = self.To(x).ToList();
+                return new {
+                    p = (arc.Count == 0)
+                        ? 0.5
+                        : arc.Sum(fixedLayer.IndexOf) * 1.0 / arc.Count,
+                    x = x
+                };
+            })
                 .OrderBy((a) => a.p)
                 .Select(x => x.x)
                 .ToList();
@@ -117,15 +157,15 @@ namespace SugiyamaCS {
          *  return the number of arc related to u or v only that are crossing IF u is before v
          *
          */
-        private int n_crossing(int u, int v, List<int> fixedLayer) {
+        private static int n_crossing(this Digraph self, int u, int v, List<int> fixedLayer) {
 
             var p = 0;
             var n = 0;
             fixedLayer.ForEach(x => {
-                if (_matrix[u].Any(y => x == y)) {
+                if (self.To(u).Any(y => x == y)) {
                     n += p;
                 }
-                if (_matrix[v].Any(y => x == y)) {
+                if (self.To(v).Any(y => x == y)) {
                     p += 1;
                 }
             });
@@ -133,7 +173,7 @@ namespace SugiyamaCS {
             return n;
         }
 
-        private void orderLayer(List<int> freeLayer, List<int> fixedLayer) {
+        private static void orderLayer(this Digraph self, List<int> freeLayer, List<int> fixedLayer) {
 
             // buble sort
             // swap position of adjacent node if it reduce the number of crossing
@@ -143,7 +183,7 @@ namespace SugiyamaCS {
                     var a = freeLayer[j];
                     var b = freeLayer[j + 1];
 
-                    if (n_crossing(a, b, fixedLayer) > n_crossing(b, a, fixedLayer)) {
+                    if (self.n_crossing(a, b, fixedLayer) > self.n_crossing(b, a, fixedLayer)) {
                         // swap
                         freeLayer[j] = b;
                         freeLayer[j + 1] = a;
@@ -159,13 +199,13 @@ namespace SugiyamaCS {
          * order each layer in a way to minimise the crossing between connection
          *
          */
-        public List<List<int>> layerOrdering(List<List<int>> layers) {
+        public static List<List<int>> layerOrdering(this Digraph self, List<List<int>> layers) {
 
             if (layers.Count <= 1) {
                 return layers;
             }
 
-            var g = this.inverse();
+            var g = self.Inverse();
 
             // start from top to bottom, init the layers with naive sorting
             for (var i = 1; i < layers.Count; i++) {
@@ -184,7 +224,7 @@ namespace SugiyamaCS {
             return layers;
         }
 
-        void addDummy(List<List<int>> layers) {
+        private static void addDummy(this Digraph self, List<List<int>> layers, Dictionary<Tuple<int, int>, List<int>> edgeJoints, HashSet<Tuple<int, int>> invertEdges) {
 
             var layerById = new Dictionary<int, int>();
             for (var i = 0; i < layers.Count; i++) {
@@ -193,139 +233,127 @@ namespace SugiyamaCS {
                     layerById[x] = i;
                 }
             }
-            this.DummyNodes.Clear();
 
-            for (var a = 0; a < _matrix.Count; a++) {
-                for (var i = _matrix[a].Count - 1; i >= 0; i--) {
-                    var b = _matrix[a][i];
+            var nodes = self.Nodes.ToList();
+            foreach (var a in nodes) {
+                var adv = self.To(a).ToList();
+                for (var i = adv.Count - 1; i >= 0; i--) {
+                    var b = adv[i];
                     var child = b;
-
+                    var edge = Tuple.Create(a, b);
+                    self.RemoveEdge(edge);
+                    var joints = new List<int>();
+                    joints.Add(b);
                     for (var k = layerById[b] - 1; k > layerById[a]; k--) {
 
-                        var x = _matrix.Count;
-                        _matrix.Add(new List<int> { child });
+                        var newdummy = self.AddNode();
 
-                        layerById[x] = k;
-                        layers[k].Add(x);
-                        DummyNodes.Add(k);
+                        self.AddEdge(child, newdummy);
 
-                        child = x;
+                        layerById[newdummy] = k;
+                        layers[k].Add(newdummy);
+                        joints.Add(newdummy);
+                        child = newdummy;
+                    }
+                    joints.Add(a);
+
+                    var invEdge = Tuple.Create(b, a);
+                    if (invertEdges.Contains(invEdge))
+                    {
+                        edgeJoints.Add(invEdge, joints);
+                    }
+                    else
+                    {
+                        edgeJoints.Add(edge, joints);
                     }
 
-                    _matrix[a][i] = child;
+                    self.AddEdge(a, child);
                 }
             }
         }
 
-        public List<int> DummyNodes { get; }
-
-        private Digraph clone() {
-            var g = new Digraph();
-            for (var arc = 0; arc < _matrix.Count; arc++) {
-                g._matrix.Set(arc, _matrix[arc].ToList());
-            }
-            g.DummyNodes.AddRange(DummyNodes);
-            foreach (var v in this.invert) { g.invert.Add(v); }
-            foreach (var v in this.othertree) { g.othertree.Add(v); }
-            return g;
+        public class GraphLayout {
+            public Dictionary<int, Point> Positions;
+            public Dictionary<Tuple<int, int>, List<int>> Joints;
         }
 
-        public class GraphPosition {
-            public List<Point> position;
-            public Digraph Digraph;
-        }
 
-        public HashSet<Tuple<int, int>> invert = new HashSet<Tuple<int, int>>();
-
-        public HashSet<int> dfs_recur(int node, HashSet<int> visited, HashSet<int> visited2) {
-            var adj = this._matrix[node];
-            visited.Add(node);
-            visited2.Add(node);
-            //document.write(node.getVertex());
-            for (var i = 0; i < adj.Count; i++) {
-                var dest = adj[i];
-                if (othertree.Contains(dest) == false) {
-                    if (visited2.Contains(dest) == false) {
-                        dfs_recur(dest, visited, visited2);
-                    } else {
-                        invert.Add(Tuple.Create(node, dest));
-                    }
-                }
-            }
-            visited2.Remove(node);
-            return visited;
-        }
-
-        private HashSet<int> dfs(int start) {
-            return this.dfs_recur(start, new HashSet<int>(), new HashSet<int>());
-        }
-
-        private HashSet<int> othertree = new HashSet<int>();
-
-        private int returnNodeOutTrees() {
-            for (var i = 0; i < this._matrix.Count; i++) {
-                if (this.othertree.Contains(i) == false) {
-                    return i;
-                };
-            }
-            return -1;
-        }
-
-        public Digraph RemoveCicle() {
-            var g = this.clone();
-            var a = g.returnNodeOutTrees();
-            while (a != -1) {
-                var v = g.dfs(a);
-                foreach (var x in v) {
-                    g.othertree.Add(x);
-                }
-                a = g.returnNodeOutTrees();
-            }
-            return g;
-        }
-
-        // index
-        public GraphPosition computePosition() {
-            var g = this.RemoveCicle();
-            g = g.clone();
-            foreach (var invert in g.invert) {
+        public static GraphLayout ComputeLayout(this Digraph self) {
+            var invertEdges = self.RemoveCicle();
+            var g = self.Clone();
+            foreach (var invert in invertEdges) {
                 g.RemoveEdge(invert.Item1, invert.Item2);
             }
-            foreach (var invert in g.invert) {
+            foreach (var invert in invertEdges) {
                 g.AddEdge(invert.Item2, invert.Item1);
             }
             var layers = g.layerize();
 
-            g.addDummy(layers);
+            var edgeJoints = new Dictionary<Tuple<int, int>, List<int>>();
+             g.addDummy(layers, edgeJoints,invertEdges);
 
             var orderedLayers = g.layerOrdering(layers);
 
-            var l = 100;
-            var position = new List<Point>();
+            var l = 300;
+            var nodePosition = new Dictionary<int, Point>();
 
             for (var ky = 0; ky < orderedLayers.Count; ky++) {
                 var list = orderedLayers[ky];
                 for (var kx = 0; kx < list.Count; kx++) {
                     var x = list[kx];
-                    position.Set(x, new Point(
-                        (int)((kx + 0.5) * l / list.Count),
+                    nodePosition[x] = new Point(
+                        (int)((kx + 0.5) * l / list.Count),  
                         (int)((ky + 0.5) * l / orderedLayers.Count)
-                    ));
+                    );
                 }
             }
 
-            return new GraphPosition { Digraph = g, position = position };
+            return new GraphLayout { Positions = nodePosition, Joints = edgeJoints };
         }
     }
-    public static class Ext {
-        public static int IndexOf<T>(this T[] self, T t) {
-            for (int i = 0; i < self.Length; i++) {
-                if (self[i].Equals(t)) {
-                    return i;
+
+    /// <summary>
+    /// 循環除去
+    /// </summary>
+    public static class RemoveCycle {
+
+        private static HashSet<int> DepthFirstSearch(this Digraph self, int node, HashSet<Tuple<int, int>> invert, HashSet<int> othertree, HashSet<int> visited, HashSet<int> path) {
+            var adj = self.To(node).ToList();
+            visited.Add(node);
+            path.Add(node);
+            foreach (var dest in adj) {
+                if (othertree.Contains(dest) == false && invert.Contains(Tuple.Create(node, dest)) == false) {
+                    if (path.Contains(dest) == false) {
+                        self.DepthFirstSearch(dest, invert, othertree, visited, path);
+                    } else {
+                        invert.Add(Tuple.Create(node, dest));
+                    }
                 }
             }
-            return -1;
+            path.Remove(node);
+            return visited;
         }
+
+
+        public static HashSet<Tuple<int, int>> RemoveCicle(this Digraph self) {
+            var invert = new HashSet<Tuple<int, int>>();
+            var othertree = new HashSet<int>();
+            for (;;) {
+                var a = self.Nodes.Where(i => othertree.Contains(i) == false).DefaultIfEmpty(-1).First();
+                if (a == -1)
+                {
+                    break;
+                }
+                var v = self.DepthFirstSearch(a, invert, othertree, new HashSet<int>(), new HashSet<int>());
+                foreach (var x in v) {
+                    othertree.Add(x);
+                }
+            }
+            return invert;
+        }
+    }
+
+    public static class Ext {
         public static IEnumerable<int> Times(this int self) {
             return Enumerable.Range(0, self);
         }
