@@ -52,7 +52,7 @@ namespace Parsing {
             var value = Value as IStructuralEquatable;
             if (value != null) {
                 return value.Equals(other.Value, StructuralComparisons.StructuralEqualityComparer);
-            } else { 
+            } else {
                 return Object.Equals(Value, other.Value);
             }
         }
@@ -151,11 +151,9 @@ namespace Parsing {
                     pos = parsed.Position; // 読み取り位置を更新する
                 }
                 var ret = result.ToArray();
-                if ((min >= 0 && ret.Length < min) || (max >= 0 && ret.Length > max))
-                {
+                if ((min >= 0 && ret.Length < min) || (max >= 0 && ret.Length > max)) {
                     return new Result<T[]>(false, new T[0], position);
-                } else
-                {
+                } else {
                     return new Result<T[]>(true, result.ToArray(), pos);
                 }
             };
@@ -254,12 +252,31 @@ namespace Parsing {
             };
         }
 
+
+        /// <summary>
+        /// 任意の一文字に一致するパーサを生成する
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static Parser<char> AnyChar() {
+            return (target, position) => {
+                if (target == null) {
+                    throw new ArgumentNullException(nameof(target));
+                }
+                if (position >= target.Length) {
+                    return new Result<char>(false, default(char), position);
+                }
+                var ch = target[position];
+                return new Result<char>(true, ch, position + 1);
+            };
+        }
+
         /// <summary>
         /// str中の一文字に一致するパーサを生成する
         /// </summary>
         /// <param name="str"></param>
         /// <returns></returns>
-        public static Parser<string> Char(string str) {
+        public static Parser<char> AnyChar(string str) {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
@@ -270,13 +287,13 @@ namespace Parsing {
                     throw new ArgumentNullException(nameof(target));
                 }
                 if (position >= target.Length) {
-                    return new Result<string>(false, null, position);
+                    return new Result<char>(false, default(char), position);
                 }
                 var ch = target[position];
                 if (dict.Contains(ch)) {
-                    return new Result<string>(true, $"{ch}", position + 1);
+                    return new Result<char>(true, ch, position + 1);
                 } else {
-                    return new Result<string>(false, null, position);
+                    return new Result<char>(false, default(char), position);
                 }
             };
         }
@@ -308,7 +325,7 @@ namespace Parsing {
         /// </summary>
         /// <param name="parser">オプションとして扱うパーサ</param>
         /// <returns></returns>
-        public static Parser<T> Option<T>(Parser<T> parser) {
+        public static Parser<T> Option<T>(this Parser<T> parser) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
@@ -377,19 +394,16 @@ namespace Parsing {
         /// </summary>
         /// <param name="parser">評価したいパーサ</param>
         /// <returns></returns>
-        public static Parser<T> Not<T>(Parser<T> parser) {
+        public static Parser<T> Not<T>(this Parser<T> parser) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
 
             return (target, position) => {
                 var parsed = parser(target, position);
-                if (parsed.Success == false)
-                {
+                if (parsed.Success == false) {
                     return new Result<T>(true, default(T), position);
-                }
-                else
-                {
+                } else {
                     return new Result<T>(false, default(T), position);
                 }
             };
@@ -408,6 +422,17 @@ namespace Parsing {
                 return parser(target, parsed.Position);
             };
         }
+
+        public static Parser<T1[]> Repeat1<T1, T2>(this Parser<T1> self, Parser<T2> separate)
+        {
+            return 
+                from _1 in self
+                from _2 in separate.Then(self).Many()
+                select new[] {_1}.Concat(_2).ToArray();
+        }
+
+
+        // monad
 
         public static Parser<T2> Select<T1, T2>(this Parser<T1> parser, Func<T1, T2> selector) {
             return (target, position) => {
@@ -439,6 +464,16 @@ namespace Parsing {
             return (target, position) => {
                 var res = parser(target, position);
                 if (!res.Success || !selector(res.Value)) {
+                    return new Result<T>(false, default(T), position);
+                } else {
+                    return new Result<T>(true, res.Value, res.Position);
+                }
+            };
+        }
+        public static Parser<T> Just<T>(this Parser<T> parser, T value) {
+            return (target, position) => {
+                var res = parser(target, position);
+                if (!res.Success || !res.Value.Equals(value)) {
                     return new Result<T>(false, default(T), position);
                 } else {
                     return new Result<T>(true, res.Value, res.Position);
