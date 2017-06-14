@@ -15,8 +15,20 @@ namespace MiniML {
             /// キー
             /// </summary>
             public string Key { get; }
+
+            /// <summary>
+            /// 値
+            /// </summary>
             public T Value { get; }
+
+            /// <summary>
+            /// 次の要素
+            /// </summary>
             public Environment<T> Next { get; }
+
+            /// <summary>
+            /// 空要素
+            /// </summary>
             public static Environment<T> Empty { get; } = new Environment<T>(null, default(T), null);
 
             public Environment(string key, T value, Environment<T> next) {

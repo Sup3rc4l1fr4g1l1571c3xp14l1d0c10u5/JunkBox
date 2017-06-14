@@ -1,9 +1,8 @@
 using System.Linq;
+using System.Text;
 
-namespace MiniML
-{
-    public static partial class MiniML
-    {
+namespace MiniML {
+    public static partial class MiniML {
         /// <summary>
         /// 評価値
         /// </summary>
@@ -43,22 +42,30 @@ namespace MiniML
             /// </summary>
             public class ConsV : ExprValue {
                 public ExprValue Value { get; }
-                public ExprValue Next { get; }
-                public static ConsV Empty { get; } = new ConsV(null,null);
-                public ConsV(ExprValue value, ExprValue next) {
+                public ConsV Next { get; }
+                public static ConsV Empty { get; } = new ConsV(null, null);
+                public ConsV(ExprValue value, ConsV next) {
                     Value = value;
                     Next = next;
                 }
 
                 public override string ToString() {
-                    if (this == Empty)
+                    var sb = new StringBuilder();
+                    var it = this;
+                    if (it == Empty)
                     {
-                        return $"[]";
+                        sb.Append("[]");
+                    } else { 
+                        sb.Append("[");
+                        sb.Append($"{it.Value}");
+                        it = it.Next;
+                        while (it != Empty) {
+                            sb.Append($"; {it.Value}");
+                            it = it.Next;
+                        }
+                        sb.Append("]");
                     }
-                    else
-                    {
-                        return $"({Value} :: {Next})";
-                    }
+                    return sb.ToString();
                 }
             }
 
@@ -78,14 +85,26 @@ namespace MiniML
             /// タプル値
             /// </summary>
             public class TupleV : ExprValue {
-                public ExprValue[] Values { get; }
-
-                public TupleV(ExprValue[] values) {
-                    Values = values;
+                public ExprValue Value { get; }
+                public TupleV Next { get; }
+                public static TupleV Empty { get; } = new TupleV(null, null);
+                public TupleV(ExprValue value, TupleV next) {
+                    Value = value;
+                    Next = next;
                 }
 
                 public override string ToString() {
-                    return $"({string.Join(" ", Values.Select(x => x.ToString()))})";
+                    var sb = new StringBuilder();
+                    var it = this;
+                    sb.Append("(");
+                    sb.Append($"{it.Value}");
+                    it = it.Next;
+                    while (it != Empty) {
+                        sb.Append($", {it.Value}");
+                        it = it.Next;
+                    }
+                    sb.Append(")");
+                    return sb.ToString();
                 }
             }
 
@@ -107,8 +126,7 @@ namespace MiniML
                     return $"<fun>";
                 }
 
-                public void BackPatchEnv(Environment<ExprValue> newenv)
-                {
+                public void BackPatchEnv(Environment<ExprValue> newenv) {
                     this.Env = newenv;
                 }
             }

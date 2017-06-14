@@ -142,7 +142,7 @@ namespace MiniML {
                     }
                     case Syntax.BinOp.Kind.Cons: {
                         if (arg2 is ExprValue.ConsV) {
-                            return new ExprValue.ConsV(arg1, arg2);
+                            return new ExprValue.ConsV(arg1, arg2 as ExprValue.ConsV);
                         }
                             throw new Exception("Right arguments must be List: ::");
                     }
@@ -176,22 +176,16 @@ namespace MiniML {
                 }
                 if (pattern is Pattern.TupleP && value is ExprValue.TupleV)
                 {
-                    var vs = (value as ExprValue.TupleV).Values;
-                    var ps = (pattern as Pattern.TupleP).Patterns;
-                    if (vs.Length != ps.Length)
-                    {
-                        return null;
-                    }
-                    var newenv = env;
-                    foreach (var pv in ps.Zip(vs,Tuple.Create))
-                    {
-                        newenv = eval_match(newenv, pv.Item2, pv.Item1);
-                        if (newenv == null)
-                        {
-                            return null;
+                    if (value == ExprValue.TupleV.Empty) {
+                        return (pattern == Pattern.TupleP.Empty) ? env : null;
+                    } else {
+                        var v = value as ExprValue.TupleV;
+                        var newenv = eval_match(env, v.Value, (pattern as Pattern.TupleP).Pattern);
+                        if (newenv != null) {
+                            return eval_match(newenv, v.Next, (pattern as Pattern.TupleP).Next);
                         }
                     }
-                    return newenv;
+
                 }
                 if (pattern is Pattern.ConsP && value is ExprValue.ConsV) {
                     if (value == ExprValue.ConsV.Empty)
@@ -199,10 +193,10 @@ namespace MiniML {
                         return (pattern == Pattern.ConsP.Empty) ? env : null;
                     } else {
                         var v = value as ExprValue.ConsV;
-                        var newenv = eval_match(env, v.Value, (pattern as Pattern.ConsP).Lhs);
+                        var newenv = eval_match(env, v.Value, (pattern as Pattern.ConsP).Pattern);
                         if (newenv != null)
                         {
-                            return eval_match(newenv, v.Next, (pattern as Pattern.ConsP).Rhs);
+                            return eval_match(newenv, v.Next, (pattern as Pattern.ConsP).Next);
                         }
                     }
                 }
@@ -231,8 +225,7 @@ namespace MiniML {
                     return new ExprValue.UnitV();
                 }
                 if (e is Syntax.TupleExp) {
-                    var values = ((Syntax.TupleExp)e).Values.Select(x => eval_exp(env, x)).ToArray();
-                    return new ExprValue.TupleV(values);
+                    return ((Syntax.TupleExp)e).Values.Select(x => eval_exp(env, x)).Reverse().Aggregate(ExprValue.TupleV.Empty, ((s,x) => new ExprValue.TupleV(x,s)));
                 }
                 if (e is Syntax.BinOp) {
                     var op = ((Syntax.BinOp)e).Op;

@@ -68,13 +68,13 @@ namespace MiniML
             /// コンスセルパターン
             /// </summary>
             public class ConsP : Pattern {
-                public Pattern Lhs { get; }
-                public Pattern Rhs { get; }
+                public Pattern Pattern { get; }
+                public Pattern Next { get; }
                 public static ConsP Empty { get; } = new ConsP(null,null);
-                public ConsP(Pattern lhs, Pattern  rhs)
+                public ConsP(Pattern pattern, Pattern next)
                 {
-                    Lhs = lhs;
-                    Rhs = rhs;
+                    Pattern = pattern;
+                    Next = next;
                 }
 
                 public override string ToString() {
@@ -82,7 +82,7 @@ namespace MiniML
                     {
                         return $"[]";
                     } else { 
-                    return $"{Lhs} :: {Rhs}";
+                    return $"{Pattern} :: {Next}";
                     }
                 }
             }
@@ -102,14 +102,20 @@ namespace MiniML
             /// タプルパターン
             /// </summary>
             public class TupleP : Pattern {
-                public TupleP(Pattern[] patterns) {
-                    Patterns = patterns;
+                public Pattern Pattern { get; }
+                public TupleP Next { get; }
+                public static TupleP Empty { get; } = new TupleP(null, null);
+                public TupleP(Pattern lhs, TupleP next) {
+                    Pattern = lhs;
+                    Next = next;
                 }
 
-                public Pattern[] Patterns { get; }
-
                 public override string ToString() {
-                    return $"({string.Join(" ", Patterns.Select(x => x.ToString()))})";
+                    if (this == Empty) {
+                        return $"[]";
+                    } else {
+                        return $"{Pattern} :: {Next}";
+                    }
                 }
             }
 

@@ -162,12 +162,12 @@ namespace MiniML
                 }
                 if (p is Pattern.ConsP)
                 {
-                    var b1 = CheckBind(((Pattern.ConsP) p).Lhs, binds);
+                    var b1 = CheckBind(((Pattern.ConsP) p).Pattern, binds);
                     if (b1 == null)
                     {
                         return null;
                     }
-                    return CheckBind(((Pattern.ConsP)p).Rhs, b1);
+                    return CheckBind(((Pattern.ConsP)p).Next, b1);
                 }
                 return binds;
             }
@@ -181,10 +181,10 @@ namespace MiniML
                     from _1 in False select (Pattern)new Pattern.BoolP(false),
                     from _1 in Id select (Pattern)new Pattern.VarP(_1),
                     from _1 in LBracket from _2 in RBracket select (Pattern)Pattern.ConsP.Empty,
-                    from _1 in LBracket from _2 in PatternExpr.Repeat1(Semi) from _3 in RBracket select _2.Reverse().Aggregate((Pattern)Pattern.ConsP.Empty, (s, x) => new Pattern.ConsP(x, s)),
+                    from _1 in LBracket from _2 in PatternExpr.Repeat1(Semi) from _3 in RBracket select (Pattern)_2.Reverse().Aggregate(Pattern.ConsP.Empty, (s, x) => new Pattern.ConsP(x, s)),
                     from _1 in Undarbar select (Pattern)new Pattern.WildP(),
                     from _1 in LParen from _2 in RParen select (Pattern)new Pattern.UnitP(),
-                    from _1 in LParen from _2 in PatternExpr.Repeat1(Comma) from _3 in RParen select (_2.Length == 1) ? _2[0] : (Pattern)new Pattern.TupleP(_2)
+                    from _1 in LParen from _2 in PatternExpr.Repeat1(Comma) from _3 in RParen select (_2.Length == 1) ? _2[0] : (Pattern)_2.Reverse().Aggregate(Pattern.TupleP.Empty, (s, x) => new Pattern.TupleP(x, s))
                 );
 
             private static readonly Parser<Pattern> PatternCons =
@@ -309,7 +309,7 @@ namespace MiniML
                 );
 
             public static Result<Program> Parse(string s) {
-                return TopLevel(s, 0);
+                return TopLevel(s, new Position(), new Position());
             }
 
         }
