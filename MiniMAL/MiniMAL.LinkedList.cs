@@ -1,0 +1,109 @@
+using System;
+using System.Text;
+
+namespace MiniMAL
+{
+    /// <summary>
+    /// 連結リスト
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public class LinkedList<T> {
+        public T Value { get; private set; }
+        public LinkedList<T> Next { get; }
+        public static LinkedList<T> Empty { get; } = new LinkedList<T>(default(T), null);
+
+        public LinkedList(T value, LinkedList<T> next) {
+            Value = value;
+            Next = next;
+        }
+
+        public override string ToString() {
+            StringBuilder sb = new StringBuilder();
+            var it = this;
+            sb.Append("[");
+            if (it != Empty) {
+                sb.Append(it.Value);
+                it = it.Next;
+                while (it != Empty) {
+                    sb.Append("; " + it.Value);
+                    it = it.Next;
+                }
+            }
+            sb.Append("]");
+            return sb.ToString();
+        }
+
+        public void Replace(T value) {
+            Value = value;
+        }
+
+    }
+
+    /// <summary>
+    /// 連結リスト操作
+    /// </summary>
+    public static class LinkedList {
+        public class NotBound : Exception {
+            public NotBound() : base() {
+            }
+            public NotBound(string s) : base(s) {
+            }
+            public NotBound(string s, Exception e) : base(s, e) {
+            }
+        }
+
+        public static LinkedList<T> Extend<T>(T v, LinkedList<T> next) {
+            return new LinkedList<T>(v, next);
+        }
+        public static T First<T>(Func<T, bool> f, LinkedList<T> env) {
+            for (var e = env; e != LinkedList<T>.Empty; e = e.Next) {
+                if (f(e.Value)) { return e.Value; }
+            }
+            throw new NotBound();
+        }
+        public static int FirstIndex<T>(Func<T, bool> f, LinkedList<T> env) {
+            int i = 0;
+            for (var e = env; e != LinkedList<T>.Empty; e = e.Next) {
+                if (f(e.Value)) { return i; }
+                i += 1;
+            }
+            return -1;
+        }
+        public static LinkedList<T> Reverse<T>(LinkedList<T> list) {
+            var ret = LinkedList<T>.Empty;
+            for (var e = list; e != LinkedList<T>.Empty; e = e.Next) {
+                ret = LinkedList.Extend(e.Value, ret);
+            }
+            return ret;
+        }
+        public static LinkedList<T2> Map<T1, T2>(Func<T1, T2> f, LinkedList<T1> list) {
+            var ret = LinkedList<T2>.Empty;
+            for (var e = list; e != LinkedList<T1>.Empty; e = e.Next) {
+                ret = LinkedList.Extend(f(e.Value), ret);
+            }
+            return LinkedList.Reverse(ret);
+        }
+
+        public static T2 FoldRight<T1, T2>(Func<T2, T1, T2> f, LinkedList<T1> env, T2 a) {
+            LinkedList<T1> kv = LinkedList.Reverse(env);
+            T2 ret = a;
+            for (var e = kv; e != LinkedList<T1>.Empty; e = e.Next) {
+                ret = f(ret, e.Value);
+            }
+            return ret;
+        }
+
+        public static T At<T>(LinkedList<T> list, int num) {
+            while (num > 0) {
+                if (list == LinkedList<T>.Empty) {
+                    throw new ArgumentOutOfRangeException();
+                }
+                list = list.Next;
+                num--;
+            }
+            return list.Value;
+        }
+
+    }
+
+}
