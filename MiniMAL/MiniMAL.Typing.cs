@@ -1,413 +1,257 @@
-using System;
+Ôªøusing System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Linq;
-using System.Numerics;
 using System.Text;
-using Parsing;
+using System.Threading.Tasks;
 
-namespace MiniMAL
-{
-    /// <summary>
-    /// ç\ï∂ÉCÉìÉ^ÉvÉäÉ^ï]âøïî
-    /// </summary>
-    public static class Eval {
-        /// <summary>
-        /// ï]âøíl
-        /// </summary>
-        public abstract class ExprValue {
-            /// <summary>
-            /// êÆêîíl
-            /// </summary>
-            public class IntV : ExprValue {
-                public BigInteger Value { get; }
-
-                public IntV(BigInteger value) {
-                    Value = value;
+namespace MiniMAL {
+    public class Typing {
+        public abstract class Type
+        {
+            public class TyInt : Type
+            {
+                public override string ToString()
+                {
+                    return "int";
                 }
+            }
 
+            public class TyBool : Type
+            {
+                public override string ToString()
+                {
+                    return "bool";
+                }
+            }
+
+            public class TyStr : Type {
                 public override string ToString() {
-                    return $"{Value}";
+                    return "string";
+                }
+            }
+
+            public class TyUnit : Type {
+                public override string ToString() {
+                    return "unit";
+                }
+            }
+
+            public class TyNil : Type {
+                public override string ToString() {
+                    return "nil";
+                }
+            }
+
+            public class TyCons : Type {
+                public Type ItemType { get; }
+                public static TyCons Empty { get; } = new TyCons(null);
+
+                public TyCons(Type itemType) {
+                    ItemType = itemType;
+                }
+                public override string ToString() {
+                    return $"{ItemType} list";
+                }
+            }
+
+            public class TyTuple : Type {
+                public Type[] ItemType { get; }
+
+                public TyTuple(Type[] itemType) {
+                    ItemType = itemType;
+                }
+                public override string ToString() {
+                    return $"({string.Join(" * ", ItemType.Select(x => x.ToString()))})";
                 }
             }
 
             /// <summary>
-            /// ï∂éöóÒíl
-            /// </summary>
-            public class StrV : ExprValue {
-                public string Value { get; }
-
-                public StrV(string value) {
-                    Value = value;
-                }
-
-                public override string ToString() {
-                    return $"\"{Value.Replace("\"", "\\\"")}\"";
-                }
-            }
-
-            /// <summary>
-            /// ò_óùíl
-            /// </summary>
-            public class BoolV : ExprValue {
-                public bool Value { get; }
-
-                public BoolV(bool value) {
-                    Value = value;
-                }
-
-                public override string ToString() {
-                    return $"{Value}";
-                }
-            }
-
-            /// <summary>
-            /// Unitíl
-            /// </summary>
-            public class UnitV : ExprValue {
-                public UnitV() { }
-
-                public override string ToString() {
-                    return $"()";
-                }
-            }
-
-            /// <summary>
-            /// ÉåÉLÉVÉJÉãÉNÉçÅ[ÉWÉÉÅ[
-            /// </summary>
-            public class ProcV : ExprValue {
-                public string Id { get; }
-                public Expressions Body { get; }
-                public Environment<ExprValue> Env { get; private set; }
-
-                public ProcV(string id, Expressions body, Environment<ExprValue> env) {
-                    Id = id;
-                    Body = body;
-                    Env = env;
-                }
-
-                public void BackPatchEnv(Environment<ExprValue> newenv) {
-                    Env = newenv;
-                }
-
-                public override string ToString() {
-                    return $"<fun>";
-                }
-            }
-
-            /// <summary>
-            /// É_ÉCÉiÉ~ÉbÉNÉNÉçÅ[ÉWÉÉÅ[
-            /// </summary>
-            public class DProcV : ExprValue {
-                public string Id { get; }
-                public Expressions Body { get; }
-
-                public DProcV(string id, Expressions body) {
-                    Id = id;
-                    Body = body;
-                }
-
-                public override string ToString() {
-                    return $"<dfun>";
-                }
-            }
-
-            /// <summary>
-            /// ÉrÉãÉgÉCÉìÉNÉçÅ[ÉWÉÉÅ[
-            /// </summary>
-            public class BProcV : ExprValue {
-                public Func<ExprValue, ExprValue> Proc { get; }
-
-                public BProcV(Func<ExprValue, ExprValue> proc) {
-                    Proc = proc;
-                }
-
-                public override string ToString() {
-                    return $"<bproc>";
-                }
-            }
-
-            /// <summary>
-            /// consÉZÉã
-            /// </summary>
-            public class ConsV : ExprValue {
-                public static ConsV Empty { get; } = new ConsV(null, null);
-                public ExprValue Value { get; }
-                public ConsV Next { get; }
-
-                public ConsV(ExprValue value, ConsV next) {
-                    Value = value;
-                    Next = next;
-                }
-
-                public override string ToString() {
-                    StringBuilder sb = new StringBuilder();
-                    sb.Append("[");
-                    if (this != Empty) {
-                        sb.Append($"{Value}");
-                        for (var p = this.Next; p != Empty; p = p.Next) {
-                            sb.Append($"; {p.Value}");
-                        }
-                    }
-                    sb.Append("]");
-                    return sb.ToString();
-                }
-            }
-
-            /// <summary>
-            /// É^ÉvÉã
-            /// </summary>
-            public class TupleV : ExprValue {
-                public ExprValue[] Value { get; }
-
-                public TupleV(ExprValue[] value) {
-                    Value = value;
-                }
-
-                public override string ToString() {
-                    return $"({String.Join(", ", Value.Select(x => x.ToString()))})";
-                }
-            }
-
-            /// <summary>
-            /// Nilíl
-            /// </summary>
-            public class NilV : ExprValue {
-
-                public NilV() {
-                }
-
-                public override string ToString() {
-                    return $"(Nil)";
-                }
-            }
-
-            /// <summary>
-            /// î‰är
+            /// ÊØîËºÉ
             /// </summary>
             /// <param name="arg1"></param>
             /// <param name="arg2"></param>
             /// <returns></returns>
-            public static bool Equals(ExprValue arg1, ExprValue arg2) {
-                if (arg1 is ExprValue.IntV && arg2 is ExprValue.IntV) {
-                    var i1 = ((ExprValue.IntV)arg1).Value;
-                    var i2 = ((ExprValue.IntV)arg2).Value;
-                    return (i1 == i2);
+            public static bool Equals(Type arg1, Type arg2) {
+                if (arg1 is Type.TyInt && arg2 is Type.TyInt)
+                {
+                    return true;
                 }
-                if (arg1 is ExprValue.StrV && arg2 is ExprValue.StrV) {
-                    var i1 = ((ExprValue.StrV)arg1).Value;
-                    var i2 = ((ExprValue.StrV)arg2).Value;
-                    return (i1 == i2);
+                if (arg1 is Type.TyStr && arg2 is Type.TyStr) {
+                    return true;
                 }
-                if (arg1 is ExprValue.BoolV && arg2 is ExprValue.BoolV) {
-                    var i1 = ((ExprValue.BoolV)arg1).Value;
-                    var i2 = ((ExprValue.BoolV)arg2).Value;
-                    return (i1 == i2);
+                if (arg1 is Type.TyBool && arg2 is Type.TyBool) {
+                    return true;
                 }
-                if (arg1 is ExprValue.UnitV && arg2 is ExprValue.UnitV) {
-                    return (true);
+                if (arg1 is Type.TyUnit && arg2 is Type.TyUnit) {
+                    return true;
                 }
-                if (arg1 is ExprValue.NilV && arg2 is ExprValue.NilV) {
-                    return (true);
+                if (arg1 is Type.TyNil && arg2 is Type.TyNil) {
+                    return true;
                 }
-                if (arg1 is ExprValue.ConsV && arg2 is ExprValue.ConsV) {
-                    var i1 = ((ExprValue.ConsV)arg1);
-                    var i2 = ((ExprValue.ConsV)arg2);
-                    while (i1 != ExprValue.ConsV.Empty && i2 != ExprValue.ConsV.Empty) {
-                        if (!Equals(i1.Value, i2.Value)) {
-                            return false;
-                        }
-                        i1 = i1.Next;
-                        i2 = i2.Next;
-                    }
-                    return (i1 != ExprValue.ConsV.Empty && i2 != ExprValue.ConsV.Empty);
+                if (arg1 is Type.TyCons && arg2 is Type.TyCons) {
+                    var i1 = ((Type.TyCons)arg1);
+                    var i2 = ((Type.TyCons)arg2);
+                    return Equals(i1.ItemType, i2.ItemType);
                 }
-                if (arg1 is ExprValue.TupleV && arg2 is ExprValue.TupleV) {
-                    var i1 = ((ExprValue.TupleV)arg1);
-                    var i2 = ((ExprValue.TupleV)arg2);
-                    if (i1.Value.Length != i2.Value.Length) {
+                if (arg1 is Type.TyTuple && arg2 is Type.TyTuple) {
+                    var i1 = ((Type.TyTuple)arg1);
+                    var i2 = ((Type.TyTuple)arg2);
+                    if (i1.ItemType.Length != i2.ItemType.Length) {
                         return false;
                     }
 
-                    return i1.Value.Zip(i2.Value, Tuple.Create).All(x => Equals(x.Item1, x.Item2));
+                    return i1.ItemType.Zip(i2.ItemType, Tuple.Create).All(x => Equals(x.Item1, x.Item2));
                 }
                 return (false);
             }
         }
 
+
         /// <summary>
-        /// ï]âøåãâ 
+        /// Ë©ï‰æ°ÁµêÊûú
         /// </summary>
         public class Result {
-            public Result(string id, Environment<ExprValue> env, ExprValue value) {
+            public Result(string id, Environment<Type> env, Type value) {
                 Id = id;
                 Env = env;
                 Value = value;
             }
 
             public string Id { get; }
-            public Environment<ExprValue> Env { get; }
-            public ExprValue Value { get; }
+            public Environment<Type> Env { get; }
+            public Type Value { get; }
         }
 
         /// <summary>
-        /// ìÒçÄââéZéqéÆÇÃï]âø
+        /// ‰∫åÈ†ÖÊºîÁÆóÂ≠êÂºè„ÅÆÁµêÊûúÂûã
         /// </summary>
         /// <param name="op"></param>
         /// <param name="args"></param>
         /// <returns></returns>
-        private static ExprValue EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, ExprValue[] args) {
+        private static Type EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, Type[] args) {
             switch (op) {
                 case Expressions.BuiltinOp.Kind.Plus: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 + i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyInt();
                     }
-                    if (args.Length == 2 && args[0] is ExprValue.StrV && args[1] is ExprValue.StrV) {
-                        var i1 = ((ExprValue.StrV)args[0]).Value;
-                        var i2 = ((ExprValue.StrV)args[1]).Value;
-                        return new ExprValue.StrV(i1 + i2);
+                    if (args.Length == 2 && args[0] is Type.TyStr && args[1] is Type.TyStr) {
+                        return new Type.TyStr();
                     }
-                    throw new Exception("Both arguments must be integer/string: +");
+                        throw new Exception("Both arguments must be integer/string: +");
 
                 }
                 case Expressions.BuiltinOp.Kind.Minus: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 - i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyInt();
                     }
                     throw new Exception("Both arguments must be integer: -");
 
                 }
                 case Expressions.BuiltinOp.Kind.Mult: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 * i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyInt();
                     }
                     throw new Exception("Both arguments must be integer: *");
                 }
                 case Expressions.BuiltinOp.Kind.Div: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 / i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyInt();
                     }
                     throw new Exception("Both arguments must be integer: /");
                 }
                 case Expressions.BuiltinOp.Kind.Lt: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 < i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyBool();
                     }
                     throw new Exception("Both arguments must be integer: <");
                 }
                 case Expressions.BuiltinOp.Kind.Le: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 <= i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyBool();
                     }
                     throw new Exception("Both arguments must be integer: <=");
                 }
                 case Expressions.BuiltinOp.Kind.Gt: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 > i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyBool();
                     }
                     throw new Exception("Both arguments must be integer: >");
                 }
                 case Expressions.BuiltinOp.Kind.Ge: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 >= i2);
+                    if (args.Length == 2 && args[0] is Type.TyInt && args[1] is Type.TyInt) {
+                        return new Type.TyBool();
                     }
                     throw new Exception("Both arguments must be integer: >=");
                 }
                 case Expressions.BuiltinOp.Kind.Eq: {
-                    if (args.Length == 2)
-                    {
-                        return new ExprValue.BoolV(ExprValue.Equals(args[0], args[1]));
+                    if (args.Length == 2 && Type.Equals(args[0], args[1])) {
+                        return new Type.TyBool();
                     }
-                    throw new Exception("argument num must be 2: ::");
+                    throw new Exception("Both arguments must be same type: =");
                 }
                 case Expressions.BuiltinOp.Kind.Ne: {
-                    if (args.Length == 2)
-                    {
-                        return new ExprValue.BoolV(!ExprValue.Equals(args[0], args[1]));
+                    if (args.Length == 2 && Type.Equals(args[0], args[1])) {
+                        return new Type.TyBool();
                     }
-                    throw new Exception("argument num must be 2: ::");
+                    throw new Exception("Both arguments must be same type: <>");
                 }
                 case Expressions.BuiltinOp.Kind.ColCol: {
-                    if (args.Length == 2 && args[1] is ExprValue.ConsV) {
-                        var i1 = ((ExprValue.ConsV)args[1]);
-                        return new ExprValue.ConsV(args[0], i1);
+                    if (args.Length == 2 && args[1] is Type.TyCons && Type.Equals(args[0], (args[1] as Type.TyCons).ItemType)) {
+                        return args[1];
                     }
-                    throw new Exception("Right arguments must be List: ::");
+                    throw new Exception("Both arguments must be same type: ::");
                 }
-                case Expressions.BuiltinOp.Kind.Head:
-                {
+                case Expressions.BuiltinOp.Kind.Head: {
                     if (args.Length == 1) {
                         var i1 = args[0];
-                        if (i1 is Eval.ExprValue.ConsV) {
-                            if (i1 == Eval.ExprValue.ConsV.Empty) {
-                                throw new Exception("null list ");
-                            }
-                            return ((Eval.ExprValue.ConsV)args[0]).Value;
+                        if (i1 is Type.TyCons) {
+                            return ((Type.TyCons)args[0]).ItemType;
                         }
+                        throw new Exception("invalid argument type: @Head");
                     }
-                    throw new Exception("invalid argument num: @Head");
+                        throw new Exception("invalid argument num: @Head");
                 }
                 case Expressions.BuiltinOp.Kind.Tail: {
                     if (args.Length == 1) {
                         var i1 = args[0];
-                        if (i1 is Eval.ExprValue.ConsV) {
-                            if (i1 == Eval.ExprValue.ConsV.Empty) {
-                                throw new Exception("null list ");
-                            }
-                            return ((Eval.ExprValue.ConsV)args[0]).Next;
+                        if (i1 is Type.TyCons) {
+                            return i1;
                         }
+                        throw new Exception("invalid argument type: @Tail");
                     }
                     throw new Exception("invalid argument num: @Tail");
                 }
-                case Expressions.BuiltinOp.Kind.IsCons:
-                {
+                case Expressions.BuiltinOp.Kind.IsCons: {
                     if (args.Length == 1) {
-                        var i1 = args[0];
-                        return new ExprValue.BoolV(i1 is Eval.ExprValue.ConsV);
+                        return new Type.TyBool();
                     }
-                    throw new Exception("invalid argument num: @IsCons");
+                        throw new Exception("invalid argument num: @IsCons");
                 }
                 case Expressions.BuiltinOp.Kind.Nth: {
                     if (args.Length == 2) {
                         var i1 = args[0];
                         var i2 = args[1];
-                        if (i1 is Eval.ExprValue.IntV && i2 is Eval.ExprValue.TupleV)
-                        {
-                            return ((Eval.ExprValue.TupleV) i2).Value[(int)((Eval.ExprValue.IntV) i1).Value];
+                        if (i1 is Eval.ExprValue.IntV && i2 is Eval.ExprValue.TupleV) {
+                            return ((Eval.ExprValue.TupleV)i2).Value[(int)((Eval.ExprValue.IntV)i1).Value];
                         }
                     }
                     throw new Exception("invalid argument num: @Nth");
                 }
                 case Expressions.BuiltinOp.Kind.IsTuple: {
                     if (args.Length == 1) {
-                        var i1 = args[0];
-                        return new ExprValue.BoolV(i1 is Eval.ExprValue.TupleV);
+                        return new Type.TyBool();
                     }
                     throw new Exception("invalid argument num: @IsTuple");
                 }
                 case Expressions.BuiltinOp.Kind.Length: {
                     if (args.Length == 1) {
                         var i1 = args[0];
-                        if (i1 is Eval.ExprValue.TupleV) {
+                        if (i1 is Type.TyTuple) {
                             return new ExprValue.IntV(((Eval.ExprValue.TupleV)i1).Value.Length);
                         }
                     }
-                        throw new Exception("invalid argument num: @Length");
+                    throw new Exception("invalid argument num: @Length");
                 }
 
                 default:
@@ -416,7 +260,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ÉpÉ^Å[ÉìÉ}ÉbÉ`ÇÃï]âø
+        /// „Éë„Çø„Éº„É≥„Éû„ÉÉ„ÉÅ„ÅÆË©ï‰æ°
         /// </summary>
         /// <param name="env"></param>
         /// <param name="pattern"></param>
@@ -499,7 +343,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// éÆÇÃï]âø
+        /// Âºè„ÅÆË©ï‰æ°
         /// </summary>
         /// <param name="env"></param>
         /// <param name="e"></param>
@@ -675,6 +519,5 @@ namespace MiniMAL
             }
             throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
         }
-
     }
 }

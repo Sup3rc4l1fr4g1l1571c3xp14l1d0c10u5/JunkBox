@@ -314,8 +314,19 @@ namespace MiniMAL
                 )
             );
 
-        public static Result<Declarations> Parse(string s) {
-            return TopLevel(s, Position.Empty, Position.Empty);
+        private static readonly Parser<Declarations> ErrorRecovery =
+            from _1 in Combinator.Choice(SemiSemi, Combinator.EoF().Select(x => "")).Not().Then(Combinator.AnyChar()).Many()
+            from _2 in Combinator.Choice(SemiSemi, Combinator.EoF().Select(x => ""))
+            select (Declarations) new Declarations.Empty();
+
+
+        public static Result<Declarations> Parse(Source s) {
+            var ret = TopLevel(s, Position.Empty, Position.Empty);
+            if (ret.Success == false)
+            {
+                ret = ErrorRecovery(s, ret.FailedPosition, ret.FailedPosition);
+            }
+            return ret;
         }
 
     }

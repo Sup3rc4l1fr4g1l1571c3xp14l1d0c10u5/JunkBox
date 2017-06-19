@@ -794,6 +794,7 @@ namespace MiniMAL
                         foreach (var bind in e.Binds.Reverse()) {
                             code = CompileExpr(bind.Item2, LinkedList.Extend(newenv, env), code, true);
                         }
+                        code = LinkedList.Extend(new Instructions.Dum(), code);
                         env = LinkedList.Extend(newenv, env);
                         codes.Add(code);
 
@@ -802,6 +803,12 @@ namespace MiniMAL
                     throw new Exception();
                 }
                 return Tuple.Create(codes.ToArray(), env);
+            }
+            if (decl is Declarations.Empty) {
+                return Tuple.Create(
+                    new LinkedList<Instructions>[0],
+                    env
+                );
             }
             throw new Exception();
         }

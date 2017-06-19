@@ -2,10 +2,74 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Parsing {
+
+    public class Source {
+        private StringBuilder buffer { get; }
+        private TextReader    reader { get; }
+        public bool EOS { get { return buffer.Length == 0 && eof; } }
+        public string Name { get; }
+
+        private bool eof;
+
+        public Source(string name, TextReader reader)
+        {
+            this.Name = name;
+            this.reader = reader;
+            this.buffer = new StringBuilder();
+            this.eof = false;
+        }
+
+        public int this[int index]
+        {
+            get
+            {
+                if (buffer.Length <= index)
+                {
+                    if (this.eof == false)
+                    {
+                        var ch = reader.Read();
+                        if (ch == -1)
+                        {
+                            this.eof = true;
+                            return -1;
+                        }
+                        buffer.Append((char) ch);
+                    }
+                    else
+                    {
+                        return -1;
+                    }
+                }
+                return buffer[index];
+
+            }
+        }
+
+        public bool StartsWith(int start, string str)
+        {
+            for (var i = 0; i < str.Length; i++)
+            {
+                if (this[i + start] != str[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public void Discard(int start)
+        {
+            buffer.Remove(0, start);
+        }
+    }
+
+
     /// <summary>
     /// パーサの位置情報
     /// </summary>
@@ -168,7 +232,7 @@ namespace Parsing {
     /// <param name="position">現在の位置</param>
     /// <param name="failedPosition">最も読み進めることに成功した失敗位置</param>
     /// <returns></returns>
-    public delegate Result<T> Parser<T>(string target, Position position, Position failedPosition);
+    public delegate Result<T> Parser<T>(Source target, Position position, Position failedPosition);
 
     /// <summary>
     /// パーサコンビネータ
@@ -193,14 +257,14 @@ namespace Parsing {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
-            var len = str.Length;
             return (target, position, failedPosition) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                if (position.Index >= target.Length || position.Index + len > target.Length) {
-                    return Result<string>.Reject(null, position, position);
-                } else if (target.Substring(position.Index, len) == str) {
+                //if (position.Index >= target.Length || position.Index + len > target.Length) {
+                //    return Result<string>.Reject(null, position, position);
+                //} else 
+                if (target.StartsWith(position.Index, str)) {
                     return Result<string>.Accept(str, position.Inc(str), failedPosition);
                 } else {
                     return Result<string>.Reject(null, position, failedPosition.MostFar(position));
@@ -360,11 +424,14 @@ namespace Parsing {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                if (position.Index >= target.Length) {
-                    return Result<char>.Reject( default(char), position, failedPosition.MostFar(position));
-                }
+                //if (position.Index >= target.Length) {
+                //    return Result<char>.Reject( default(char), position, failedPosition.MostFar(position));
+                //}
                 var ch = target[position.Index];
-                return Result<char>.Accept( ch, position.Inc($"{ch}"), failedPosition);
+                if (ch == -1) {
+                    return Result<char>.Reject(default(char), position, failedPosition.MostFar(position));
+                }
+                return Result<char>.Accept((char)ch, position.Inc($"{(char)ch}"), failedPosition);
             };
         }
 
@@ -383,15 +450,34 @@ namespace Parsing {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                if (position.Index >= target.Length) {
-                    return Result<char>.Reject( default(char), position, failedPosition.MostFar(position));
-                }
+                //if (position.Index >= target.Length) {
+                //    return Result<char>.Reject( default(char), position, failedPosition.MostFar(position));
+                //}
                 var ch = target[position.Index];
-                if (dict.Contains(ch)) {
-                    return Result<char>.Accept( ch, position.Inc($"{ch}"), failedPosition);
-                } else {
+                if (ch != -1 && dict.Contains((char)ch)) {
+                    return Result<char>.Accept((char)ch, position.Inc($"{(char)ch}"), failedPosition);
+                }
+                return Result<char>.Reject(default(char), position, failedPosition.MostFar(position));
+            };
+        }
+
+        /// <summary>
+        /// EOFにマッチするパーサ
+        /// </summary>
+        /// <returns></returns>
+        public static Parser<char> EoF() {
+            return (target, position, failedPosition) => {
+                if (target == null) {
+                    throw new ArgumentNullException(nameof(target));
+                }
+                //if (position.Index >= target.Length) {
+                //    return Result<char>.Reject( default(char), position, failedPosition.MostFar(position));
+                //}
+                var ch = target[position.Index];
+                if (ch != -1) {
                     return Result<char>.Reject(default(char), position, failedPosition.MostFar(position));
                 }
+                return Result<char>.Accept(default(char), position, failedPosition);
             };
         }
 
