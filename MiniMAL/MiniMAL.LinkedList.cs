@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace MiniMAL
@@ -104,6 +106,15 @@ namespace MiniMAL
             return list.Value;
         }
 
+        public static LinkedList<T> Create<T>(params T[] values)
+        {
+            return values.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => LinkedList.Extend(x, s));
+        }
+
+        public static LinkedList<T> Concat<T>(LinkedList<T> l1, LinkedList<T> l2)
+        {
+            return FoldRight((s, x) => LinkedList.Extend(x, s), l1, l2);
+        }
     }
 
 }
