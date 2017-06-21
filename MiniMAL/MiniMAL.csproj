@@ -81,6 +81,7 @@
     <Compile Include="MiniMAL.Environment.cs" />
     <Compile Include="MiniMAL.Eval.cs" />
     <Compile Include="MiniMAL.Expressions.cs" />
+    <Compile Include="MiniMAL.Set.cs" />
     <Compile Include="MiniMAL.LinkedList.cs" />
     <Compile Include="MiniMAL.Parser.cs" />
     <Compile Include="MiniMAL.PatternCompiler.cs" />

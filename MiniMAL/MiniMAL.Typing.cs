@@ -121,8 +121,10 @@ namespace MiniMAL {
             /// <returns></returns>
             public static bool Equals(Type arg1, Type arg2)
             {
-                if (arg1 is Type.TyInt && arg2 is Type.TyInt)
-                {
+                if (arg1 is Type.TyVar && arg2 is Type.TyVar) {
+                    return (arg1 as Type.TyVar).Id == (arg2 as Type.TyVar).Id;
+                }
+                if (arg1 is Type.TyInt && arg2 is Type.TyInt) {
                     return true;
                 }
                 if (arg1 is Type.TyStr && arg2 is Type.TyStr)
@@ -140,6 +142,12 @@ namespace MiniMAL {
                 if (arg1 is Type.TyNil && arg2 is Type.TyNil)
                 {
                     return true;
+                }
+                if (arg1 is Type.TyFunc && arg2 is Type.TyFunc)
+                {
+                    var i1 = (arg1 as Type.TyFunc);
+                    var i2 = (arg2 as Type.TyFunc);
+                    return Equals(i1.ArgType, i2.ArgType) && Equals(i1.RetType, i2.RetType);
                 }
                 if (arg1 is Type.TyCons && arg2 is Type.TyCons)
                 {
@@ -212,11 +220,11 @@ namespace MiniMAL {
         private static Type resolve_type(LinkedList<TypeSubst> s, Type typ)
         {
             if (typ is Type.TyVar) {
-                var ret = LinkedList.First(x => Type.Equals(x, typ), s);
+                var ret = LinkedList.First(x => Type.Equals(x.Var, typ), s);
                 if (ret == null) {
                     return typ;
                 } else {
-                    return ret.Var;
+                    return ret.Type;
                 }
             }
             if (typ is Type.TyFunc) {
@@ -360,73 +368,106 @@ namespace MiniMAL {
         /// <param name="op"></param>
         /// <param name="args"></param>
         /// <returns></returns>
-        private static Type EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, Type[] args) {
+        private static Tuple<Type, LinkedList<TypeEquality>> EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, Type[] args) {
             switch (op) {
                 case Expressions.BuiltinOp.Kind.Plus: {
                     if (args.Length == 2) {
-                        return new Type.TyInt();
+                        return Tuple.Create(
+                            (Type)new Type.TyInt(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x,new Type.TyInt())).ToArray())
+                        );
                     }
                     throw new Exception("Both arguments must be integer: +");
 
                 }
                 case Expressions.BuiltinOp.Kind.Minus: {
                     if (args.Length == 2) {
-                        return new Type.TyInt();
+                        return Tuple.Create(
+                            (Type)new Type.TyInt(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: -");
+                        throw new Exception("Both arguments must be integer: -");
 
                 }
                 case Expressions.BuiltinOp.Kind.Mult: {
                     if (args.Length == 2) {
-                        return new Type.TyInt();
+                        return Tuple.Create(
+                            (Type)new Type.TyInt(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: *");
+                        throw new Exception("Both arguments must be integer: *");
                 }
                 case Expressions.BuiltinOp.Kind.Div: {
                     if (args.Length == 2) {
-                        return new Type.TyInt();
+                        return Tuple.Create(
+                            (Type)new Type.TyInt(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: /");
+                        throw new Exception("Both arguments must be integer: /");
                 }
                 case Expressions.BuiltinOp.Kind.Lt: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: <");
+                        throw new Exception("Both arguments must be integer: <");
                 }
                 case Expressions.BuiltinOp.Kind.Le: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: <=");
+                        throw new Exception("Both arguments must be integer: <=");
                 }
                 case Expressions.BuiltinOp.Kind.Gt: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: >");
+                        throw new Exception("Both arguments must be integer: >");
                 }
                 case Expressions.BuiltinOp.Kind.Ge: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
+                        );
                     }
-                    throw new Exception("Both arguments must be integer: >=");
+                        throw new Exception("Both arguments must be integer: >=");
                 }
                 case Expressions.BuiltinOp.Kind.Eq: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(new TypeEquality(args[0], args[1]))
+                        );
                     }
                     throw new Exception("Both arguments must be same type: =");
                 }
                 case Expressions.BuiltinOp.Kind.Ne: {
                     if (args.Length == 2) {
-                        return new Type.TyBool();
+                        return Tuple.Create(
+                            (Type)new Type.TyBool(),
+                            LinkedList.Create(new TypeEquality(args[0], args[1]))
+                        );
                     }
                     throw new Exception("Both arguments must be same type: <>");
                 }
                 case Expressions.BuiltinOp.Kind.ColCol: {
                     if (args.Length == 2) {
-                        return args[1];
+                        return Tuple.Create(
+                            (Type)new Type.TyCons(args[0]),
+                            LinkedList.Create(new TypeEquality(new Type.TyCons(args[0]), args[1]))
+                        );
                     }
                     throw new Exception("Both arguments must be same type: ::");
                 }
@@ -564,114 +605,213 @@ namespace MiniMAL {
         /// <param name="env"></param>
         /// <param name="e"></param>
         /// <returns></returns>
-        private static Tuple<Type, LinkedList<TypeEquality>>  EvalExpressions(Environment<Type> env, Type e) {
-            if (e is Type.TyVar) {
-                var x = ((Type.TyVar)e).Id;
+        private static Tuple<LinkedList<TypeSubst>, Type>  EvalExpressions(Environment<Type> env, Expressions e) {
+            if (e is Expressions.Var) {
+                var x = ((Expressions.Var)e).Id;
                 try {
-                    return Environment.LookUp(x, env);
+                    return Tuple.Create(
+                        LinkedList<TypeSubst>.Empty,
+                        Environment.LookUp(x, env)
+                    );
                 } catch (Environment.NotBound) {
                     throw new Exception($"Variable not bound: {x}");
                 }
             }
-            if (e is Type.IntLit) {
-                return new Type.IntV(((Type.IntLit)e).Value);
+            if (e is Expressions.IntLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                        (Type)new Type.TyInt()
+                );
             }
-            if (e is Type.StrLit) {
-                return new Type.StrV(((Type.StrLit)e).Value);
+            if (e is Expressions.StrLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                    (Type)new Type.TyStr()
+                );
             }
-            if (e is Type.BoolLit) {
-                return new Type.BoolV(((Type.BoolLit)e).Value);
+            if (e is Expressions.BoolLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                    (Type)new Type.TyBool()
+                );
             }
-            if (e is Type.EmptyListLit) {
-                return Type.ConsV.Empty;
+            if (e is Expressions.EmptyListLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                    (Type)Type.TyCons.Empty
+                );
             }
-            if (e is Type.UnitLit) {
-                return new Type.UnitV();
+            if (e is Expressions.UnitLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                    (Type)new Type.TyUnit()
+                );
             }
             if (e is Expressions.BuiltinOp) {
                 var op = ((Expressions.BuiltinOp)e).Op;
                 var args = ((Expressions.BuiltinOp)e).Exprs.Select(x => EvalExpressions(env, x)).ToArray();
-                return EvalBuiltinExpressions(op, args);
+                var ret = EvalBuiltinExpressions(op, args.Select(x => x.Item2).ToArray());
+                var ss = LinkedList.Concat(LinkedList.Concat(args.Select(x => eqs_of_subst(x.Item1)).ToArray()), ret.Item2);
+                var eqs = unify(ss);
+                return Tuple.Create(
+                    eqs,
+                    subst_type(eqs, ret.Item1)
+                );
             }
-            if (e is Type.IfExp) {
-                var cond = EvalExpressions(env, ((Type.IfExp)e).Cond);
-                if (cond is Type.BoolV) {
-                    var v = ((Type.BoolV)cond).Value;
-                    if (v) {
-                        return EvalExpressions(env, ((Type.IfExp)e).Then);
-                    } else {
-                        return EvalExpressions(env, ((Type.IfExp)e).Else);
-                    }
-                }
-                throw new Exception("Test expression must be boolean: if");
+            if (e is Expressions.IfExp) {
+                var cond = EvalExpressions(env, ((Expressions.IfExp)e).Cond);
+                var then = EvalExpressions(env, ((Expressions.IfExp)e).Then);
+                var @else = EvalExpressions(env, ((Expressions.IfExp)e).Else);
+                var s = LinkedList.Concat(
+                    LinkedList.Create(new TypeEquality(cond.Item2, new Type.TyBool())),
+                    eqs_of_subst(cond.Item1),
+                    eqs_of_subst(then.Item1),
+                    eqs_of_subst(@else.Item1),
+                    LinkedList.Create(new TypeEquality(then.Item2, @else.Item2))
+                );
+                var eqs = unify(s);
+                return Tuple.Create(
+                    eqs,
+                    subst_type(eqs, then.Item2)
+                );
             }
-            if (e is Type.LetExp) {
-                var newenv = env;
-                foreach (var bind in ((Type.LetExp)e).Binds) {
-                    var value = EvalExpressions(env, bind.Item2);
-                    newenv = Environment.Extend(bind.Item1, value, newenv);
-                }
-                return EvalExpressions(newenv, ((Type.LetExp)e).Body);
-            }
-            if (e is Type.LetRecExp) {
-                var dummyenv = Environment<Type>.Empty;
-                var newenv = env;
-                var procs = new List<Type.ProcV>();
+            if (e is Expressions.LetExp)
+            {
+                var exp = (Expressions.LetExp)e;
 
-                foreach (var bind in ((Type.LetRecExp)e).Binds) {
-                    var value = EvalExpressions(dummyenv, bind.Item2);
-                    if (value is Type.ProcV) {
-                        procs.Add((Type.ProcV)value);
-                    }
-                    newenv = Environment.Extend(bind.Item1, value, newenv);
+                var newenv = env;
+                var eqs = LinkedList<TypeEquality>.Empty;
+                foreach (var bind in exp.Binds) {
+                    var v = EvalExpressions(env, bind.Item2);
+                    var s  = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+                    newenv = Environment.Extend(bind.Item1, ty, newenv);
                 }
 
-                foreach (var proc in procs) {
-                    proc.BackPatchEnv(newenv);
-                }
-                return EvalExpressions(newenv, ((Type.LetRecExp)e).Body);
-            }
-            if (e is Type.FunExp) {
-                return new Type.ProcV(((Type.FunExp)e).Arg, ((Type.FunExp)e).Body, env);
-            }
-            if (e is Type.DFunExp) {
-                return new Type.DProcV(((Type.DFunExp)e).Arg, ((Type.DFunExp)e).Body);
-            }
-            if (e is Type.AppExp) {
-                var funval = EvalExpressions(env, ((Type.AppExp)e).Fun);
-                var arg = EvalExpressions(env, ((Type.AppExp)e).Arg);
-                if (funval is Type.ProcV) {
-                    var newenv = Environment.Extend(((Type.ProcV)funval).Id, arg, ((Type.ProcV)funval).Env);
-                    return EvalExpressions(newenv, ((Type.ProcV)funval).Body);
-                } else if (funval is Type.DProcV) {
-                    var newenv = Environment.Extend(((Type.DProcV)funval).Id, arg, env);
-                    return EvalExpressions(newenv, ((Type.DProcV)funval).Body);
-                } else if (funval is Type.BProcV) {
-                    return ((Type.BProcV)funval).Proc(arg);
-                } else {
-                    throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
+                { 
+                    var v = EvalExpressions(newenv, exp.Body);
+                    var s = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+
+                    var s3 = unify(eqs);
+                    return Tuple.Create(
+                        s3,
+                        subst_type(s3, ty)
+                    );
                 }
             }
-            if (e is Type.MatchExp) {
-                var val = EvalExpressions(env, ((Type.MatchExp)e).Exp);
-                foreach (var pattern in ((Type.MatchExp)e).Patterns) {
-                    var ret = EvalPatternExpressions(env, pattern.Item1, val);
-                    if (ret != null) {
-                        var newenv = ret.Aggregate(env, (s, x) => Environment.Extend(x.Key, x.Value, s));
-                        return EvalExpressions(newenv, pattern.Item2);
-                    }
+            if (e is Expressions.LetRecExp) {
+                var exp = (Expressions.LetExp)e;
+
+                var newenv = env;
+                var eqs = LinkedList<TypeEquality>.Empty;
+                var binds = exp.Binds.Select(x => Tuple.Create(x.Item1, x.Item2, Type.TyVar.Fresh())).ToArray();
+                foreach (var bind in binds) {
+                    newenv = Environment.Extend(bind.Item1, bind.Item3, newenv);
                 }
-                throw new NotSupportedException($"value {val} is not match.");
+
+                foreach (var bind in binds) {
+                    var v = EvalExpressions(newenv, bind.Item2);
+                    var s = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(LinkedList.Create(new TypeEquality(ty, bind.Item3)), eqs_of_subst(s), eqs);
+                }
+
+                {
+                    var v = EvalExpressions(newenv, exp.Body);
+                    var s = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+
+                    var s3 = unify(eqs);
+                    return Tuple.Create(
+                        s3,
+                        subst_type(s3, ty)
+                    );
+                }
             }
-            if (e is Type.TupleExp) {
-                var t = e as Type.TupleExp;
-                return new Type.TupleV(t.Exprs.Select((x) => EvalExpressions(env, x)).ToArray());
+            if (e is Expressions.FunExp)
+            {
+                var exp = e as Expressions.FunExp;
+                var domty = Type.TyVar.Fresh();
+                var v = EvalExpressions(Environment.Extend(exp.Arg, domty, env), exp.Body);
+                return Tuple.Create(
+                    v.Item1,
+                    (Type)new Type.TyFunc(subst_type(v.Item1, domty),v.Item2)
+                );
             }
-            if (e is Type.NilLit) {
-                return new Type.NilV();
+            if (e is Expressions.DFunExp) {
+                throw new NotSupportedException();
             }
-            if (e is Type.HaltExp) {
-                throw new Exception((e as Type.HaltExp).Message);
+            if (e is Expressions.AppExp) {
+                var exp = (Expressions.AppExp)e;
+
+                var v1 = EvalExpressions(env, exp.Fun);
+                var s1 = v1.Item1;
+                var ty1 = v1.Item2;
+
+                var v2 = EvalExpressions(env, exp.Arg);
+                var s2 = v2.Item1;
+                var ty2 = v2.Item2;
+
+                var domty = Type.TyVar.Fresh();
+
+                var eqs = LinkedList.Concat(
+                    LinkedList.Create(new TypeEquality(ty1, new Type.TyFunc(ty2, domty))),
+                    eqs_of_subst(s1),
+                    eqs_of_subst(s2)
+                );
+                var s3 = unify(eqs);
+                return Tuple.Create(
+                    s3,
+                    subst_type(s3, domty)
+                );
+            }
+            if (e is Expressions.MatchExp)
+            {
+                var exp = e as Expressions.MatchExp;
+                var domty = Type.TyVar.Fresh();
+
+                var v1 = EvalExpressions(env, exp.Exp);
+                var s1 = v1.Item1;
+                var ty1 = v1.Item2;
+
+                var eqs = eqs_of_subst(s1);
+                foreach (var pattern in exp.Patterns) {
+                    var p1 = EvalPatternExpressions(env, pattern.Item1, ty1);
+                    var b1 = EvalExpressions(p1.Item2.Aggregate(env, (s,x) => Environment.Extend(x.Key, x.Value, s)), pattern.Item2);
+                    eqs = LinkedList.Concat(LinkedList.Create(new TypeEquality(domty, b1.Item2)), p1.Item1, eqs_of_subst(b1.Item1), eqs);
+                };
+                var s3 = unify(eqs);
+
+                return Tuple.Create(
+                    s3,
+                    subst_type(s3, domty)
+                );
+            }
+            if (e is Expressions.TupleExp)
+            {
+                var exp = e as Expressions.TupleExp;
+                var mems = exp.Exprs.Select(x => EvalExpressions(env, x)).ToArray();
+                var ss = mems.Aggregate(LinkedList<TypeEquality>.Empty, (s, x) => LinkedList.Concat(eqs_of_subst(x.Item1), s));
+                var ty = mems.Select(x => x.Item2).ToArray();
+                var eqs = unify(ss);
+
+                return Tuple.Create(
+                    eqs,
+                    (Type)new Type.TyTuple(ty.Select(x => subst_type(eqs, x)).ToArray())
+                );
+            }
+            if (e is Expressions.NilLit) {
+                return Tuple.Create(
+                    LinkedList<TypeSubst>.Empty,
+                    (Type)new Type.TyNil()
+                );
+            }
+            if (e is Expressions.HaltExp) {
+                throw new Exception((e as Expressions.HaltExp).Message);
             }
 
             throw new NotSupportedException($"expression {e} cannot eval.");
@@ -680,36 +820,47 @@ namespace MiniMAL {
         private static Result eval_declEntry(Environment<Type> env, Declarations.DeclBase p) {
             if (p is Declarations.Decl) {
                 var d = (Declarations.Decl)p;
-                var newenv = env;
-                var ret = new Result("", env, null);
 
+                var newenv = env;
+                var eqs = LinkedList<TypeEquality>.Empty;
+                var ret = new Result("", newenv, null);
                 foreach (var bind in d.Binds) {
-                    var v = EvalExpressions(newenv, bind.Item2);
-                    ret = new Result(bind.Item1, Environment.Extend(bind.Item1, v, ret.Env), v);
+                    var v = EvalExpressions(env, bind.Item2);
+                    var s = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+                    newenv = Environment.Extend(bind.Item1, ty, newenv);
+                    ret = new Result(bind.Item1, newenv, ty);
                 }
-                return ret;
+
+                {
+                    var s3 = unify(eqs);
+                    return new Result(ret.Id, newenv, subst_type(s3, ret.Value));
+                }
             }
             if (p is Declarations.RecDecl) {
                 var d = (Declarations.RecDecl)p;
+
                 var newenv = env;
-                var ret = new Result("", env, null);
-
-                var dummyenv = Environment<Type>.Empty;
-                var procs = new List<Type.ProcV>();
-
-                foreach (var bind in d.Binds) {
-                    var v = EvalExpressions(dummyenv, bind.Item2);
-                    if (v is Type.ProcV) {
-                        procs.Add((Type.ProcV)v);
-                    }
-                    newenv = Environment.Extend(bind.Item1, v, newenv);
-                    ret = new Result(bind.Item1, newenv, v);
+                var eqs = LinkedList<TypeEquality>.Empty;
+                var binds = d.Binds.Select(x => Tuple.Create(x.Item1, x.Item2, Type.TyVar.Fresh())).ToArray();
+                foreach (var bind in binds) {
+                    newenv = Environment.Extend(bind.Item1, bind.Item3, newenv);
                 }
 
-                foreach (var proc in procs) {
-                    proc.BackPatchEnv(newenv);
+                var ret = new Result("", newenv, null);
+                foreach (var bind in binds) {
+                    var v = EvalExpressions(newenv, bind.Item2);
+                    var s = v.Item1;
+                    var ty = v.Item2;
+                    eqs = LinkedList.Concat(LinkedList.Create(new TypeEquality(ty, bind.Item3)), eqs_of_subst(s), eqs);
+                    ret = new Result(bind.Item1, newenv, ty);
                 }
-                return ret;
+
+                {
+                    var s3 = unify(eqs);
+                    return new Result(ret.Id, newenv, subst_type(s3, ret.Value));
+                }
             }
             throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
         }
@@ -718,7 +869,7 @@ namespace MiniMAL {
             if (p is Declarations.Exp) {
                 var e = (Declarations.Exp)p;
                 var v = EvalExpressions(env, e.Syntax);
-                return new Result("-", env, v);
+                return new Result("-", env, v.Item2);
             }
             if (p is Declarations.Decls) {
                 var ds = (Declarations.Decls)p;

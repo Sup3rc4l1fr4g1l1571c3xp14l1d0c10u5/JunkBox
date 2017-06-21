@@ -61,7 +61,7 @@ namespace MiniMAL
             for (var e = env; e != LinkedList<T>.Empty; e = e.Next) {
                 if (f(e.Value)) { return e.Value; }
             }
-            throw new NotBound();
+            return default(T);
         }
         public static int FirstIndex<T>(Func<T, bool> f, LinkedList<T> env) {
             int i = 0;
@@ -111,9 +111,9 @@ namespace MiniMAL
             return values.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => LinkedList.Extend(x, s));
         }
 
-        public static LinkedList<T> Concat<T>(LinkedList<T> l1, LinkedList<T> l2)
+        public static LinkedList<T> Concat<T>(params LinkedList<T>[] l)
         {
-            return FoldRight((s, x) => LinkedList.Extend(x, s), l1, l2);
+            return l.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => FoldRight((ss, xx) => LinkedList.Extend(xx, ss), x, s));
         }
     }
 
