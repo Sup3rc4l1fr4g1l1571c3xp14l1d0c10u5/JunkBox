@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Net.Configuration;
+using System.Security.Cryptography.X509Certificates;
 using MiniMAL;
 
 namespace MiniMAL {
@@ -7,23 +9,25 @@ namespace MiniMAL {
     /// 対話実行環境
     /// </summary>
     public static class REPL {
-        public static void EvalRun()
-        {
+        public static void EvalRun() {
             var env = Environment<Eval.ExprValue>.Empty;
-            var tyenv = Environment<Typing.Type>.Empty;
+            //var tyenv = Environment<Typing.Type>.Empty;
+            var tyenv = Environment<PolymorphicTyping.TypeScheme>.Empty;
             // load init.miniml
-            string init = "init.miniml";
+            string init = "init.miniml2";
             if (System.IO.File.Exists(init)) {
                 using (System.IO.TextReader tr = new System.IO.StreamReader(init)) {
                     Parsing.Source source = new Parsing.Source(init, tr);
                     while (!source.EOS) {
                         var decl = Parser.Parse(source);
                         if (decl.Success) {
-                            try
-                            {
-                                var ty = Typing.ty_decl(tyenv, decl.Value);
+                            try {
+                                //var ty = Typing.eval_decl(tyenv, decl.Value);
+                                var ty = PolymorphicTyping.eval_decl(tyenv, decl.Value);
+
                                 var ret = Eval.eval_decl(env, decl.Value);
                                 env = ret.Env;
+                                tyenv = ty.Env;
                             } catch (Exception e) {
                                 Console.Error.WriteLine($"{init}: Runtime error: {e.Message}");
                             }
@@ -43,9 +47,12 @@ namespace MiniMAL {
                     if (decl.Success) {
                         try {
                             //Console.WriteLine($"expr is {decl.Value}");
+                            //var ty = Typing.eval_decl(tyenv, decl.Value);
+                            var ty = PolymorphicTyping.eval_decl(tyenv, decl.Value);
                             var ret = Eval.eval_decl(env, decl.Value);
                             env = ret.Env;
-                            //Console.WriteLine($"val {ret.Id} = {ret.Value}");
+                            tyenv = ty.Env;
+                            Console.WriteLine($"val {ret.Id} : {ty.Value} = {ret.Value}");
                         } catch (Exception e) {
                             Console.Error.WriteLine($"<stdin>: Runtime error: {e.Message}");
                             //Console.Error.WriteLine($"{e.StackTrace}");
@@ -63,7 +70,7 @@ namespace MiniMAL {
             var envvalue = LinkedList<LinkedList<VM.ExprValue>>.Empty;
 
             // repl
-            Parsing.Source source = new Parsing.Source("<stdin>",Console.In);
+            Parsing.Source source = new Parsing.Source("<stdin>", Console.In);
             while (!source.EOS) {
                 Console.Write("# ");
                 var decl = Parser.Parse(source);

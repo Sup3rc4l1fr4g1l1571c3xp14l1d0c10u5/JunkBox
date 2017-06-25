@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -20,7 +19,7 @@ namespace MiniMAL
         }
 
         public override string ToString() {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             var it = this;
             sb.Append("[");
             if (it != Empty) {
@@ -45,15 +44,6 @@ namespace MiniMAL
     /// òAåãÉäÉXÉgëÄçÏ
     /// </summary>
     public static class LinkedList {
-        public class NotBound : Exception {
-            public NotBound() : base() {
-            }
-            public NotBound(string s) : base(s) {
-            }
-            public NotBound(string s, Exception e) : base(s, e) {
-            }
-        }
-
         public static LinkedList<T> Extend<T>(T v, LinkedList<T> next) {
             return new LinkedList<T>(v, next);
         }
@@ -64,7 +54,7 @@ namespace MiniMAL
             return default(T);
         }
         public static int FirstIndex<T>(Func<T, bool> f, LinkedList<T> env) {
-            int i = 0;
+            var i = 0;
             for (var e = env; e != LinkedList<T>.Empty; e = e.Next) {
                 if (f(e.Value)) { return i; }
                 i += 1;
@@ -74,21 +64,21 @@ namespace MiniMAL
         public static LinkedList<T> Reverse<T>(LinkedList<T> list) {
             var ret = LinkedList<T>.Empty;
             for (var e = list; e != LinkedList<T>.Empty; e = e.Next) {
-                ret = LinkedList.Extend(e.Value, ret);
+                ret = Extend(e.Value, ret);
             }
             return ret;
         }
         public static LinkedList<T2> Map<T1, T2>(Func<T1, T2> f, LinkedList<T1> list) {
             var ret = LinkedList<T2>.Empty;
             for (var e = list; e != LinkedList<T1>.Empty; e = e.Next) {
-                ret = LinkedList.Extend(f(e.Value), ret);
+                ret = Extend(f(e.Value), ret);
             }
-            return LinkedList.Reverse(ret);
+            return Reverse(ret);
         }
 
         public static T2 FoldRight<T1, T2>(Func<T2, T1, T2> f, LinkedList<T1> env, T2 a) {
-            LinkedList<T1> kv = LinkedList.Reverse(env);
-            T2 ret = a;
+            var kv = Reverse(env);
+            var ret = a;
             for (var e = kv; e != LinkedList<T1>.Empty; e = e.Next) {
                 ret = f(ret, e.Value);
             }
@@ -108,12 +98,12 @@ namespace MiniMAL
 
         public static LinkedList<T> Create<T>(params T[] values)
         {
-            return values.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => LinkedList.Extend(x, s));
+            return values.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => Extend(x, s));
         }
 
         public static LinkedList<T> Concat<T>(params LinkedList<T>[] l)
         {
-            return l.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => FoldRight((ss, xx) => LinkedList.Extend(xx, ss), x, s));
+            return l.Reverse().Aggregate(LinkedList<T>.Empty, (s, x) => FoldRight((ss, xx) => Extend(xx, ss), x, s));
         }
     }
 

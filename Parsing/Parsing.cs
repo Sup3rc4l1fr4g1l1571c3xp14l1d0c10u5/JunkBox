@@ -63,9 +63,11 @@ namespace Parsing {
             return true;
         }
 
-        public void Discard(int start)
-        {
+        public void Discard(int start) {
             buffer.Remove(0, start);
+        }
+        public void DiscardAll() {
+            buffer.Clear();
         }
     }
 

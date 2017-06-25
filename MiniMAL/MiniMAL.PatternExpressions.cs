@@ -133,5 +133,27 @@ namespace MiniMAL
                 return $"({String.Join(", ", Value.Select(x => x.ToString()))})";
             }
         }
+
+        /// <summary>
+        /// OptionÉpÉ^Å[Éì
+        /// </summary>
+        public class OptionP: PatternExpressions {
+            public static OptionP None { get; } = new OptionP(null);
+            public PatternExpressions Value { get; }
+
+            public OptionP(PatternExpressions value) {
+                Value = value;
+            }
+
+            public override string ToString() {
+                if (this == None)
+                {
+                    return $"None";
+                } else
+                {
+                    return $"Some {Value}";
+                }
+            }
+        }
     }
 }

@@ -8,87 +8,87 @@ namespace MiniMAL
     /// パターン式コンパイラ
     /// </summary>
     public static class PatternCompiler {
-        private static int anonymousV = 0;
-        private static string GenAnonymousVariable() { return $"@{(++anonymousV)}"; }
+        private static int _anonymousV;
+        private static string GenAnonymousVariable() { return $"@{(++_anonymousV)}"; }
 
         public static Expressions CompilePattern(Expressions value, PatternExpressions pattern, Expressions action) {
             if (pattern is PatternExpressions.WildP) {
                 return action;
             }
             if (pattern is PatternExpressions.VarP) {
-                var p = pattern as PatternExpressions.VarP;
+                var p = (PatternExpressions.VarP) pattern;
                 // $"(LetExp [((Var {p.Id}), {target})] {code})";
                 return new Expressions.LetExp(new[] { Tuple.Create(p.Id, value) }, action);
             }
             if (pattern is PatternExpressions.IntP) {
-                var p = pattern as PatternExpressions.IntP;
+                var p = (PatternExpressions.IntP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.IntLit(p.Value), value}),
+                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.IntLit(p.Value), value}),
                     action,
-                    new Expressions.NilLit()
+                    Expressions.OptionExp.None
                 );
             }
             if (pattern is PatternExpressions.StrP) {
-                var p = pattern as PatternExpressions.StrP;
+                var p = (PatternExpressions.StrP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.StrLit(p.Value), value}),
+                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.StrLit(p.Value), value}),
                     action,
-                    new Expressions.NilLit()
+                    Expressions.OptionExp.None
                 );
             }
             if (pattern is PatternExpressions.BoolP) {
-                var p = pattern as PatternExpressions.BoolP;
+                var p = (PatternExpressions.BoolP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.BoolLit(p.Value), value}),
+                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.BoolLit(p.Value), value}),
                     action,
-                    new Expressions.NilLit()
+                    Expressions.OptionExp.None
                 );
             }
             if (pattern is PatternExpressions.UnitP) {
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.UnitLit(), value}),
+                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.UnitLit(), value}),
                     action,
-                    new Expressions.NilLit()
+                    Expressions.OptionExp.None
                 );
             }
             if (pattern is PatternExpressions.ConsP) {
                 if (pattern == PatternExpressions.ConsP.Empty) {
                     return new Expressions.IfExp(
-                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.EmptyListLit(), value}),
+                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.EmptyListLit(), value}),
                         action,
-                        new Expressions.NilLit()
+                        Expressions.OptionExp.None
                     );
                 } else {
-                    var p = pattern as PatternExpressions.ConsP;
+                    var p = (PatternExpressions.ConsP) pattern;
                     var x = p.Value;
                     var xs = p.Next;
-                    var var_x = new Expressions.Var(GenAnonymousVariable());
-                    var var_xs = new Expressions.Var(GenAnonymousVariable());
-                    var code_ = CompilePattern(var_xs, xs, action);
-                    var code__ = CompilePattern(var_x, x, code_);
+                    var varX = new Expressions.Var(GenAnonymousVariable());
+                    var varXs = new Expressions.Var(GenAnonymousVariable());
+                    var codeXs = CompilePattern(varXs, xs, action);
+                    var codeX = CompilePattern(varX, x, codeXs);
                     // $"(IfExp (IsCons {target}) (IfExp (BuiltinOp Eq UnitLit {target}) None (LetExp[({targetx}, (Head {target})); ({targetxs}, (Tail {target}))] {code__})) None)";
                     return new Expressions.IfExp(
                         new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.IsCons, new[] { value }),
                         new Expressions.IfExp(
-                            new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new Expressions[] { new Expressions.UnitLit(), value}),
-                            new Expressions.NilLit(),
+                            new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.UnitLit(), value}),
+                            Expressions.OptionExp.None,
                             new Expressions.LetExp(
                                 new[] {
-                                    Tuple.Create<string,Expressions>(var_x.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Head, new [] { value })),
-                                    Tuple.Create<string,Expressions>(var_xs.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Tail, new [] { value }))
+                                    Tuple.Create<string,Expressions>(varX.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Head, new [] { value })),
+                                    Tuple.Create<string,Expressions>(varXs.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Tail, new [] { value }))
                                 },
-                                code__
+                                codeX
                             )
                         ),
-                        new Expressions.NilLit()
+                        Expressions.OptionExp.None
                     );
                 }
             }
             if (pattern is PatternExpressions.TupleP) {
-                var p = pattern as PatternExpressions.TupleP;
+                var p = (PatternExpressions.TupleP) pattern;
                 // $"(IfExp (AppExp tuple? {target}) 
                 //          (IfExp (BuiltinOp Ne (AppExp count? {this}) (IntLit {pattern.Length}))
                 //                 None
@@ -96,7 +96,7 @@ namespace MiniMAL
                 //          )
                 //   )"
 
-                var body = p.Value.Reverse<PatternExpressions>().Aggregate(Tuple.Create((Expressions)action, p.Value.Length - 1), (s, x) => {
+                var body = p.Value.Reverse().Aggregate(Tuple.Create(action, p.Value.Length - 1), (s, x) => {
                     var tmp = new Expressions.Var(GenAnonymousVariable());
                     var expr = new Expressions.LetExp(
                         new[] {
@@ -111,13 +111,13 @@ namespace MiniMAL
                     new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.IsTuple, new [] { value}),
                     new Expressions.IfExp(
                         new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Ne, new Expressions[] { new Expressions.IntLit(p.Value.Length), new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Length, new [] { value}), }),
-                        new Expressions.NilLit(),
+                        Expressions.OptionExp.None,
                         body.Item1
                     ),
-                    new Expressions.NilLit()
+                    Expressions.OptionExp.None
                 );
             }
-            throw new Exception();
+            throw new NotSupportedException(pattern.ToString());
         }
     }
 }

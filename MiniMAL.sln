@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parsing", "Parsing\Parsing.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Repl", "Repl\Repl.csproj", "{EC2184CF-4BAE-4A03-B1BE-677255DD06D8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniMALTest", "Test\MiniMALTest.csproj", "{1C789AB7-B482-4966-B9D1-8C6390B2A505}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{EC2184CF-4BAE-4A03-B1BE-677255DD06D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EC2184CF-4BAE-4A03-B1BE-677255DD06D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EC2184CF-4BAE-4A03-B1BE-677255DD06D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1C789AB7-B482-4966-B9D1-8C6390B2A505}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1C789AB7-B482-4966-B9D1-8C6390B2A505}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1C789AB7-B482-4966-B9D1-8C6390B2A505}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1C789AB7-B482-4966-B9D1-8C6390B2A505}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

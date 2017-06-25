@@ -20,6 +20,14 @@ namespace MiniMAL
             Value = value;
             Next = next;
         }
+
+        public override string ToString() {
+            var items = new List<T>();
+            for (var it = this; it != Empty; it = it.Next) {
+                items.Add(it.Value);
+            }
+            return $"[{string.Join("; ", items.Select(x => x.ToString()))}]";
+        }
     }
 
     public static class Set
@@ -33,7 +41,7 @@ namespace MiniMAL
         }
 
         public static LinkedList<T> to_list<T>(Set<T> xs) {
-            return Set.Fold((s, x) => LinkedList.Extend(x, s), xs, LinkedList<T>.Empty);
+            return Set.Fold((s, x) => LinkedList.Extend(x, s), LinkedList<T>.Empty, xs);
         }
 
         public static Set<T> insert<T>(T x, Set<T> xs) {
@@ -59,10 +67,10 @@ namespace MiniMAL
             }
             return ret;
         }
-        public static T2 Fold<T1, T2>(Func<T2, T1, T2> func, Set<T1> xs, T2 seed) {
+        public static T2 Fold<T1, T2>(Func<T2, T1, T2> func, T2 seed, Set<T1> xs) {
             var ret = seed;
             while (xs != Set<T1>.Empty) {
-                seed = func(seed, xs.Value);
+                ret  = func(ret, xs.Value);
                 xs = xs.Next;
             }
             return ret;
@@ -72,15 +80,19 @@ namespace MiniMAL
             return Set.Fold((s, x) => Set.remove(x, s), xs, ys);
         }
 
-        public static T member<T>(T x, Set<T> xs) {
+        public static int Count<T>(Set<T> set) {
+            return Set.Fold((s, x) => s + 1, 0, set);
+        }
+
+        public static bool member<T>(T x, Set<T> xs) {
             var ret = Set<T>.Empty;
             while (xs != Set<T>.Empty) {
                 if (xs.Value.Equals(x)) {
-                    return xs.Value;
+                    return true;
                 }
                 xs = xs.Next;
             }
-            return default(T);
+            return false;
         }
         public static Set<T2> map<T1, T2>(Func<T1, T2> func, Set<T1> xs) {
             var ret = Set<T2>.Empty;

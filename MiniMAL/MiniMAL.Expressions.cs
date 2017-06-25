@@ -82,14 +82,23 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Nilリテラル(処理系内部でのみ利用するnullもしくはOption.None相当の値)
+        /// Option型値
         /// </summary>
-        public class NilLit : Expressions {
+        public class OptionExp : Expressions {
+            public static OptionExp None { get; } = new OptionExp(null);
+            public Expressions Expr { get; }
 
-            public NilLit() { }
+            public OptionExp(Expressions expr) {
+                Expr = expr;
+            }
 
             public override string ToString() {
-                return $"Nil";
+                if (this == None)
+                {
+                    return $"None";
+                } else {
+                    return $"Some {Expr}";
+                }
             }
         }
 
@@ -137,13 +146,16 @@ namespace MiniMAL {
                 Eq,
                 Ne,
                 ColCol,
-                // builtin operators
+                // builtin operators 
                 Head,
                 Tail,
                 IsCons,
                 Nth,
                 IsTuple,
                 Length,
+                IsNone,
+                IsSome,
+                Get
 
             }
             private Dictionary<Kind, string> BinOpToStr = new Dictionary<Kind, string>(){
@@ -164,6 +176,9 @@ namespace MiniMAL {
                 { Kind.Nth, "@Nth" },
                 { Kind.IsTuple, "@IsTuple" },
                 { Kind.Length, "@Length" },
+                { Kind.IsNone, "@IsNone" },
+                { Kind.IsSome, "@IsSome" },
+                { Kind.Get, "@Get" },
             };
 
             public BuiltinOp(Kind op, Expressions[] exprs) {
@@ -194,6 +209,9 @@ namespace MiniMAL {
                     case Kind.Nth:
                     case Kind.IsTuple:
                     case Kind.Length:
+                    case Kind.IsNone:
+                    case Kind.IsSome:
+                    case Kind.Get:
                         return $"({BinOpToStr[Op]} {string.Join(" ", Exprs.Select(x => x.ToString()))})";
                     default:
                         throw new ArgumentOutOfRangeException();

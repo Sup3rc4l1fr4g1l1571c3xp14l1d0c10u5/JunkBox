@@ -5,8 +5,7 @@ using System.Numerics;
 using System.Text;
 using Parsing;
 
-namespace MiniMAL
-{
+namespace MiniMAL {
     /// <summary>
     /// 構文インタプリタ評価部
     /// </summary>
@@ -169,15 +168,24 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// Nil値
+            /// Option型
             /// </summary>
-            public class NilV : ExprValue {
+            public class OptionV : ExprValue {
 
-                public NilV() {
+                public static OptionV None { get; } = new OptionV(null);
+
+                public ExprValue Value { get; }
+
+                public OptionV(ExprValue value) {
+                    Value = value;
                 }
 
                 public override string ToString() {
-                    return $"(Nil)";
+                    if (this == None) {
+                        return $"None";
+                    } else {
+                        return $"Some {Value}";
+                    }
                 }
             }
 
@@ -206,7 +214,7 @@ namespace MiniMAL
                 if (arg1 is ExprValue.UnitV && arg2 is ExprValue.UnitV) {
                     return (true);
                 }
-                if (arg1 is ExprValue.NilV && arg2 is ExprValue.NilV) {
+                if (arg1 is ExprValue.OptionV && arg2 is ExprValue.OptionV) {
                     return (true);
                 }
                 if (arg1 is ExprValue.ConsV && arg2 is ExprValue.ConsV) {
@@ -258,157 +266,180 @@ namespace MiniMAL
         private static ExprValue EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, ExprValue[] args) {
             switch (op) {
                 case Expressions.BuiltinOp.Kind.Plus: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 + i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: +");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.IntV(i1 + i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: +");
+                        }
                     }
-                    if (args.Length == 2 && args[0] is ExprValue.StrV && args[1] is ExprValue.StrV) {
-                        var i1 = ((ExprValue.StrV)args[0]).Value;
-                        var i2 = ((ExprValue.StrV)args[1]).Value;
-                        return new ExprValue.StrV(i1 + i2);
-                    }
-                    throw new Exception("Both arguments must be integer/string: +");
-
-                }
                 case Expressions.BuiltinOp.Kind.Minus: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 - i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: -");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.IntV(i1 - i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: -");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: -");
-
-                }
                 case Expressions.BuiltinOp.Kind.Mult: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 * i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: *");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.IntV(i1 * i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: *");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: *");
-                }
                 case Expressions.BuiltinOp.Kind.Div: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.IntV(i1 / i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: /");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.IntV(i1 / i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: /");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: /");
-                }
                 case Expressions.BuiltinOp.Kind.Lt: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 < i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: <");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.BoolV(i1 < i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: <");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: <");
-                }
                 case Expressions.BuiltinOp.Kind.Le: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 <= i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: <=");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.BoolV(i1 <= i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: <=");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: <=");
-                }
                 case Expressions.BuiltinOp.Kind.Gt: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 > i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: >");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.BoolV(i1 > i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: >");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: >");
-                }
                 case Expressions.BuiltinOp.Kind.Ge: {
-                    if (args.Length == 2 && args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                        var i1 = ((ExprValue.IntV)args[0]).Value;
-                        var i2 = ((ExprValue.IntV)args[1]).Value;
-                        return new ExprValue.BoolV(i1 >= i2);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: >=");
+                        }
+                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                            var i1 = ((ExprValue.IntV)args[0]).Value;
+                            var i2 = ((ExprValue.IntV)args[1]).Value;
+                            return new ExprValue.BoolV(i1 >= i2);
+                        } else {
+                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: >=");
+                        }
                     }
-                    throw new Exception("Both arguments must be integer: >=");
-                }
                 case Expressions.BuiltinOp.Kind.Eq: {
-                    if (args.Length == 2)
-                    {
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: =");
+                        }
                         return new ExprValue.BoolV(ExprValue.Equals(args[0], args[1]));
                     }
-                    throw new Exception("argument num must be 2: ::");
-                }
                 case Expressions.BuiltinOp.Kind.Ne: {
-                    if (args.Length == 2)
-                    {
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: <>");
+                        }
                         return new ExprValue.BoolV(!ExprValue.Equals(args[0], args[1]));
                     }
-                    throw new Exception("argument num must be 2: ::");
-                }
                 case Expressions.BuiltinOp.Kind.ColCol: {
-                    if (args.Length == 2 && args[1] is ExprValue.ConsV) {
-                        var i1 = ((ExprValue.ConsV)args[1]);
-                        return new ExprValue.ConsV(args[0], i1);
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: ::");
+                        }
+                        if (args[1] is ExprValue.ConsV) {
+                            var i1 = ((ExprValue.ConsV)args[1]);
+                            return new ExprValue.ConsV(args[0], i1);
+                        }
+                        throw new Exception.InvalidArgumentNumException("Right arguments must be List: ::");
                     }
-                    throw new Exception("Right arguments must be List: ::");
-                }
-                case Expressions.BuiltinOp.Kind.Head:
-                {
-                    if (args.Length == 1) {
-                        var i1 = args[0];
-                        if (i1 is Eval.ExprValue.ConsV) {
-                            if (i1 == Eval.ExprValue.ConsV.Empty) {
-                                throw new Exception("null list ");
+                case Expressions.BuiltinOp.Kind.Head: {
+                        if (args.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 1: @Head");
+                        }
+                        if (args[0] is Eval.ExprValue.ConsV) {
+                            if (args[0] == Eval.ExprValue.ConsV.Empty) {
+                                throw new Exception.InvalidArgumentTypeException("arguments must be not empty list: @Head");
                             }
                             return ((Eval.ExprValue.ConsV)args[0]).Value;
                         }
+                        throw new Exception.InvalidArgumentTypeException("arguments must be List: @Head");
                     }
-                    throw new Exception("invalid argument num: @Head");
-                }
                 case Expressions.BuiltinOp.Kind.Tail: {
-                    if (args.Length == 1) {
-                        var i1 = args[0];
-                        if (i1 is Eval.ExprValue.ConsV) {
-                            if (i1 == Eval.ExprValue.ConsV.Empty) {
-                                throw new Exception("null list ");
-                            }
-                            return ((Eval.ExprValue.ConsV)args[0]).Next;
+                        if (args.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 1: @Tail");
                         }
+                        if (args[0] is Eval.ExprValue.ConsV) {
+                            if (args[0] == Eval.ExprValue.ConsV.Empty) {
+                                throw new Exception.InvalidArgumentTypeException("arguments must be not empty list: @Tail");
+                            }
+                            return ((Eval.ExprValue.ConsV)args[0]).Value;
+                        }
+                        throw new Exception.InvalidArgumentTypeException("arguments must be List: @Tail");
                     }
-                    throw new Exception("invalid argument num: @Tail");
-                }
-                case Expressions.BuiltinOp.Kind.IsCons:
-                {
-                    if (args.Length == 1) {
-                        var i1 = args[0];
-                        return new ExprValue.BoolV(i1 is Eval.ExprValue.ConsV);
+                case Expressions.BuiltinOp.Kind.IsCons: {
+                        if (args.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 1: @IsCons");
+                        }
+                        return new ExprValue.BoolV(args[0] is Eval.ExprValue.ConsV);
                     }
-                    throw new Exception("invalid argument num: @IsCons");
-                }
                 case Expressions.BuiltinOp.Kind.Nth: {
-                    if (args.Length == 2) {
+                        if (args.Length != 2) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: @Nth");
+                        }
                         var i1 = args[0];
                         var i2 = args[1];
-                        if (i1 is Eval.ExprValue.IntV && i2 is Eval.ExprValue.TupleV)
-                        {
-                            return ((Eval.ExprValue.TupleV) i2).Value[(int)((Eval.ExprValue.IntV) i1).Value];
+                        if (i1 is Eval.ExprValue.IntV && i2 is Eval.ExprValue.TupleV) {
+                            return ((Eval.ExprValue.TupleV)i2).Value[(int)((Eval.ExprValue.IntV)i1).Value];
                         }
+                        throw new Exception.InvalidArgumentTypeException("arguments must be int and Tuple: @Nth");
                     }
-                    throw new Exception("invalid argument num: @Nth");
-                }
                 case Expressions.BuiltinOp.Kind.IsTuple: {
-                    if (args.Length == 1) {
-                        var i1 = args[0];
-                        return new ExprValue.BoolV(i1 is Eval.ExprValue.TupleV);
+                        if (args.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 1: @IsTuple");
+                        }
+                        return new ExprValue.BoolV(args[0] is Eval.ExprValue.TupleV);
                     }
-                    throw new Exception("invalid argument num: @IsTuple");
-                }
                 case Expressions.BuiltinOp.Kind.Length: {
-                    if (args.Length == 1) {
+                        if (args.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException("Argument num must be 1: @Length");
+                        }
                         var i1 = args[0];
                         if (i1 is Eval.ExprValue.TupleV) {
                             return new ExprValue.IntV(((Eval.ExprValue.TupleV)i1).Value.Length);
                         }
+                        throw new Exception.InvalidArgumentTypeException("arguments must be int and Tuple: @Length");
                     }
-                        throw new Exception("invalid argument num: @Length");
-                }
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(op), op, null);
@@ -509,8 +540,8 @@ namespace MiniMAL
                 var x = ((Expressions.Var)e).Id;
                 try {
                     return Environment.LookUp(x, env);
-                } catch (Environment.NotBound) {
-                    throw new Exception($"Variable not bound: {x}");
+                } catch (Exception.NotBound) {
+                    throw new Exception.NotBound($"Variable not bound: {x}");
                 }
             }
             if (e is Expressions.IntLit) {
@@ -543,7 +574,7 @@ namespace MiniMAL
                         return EvalExpressions(env, ((Expressions.IfExp)e).Else);
                     }
                 }
-                throw new Exception("Test expression must be boolean: if");
+                throw new NotSupportedException("Test expression must be boolean: if");
             }
             if (e is Expressions.LetExp) {
                 var newenv = env;
@@ -607,19 +638,23 @@ namespace MiniMAL
                 var t = e as Expressions.TupleExp;
                 return new ExprValue.TupleV(t.Exprs.Select((x) => EvalExpressions(env, x)).ToArray());
             }
-            if (e is Expressions.NilLit) {
-                return new ExprValue.NilV();
+            if (e is Expressions.OptionExp) {
+                if (e == Expressions.OptionExp.None) {
+                    return ExprValue.OptionV.None;
+                } else {
+                    return new ExprValue.OptionV(EvalExpressions(env, (e as Expressions.OptionExp).Expr));
+                }
             }
             if (e is Expressions.HaltExp) {
-                throw new Exception((e as Expressions.HaltExp).Message);
+                throw new Exception.HaltException((e as Expressions.HaltExp).Message);
             }
 
             throw new NotSupportedException($"expression {e} cannot eval.");
         }
 
-        private static Result eval_declEntry(Environment<ExprValue> env, Declarations.DeclBase p) {
-            if (p is Declarations.Decl) {
-                var d = (Declarations.Decl)p;
+        private static Result eval_declEntry(Environment<ExprValue> env, Declarations.Decls.DeclBase p) {
+            if (p is Declarations.Decls.Decl) {
+                var d = (Declarations.Decls.Decl)p;
                 var newenv = env;
                 var ret = new Result("", env, null);
 
@@ -629,8 +664,8 @@ namespace MiniMAL
                 }
                 return ret;
             }
-            if (p is Declarations.RecDecl) {
-                var d = (Declarations.RecDecl)p;
+            if (p is Declarations.Decls.RecDecl) {
+                var d = (Declarations.Decls.RecDecl)p;
                 var newenv = env;
                 var ret = new Result("", env, null);
 

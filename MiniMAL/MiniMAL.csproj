@@ -86,12 +86,14 @@
     <Compile Include="MiniMAL.Parser.cs" />
     <Compile Include="MiniMAL.PatternCompiler.cs" />
     <Compile Include="MiniMAL.PatternExpressions.cs" />
-    <Compile Include="MiniMAL.Typing.cs" />
+    <Compile Include="MiniMAL.PolymorphicTyping.cs" />
+    <Compile Include="MiniMAL.MonomorphicTyping.cs" />
     <Compile Include="MiniMAL.VM.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <Compile Include="MiniMAL.Exception.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.5.2">

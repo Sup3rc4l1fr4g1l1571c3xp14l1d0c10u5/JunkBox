@@ -24,30 +24,32 @@ namespace MiniMAL
                 return Syntax.ToString() + ";;";
             }
         }
-        public abstract class DeclBase {
-            protected DeclBase(Tuple<string, Expressions>[] binds) {
-                Binds = binds;
-            }
-
-            public Tuple<string, Expressions>[] Binds { get; }
-            public override string ToString() {
-                return String.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"));
-            }
-        }
-        public class Decl : DeclBase {
-            public Decl(Tuple<string, Expressions>[] binds) : base(binds) { }
-            public override string ToString() {
-                return $"let {base.ToString()}";
-            }
-        }
-        public class RecDecl : DeclBase {
-            public RecDecl(Tuple<string, Expressions>[] binds) : base(binds) { }
-            public override string ToString() {
-                return $"let rec {base.ToString()}";
-            }
-        }
-
         public class Decls : Declarations {
+            public abstract class DeclBase {
+                protected DeclBase(Tuple<string, Expressions>[] binds) {
+                    Binds = binds;
+                }
+
+                public Tuple<string, Expressions>[] Binds { get; }
+                public override string ToString() {
+                    return String.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"));
+                }
+            }
+
+            public class Decl : DeclBase {
+                public Decl(Tuple<string, Expressions>[] binds) : base(binds) { }
+                public override string ToString() {
+                    return $"let {base.ToString()}";
+                }
+            }
+
+            public class RecDecl : DeclBase {
+                public RecDecl(Tuple<string, Expressions>[] binds) : base(binds) { }
+                public override string ToString() {
+                    return $"let rec {base.ToString()}";
+                }
+            }
+
             public Decls(DeclBase[] entries) {
                 Entries = entries;
             }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace MiniMAL
@@ -152,15 +153,23 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// Nil値
+            /// Option値
             /// </summary>
-            public class NilV : ExprValue {
+            public class OptionV : ExprValue {
+                public static OptionV None { get; } = new OptionV(null);
+                public ExprValue Value { get; }
 
-                public NilV() {
+                public OptionV(ExprValue value) {
+                    Value = value;
                 }
 
                 public override string ToString() {
-                    return $"(Nil)";
+                    if (this == None)
+                    {
+                        return "None";
+                    } else {
+                        return $"Some {Value}";
+                    }
                 }
             }
 
@@ -189,8 +198,22 @@ namespace MiniMAL
                 if (arg1 is ExprValue.UnitV && arg2 is ExprValue.UnitV) {
                     return (true);
                 }
-                if (arg1 is ExprValue.NilV && arg2 is ExprValue.NilV) {
-                    return (true);
+                if (arg1 is ExprValue.OptionV && arg2 is ExprValue.OptionV)
+                {
+                    if (arg1 == ExprValue.OptionV.None)
+                    {
+                        return arg2 == ExprValue.OptionV.None;
+                    }
+                    else if (arg2 == ExprValue.OptionV.None)
+                    {
+                        return arg1 == ExprValue.OptionV.None;
+                    }
+                    else
+                    {
+                        var i1 = ((ExprValue.OptionV) arg1);
+                        var i2 = ((ExprValue.OptionV) arg2);
+                        return Equals(i1.Value, i2.Value);
+                    }
                 }
                 if (arg1 is ExprValue.ConsV && arg2 is ExprValue.ConsV) {
                     var i1 = ((ExprValue.ConsV)arg1);
@@ -427,6 +450,20 @@ namespace MiniMAL
                 }
             }
 
+            public class Opti : Instructions {
+                public bool None { get; }
+
+                public Opti(bool none)
+                {
+                    this.None = none;
+                }
+
+
+                public override string ToString() {
+                    return $"(opti {None})";
+                }
+            }
+
         }
 
         /// <summary>
@@ -451,7 +488,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.StrV)arg2).Value;
                             return new ExprValue.StrV(i1 + i2);
                         }
-                        throw new Exception("Both arguments must be integer/string: +");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer/string: +");
 
                     };
                 case Expressions.BuiltinOp.Kind.Minus:
@@ -464,7 +501,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.IntV(i1 - i2);
                         }
-                        throw new Exception("Both arguments must be integer: -");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: -");
 
                     };
                 case Expressions.BuiltinOp.Kind.Mult:
@@ -477,7 +514,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.IntV(i1 * i2);
                         }
-                        throw new Exception("Both arguments must be integer: *");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: *");
                     };
                 case Expressions.BuiltinOp.Kind.Div:
                     {
@@ -489,7 +526,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.IntV(i1 / i2);
                         }
-                        throw new Exception("Both arguments must be integer: /");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: /");
                     };
                 case Expressions.BuiltinOp.Kind.Lt:
                     {
@@ -501,7 +538,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.BoolV(i1 < i2);
                         }
-                        throw new Exception("Both arguments must be integer: <");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: <");
                     };
                 case Expressions.BuiltinOp.Kind.Le:
                     {
@@ -513,7 +550,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.BoolV(i1 <= i2);
                         }
-                        throw new Exception("Both arguments must be integer: <=");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: <=");
                     };
                 case Expressions.BuiltinOp.Kind.Gt:
                     {
@@ -525,7 +562,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.BoolV(i1 > i2);
                         }
-                        throw new Exception("Both arguments must be integer: >");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: >");
                     };
                 case Expressions.BuiltinOp.Kind.Ge:
                     {
@@ -537,7 +574,7 @@ namespace MiniMAL
                             var i2 = ((ExprValue.IntV)arg2).Value;
                             return new ExprValue.BoolV(i1 >= i2);
                         }
-                        throw new Exception("Both arguments must be integer: >=");
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: >=");
                     };
                 case Expressions.BuiltinOp.Kind.Eq:
                     {
@@ -560,29 +597,29 @@ namespace MiniMAL
                             var i2 = ((ExprValue.ConsV)arg2);
                             return new ExprValue.ConsV(arg1, i2);
                         }
-                        throw new Exception("Right arguments must be List: ::");
+                        throw new Exception.InvalidArgumentTypeException("Right arguments must be List: ::");
                     };
                 case Expressions.BuiltinOp.Kind.Head: {
                     var arg1 = x.Value;
 
                     if (arg1 is ExprValue.ConsV) {
                         if (arg1 == ExprValue.ConsV.Empty) {
-                            throw new Exception("null list ");
+                            throw new Exception.InvalidArgumentTypeException("arguments must be not empty list: Head");
                         }
-                        return ((ExprValue.ConsV)arg1).Value;
+                            return ((ExprValue.ConsV)arg1).Value;
                     }
-                    throw new Exception("arguments 1 must be ConsV: @Head");
+                    throw new Exception.InvalidArgumentTypeException("arguments must be List: Head");
                 }
                 case Expressions.BuiltinOp.Kind.Tail: {
                     var arg1 = x.Value;
 
                     if (arg1 is ExprValue.ConsV) {
                         if (arg1 == ExprValue.ConsV.Empty) {
-                            throw new Exception("null list ");
+                            throw new Exception.InvalidArgumentTypeException("arguments must be not empty list: Tail");
                         }
-                        return ((ExprValue.ConsV)arg1).Next;
+                            return ((ExprValue.ConsV)arg1).Next;
                     }
-                    throw new Exception("arguments 1 must be ConsV: @Tail");
+                    throw new Exception.InvalidArgumentTypeException("arguments must be List: Head");
                 }
                 case Expressions.BuiltinOp.Kind.IsCons: {
                     var arg1 = x.Value;
@@ -595,8 +632,8 @@ namespace MiniMAL
 
                     if (arg1 is ExprValue.IntV && arg2 is ExprValue.TupleV) {
                         return ((ExprValue.TupleV)arg2).Values[(int)((ExprValue.IntV)arg1).Value];
-                    } else { 
-                        throw new Exception("arguments 1 must be ConsV: @Tail");
+                    } else {
+                        throw new Exception.InvalidArgumentTypeException("arguments 1 must be int and 2 must be Tuple: Nth");
                     }
 
                     }
@@ -609,7 +646,7 @@ namespace MiniMAL
                     if (arg1 is ExprValue.TupleV) {
                         return new ExprValue.IntV(((ExprValue.TupleV)arg1).Values.Length);
                     }
-                    throw new Exception("invalid argument num: @Length");
+                    throw new Exception.InvalidArgumentTypeException("arguments must be TupleV: Length");
                 }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(op), op, null);
@@ -657,7 +694,7 @@ namespace MiniMAL
                     }
                     frame++;
                 }
-                throw new Exception($"undefined variable: {e.Id}");
+                throw new Exception.NotBound($"Variable not bound: {e.Id}");
             }
             if (expr is Expressions.IfExp) {
                 var e = expr as Expressions.IfExp;
@@ -743,11 +780,29 @@ namespace MiniMAL
             if (expr is Expressions.HaltExp) {
                 return LinkedList.Extend(new Instructions.Halt((expr as Expressions.HaltExp).Message), code);
             }
-            if (expr is Expressions.NilLit) {
-                return LinkedList.Extend(new Instructions.Ldc(new ExprValue.NilV()), code);
+            if (expr is Expressions.OptionExp) {
+                if (expr == Expressions.OptionExp.None)
+                {
+                    return LinkedList.Extend(new Instructions.Ldc(ExprValue.OptionV.None), code);
+                }
+                else
+                {
+                    var e = expr as Expressions.OptionExp;
+                    if (e == Expressions.OptionExp.None)
+                    {
+                        code = LinkedList.Extend(new Instructions.Opti(false), code);
+                        code = CompileExpr(e.Expr, env, code, false);
+                    }
+                    else
+                    {
+                        code = LinkedList.Extend(new Instructions.Opti(true), code);
+                    }
+                    return code;
+
+                }
             }
 
-            throw new Exception();
+            throw new NotSupportedException($"cannot compile expr: {expr.ToString()}");
         }
 
         public static Tuple<LinkedList<Instructions>[], LinkedList<LinkedList<string>>> CompileDecl(Declarations decl, LinkedList<LinkedList<string>> env) {
@@ -763,8 +818,8 @@ namespace MiniMAL
 
                 List<LinkedList<Instructions>> codes = new List<LinkedList<Instructions>>();
                 foreach (var d in decls) {
-                    if (d is Declarations.Decl) {
-                        var e = d as Declarations.Decl;
+                    if (d is Declarations.Decls.Decl) {
+                        var e = d as Declarations.Decls.Decl;
 
                         var newenv = LinkedList<string>.Empty;
                         foreach (var bind in e.Binds.Reverse()) {
@@ -781,8 +836,8 @@ namespace MiniMAL
 
                         continue;
                     }
-                    if (d is Declarations.RecDecl) {
-                        var e = d as Declarations.RecDecl;
+                    if (d is Declarations.Decls.RecDecl) {
+                        var e = d as Declarations.Decls.RecDecl;
 
                         var newenv = LinkedList<string>.Empty;
                         foreach (var bind in e.Binds.Reverse()) {
@@ -800,7 +855,7 @@ namespace MiniMAL
 
                         continue;
                     }
-                    throw new Exception();
+                    throw new NotSupportedException($"cannot compile decls: {d.ToString()}");
                 }
                 return Tuple.Create(codes.ToArray(), env);
             }
@@ -810,7 +865,7 @@ namespace MiniMAL
                     env
                 );
             }
-            throw new Exception();
+            throw new NotSupportedException($"cannot compile declarations: {decl.ToString()}");
         }
 
         /// <summary>
@@ -925,7 +980,7 @@ namespace MiniMAL
                         _nextcode = code.Next;
                         _nextdump = dump;;
                     } else {
-                        throw new Exception($"{closure} is cannot apply.");
+                        throw new Exception.RuntimeErrorException($"App cannot eval: {closure}.");
                     }
                 } else if (code.Value is Instructions.Tapp) {
                     // app <n>
@@ -1040,7 +1095,7 @@ namespace MiniMAL
                 } else if (code.Value is Instructions.Halt) {
                     // halt
                     // エラーを生成して停止する
-                    throw new Exception((code.Value as Instructions.Halt).Message);
+                    throw new Exception.HaltException((code.Value as Instructions.Halt).Message);
                     break;
 
                     //_nextstack = stack;
@@ -1134,7 +1189,7 @@ namespace MiniMAL
                     _nextcode = code.Next;
                     _nextdump = dump;
                 } else {
-                    throw new Exception();
+                    throw new NotSupportedException($"instruction {code.Value} is not supported");
                 }
 
                 stack = _nextstack;
