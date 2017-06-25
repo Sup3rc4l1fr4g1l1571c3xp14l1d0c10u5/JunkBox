@@ -7,15 +7,15 @@ using Parsing;
 
 namespace MiniMAL {
     /// <summary>
-    /// \•¶ƒCƒ“ƒ^ƒvƒŠƒ^•]‰¿•”
+    /// æ§‹æ–‡ã‚¤ãƒ³ã‚¿ãƒ—ãƒªã‚¿è©•ä¾¡éƒ¨
     /// </summary>
     public static class Eval {
         /// <summary>
-        /// •]‰¿’l
+        /// è©•ä¾¡å€¤
         /// </summary>
         public abstract class ExprValue {
             /// <summary>
-            /// ®”’l
+            /// æ•´æ•°å€¤
             /// </summary>
             public class IntV : ExprValue {
                 public BigInteger Value { get; }
@@ -30,7 +30,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// •¶š—ñ’l
+            /// æ–‡å­—åˆ—å€¤
             /// </summary>
             public class StrV : ExprValue {
                 public string Value { get; }
@@ -45,7 +45,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ˜_—’l
+            /// è«–ç†å€¤
             /// </summary>
             public class BoolV : ExprValue {
                 public bool Value { get; }
@@ -60,7 +60,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// Unit’l
+            /// Unitå€¤
             /// </summary>
             public class UnitV : ExprValue {
                 public UnitV() { }
@@ -71,7 +71,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ƒŒƒLƒVƒJƒ‹ƒNƒ[ƒWƒƒ[
+            /// ãƒ¬ã‚­ã‚·ã‚«ãƒ«ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ãƒ¼
             /// </summary>
             public class ProcV : ExprValue {
                 public string Id { get; }
@@ -94,7 +94,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ƒ_ƒCƒiƒ~ƒbƒNƒNƒ[ƒWƒƒ[
+            /// ãƒ€ã‚¤ãƒŠãƒŸãƒƒã‚¯ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ãƒ¼
             /// </summary>
             public class DProcV : ExprValue {
                 public string Id { get; }
@@ -111,7 +111,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ƒrƒ‹ƒgƒCƒ“ƒNƒ[ƒWƒƒ[
+            /// ãƒ“ãƒ«ãƒˆã‚¤ãƒ³ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ãƒ¼
             /// </summary>
             public class BProcV : ExprValue {
                 public Func<ExprValue, ExprValue> Proc { get; }
@@ -126,7 +126,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// consƒZƒ‹
+            /// consã‚»ãƒ«
             /// </summary>
             public class ConsV : ExprValue {
                 public static ConsV Empty { get; } = new ConsV(null, null);
@@ -153,7 +153,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ƒ^ƒvƒ‹
+            /// ã‚¿ãƒ—ãƒ«
             /// </summary>
             public class TupleV : ExprValue {
                 public ExprValue[] Value { get; }
@@ -168,7 +168,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// OptionŒ^
+            /// Optionå‹
             /// </summary>
             public class OptionV : ExprValue {
 
@@ -190,7 +190,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ”äŠr
+            /// æ¯”è¼ƒ
             /// </summary>
             /// <param name="arg1"></param>
             /// <param name="arg2"></param>
@@ -243,7 +243,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// •]‰¿Œ‹‰Ê
+        /// è©•ä¾¡çµæœ
         /// </summary>
         public class Result {
             public Result(string id, Environment<ExprValue> env, ExprValue value) {
@@ -258,7 +258,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// “ñ€‰‰Zq®‚Ì•]‰¿
+        /// äºŒé …æ¼”ç®—å­å¼ã®è©•ä¾¡
         /// </summary>
         /// <param name="op"></param>
         /// <param name="args"></param>
@@ -447,7 +447,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ƒpƒ^[ƒ“ƒ}ƒbƒ`‚Ì•]‰¿
+        /// ãƒ‘ã‚¿ãƒ¼ãƒ³ãƒãƒƒãƒã®è©•ä¾¡
         /// </summary>
         /// <param name="env"></param>
         /// <param name="pattern"></param>
@@ -530,7 +530,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ®‚Ì•]‰¿
+        /// å¼ã®è©•ä¾¡
         /// </summary>
         /// <param name="env"></param>
         /// <param name="e"></param>

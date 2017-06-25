@@ -6,7 +6,7 @@ using Parsing;
 
 namespace MiniMAL {
     /// <summary>
-    /// パーサ定義
+    /// 繝代�ｼ繧ｵ螳夂ｾｩ
     /// </summary>
     public static class Parser {
         private static readonly Parser<string> WhiteSpace = Combinator.Many(Combinator.AnyChar(" \t\r\n"), 1).Select(x => String.Join("", x));

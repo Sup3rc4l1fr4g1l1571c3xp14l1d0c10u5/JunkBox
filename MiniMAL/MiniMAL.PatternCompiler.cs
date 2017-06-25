@@ -5,7 +5,7 @@ namespace MiniMAL
 {
 
     /// <summary>
-    /// パターン式コンパイラ
+    /// 繝代ち繝ｼ繝ｳ蠑上さ繝ｳ繝代う繝ｩ
     /// </summary>
     public static class PatternCompiler {
         private static int _anonymousV;

@@ -5,12 +5,12 @@ using System.Numerics;
 
 namespace MiniMAL {
     /// <summary>
-    /// ®
+    /// å¼
     /// </summary>
     public abstract class Expressions {
 
         /// <summary>
-        /// •Ï”®
+        /// å¤‰æ•°å¼
         /// </summary>
         public class Var : Expressions {
             public string Id { get; }
@@ -25,7 +25,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ®”®
+        /// æ•´æ•°å¼
         /// </summary>
         public class IntLit : Expressions {
             public BigInteger Value { get; }
@@ -40,7 +40,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ®”®
+        /// æ•´æ•°å¼
         /// </summary>
         public class StrLit : Expressions {
             public string Value { get; }
@@ -55,7 +55,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ^‹U®
+        /// çœŸå½å¼
         /// </summary>
         public class BoolLit : Expressions {
             public bool Value { get; }
@@ -70,7 +70,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ‹óƒŠƒXƒg
+        /// ç©ºãƒªã‚¹ãƒˆ
         /// </summary>
         public class EmptyListLit : Expressions {
 
@@ -82,7 +82,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// OptionŒ^’l
+        /// Optionå‹å€¤
         /// </summary>
         public class OptionExp : Expressions {
             public static OptionExp None { get; } = new OptionExp(null);
@@ -116,7 +116,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ƒ^ƒvƒ‹®
+        /// ã‚¿ãƒ—ãƒ«å¼
         /// </summary>
         public class TupleExp : Expressions {
             public TupleExp(Expressions[] exprs) {
@@ -130,7 +130,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// “ñ€‰‰Zq®
+        /// äºŒé …æ¼”ç®—å­å¼
         /// </summary>
         public class BuiltinOp : Expressions {
             public enum Kind {
@@ -220,7 +220,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// if®
+        /// ifå¼
         /// </summary>
         public class IfExp : Expressions {
             public IfExp(Expressions cond, Expressions then, Expressions @else) {
@@ -238,7 +238,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// let®
+        /// letå¼
         /// </summary>
         public class LetExp : Expressions {
             public LetExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -254,7 +254,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// –³–¼ŠÖ”®iÃ“IƒXƒR[ƒv”Åj
+        /// ç„¡åé–¢æ•°å¼ï¼ˆé™çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
         /// </summary>
         public class FunExp : Expressions {
             public FunExp(string arg, Expressions body) {
@@ -270,7 +270,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// –³–¼ŠÖ”®i“®“IƒXƒR[ƒv”Åj
+        /// ç„¡åé–¢æ•°å¼ï¼ˆå‹•çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
         /// </summary>
         public class DFunExp : Expressions {
             public DFunExp(string arg, Expressions body) {
@@ -286,7 +286,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ŠÖ”“K—p®
+        /// é–¢æ•°é©ç”¨å¼
         /// </summary>
         public class AppExp : Expressions {
             public AppExp(Expressions fun, Expressions arg) {
@@ -302,7 +302,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// let-rec®
+        /// let-recå¼
         /// </summary>
         public class LetRecExp : Expressions {
             public LetRecExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -318,7 +318,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// match®
+        /// matchå¼
         /// </summary>
         public class MatchExp : Expressions {
             public MatchExp(Expressions exp, Tuple<PatternExpressions, Expressions>[] patterns) {
@@ -334,7 +334,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Halt®
+        /// Haltå¼
         /// </summary>
         public class HaltExp : Expressions {
             public string Message { get; }
