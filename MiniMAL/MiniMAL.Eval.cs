@@ -7,15 +7,15 @@ using Parsing;
 
 namespace MiniMAL {
     /// <summary>
-    /// ÊßãÊñá„Ç§„É≥„Çø„Éó„É™„ÇøË©ï‰æ°ÈÉ®
+    /// ç\ï∂ÉCÉìÉ^ÉvÉäÉ^ï]âøïî
     /// </summary>
     public static class Eval {
         /// <summary>
-        /// Ë©ï‰æ°ÂÄ§
+        /// ï]âøíl
         /// </summary>
         public abstract class ExprValue {
             /// <summary>
-            /// Êï¥Êï∞ÂÄ§
+            /// êÆêîíl
             /// </summary>
             public class IntV : ExprValue {
                 public BigInteger Value { get; }
@@ -30,7 +30,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ÊñáÂ≠óÂàóÂÄ§
+            /// ï∂éöóÒíl
             /// </summary>
             public class StrV : ExprValue {
                 public string Value { get; }
@@ -45,7 +45,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// Ë´ñÁêÜÂÄ§
+            /// ò_óùíl
             /// </summary>
             public class BoolV : ExprValue {
                 public bool Value { get; }
@@ -60,7 +60,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// UnitÂÄ§
+            /// Unitíl
             /// </summary>
             public class UnitV : ExprValue {
                 public UnitV() { }
@@ -71,7 +71,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// „É¨„Ç≠„Ç∑„Ç´„É´„ÇØ„É≠„Éº„Ç∏„É£„Éº
+            /// ÉåÉLÉVÉJÉãÉNÉçÅ[ÉWÉÉÅ[
             /// </summary>
             public class ProcV : ExprValue {
                 public string Id { get; }
@@ -94,7 +94,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// „ÉÄ„Ç§„Éä„Éü„ÉÉ„ÇØ„ÇØ„É≠„Éº„Ç∏„É£„Éº
+            /// É_ÉCÉiÉ~ÉbÉNÉNÉçÅ[ÉWÉÉÅ[
             /// </summary>
             public class DProcV : ExprValue {
                 public string Id { get; }
@@ -111,7 +111,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// „Éì„É´„Éà„Ç§„É≥„ÇØ„É≠„Éº„Ç∏„É£„Éº
+            /// ÉrÉãÉgÉCÉìÉNÉçÅ[ÉWÉÉÅ[
             /// </summary>
             public class BProcV : ExprValue {
                 public Func<ExprValue, ExprValue> Proc { get; }
@@ -126,7 +126,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// cons„Çª„É´
+            /// consÉZÉã
             /// </summary>
             public class ConsV : ExprValue {
                 public static ConsV Empty { get; } = new ConsV(null, null);
@@ -153,7 +153,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// „Çø„Éó„É´
+            /// É^ÉvÉã
             /// </summary>
             public class TupleV : ExprValue {
                 public ExprValue[] Value { get; }
@@ -168,7 +168,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// OptionÂûã
+            /// Optionå^
             /// </summary>
             public class OptionV : ExprValue {
 
@@ -190,7 +190,7 @@ namespace MiniMAL {
             }
 
             /// <summary>
-            /// ÊØîËºÉ
+            /// î‰är
             /// </summary>
             /// <param name="arg1"></param>
             /// <param name="arg2"></param>
@@ -243,7 +243,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Ë©ï‰æ°ÁµêÊûú
+        /// ï]âøåãâ 
         /// </summary>
         public class Result {
             public Result(string id, Environment<ExprValue> env, ExprValue value) {
@@ -258,25 +258,47 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ‰∫åÈ†ÖÊºîÁÆóÂ≠êÂºè„ÅÆË©ï‰æ°
+        /// ëgÇ›çûÇ›ââéZéqéÆÇÃï]âø
         /// </summary>
         /// <param name="op"></param>
         /// <param name="args"></param>
         /// <returns></returns>
         private static ExprValue EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op, ExprValue[] args) {
             switch (op) {
-                case Expressions.BuiltinOp.Kind.Plus: {
-                        if (args.Length != 2) {
-                            throw new Exception.InvalidArgumentNumException("Argument num must be 2: +");
-                        }
-                        if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
-                            var i1 = ((ExprValue.IntV)args[0]).Value;
-                            var i2 = ((ExprValue.IntV)args[1]).Value;
-                            return new ExprValue.IntV(i1 + i2);
-                        } else {
-                            throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: +");
-                        }
+                case Expressions.BuiltinOp.Kind.UnaryMinus: {
+                    if (args.Length != 1) {
+                        throw new Exception.InvalidArgumentNumException("Argument num must be 1: -");
                     }
+                    if (args[0] is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)args[0]).Value;
+                        return new ExprValue.IntV(-i1);
+                    } else {
+                        throw new Exception.InvalidArgumentTypeException("arguments must be integer: -");
+                    }
+                }
+                case Expressions.BuiltinOp.Kind.UnaryPlus: {
+                    if (args.Length != 1) {
+                        throw new Exception.InvalidArgumentNumException("Argument num must be 1: +");
+                    }
+                    if (args[0] is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)args[0]).Value;
+                        return new ExprValue.IntV(i1);
+                    } else {
+                        throw new Exception.InvalidArgumentTypeException("arguments must be integer: +");
+                    }
+                }
+                case Expressions.BuiltinOp.Kind.Plus: {
+                    if (args.Length != 2) {
+                        throw new Exception.InvalidArgumentNumException("Argument num must be 2: +");
+                    }
+                    if (args[0] is ExprValue.IntV && args[1] is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)args[0]).Value;
+                        var i2 = ((ExprValue.IntV)args[1]).Value;
+                        return new ExprValue.IntV(i1 + i2);
+                    } else {
+                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: +");
+                    }
+                }
                 case Expressions.BuiltinOp.Kind.Minus: {
                         if (args.Length != 2) {
                             throw new Exception.InvalidArgumentNumException("Argument num must be 2: -");
@@ -447,7 +469,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// „Éë„Çø„Éº„É≥„Éû„ÉÉ„ÉÅ„ÅÆË©ï‰æ°
+        /// ÉpÉ^Å[ÉìÉ}ÉbÉ`ÇÃï]âø
         /// </summary>
         /// <param name="env"></param>
         /// <param name="pattern"></param>
@@ -509,6 +531,31 @@ namespace MiniMAL {
 
                 return dic;
             }
+            if (pattern is PatternExpressions.OptionP && value is ExprValue.OptionV) {
+                var p = pattern as PatternExpressions.OptionP;
+                var q = value as ExprValue.OptionV;
+                var dic = new Dictionary<string, ExprValue>();
+                if (p == PatternExpressions.OptionP.None) {
+                    if (q == ExprValue.OptionV.None) {
+                        return dic;
+                    }
+                    else {
+                        return null;
+                    }
+                }
+                else {
+                    var ret1 = EvalPatternExpressions(env, p.Value, q.Value);
+                    if (ret1 == null) {
+                        return null;
+                    }
+                    dic = ret1.Aggregate(dic,
+                                         (s, x) => {
+                                             s[x.Key] = x.Value;
+                                             return s;
+                                         });
+                    return dic;
+                }
+            }
             if (pattern is PatternExpressions.TupleP && value is ExprValue.TupleV) {
                 var p = pattern as PatternExpressions.TupleP;
                 var q = value as ExprValue.TupleV;
@@ -530,7 +577,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Âºè„ÅÆË©ï‰æ°
+        /// éÆÇÃï]âø
         /// </summary>
         /// <param name="env"></param>
         /// <param name="e"></param>

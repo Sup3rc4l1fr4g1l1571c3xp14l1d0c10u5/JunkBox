@@ -5,12 +5,12 @@ using System.Numerics;
 
 namespace MiniMAL {
     /// <summary>
-    /// å¼
+    /// ®
     /// </summary>
     public abstract class Expressions {
 
         /// <summary>
-        /// å¤‰æ•°å¼
+        /// •Ï”®
         /// </summary>
         public class Var : Expressions {
             public string Id { get; }
@@ -25,7 +25,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// æ•´æ•°å¼
+        /// ®”®
         /// </summary>
         public class IntLit : Expressions {
             public BigInteger Value { get; }
@@ -40,7 +40,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// æ•´æ•°å¼
+        /// ®”®
         /// </summary>
         public class StrLit : Expressions {
             public string Value { get; }
@@ -55,7 +55,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// çœŸå½å¼
+        /// ^‹U®
         /// </summary>
         public class BoolLit : Expressions {
             public bool Value { get; }
@@ -70,7 +70,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ç©ºãƒªã‚¹ãƒˆ
+        /// ‹óƒŠƒXƒg
         /// </summary>
         public class EmptyListLit : Expressions {
 
@@ -82,7 +82,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Optionå‹å€¤
+        /// OptionŒ^’l
         /// </summary>
         public class OptionExp : Expressions {
             public static OptionExp None { get; } = new OptionExp(null);
@@ -116,7 +116,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ã‚¿ãƒ—ãƒ«å¼
+        /// ƒ^ƒvƒ‹®
         /// </summary>
         public class TupleExp : Expressions {
             public TupleExp(Expressions[] exprs) {
@@ -130,10 +130,13 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// äºŒé …æ¼”ç®—å­å¼
+        /// “ñ€‰‰Zq®
         /// </summary>
         public class BuiltinOp : Expressions {
             public enum Kind {
+                // unary operators
+                UnaryPlus,
+                UnaryMinus,
                 // binary operators
                 Plus,
                 Minus,
@@ -159,6 +162,8 @@ namespace MiniMAL {
 
             }
             private Dictionary<Kind, string> BinOpToStr = new Dictionary<Kind, string>(){
+                { Kind.UnaryPlus, "+" },
+                { Kind.UnaryMinus, "-" },
                 { Kind.Plus, "+" },
                 { Kind.Minus, "-" },
                 { Kind.Mult, "*" },
@@ -191,6 +196,9 @@ namespace MiniMAL {
             public override string ToString() {
                 switch (Op)
                 {
+                    case Kind.UnaryPlus:
+                    case Kind.UnaryMinus:
+                        return $"({BinOpToStr[Op]} {Exprs[1]})";
                     case Kind.Plus:
                     case Kind.Minus:
                     case Kind.Mult:
@@ -220,7 +228,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ifå¼
+        /// if®
         /// </summary>
         public class IfExp : Expressions {
             public IfExp(Expressions cond, Expressions then, Expressions @else) {
@@ -238,7 +246,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// letå¼
+        /// let®
         /// </summary>
         public class LetExp : Expressions {
             public LetExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -254,7 +262,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ç„¡åé–¢æ•°å¼ï¼ˆé™çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
+        /// –³–¼ŠÖ”®iÃ“IƒXƒR[ƒv”Åj
         /// </summary>
         public class FunExp : Expressions {
             public FunExp(string arg, Expressions body) {
@@ -270,7 +278,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ç„¡åé–¢æ•°å¼ï¼ˆå‹•çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
+        /// –³–¼ŠÖ”®i“®“IƒXƒR[ƒv”Åj
         /// </summary>
         public class DFunExp : Expressions {
             public DFunExp(string arg, Expressions body) {
@@ -286,7 +294,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// é–¢æ•°é©ç”¨å¼
+        /// ŠÖ”“K—p®
         /// </summary>
         public class AppExp : Expressions {
             public AppExp(Expressions fun, Expressions arg) {
@@ -302,7 +310,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// let-recå¼
+        /// let-rec®
         /// </summary>
         public class LetRecExp : Expressions {
             public LetRecExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -318,7 +326,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// matchå¼
+        /// match®
         /// </summary>
         public class MatchExp : Expressions {
             public MatchExp(Expressions exp, Tuple<PatternExpressions, Expressions>[] patterns) {
@@ -334,7 +342,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// Haltå¼
+        /// Halt®
         /// </summary>
         public class HaltExp : Expressions {
             public string Message { get; }

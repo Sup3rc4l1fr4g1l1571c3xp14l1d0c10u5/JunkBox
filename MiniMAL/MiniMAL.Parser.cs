@@ -6,7 +6,7 @@ using Parsing;
 
 namespace MiniMAL {
     /// <summary>
-    /// 繝代�ｼ繧ｵ螳夂ｾｩ
+    /// パーサ定義
     /// </summary>
     public static class Parser {
         private static readonly Parser<string> WhiteSpace = Combinator.Many(Combinator.AnyChar(" \t\r\n"), 1).Select(x => String.Join("", x));
@@ -240,11 +240,23 @@ namespace MiniMAL {
             from _1 in PrimaryExpression.Many(1)
             select _1.Aggregate((s, x) => new Expressions.AppExp(s, x));
 
+        private static readonly Parser<Expressions.BuiltinOp.Kind> UnaryOperator = WS.Then(
+            Combinator.Choice(
+                Combinator.Token("-").Select(x => Expressions.BuiltinOp.Kind.UnaryMinus),
+                Combinator.Token("+").Select(x => Expressions.BuiltinOp.Kind.UnaryPlus)
+            )
+        );
+
+        private static readonly Parser<Expressions> UnaryExpression =
+            from _1 in UnaryOperator.Many()
+            from _2 in ApplyExpression
+            select _1.Reverse().Aggregate(_2, (s, x) => new Expressions.BuiltinOp(x, new [] {s}));
+
         private static readonly Parser<Expressions> MultiplicativeExpression =
-            from _1 in ApplyExpression
+            from _1 in UnaryExpression
             from _2 in Combinator.Many(
                 from _3 in Combinator.Choice(Mult, Div)
-                from _4 in ApplyExpression
+                from _4 in UnaryExpression
                 select (Func<Expressions, Expressions>)(x => new Expressions.BuiltinOp(_3, new Expressions[] { x, _4 }))
             )
             select _2.Aggregate(_1, (s, x) => x(s));

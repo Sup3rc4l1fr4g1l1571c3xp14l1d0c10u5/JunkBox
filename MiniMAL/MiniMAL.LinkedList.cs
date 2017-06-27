@@ -5,7 +5,7 @@ using System.Text;
 namespace MiniMAL
 {
     /// <summary>
-    /// é€£çµãƒªã‚¹ãƒˆ
+    /// ˜AŒ‹ƒŠƒXƒg
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public class LinkedList<T> {
@@ -41,7 +41,7 @@ namespace MiniMAL
     }
 
     /// <summary>
-    /// é€£çµãƒªã‚¹ãƒˆæ“ä½œ
+    /// ˜AŒ‹ƒŠƒXƒg‘€ì
     /// </summary>
     public static class LinkedList {
         public static LinkedList<T> Extend<T>(T v, LinkedList<T> next) {

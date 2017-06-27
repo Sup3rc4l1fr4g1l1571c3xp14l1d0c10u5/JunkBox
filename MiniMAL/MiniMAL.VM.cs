@@ -8,16 +8,16 @@ using System.Text;
 namespace MiniMAL
 {
     /// <summary>
-    /// SECDæ©Ÿæ¢°ãƒ™ãƒ¼ã‚¹VM
+    /// SECD‹@ŠBƒx[ƒXVM
     /// </summary>
     public static class VM {
 
         /// <summary>
-        /// è©•ä¾¡å€¤
+        /// •]‰¿’l
         /// </summary>
         public abstract class ExprValue {
             /// <summary>
-            /// æ•´æ•°å€¤
+            /// ®”’l
             /// </summary>
             public class IntV : ExprValue {
                 public BigInteger Value { get; }
@@ -32,7 +32,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// æ–‡å­—åˆ—å€¤
+            /// •¶š—ñ’l
             /// </summary>
             public class StrV : ExprValue {
                 public string Value { get; }
@@ -47,7 +47,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// è«–ç†å€¤
+            /// ˜_—’l
             /// </summary>
             public class BoolV : ExprValue {
                 public bool Value { get; }
@@ -62,7 +62,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// Unitå€¤
+            /// Unit’l
             /// </summary>
             public class UnitV : ExprValue {
                 public UnitV() { }
@@ -73,7 +73,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// ãƒ¬ã‚­ã‚·ã‚«ãƒ«ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ãƒ¼
+            /// ƒŒƒLƒVƒJƒ‹ƒNƒ[ƒWƒƒ[
             /// </summary>
             public class ProcV : ExprValue {
                 public string Id { get; }
@@ -96,7 +96,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// ãƒ“ãƒ«ãƒˆã‚¤ãƒ³ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ãƒ¼
+            /// ƒrƒ‹ƒgƒCƒ“ƒNƒ[ƒWƒƒ[
             /// </summary>
             public class BProcV : ExprValue {
                 public Func<LinkedList<ExprValue>, ExprValue> Proc { get; }
@@ -111,7 +111,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// consã‚»ãƒ«
+            /// consƒZƒ‹
             /// </summary>
             public class ConsV : ExprValue {
                 public static ConsV Empty { get; } = new ConsV(null, null);
@@ -138,7 +138,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// ã‚¿ãƒ—ãƒ«
+            /// ƒ^ƒvƒ‹
             /// </summary>
             public class TupleV : ExprValue {
                 public ExprValue[] Values { get; }
@@ -153,7 +153,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// Optionå€¤
+            /// Option’l
             /// </summary>
             public class OptionV : ExprValue {
                 public static OptionV None { get; } = new OptionV(null);
@@ -174,7 +174,7 @@ namespace MiniMAL
             }
 
             /// <summary>
-            /// æ¯”è¼ƒ
+            /// ”äŠr
             /// </summary>
             /// <param name="arg1"></param>
             /// <param name="arg2"></param>
@@ -242,7 +242,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ä»®æƒ³ãƒã‚·ãƒ³å‘½ä»¤
+        /// ‰¼‘zƒ}ƒVƒ“–½—ß
         /// </summary>
         public abstract class Instructions {
             public class Ld : Instructions {
@@ -467,43 +467,56 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// çµ„ã¿è¾¼ã¿å‘½ä»¤ã‚’å‡¦ç†
+        /// ‘g‚İ‚İ–½—ß‚ğˆ—
         /// </summary>
         /// <param name="op"></param>
         /// <returns></returns>
         private static ExprValue BuiltinProc(Expressions.BuiltinOp.Kind op, LinkedList<ExprValue> x) {
             switch (op) {
-                case Expressions.BuiltinOp.Kind.Plus:
-                    {
-                        var arg2 = x.Value;
-                        var arg1 = x.Next.Value;
+                case Expressions.BuiltinOp.Kind.UnaryMinus: {
+                    var arg1 = x.Value;
 
-                        if (arg1 is ExprValue.IntV && arg2 is ExprValue.IntV) {
-                            var i1 = ((ExprValue.IntV)arg1).Value;
-                            var i2 = ((ExprValue.IntV)arg2).Value;
-                            return new ExprValue.IntV(i1 + i2);
-                        }
-                        if (arg1 is ExprValue.StrV && arg2 is ExprValue.StrV) {
-                            var i1 = ((ExprValue.StrV)arg1).Value;
-                            var i2 = ((ExprValue.StrV)arg2).Value;
-                            return new ExprValue.StrV(i1 + i2);
-                        }
-                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer/string: +");
+                    if (arg1 is ExprValue.IntV ) {
+                        var i1 = ((ExprValue.IntV)arg1).Value;
+                        return new ExprValue.IntV(-i1);
+                    }
+                    throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: -");
 
-                    };
-                case Expressions.BuiltinOp.Kind.Minus:
-                    {
-                        var arg2 = x.Value;
-                        var arg1 = x.Next.Value;
+                };
+                case Expressions.BuiltinOp.Kind.UnaryPlus: {
+                    var arg1 = x.Value;
 
-                        if (arg1 is ExprValue.IntV && arg2 is ExprValue.IntV) {
-                            var i1 = ((ExprValue.IntV)arg1).Value;
-                            var i2 = ((ExprValue.IntV)arg2).Value;
-                            return new ExprValue.IntV(i1 - i2);
-                        }
-                        throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: -");
+                    if (arg1 is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)arg1).Value;
+                        return new ExprValue.IntV(-i1);
+                    }
+                    throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: +");
 
                     };
+                case Expressions.BuiltinOp.Kind.Plus: {
+                    var arg2 = x.Value;
+                    var arg1 = x.Next.Value;
+
+                    if (arg1 is ExprValue.IntV && arg2 is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)arg1).Value;
+                        var i2 = ((ExprValue.IntV)arg2).Value;
+                        return new ExprValue.IntV(i1 + i2);
+                    }
+                    throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: +");
+
+                };
+                case Expressions.BuiltinOp.Kind.Minus: {
+                    var arg2 = x.Value;
+                    var arg1 = x.Next.Value;
+
+                    if (arg1 is ExprValue.IntV && arg2 is ExprValue.IntV) {
+                        var i1 = ((ExprValue.IntV)arg1).Value;
+                        var i2 = ((ExprValue.IntV)arg2).Value;
+                        return new ExprValue.IntV(i1 - i2);
+                    }
+                    throw new Exception.InvalidArgumentTypeException("Both arguments must be integer: -");
+
+                };
                 case Expressions.BuiltinOp.Kind.Mult:
                     {
                         var arg2 = x.Value;
@@ -654,11 +667,11 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// å¼ã®ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«
+        /// ®‚ÌƒRƒ“ƒpƒCƒ‹
         /// </summary>
-        /// <param name="expr">å¼</param>
-        /// <param name="env">åå‰ç’°å¢ƒ</param>
-        /// <param name="code">å¾Œç¶šã®ã‚³ãƒ¼ãƒ‰</param>
+        /// <param name="expr">®</param>
+        /// <param name="env">–¼‘OŠÂ‹«</param>
+        /// <param name="code">Œã‘±‚ÌƒR[ƒh</param>
         /// <returns></returns>
         private static LinkedList<Instructions> CompileExpr(Expressions expr, LinkedList<LinkedList<string>> env, LinkedList<Instructions> code, bool isTail) {
             if (expr is Expressions.IntLit) {
@@ -869,16 +882,16 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«
+        /// ƒRƒ“ƒpƒCƒ‹
         /// </summary>
-        /// <param name="expr">å¼</param>
-        /// <returns>ä»®æƒ³ãƒã‚·ãƒ³å‘½ä»¤åˆ—</returns>
+        /// <param name="expr">®</param>
+        /// <returns>‰¼‘zƒ}ƒVƒ“–½—ß—ñ</returns>
         public static LinkedList<Instructions> Compile(Expressions expr) {
             return CompileExpr(expr, LinkedList<LinkedList<string>>.Empty, LinkedList.Extend(new Instructions.Stop(), LinkedList<Instructions>.Empty), true);
         }
 
         /// <summary>
-        /// Dumpãƒ¬ã‚¸ã‚¹ã‚¿å‹
+        /// DumpƒŒƒWƒXƒ^Œ^
         /// </summary>
         public class DumpInfo {
             public LinkedList<ExprValue> Stack { get; }
@@ -897,9 +910,9 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ä»®æƒ³ãƒã‚·ãƒ³å‘½ä»¤ã®å®Ÿè¡Œ
+        /// ‰¼‘zƒ}ƒVƒ“–½—ß‚ÌÀs
         /// </summary>
-        /// <param name="Code">ä»®æƒ³ãƒã‚·ãƒ³å‘½ä»¤åˆ—</param>
+        /// <param name="Code">‰¼‘zƒ}ƒVƒ“–½—ß—ñ</param>
         /// <returns></returns>
         public static Tuple<ExprValue, LinkedList<LinkedList<ExprValue>>> Run(LinkedList<Instructions> Code, LinkedList<LinkedList<ExprValue>> Env) {
             LinkedList<ExprValue> stack = LinkedList<ExprValue>.Empty;
@@ -916,7 +929,7 @@ namespace MiniMAL
 
                 if (code.Value is Instructions.Ld) {
                     // ld <i> <j>
-                    // E ãƒ¬ã‚¸ã‚¹ã‚¿ã® <i> ç•ªç›®ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã® <j> ç•ªç›®ã®è¦ç´ ã‚’ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã‚€
+                    // E ƒŒƒWƒXƒ^‚Ì <i> ”Ô–Ú‚ÌƒtƒŒ[ƒ€‚Ì <j> ”Ô–Ú‚Ì—v‘f‚ğƒXƒ^ƒbƒN‚ÉÏ‚Ş
                     var ld = code.Value as Instructions.Ld;
                     var frame = LinkedList.At(env, ld.Frame);
                     var val = LinkedList.At(frame, ld.Index);
@@ -927,7 +940,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Ldc) {
                     // ldc <const>
-                    // å®šæ•° <const> ã‚’ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã‚€
+                    // ’è” <const> ‚ğƒXƒ^ƒbƒN‚ÉÏ‚Ş
                     var ldc = code.Value as Instructions.Ldc;
 
                     _nextstack = LinkedList.Extend(ldc.Value, stack);
@@ -936,7 +949,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Ldf) {
                     // ldf <code>
-                    // code ã‹ã‚‰ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ã‚’ç”Ÿæˆã—ã¦ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã‚€
+                    // code ‚©‚çƒNƒ[ƒWƒƒ‚ğ¶¬‚µ‚ÄƒXƒ^ƒbƒN‚ÉÏ‚Ş
                     var ldf = code.Value as Instructions.Ldf;
                     ExprValue closure;
                     if (ldf.Function is Instructions.Ldf.Closure)
@@ -955,7 +968,7 @@ namespace MiniMAL
 
                 } else if (code.Value is Instructions.App) {
                     // app <n>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã¾ã‚Œã¦ã„ã‚‹ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ã¨å¼•æ•°ã‚’å–ã‚Šå‡ºã—ã¦é–¢æ•°å‘¼ã³å‡ºã—ã‚’è¡Œã†
+                    // ƒXƒ^ƒbƒN‚ÉÏ‚Ü‚ê‚Ä‚¢‚éƒNƒ[ƒWƒƒ‚Æˆø”‚ğæ‚èo‚µ‚ÄŠÖ”ŒÄ‚Ño‚µ‚ğs‚¤
                     var app = code.Value as Instructions.App;
                     var closure = LinkedList.At(stack, 0);
                     stack = stack.Next;
@@ -984,7 +997,7 @@ namespace MiniMAL
                     }
                 } else if (code.Value is Instructions.Tapp) {
                     // app <n>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã¾ã‚Œã¦ã„ã‚‹ã‚¯ãƒ­ãƒ¼ã‚¸ãƒ£ã¨å¼•æ•°ã‚’å–ã‚Šå‡ºã—ã¦é–¢æ•°å‘¼ã³å‡ºã—ã‚’è¡Œã†
+                    // ƒXƒ^ƒbƒN‚ÉÏ‚Ü‚ê‚Ä‚¢‚éƒNƒ[ƒWƒƒ‚Æˆø”‚ğæ‚èo‚µ‚ÄŠÖ”ŒÄ‚Ño‚µ‚ğs‚¤
                     var tapp = code.Value as Instructions.Tapp;
                     var closure = LinkedList.At(stack, 0);
                     stack = stack.Next;
@@ -1013,7 +1026,7 @@ namespace MiniMAL
                     }
                 } else if (code.Value is Instructions.Ent) {
                     // ent <n>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã¾ã‚Œã¦ã„ã‚‹å¼•æ•°ã‚’å–ã‚Šå‡ºã—ã¦ç’°å¢ƒã‚’ä½œã‚‹
+                    // ƒXƒ^ƒbƒN‚ÉÏ‚Ü‚ê‚Ä‚¢‚éˆø”‚ğæ‚èo‚µ‚ÄŠÂ‹«‚ğì‚é
                     var app = code.Value as Instructions.Ent;
 
                     var val = LinkedList<ExprValue>.Empty;
@@ -1029,7 +1042,7 @@ namespace MiniMAL
 
                 } else if (code.Value is Instructions.Rtn) {
                     // rtn
-                    // é–¢æ•°å‘¼ã³å‡ºã—ã‹ã‚‰æˆ»ã‚‹
+                    // ŠÖ”ŒÄ‚Ño‚µ‚©‚ç–ß‚é
                     var rtn = code.Value as Instructions.Rtn;
                     var val = LinkedList.At(stack, 0);
                     var prevdump = dump.Value;
@@ -1040,7 +1053,7 @@ namespace MiniMAL
                     _nextdump = dump.Next;
                 } else if (code.Value is Instructions.Sel) {
                     // sel <ct> <cf>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ãƒˆãƒƒãƒ—ã®å€¤ãŒçœŸãªã‚‰ã° <ct> ã‚’å®Ÿè¡Œã™ã‚‹ã€‚å½ãªã‚‰ã° <cf> ã‚’å®Ÿè¡Œã™ã‚‹
+                    // ƒXƒ^ƒbƒNƒgƒbƒv‚Ì’l‚ª^‚È‚ç‚Î <ct> ‚ğÀs‚·‚éB‹U‚È‚ç‚Î <cf> ‚ğÀs‚·‚é
                     var sel = code.Value as Instructions.Sel;
                     var val = LinkedList.At(stack, 0);
                     var cond = (val as ExprValue.BoolV).Value;
@@ -1052,8 +1065,8 @@ namespace MiniMAL
                     _nextdump = LinkedList.Extend(newdump, dump);
                 } else if (code.Value is Instructions.Selr) {
                     // selr <ct> <cf>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ãƒˆãƒƒãƒ—ã®å€¤ãŒçœŸãªã‚‰ã° <ct> ã‚’å®Ÿè¡Œã™ã‚‹ã€‚å½ãªã‚‰ã° <cf> ã‚’å®Ÿè¡Œã™ã‚‹
-                    // dumpã‚’æ›´æ–°ã—ãªã„
+                    // ƒXƒ^ƒbƒNƒgƒbƒv‚Ì’l‚ª^‚È‚ç‚Î <ct> ‚ğÀs‚·‚éB‹U‚È‚ç‚Î <cf> ‚ğÀs‚·‚é
+                    // dump‚ğXV‚µ‚È‚¢
                     var selr = code.Value as Instructions.Selr;
                     var val = LinkedList.At(stack, 0);
                     var cond = (val as ExprValue.BoolV).Value;
@@ -1065,7 +1078,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Join) {
                     // join
-                    // æ¡ä»¶åˆ†å²(sel)ã‹ã‚‰åˆæµã™ã‚‹ 
+                    // ğŒ•ªŠò(sel)‚©‚ç‡—¬‚·‚é 
                     var join = code.Value as Instructions.Join;
                     var prevdump = dump.Value;
 
@@ -1075,7 +1088,7 @@ namespace MiniMAL
                     _nextdump = dump.Next;
                 } else if (code.Value is Instructions.Pop) {
                     // pop <ct> <cf>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ãƒˆãƒƒãƒ—ã®å€¤ã‚’å–ã‚Šé™¤ã
+                    // ƒXƒ^ƒbƒNƒgƒbƒv‚Ì’l‚ğæ‚èœ‚­
                     var pop = code.Value as Instructions.Pop;
 
                     _nextstack = stack.Next;
@@ -1084,7 +1097,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Stop) {
                     // stop
-                    // ã‚¹ã‚¿ãƒƒã‚¯ãƒˆãƒƒãƒ—ã®å€¤ãŒçœŸãªã‚‰ã° <ct> ã‚’å®Ÿè¡Œã™ã‚‹ã€‚å½ãªã‚‰ã° <cf> ã‚’å®Ÿè¡Œã™ã‚‹
+                    // ƒXƒ^ƒbƒNƒgƒbƒv‚Ì’l‚ª^‚È‚ç‚Î <ct> ‚ğÀs‚·‚éB‹U‚È‚ç‚Î <cf> ‚ğÀs‚·‚é
                     break;
 
                     //_nextstack = stack;
@@ -1094,7 +1107,7 @@ namespace MiniMAL
                     //_nextglobal = global;
                 } else if (code.Value is Instructions.Halt) {
                     // halt
-                    // ã‚¨ãƒ©ãƒ¼ã‚’ç”Ÿæˆã—ã¦åœæ­¢ã™ã‚‹
+                    // ƒGƒ‰[‚ğ¶¬‚µ‚Ä’â~‚·‚é
                     throw new Exception.HaltException((code.Value as Instructions.Halt).Message);
                     break;
 
@@ -1105,7 +1118,7 @@ namespace MiniMAL
                     //_nextglobal = global;
                 } else if (code.Value is Instructions.Tuple) {
                     // tuple <n>
-                    // ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã¾ã‚Œã¦ã„ã‚‹å€¤ã‚’nå€‹å–ã‚Šå‡ºã—ã¦ã‚¿ãƒ—ãƒ«ã‚’ä½œã‚‹
+                    // ƒXƒ^ƒbƒN‚ÉÏ‚Ü‚ê‚Ä‚¢‚é’l‚ğnŒÂæ‚èo‚µ‚Äƒ^ƒvƒ‹‚ğì‚é
                     var val = new List<ExprValue>();
                     for (int i = 0; i < ((Instructions.Tuple)code.Value).Num; i++) {
                         val.Add(stack.Value);
@@ -1119,7 +1132,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Dum) {
                     // dum
-                    // ç©ºç’°å¢ƒã‚’ç©ã‚€
+                    // ‹óŠÂ‹«‚ğÏ‚Ş
                     var dum = code.Value as Instructions.Dum;
 
                     _nextstack = stack;
@@ -1128,7 +1141,7 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Rap) {
                     // rap <n>
-                    // ç©ºç’°å¢ƒã‚’å¼•æ•°ã§ç½®ãæ›ãˆã‚‹
+                    // ‹óŠÂ‹«‚ğˆø”‚Å’u‚«Š·‚¦‚é
                     var rap = code.Value as Instructions.Rap;
                     var closure = LinkedList.At(stack, 0);
                     stack = stack.Next;
@@ -1157,7 +1170,7 @@ namespace MiniMAL
                     }
                 } else if (code.Value is Instructions.Rent) {
                     // rent <n>
-                    // ç©ºç’°å¢ƒã‚’å¼•æ•°ã§ç½®ãæ›ãˆã‚‹
+                    // ‹óŠÂ‹«‚ğˆø”‚Å’u‚«Š·‚¦‚é
                     var rap = code.Value as Instructions.Rent;
 
                     var val = LinkedList<ExprValue>.Empty;
@@ -1173,8 +1186,8 @@ namespace MiniMAL
                     _nextdump = dump;
                 } else if (code.Value is Instructions.Bapp) {
                     // bltin <op> <n>
-                    // çµ„ã¿è¾¼ã¿å‘½ä»¤ã®å®Ÿè¡Œã‚’è¡Œã†
-                    // å¼•æ•°ã¯ã‚¹ã‚¿ãƒƒã‚¯ã«ç©ã¾ã‚Œã¦ã„ã‚‹å¼•æ•°ã‚’å–ã‚Šå‡ºã™
+                    // ‘g‚İ‚İ–½—ß‚ÌÀs‚ğs‚¤
+                    // ˆø”‚ÍƒXƒ^ƒbƒN‚ÉÏ‚Ü‚ê‚Ä‚¢‚éˆø”‚ğæ‚èo‚·
                     var bltin = code.Value as Instructions.Bapp;
 
                     var val = LinkedList<ExprValue>.Empty;

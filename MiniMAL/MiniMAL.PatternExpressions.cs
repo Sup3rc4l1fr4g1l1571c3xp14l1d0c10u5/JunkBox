@@ -6,11 +6,11 @@ using System.Text;
 namespace MiniMAL
 {
     /// <summary>
-    /// ãƒ‘ã‚¿ãƒ¼ãƒ³å¼
+    /// ƒpƒ^[ƒ“®
     /// </summary>
     public abstract class PatternExpressions {
         /// <summary>
-        /// ãƒ¯ã‚¤ãƒ«ãƒ‰ã‚«ãƒ¼ãƒ‰ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// ƒƒCƒ‹ƒhƒJ[ƒhƒpƒ^[ƒ“
         /// </summary>
         public class WildP : PatternExpressions {
             public int Value { get; }
@@ -24,7 +24,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// å¤‰æ•°ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// •Ï”ƒpƒ^[ƒ“
         /// </summary>
         public class VarP : PatternExpressions {
             public string Id { get; }
@@ -39,7 +39,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// æ•´æ•°å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// ®”’lƒpƒ^[ƒ“
         /// </summary>
         public class IntP : PatternExpressions {
             public BigInteger Value { get; }
@@ -54,7 +54,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// æ–‡å­—åˆ—å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// •¶š—ñ’lƒpƒ^[ƒ“
         /// </summary>
         public class StrP : PatternExpressions {
             public string Value { get; }
@@ -69,7 +69,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// è«–ç†å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// ˜_—’lƒpƒ^[ƒ“
         /// </summary>
         public class BoolP : PatternExpressions {
             public bool Value { get; }
@@ -84,7 +84,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// Unitãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// Unitƒpƒ^[ƒ“
         /// </summary>
         public class UnitP : PatternExpressions {
             public UnitP() {
@@ -96,7 +96,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// consã‚»ãƒ«
+        /// consƒZƒ‹
         /// </summary>
         public class ConsP : PatternExpressions {
             public static ConsP Empty { get; } = new ConsP(null, null);
@@ -120,7 +120,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ã‚¿ãƒ—ãƒ«ãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// ƒ^ƒvƒ‹ƒpƒ^[ƒ“
         /// </summary>
         public class TupleP : PatternExpressions {
             public PatternExpressions[] Value { get; }
@@ -135,7 +135,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// Optionãƒ‘ã‚¿ãƒ¼ãƒ³
+        /// Optionƒpƒ^[ƒ“
         /// </summary>
         public class OptionP: PatternExpressions {
             public static OptionP None { get; } = new OptionP(null);

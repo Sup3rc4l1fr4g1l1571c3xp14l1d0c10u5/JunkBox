@@ -7,7 +7,7 @@ using System.Xml.Schema;
 namespace MiniMAL
 {
     /// <summary>
-    /// é›†åˆ
+    /// W‡
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public class Set<T> {

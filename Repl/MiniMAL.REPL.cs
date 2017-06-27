@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net.Configuration;
 using System.Security.Cryptography.X509Certificates;
 using MiniMAL;
@@ -11,8 +11,8 @@ namespace MiniMAL {
     public static class REPL {
         public static void EvalRun() {
             var env = Environment<Eval.ExprValue>.Empty;
-            //var tyenv = Environment<Typing.Type>.Empty;
-            var tyenv = Environment<PolymorphicTyping.TypeScheme>.Empty;
+            //var tyenv = Environment<Typing.MonomorphicTyping>.Empty;
+            var tyenv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
             // load init.miniml
             string init = "init.miniml2";
             if (System.IO.File.Exists(init)) {
@@ -22,8 +22,8 @@ namespace MiniMAL {
                         var decl = Parser.Parse(source);
                         if (decl.Success) {
                             try {
-                                //var ty = Typing.eval_decl(tyenv, decl.Value);
-                                var ty = PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                                //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
+                                var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
 
                                 var ret = Eval.eval_decl(env, decl.Value);
                                 env = ret.Env;
@@ -47,8 +47,8 @@ namespace MiniMAL {
                     if (decl.Success) {
                         try {
                             //Console.WriteLine($"expr is {decl.Value}");
-                            //var ty = Typing.eval_decl(tyenv, decl.Value);
-                            var ty = PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                            //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
+                            var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
                             var ret = Eval.eval_decl(env, decl.Value);
                             env = ret.Env;
                             tyenv = ty.Env;
