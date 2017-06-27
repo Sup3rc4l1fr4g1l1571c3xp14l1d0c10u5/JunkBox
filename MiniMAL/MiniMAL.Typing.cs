@@ -680,20 +680,20 @@ namespace MiniMAL {
                 var exp = (Expressions.LetExp)e;
 
                 var newenv = env;
-                var eqs = LinkedList<TypeEquality>.Empty;
+                var substs = LinkedList<TypeSubst>.Empty;
                 foreach (var bind in exp.Binds) {
                     var v = EvalExpressions(env, bind.Item2);
                     var s  = v.Item1;
                     var ty = v.Item2;
-                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
-                    newenv = Environment.Extend(bind.Item1, ty, newenv);
+                    substs = LinkedList.Concat(s, substs);
+                    newenv = Environment.Extend(bind.Item1, closure(ty, env, s), newenv);
                 }
 
                 { 
                     var v = EvalExpressions(newenv, exp.Body);
                     var s = v.Item1;
                     var ty = v.Item2;
-                    eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+                    var eqs = eqs_of_subst(LinkedList.Concat(substs, s));
 
                     var s3 = unify(eqs);
                     return Tuple.Create(
@@ -705,19 +705,32 @@ namespace MiniMAL {
             if (e is Expressions.LetRecExp) {
                 var exp = (Expressions.LetExp)e;
 
-                var newenv = env;
-                var eqs = LinkedList<TypeEquality>.Empty;
+                var dummyenv = env;
+
                 var binds = exp.Binds.Select(x => Tuple.Create(x.Item1, x.Item2, Type.TyVar.Fresh())).ToArray();
                 foreach (var bind in binds) {
-                    newenv = Environment.Extend(bind.Item1, bind.Item3, newenv);
+                    dummyenv = Environment.Extend(bind.Item1, bind.Item3, dummyenv);
                 }
 
+                var substs = LinkedList<TypeSubst>.Empty;
+                var eqs = LinkedList<TypeEquality>.Empty;
+
                 foreach (var bind in binds) {
-                    var v = EvalExpressions(newenv, bind.Item2);
+                    var v = EvalExpressions(dummyenv, bind.Item2);
                     var s = v.Item1;
                     var ty = v.Item2;
-                    eqs = LinkedList.Concat(LinkedList.Create(new TypeEquality(ty, bind.Item3)), eqs_of_subst(s), eqs);
+                    eqs = LinkedList.Extend(new TypeEquality(bind.Item3, ty), eqs);
+                    substs = LinkedList.Concat(s, substs);
                 }
+                var eqsBinds = LinkedList.Concat(eqs, eqs_of_subst(substs));
+                var substBinds = unify(eqsBinds);
+
+                var newenv = env;
+                foreach (var bind in binds) {
+                    var tysc = closure(subst_ty(substBinds, bind.Item3), env, bind.Item3))
+                    newenv = Environment.Extend(bind.Item1, tysc, newenv);
+                }
+
 
                 {
                     var v = EvalExpressions(newenv, exp.Body);
