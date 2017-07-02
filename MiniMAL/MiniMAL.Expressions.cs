@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 
 namespace MiniMAL {
     /// <summary>
-    /// ®
+    /// å¼
     /// </summary>
     public abstract class Expressions {
 
         /// <summary>
-        /// •Ï”®
+        /// å¤‰æ•°å¼
         /// </summary>
         public class Var : Expressions {
             public string Id { get; }
@@ -25,7 +27,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ®”®
+        /// æ•´æ•°å¼
         /// </summary>
         public class IntLit : Expressions {
             public BigInteger Value { get; }
@@ -40,7 +42,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ®”®
+        /// æ–‡å­—åˆ—å¼
         /// </summary>
         public class StrLit : Expressions {
             public string Value { get; }
@@ -55,7 +57,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ^‹U®
+        /// çœŸå½å¼
         /// </summary>
         public class BoolLit : Expressions {
             public bool Value { get; }
@@ -70,7 +72,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ‹óƒŠƒXƒg
+        /// ç©ºãƒªã‚¹ãƒˆ
         /// </summary>
         public class EmptyListLit : Expressions {
 
@@ -82,7 +84,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// OptionŒ^’l
+        /// Optionå‹å€¤
         /// </summary>
         public class OptionExp : Expressions {
             public static OptionExp None { get; } = new OptionExp(null);
@@ -116,21 +118,37 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ƒ^ƒvƒ‹®
+        /// ã‚¿ãƒ—ãƒ«å¼
         /// </summary>
         public class TupleExp : Expressions {
-            public TupleExp(Expressions[] exprs) {
-                Exprs = exprs;
+            public static TupleExp Tail { get; } = new TupleExp(null, null);
+            public TupleExp(Expressions car, TupleExp cdr) {
+                Car = car;
+                Cdr = cdr;
             }
 
-            public Expressions[] Exprs { get; }
+            public Expressions Car { get; }
+            public TupleExp Cdr { get; }
+
             public override string ToString() {
-                return $"({String.Join(", ", Exprs.Select(x => x.ToString()))})";
+                StringBuilder sb = new StringBuilder();
+                sb.Append("(");
+                var it = this;
+                if (!ReferenceEquals(it, Tail)) {
+                    sb.Append($"{it.Car}");
+                    it = it.Cdr;
+                    while (!ReferenceEquals(it, Tail)) {
+                        sb.Append($", {it.Car}");
+                        it = it.Cdr;
+                    }
+                }
+                sb.Append(")");
+                return sb.ToString();
             }
         }
 
         /// <summary>
-        /// “ñ€‰‰Zq®
+        /// çµ„ã¿è¾¼ã¿æ¼”ç®—å­
         /// </summary>
         public class BuiltinOp : Expressions {
             public enum Kind {
@@ -153,7 +171,9 @@ namespace MiniMAL {
                 Head,
                 Tail,
                 IsCons,
-                Nth,
+                Car,
+                Cdr,
+                IsTail,
                 IsTuple,
                 Length,
                 IsNone,
@@ -178,7 +198,9 @@ namespace MiniMAL {
                 { Kind.Head, "@Head" },
                 { Kind.Tail, "@Tail" },
                 { Kind.IsCons, "@IsCons" },
-                { Kind.Nth, "@Nth" },
+                { Kind.Car, "@Car" },
+                { Kind.Cdr, "@Cdr" },
+                { Kind.IsTail, "@IsTail" },
                 { Kind.IsTuple, "@IsTuple" },
                 { Kind.Length, "@Length" },
                 { Kind.IsNone, "@IsNone" },
@@ -214,7 +236,9 @@ namespace MiniMAL {
                     case Kind.Head:
                     case Kind.Tail:
                     case Kind.IsCons:
-                    case Kind.Nth:
+                    case Kind.Car:
+                    case Kind.Cdr:
+                    case Kind.IsTail:
                     case Kind.IsTuple:
                     case Kind.Length:
                     case Kind.IsNone:
@@ -228,7 +252,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// if®
+        /// ifå¼
         /// </summary>
         public class IfExp : Expressions {
             public IfExp(Expressions cond, Expressions then, Expressions @else) {
@@ -246,7 +270,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// let®
+        /// letå¼
         /// </summary>
         public class LetExp : Expressions {
             public LetExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -257,12 +281,12 @@ namespace MiniMAL {
             public Tuple<string, Expressions>[] Binds { get; }
             public Expressions Body { get; }
             public override string ToString() {
-                return $"let {String.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"))} in {Body}";
+                return $"let {string.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"))} in {Body}";
             }
         }
 
         /// <summary>
-        /// –³–¼ŠÖ”®iÃ“IƒXƒR[ƒv”Åj
+        /// ç„¡åé–¢æ•°å¼ï¼ˆé™çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
         /// </summary>
         public class FunExp : Expressions {
             public FunExp(string arg, Expressions body) {
@@ -278,7 +302,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// –³–¼ŠÖ”®i“®“IƒXƒR[ƒv”Åj
+        /// ç„¡åé–¢æ•°å¼ï¼ˆå‹•çš„ã‚¹ã‚³ãƒ¼ãƒ—ç‰ˆï¼‰
         /// </summary>
         public class DFunExp : Expressions {
             public DFunExp(string arg, Expressions body) {
@@ -294,7 +318,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// ŠÖ”“K—p®
+        /// é–¢æ•°é©ç”¨å¼
         /// </summary>
         public class AppExp : Expressions {
             public AppExp(Expressions fun, Expressions arg) {
@@ -310,7 +334,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// let-rec®
+        /// let-recå¼
         /// </summary>
         public class LetRecExp : Expressions {
             public LetRecExp(Tuple<string, Expressions>[] binds, Expressions body) {
@@ -321,12 +345,12 @@ namespace MiniMAL {
             public Tuple<string, Expressions>[] Binds { get; }
             public Expressions Body { get; }
             public override string ToString() {
-                return $"let rec {String.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"))} in {Body}";
+                return $"let rec {string.Join(" and ", Binds.Select(x => $"{x.Item1} = {x.Item2}"))} in {Body}";
             }
         }
 
         /// <summary>
-        /// match®
+        /// matchå¼
         /// </summary>
         public class MatchExp : Expressions {
             public MatchExp(Expressions exp, Tuple<PatternExpressions, Expressions>[] patterns) {
@@ -337,12 +361,12 @@ namespace MiniMAL {
             public Expressions Exp { get; }
             public Tuple<PatternExpressions, Expressions>[] Patterns { get; }
             public override string ToString() {
-                return $"match {Exp} with {String.Join(" | ", Patterns.Select(x => $"{x.Item1.ToString()} -> {x.Item2.ToString()}"))}";
+                return $"match {Exp} with {string.Join(" | ", Patterns.Select(x => $"{x.Item1.ToString()} -> {x.Item2.ToString()}"))}";
             }
         }
 
         /// <summary>
-        /// Halt®
+        /// Haltå¼
         /// </summary>
         public class HaltExp : Expressions {
             public string Message { get; }

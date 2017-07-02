@@ -1,11 +1,12 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace MiniMAL
 {
 
     /// <summary>
-    /// パターン式コンパイラ
+    /// 繝代ち繝ｼ繝ｳ蠑上さ繝ｳ繝代う繝ｩ
     /// </summary>
     public static class PatternCompiler {
         private static int _anonymousV;
@@ -96,21 +97,39 @@ namespace MiniMAL
                 //          )
                 //   )"
 
-                var body = p.Value.Reverse().Aggregate(Tuple.Create(action, p.Value.Length - 1), (s, x) => {
+                var patterns = new List<PatternExpressions>();
+                
+                for (var it = p; !ReferenceEquals(it, PatternExpressions.TupleP.Tail); it = it.Cdr) {
+                    patterns.Add(it.Car);
+                }
+
+                Func<int, Expressions, Expressions> wrapCar =
+                    (cnt, val) => new Expressions.BuiltinOp(
+                        Expressions.BuiltinOp.Kind.Car,
+                        new [] { 
+                        Enumerable.Repeat(0, cnt-1)
+                                            .Aggregate(
+                                                val, (s, x) => new Expressions.BuiltinOp(
+                                                         Expressions.BuiltinOp.Kind.Cdr,
+                                                         new[] {s})
+                                  )}
+                        );
+
+                var body = patterns.Reverse<PatternExpressions>().Aggregate(Tuple.Create(action, patterns.Count), (s, x) => {
                     var tmp = new Expressions.Var(GenAnonymousVariable());
                     var expr = new Expressions.LetExp(
                         new[] {
-                            Tuple.Create<string,Expressions>(tmp.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Nth, new [] { new Expressions.IntLit(s.Item2), value })),
+                            Tuple.Create<string,Expressions>(tmp.Id, wrapCar(s.Item2, value)),
                         },
                         CompilePattern(tmp, x, s.Item1)
                     );
-                    return Tuple.Create((Expressions)expr, s.Item2 - 1);
+                    return Tuple.Create((Expressions)expr, s.Item2-1);
                 });
 
                 return new Expressions.IfExp(
                     new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.IsTuple, new [] { value}),
                     new Expressions.IfExp(
-                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Ne, new Expressions[] { new Expressions.IntLit(p.Value.Length), new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Length, new [] { value}), }),
+                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Ne, new Expressions[] { new Expressions.IntLit(patterns.Count), new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Length, new [] { value}), }),
                         Expressions.OptionExp.None,
                         body.Item1
                     ),

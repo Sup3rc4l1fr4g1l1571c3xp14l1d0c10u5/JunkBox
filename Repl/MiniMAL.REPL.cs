@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Configuration;
 using System.Security.Cryptography.X509Certificates;
 using MiniMAL;
@@ -10,7 +10,7 @@ namespace MiniMAL {
     /// </summary>
     public static class REPL {
         public static void EvalRun() {
-            var env = Environment<Eval.ExprValue>.Empty;
+            var env = Environment<AbstractSyntaxTreeInterpreter.ExprValue>.Empty;
             //var tyenv = Environment<Typing.MonomorphicTyping>.Empty;
             var tyenv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
             // load init.miniml
@@ -25,7 +25,7 @@ namespace MiniMAL {
                                 //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
                                 var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
 
-                                var ret = Eval.eval_decl(env, decl.Value);
+                                var ret = AbstractSyntaxTreeInterpreter.eval_decl(env, decl.Value);
                                 env = ret.Env;
                                 tyenv = ty.Env;
                             } catch (Exception e) {
@@ -49,7 +49,7 @@ namespace MiniMAL {
                             //Console.WriteLine($"expr is {decl.Value}");
                             //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
                             var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
-                            var ret = Eval.eval_decl(env, decl.Value);
+                            var ret = AbstractSyntaxTreeInterpreter.eval_decl(env, decl.Value);
                             env = ret.Env;
                             tyenv = ty.Env;
                             Console.WriteLine($"val {ret.Id} : {ty.Value} = {ret.Value}");
@@ -67,7 +67,8 @@ namespace MiniMAL {
         }
         public static void VMRun() {
             var envname = LinkedList<LinkedList<string>>.Empty;
-            var envvalue = LinkedList<LinkedList<VM.ExprValue>>.Empty;
+            var envvalue = LinkedList<LinkedList<SecdMachineInterpreter.ExprValue>>.Empty;
+            var tyenv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
 
             // repl
             Parsing.Source source = new Parsing.Source("<stdin>", Console.In);
@@ -77,17 +78,19 @@ namespace MiniMAL {
                 if (decl.Success) {
                     try {
                         Console.WriteLine($"expr is {decl.Value}");
-                        var compileret = VM.CompileDecl(decl.Value, envname);
+                        var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                        var compileret = SecdMachineInterpreter.CompileDecl(decl.Value, envname);
                         var code = compileret.Item1;
                         envname = compileret.Item2;
+                        tyenv = ty.Env;
                         Console.WriteLine($"Compiled instruction = ");
                         foreach (var c in code) {
                             Console.WriteLine($"{c}");
                         }
                         foreach (var c in code) {
-                            var ret = VM.Run(c, envvalue);
+                            var ret = SecdMachineInterpreter.Run(c, envvalue);
                             if (ret.Item1 != null) {
-                                Console.WriteLine($"val - = {ret.Item1}");
+                                Console.WriteLine($"val - : {ty.Value} = {ret.Item1}");
                             } else {
                                 var namee = envname.Value;
                                 var vale = ret.Item2.Value;

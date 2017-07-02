@@ -77,9 +77,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MiniMAL.Declarations.cs" />
+    <Compile Include="MiniMAL.Toplevel.cs" />
     <Compile Include="MiniMAL.Environment.cs" />
-    <Compile Include="MiniMAL.Eval.cs" />
+    <Compile Include="MiniMAL.AbstractSyntaxTreeInterpreter.cs" />
     <Compile Include="MiniMAL.Expressions.cs" />
     <Compile Include="MiniMAL.Typing.cs" />
     <Compile Include="MiniMAL.Set.cs" />
@@ -87,9 +87,9 @@
     <Compile Include="MiniMAL.Parser.cs" />
     <Compile Include="MiniMAL.PatternCompiler.cs" />
     <Compile Include="MiniMAL.PatternExpressions.cs" />
-    <Compile Include="MiniMAL.PolymorphicTyping.cs" />
-    <Compile Include="MiniMAL.MonomorphicTyping.cs" />
-    <Compile Include="MiniMAL.VM.cs" />
+    <Compile Include="MiniMAL.Typing.PolymorphicTyping.cs" />
+    <Compile Include="MiniMAL.Typing.MonomorphicTyping.cs" />
+    <Compile Include="MiniMAL.SecdMachineInterpreter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

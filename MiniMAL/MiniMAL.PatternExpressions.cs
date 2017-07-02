@@ -6,11 +6,11 @@ using System.Text;
 namespace MiniMAL
 {
     /// <summary>
-    /// ƒpƒ^[ƒ“®
+    /// ãƒ‘ã‚¿ãƒ¼ãƒ³å¼
     /// </summary>
     public abstract class PatternExpressions {
         /// <summary>
-        /// ƒƒCƒ‹ƒhƒJ[ƒhƒpƒ^[ƒ“
+        /// ãƒ¯ã‚¤ãƒ«ãƒ‰ã‚«ãƒ¼ãƒ‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class WildP : PatternExpressions {
             public int Value { get; }
@@ -24,7 +24,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// •Ï”ƒpƒ^[ƒ“
+        /// å¤‰æ•°ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class VarP : PatternExpressions {
             public string Id { get; }
@@ -39,7 +39,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ®”’lƒpƒ^[ƒ“
+        /// æ•´æ•°å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class IntP : PatternExpressions {
             public BigInteger Value { get; }
@@ -54,7 +54,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// •¶š—ñ’lƒpƒ^[ƒ“
+        /// æ–‡å­—åˆ—å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class StrP : PatternExpressions {
             public string Value { get; }
@@ -69,7 +69,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ˜_—’lƒpƒ^[ƒ“
+        /// è«–ç†å€¤ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class BoolP : PatternExpressions {
             public bool Value { get; }
@@ -84,7 +84,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// Unitƒpƒ^[ƒ“
+        /// Unitãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class UnitP : PatternExpressions {
             public UnitP() {
@@ -96,7 +96,7 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// consƒZƒ‹
+        /// consã‚»ãƒ«
         /// </summary>
         public class ConsP : PatternExpressions {
             public static ConsP Empty { get; } = new ConsP(null, null);
@@ -120,22 +120,37 @@ namespace MiniMAL
         }
 
         /// <summary>
-        /// ƒ^ƒvƒ‹ƒpƒ^[ƒ“
+        /// ã‚¿ãƒ—ãƒ«ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class TupleP : PatternExpressions {
-            public PatternExpressions[] Value { get; }
+            public static TupleP Tail { get; } = new TupleP(null, null);
+            public PatternExpressions Car { get; }
+            public TupleP Cdr { get; }
 
-            public TupleP(PatternExpressions[] value) {
-                Value = value;
+            public TupleP(PatternExpressions car, TupleP cdr) {
+                Car = car;
+                Cdr = cdr;
             }
 
             public override string ToString() {
-                return $"({String.Join(", ", Value.Select(x => x.ToString()))})";
+                StringBuilder sb = new StringBuilder();
+                sb.Append("(");
+                var it = this;
+                if (!ReferenceEquals(it, Tail)) {
+                    sb.Append($"{it.Car}");
+                    it = it.Cdr;
+                    while (!ReferenceEquals(it, Tail)) {
+                        sb.Append($", {it.Car}");
+                        it = it.Cdr;
+                    }
+                }
+                sb.Append(")");
+                return sb.ToString();
             }
         }
 
         /// <summary>
-        /// Optionƒpƒ^[ƒ“
+        /// Optionãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public class OptionP: PatternExpressions {
             public static OptionP None { get; } = new OptionP(null);

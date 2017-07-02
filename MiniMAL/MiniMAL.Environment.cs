@@ -1,18 +1,33 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MiniMAL
-{
+namespace MiniMAL {
+
     /// <summary>
     /// 環境
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class Environment<T> {
+    public class Environment<T> { 
 
+        /// <summary>
+        /// 束縛名
+        /// </summary>
         public string Id { get; }
+
+        /// <summary>
+        /// 値
+        /// </summary>
         public T Value { get; }
+
+        /// <summary>
+        /// 次の要素
+        /// </summary>
         public Environment<T> Next { get; }
+
+        /// <summary>
+        /// 終端を意味する空要素
+        /// </summary>
         public static Environment<T> Empty { get; } = new Environment<T>(null, default(T), null);
 
         public Environment(string id, T value, Environment<T> next) {
@@ -35,6 +50,12 @@ namespace MiniMAL
                 if (e.Id == x) { return e.Value; }
             }
             throw new Exception.NotBound(x);
+        }
+        public static bool Contains<T>(string x, Environment<T> env) {
+            for (var e = env; e != Environment<T>.Empty; e = e.Next) {
+                if (e.Id == x) { return true; }
+            }
+            return false;
         }
         public static Environment<T2> Map<T1, T2>(Func<T1, T2> f, Environment<T1> env) {
             List<Tuple<string, T2>> kv = new List<Tuple<string, T2>>();
