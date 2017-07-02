@@ -77,6 +77,8 @@ namespace MiniMAL {
         private static readonly Parser<string> RParen = WS.Then(Combinator.Token(")"));
         private static readonly Parser<string> LBracket = WS.Then(Combinator.Token("["));
         private static readonly Parser<string> RBracket = WS.Then(Combinator.Token("]"));
+        private static readonly Parser<string> LBrace = WS.Then(Combinator.Token("{"));
+        private static readonly Parser<string> RBrace = WS.Then(Combinator.Token("}"));
         private static readonly Parser<string> Semi = WS.Then(Combinator.Token(";"));
         private static readonly Parser<string> SemiSemi = WS.Then(Combinator.Token(";;"));
         private static readonly Parser<string> RArrow = WS.Then(Combinator.Token("->"));
@@ -327,13 +329,14 @@ namespace MiniMAL {
             (from _1 in String select Tuple.Create(x, (Typing.Type)new Typing.Type.TyStr())),
             (from _1 in Unit select Tuple.Create(x, (Typing.Type)new Typing.Type.TyUnit())),
             (from _1 in Quote from _2 in Id let ev = Environment.Contains(_2, x) ? x : Environment.Extend(_2, Typing.Type.TyVar.Fresh().Id, x) let id = Environment.LookUp(_2, x) select Tuple.Create(ev, (Typing.Type)new Typing.Type.TyVar(id))),
+            (from _1 in LBrace from _2 in TypeRecordBody from _3 in RBrace select _2),
             (from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr(x)) from _3 in RParen select _2)
             );
 
         private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExprList = (x) =>
             from _1 in TypeExprTerm(x)
-            from _2 in List.Many()
-            select Tuple.Create(_1.Item1, _2.Aggregate(_1.Item2, (s, _) => new Typing.Type.TyCons(s)));
+            from _2 in Combinator.Choice(List, Option).Many()
+            select Tuple.Create(_1.Item1, _2.Aggregate(_1.Item2, (s, y) => y == "list" ? (Typing.Type)new Typing.Type.TyCons(s) : (Typing.Type)new Typing.Type.TyOption(s)));
 
         private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type.TyTuple>>> TypeExprTupleBody = (x) =>
             from _1 in TypeExprList(x)
