@@ -10,27 +10,15 @@ namespace MiniMAL {
         /// </summary>
         public abstract class Type {
             public class TyInt : Type {
-                public override string ToString() {
-                    return "int";
-                }
             }
 
             public class TyBool : Type {
-                public override string ToString() {
-                    return "bool";
-                }
             }
 
             public class TyStr : Type {
-                public override string ToString() {
-                    return "string";
-                }
             }
 
             public class TyUnit : Type {
-                public override string ToString() {
-                    return "unit";
-                }
             }
 
             public class TyVar : Type {
@@ -44,10 +32,6 @@ namespace MiniMAL {
                 public TyVar(int id) {
                     Id = id;
                 }
-
-                public override string ToString() {
-                    return $"'{Id}";
-                }
             }
 
             public class TyFunc : Type {
@@ -58,10 +42,6 @@ namespace MiniMAL {
                     ArgType = argType;
                     RetType = retType;
                 }
-
-                public override string ToString() {
-                    return $"({ArgType} -> {RetType})";
-                }
             }
 
             public class TyCons : Type {
@@ -70,10 +50,6 @@ namespace MiniMAL {
 
                 public TyCons(Type itemType) {
                     ItemType = itemType;
-                }
-
-                public override string ToString() {
-                    return $"{ItemType} list";
                 }
             }
 
@@ -85,22 +61,6 @@ namespace MiniMAL {
                     Car = car;
                     Cdr = cdr;
                 }
-
-                public override string ToString() {
-                    StringBuilder sb = new StringBuilder();
-                    sb.Append("(");
-                    var it = this;
-                    if (!ReferenceEquals(it,Tail)) {
-                        sb.Append($"{it.Car}");
-                        it = it.Cdr;
-                        while (!ReferenceEquals(it, Tail)) {
-                            sb.Append($", {it.Car}");
-                            it = it.Cdr;
-                        }
-                    }
-                    sb.Append(")");
-                    return sb.ToString();
-                }
             }
 
             public class TyOption : Type {
@@ -108,10 +68,6 @@ namespace MiniMAL {
 
                 public TyOption(Type itemType) {
                     ItemType = itemType;
-                }
-
-                public override string ToString() {
-                    return $"{ItemType} option";
                 }
             }
 
@@ -188,6 +144,105 @@ namespace MiniMAL {
             public override int GetHashCode() {
                 return GetType().GetHashCode();
             }
+
+            private static void type_stringizer(Dictionary<int, string> vars,
+                                                StringBuilder buffer,
+                                                int priority,
+                                                Type t) {
+                if (t is Type.TyVar) {
+                    var tt = t as Type.TyVar;
+                    if (!vars.ContainsKey(tt.Id)) {
+                        int i = vars.Count;
+                        string str = "'";
+                        for (;;) {
+                            str = str + (char) ('a' + i % 26);
+                            if (i < 26) {
+                                break;
+                            }
+                            i /= 26;
+                        }
+                        vars[tt.Id] = str;
+                    }
+                    buffer.Append(vars[tt.Id]);
+                    return;
+                }
+                if (t is Type.TyUnit) {
+                    buffer.Append("unit");
+                    return;
+                }
+                if (t is Type.TyInt) {
+                    buffer.Append("int");
+                    return;
+                }
+                if (t is Type.TyBool) {
+                    buffer.Append("bool");
+                    return;
+                }
+                if (t is Type.TyStr) {
+                    buffer.Append("string");
+                    return;
+                }
+                if (t is Type.TyTuple) {
+                    var tt = t as Type.TyTuple;
+                    if (priority > 1) {
+                        buffer.Append("(");
+                    }
+                    type_stringizer(vars, buffer, 2, tt.Car);
+                    for (var it = tt.Cdr; it != TyTuple.Tail; it = it.Cdr) {
+                        buffer.Append(" * ");
+                        type_stringizer(vars, buffer, 2, it.Car);
+                    }
+                    if (priority > 1) {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
+                if (t is Type.TyCons) {
+                    var tt = t as Type.TyCons;
+                    if (priority > 2) {
+                        buffer.Append("(");
+                    }
+                    type_stringizer(vars, buffer, 2, tt.ItemType);
+                    buffer.Append(" list");
+                    if (priority > 2) {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
+                if (t is Type.TyOption) {
+                    var tt = t as Type.TyOption;
+                    if (priority > 2) {
+                        buffer.Append("(");
+                    }
+                    type_stringizer(vars, buffer, 2, tt.ItemType);
+                    buffer.Append(" option");
+                    if (priority > 2) {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
+                if (t is Type.TyFunc) {
+                    var tt = t as Type.TyFunc;
+                    if (priority > 0) {
+                        buffer.Append("(");
+                    }
+                    type_stringizer(vars, buffer, 1, tt.ArgType);
+                    buffer.Append(" -> ");
+                    type_stringizer(vars, buffer, 0, tt.RetType);
+                    if (priority > 0) {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
+                //throw new NotSupportedException();
+            }
+
+            public override string ToString() {
+                var sb = new StringBuilder();
+                var dic = new Dictionary<int,string>();
+                type_stringizer(dic, sb, 0, this);
+                return sb.ToString();
+            }
         }
 
         /// <summary>
@@ -258,7 +313,7 @@ namespace MiniMAL {
                     items.Add(ty1.Car);
                     ty1 = ty1.Cdr;
                 }
-                return items.Aggregate(Type.TyTuple.Tail, (s,x) => new Type.TyTuple(resolve_type(substs, x),s));
+                return items.Reverse<Type>().Aggregate(Type.TyTuple.Tail, (s,x) => new Type.TyTuple(resolve_type(substs, x),s));
             }
             return typ;
         }
@@ -639,13 +694,16 @@ namespace MiniMAL {
                     );
                 } else {
                     var tyitem = Type.TyVar.Fresh();
+                    var tyList = new Type.TyCons(tyitem);
                     var ret1 = EvalPatternExpressions(p.Value, tyitem);
+                    var ret2 = EvalPatternExpressions(p.Next, tyList);
                     return Tuple.Create(
                         LinkedList.Concat(
-                            LinkedList.Create( new TypeEquality(value, new Type.TyCons(tyitem)) ),
-                            ret1.Item1
+                            LinkedList.Create(new TypeEquality(tyList, value)),
+                            ret1.Item1,
+                            ret2.Item1
                         ),
-                        ret1.Item2
+                        ret2.Item2.Aggregate(new Dictionary<string,Type>(ret1.Item2), (s, x) => { s[x.Key] = x.Value; return s; })
                     );
                 }
             }
@@ -675,7 +733,7 @@ namespace MiniMAL {
                     var pateqs = ret.Item1;
                     var patbind = ret.Item2;
 
-                    eqs = LinkedList.Concat(eqs, pateqs);
+                    eqs = LinkedList.Concat(pateqs, eqs);
                     binds = patbind.Aggregate(binds, (s, x) => {
                         s[x.Key] = x.Value;
                         return s;

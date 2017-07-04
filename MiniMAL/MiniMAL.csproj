@@ -77,6 +77,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MiniMAL.TypeExpr.cs" />
     <Compile Include="MiniMAL.Toplevel.cs" />
     <Compile Include="MiniMAL.Environment.cs" />
     <Compile Include="MiniMAL.AbstractSyntaxTreeInterpreter.cs" />

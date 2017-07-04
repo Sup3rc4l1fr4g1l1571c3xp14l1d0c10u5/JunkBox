@@ -1,7 +1,9 @@
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Parsing;
 
@@ -58,11 +60,12 @@ namespace MiniMAL {
         private static readonly Parser<string> String = WS.Then(Ident.Where(x => x == "string"));
         private static readonly Parser<string> Unit = WS.Then(Ident.Where(x => x == "unit"));
         private static readonly Parser<string> List = WS.Then(Ident.Where(x => x == "list"));
+        private static readonly Parser<string> Option = WS.Then(Ident.Where(x => x == "option"));
         private static readonly Parser<string> Some = WS.Then(Constructor.Where(x => x == "Some"));
         private static readonly Parser<string> None = WS.Then(Constructor.Where(x => x == "None"));
 
         private static readonly Parser<string> ReservedWords = Combinator.Choice(True, False, If, Then, Else, Let, Rec, In, And, Fun, DFun, Match, With, Type, 
-            Int, Bool, String, List, Some, None);
+            Int, Bool, String, Unit, List, Option, Some, None);
 
         private static readonly Parser<string> Id = WS.Then(ReservedWords.Not()).Then(Ident);
 
@@ -186,14 +189,15 @@ namespace MiniMAL {
             from _1 in PatternExpr.Repeat1(ColCol)
             select _1.Reverse().Aggregate((s, x) => new PatternExpressions.ConsP(x, s));
 
-#if false
         private static readonly Parser<Tuple<PatternExpressions, Expressions>> PatternEntry =
-            from _1 in PatternCons
-            from _2 in RArrow
-            from _3 in Expr
-            select Tuple.Create(_1, _3)
+                from _1 in PatternCons
+                from _2 in RArrow
+                from _3 in Expr
+                select Tuple.Create(_1, _3)
             ;
 
+
+#if true
         private static readonly Parser<Expressions> MatchExpr =
             from _1 in Match
             from _2 in Expr
@@ -201,12 +205,6 @@ namespace MiniMAL {
             from _4 in Bar.Option().Then(PatternEntry.Repeat1(Bar))
             select (Expressions)new Expressions.MatchExp(_2, _4);
 #else
-        private static readonly Parser<Expressions> PatternEntry =
-                from _1 in PatternCons
-                from _2 in RArrow
-                from _3 in Expr
-                select PatternCompiler.CompilePattern(new Expressions.Var("@v"), _1, _3)
-            ;
 
         private static readonly Parser<Expressions> MatchExpr =
             from _1 in Match
@@ -216,7 +214,7 @@ namespace MiniMAL {
             select (Expressions)
             new Expressions.LetExp(
                 new[] { Tuple.Create<string, Expressions>("@v", _2) },
-                _4.Reverse().Aggregate(
+                _4.Select(x => PatternCompiler.CompilePattern(new Expressions.Var("@v"), x.Item1, x.Item2)).Reverse().Aggregate(
                     (Expressions)new Expressions.HaltExp("not match"),
                     (s, x) => new Expressions.LetExp(
                         new[] { Tuple.Create<string, Expressions>("@ret", x) },
@@ -320,48 +318,36 @@ namespace MiniMAL {
             )
             select _2.Aggregate(_1, (s, x) => x(s));
 
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExprTerm = (x) =>
+        private static readonly Parser<TypeExp> SimpleType =
+            from _1 in Combinator.Choice(
+                Quote.Then(Id).Select(x => (TypeExp) new TypeExp.TypeVar("'" + x)),
+                from _1 in Int select (TypeExp)new TypeExp.IntType(),
+                from _1 in Bool select (TypeExp)new TypeExp.BoolType(),
+                from _1 in Unit select (TypeExp)new TypeExp.UnitType(),
+                from _1 in String select (TypeExp)new TypeExp.StrType(),
+                Id.Select(x => (TypeExp)new TypeExp.TypeConstruct(new TypeExp.TypeName(x), new TypeExp[0])),
+                from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr).Repeat1(Comma) from _3 in RParen from _4 in Id.Select(x => new TypeExp.TypeName(x)) select (TypeExp) new TypeExp.TypeConstruct(_4, _2),
+                from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr) from _3 in RParen select _2
+            )
+            from _2 in Id.Select(x => new TypeExp.TypeName(x)).Many()
+            select _2.Aggregate(_1, (s, y) => (TypeExp) new TypeExp.TypeConstruct(y, new TypeExp[] {s}));
+
+        private static readonly Parser<TypeExp> TypeExprTuple =
+            SimpleType.Repeat1(Mult)
+                      .Select(x => (x.Length > 1
+                                        ? x.Reverse()
+                                           .Aggregate(TypeExp.TupleType.Tail, (s, y) => new TypeExp.TupleType(y, s))
+                                        : x[0]));
+
+        private static readonly Parser<TypeExp> TypeExprFunc =
             Combinator.Choice(
-            (from _1 in Int select Tuple.Create(x, (Typing.Type)new Typing.Type.TyInt())),
-            (from _1 in Bool select Tuple.Create(x, (Typing.Type)new Typing.Type.TyBool())),
-            (from _1 in String select Tuple.Create(x, (Typing.Type)new Typing.Type.TyStr())),
-            (from _1 in Unit select Tuple.Create(x, (Typing.Type)new Typing.Type.TyUnit())),
-            (from _1 in Quote from _2 in Id let ev = Environment.Contains(_2, x) ? x : Environment.Extend(_2, Typing.Type.TyVar.Fresh().Id, x) let id = Environment.LookUp(_2, x) select Tuple.Create(ev, (Typing.Type)new Typing.Type.TyVar(id))),
-            (from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr(x)) from _3 in RParen select _2)
+                from _1 in TypeExprTuple
+                from _2 in RArrow.Then(Combinator.Lazy(()=>TypeExprFunc)).Option()
+                select _2 == null ? _1 : (TypeExp)new TypeExp.FuncType(_1, _2)
             );
 
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExprList = (x) =>
-            from _1 in TypeExprTerm(x)
-            from _2 in List.Many()
-            select Tuple.Create(_1.Item1, _2.Aggregate(_1.Item2, (s, _) => new Typing.Type.TyCons(s)));
-
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type.TyTuple>>> TypeExprTupleBody = (x) =>
-            from _1 in TypeExprList(x)
-            from _2 in Mult.Then(TypeExprTupleBody(_1.Item1)).Option()
-            select _2 == null ? Tuple.Create(_1.Item1, new Typing.Type.TyTuple(_1.Item2, Typing.Type.TyTuple.Tail)) : Tuple.Create(_2.Item1, new Typing.Type.TyTuple(_1.Item2, _2.Item2))
-            ;
-
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExprTuple = (x) =>
-            from _1 in TypeExprList(x)
-            from _2 in Mult.Then(TypeExprTupleBody(_1.Item1)).Option()
-            select _2 == null ? _1 : Tuple.Create(_2.Item1, (Typing.Type)new Typing.Type.TyTuple(_1.Item2, _2.Item2))
-            ;
-
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExprFunc = (x) =>
-            from _1 in TypeExprTuple(x)
-            from _2 in RArrow.Then(TypeExprFunc(_1.Item1)).Option()
-            select _2 == null ? _1 : Tuple.Create(_2.Item1, (Typing.Type)new Typing.Type.TyFunc(_1.Item2, _2.Item2))
-            ;
-
-        private static readonly Func<Environment<int>, Parser<Tuple<Environment<int>, Typing.Type>>> TypeExpr = (x) =>
-            TypeExprFunc(x)
-            ;
-
-        private static readonly Parser<Tuple<string, Typing.Type>> Typedef =
-            from _1 in Id
-            from _2 in Eq
-            from _3 in TypeExpr(Environment<int>.Empty)
-            select Tuple.Create(_1, _3.Item2);
+        private static readonly Parser<TypeExp> TypeExpr =
+            TypeExprFunc;
 
         private static readonly Parser<Toplevel> TopLevel =
             Combinator.Choice(
@@ -371,10 +357,18 @@ namespace MiniMAL {
                     select (Toplevel)new Toplevel.Exp(_1)
                 ), (
                        from _1 in Type
-                       from _2 in Typedef.Repeat1(And)
-                       from _3 in SemiSemi
-                       select (Toplevel)new Toplevel.TypeDef(_2)
-                ), (
+                       from _2 in Combinator.Choice(
+                                   from _3 in LParen
+                                   from _4 in Quote.Then(Id).Select(x => "'"+x).Repeat1(Comma)
+                                   from _5 in RParen
+                                   select _4,
+                                   Quote.Then(Id).Select(x => new [] { "'" + x })
+                               ).Option()
+                        from _3 in Id
+                        from _4 in Eq
+                        from _5 in TypeExpr
+                       select (Toplevel)new Toplevel.TypeDef(_3, _2 == null ? new string[] {} : _2, _5)
+                   ), (
                     from _1 in Combinator.Many(
                         Combinator.Choice(
                             (

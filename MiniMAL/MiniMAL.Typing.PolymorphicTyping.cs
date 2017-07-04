@@ -278,17 +278,20 @@ namespace MiniMAL {
                     var st = v1.Item1;
                     var ty = v1.Item2;
 
-                    // 
                     var eqs = eqs_of_subst(st);
                     foreach (var pattern in exp.Patterns) {
                         var pt = pattern.Item1;
                         var ex = pattern.Item2;
 
+                        // パターン式から型等式と束縛を導出
                         var v2 = EvalPatternExpressions(pt, ty);
                         var eqs1 = v2.Item1;
                         var binds1 = v2.Item2;
 
+                        // 束縛を環境に結合
                         var env1 = binds1.Aggregate(env, (s, x) => Environment.Extend(x.Key, tysc_of_ty(x.Value), s));
+
+                        // 本体から型等式と戻り値型を導出
                         var v3 = EvalExpressions(env1, ex);
                         var se = v3.Item1;
                         var tye = v3.Item2;
@@ -359,19 +362,19 @@ namespace MiniMAL {
 
                     var newenv = env;
                     var substs = LinkedList<TypeSubst>.Empty;
-                    var ret = new Result("", env, null);
+                    var ret = new Result("", env,   null);
                     foreach (var bind in decl.Binds) {
                         var v = EvalExpressions(env, bind.Item2);
                         var s = v.Item1;
                         var ty = v.Item2;
                         substs = LinkedList.Concat(s, substs);
                         newenv = Environment.Extend(bind.Item1, Closure(ty, env, s), newenv);
-                        ret = new Result(bind.Item1, newenv, ty);
+                        ret = new Result(bind.Item1, newenv,  ty);
                     }
 
                     {
                         var s3 = Unify(eqs_of_subst(substs));
-                        return new Result(ret.Id, newenv, subst_type(s3, ret.Value));
+                        return new Result(ret.Id, newenv,  subst_type(s3, ret.Value));
                     }
                 }
                 if (p is Toplevel.Binding.LetRecDecl) {
@@ -398,16 +401,16 @@ namespace MiniMAL {
                     var substBinds = Unify(eqsBinds);
 
                     var newenv = env;
-                    var ret = new Result("", newenv, null);
+                    var ret = new Result("", newenv,  null);
                     foreach (var bind in binds) {
                         var tysc = Closure(subst_type(substBinds, bind.Item3), env, substBinds);
                         newenv = Environment.Extend(bind.Item1, tysc, newenv);
-                        ret = new Result(bind.Item1, newenv, tysc.Type);
+                        ret = new Result(bind.Item1, newenv,  tysc.Type);
                     }
 
                     {
                         var s3 = Unify(eqs_of_subst(substs));
-                        return new Result(ret.Id, newenv, subst_type(s3, ret.Value));
+                        return new Result(ret.Id, newenv,  subst_type(s3, ret.Value));
                     }
                 }
                 throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
@@ -417,20 +420,20 @@ namespace MiniMAL {
                 if (p is Toplevel.Exp) {
                     var e = (Toplevel.Exp) p;
                     var v = EvalExpressions(env, e.Syntax);
-                    return new Result("-", env, v.Item2);
+                    return new Result("-", env,  v.Item2);
                 }
                 if (p is Toplevel.Binding) {
                     var ds = (Toplevel.Binding) p;
                     var newenv = env;
-                    var ret = new Result("", env, null);
+                    var ret = new Result("", env,  null);
                     foreach (var d in ds.Entries) {
-                        ret = eval_declEntry(newenv, d);
+                        ret = eval_declEntry(newenv,  d);
                         newenv = ret.Env;
                     }
                     return ret;
                 }
                 if (p is Toplevel.Empty) {
-                    return new Result("", env, null);
+                    return new Result("", env,  null);
                 }
                 throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
             }

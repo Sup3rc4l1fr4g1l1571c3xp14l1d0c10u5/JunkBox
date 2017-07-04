@@ -23,7 +23,7 @@ namespace MiniMAL {
                         if (decl.Success) {
                             try {
                                 //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
-                                var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                                var ty = Typing.PolymorphicTyping.eval_decl(tyenv,  decl.Value);
 
                                 var ret = AbstractSyntaxTreeInterpreter.eval_decl(env, decl.Value);
                                 env = ret.Env;
@@ -46,9 +46,9 @@ namespace MiniMAL {
                     var decl = Parser.Parse(source);
                     if (decl.Success) {
                         try {
-                            //Console.WriteLine($"expr is {decl.Value}");
+                            Console.WriteLine($"expr is {decl.Value}");
                             //var ty = Typing.MonomorphicTyping.eval_decl(tyenv, decl.Value);
-                            var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                            var ty = Typing.PolymorphicTyping.eval_decl(tyenv,  decl.Value);
                             var ret = AbstractSyntaxTreeInterpreter.eval_decl(env, decl.Value);
                             env = ret.Env;
                             tyenv = ty.Env;
@@ -69,6 +69,7 @@ namespace MiniMAL {
             var envname = LinkedList<LinkedList<string>>.Empty;
             var envvalue = LinkedList<LinkedList<SecdMachineInterpreter.ExprValue>>.Empty;
             var tyenv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
+            var typedefenv = Environment<Typing.Type>.Empty;
 
             // repl
             Parsing.Source source = new Parsing.Source("<stdin>", Console.In);
@@ -78,7 +79,7 @@ namespace MiniMAL {
                 if (decl.Success) {
                     try {
                         Console.WriteLine($"expr is {decl.Value}");
-                        var ty = Typing.PolymorphicTyping.eval_decl(tyenv, decl.Value);
+                        var ty = Typing.PolymorphicTyping.eval_decl(tyenv,  decl.Value);
                         var compileret = SecdMachineInterpreter.CompileDecl(decl.Value, envname);
                         var code = compileret.Item1;
                         envname = compileret.Item2;

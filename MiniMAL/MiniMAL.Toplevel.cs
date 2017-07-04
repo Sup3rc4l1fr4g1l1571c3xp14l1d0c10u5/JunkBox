@@ -89,14 +89,20 @@ namespace MiniMAL {
         }
 
         public class TypeDef : Toplevel {
-            public Tuple<string, Typing.Type>[] Defs { get; }
 
-            public TypeDef(Tuple<string, Typing.Type>[] defs) {
-                Defs = defs;
+            public TypeDef(string id, string[] vars, TypeExp type) {
+                Id = id;
+                Vars = vars;
+                Type = type;
             }
 
+            public string Id { get; }
+            public string[] Vars { get; }
+            public TypeExp Type { get; }
+
             public override string ToString() {
-                return $"type " + string.Join(" and ", Defs.Select(x => $"{x.Item1} = {x.Item2}"));
+                var vs = (Vars.Any()) ? " (" + string.Join(", ", Vars) +")" : "";
+                return $"type{vs} {Id} = {Type};;";
             }
 
         }
