@@ -61,6 +61,8 @@ namespace MiniMAL {
         private static readonly Parser<string> Unit = WS.Then(Ident.Where(x => x == "unit"));
         private static readonly Parser<string> List = WS.Then(Ident.Where(x => x == "list"));
         private static readonly Parser<string> Option = WS.Then(Ident.Where(x => x == "option"));
+        private static readonly Parser<string> External = WS.Then(Ident.Where(x => x == "external"));
+
         private static readonly Parser<string> Some = WS.Then(Constructor.Where(x => x == "Some"));
         private static readonly Parser<string> None = WS.Then(Constructor.Where(x => x == "None"));
 
@@ -80,6 +82,7 @@ namespace MiniMAL {
         private static readonly Parser<string> RParen = WS.Then(Combinator.Token(")"));
         private static readonly Parser<string> LBracket = WS.Then(Combinator.Token("["));
         private static readonly Parser<string> RBracket = WS.Then(Combinator.Token("]"));
+        private static readonly Parser<string> Colon = WS.Then(Combinator.Token(":"));
         private static readonly Parser<string> Semi = WS.Then(Combinator.Token(";"));
         private static readonly Parser<string> SemiSemi = WS.Then(Combinator.Token(";;"));
         private static readonly Parser<string> RArrow = WS.Then(Combinator.Token("->"));
@@ -135,7 +138,13 @@ namespace MiniMAL {
             select _2.Reverse().Aggregate(_4, (s, x) => new Expressions.DFunExp(x, s));
 
         private static readonly Parser<Tuple<string, Expressions>> LetBind =
-            from _1 in Id
+            from _1 in Combinator.Choice(
+                           Id,
+                           from _1 in LParen
+                           from _2 in WS.Then(Combinator.AnyChar("*/%+-<=$|").Many(1).Select(string.Join))
+                           from _3 in RParen
+                           select $"({_2})"
+                       )
             from _2 in Id.Many()
             from _3 in Eq
             from _4 in Expr
@@ -355,6 +364,15 @@ namespace MiniMAL {
                     from _1 in Expr
                     from _2 in SemiSemi
                     select (Toplevel)new Toplevel.Exp(_1)
+                ), (
+                    from _1 in External
+                    from _2 in Id
+                    from _3 in Colon
+                    from _4 in TypeExpr
+                    from _5 in Eq
+                    from _6 in StrV
+                    from _7 in SemiSemi
+                    select (Toplevel)new Toplevel.ExternalDecl(_2, _4, _7)
                 ), (
                        from _1 in Type
                        from _2 in Combinator.Choice(
