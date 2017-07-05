@@ -44,11 +44,11 @@ namespace MiniMAL {
                 }
             }
 
-            public class TyCons : Type {
+            public class TyList : Type {
                 public Type ItemType { get; }
-                public static TyCons Empty { get; } = new TyCons(null);
+                public static TyList Empty { get; } = new TyList(null);
 
-                public TyCons(Type itemType) {
+                public TyList(Type itemType) {
                     ItemType = itemType;
                 }
             }
@@ -103,14 +103,14 @@ namespace MiniMAL {
                     var i2 = (TyFunc)arg2;
                     return Equals(i1.ArgType, i2.ArgType) && Equals(i1.RetType, i2.RetType);
                 }
-                if (arg1 is TyCons && arg2 is TyCons) {
-                    var i1 = (TyCons)arg1;
-                    var i2 = (TyCons)arg2;
-                    if (ReferenceEquals(i1, TyCons.Empty)) {
-                        return ReferenceEquals(i1, TyCons.Empty);
+                if (arg1 is TyList && arg2 is TyList) {
+                    var i1 = (TyList)arg1;
+                    var i2 = (TyList)arg2;
+                    if (ReferenceEquals(i1, TyList.Empty)) {
+                        return ReferenceEquals(i1, TyList.Empty);
                     }
-                    if (ReferenceEquals(i2, TyCons.Empty)) {
-                        return ReferenceEquals(i1, TyCons.Empty);
+                    if (ReferenceEquals(i2, TyList.Empty)) {
+                        return ReferenceEquals(i1, TyList.Empty);
                     }
                     return Equals(i1.ItemType, i2.ItemType);
                 }
@@ -197,8 +197,8 @@ namespace MiniMAL {
                     }
                     return;
                 }
-                if (t is Type.TyCons) {
-                    var tt = t as Type.TyCons;
+                if (t is Type.TyList) {
+                    var tt = t as Type.TyList;
                     if (priority > 2) {
                         buffer.Append("(");
                     }
@@ -298,9 +298,9 @@ namespace MiniMAL {
                 var ty2 = ((Type.TyFunc)typ).RetType;
                 return new Type.TyFunc(resolve_type(substs, ty1), resolve_type(substs, ty2));
             }
-            if (typ is Type.TyCons) {
-                var ty1 = ((Type.TyCons)typ).ItemType;
-                return new Type.TyCons(resolve_type(substs, ty1));
+            if (typ is Type.TyList) {
+                var ty1 = ((Type.TyList)typ).ItemType;
+                return new Type.TyList(resolve_type(substs, ty1));
             }
             if (typ is Type.TyOption) {
                 var ty1 = ((Type.TyOption)typ).ItemType;
@@ -356,8 +356,8 @@ namespace MiniMAL {
                 var ty2 = f.RetType;
                 return Set.Union(freevar_ty(ty1), freevar_ty(ty2));
             }
-            if (ty is Type.TyCons) {
-                var f = (Type.TyCons)ty;
+            if (ty is Type.TyList) {
+                var f = (Type.TyList)ty;
                 return freevar_ty(f.ItemType);
             }
             if (ty is Type.TyOption) {
@@ -402,9 +402,9 @@ namespace MiniMAL {
                 return Unify(LinkedList.Concat(LinkedList.Create(new TypeEquality(f1.ItemType, f2.ItemType)),
                 eqs.Next));
             }
-            if (eqs.Value.Type1 is Type.TyCons && eqs.Value.Type2 is Type.TyCons) {
-                var f1 = (Type.TyCons)eqs.Value.Type1;
-                var f2 = (Type.TyCons)eqs.Value.Type2;
+            if (eqs.Value.Type1 is Type.TyList && eqs.Value.Type2 is Type.TyList) {
+                var f1 = (Type.TyList)eqs.Value.Type1;
+                var f2 = (Type.TyList)eqs.Value.Type2;
                 return Unify(LinkedList.Concat(LinkedList.Create(new TypeEquality(f1.ItemType, f2.ItemType)),
                 eqs.Next));
             }
@@ -599,8 +599,8 @@ namespace MiniMAL {
                 case Expressions.BuiltinOp.Kind.ColCol: {
                         if (args.Length == 2) {
                             return Tuple.Create(
-                                (Type)new Type.TyCons(args[0]),
-                                LinkedList.Create(new TypeEquality(new Type.TyCons(args[0]), args[1]))
+                                (Type)new Type.TyList(args[0]),
+                                LinkedList.Create(new TypeEquality(new Type.TyList(args[0]), args[1]))
                             );
                         }
                         throw new Exception.InvalidArgumentNumException("Argument num must be 2: ::");
@@ -689,12 +689,12 @@ namespace MiniMAL {
                 var p = (PatternExpressions.ConsP)pattern;
                 if (p == PatternExpressions.ConsP.Empty) {
                     return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, Type.TyCons.Empty)),
+                        LinkedList.Create(new TypeEquality(value, Type.TyList.Empty)),
                         new Dictionary<string, Type>()
                     );
                 } else {
                     var tyitem = Type.TyVar.Fresh();
-                    var tyList = new Type.TyCons(tyitem);
+                    var tyList = new Type.TyList(tyitem);
                     var ret1 = EvalPatternExpressions(p.Value, tyitem);
                     var ret2 = EvalPatternExpressions(p.Next, tyList);
                     return Tuple.Create(

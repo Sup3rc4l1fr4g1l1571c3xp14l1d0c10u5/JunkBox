@@ -106,6 +106,18 @@ namespace MiniMAL {
             }
 
         }
+
+        public class ExternalDecl : Toplevel {
+            public string Id { get; }
+            public TypeExp Type { get; }
+            public string Symbol { get; }
+
+            public ExternalDecl(string id, TypeExp type, string symbol) {
+                Id = id;
+                Type = type;
+                Symbol = symbol;
+            }
+        }
     }
 
 }

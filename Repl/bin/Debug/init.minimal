@@ -1,0 +1,28 @@
+external add: (int * int) -> int = "add";;
+external sub: (int * int) -> int = "sub";;
+external mul: (int * int) -> int = "mul";;
+external div: (int * int) -> int = "div";;
+external mod: (int * int) -> int = "mod";;
+
+external lt: (int * int) -> bool = "lt";;
+external le: (int * int) -> bool = "le";;
+external gt: (int * int) -> bool = "gt";;
+external ge: (int * int) -> bool = "ge";;
+external equal: ('a * 'a)   -> bool = "equal";;
+
+external cons: 'a * ('a list) -> ('a list) = "cons";;
+
+let ( + ) lhs rhs = add (lhs, rhs);;
+let ( - ) lhs rhs = sub (lhs, rhs);;
+let ( * ) lhs rhs = mul (lhs, rhs);;
+let ( / ) lhs rhs = div (lhs, rhs);;
+let ( % ) lhs rhs = mod (lhs, rhs);;
+
+let ( <  ) lhs rhs = lt (lhs, rhs);;
+let ( <= ) lhs rhs = le (lhs, rhs);;
+let ( >  ) lhs rhs = gt (lhs, rhs);;
+let ( >= ) lhs rhs = ge (lhs, rhs);;
+let ( =  ) lhs rhs = equal (lhs, rhs);;
+let ( <> ) lhs rhs = if equal (lhs, rhs) then false else true;;
+
+let ( :: ) x xs = cons (x, xs);;

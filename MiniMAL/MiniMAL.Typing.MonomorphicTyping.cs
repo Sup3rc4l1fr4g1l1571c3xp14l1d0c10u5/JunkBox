@@ -60,7 +60,7 @@ namespace MiniMAL {
             if (e is Expressions.EmptyListLit) {
                 return Tuple.Create(
                 LinkedList<TypeSubst>.Empty,
-                (Type)new Type.TyCons(Type.TyVar.Fresh())
+                (Type)new Type.TyList(Type.TyVar.Fresh())
                 );
             }
             if (e is Expressions.UnitLit) {

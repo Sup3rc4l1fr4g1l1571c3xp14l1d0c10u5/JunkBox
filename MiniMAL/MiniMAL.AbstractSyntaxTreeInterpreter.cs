@@ -811,11 +811,17 @@ namespace MiniMAL {
             throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
         }
 
-        public static Result eval_decl(Environment<ExprValue> env, Toplevel p) {
+        public static Result eval_decl(Environment<ExprValue> env, Environment<AbstractSyntaxTreeInterpreter.ExprValue.BProcV> builtins, Toplevel p) {
             if (p is Toplevel.Exp) {
                 var e = (Toplevel.Exp)p;
                 var v = EvalExpressions(env, e.Syntax);
                 return new Result("-", env, v);
+            }
+            if (p is Toplevel.ExternalDecl) {
+                var e = (Toplevel.ExternalDecl)p;
+                var val = Environment.LookUp(e.Symbol, builtins);
+                var newenv = Environment.Extend(e.Id, val, env);
+                return new Result(e.Id, newenv, val);
             }
             if (p is Toplevel.Binding) {
                 var ds = (Toplevel.Binding)p;

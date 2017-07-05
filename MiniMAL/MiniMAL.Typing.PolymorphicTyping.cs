@@ -122,7 +122,7 @@ namespace MiniMAL {
                 if (e is Expressions.EmptyListLit) {
                     return Tuple.Create(
                         LinkedList<TypeSubst>.Empty,
-                        (Type) new Type.TyCons(Type.TyVar.Fresh())
+                        (Type) new Type.TyList(Type.TyVar.Fresh())
                     );
                 }
                 if (e is Expressions.UnitLit) {
@@ -422,6 +422,12 @@ namespace MiniMAL {
                     var v = EvalExpressions(env, e.Syntax);
                     return new Result("-", env,  v.Item2);
                 }
+                if (p is Toplevel.ExternalDecl) {
+                    var e = (Toplevel.ExternalDecl)p;
+                    var ty = EvalTypeExpressions(e.Type, new Dictionary<string, Type.TyVar>());
+                    var newenv = Environment.Extend(e.Id, tysc_of_ty(ty), env);
+                    return new Result(e.Id, newenv, ty);
+                }
                 if (p is Toplevel.Binding) {
                     var ds = (Toplevel.Binding) p;
                     var newenv = env;
@@ -436,6 +442,46 @@ namespace MiniMAL {
                     return new Result("", env,  null);
                 }
                 throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
+            }
+
+            private static Type EvalTypeExpressions(TypeExp exp, Dictionary<string,Type.TyVar> vars) {
+                if (exp is TypeExp.TypeVar) { var e = exp as TypeExp.TypeVar; if (vars.ContainsKey(e.Id)==false) { vars[e.Id] = Type.TyVar.Fresh(); } return vars[e.Id]; }
+                if (exp is TypeExp.IntType) { var e = exp as TypeExp.IntType; return new Type.TyInt();}
+                if (exp is TypeExp.BoolType) { var e = exp as TypeExp.BoolType; return new Type.TyBool(); }
+                if (exp is TypeExp.StrType) { var e = exp as TypeExp.StrType; return new Type.TyStr(); }
+                if (exp is TypeExp.UnitType) { var e = exp as TypeExp.UnitType; return new Type.TyUnit(); }
+                if (exp is TypeExp.ListType) { var e = exp as TypeExp.ListType; return new Type.TyList(EvalTypeExpressions(e.Type, vars)); }
+                if (exp is TypeExp.OptionType) { var e = exp as TypeExp.OptionType; return new Type.TyOption(EvalTypeExpressions(e.Type, vars)); }
+                if (exp is TypeExp.TupleType) {
+                    var e = exp as TypeExp.TupleType;
+                    var cars = new List<Type>();
+                    for (var it = e; it != TypeExp.TupleType.Tail; it = it.Cdr) {
+                        cars.Add(EvalTypeExpressions(it.Car,vars));
+                    }
+                    return cars.Reverse<Type>().Aggregate(Type.TyTuple.Tail, (s,x) => new Type.TyTuple(x,s));
+                }
+                if (exp is TypeExp.FuncType) { var e = exp as TypeExp.FuncType; return new Type.TyFunc(EvalTypeExpressions(e.DomainType, vars), EvalTypeExpressions(e.RangeType, vars)); }
+                if (exp is TypeExp.TypeName) { var e = exp as TypeExp.TypeName;
+                    throw new NotImplementedException();
+                    return new Type.TyInt();
+                }
+                if (exp is TypeExp.TypeConstruct) {
+                    var e = exp as TypeExp.TypeConstruct;
+                    if (e.Base.Name == "list") {
+                        if (e.Params.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException();
+                        }
+                        return new Type.TyList(EvalTypeExpressions(e.Params[0], vars));
+                    }
+                    if (e.Base.Name == "option") {
+                        if (e.Params.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException();
+                        }
+                        return new Type.TyOption(EvalTypeExpressions(e.Params[0], vars));
+                    }
+                    return new Type.TyInt();
+                }
+                throw new NotSupportedException();
             }
         }
     }
