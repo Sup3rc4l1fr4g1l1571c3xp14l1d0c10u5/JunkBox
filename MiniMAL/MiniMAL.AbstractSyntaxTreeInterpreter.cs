@@ -229,8 +229,22 @@ namespace MiniMAL {
                 if (arg1 is ExprValue.UnitV && arg2 is ExprValue.UnitV) {
                     return (true);
                 }
-                if (arg1 is ExprValue.OptionV && arg2 is ExprValue.OptionV) {
-                    return (true);
+                if (arg1 is ExprValue.OptionV && arg2 is ExprValue.OptionV)
+                {
+                    if (arg1 == ExprValue.OptionV.None)
+                    {
+                        return arg2 == ExprValue.OptionV.None;
+                    }
+                    else if (arg2 == ExprValue.OptionV.None)
+                    {
+                        return arg1 == ExprValue.OptionV.None;
+                    }
+                    else
+                    {
+                        var i1 = (ExprValue.OptionV) arg1;
+                        var i2 = (ExprValue.OptionV) arg2;
+                        return Equals(i1.Value, i2.Value);
+                    }
                 }
                 if (arg1 is ExprValue.ConsV && arg2 is ExprValue.ConsV) {
                     var i1 = ((ExprValue.ConsV)arg1);
@@ -585,8 +599,8 @@ namespace MiniMAL {
                 var p = pattern as PatternExpressions.OptionP;
                 var q = value as ExprValue.OptionV;
                 var dic = new Dictionary<string, ExprValue>();
-                if (p == PatternExpressions.OptionP.None) {
-                    if (q == ExprValue.OptionV.None) {
+                if (p == PatternExpressions.OptionP.None || q == ExprValue.OptionV.None) {
+                    if (p == PatternExpressions.OptionP.None && q == ExprValue.OptionV.None) {
                         return dic;
                     }
                     else {
