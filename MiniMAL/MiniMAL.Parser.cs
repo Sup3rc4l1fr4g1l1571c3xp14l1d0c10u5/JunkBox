@@ -90,6 +90,7 @@ namespace MiniMAL {
         private static readonly Parser<string> Comma = WS.Then(Combinator.Token(","));
         private static readonly Parser<string> Quote = WS.Then(Combinator.Token("'"));
         private static readonly Parser<string> Wild = WS.Then(Combinator.Token("_"));
+#if false
         private static readonly Parser<Expressions.BuiltinOp.Kind> Plus = WS.Then(Combinator.Token("+")).Select(x => Expressions.BuiltinOp.Kind.Plus);
         private static readonly Parser<Expressions.BuiltinOp.Kind> Minus = WS.Then(Combinator.Token("-")).Select(x => Expressions.BuiltinOp.Kind.Minus);
         private static readonly Parser<Expressions.BuiltinOp.Kind> Mult = WS.Then(Combinator.Token("*")).Select(x => Expressions.BuiltinOp.Kind.Mult);
@@ -103,6 +104,7 @@ namespace MiniMAL {
         private static readonly Parser<Expressions.BuiltinOp.Kind> ColCol = WS.Then(Combinator.Token("::")).Select(x => Expressions.BuiltinOp.Kind.ColCol);
 
         private static readonly Parser<Expressions.BuiltinOp.Kind> BinOp = Combinator.Choice(Plus, Minus, Mult, Div, Eq, Ne, Le, Lt, Ge, Gt, ColCol);
+#endif
 
         private static readonly Parser<string> LAnd = WS.Then(Combinator.Token("&&"));
         private static readonly Parser<string> LOr = WS.Then(Combinator.Token("||"));
@@ -150,7 +152,11 @@ namespace MiniMAL {
                            from _3 in RParen
                            select $"{_2}"
                        )
-            from _2 in Id.Many()
+            from _2 in (
+                from _3 in Id
+                from _4 in Colon.Then(TypeExpr)
+                select _3
+            }.Many()
             from _3 in Eq
             from _4 in Expr
             select Tuple.Create(_1, _2.Reverse().Aggregate(_4, (s, x) => new Expressions.FunExp(x, s)));
