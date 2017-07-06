@@ -66,7 +66,7 @@ namespace MiniMAL {
                 public UnitV() { }
 
                 public override string ToString() {
-                    return $"()";
+                    return $"unit";
                 }
             }
 
@@ -92,7 +92,7 @@ namespace MiniMAL {
                     return $"<fun>";
                 }
             }
-
+#if false
             /// <summary>
             /// ダイナミッククロージャー
             /// </summary>
@@ -109,6 +109,7 @@ namespace MiniMAL {
                     return $"<dfun>";
                 }
             }
+#endif
 
             /// <summary>
             /// ビルトインクロージャー
@@ -231,13 +232,9 @@ namespace MiniMAL {
                 }
                 if (arg1 is ExprValue.OptionV && arg2 is ExprValue.OptionV)
                 {
-                    if (arg1 == ExprValue.OptionV.None)
+                    if (arg1 == ExprValue.OptionV.None || arg2 == ExprValue.OptionV.None)
                     {
-                        return arg2 == ExprValue.OptionV.None;
-                    }
-                    else if (arg2 == ExprValue.OptionV.None)
-                    {
-                        return arg1 == ExprValue.OptionV.None;
+                        return arg2 == ExprValue.OptionV.None && arg1 == ExprValue.OptionV.None;
                     }
                     else
                     {
@@ -324,6 +321,7 @@ namespace MiniMAL {
                         throw new Exception.InvalidArgumentTypeException("arguments must be integer: +");
                     }
                 }
+#if false
                 case Expressions.BuiltinOp.Kind.Plus: {
                     if (args.Length != 2) {
                         throw new Exception.InvalidArgumentNumException("Argument num must be 2: +");
@@ -442,6 +440,7 @@ namespace MiniMAL {
                         }
                         throw new Exception.InvalidArgumentNumException("Right arguments must be List: ::");
                     }
+#endif
                 case Expressions.BuiltinOp.Kind.Head: {
                         if (args.Length != 1) {
                             throw new Exception.InvalidArgumentNumException("Argument num must be 1: @Head");
@@ -722,18 +721,22 @@ namespace MiniMAL {
             if (e is Expressions.FunExp) {
                 return new ExprValue.ProcV(((Expressions.FunExp)e).Arg, ((Expressions.FunExp)e).Body, env);
             }
+#if false
             if (e is Expressions.DFunExp) {
                 return new ExprValue.DProcV(((Expressions.DFunExp)e).Arg, ((Expressions.DFunExp)e).Body);
             }
+#endif
             if (e is Expressions.AppExp) {
                 var funval = EvalExpressions(env, ((Expressions.AppExp)e).Fun);
                 var arg = EvalExpressions(env, ((Expressions.AppExp)e).Arg);
                 if (funval is ExprValue.ProcV) {
                     var newenv = Environment.Extend(((ExprValue.ProcV)funval).Id, arg, ((ExprValue.ProcV)funval).Env);
                     return EvalExpressions(newenv, ((ExprValue.ProcV)funval).Body);
+#if false
                 } else if (funval is ExprValue.DProcV) {
                     var newenv = Environment.Extend(((ExprValue.DProcV)funval).Id, arg, env);
                     return EvalExpressions(newenv, ((ExprValue.DProcV)funval).Body);
+#endif
                 } else if (funval is ExprValue.BProcV) {
                     return ((ExprValue.BProcV)funval).Proc(arg);
                 } else {
