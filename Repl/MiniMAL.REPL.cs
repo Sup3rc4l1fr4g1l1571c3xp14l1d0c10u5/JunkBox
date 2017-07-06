@@ -12,15 +12,24 @@ namespace MiniMAL {
     /// </summary>
     public static class REPL {
 
+        public static AbstractSyntaxTreeInterpreter.ExprValue.BProcV Fun<T>(Func<T, AbstractSyntaxTreeInterpreter.ExprValue> body)
+            where T : AbstractSyntaxTreeInterpreter.ExprValue
+        {
+            return new AbstractSyntaxTreeInterpreter.ExprValue.BProcV((x) => {
+                var arg = (T)x;
+                return body(arg);
+            });
+        }
+
         public static AbstractSyntaxTreeInterpreter.ExprValue.BProcV BinOp<T1, T2>(Func<T1, T2, AbstractSyntaxTreeInterpreter.ExprValue> body)
             where T1 : AbstractSyntaxTreeInterpreter.ExprValue
             where T2 : AbstractSyntaxTreeInterpreter.ExprValue
         {
             return new AbstractSyntaxTreeInterpreter.ExprValue.BProcV((x) => {
                 var arg = x as AbstractSyntaxTreeInterpreter.ExprValue.TupleV;
-                var lhs = arg.Car as T1;
-                var rhs = arg.Cdr.Car as T2;
-                return body(lhs,rhs);
+                var lhs = (T1)arg.Car;
+                var rhs = (T2)arg.Cdr.Car;
+                return body(lhs, rhs);
             });
         }
 
@@ -82,6 +91,21 @@ namespace MiniMAL {
                     (AbstractSyntaxTreeInterpreter.ExprValue lhs,
                      AbstractSyntaxTreeInterpreter.ExprValue.ConsV rhs) =>
                         new AbstractSyntaxTreeInterpreter.ExprValue.ConsV(lhs, rhs));
+
+            builtins["head"] =
+                Fun((AbstractSyntaxTreeInterpreter.ExprValue.ConsV arg) => arg.Value);
+
+            builtins["tail"] =
+                Fun((AbstractSyntaxTreeInterpreter.ExprValue.ConsV arg) => arg.Next);
+
+            builtins["get"] =
+                Fun((AbstractSyntaxTreeInterpreter.ExprValue.OptionV arg) => {
+                    if (arg == AbstractSyntaxTreeInterpreter.ExprValue.OptionV.None)
+                    {
+                        throw new Exception.InvalidArgumentTypeException();
+                    }
+                    return arg.Value;
+                    });
 
             var env = Environment<AbstractSyntaxTreeInterpreter.ExprValue>.Empty;
             var builtinEnv = builtins.Aggregate(Environment<AbstractSyntaxTreeInterpreter.ExprValue.BProcV>.Empty, (s,x) => Environment.Extend(x.Key,x.Value,s));

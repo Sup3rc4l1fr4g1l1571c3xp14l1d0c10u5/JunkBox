@@ -155,57 +155,31 @@ namespace MiniMAL {
                 // unary operators
                 UnaryPlus,
                 UnaryMinus,
-                // binary operators
-                Plus,
-                Minus,
-                Mult,
-                Div,
-                Lt,
-                Gt,
-                Le,
-                Ge,
-                Eq,
-                Ne,
-                ColCol,
                 // builtin operators 
-                Head,
-                Tail,
-                IsCons,
+                //Head,
+                //Tail,
+                //IsCons,
                 Car,
                 Cdr,
                 IsTail,
                 IsTuple,
                 Length,
-                IsNone,
-                IsSome,
-                Get
+                //IsNone,
+                //IsSome,
+                //Get
 
             }
             public static IDictionary<Kind, string> BinOpToStr { get; }= new Dictionary<Kind, string>(){
                 { Kind.UnaryPlus, "+" },
                 { Kind.UnaryMinus, "-" },
-                { Kind.Plus, "+" },
-                { Kind.Minus, "-" },
-                { Kind.Mult, "*" },
-                { Kind.Div, "/" },
-                { Kind.Lt, "<" },
-                { Kind.Gt, ">" },
-                { Kind.Le, "<=" },
-                { Kind.Ge, ">=" },
-                { Kind.Eq, "=" },
-                { Kind.Ne, "<>" },
-                { Kind.ColCol, "::" },
-                { Kind.Head, "@Head" },
-                { Kind.Tail, "@Tail" },
-                { Kind.IsCons, "@IsCons" },
                 { Kind.Car, "@Car" },
                 { Kind.Cdr, "@Cdr" },
                 { Kind.IsTail, "@IsTail" },
                 { Kind.IsTuple, "@IsTuple" },
                 { Kind.Length, "@Length" },
-                { Kind.IsNone, "@IsNone" },
-                { Kind.IsSome, "@IsSome" },
-                { Kind.Get, "@Get" },
+                //{ Kind.IsNone, "@IsNone" },
+                //{ Kind.IsSome, "@IsSome" },
+                //{ Kind.Get, "@Get" },
             };
 
             public BuiltinOp(Kind op, Expressions[] exprs) {
@@ -215,40 +189,6 @@ namespace MiniMAL {
 
             public Kind Op { get; }
             public Expressions[] Exprs { get; }
-            //public override string ToString() {
-            //    switch (Op)
-            //    {
-            //        case Kind.UnaryPlus:
-            //        case Kind.UnaryMinus:
-            //            return $"({BinOpToStr[Op]} {Exprs[1]})";
-            //        case Kind.Plus:
-            //        case Kind.Minus:
-            //        case Kind.Mult:
-            //        case Kind.Div:
-            //        case Kind.Lt:
-            //        case Kind.Gt:
-            //        case Kind.Le:
-            //        case Kind.Ge:
-            //        case Kind.Eq:
-            //        case Kind.Ne:
-            //        case Kind.ColCol:
-            //            return $"({Exprs[0]} {BinOpToStr[Op]} {Exprs[1]})";
-            //        case Kind.Head:
-            //        case Kind.Tail:
-            //        case Kind.IsCons:
-            //        case Kind.Car:
-            //        case Kind.Cdr:
-            //        case Kind.IsTail:
-            //        case Kind.IsTuple:
-            //        case Kind.Length:
-            //        case Kind.IsNone:
-            //        case Kind.IsSome:
-            //        case Kind.Get:
-            //            return $"({BinOpToStr[Op]} {string.Join(" ", Exprs.Select(x => x.ToString()))})";
-            //        default:
-            //            throw new ArgumentOutOfRangeException();
-            //    }
-            //}
         }
 
         /// <summary>
@@ -288,7 +228,7 @@ namespace MiniMAL {
         }
 
         /// <summary>
-        /// 無名関数式（静的スコープ版）
+        /// 無名関数式
         /// </summary>
         public class FunExp : Expressions {
             public FunExp(string arg, Expressions body) {
@@ -301,23 +241,6 @@ namespace MiniMAL {
 
             //public override string ToString() {
             //    return $"fun {Arg} -> {Body}";
-            //}
-        }
-
-        /// <summary>
-        /// 無名関数式（動的スコープ版）
-        /// </summary>
-        public class DFunExp : Expressions {
-            public DFunExp(string arg, Expressions body) {
-                Arg = arg;
-                Body = body;
-            }
-
-            public string Arg { get; }
-            public Expressions Body { get; }
-
-            //public override string ToString() {
-            //    return $"dfun {Arg} -> {Body}";
             //}
         }
 
@@ -397,40 +320,24 @@ namespace MiniMAL {
             if (exp is UnitLit) { return 100; }
             if (exp is TupleExp) { return 100; }
             if (exp is BuiltinOp) {
-                switch ((exp as BuiltinOp).Op) {
+                switch (((BuiltinOp) exp).Op) {
                     case BuiltinOp.Kind.UnaryPlus: return 2;
                     case BuiltinOp.Kind.UnaryMinus: return 2;
 
-                    case BuiltinOp.Kind.Mult: return 8;
-                    case BuiltinOp.Kind.Div: return 8;
-                    case BuiltinOp.Kind.Plus: return 7;
-                    case BuiltinOp.Kind.Minus: return 7;
-                    case BuiltinOp.Kind.ColCol: return 6;
-                    case BuiltinOp.Kind.Lt: return 5;
-                    case BuiltinOp.Kind.Gt: return 5;
-                    case BuiltinOp.Kind.Le: return 5;
-                    case BuiltinOp.Kind.Ge: return 5;
-                    case BuiltinOp.Kind.Eq: return 4;
-                    case BuiltinOp.Kind.Ne: return 4;
-
-                    case BuiltinOp.Kind.Head: return 2;
-                    case BuiltinOp.Kind.Tail: return 2;
-                    case BuiltinOp.Kind.IsCons: return 2;
                     case BuiltinOp.Kind.Car: return 2;
                     case BuiltinOp.Kind.Cdr: return 2;
                     case BuiltinOp.Kind.IsTail: return 2;
                     case BuiltinOp.Kind.IsTuple: return 2;
                     case BuiltinOp.Kind.Length: return 2;
-                    case BuiltinOp.Kind.IsNone: return 2;
-                    case BuiltinOp.Kind.IsSome: return 2;
-                    case BuiltinOp.Kind.Get: return 2;
+                    //case BuiltinOp.Kind.IsNone: return 2;
+                    //case BuiltinOp.Kind.IsSome: return 2;
+                    //case BuiltinOp.Kind.Get: return 2;
                     default: throw new ArgumentOutOfRangeException();
                 }
             }
             if (exp is IfExp) { return 3; }
             if (exp is LetExp) { return 100; }
             if (exp is FunExp) { return 1; }
-            if (exp is DFunExp) { return 1; }
             if (exp is AppExp) { return 2; }
             if (exp is LetRecExp) { return 100; }
             if (exp is MatchExp) { return 1; }
@@ -450,7 +357,7 @@ namespace MiniMAL {
                     return "None";
                 }
                 else {
-                    var e = exp as OptionExp;
+                    var e = (OptionExp) exp;
                     if (e.Expr is TupleExp) {
                         return "Some" + ExpressionToString(p, e.Expr);
                     }
@@ -474,29 +381,14 @@ namespace MiniMAL {
                     case BuiltinOp.Kind.UnaryPlus:
                     case BuiltinOp.Kind.UnaryMinus:
                         return BuiltinOp.BinOpToStr[e.Op] + ExpressionToString(p, e.Exprs[0]);
-                    case BuiltinOp.Kind.Plus:
-                    case BuiltinOp.Kind.Minus:
-                    case BuiltinOp.Kind.Mult:
-                    case BuiltinOp.Kind.Div:
-                    case BuiltinOp.Kind.Lt:
-                    case BuiltinOp.Kind.Gt:
-                    case BuiltinOp.Kind.Le:
-                    case BuiltinOp.Kind.Ge:
-                    case BuiltinOp.Kind.Eq:
-                    case BuiltinOp.Kind.Ne:
-                    case BuiltinOp.Kind.ColCol:
-                        return ExpressionToString(p, e.Exprs[0]) + BuiltinOp.BinOpToStr[e.Op] + ExpressionToString(p, e.Exprs[1]);
-                    case BuiltinOp.Kind.Head:
-                    case BuiltinOp.Kind.Tail:
-                    case BuiltinOp.Kind.IsCons:
                     case BuiltinOp.Kind.Car:
                     case BuiltinOp.Kind.Cdr:
                     case BuiltinOp.Kind.IsTail:
                     case BuiltinOp.Kind.IsTuple:
                     case BuiltinOp.Kind.Length:
-                    case BuiltinOp.Kind.IsNone:
-                    case BuiltinOp.Kind.IsSome:
-                    case BuiltinOp.Kind.Get:
+                    //case BuiltinOp.Kind.IsNone:
+                    //case BuiltinOp.Kind.IsSome:
+                    //case BuiltinOp.Kind.Get:
                         return BuiltinOp.BinOpToStr[e.Op] + string.Join(" ", e.Exprs.Select(x => ExpressionToString(p, x)));
                     default:
                         throw new ArgumentOutOfRangeException();
@@ -514,10 +406,6 @@ namespace MiniMAL {
             if (exp is FunExp) {
                 var e = exp as FunExp;
                 return $"fun {e.Arg} -> {ExpressionToString(0, e.Body)}";
-            }
-            if (exp is DFunExp) {
-                var e = exp as DFunExp;
-                return $"dfun {e.Arg} -> {ExpressionToString(0, e.Body)}";
             }
             if (exp is AppExp) {
                 var e = exp as AppExp;

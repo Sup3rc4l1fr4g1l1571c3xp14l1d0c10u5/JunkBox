@@ -177,9 +177,6 @@ namespace MiniMAL {
                 subst_type(s, new Type.TyFunc(domty, v.Item2))
                 );
             }
-            if (e is Expressions.DFunExp) {
-                throw new NotSupportedException();
-            }
             if (e is Expressions.AppExp) {
                 var exp = (Expressions.AppExp)e;
 

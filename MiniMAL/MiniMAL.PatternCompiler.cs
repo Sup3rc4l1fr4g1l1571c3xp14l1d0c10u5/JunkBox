@@ -12,6 +12,18 @@ namespace MiniMAL
         private static int _anonymousV;
         private static string GenAnonymousVariable() { return $"@{(++_anonymousV)}"; }
 
+        private static Expressions Call(string name, params Expressions[] args)
+        {
+            return args.Aggregate((Expressions)new Expressions.Var(name), (s,x) => new Expressions.AppExp(s, x));
+        }
+
+        private static Expressions GenEq(Expressions lhs, Expressions rhs) {
+            return Call("=", lhs, rhs);
+        }
+        private static Expressions GenNe(Expressions lhs, Expressions rhs) {
+            return Call("<>", lhs, rhs);
+        }
+
         public static Expressions CompilePattern(Expressions value, PatternExpressions pattern, Expressions action) {
             if (pattern is PatternExpressions.WildP) {
                 return action;
@@ -25,7 +37,7 @@ namespace MiniMAL
                 var p = (PatternExpressions.IntP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.IntLit(p.Value), value}),
+                    GenEq(new Expressions.IntLit(p.Value), value),
                     action,
                     Expressions.OptionExp.None
                 );
@@ -34,7 +46,7 @@ namespace MiniMAL
                 var p = (PatternExpressions.StrP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.StrLit(p.Value), value}),
+                    GenEq(new Expressions.StrLit(p.Value), value),
                     action,
                     Expressions.OptionExp.None
                 );
@@ -43,14 +55,14 @@ namespace MiniMAL
                 var p = (PatternExpressions.BoolP) pattern;
                 // $"(IfExp (BuiltinOp Eq {p.Value} {target}) {code} None)";
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.BoolLit(p.Value), value}),
+                    GenEq(new Expressions.BoolLit(p.Value), value),
                     action,
                     Expressions.OptionExp.None
                 );
             }
             if (pattern is PatternExpressions.UnitP) {
                 return new Expressions.IfExp(
-                    new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.UnitLit(), value}),
+                    GenEq(new Expressions.UnitLit(), value),
                     action,
                     Expressions.OptionExp.None
                 );
@@ -58,7 +70,7 @@ namespace MiniMAL
             if (pattern is PatternExpressions.ConsP) {
                 if (pattern == PatternExpressions.ConsP.Empty) {
                     return new Expressions.IfExp(
-                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.EmptyListLit(), value}),
+                        GenEq(new Expressions.EmptyListLit(), value),
                         action,
                         Expressions.OptionExp.None
                     );
@@ -72,19 +84,15 @@ namespace MiniMAL
                     var codeX = CompilePattern(varX, x, codeXs);
                     // $"(IfExp (IsCons {target}) (IfExp (BuiltinOp Eq UnitLit {target}) None (LetExp[({targetx}, (Head {target})); ({targetxs}, (Tail {target}))] {code__})) None)";
                     return new Expressions.IfExp(
-                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.IsCons, new[] { value }),
-                        new Expressions.IfExp(
-                            new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Eq, new[] { new Expressions.UnitLit(), value}),
+                            GenEq(new Expressions.UnitLit(), value),
                             Expressions.OptionExp.None,
                             new Expressions.LetExp(
                                 new[] {
-                                    Tuple.Create<string,Expressions>(varX.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Head, new [] { value })),
-                                    Tuple.Create<string,Expressions>(varXs.Id, new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Tail, new [] { value }))
+                                    Tuple.Create<string,Expressions>(varX.Id, Call("head", value)),
+                                    Tuple.Create<string,Expressions>(varXs.Id, Call("tail", value))
                                 },
                                 codeX
                             )
-                        ),
-                        Expressions.OptionExp.None
                     );
                 }
             }
@@ -129,7 +137,7 @@ namespace MiniMAL
                 return new Expressions.IfExp(
                     new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.IsTuple, new [] { value}),
                     new Expressions.IfExp(
-                        new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Ne, new Expressions[] { new Expressions.IntLit(patterns.Count), new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Length, new [] { value}), }),
+                        GenNe(new Expressions.IntLit(patterns.Count), new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.Length, new[] { value })),
                         Expressions.OptionExp.None,
                         body.Item1
                     ),

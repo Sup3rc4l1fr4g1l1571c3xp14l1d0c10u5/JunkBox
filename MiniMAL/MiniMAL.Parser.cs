@@ -1,26 +1,24 @@
 using System;
-using System.CodeDom;
-using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Parsing;
 
-namespace MiniMAL {
+namespace MiniMAL
+{
     /// <summary>
     /// パーサ定義
     /// </summary>
-    public static class Parser {
-        private static readonly Parser<string> WhiteSpace = Combinator.Many(Combinator.AnyChar(" \t\r\n"), 1).Select(x => string.Join("", x));
+    public static class Parser
+    {
+        private static readonly Parser<string> WhiteSpace = Combinator.AnyChar(" \t\r\n").Many(1).Select(x => string.Join("", x));
         private static readonly Parser<string> Comment =
             from _1 in Combinator.Token("(*")
-            from _2 in Combinator.Many(
+            from _2 in
                 Combinator.Choice(
                     Combinator.Lazy(() => Comment),
                     Combinator.Not(Combinator.Token("*)")).Then(Combinator.AnyChar().Select(x => $"{x}"))
-                )
-            ).Select(string.Concat)
+                ).Many().Select(string.Concat)
             from _3 in Combinator.Token("*)")
             select _1 + _2 + _3;
 
@@ -39,7 +37,6 @@ namespace MiniMAL {
             from _2 in Combinator.Choice(LowerChar, UpperChar, DigitChar, Combinator.AnyChar("_'")).Many()
             select new StringBuilder().Append(_1).Append(_2).ToString();
 
-        private static readonly Parser<string> ConstractorId = WS.Then(Constructor).Where(x => !(ReservedWords(new Source("", new System.IO.StringReader(x)), Position.Empty, Position.Empty)).Success);
 
         private static readonly Parser<string> True = WS.Then(Ident.Where(x => x == "true"));
         private static readonly Parser<string> False = WS.Then(Ident.Where(x => x == "false"));
@@ -51,7 +48,6 @@ namespace MiniMAL {
         private static readonly Parser<string> In = WS.Then(Ident.Where(x => x == "in"));
         private static readonly Parser<string> And = WS.Then(Ident.Where(x => x == "and"));
         private static readonly Parser<string> Fun = WS.Then(Ident.Where(x => x == "fun"));
-        private static readonly Parser<string> DFun = WS.Then(Ident.Where(x => x == "dfun"));
         private static readonly Parser<string> Match = WS.Then(Ident.Where(x => x == "match"));
         private static readonly Parser<string> With = WS.Then(Ident.Where(x => x == "with"));
         private static readonly Parser<string> Type = WS.Then(Ident.Where(x => x == "type"));
@@ -59,14 +55,13 @@ namespace MiniMAL {
         private static readonly Parser<string> Bool = WS.Then(Ident.Where(x => x == "bool"));
         private static readonly Parser<string> String = WS.Then(Ident.Where(x => x == "string"));
         private static readonly Parser<string> Unit = WS.Then(Ident.Where(x => x == "unit"));
-        //private static readonly Parser<string> List = WS.Then(Ident.Where(x => x == "list"));
-        //private static readonly Parser<string> Option = WS.Then(Ident.Where(x => x == "option"));
         private static readonly Parser<string> External = WS.Then(Ident.Where(x => x == "external"));
 
+        private static readonly Parser<string> ConstractorId = WS.Then(Constructor).Where(x => !(ReservedWords(new Source("", new System.IO.StringReader(x)), Position.Empty, Position.Empty)).Success);
         private static readonly Parser<string> Some = WS.Then(Constructor.Where(x => x == "Some"));
         private static readonly Parser<string> None = WS.Then(Constructor.Where(x => x == "None"));
 
-        private static readonly Parser<string> ReservedWords = Combinator.Choice(True, False, If, Then, Else, Let, Rec, In, And, Fun, DFun, Match, With, Type, 
+        private static readonly Parser<string> ReservedWords = Combinator.Choice(True, False, If, Then, Else, Let, Rec, In, And, Fun, Match, With, Type,
             Int, Bool, String, Unit, Some, None);
 
         private static readonly Parser<string> Id = WS.Then(ReservedWords.Not()).Then(Ident);
@@ -90,30 +85,15 @@ namespace MiniMAL {
         private static readonly Parser<string> Comma = WS.Then(Combinator.Token(","));
         private static readonly Parser<string> Quote = WS.Then(Combinator.Token("'"));
         private static readonly Parser<string> Wild = WS.Then(Combinator.Token("_"));
-#if false
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Plus = WS.Then(Combinator.Token("+")).Select(x => Expressions.BuiltinOp.Kind.Plus);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Minus = WS.Then(Combinator.Token("-")).Select(x => Expressions.BuiltinOp.Kind.Minus);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Mult = WS.Then(Combinator.Token("*")).Select(x => Expressions.BuiltinOp.Kind.Mult);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Div = WS.Then(Combinator.Token("/")).Select(x => Expressions.BuiltinOp.Kind.Div);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Eq = WS.Then(Combinator.Token("=")).Select(x => Expressions.BuiltinOp.Kind.Eq);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Ne = WS.Then(Combinator.Token("<>")).Select(x => Expressions.BuiltinOp.Kind.Ne);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Lt = WS.Then(Combinator.Token("<")).Select(x => Expressions.BuiltinOp.Kind.Lt);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Le = WS.Then(Combinator.Token("<=")).Select(x => Expressions.BuiltinOp.Kind.Le);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Gt = WS.Then(Combinator.Token(">")).Select(x => Expressions.BuiltinOp.Kind.Gt);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> Ge = WS.Then(Combinator.Token(">=")).Select(x => Expressions.BuiltinOp.Kind.Ge);
-        private static readonly Parser<Expressions.BuiltinOp.Kind> ColCol = WS.Then(Combinator.Token("::")).Select(x => Expressions.BuiltinOp.Kind.ColCol);
+        private static readonly Parser<string> Eq = WS.Then(Combinator.Token("="));
+        private static readonly Parser<string> ColCol = WS.Then(Combinator.Token("::"));
 
-        private static readonly Parser<Expressions.BuiltinOp.Kind> BinOp = Combinator.Choice(Plus, Minus, Mult, Div, Eq, Ne, Le, Lt, Ge, Gt, ColCol);
-#endif
-
-        private static readonly Parser<string> LAnd = WS.Then(Combinator.Token("&&"));
-        private static readonly Parser<string> LOr = WS.Then(Combinator.Token("||"));
-
-        private static readonly Parser<string> InfixOp = WS.Then(Combinator.AnyChar("!%&*+-/<=>?@^|:").Many(1).Select(string.Concat));
-        private static Parser<string> InfixOpOf(string startwith) => 
+        private static readonly Parser<char> InfixOpChar = Combinator.AnyChar("!%&*+-/<=>?@^|:");
+        private static readonly Parser<string> InfixOp = WS.Then(InfixOpChar.Many(1).Select(string.Concat));
+        private static Parser<string> InfixOpOf(string startwith) =>
             from _1 in WS
             from _2 in Combinator.AnyChar(startwith)
-            from _3 in Combinator.AnyChar("!%&*+-/<=>?@^|:").Many().Select(string.Concat)
+            from _3 in InfixOpChar.Many().Select(string.Concat)
             select _2 + _3;
 
         private static readonly Parser<string> StringLiteral =
@@ -137,13 +117,6 @@ namespace MiniMAL {
             from _4 in Expr
             select _2.Reverse().Aggregate(_4, (s, x) => new Expressions.FunExp(x, s));
 
-        private static readonly Parser<Expressions> DFunExpr =
-            from _1 in DFun
-            from _2 in Id.Many(1)
-            from _3 in RArrow
-            from _4 in Expr
-            select _2.Reverse().Aggregate(_4, (s, x) => new Expressions.DFunExp(x, s));
-
         private static readonly Parser<Tuple<string, Expressions>> LetBind =
             from _1 in Combinator.Choice(
                            Id,
@@ -154,9 +127,9 @@ namespace MiniMAL {
                        )
             from _2 in (
                 from _3 in Id
-                from _4 in Colon.Then(TypeExpr)
+                //from _4 in Colon.Then(TypeExpr)
                 select _3
-            }.Many()
+            ).Many()
             from _3 in Eq
             from _4 in Expr
             select Tuple.Create(_1, _2.Reverse().Aggregate(_4, (s, x) => new Expressions.FunExp(x, s)));
@@ -196,7 +169,7 @@ namespace MiniMAL {
                 (from _1 in None select (PatternExpressions)PatternExpressions.OptionP.None),
                 (from _1 in Some from _2 in Combinator.Lazy(() => PatternExpr) select (PatternExpressions)new PatternExpressions.OptionP(_2)),
                 (from _1 in LParen from _2 in RParen select (PatternExpressions)new PatternExpressions.UnitP()),
-                (from _1 in LParen from _2 in Combinator.Lazy(() => PatternCons.Repeat1(Comma)) from _3 in RParen select _2.Length > 1 ? _2.Reverse().Aggregate(PatternExpressions.TupleP.Tail, (s,x) => new PatternExpressions.TupleP(x,s)) : _2[0]),
+                (from _1 in LParen from _2 in Combinator.Lazy(() => PatternCons.Repeat1(Comma)) from _3 in RParen select _2.Length > 1 ? _2.Reverse().Aggregate(PatternExpressions.TupleP.Tail, (s, x) => new PatternExpressions.TupleP(x, s)) : _2[0]),
                 (from _1 in LBracket from _2 in RBracket select (PatternExpressions)PatternExpressions.ConsP.Empty),
                 (from _1 in LBracket
                  from _2 in Combinator.Lazy(() => PatternCons.Repeat1(Semi))
@@ -217,20 +190,14 @@ namespace MiniMAL {
             ;
 
 
-#if true
         private static readonly Parser<Expressions> MatchExpr =
             from _1 in Match
             from _2 in Expr
             from _3 in With
             from _4 in Bar.Option().Then(PatternEntry.Repeat1(Bar))
+#if true
             select (Expressions)new Expressions.MatchExp(_2, _4);
 #else
-
-        private static readonly Parser<Expressions> MatchExpr =
-            from _1 in Match
-            from _2 in Expr
-            from _3 in With
-            from _4 in Bar.Option().Then(PatternEntry.Repeat1(Bar))
             select (Expressions)
             new Expressions.LetExp(
                 new[] { Tuple.Create<string, Expressions>("@v", _2) },
@@ -249,7 +216,7 @@ namespace MiniMAL {
 #endif
         private static readonly Parser<Expressions> PrimaryExpression =
             Combinator.Choice(
-                IfExpr, LetRecExpr, LetExpr, FunExpr, DFunExpr, MatchExpr,
+                IfExpr, LetRecExpr, LetExpr, FunExpr, MatchExpr,
                 from _1 in IntV select (Expressions)new Expressions.IntLit(_1),
                 from _1 in StrV select (Expressions)new Expressions.StrLit(_1),
                 from _1 in True select (Expressions)new Expressions.BoolLit(true),
@@ -259,9 +226,9 @@ namespace MiniMAL {
                 from _1 in Some from _2 in Combinator.Lazy(() => Expr) select (Expressions)new Expressions.OptionExp(_2),
                 from _1 in LParen from _2 in RParen select (Expressions)new Expressions.UnitLit(),
                 from _1 in LParen from _2 in InfixOp from _3 in RParen select (Expressions)new Expressions.Var($"{_2}"),
-                from _1 in LParen from _2 in Expr.Repeat1(Comma) from _3 in RParen select _2.Length > 1 ? _2.Reverse().Aggregate(Expressions.TupleExp.Tail, (s,x) => new Expressions.TupleExp(x,s)) : _2[0],
+                from _1 in LParen from _2 in Expr.Repeat1(Comma) from _3 in RParen select _2.Length > 1 ? _2.Reverse().Aggregate(Expressions.TupleExp.Tail, (s, x) => new Expressions.TupleExp(x, s)) : _2[0],
                 from _1 in LBracket from _2 in RBracket select (Expressions)new Expressions.EmptyListLit(),
-                from _1 in LBracket from _2 in Expr.Repeat1(Semi) from _3 in RBracket select _2.Reverse().Aggregate((Expressions)new Expressions.EmptyListLit(), (s, x) => new Expressions.BuiltinOp(Expressions.BuiltinOp.Kind.ColCol, new Expressions[] { x, s }))
+                from _1 in LBracket from _2 in Expr.Repeat1(Semi) from _3 in RBracket select _2.Reverse().Aggregate((Expressions)new Expressions.EmptyListLit(), (s, x) => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var("::"), x), s))
             );
 
         private static readonly Parser<Expressions> ApplyExpression =
@@ -278,27 +245,21 @@ namespace MiniMAL {
         private static readonly Parser<Expressions> UnaryExpression =
             from _1 in UnaryOperator.Many()
             from _2 in ApplyExpression
-            select _1.Reverse().Aggregate(_2, (s, x) => new Expressions.BuiltinOp(x, new [] {s}));
+            select _1.Reverse().Aggregate(_2, (s, x) => new Expressions.BuiltinOp(x, new[] { s }));
 
         private static readonly Parser<Expressions> MultiplicativeExpression =
             from _1 in UnaryExpression
             from _2 in Combinator.Many(
-                //from _3 in Combinator.Choice(Mult, Div)
-                //from _4 in UnaryExpression
-                //select (Func<Expressions, Expressions>)(x => new Expressions.BuiltinOp(_3, new Expressions[] { x, _4 }))
                 from _3 in InfixOpOf("*/%")
                 from _4 in UnaryExpression
                 select (Func<Expressions, Expressions>)(x => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(_3), x), _4))
-                
+
             )
             select _2.Aggregate(_1, (s, x) => x(s));
 
         private static readonly Parser<Expressions> AdditiveExpression =
             from _1 in MultiplicativeExpression
             from _2 in Combinator.Many(
-                //from _3 in Combinator.Choice(Plus, Minus)
-                //from _4 in MultiplicativeExpression
-                //select (Func<Expressions, Expressions>)(x => new Expressions.BuiltinOp(_3, new Expressions[] { x, _4 }))
                 from _3 in InfixOpOf("+-")
                 from _4 in MultiplicativeExpression
                 select (Func<Expressions, Expressions>)(x => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(_3), x), _4))
@@ -310,9 +271,9 @@ namespace MiniMAL {
             from _2 in (
                 from _3 in InfixOpOf("^")
                 from _4 in AdditiveExpression
-                select Tuple.Create(_3,_4)//(Func<Expressions, Expressions>)(x => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(_3), x), _4))
+                select Tuple.Create(_3, _4)
             ).Many()
-            let exprs = new [] {_1}.Concat(_2.Select(x => x.Item2)).Reverse().ToArray()
+            let exprs = new[] { _1 }.Concat(_2.Select(x => x.Item2)).Reverse().ToArray()
             let e = exprs.First()
             let es = exprs.Skip(1).Zip(_2.Select(x => x.Item1).Reverse(), Tuple.Create).ToArray()
             select es.Aggregate(e, (s, x) => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(x.Item2), x.Item1), s));
@@ -322,21 +283,12 @@ namespace MiniMAL {
             from _2 in (
                            from _3 in InfixOpOf(":")
                            from _4 in CapExpression
-                           select Tuple.Create(_3, _4)//(Func<Expressions, Expressions>)(x => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(_3), x), _4))
+                           select Tuple.Create(_3, _4)
                        ).Many()
             let exprs = new[] { _1 }.Concat(_2.Select(x => x.Item2)).Reverse().ToArray()
             let e = exprs.First()
             let es = exprs.Skip(1).Zip(_2.Select(x => x.Item1).Reverse(), Tuple.Create).ToArray()
             select es.Aggregate(e, (s, x) => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(x.Item2), x.Item1), s));
-
-        //private static readonly Parser<Expressions> RelationalExpression =
-        //    from _1 in ConsExpression
-        //    from _2 in Combinator.Many(
-        //        from _3 in Combinator.Not(Ne).Then(Combinator.Choice(Le, Lt, Ge, Gt))
-        //        from _4 in ConsExpression
-        //        select (Func<Expressions, Expressions>)(x => new Expressions.BuiltinOp(_3, new Expressions[] { x, _4 }))
-        //    )
-        //    select _2.Aggregate(_1, (s, x) => x(s));
 
         private static readonly Parser<Expressions> EqualityExpression =
             from _1 in ConsExpression
@@ -351,7 +303,7 @@ namespace MiniMAL {
             from _1 in EqualityExpression
             from _2 in Combinator.Many(
                 from _3 in InfixOpOf("&")
-                //from _3 in LAnd
+                    //from _3 in LAnd
                 from _4 in EqualityExpression
                 select _3 == "&&" ? (Func<Expressions, Expressions>)(x => new Expressions.IfExp(x, _4, new Expressions.BoolLit(false)))
                                   : (Func<Expressions, Expressions>)(x => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var(_3), x), _4))
@@ -372,20 +324,20 @@ namespace MiniMAL {
 
         private static readonly Parser<TypeExp> SimpleType =
             from _1 in Combinator.Choice(
-                Quote.Then(Id).Select(x => (TypeExp) new TypeExp.TypeVar("'" + x)),
+                Quote.Then(Id).Select(x => (TypeExp)new TypeExp.TypeVar("'" + x)),
                 from _1 in Int select (TypeExp)new TypeExp.IntType(),
                 from _1 in Bool select (TypeExp)new TypeExp.BoolType(),
                 from _1 in Unit select (TypeExp)new TypeExp.UnitType(),
                 from _1 in String select (TypeExp)new TypeExp.StrType(),
                 Id.Select(x => (TypeExp)new TypeExp.TypeConstruct(new TypeExp.TypeName(x), new TypeExp[0])),
-                from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr).Repeat1(Comma) from _3 in RParen from _4 in Id.Select(x => new TypeExp.TypeName(x)) select (TypeExp) new TypeExp.TypeConstruct(_4, _2),
+                from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr).Repeat1(Comma) from _3 in RParen from _4 in Id.Select(x => new TypeExp.TypeName(x)) select (TypeExp)new TypeExp.TypeConstruct(_4, _2),
                 from _1 in LParen from _2 in Combinator.Lazy(() => TypeExpr) from _3 in RParen select _2
             )
             from _2 in Id.Select(x => new TypeExp.TypeName(x)).Many()
-            select _2.Aggregate(_1, (s, y) => (TypeExp) new TypeExp.TypeConstruct(y, new TypeExp[] {s}));
+            select _2.Aggregate(_1, (s, y) => (TypeExp)new TypeExp.TypeConstruct(y, new TypeExp[] { s }));
 
         private static readonly Parser<TypeExp> TypeExprTuple =
-            SimpleType.Repeat1(Mult)
+            SimpleType.Repeat1(WS.Then(Combinator.Token("*")))
                       .Select(x => (x.Length > 1
                                         ? x.Reverse()
                                            .Aggregate(TypeExp.TupleType.Tail, (s, y) => new TypeExp.TupleType(y, s))
@@ -394,7 +346,7 @@ namespace MiniMAL {
         private static readonly Parser<TypeExp> TypeExprFunc =
             Combinator.Choice(
                 from _1 in TypeExprTuple
-                from _2 in RArrow.Then(Combinator.Lazy(()=>TypeExprFunc)).Option()
+                from _2 in RArrow.Then(Combinator.Lazy(() => TypeExprFunc)).Option()
                 select _2 == null ? _1 : (TypeExp)new TypeExp.FuncType(_1, _2)
             );
 
@@ -420,15 +372,15 @@ namespace MiniMAL {
                        from _1 in Type
                        from _2 in Combinator.Choice(
                                    from _3 in LParen
-                                   from _4 in Quote.Then(Id).Select(x => "'"+x).Repeat1(Comma)
+                                   from _4 in Quote.Then(Id).Select(x => "'" + x).Repeat1(Comma)
                                    from _5 in RParen
                                    select _4,
-                                   Quote.Then(Id).Select(x => new [] { "'" + x })
+                                   Quote.Then(Id).Select(x => new[] { "'" + x })
                                ).Option()
-                        from _3 in Id
-                        from _4 in Eq
-                        from _5 in TypeExpr
-                       select (Toplevel)new Toplevel.TypeDef(_3, _2 == null ? new string[] {} : _2, _5)
+                       from _3 in Id
+                       from _4 in Eq
+                       from _5 in TypeExpr
+                       select (Toplevel)new Toplevel.TypeDef(_3, _2 == null ? new string[] { } : _2, _5)
                    ), (
                     from _1 in Combinator.Many(
                         Combinator.Choice(
@@ -460,12 +412,16 @@ namespace MiniMAL {
             from _2 in Combinator.Choice(SemiSemi, Combinator.EoF().Select(x => ""))
             select (Toplevel)new Toplevel.Empty();
 
-        public static Result<Toplevel> Parse(Source s) {
+        public static Result<Toplevel> Parse(Source s)
+        {
             var ret = TopLevel(s, Position.Empty, Position.Empty);
-            if (ret.Success == false) {
+            if (ret.Success == false)
+            {
                 var ret2 = ErrorRecovery(s, ret.FailedPosition, ret.FailedPosition);
                 return new Result<Toplevel>(false, null, ret2.Position, ret.FailedPosition);
-            } else {
+            }
+            else
+            {
                 return ret;
             }
         }
