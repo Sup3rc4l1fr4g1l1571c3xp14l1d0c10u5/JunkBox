@@ -1,51 +1,72 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MiniMAL;
 
-namespace MiniMALTest {
+namespace MiniMAL.Tests
+{
     [TestClass]
     public class SetTest {
         [TestMethod]
-        public void ToStringメソッド() {
+        public void ToStringのテスト() {
             var set1 = Set.FromLinkedList(LinkedList.Create(0, 1, 2, 3, 4));
             Assert.AreEqual(set1.ToString(), $"[{string.Join("; ", new[] { 0, 1, 2, 3, 4 }.Select(x => x.ToString()))}]");
             var set2 = Set.FromLinkedList(LinkedList.Create(100));
-            Assert.AreEqual(set2.ToString(), $"[100]");
-            Assert.AreEqual(Set<int>.Empty.ToString(), $"[]");
+            Assert.AreEqual(set2.ToString(), "[100]");
+            Assert.AreEqual(Set<int>.Empty.ToString(), "[]");
         }
 
         [TestMethod]
-        public void Emptyメソッド() {
-            var set = MiniMAL.Set<int>.Empty;
-            Assert.AreEqual(set, MiniMAL.Set<int>.Empty);
+        public void Emptyのテスト() {
+            var set = Set<int>.Empty;
+            Assert.AreEqual(set, Set<int>.Empty);
             Assert.AreEqual(Set.Count(set), 0);
         }
 
         [TestMethod]
-        public void Singletonメソッド() {
+        public void Singletonのテスト() {
             var set = Set.Singleton(1);
-            Assert.AreNotEqual(set, MiniMAL.Set<int>.Empty);
+            Assert.AreNotEqual(set, Set<int>.Empty);
             Assert.AreEqual(set.Value, 1);
-            Assert.AreEqual(set.Next, MiniMAL.Set<int>.Empty);
+            Assert.AreEqual(set.Next, Set<int>.Empty);
             Assert.AreEqual(Set.Count(set), 1);
         }
 
         [TestMethod]
-        public void FromListメソッド() {
+        public void FromLinkedListのテスト()
+        {
             var set = Set.FromLinkedList(LinkedList.Create(0, 1, 2, 3, 4));
-            Assert.AreNotEqual(set, MiniMAL.Set<int>.Empty);
-            for (var i = 0; i < 5; i++) {
+            Assert.AreNotEqual(set, Set<int>.Empty);
+            for (var i = 0; i < 5; i++)
+            {
                 Assert.IsTrue(Set.Member(i, set));
             }
             Assert.AreEqual(Set.Count(set), 5);
         }
 
         [TestMethod]
+        public void ToLinkedListのテスト()
+        {
+            var list1 = LinkedList.Create(0, 1, 2, 3, 4);
+            var set = Set.FromLinkedList(LinkedList.Create(0, 1, 2, 3, 4));
+            var list2 = Set.ToLinkedList(set);
+
+            Assert.AreNotEqual(LinkedList.FirstIndex((x => x == 0), list2), -1);
+            Assert.AreEqual(LinkedList.At(LinkedList.FirstIndex((x => x == 0), list2), list2), 0);
+            Assert.AreNotEqual(LinkedList.FirstIndex((x => x == 1), list2), -1);
+            Assert.AreEqual(LinkedList.At(LinkedList.FirstIndex((x => x == 1), list2), list2), 1);
+            Assert.AreNotEqual(LinkedList.FirstIndex((x => x == 2), list2), -1);
+            Assert.AreEqual(LinkedList.At(LinkedList.FirstIndex((x => x == 2), list2), list2), 2);
+            Assert.AreNotEqual(LinkedList.FirstIndex((x => x == 3), list2), -1);
+            Assert.AreEqual(LinkedList.At(LinkedList.FirstIndex((x => x == 3), list2), list2), 3);
+            Assert.AreNotEqual(LinkedList.FirstIndex((x => x == 4), list2), -1);
+            Assert.AreEqual(LinkedList.At(LinkedList.FirstIndex((x => x == 4), list2), list2), 4);
+
+        }
+
+        [TestMethod]
         public void 要素追加テスト() {
-            var firstset = MiniMAL.Set<int>.Empty;
+            var firstset = Set<int>.Empty;
             var set = firstset;
             for (var i = 0; i < 100; i++) {
                 set = Set.Insert(i, set);
@@ -53,8 +74,8 @@ namespace MiniMALTest {
             Assert.AreEqual(Set.Count(firstset), 0);
             Assert.AreEqual(Set.Count(set), 100);
             Assert.AreNotEqual(set, firstset);
-            Assert.AreEqual(firstset, MiniMAL.Set<int>.Empty);
-            Assert.AreNotEqual(set, MiniMAL.Set<int>.Empty);
+            Assert.AreEqual(firstset, Set<int>.Empty);
+            Assert.AreNotEqual(set, Set<int>.Empty);
             for (var i = 0; i < 100; i++) {
                 Assert.IsFalse(Set.Member(i, firstset));
                 Assert.IsTrue(Set.Member(i, set));
@@ -80,7 +101,7 @@ namespace MiniMALTest {
 
         [TestMethod]
         public void 重複する要素の追加テスト() {
-            var firstset = MiniMAL.Set<int>.Empty;
+            var firstset = Set<int>.Empty;
             var set = firstset;
             for (var i = 0; i < 100; i++) {
                 set = Set.Insert(i, set);

@@ -7,7 +7,7 @@ namespace MiniMALRepl {
     class Program {
         static void Main(string[] args)
         {
-            MiniMAL.REPL.EvalRun();
+            MiniMAL.REPL.SecdMachineInterpreterRepl.Run();
         }
     }
 }

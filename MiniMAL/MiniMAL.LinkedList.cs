@@ -76,16 +76,32 @@ namespace MiniMAL
             return Reverse(ret);
         }
 
-        public static T2 FoldRight<T1, T2>(Func<T2, T1, T2> f, LinkedList<T1> env, T2 a) {
-            var kv = Reverse(env);
+        public static T2 FoldLeft<T1, T2>(Func<T2, T1, T2> f, LinkedList<T1> env, T2 a)
+        {
             var ret = a;
-            for (var e = kv; e != LinkedList<T1>.Empty; e = e.Next) {
+            for (var e = env; e != LinkedList<T1>.Empty; e = e.Next)
+            {
                 ret = f(ret, e.Value);
             }
             return ret;
         }
 
-        public static T At<T>(LinkedList<T> list, int num) {
+        public static T2 FoldRight<T1, T2>(Func<T2, T1, T2> f, LinkedList<T1> env, T2 a)
+        {
+            var kv = Reverse(env);
+            var ret = a;
+            for (var e = kv; e != LinkedList<T1>.Empty; e = e.Next)
+            {
+                ret = f(ret, e.Value);
+            }
+            return ret;
+        }
+
+        public static T At<T>(int num, LinkedList<T> list) {
+            if (num < 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
             while (num > 0) {
                 if (list == LinkedList<T>.Empty) {
                     throw new ArgumentOutOfRangeException();

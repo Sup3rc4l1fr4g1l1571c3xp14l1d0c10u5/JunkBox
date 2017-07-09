@@ -6,6 +6,8 @@ external equal: ('a * 'a)   -> bool = "equal";;
 let ( =  ) lhs rhs = equal (lhs, rhs);;
 let ( <> ) lhs rhs = if equal (lhs, rhs) then false else true;;
 
+external istuple: 'a   -> bool = "istuple";;
+
 (* int *)
 
 external add: (int * int) -> int = "add";;
@@ -19,6 +21,9 @@ let ( - ) lhs rhs = sub (lhs, rhs);;
 let ( * ) lhs rhs = mul (lhs, rhs);;
 let ( / ) lhs rhs = div (lhs, rhs);;
 let ( % ) lhs rhs = mod (lhs, rhs);;
+
+let ( ~+ ) arg = 0 + arg ;;
+let ( ~- ) arg = 0 - arg ;;
 
 external lt: (int * int) -> bool = "lt";;
 external le: (int * int) -> bool = "le";;
@@ -39,6 +44,14 @@ external tail: ('a list) -> ('a list) = "tail";;
 let ( :: ) x xs = cons (x, xs);;
 
 (* option *)
+
 external get: 'a option -> 'a = "get";;
+
+(* tuple  *)
+
+external field_: ('a * int) -> 'b = "field";;
+let field f i = field_ (f,i);;
+
+external size: 'a -> int = "size";;
 
 

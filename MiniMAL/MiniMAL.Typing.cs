@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using MiniMAL.Syntax;
 
 namespace MiniMAL {
     public static partial class Typing {
@@ -23,11 +24,12 @@ namespace MiniMAL {
 
             public class TyVar : Type {
                 private static int _counter;
-                public int Id { get; }
 
                 public static TyVar Fresh() {
                     return new TyVar(_counter++);
                 }
+
+                public int Id { get; }
 
                 public TyVar(int id) {
                     Id = id;
@@ -54,12 +56,9 @@ namespace MiniMAL {
             }
 
             public class TyTuple : Type {
-                public Type Car { get; }
-                public TyTuple Cdr { get; }
-                public static TyTuple Tail { get; }= new TyTuple(null, null);
-                public TyTuple(Type car, TyTuple cdr) {
-                    Car = car;
-                    Cdr = cdr;
+                public Type[] Members { get; }
+                public TyTuple(Type[] members) {
+                    Members = members;
                 }
             }
 
@@ -117,19 +116,7 @@ namespace MiniMAL {
                 if (arg1 is TyTuple && arg2 is TyTuple) {
                     var i1 = (TyTuple)arg1;
                     var i2 = (TyTuple)arg2;
-                    while (!ReferenceEquals(i1, Type.TyTuple.Tail) && !ReferenceEquals(i1, Type.TyTuple.Tail)) {
-                        var ty1 = i1.Car;
-                        var ty2 = i2.Car;
-                        if (Equals(ty1, ty2) == false) {
-                            return false;
-                        }
-                        i1 = i1.Cdr;
-                        i2 = i2.Cdr;
-                    }
-                    if (!ReferenceEquals(i1, Type.TyTuple.Tail) || !ReferenceEquals(i2, Type.TyTuple.Tail)) {
-                        return false;
-                    }
-                    return true;
+                    return ReferenceEquals(i1.Members, i2.Members);
                 }
                 return false;
             }
@@ -149,8 +136,8 @@ namespace MiniMAL {
                                                 StringBuilder buffer,
                                                 int priority,
                                                 Type t) {
-                if (t is Type.TyVar) {
-                    var tt = t as Type.TyVar;
+                if (t is TyVar) {
+                    var tt = (TyVar) t;
                     if (!vars.ContainsKey(tt.Id)) {
                         int i = vars.Count;
                         string str = "'";
@@ -166,39 +153,40 @@ namespace MiniMAL {
                     buffer.Append(vars[tt.Id]);
                     return;
                 }
-                if (t is Type.TyUnit) {
+                if (t is TyUnit) {
                     buffer.Append("unit");
                     return;
                 }
-                if (t is Type.TyInt) {
+                if (t is TyInt) {
                     buffer.Append("int");
                     return;
                 }
-                if (t is Type.TyBool) {
+                if (t is TyBool) {
                     buffer.Append("bool");
                     return;
                 }
-                if (t is Type.TyStr) {
+                if (t is TyStr) {
                     buffer.Append("string");
                     return;
                 }
-                if (t is Type.TyTuple) {
-                    var tt = t as Type.TyTuple;
+                if (t is TyTuple) {
+                    var tt = (TyTuple) t;
                     if (priority > 1) {
                         buffer.Append("(");
                     }
-                    type_stringizer(vars, buffer, 2, tt.Car);
-                    for (var it = tt.Cdr; it != TyTuple.Tail; it = it.Cdr) {
-                        buffer.Append(" * ");
-                        type_stringizer(vars, buffer, 2, it.Car);
-                    }
+                    tt.Members.Aggregate("", (s, x) =>
+                    {
+                        buffer.Append(s);
+                        type_stringizer(vars, buffer, 2, x);
+                        return " * ";
+                    });
                     if (priority > 1) {
                         buffer.Append(")");
                     }
                     return;
                 }
-                if (t is Type.TyList) {
-                    var tt = t as Type.TyList;
+                if (t is TyList) {
+                    var tt = (TyList) t;
                     if (priority > 2) {
                         buffer.Append("(");
                     }
@@ -209,8 +197,8 @@ namespace MiniMAL {
                     }
                     return;
                 }
-                if (t is Type.TyOption) {
-                    var tt = t as Type.TyOption;
+                if (t is TyOption) {
+                    var tt = (TyOption) t;
                     if (priority > 2) {
                         buffer.Append("(");
                     }
@@ -221,8 +209,8 @@ namespace MiniMAL {
                     }
                     return;
                 }
-                if (t is Type.TyFunc) {
-                    var tt = t as Type.TyFunc;
+                if (t is TyFunc) {
+                    var tt = (TyFunc) t;
                     if (priority > 0) {
                         buffer.Append("(");
                     }
@@ -234,7 +222,7 @@ namespace MiniMAL {
                     }
                     return;
                 }
-                //throw new NotSupportedException();
+                throw new NotSupportedException();
             }
 
             public override string ToString() {
@@ -308,12 +296,7 @@ namespace MiniMAL {
             }
             if (typ is Type.TyTuple) {
                 var ty1 = ((Type.TyTuple)typ);
-                var items = new List<Type>();
-                while (!ReferenceEquals(ty1, Type.TyTuple.Tail)) {
-                    items.Add(ty1.Car);
-                    ty1 = ty1.Cdr;
-                }
-                return items.Reverse<Type>().Aggregate(Type.TyTuple.Tail, (s,x) => new Type.TyTuple(resolve_type(substs, x),s));
+                return new Type.TyTuple(ty1.Members.Select(x => resolve_type(substs, x)).ToArray());
             }
             return typ;
         }
@@ -366,12 +349,7 @@ namespace MiniMAL {
             }
             if (ty is Type.TyTuple) {
                 var f = (Type.TyTuple)ty;
-                var s = Set<Type.TyVar>.Empty;
-                while (!ReferenceEquals(f,Type.TyTuple.Tail)) {
-                    Set.Union(freevar_ty(f.Car), s);
-                    f = f.Cdr;
-                }
-                return s;
+                return f.Members.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Union(freevar_ty(x), s));
             }
             return Set<Type.TyVar>.Empty;
         }
@@ -434,17 +412,12 @@ namespace MiniMAL {
                 var f1 = (Type.TyTuple)eqs.Value.Type1;
                 var f2 = (Type.TyTuple)eqs.Value.Type2;
 
-                var neweqs = LinkedList<TypeEquality>.Empty;
-                while (!ReferenceEquals(f1, Type.TyTuple.Tail) && !ReferenceEquals(f2, Type.TyTuple.Tail)) {
-                    var ty1 = f1.Car;
-                    var ty2 = f2.Car;
-                    neweqs = LinkedList.Concat(LinkedList.Create(new TypeEquality(ty1, ty2)), neweqs);
-                    f1 = f1.Cdr;
-                    f2 = f2.Cdr;
-                }
-                if (!ReferenceEquals(f1, Type.TyTuple.Tail) || !ReferenceEquals(f2, Type.TyTuple.Tail)) {
+                if (f1.Members.Length != f2.Members.Length) {
                     throw new Exception.TypingException("Type missmatch");
                 }
+
+                var neweqs = f1.Members.Zip(f2.Members,Tuple.Create).Aggregate(LinkedList<TypeEquality>.Empty,
+                    (s, x) => LinkedList.Extend(new TypeEquality(x.Item1, x.Item2), s));
                 return Unify(neweqs);
             }
             if (eqs.Value.Type1 is Type.TyVar && eqs.Value.Type2 is Type.TyVar) {
@@ -460,7 +433,7 @@ namespace MiniMAL {
                 var v1 = (Type.TyVar)eqs.Value.Type1;
                 var ty = eqs.Value.Type2;
                 var rest = eqs.Next;
-                if (Set.Member(v1, freevar_ty(ty)) != false) {
+                if (Set.Member(v1, freevar_ty(ty))) {
                     throw new Exception.TypingException("Recursive type");
                 }
                 var eqs2 = LinkedList.Create(new TypeSubst(v1, ty));
@@ -470,51 +443,13 @@ namespace MiniMAL {
                 var v1 = (Type.TyVar)eqs.Value.Type2;
                 var ty = eqs.Value.Type1;
                 var rest = eqs.Next;
-                if (Set.Member(v1, freevar_ty(ty)) != false) {
+                if (Set.Member(v1, freevar_ty(ty))) {
                     throw new Exception.TypingException("Recursive type");
                 }
                 var eqs2 = LinkedList.Create(new TypeSubst(v1, ty));
                 return LinkedList.Concat(eqs2, Unify(subst_eqs(eqs2, rest)));
             }
             throw new Exception.TypingException($"Cannot unify type: {eqs.Value.Type1} and {eqs.Value.Type2}");
-        }
-
-        /// <summary>
-        ///     組み込み演算子式の結果型
-        /// </summary>
-        /// <param name="op"></param>
-        /// <param name="args"></param>
-        /// <returns></returns>
-        private static Tuple<Type, LinkedList<TypeEquality>> EvalBuiltinExpressions(Expressions.BuiltinOp.Kind op,
-            Type[] args) {
-            switch (op) {
-                case Expressions.BuiltinOp.Kind.UnaryMinus: {
-                    if (args.Length == 1) {
-                        return Tuple.Create(
-                            (Type)new Type.TyInt(),
-                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
-                        );
-                    }
-                    throw new Exception.InvalidArgumentNumException("Argument num must be 1: -");
-                }
-                case Expressions.BuiltinOp.Kind.UnaryPlus: {
-                    if (args.Length == 1) {
-                        return Tuple.Create(
-                            (Type)new Type.TyInt(),
-                            LinkedList.Create(args.Select(x => new TypeEquality(x, new Type.TyInt())).ToArray())
-                        );
-                    }
-                    throw new Exception.InvalidArgumentNumException("Argument num must be 2: +");
-                }
-                case Expressions.BuiltinOp.Kind.Car:
-                case Expressions.BuiltinOp.Kind.Cdr:
-                case Expressions.BuiltinOp.Kind.IsTail:
-                case Expressions.BuiltinOp.Kind.IsTuple:
-                case Expressions.BuiltinOp.Kind.Length:
-                    throw new NotSupportedException();
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(op), op, null);
-            }
         }
 
         /// <summary>
@@ -608,18 +543,8 @@ namespace MiniMAL {
             if (pattern is PatternExpressions.TupleP) {
                 var p = (PatternExpressions.TupleP)pattern;
 
-                var it = p;
-                var members = new List<Tuple<PatternExpressions, Type.TyVar>>();
-                while (it != PatternExpressions.TupleP.Tail) {
-                    var tyvar = Type.TyVar.Fresh();
-                    members.Add(Tuple.Create(it.Car, tyvar));
-                    it = it.Cdr;
-                }
-                var tupleType = members.Reverse<Tuple<PatternExpressions, Type.TyVar>>()
-                       .Aggregate(
-                           Type.TyTuple.Tail,
-                           (s,x) => new Type.TyTuple(x.Item2,s)
-                       );
+                var members = p.Members.Select(x => Tuple.Create(x, Type.TyVar.Fresh())).ToArray();
+                var tupleType = new Type.TyTuple(members.Select(x => (Type)x.Item2).ToArray());
 
                 var eqs = LinkedList.Create(new TypeEquality(value, tupleType));
                 var binds = new Dictionary<string, Type>();

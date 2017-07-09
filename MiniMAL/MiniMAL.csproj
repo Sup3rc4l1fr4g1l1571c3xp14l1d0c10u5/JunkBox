@@ -77,20 +77,27 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MiniMAL.TypeExpr.cs" />
-    <Compile Include="MiniMAL.Toplevel.cs" />
+    <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.Context .cs" />
+    <Compile Include="MiniMAL.Interpreter.AbstractSyntaxTreeInterpreter.Context.cs" />
+    <Compile Include="MiniMAL.Interpreter.AbstractSyntaxTreeInterpreter.ExprValue.cs" />
+    <Compile Include="MiniMAL.Interpreter.AbstractSyntaxTreeInterpreter.Result.cs" />
+    <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.Compiler.cs" />
+    <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.ExprValue.cs" />
+    <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.Instructions.cs" />
+    <Compile Include="MiniMAL.Syntax.TypeExpressions.cs" />
+    <Compile Include="MiniMAL.Syntax.Toplevel.cs" />
     <Compile Include="MiniMAL.Environment.cs" />
-    <Compile Include="MiniMAL.AbstractSyntaxTreeInterpreter.cs" />
-    <Compile Include="MiniMAL.Expressions.cs" />
+    <Compile Include="MiniMAL.Interpreter.AbstractSyntaxTreeInterpreter.cs" />
+    <Compile Include="MiniMAL.Syntax.Expressions.cs" />
     <Compile Include="MiniMAL.Typing.cs" />
     <Compile Include="MiniMAL.Set.cs" />
     <Compile Include="MiniMAL.LinkedList.cs" />
-    <Compile Include="MiniMAL.Parser.cs" />
-    <Compile Include="MiniMAL.PatternCompiler.cs" />
-    <Compile Include="MiniMAL.PatternExpressions.cs" />
+    <Compile Include="MiniMAL.Syntax.Parser.cs" />
+    <Compile Include="MiniMAL.Syntax.PatternExpressions.Compiler.cs" />
+    <Compile Include="MiniMAL.Syntax.PatternExpressions.cs" />
     <Compile Include="MiniMAL.Typing.PolymorphicTyping.cs" />
     <Compile Include="MiniMAL.Typing.MonomorphicTyping.cs" />
-    <Compile Include="MiniMAL.SecdMachineInterpreter.cs" />
+    <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

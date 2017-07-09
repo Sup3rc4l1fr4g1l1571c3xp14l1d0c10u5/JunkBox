@@ -40,7 +40,7 @@ namespace MiniMAL
         }
 
         public static LinkedList<T> ToLinkedList<T>(Set<T> xs) {
-            return Set.Fold((s, x) => LinkedList.Extend(x, s), LinkedList<T>.Empty, xs);
+            return Fold((s, x) => LinkedList.Extend(x, s), LinkedList<T>.Empty, xs);
         }
 
         public static Set<T> Insert<T>(T x, Set<T> xs) {

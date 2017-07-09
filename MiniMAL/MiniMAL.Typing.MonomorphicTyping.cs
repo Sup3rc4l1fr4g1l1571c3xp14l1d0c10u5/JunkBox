@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using MiniMAL.Syntax;
 
 namespace MiniMAL {
     public static partial  class Typing { 
@@ -67,18 +67,6 @@ namespace MiniMAL {
                 return Tuple.Create(
                 LinkedList<TypeSubst>.Empty,
                 (Type)new Type.TyUnit()
-                );
-            }
-            if (e is Expressions.BuiltinOp) {
-                var op = ((Expressions.BuiltinOp)e).Op;
-                var args = ((Expressions.BuiltinOp)e).Exprs.Select(x => EvalExpressions(env, x)).ToArray();
-                var ret = EvalBuiltinExpressions(op, args.Select(x => x.Item2).ToArray());
-                var ss = LinkedList.Concat(LinkedList.Concat(args.Select(x => eqs_of_subst(x.Item1)).ToArray()),
-                ret.Item2);
-                var eqs = Unify(ss);
-                return Tuple.Create(
-                eqs,
-                subst_type(eqs, ret.Item1)
                 );
             }
             if (e is Expressions.IfExp) {
@@ -245,23 +233,15 @@ namespace MiniMAL {
                 );
             }
             if (e is Expressions.TupleExp) {
-                if (e == Expressions.TupleExp.Tail) {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)Type.TyTuple.Tail
-                    );
-                } else {
-                    var exp = (Expressions.TupleExp)e;
-                    var tyCar = EvalExpressions(env, exp.Car);
-                    var tyCdr = EvalExpressions(env, exp.Cdr);
-                    var ss = LinkedList.Concat(eqs_of_subst(tyCar.Item1), eqs_of_subst(tyCdr.Item1));
-                    var eqs = Unify(ss);
+                var exp = (Expressions.TupleExp)e;
+                var tyMembers = exp.Members.Select(x => EvalExpressions(env, x)).ToArray();
+                var ss = tyMembers.Aggregate(LinkedList<TypeEquality>.Empty, (s,x) => LinkedList.Concat(s, eqs_of_subst(x.Item1)));
+                var eqs = Unify(ss);
 
-                    return Tuple.Create(
-                        eqs,
-                        (Type)new Type.TyTuple(subst_type(eqs, tyCar.Item2), subst_type(eqs, tyCdr.Item2) as Type.TyTuple)
-                    );
-                }
+                return Tuple.Create(
+                    eqs,
+                    (Type)new Type.TyTuple(tyMembers.Select(x => subst_type(eqs, x.Item2)).ToArray())
+                );
             }
                 if (e is Expressions.OptionExp) {
                 if (e == Expressions.OptionExp.None) {
