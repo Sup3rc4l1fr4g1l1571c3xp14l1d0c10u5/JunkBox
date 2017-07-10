@@ -33,6 +33,7 @@ namespace Parsing {
                 {
                     if (this.eof == false)
                     {
+
                         var ch = reader.Read();
                         if (ch == -1)
                         {

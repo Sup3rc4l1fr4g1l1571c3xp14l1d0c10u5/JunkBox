@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 
@@ -151,14 +152,19 @@ namespace MiniMAL
             /// </summary>
             public class FunExp : Expressions
             {
-                public FunExp(string arg, Expressions body)
+                public FunExp(string arg, Expressions body, TypeExpressions argTy, TypeExpressions bodyTy)
                 {
                     Arg = arg;
                     Body = body;
+                    ArgTy = argTy;
+                    BodyTy = bodyTy;
                 }
 
                 public string Arg { get; }
                 public Expressions Body { get; }
+
+                public TypeExpressions ArgTy { get; }
+                public TypeExpressions BodyTy { get; }
 
             }
 
@@ -290,7 +296,7 @@ namespace MiniMAL
                 if (exp is FunExp)
                 {
                     var e = (FunExp)exp;
-                    return $"fun {e.Arg} -> {ExpressionToString(0, e.Body)}";
+                    return $"fun ({e.Arg} : {e.ArgTy}) : {e.BodyTy} -> {ExpressionToString(0, e.Body)}";
                 }
                 if (exp is AppExp)
                 {

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace MiniMAL
 {
@@ -11,28 +12,57 @@ namespace MiniMAL
         {
             public class TypeVar : TypeExpressions
             {
+                private static int _counter;
+
+                public static TypeVar Fresh()
+                {
+                    return new TypeVar("$"+(_counter++));
+                }
+
+
                 public string Id { get; }
 
                 public TypeVar(string id)
                 {
                     Id = id;
                 }
+
+                public override string ToString()
+                {
+                    return $"{Id}";
+                }
             }
 
             public class IntType : TypeExpressions
             {
+                public override string ToString()
+                {
+                    return "int";
+                }
             }
 
             public class BoolType : TypeExpressions
             {
+                public override string ToString()
+                {
+                    return "bool";
+                }
             }
 
             public class StrType : TypeExpressions
             {
+                public override string ToString()
+                {
+                    return "string";
+                }
             }
 
             public class UnitType : TypeExpressions
             {
+                public override string ToString()
+                {
+                    return "unit";
+                }
             }
 
             public class ListType : TypeExpressions
@@ -43,6 +73,10 @@ namespace MiniMAL
                 {
                     Type = type;
                 }
+                public override string ToString()
+                {
+                    return $"{Type} list";
+                } 
             }
 
             public class OptionType : TypeExpressions
@@ -52,6 +86,10 @@ namespace MiniMAL
                 public OptionType(TypeExpressions type)
                 {
                     Type = type;
+                }
+                public override string ToString()
+                {
+                    return $"{Type} option";
                 }
             }
 
@@ -65,6 +103,10 @@ namespace MiniMAL
                     Members = members;
                 }
 
+                public override string ToString()
+                {
+                    return $"({string.Join(" * ", Members.Select(x => x.ToString()))})";
+                }
             }
 
             public class RecordType : TypeExpressions
@@ -74,6 +116,10 @@ namespace MiniMAL
                 public RecordType(Tuple<string, TypeExpressions>[] members)
                 {
                     Members = members;
+                }
+                public override string ToString()
+                {
+                    return $"({string.Join(" * ", Members.Select(x => $"{x.Item1} : {x.Item2.ToString()}"))})";
                 }
 
             }
@@ -88,6 +134,10 @@ namespace MiniMAL
                     DomainType = domType;
                     RangeType = ranType;
                 }
+                public override string ToString()
+                {
+                    return $"{DomainType} -> {RangeType}";
+                }
             }
 
             public class TypeName : TypeExpressions
@@ -98,6 +148,10 @@ namespace MiniMAL
                 public TypeName(string name)
                 {
                     Name = name;
+                }
+                public override string ToString()
+                {
+                    return $"{Name}";
                 }
             }
 
@@ -112,6 +166,10 @@ namespace MiniMAL
                 {
                     Base = @base;
                     Params = @params;
+                }
+                public override string ToString()
+                {
+                    return $"({string.Join(", ", Params.Select(x => x.ToString()))}) {Base}";
                 }
             }
         }

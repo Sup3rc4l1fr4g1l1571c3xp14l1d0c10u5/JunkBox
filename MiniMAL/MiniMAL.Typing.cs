@@ -138,6 +138,7 @@ namespace MiniMAL {
                                                 Type t) {
                 if (t is TyVar) {
                     var tt = (TyVar) t;
+#if true
                     if (!vars.ContainsKey(tt.Id)) {
                         int i = vars.Count;
                         string str = "'";
@@ -151,6 +152,9 @@ namespace MiniMAL {
                         vars[tt.Id] = str;
                     }
                     buffer.Append(vars[tt.Id]);
+#else
+                    buffer.Append("'"+tt.Id);
+#endif
                     return;
                 }
                 if (t is TyUnit) {

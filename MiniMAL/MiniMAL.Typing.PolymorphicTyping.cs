@@ -84,7 +84,9 @@ namespace MiniMAL {
             /// <returns></returns>
             private static Tuple<LinkedList<TypeSubst>, Type> EvalExpressions(
                 Environment<TypeScheme> env,
-                Expressions e) {
+                Dictionary<string, Type.TyVar> dic,
+                Expressions e
+                ) {
                 if (e is Expressions.Var) {
                     var vid = ((Expressions.Var) e).Id;
                     try {
@@ -134,9 +136,9 @@ namespace MiniMAL {
                     );
                 }
                 if (e is Expressions.IfExp) {
-                    var cond = EvalExpressions(env, ((Expressions.IfExp) e).Cond);
-                    var then = EvalExpressions(env, ((Expressions.IfExp) e).Then);
-                    var @else = EvalExpressions(env, ((Expressions.IfExp) e).Else);
+                    var cond = EvalExpressions(env, dic, ((Expressions.IfExp) e).Cond);
+                    var then = EvalExpressions(env, dic, ((Expressions.IfExp) e).Then);
+                    var @else = EvalExpressions(env, dic, ((Expressions.IfExp) e).Else);
                     var s = LinkedList.Concat(
                         LinkedList.Create(new TypeEquality(cond.Item2, new Type.TyBool())),
                         LinkedList.Create(new TypeEquality(then.Item2, @else.Item2)),
@@ -156,15 +158,17 @@ namespace MiniMAL {
                     var newenv = env;
                     var substs = LinkedList<TypeSubst>.Empty;
                     foreach (var bind in exp.Binds) {
-                        var v = EvalExpressions(env, bind.Item2);
+                        var v = EvalExpressions(env, dic, bind.Item2);
                         var s = v.Item1;
                         var ty = v.Item2;
                         substs = LinkedList.Concat(s, substs);
-                        newenv = Environment.Extend(bind.Item1, Closure(ty, env, s), newenv);
+                        var ctys = Closure(ty, env, s);
+                        var newctys = new TypeScheme(dic.Aggregate(ctys.Vars, (ss,x) => Set.Remove(x.Value,ss)), ctys.Type); 
+                        newenv = Environment.Extend(bind.Item1, newctys, newenv);
                     }
 
                     {
-                        var v = EvalExpressions(newenv, exp.Body);
+                        var v = EvalExpressions(newenv, dic, exp.Body);
                         var s = v.Item1;
                         var ty = v.Item2;
                         var eqs = eqs_of_subst(LinkedList.Concat(substs, s));
@@ -190,7 +194,7 @@ namespace MiniMAL {
                     var eqs = LinkedList<TypeEquality>.Empty;
 
                     foreach (var bind in binds) {
-                        var v = EvalExpressions(dummyenv, bind.Item2);
+                        var v = EvalExpressions(dummyenv, dic, bind.Item2);
                         var s = v.Item1;
                         var ty = v.Item2;
                         eqs = LinkedList.Extend(new TypeEquality(bind.Item3, ty), eqs);
@@ -207,7 +211,7 @@ namespace MiniMAL {
 
 
                     {
-                        var v = EvalExpressions(newenv, exp.Body);
+                        var v = EvalExpressions(newenv, dic, exp.Body);
                         var s = v.Item1;
                         var ty = v.Item2;
                         eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
@@ -220,25 +224,46 @@ namespace MiniMAL {
                     }
                 }
                 if (e is Expressions.FunExp) {
-                    var exp = (Expressions.FunExp) e;
-                    var domty = Type.TyVar.Fresh();
-                    var newenv = Environment.Extend(exp.Arg, tysc_of_ty(domty), env);
-                    var v = EvalExpressions(newenv, exp.Body);
-                    var s = v.Item1;
-                    var ty = v.Item2;
+                    var exp = (Expressions.FunExp)e;
+
+                    // 関数定義から読み取った型
+                    var fundecty = EvalTypeExpressions(
+                        new TypeExpressions.FuncType(exp.ArgTy, exp.BodyTy),
+                        dic
+                    ) as Type.TyFunc;
+
+                    // 関数の型
+                    var argty = Type.TyVar.Fresh();
+                    var newenv = Environment.Extend(exp.Arg, tysc_of_ty(argty), env);
+                    var funv = EvalExpressions(newenv, dic, exp.Body);
+                    var st = funv.Item1;
+                    var ty = funv.Item2;
+                    var funty = (Type) new Type.TyFunc(argty, ty);
+
+                    
+                    var eq = LinkedList.Concat(
+                        eqs_of_subst(st),
+                        LinkedList.Create(
+                            new TypeEquality(funty, fundecty)
+                        )
+                    );
+
+                    var eqs = Unify(eq);
+
+
                     return Tuple.Create(
-                        s,
-                        (Type) new Type.TyFunc(subst_type(s, domty), ty)
+                        eqs,
+                        subst_type(eqs,funty)
                     );
                 }
                 if (e is Expressions.AppExp) {
                     var exp = (Expressions.AppExp) e;
 
-                    var v1 = EvalExpressions(env, exp.Fun);
+                    var v1 = EvalExpressions(env, dic, exp.Fun);
                     var s1 = v1.Item1;
                     var ty1 = v1.Item2;
 
-                    var v2 = EvalExpressions(env, exp.Arg);
+                    var v2 = EvalExpressions(env, dic, exp.Arg);
                     var s2 = v2.Item1;
                     var ty2 = v2.Item2;
 
@@ -261,7 +286,7 @@ namespace MiniMAL {
                     var domty = Type.TyVar.Fresh();
 
                     // 式の型推論
-                    var v1 = EvalExpressions(env, exp.Exp);
+                    var v1 = EvalExpressions(env, dic, exp.Exp);
                     var st = v1.Item1;
                     var ty = v1.Item2;
 
@@ -279,7 +304,7 @@ namespace MiniMAL {
                         var env1 = binds1.Aggregate(env, (s, x) => Environment.Extend(x.Key, tysc_of_ty(x.Value), s));
 
                         // 本体から型等式と戻り値型を導出
-                        var v3 = EvalExpressions(env1, ex);
+                        var v3 = EvalExpressions(env1, dic, ex);
                         var se = v3.Item1;
                         var tye = v3.Item2;
 
@@ -300,7 +325,7 @@ namespace MiniMAL {
                 }
                 if (e is Expressions.TupleExp) {
                     var exp = (Expressions.TupleExp)e;
-                    var tyMembers = exp.Members.Select(x => EvalExpressions(env, x)).ToArray();
+                    var tyMembers = exp.Members.Select(x => EvalExpressions(env, dic, x)).ToArray();
                     var ss = tyMembers.Aggregate(LinkedList<TypeEquality>.Empty, (s, x) => LinkedList.Concat(s, eqs_of_subst(x.Item1)));
                     var eqs = Unify(ss);
 
@@ -318,7 +343,7 @@ namespace MiniMAL {
                             (Type) new Type.TyOption(domty)
                         );
                     } else { 
-                        var mem = EvalExpressions(env, exp.Expr);
+                        var mem = EvalExpressions(env, dic, exp.Expr);
                         var ss = eqs_of_subst(mem.Item1);
                         var ty = mem.Item2;
                         var eqs = Unify(ss);
@@ -339,7 +364,7 @@ namespace MiniMAL {
                 throw new NotSupportedException($"expression {e} cannot eval.");
             }
 
-            private static Result eval_declEntry(Environment<TypeScheme> env, Toplevel.Binding.DeclBase p) {
+            private static Result eval_declEntry(Environment<TypeScheme> env, Dictionary<string, Type.TyVar>  dic, Toplevel.Binding.DeclBase p) {
                 if (p is Toplevel.Binding.LetDecl) {
                     var decl = (Toplevel.Binding.LetDecl) p;
 
@@ -347,7 +372,7 @@ namespace MiniMAL {
                     var substs = LinkedList<TypeSubst>.Empty;
                     var ret = new Result("", env,   null);
                     foreach (var bind in decl.Binds) {
-                        var v = EvalExpressions(env, bind.Item2);
+                        var v = EvalExpressions(env, dic, bind.Item2);
                         var s = v.Item1;
                         var ty = v.Item2;
                         substs = LinkedList.Concat(s, substs);
@@ -374,7 +399,7 @@ namespace MiniMAL {
                     var eqs = LinkedList<TypeEquality>.Empty;
 
                     foreach (var bind in binds) {
-                        var v = EvalExpressions(dummyenv, bind.Item2);
+                        var v = EvalExpressions(dummyenv, dic, bind.Item2);
                         var s = v.Item1;
                         var ty = v.Item2;
                         eqs = LinkedList.Extend(new TypeEquality(bind.Item3, ty), eqs);
@@ -402,21 +427,25 @@ namespace MiniMAL {
             public static Result eval_decl(Environment<TypeScheme> env, Toplevel p) {
                 if (p is Toplevel.Exp) {
                     var e = (Toplevel.Exp) p;
-                    var v = EvalExpressions(env, e.Syntax);
+                    var v = EvalExpressions(env, new Dictionary<string, Type.TyVar>(), e.Syntax);
                     return new Result("-", env,  v.Item2);
                 }
                 if (p is Toplevel.ExternalDecl) {
                     var e = (Toplevel.ExternalDecl)p;
-                    var tysc = EvalTypeExpressions(e.Type, new Dictionary<string, Type.TyVar>());
-                    var newenv = Environment.Extend(e.Id, tysc, env);
-                    return new Result(e.Id, newenv, tysc.Type);
+                    var dic = new Dictionary<string, Type.TyVar>();
+                    var newenv = EnumTypeVariables(e.Type, env);
+                    var ty = EvalTypeExpressions(e.Type, dic);
+                    var tysc = new TypeScheme(dic.Values.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x, s)), ty);
+                    newenv = Environment.Extend(e.Id, tysc, newenv);
+                    return new Result(e.Id, newenv, ty);
                 }
                 if (p is Toplevel.Binding) {
                     var ds = (Toplevel.Binding) p;
                     var newenv = env;
+                    var dic = new Dictionary<string, Type.TyVar>();
                     var ret = new Result("", env,  null);
                     foreach (var d in ds.Entries) {
-                        ret = eval_declEntry(newenv,  d);
+                        ret = eval_declEntry(newenv,  dic, d);
                         newenv = ret.Env;
                     }
                     return ret;
@@ -424,7 +453,9 @@ namespace MiniMAL {
                 if (p is Toplevel.TypeDef)
                 {
                     var e = (Toplevel.TypeDef)p;
-                    var tysc = EvalTypeExpressions(e.Type, new Dictionary<string, Type.TyVar>());
+                    var dic = new Dictionary<string, Type.TyVar>();
+                    var ty = EvalTypeExpressions(e.Type, dic);
+                    var tysc = new TypeScheme(dic.Values.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x, s)), ty);
                     var newenv = Environment.Extend(e.Id, tysc, env);
                     return new Result(e.Id, newenv, tysc.Type);
                 }
@@ -434,38 +465,35 @@ namespace MiniMAL {
                 throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
             }
 
-            private static TypeScheme EvalTypeExpressions(TypeExpressions expressions, Dictionary<string,Type.TyVar> vars) {
-                if (expressions is TypeExpressions.TypeVar) { var e = (TypeExpressions.TypeVar) expressions; if (vars.ContainsKey(e.Id)==false) { vars[e.Id] = Type.TyVar.Fresh(); } return new TypeScheme(Set.Singleton(vars[e.Id]), vars[e.Id]); }
-                if (expressions is TypeExpressions.IntType) { return tysc_of_ty(new Type.TyInt());}
-                if (expressions is TypeExpressions.BoolType) { return tysc_of_ty(new Type.TyBool()); }
-                if (expressions is TypeExpressions.StrType) { return tysc_of_ty(new Type.TyStr()); }
-                if (expressions is TypeExpressions.UnitType) { return tysc_of_ty(new Type.TyUnit()); }
+            private static Type EvalTypeExpressions(TypeExpressions expressions, Dictionary<string,Type.TyVar> vars) {
+                if (expressions is TypeExpressions.TypeVar) { var e = (TypeExpressions.TypeVar)expressions; if (vars.ContainsKey(e.Id)==false) { vars[e.Id] = Type.TyVar.Fresh(); } return vars[e.Id]; }
+                if (expressions is TypeExpressions.IntType) { return (new Type.TyInt());}
+                if (expressions is TypeExpressions.BoolType) { return (new Type.TyBool()); }
+                if (expressions is TypeExpressions.StrType) { return (new Type.TyStr()); }
+                if (expressions is TypeExpressions.UnitType) { return (new Type.TyUnit()); }
                 if (expressions is TypeExpressions.ListType)
                 {
                     var e = (TypeExpressions.ListType) expressions;
                     var tysc = EvalTypeExpressions(e.Type, vars);
-                    return new TypeScheme(tysc.Vars, new Type.TyList(tysc.Type));
+                    return new Type.TyList(tysc);
                 }
                 if (expressions is TypeExpressions.OptionType)
                 {
                     var e = (TypeExpressions.OptionType) expressions;
                     var tysc = EvalTypeExpressions(e.Type, vars);
-                    return new TypeScheme(tysc.Vars, new Type.TyOption(tysc.Type));
+                    return new Type.TyOption(tysc);
                 }
                 if (expressions is TypeExpressions.TupleType) {
                     var e = (TypeExpressions.TupleType) expressions;
                     var tyscs = e.Members.Select(x => EvalTypeExpressions(x, vars)).ToArray();
-                    return new TypeScheme(tyscs.Aggregate(Set<Type.TyVar>.Empty, (s,x) => Set.Union(x.Vars,s)), new Type.TyTuple(tyscs.Select(x => x.Type).ToArray()));
+                    return new Type.TyTuple(tyscs);
                 }
                 if (expressions is TypeExpressions.FuncType)
                 {
                     var e = (TypeExpressions.FuncType) expressions;
                     var tysc1 = EvalTypeExpressions(e.DomainType, vars);
                     var tysc2 = EvalTypeExpressions(e.RangeType, vars);
-                    return new TypeScheme(
-                        Set.Union(tysc1.Vars, tysc2.Vars),
-                        new Type.TyFunc( tysc1.Type,  tysc2.Type )
-                    );
+                    return new Type.TyFunc(tysc1, tysc2);
                 }
                 if (expressions is TypeExpressions.TypeName) {
                     throw new NotImplementedException();
@@ -477,20 +505,75 @@ namespace MiniMAL {
                             throw new Exception.InvalidArgumentNumException();
                         }
                         var tysc = EvalTypeExpressions(e.Params[0], vars);
-                        return new TypeScheme(
-                            tysc.Vars, 
-                            new Type.TyList(tysc.Type)
-                        );
+                        return new Type.TyList(tysc);
                     }
                     if (e.Base.Name == "option") {
                         if (e.Params.Length != 1) {
                             throw new Exception.InvalidArgumentNumException();
                         }
                         var tysc = EvalTypeExpressions(e.Params[0], vars);
-                        return new TypeScheme(
-                            tysc.Vars,
-                            new Type.TyOption(tysc.Type)
-                        );
+                        return new Type.TyOption(tysc);
+                    }
+                    throw new NotImplementedException();
+                }
+                throw new NotSupportedException();
+            }
+
+            private static Environment<TypeScheme> EnumTypeVariables(TypeExpressions expressions, Environment<TypeScheme> vars) {
+                if (expressions is TypeExpressions.TypeVar)
+                {
+                    var e = (TypeExpressions.TypeVar) expressions;
+                    if (Environment.Contains(e.Id, vars) == false)
+                    {
+                        var tyvar = Type.TyVar.Fresh();
+                        return Environment.Extend(e.Id, new TypeScheme(Set.Singleton(tyvar), tyvar), vars);
+                    }
+                    else
+                    {
+                        return vars;
+                    }
+                }
+                if (expressions is TypeExpressions.IntType) { return vars; }
+                if (expressions is TypeExpressions.BoolType) { return vars; }
+                if (expressions is TypeExpressions.StrType) { return vars; }
+                if (expressions is TypeExpressions.UnitType) { return vars; }
+                if (expressions is TypeExpressions.ListType)
+                {
+                    var e = (TypeExpressions.ListType) expressions;
+                    return EnumTypeVariables(e.Type, vars);
+                }
+                if (expressions is TypeExpressions.OptionType)
+                {
+                    var e = (TypeExpressions.OptionType) expressions;
+                    return EnumTypeVariables(e.Type, vars);
+                }
+                if (expressions is TypeExpressions.TupleType) {
+                    var e = (TypeExpressions.TupleType) expressions;
+                    return e.Members.Aggregate(vars,(s,x) => EnumTypeVariables(x, s));
+                }
+                if (expressions is TypeExpressions.FuncType)
+                {
+                    var e = (TypeExpressions.FuncType) expressions;
+                    var vars1 = EnumTypeVariables(e.DomainType, vars);
+                    var tysc2 = EnumTypeVariables(e.RangeType, vars1);
+                    return tysc2;
+                }
+                if (expressions is TypeExpressions.TypeName) {
+                    throw new NotImplementedException();
+                }
+                if (expressions is TypeExpressions.TypeConstruct) {
+                    var e = (TypeExpressions.TypeConstruct) expressions;
+                    if (e.Base.Name == "list") {
+                        if (e.Params.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException();
+                        }
+                        return EnumTypeVariables(e.Params[0], vars);
+                    }
+                    if (e.Base.Name == "option") {
+                        if (e.Params.Length != 1) {
+                            throw new Exception.InvalidArgumentNumException();
+                        }
+                        return EnumTypeVariables(e.Params[0], vars);
                     }
                     throw new NotImplementedException();
                 }

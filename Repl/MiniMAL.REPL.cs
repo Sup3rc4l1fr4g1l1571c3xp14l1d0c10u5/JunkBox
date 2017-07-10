@@ -41,7 +41,7 @@ namespace MiniMAL
                 });
             }
 
-            public static void EvalRun()
+            public static void Run()
             {
                 var builtins = new Dictionary<string, AbstractSyntaxTreeInterpreter.ExprValue.BProcV>();
                 builtins["add"] =
@@ -174,7 +174,7 @@ namespace MiniMAL
                             //var ty = Typing.MonomorphicTyping.eval_decl(context.TypingEnv, decl.Value);
                             var ty = Typing.PolymorphicTyping.eval_decl(context.TypingEnv, decl.Value);
                             var ret = AbstractSyntaxTreeInterpreter.eval_decl(context.Env, context.BuiltinEnv, decl.Value);
-                            context = new AbstractSyntaxTreeInterpreter.Context(context.Env, context.BuiltinEnv, context.TypingEnv);
+                            context = new AbstractSyntaxTreeInterpreter.Context(ret.Env, context.BuiltinEnv, ty.Env);
                             Console.WriteLine($"val {ret.Id} : {ty.Value} = {ret.Value}");
                         }
                         catch (Exception e)

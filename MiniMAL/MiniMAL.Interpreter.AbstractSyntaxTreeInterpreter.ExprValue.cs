@@ -260,6 +260,19 @@ namespace MiniMAL
                     }
                     return false;
                 }
+
+                public override bool Equals(object obj)
+                {
+                    if (ReferenceEquals(null, obj)) return false;
+                    if (ReferenceEquals(this, obj)) return true;
+                    if (obj.GetType() != this.GetType()) return false;
+                    return Equals(this,(ExprValue) obj);
+                }
+
+                public override int GetHashCode()
+                {
+                    return this.GetType().GetHashCode();
+                }
             }
         }
     }

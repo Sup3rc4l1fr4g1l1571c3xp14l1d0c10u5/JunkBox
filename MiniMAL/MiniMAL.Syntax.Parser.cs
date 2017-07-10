@@ -139,7 +139,7 @@ namespace MiniMAL
                 from t2 in Id.Many(1)
                 from t3 in RArrow
                 from t4 in Expr
-                select t2.Reverse().Aggregate(t4, (s, x) => new Expressions.FunExp(x, s));
+                select t2.Reverse().Aggregate(t4, (s, x) => new Expressions.FunExp(x, s, TypeExpressions.TypeVar.Fresh(), TypeExpressions.TypeVar.Fresh()));
 
             private static readonly Parser<Tuple<string, Expressions>> LetBind =
                 from t1 in Combinator.Choice(
@@ -149,10 +149,23 @@ namespace MiniMAL
                     from t3 in RParen
                     select $"{t2}"
                 )
-                from t2 in Id.Many()
-                from t3 in Eq
-                from t4 in Expr
-                select Tuple.Create(t1, t2.Reverse().Aggregate(t4, (s, x) => new Expressions.FunExp(x, s)));
+                from t2 in Combinator.Choice(
+                    from t3 in Id
+                    select Tuple.Create<string, TypeExpressions>(t3,TypeExpressions.TypeVar.Fresh()),
+                    from t3 in LParen
+                    from t4 in Id
+                    from t5 in Colon.Then(TypeExpr).Option().Select(x => (x ?? TypeExpressions.TypeVar.Fresh()))
+                    from t6 in RParen
+                    select Tuple.Create(t4, t5)
+                ).Many()
+                from t3 in Colon.Then(TypeExpr).Option().Select(x => (x ?? TypeExpressions.TypeVar.Fresh()))
+                from t4 in Eq
+                from t5 in Expr
+                let f = t2.Reverse().Aggregate(Tuple.Create(t3,t5),(s,x) => Tuple.Create(
+                    (TypeExpressions)new TypeExpressions.FuncType(x.Item2, s.Item1), 
+                    (Expressions)new Expressions.FunExp(x.Item1, s.Item2, x.Item2, s.Item1))
+                )
+                select Tuple.Create(t1, f.Item2);
 
             private static readonly Parser<Expressions> LetExpr =
                 from t1 in Let
@@ -225,7 +238,7 @@ namespace MiniMAL
                 from t2 in Expr
                 from t3 in With
                 from t4 in Bar.Option().Then(PatternEntry.Repeat1(Bar))
-#if false
+#if true
                 select (Expressions)new Expressions.MatchExp(t2, t4);
 #else
             select (Expressions)
