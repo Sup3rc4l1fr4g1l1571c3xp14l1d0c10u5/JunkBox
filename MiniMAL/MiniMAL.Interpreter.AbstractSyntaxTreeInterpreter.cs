@@ -140,8 +140,8 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.TupleP && value is ExprValue.TupleV)
                 {
-                    var p = (PatternExpressions.TupleP) pattern;
-                    var q = (ExprValue.TupleV) value;
+                    var p = (PatternExpressions.TupleP)pattern;
+                    var q = (ExprValue.TupleV)value;
                     var dic = new Dictionary<string, ExprValue>();
 
                     if (p.Members.Length != q.Members.Length)
@@ -151,6 +151,32 @@ namespace MiniMAL
                     foreach (var pq in p.Members.Zip(q.Members, Tuple.Create))
                     {
                         var ret1 = EvalPatternExpressions(pq.Item1, pq.Item2);
+                        if (ret1 == null)
+                        {
+                            return null;
+                        }
+                        dic = ret1.Aggregate(dic, (s, x) =>
+                        {
+                            s[x.Key] = x.Value;
+                            return s;
+                        });
+                    }
+                    return dic;
+
+                }
+                if (pattern is PatternExpressions.RecordP && value is ExprValue.RecordV)
+                {
+                    var p = (PatternExpressions.RecordP)pattern;
+                    var q = (ExprValue.RecordV)value;
+                    var dic = new Dictionary<string, ExprValue>();
+
+                    if (p.Members.Length != q.Members.Length)
+                    {
+                        return null;
+                    }
+                    foreach (var pq in p.Members.Zip(q.Members, Tuple.Create))
+                    {
+                        var ret1 = EvalPatternExpressions(pq.Item1.Item2, pq.Item2.Item2);
                         if (ret1 == null)
                         {
                             return null;
@@ -320,6 +346,11 @@ namespace MiniMAL
                     throw new Exception.HaltException(((Expressions.HaltExp) e).Message);
                 }
 
+                if (e is Expressions.RecordExp)
+                {
+                    var t = (Expressions.RecordExp)e;
+                    return new ExprValue.RecordV(t.Members.Select(x => Tuple.Create(x.Item1,EvalExpressions(env, x.Item2))).ToArray());
+                }
                 throw new NotSupportedException($"expression {e} cannot eval.");
             }
 
@@ -396,6 +427,10 @@ namespace MiniMAL
                     return ret;
                 }
                 if (p is Toplevel.Empty)
+                {
+                    return new Result("", env, null);
+                }
+                if (p is Toplevel.TypeDef)
                 {
                     return new Result("", env, null);
                 }

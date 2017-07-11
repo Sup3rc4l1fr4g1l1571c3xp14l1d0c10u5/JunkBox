@@ -140,7 +140,8 @@ namespace MiniMAL
                 context = new AbstractSyntaxTreeInterpreter.Context(
                     context.Env,
                     builtins.Aggregate(context.BuiltinEnv, (s, x) => Environment.Extend(x.Key, x.Value, s)), 
-                    context.TypingEnv
+                    context.TypingEnv,
+                    context.TyEnv
                 );
 
                 // load init.miniml
@@ -172,9 +173,9 @@ namespace MiniMAL
                         {
                             Console.WriteLine($"expr is {decl.Value}");
                             //var ty = Typing.MonomorphicTyping.eval_decl(context.TypingEnv, decl.Value);
-                            var ty = Typing.PolymorphicTyping.eval_decl(context.TypingEnv, decl.Value);
+                            var ty = Typing.PolymorphicTyping.eval_decl(context.TypingEnv, context.TyEnv, decl.Value);
                             var ret = AbstractSyntaxTreeInterpreter.eval_decl(context.Env, context.BuiltinEnv, decl.Value);
-                            context = new AbstractSyntaxTreeInterpreter.Context(ret.Env, context.BuiltinEnv, ty.Env);
+                            context = new AbstractSyntaxTreeInterpreter.Context(ret.Env, context.BuiltinEnv, ty.Env, ty.TyEnv);
                             Console.WriteLine($"val {ret.Id} : {ty.Value} = {ret.Value}");
                         }
                         catch (Exception e)
@@ -325,7 +326,8 @@ namespace MiniMAL
                     context.NameEnv,
                     context.ValueEnv,
                     builtins.Aggregate(context.BuiltinEnv, (s, x) => Environment.Extend(x.Key, x.Value, s)),
-                    context.TypingEnv
+                    context.TypingEnv,
+                    context.TyEnv
                 );
                 // init
                 string init = "init.minimal";
@@ -357,8 +359,9 @@ namespace MiniMAL
                         {
                             Console.WriteLine($"expr is {decl.Value}");
 
-                            var ty = Typing.PolymorphicTyping.eval_decl(context.TypingEnv, decl.Value);
+                            var ty = Typing.PolymorphicTyping.eval_decl(context.TypingEnv, context.TyEnv, decl.Value);
                             var typingEnv = ty.Env;
+                            var tyEnv = ty.TyEnv;
 
                             var compileret = SecdMachineInterpreter.Compiler.CompileDecl(decl.Value, context.NameEnv);
                             var code = compileret.Item1;
@@ -368,7 +371,8 @@ namespace MiniMAL
                                 nameEnv,
                                 context.ValueEnv,
                                 context.BuiltinEnv,
-                                typingEnv
+                                typingEnv,
+                                tyEnv
                             );
                             Console.WriteLine($"Compiled instruction = ");
                             foreach (var c in code)
@@ -398,7 +402,8 @@ namespace MiniMAL
                                     context.NameEnv,
                                     valueEnv,
                                     context.BuiltinEnv,
-                                    context.TypingEnv
+                                    context.TypingEnv,
+                                    tyEnv
                                 );
                             }
                         }

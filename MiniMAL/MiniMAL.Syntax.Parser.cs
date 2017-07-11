@@ -283,7 +283,18 @@ namespace MiniMAL
                     from t2 in Expr.Repeat1(Semi)
                     from t3 in RBracket
                     select t2.Reverse().Aggregate((Expressions)new Expressions.EmptyListLit(),
-                        (s, x) => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var("::"), x), s))
+                        (s, x) => new Expressions.AppExp(new Expressions.AppExp(new Expressions.Var("::"), x), s)),
+                    (from t1 in LBrace
+                        from t2 in Combinator.Lazy(() =>
+                            from t3 in Id
+                            from t4 in Eq
+                            from t5 in Expr
+                            select Tuple.Create(t3, t5)
+                        ).Repeat1(Semi)
+                        from t6 in RBrace
+                        select (Expressions)new Expressions.RecordExp(t2)
+                    )
+
                 );
 
             private static readonly Parser<Expressions> ApplyExpression =
@@ -455,6 +466,7 @@ namespace MiniMAL
                         from t3 in Id
                         from t4 in Eq
                         from t5 in TypeExpr
+                        from t6 in SemiSemi
                         select (Toplevel)new Toplevel.TypeDef(t3, t2 ?? new string[] { }, t5)
                     ), (
                         from t1 in Combinator.Many(

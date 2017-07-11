@@ -55,3 +55,7 @@ let field f i = field_ (f,i);;
 external size: 'a -> int = "size";;
 
 
+type point = {x:int; y:int};;
+let p = {x=0; y=1};;
+
+match p with {x=a; y=b} -> (a,b);;

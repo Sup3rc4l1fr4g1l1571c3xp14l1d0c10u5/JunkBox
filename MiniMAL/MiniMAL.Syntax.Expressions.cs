@@ -113,6 +113,16 @@ namespace MiniMAL
                 }
             }
 
+            public class RecordExp : Expressions
+            {
+                public Tuple<string,Expressions>[] Members { get; }
+                public RecordExp(Tuple<string, Expressions>[] members)
+                {
+                    Members = members;
+                }
+            }
+
+
             /// <summary>
             /// if式
             /// </summary>
@@ -240,6 +250,7 @@ namespace MiniMAL
                 if (exp is OptionExp) { return 100; }
                 if (exp is UnitLit) { return 100; }
                 if (exp is TupleExp) { return 100; }
+                if (exp is RecordExp) { return 100; }
                 if (exp is IfExp) { return 3; }
                 if (exp is LetExp) { return 100; }
                 if (exp is FunExp) { return 1; }
@@ -247,7 +258,8 @@ namespace MiniMAL
                 if (exp is LetRecExp) { return 100; }
                 if (exp is MatchExp) { return 1; }
                 if (exp is HaltExp) { return 2; }
-                throw new NotSupportedException();
+                                if (exp is TupleExp) { return 100; }
+throw new NotSupportedException();
 
             }
 
@@ -282,6 +294,11 @@ namespace MiniMAL
                 {
                     var e = (TupleExp)exp;
                     return "(" + string.Join(",", e.Members.Select(x => x.ToString())) + ")";
+                }
+                if (exp is RecordExp)
+                {
+                    var e = (RecordExp)exp;
+                    return "{" + string.Join(",", e.Members.Select(x => $"{x.Item1.ToString()} = {x.Item2.ToString()}")) + "}";
                 }
                 if (exp is IfExp)
                 {

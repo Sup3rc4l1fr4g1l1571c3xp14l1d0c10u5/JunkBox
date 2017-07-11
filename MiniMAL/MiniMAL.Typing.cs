@@ -55,9 +55,20 @@ namespace MiniMAL {
                 }
             }
 
-            public class TyTuple : Type {
+            public class TyTuple : Type
+            {
                 public Type[] Members { get; }
-                public TyTuple(Type[] members) {
+                public TyTuple(Type[] members)
+                {
+                    Members = members;
+                }
+            }
+
+            public class TyRecord : Type
+            {
+                public Tuple<string,Type>[] Members { get; }
+                public TyRecord(Tuple<string, Type>[] members)
+                {
                     Members = members;
                 }
             }
@@ -113,9 +124,16 @@ namespace MiniMAL {
                     }
                     return Equals(i1.ItemType, i2.ItemType);
                 }
-                if (arg1 is TyTuple && arg2 is TyTuple) {
+                if (arg1 is TyTuple && arg2 is TyTuple)
+                {
                     var i1 = (TyTuple)arg1;
                     var i2 = (TyTuple)arg2;
+                    return ReferenceEquals(i1.Members, i2.Members);
+                }
+                if (arg1 is TyRecord && arg2 is TyRecord)
+                {
+                    var i1 = (TyRecord)arg1;
+                    var i2 = (TyRecord)arg2;
                     return ReferenceEquals(i1.Members, i2.Members);
                 }
                 return false;
@@ -226,6 +244,28 @@ namespace MiniMAL {
                     }
                     return;
                 }
+                if (t is TyRecord)
+                {
+                    var tt = (TyRecord)t;
+                    if (priority > 1)
+                    {
+                        buffer.Append("(");
+                    }
+                    buffer.Append("{");
+                    tt.Members.Aggregate("", (s, x) =>
+                    {
+                        buffer.Append(s);
+                        buffer.Append($"{x.Item1}=");
+                        type_stringizer(vars, buffer, 2, x.Item2);
+                        return "; ";
+                    });
+                    buffer.Append("}");
+                    if (priority > 1)
+                    {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
                 throw new NotSupportedException();
             }
 
@@ -298,9 +338,15 @@ namespace MiniMAL {
                 var ty1 = ((Type.TyOption)typ).ItemType;
                 return new Type.TyOption(resolve_type(substs, ty1));
             }
-            if (typ is Type.TyTuple) {
+            if (typ is Type.TyTuple)
+            {
                 var ty1 = ((Type.TyTuple)typ);
                 return new Type.TyTuple(ty1.Members.Select(x => resolve_type(substs, x)).ToArray());
+            }
+            if (typ is Type.TyRecord)
+            {
+                var ty1 = ((Type.TyRecord)typ);
+                return new Type.TyRecord(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
             }
             return typ;
         }
@@ -412,16 +458,34 @@ namespace MiniMAL {
                 LinkedList.Create(new TypeEquality(ty11, ty21), new TypeEquality(ty12, ty22)),
                 eqs.Next));
             }
-            if (eqs.Value.Type1 is Type.TyTuple && eqs.Value.Type2 is Type.TyTuple) {
+            if (eqs.Value.Type1 is Type.TyTuple && eqs.Value.Type2 is Type.TyTuple)
+            {
                 var f1 = (Type.TyTuple)eqs.Value.Type1;
                 var f2 = (Type.TyTuple)eqs.Value.Type2;
 
-                if (f1.Members.Length != f2.Members.Length) {
+                if (f1.Members.Length != f2.Members.Length)
+                {
                     throw new Exception.TypingException("Type missmatch");
                 }
 
-                var neweqs = f1.Members.Zip(f2.Members,Tuple.Create).Aggregate(LinkedList<TypeEquality>.Empty,
+                var neweqs = f1.Members.Zip(f2.Members, Tuple.Create).Aggregate(
+                    eqs.Next,
                     (s, x) => LinkedList.Extend(new TypeEquality(x.Item1, x.Item2), s));
+                return Unify(neweqs);
+            }
+            if (eqs.Value.Type1 is Type.TyRecord && eqs.Value.Type2 is Type.TyRecord)
+            {
+                var f1 = (Type.TyRecord)eqs.Value.Type1;
+                var f2 = (Type.TyRecord)eqs.Value.Type2;
+
+                if (f1.Members.Length != f2.Members.Length)
+                {
+                    throw new Exception.TypingException("Type missmatch");
+                }
+
+                var neweqs = f1.Members.Zip(f2.Members, Tuple.Create).Aggregate(
+                    eqs.Next,
+                    (s, x) => LinkedList.Extend(new TypeEquality(x.Item1.Item2, x.Item2.Item2), s));
                 return Unify(neweqs);
             }
             if (eqs.Value.Type1 is Type.TyVar && eqs.Value.Type2 is Type.TyVar) {
@@ -482,7 +546,8 @@ namespace MiniMAL {
                     new Dictionary<string, Type>()
                 );
             }
-            if (pattern is PatternExpressions.BoolP) {
+            if (pattern is PatternExpressions.BoolP)
+            {
                 return Tuple.Create(
                     LinkedList.Create(new TypeEquality(value, new Type.TyBool())),
                     new Dictionary<string, Type>()
@@ -526,7 +591,7 @@ namespace MiniMAL {
                 var p = (PatternExpressions.ConsP)pattern;
                 if (p == PatternExpressions.ConsP.Empty) {
                     return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, Type.TyList.Empty)),
+                        LinkedList.Create(new TypeEquality(value, new Type.TyList(Type.TyVar.Fresh()))),
                         new Dictionary<string, Type>()
                     );
                 } else {
@@ -571,6 +636,7 @@ namespace MiniMAL {
                 binds
                 );
             }
+
             return null;
         }
 

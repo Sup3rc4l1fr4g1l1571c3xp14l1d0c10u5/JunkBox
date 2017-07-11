@@ -176,6 +176,24 @@ namespace MiniMAL
                 }
 
                 /// <summary>
+                /// ƒ^ƒvƒ‹
+                /// </summary>
+                public class RecordV : ExprValue
+                {
+                    public Tuple<string,ExprValue>[] Members { get; }
+
+                    public RecordV(Tuple<string, ExprValue>[] membera)
+                    {
+                        Members = membera;
+                    }
+
+                    public override string ToString()
+                    {
+                        return $"{{{string.Join("; ", Members.Select(x => $"{x.Item1.ToString()}={x.Item2.ToString()}"))}}}";
+                    }
+                }
+
+                /// <summary>
                 /// Option
                 /// </summary>
                 public class OptionV : ExprValue
@@ -258,6 +276,12 @@ namespace MiniMAL
                         var i2 = (TupleV)arg2;
                         return i1.Members.SequenceEqual(i2.Members);
                     }
+                    if (arg1 is RecordV && arg2 is RecordV)
+                    {
+                        var i1 = (RecordV)arg1;
+                        var i2 = (RecordV)arg2;
+                        return i1.Members.SequenceEqual(i2.Members);
+                    }
                     return false;
                 }
 
@@ -273,6 +297,7 @@ namespace MiniMAL
                 {
                     return this.GetType().GetHashCode();
                 }
+
             }
         }
     }

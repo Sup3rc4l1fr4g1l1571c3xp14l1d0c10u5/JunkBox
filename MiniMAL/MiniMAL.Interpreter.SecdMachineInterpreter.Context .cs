@@ -11,6 +11,7 @@ namespace MiniMAL
                 public Environment<ExprValue> BuiltinEnv { get; }
                 public Environment<Typing.PolymorphicTyping.TypeScheme> TypingEnv { get; }
                 //public Environment<Typing.MonomorphicTyping> TypingEnv { get; }
+                public Environment<Typing.PolymorphicTyping.TypeScheme> TyEnv { get; }
 
                 public Context()
                 {
@@ -18,13 +19,15 @@ namespace MiniMAL
                     ValueEnv = LinkedList<LinkedList<ExprValue>>.Empty;
                     BuiltinEnv = Environment<ExprValue>.Empty;
                     TypingEnv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
+                    TyEnv = Environment<Typing.PolymorphicTyping.TypeScheme>.Empty;
                 }
-                public Context(LinkedList<LinkedList<string>> nameEnv, LinkedList<LinkedList<ExprValue>> valueEnv, Environment<ExprValue> builtinEnv, Environment<Typing.PolymorphicTyping.TypeScheme> typingEnv)
+                public Context(LinkedList<LinkedList<string>> nameEnv, LinkedList<LinkedList<ExprValue>> valueEnv, Environment<ExprValue> builtinEnv, Environment<Typing.PolymorphicTyping.TypeScheme> typingEnv, Environment<Typing.PolymorphicTyping.TypeScheme> tyEnv)
                 {
                     NameEnv = nameEnv;
                     ValueEnv = valueEnv;
                     BuiltinEnv = builtinEnv;
                     TypingEnv = typingEnv;
+                    TyEnv = tyEnv;
                 }
             }
         }
