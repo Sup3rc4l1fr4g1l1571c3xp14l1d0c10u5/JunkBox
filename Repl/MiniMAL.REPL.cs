@@ -163,10 +163,11 @@ namespace MiniMAL
 
             private static AbstractSyntaxTreeInterpreter.Context Evaluate(AbstractSyntaxTreeInterpreter.Context context, Source source)
             {
+                var pos = Position.Empty;
                 while (!source.EOS)
                 {
-                    Console.Write("# ");
-                    var decl = Parser.Parse(source);
+                    Console.Write($"{source.Name}({pos.Row}:{pos.Column}) # ");
+                    var decl = Parser.Parse(source, pos);
                     if (decl.Success)
                     {
                         try
@@ -190,6 +191,7 @@ namespace MiniMAL
                             $"<stdin>: Syntax error on line {decl.FailedPosition.Row} column {decl.FailedPosition.Column}.");
                     }
                     source.Discard(decl.Position.Index);
+                    pos = decl.Position.Discard(decl.Position.Index);
                 }
                 return context;
             }
@@ -349,10 +351,11 @@ namespace MiniMAL
             private static SecdMachineInterpreter.Context GetValue(
                 SecdMachineInterpreter.Context context, Source source)
             {
+                var pos = Position.Empty;
                 while (!source.EOS)
                 {
-                    Console.Write("# ");
-                    var decl = Parser.Parse(source);
+                    Console.Write($"{source.Name}({pos.Row}:{pos.Column}) # ");
+                    var decl = Parser.Parse(source, pos);
                     if (decl.Success)
                     {
                         try
@@ -419,6 +422,7 @@ namespace MiniMAL
                             $"<stdin>: Syntax error on line {decl.FailedPosition.Row} column {decl.FailedPosition.Column}.");
                     }
                     source.Discard(decl.Position.Index);
+                    pos = decl.Position.Discard(decl.Position.Index);
                 }
                 return context;
             }

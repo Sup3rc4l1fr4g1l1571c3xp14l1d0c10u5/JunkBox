@@ -119,7 +119,22 @@ namespace MiniMAL
                 }
                 public override string ToString()
                 {
-                    return $"({string.Join(" * ", Members.Select(x => $"{x.Item1} : {x.Item2.ToString()}"))})";
+                    return $"{{{string.Join("; ", Members.Select(x => $"{x.Item1} : {x.Item2.ToString()}"))}}}";
+                }
+
+            }
+
+            public class VariantType : TypeExpressions
+            {
+                public Tuple<string, TypeExpressions>[] Members { get; }
+
+                public VariantType(Tuple<string, TypeExpressions>[] members)
+                {
+                    Members = members;
+                }
+                public override string ToString()
+                {
+                    return $"{string.Join(" | ", Members.Select(x => $"{x.Item1} of {x.Item2.ToString()}"))}}}";
                 }
 
             }

@@ -363,15 +363,23 @@ namespace MiniMAL {
                         throw new Exception.NotBound($"Record not bound: {exp}");
                     }
 
-                    var tyMembers = exp.Members.Select(x => Tuple.Create(x.Item1, EvalExpressions(env, tyEnv, dic, x.Item2))).ToArray();
+                    //
+                    var tyRecVar = new Type.TyRecord(((Type.TyRecord) tyRec.Type).Members.Select(x => Tuple.Create(x.Item1, (Type)Type.TyVar.Fresh() )).ToArray());
+                    var tyRecTy = (Type.TyRecord)tyRec.Type;
+                    var ret = exp.Members.Select(x => EvalExpressions(env, tyEnv, dic, x.Item2)).ToArray();
+                    var tyExp = new Type.TyRecord(exp.Members.Select(x => x.Item1).Zip(ret.Select(x => x.Item2), Tuple.Create).ToArray());
 
-                    var ss = tyMembers.Aggregate(LinkedList<TypeEquality>.Empty, (s, x) => LinkedList.Concat(s, eqs_of_subst(x.Item2.Item1)));
-                    var eqs = Unify(ss);
-
-                    return Tuple.Create(
-                        eqs,
-                        (Type)new Type.TyRecord(tyMembers.Select(x => Tuple.Create(x.Item1, subst_type(eqs, x.Item2.Item2))).ToArray())
+                    var eqs = LinkedList.Concat(
+                        LinkedList.Create(
+                            new TypeEquality(tyRecVar, tyExp),
+                            new TypeEquality(tyExp, tyRecTy)
+                        ),
+                        LinkedList.Concat(ret.Select(x => eqs_of_subst(x.Item1)).ToArray())
                     );
+
+                    var eqs2 = Unify(eqs);
+
+                    return Tuple.Create(eqs2, subst_type(eqs2, tyRecVar));
                 }
                 throw new NotSupportedException($"expression {e} cannot eval.");
             }
@@ -472,8 +480,8 @@ namespace MiniMAL {
             }
 
             public static Result eval_decl(
-                Environment<TypeScheme> env, 
-                Environment<TypeScheme> tyEnv, 
+                Environment<TypeScheme> env,
+                Environment<TypeScheme> tyEnv,
                 Toplevel p) {
                 if (p is Toplevel.Exp) {
                     var e = (Toplevel.Exp) p;
@@ -510,6 +518,9 @@ namespace MiniMAL {
                     }
                     var tysc = new TypeScheme(dic.Values.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x, s)), ty);
                     var newtyEnv = Environment.Extend(e.Id, tysc, tyEnv);
+
+                    // TODO: バリアント型はコンストラクタを登録すること
+
                     return new Result(e.Id, env, newtyEnv, tysc.Type);
                 }
                 if (p is Toplevel.Empty) {
@@ -584,6 +595,23 @@ namespace MiniMAL {
                         var tysc = EvalTypeExpressions(e.Params[0], tyEnv, vars);
                         return new Type.TyOption(tysc);
                     }
+                    {
+                        var tyscBase = Environment.LookUp(e.Base.Name, tyEnv);
+                        if (Set.Count(tyscBase.Vars) != e.Params.Length)
+                        {
+                            throw new Exception.TypingException("type param count missmatch.");
+                        }
+                        var tyArgs = e.Params.Select(x => EvalTypeExpressions(x, tyEnv, vars)).ToArray();
+                        var ss = Set.Fold((s, x) =>
+                                            {
+                                                s.Add(x);
+                                                return s;
+                                            }, new List<Type.TyVar>(), tyscBase.Vars)
+                                    .Zip(tyArgs, (x, y) => new TypeSubst(x, y))
+                                    .Aggregate(LinkedList<TypeSubst>.Empty, (s, x) => LinkedList.Extend(x, s));
+                        return subst_type(ss, tyscBase.Type);
+                    }
+
                     throw new NotImplementedException();
                 }
                 if (expressions is TypeExpressions.RecordType)
@@ -591,6 +619,12 @@ namespace MiniMAL {
                     var e = (TypeExpressions.RecordType)expressions;
                     var tyscs = e.Members.Select(x => Tuple.Create(x.Item1, EvalTypeExpressions(x.Item2, tyEnv, vars))).ToArray();
                     return new Type.TyRecord(tyscs);
+                }
+                if (expressions is TypeExpressions.VariantType)
+                {
+                    var e = (TypeExpressions.VariantType)expressions;
+                    var tyscs = e.Members.Select(x => Tuple.Create(x.Item1, EvalTypeExpressions(x.Item2, tyEnv, vars))).ToArray();
+                    return new Type.TyVariant(tyscs);
                 }
                 throw new NotSupportedException();
             }

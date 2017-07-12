@@ -80,47 +80,58 @@ namespace Parsing {
         public int Index { get; }   // 文字列上の位置
         public int Row { get; } // 行
         public int Column { get; }  // 列
+        private char PrevChar { get; }
 
-        private Position(int index, int row, int column) {
+        private Position(int index, int row, int column, char prevChar) {
             Index = index;
             Row = row;
             Column = column;
+            PrevChar = prevChar;
         }
 
         public override string ToString() {
             return $"({Row}:{Column})";
         }
 
-        public static Position Empty { get; } = new Position(0, 1, 1);
+        public static Position Empty { get; } = new Position(0, 1, 1, '\0');
         public Position Inc(string substr) {
             int row = this.Row;
             int col = this.Column;
             int index = this.Index;
+            char prevChar = this.PrevChar;
 
-            for (var i=0; i<substr.Length;) {
-                if (i + 2 <= substr.Length && substr[i + 0] == '\r' && substr[i + 1] == '\n') {
-                    index += 2;
-                    row++;
-                    col = 1;
-                    i += 2;
-                    continue;
-                } else if (substr[i] == '\r' || substr[i] == '\r') {
+            for (var i=0; i<substr.Length;i++) {
+                if (substr[i] == '\n') {
+                    index += 1;
+                    if (prevChar != '\r') {
+                        row++;
+                        col = 1;
+                    }
+                } else if (substr[i] == '\r') {
                     index += 1;
                     row++;
                     col = 1;
-                    i += 1;
-                    continue;
                 } else {
                     index += 1;
                     col += 1;
-                    i += 1;
                 }
+                prevChar = substr[i];
             }
-            return new Position(index, row, col);
+            return new Position(index, row, col, prevChar);
         }
 
-        public Position MostFar(Position p) {
+        public Position MostFar(Position p)
+        {
             return this.Index > p.Index ? this : p;
+        }
+
+        public Position Discard(int index)
+        {
+            if (this.Index < index)
+            {
+                throw new IndexOutOfRangeException(nameof(index));
+            }
+            return new Position(this.Index- index, this.Row, this.Column, this.PrevChar);
         }
     }
 

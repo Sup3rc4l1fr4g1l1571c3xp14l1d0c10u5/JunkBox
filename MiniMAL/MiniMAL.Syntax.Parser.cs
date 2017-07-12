@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -64,6 +65,7 @@ namespace MiniMAL
             private static readonly Parser<string> String = WS.Then(Ident.Where(x => x == "string"));
             private static readonly Parser<string> Unit = WS.Then(Ident.Where(x => x == "unit"));
             private static readonly Parser<string> External = WS.Then(Ident.Where(x => x == "external"));
+            private static readonly Parser<string> Of = WS.Then(Ident.Where(x => x == "of"));
 
             private static readonly Parser<string> ConstractorId =
                 WS.Then(Constructor).Where(x => !(ReservedWords(new Source("", new System.IO.StringReader(x)),
@@ -74,7 +76,7 @@ namespace MiniMAL
 
             private static readonly Parser<string> ReservedWords = Combinator.Choice(True, False, If, Then, Else, Let,
                 Rec, In, And, Fun, Match, With, Type,
-                Int, Bool, String, Unit, Some, None);
+                Int, Bool, String, Unit, External, Of, Some, None);
 
             private static readonly Parser<string> Id = WS.Then(ReservedWords.Not()).Then(Ident);
 
@@ -408,16 +410,7 @@ namespace MiniMAL
                     from t3 in RParen
                     from t4 in Id.Select(x => new TypeExpressions.TypeName(x))
                     select (TypeExpressions)new TypeExpressions.TypeConstruct(t4, t2),
-                    from t1 in LParen from t2 in Combinator.Lazy(() => TypeExpr) from t3 in RParen select t2,
-                    from t1 in LBrace
-                    from t2 in Combinator.Lazy(() =>
-                        from t3 in Id
-                        from t4 in Colon
-                        from t5 in TypeExpr
-                        select Tuple.Create(t3, t5)
-                    ).Repeat1(Semi)
-                    from t6 in RBrace
-                    select (TypeExpressions)new TypeExpressions.RecordType(t2)
+                    from t1 in LParen from t2 in Combinator.Lazy(() => TypeExpr) from t3 in RParen select t2
 
                 )
                 from t2 in Id.Select(x => new TypeExpressions.TypeName(x)).Many()
@@ -439,6 +432,26 @@ namespace MiniMAL
             private static readonly Parser<TypeExpressions> TypeExpr =
                 TypeExprFunc;
 
+            private static readonly Parser<TypeExpressions> RecordTypeExpr =
+                from t1 in LBrace
+                from t2 in Combinator.Lazy(() =>
+                    from t3 in Id
+                    from t4 in Colon
+                    from t5 in TypeExpr
+                    select Tuple.Create(t3, t5)
+                ).Repeat1(Semi)
+                from t6 in RBrace
+                select (TypeExpressions) new TypeExpressions.RecordType(t2);
+
+            private static readonly Parser<TypeExpressions> VariantTypeExpr =
+                from t1 in Bar.Option()
+                from t2 in Combinator.Lazy(() =>
+                    from t3 in ConstractorId
+                    from t4 in Of.Then(TypeExpr).Option().Select(x => x ?? new TypeExpressions.UnitType())
+                    select Tuple.Create(t3, t4)
+                ).Repeat1(Bar)
+                select (TypeExpressions)new TypeExpressions.VariantType(t2);
+            
             private static readonly Parser<Toplevel> TopLevel =
                 Combinator.Choice(
                     (
@@ -455,6 +468,7 @@ namespace MiniMAL
                         from t7 in SemiSemi
                         select (Toplevel)new Toplevel.ExternalDecl(t2, t4, t6)
                     ), (
+                        // TODO:  let 同様に type ～ and ～ で複数の型を定義できるように
                         from t1 in Type
                         from t2 in Combinator.Choice(
                             from t3 in LParen
@@ -465,7 +479,7 @@ namespace MiniMAL
                         ).Option()
                         from t3 in Id
                         from t4 in Eq
-                        from t5 in TypeExpr
+                        from t5 in Combinator.Choice(TypeExpr, RecordTypeExpr, VariantTypeExpr)
                         from t6 in SemiSemi
                         select (Toplevel)new Toplevel.TypeDef(t3, t2 ?? new string[] { }, t5)
                     ), (
@@ -500,9 +514,9 @@ namespace MiniMAL
                 from t2 in Combinator.Choice(SemiSemi, Combinator.EoF().Select(x => ""))
                 select (Toplevel)new Toplevel.Empty();
 
-            public static Result<Toplevel> Parse(Source s)
+            public static Result<Toplevel> Parse(Source s, Position pos)
             {
-                var ret = TopLevel(s, Position.Empty, Position.Empty);
+                var ret = TopLevel(s, pos, pos);
                 if (ret.Success == false)
                 {
                     var ret2 = ErrorRecovery(s, ret.FailedPosition, ret.FailedPosition);

@@ -66,8 +66,17 @@ namespace MiniMAL {
 
             public class TyRecord : Type
             {
-                public Tuple<string,Type>[] Members { get; }
+                public Tuple<string, Type>[] Members { get; }
                 public TyRecord(Tuple<string, Type>[] members)
+                {
+                    Members = members;
+                }
+            }
+
+            public class TyVariant : Type
+            {
+                public Tuple<string, Type>[] Members { get; }
+                public TyVariant(Tuple<string, Type>[] members)
                 {
                     Members = members;
                 }
@@ -134,6 +143,12 @@ namespace MiniMAL {
                 {
                     var i1 = (TyRecord)arg1;
                     var i2 = (TyRecord)arg2;
+                    return ReferenceEquals(i1.Members, i2.Members);
+                }
+                if (arg1 is TyVariant && arg2 is TyVariant)
+                {
+                    var i1 = (TyVariant)arg1;
+                    var i2 = (TyVariant)arg2;
                     return ReferenceEquals(i1.Members, i2.Members);
                 }
                 return false;
@@ -266,6 +281,26 @@ namespace MiniMAL {
                     }
                     return;
                 }
+                if (t is TyVariant)
+                {
+                    var tt = (TyVariant)t;
+                    if (priority > 1)
+                    {
+                        buffer.Append("(");
+                    }
+                    tt.Members.Aggregate("", (s, x) =>
+                    {
+                        buffer.Append(s);
+                        buffer.Append($"{x.Item1} of ");
+                        type_stringizer(vars, buffer, 2, x.Item2);
+                        return " | ";
+                    });
+                    if (priority > 1)
+                    {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
                 throw new NotSupportedException();
             }
 
@@ -347,6 +382,11 @@ namespace MiniMAL {
             {
                 var ty1 = ((Type.TyRecord)typ);
                 return new Type.TyRecord(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
+            }
+            if (typ is Type.TyVariant)
+            {
+                var ty1 = ((Type.TyVariant)typ);
+                return new Type.TyVariant(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
             }
             return typ;
         }
@@ -477,6 +517,21 @@ namespace MiniMAL {
             {
                 var f1 = (Type.TyRecord)eqs.Value.Type1;
                 var f2 = (Type.TyRecord)eqs.Value.Type2;
+
+                if (f1.Members.Length != f2.Members.Length)
+                {
+                    throw new Exception.TypingException("Type missmatch");
+                }
+
+                var neweqs = f1.Members.Zip(f2.Members, Tuple.Create).Aggregate(
+                    eqs.Next,
+                    (s, x) => LinkedList.Extend(new TypeEquality(x.Item1.Item2, x.Item2.Item2), s));
+                return Unify(neweqs);
+            }
+            if (eqs.Value.Type1 is Type.TyVariant && eqs.Value.Type2 is Type.TyVariant)
+            {
+                var f1 = (Type.TyVariant)eqs.Value.Type1;
+                var f2 = (Type.TyVariant)eqs.Value.Type2;
 
                 if (f1.Members.Length != f2.Members.Length)
                 {
