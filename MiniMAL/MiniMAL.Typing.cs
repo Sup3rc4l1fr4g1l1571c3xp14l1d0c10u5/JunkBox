@@ -81,6 +81,15 @@ namespace MiniMAL {
                     Members = members;
                 }
             }
+            public class TyTypeRef : Type
+            {
+                public string Name { get; }
+                public Type Type { get; set; }
+                public TyTypeRef(string name)
+                {
+                    Name = name;
+                }
+            }
 
             public class TyOption : Type {
                 public Type ItemType { get; }
@@ -150,6 +159,12 @@ namespace MiniMAL {
                     var i1 = (TyVariant)arg1;
                     var i2 = (TyVariant)arg2;
                     return ReferenceEquals(i1.Members, i2.Members);
+                }
+                if (arg1 is TyTypeRef && arg2 is TyTypeRef)
+                {
+                    var i1 = (TyTypeRef)arg1;
+                    var i2 = (TyTypeRef)arg2;
+                    return (i1.Name == i2.Name) && (ReferenceEquals(i1.Type, i2.Type));
                 }
                 return false;
             }
@@ -301,6 +316,21 @@ namespace MiniMAL {
                     }
                     return;
                 }
+                if (t is TyTypeRef)
+                {
+                    var tt = (TyTypeRef)t;
+                    if (priority > 2)
+                    {
+                        buffer.Append("(");
+                    }
+                    buffer.Append(tt.Name);
+                    if (priority > 2)
+                    {
+                        buffer.Append(")");
+                    }
+                    return;
+                }
+
                 throw new NotSupportedException();
             }
 
@@ -388,6 +418,12 @@ namespace MiniMAL {
                 var ty1 = ((Type.TyVariant)typ);
                 return new Type.TyVariant(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
             }
+            if (typ is Type.TyTypeRef)
+            {
+                // Todo: 型適用をどうするか考えること
+                // （ほかの要素と同様に適用してしまうと再帰型バリアントの場合に無限ループとなる）
+                return typ;
+            }
             return typ;
         }
 
@@ -441,6 +477,7 @@ namespace MiniMAL {
                 var f = (Type.TyTuple)ty;
                 return f.Members.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Union(freevar_ty(x), s));
             }
+            // ToDo: TyVariantとTyTypeDefについてはどうすればいいかわからない
             return Set<Type.TyVar>.Empty;
         }
 
@@ -571,6 +608,24 @@ namespace MiniMAL {
                 }
                 var eqs2 = LinkedList.Create(new TypeSubst(v1, ty));
                 return LinkedList.Concat(eqs2, Unify(subst_eqs(eqs2, rest)));
+            }
+            if (eqs.Value.Type1 is Type.TyTypeRef)
+            {
+                if (ReferenceEquals(eqs.Value.Type1, eqs.Value.Type2))
+                {
+                    return Unify(eqs.Next);
+                }
+                var eqs2 = LinkedList.Extend(new TypeEquality(((Type.TyTypeRef)eqs.Value.Type1).Type, eqs.Value.Type2), eqs.Next);
+                return Unify(eqs2);
+            }
+            if (eqs.Value.Type2 is Type.TyTypeRef)
+            {
+                if (ReferenceEquals(eqs.Value.Type1, eqs.Value.Type2))
+                {
+                    return Unify(eqs.Next);
+                }
+                var eqs2 = LinkedList.Extend(new TypeEquality(eqs.Value.Type1, ((Type.TyTypeRef)eqs.Value.Type2).Type), eqs.Next);
+                return Unify(eqs2);
             }
             throw new Exception.TypingException($"Cannot unify type: {eqs.Value.Type1} and {eqs.Value.Type2}");
         }

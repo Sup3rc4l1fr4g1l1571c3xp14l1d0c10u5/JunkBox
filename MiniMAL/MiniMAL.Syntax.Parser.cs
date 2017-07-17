@@ -67,7 +67,7 @@ namespace MiniMAL
             private static readonly Parser<string> External = WS.Then(Ident.Where(x => x == "external"));
             private static readonly Parser<string> Of = WS.Then(Ident.Where(x => x == "of"));
 
-            private static readonly Parser<string> ConstractorId =
+            private static readonly Parser<string> ConstructorId =
                 WS.Then(Constructor).Where(x => !(ReservedWords(new Source("", new System.IO.StringReader(x)),
                     Position.Empty, Position.Empty)).Success);
 
@@ -267,6 +267,7 @@ namespace MiniMAL
                     from t1 in True select (Expressions)new Expressions.BoolLit(true),
                     from t1 in False select (Expressions)new Expressions.BoolLit(false),
                     from t1 in Id select (Expressions)new Expressions.Var(t1),
+                    from t1 in ConstructorId from t2 in Expr.Option() select (Expressions)new Expressions.ConstructorExp(t1,t2 ?? new Expressions.UnitLit()),
                     from t1 in None select (Expressions)Expressions.OptionExp.None,
                     from t1 in Some
                     from t2 in Combinator.Lazy(() => Expr)
@@ -446,7 +447,7 @@ namespace MiniMAL
             private static readonly Parser<TypeExpressions> VariantTypeExpr =
                 from t1 in Bar.Option()
                 from t2 in Combinator.Lazy(() =>
-                    from t3 in ConstractorId
+                    from t3 in ConstructorId
                     from t4 in Of.Then(TypeExpr).Option().Select(x => x ?? new TypeExpressions.UnitType())
                     select Tuple.Create(t3, t4)
                 ).Repeat1(Bar)

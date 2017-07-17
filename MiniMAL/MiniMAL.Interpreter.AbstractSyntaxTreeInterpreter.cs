@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using MiniMAL.Syntax;
@@ -351,6 +352,26 @@ namespace MiniMAL
                     var t = (Expressions.RecordExp)e;
                     return new ExprValue.RecordV(t.Members.Select(x => Tuple.Create(x.Item1,EvalExpressions(env, x.Item2))).ToArray());
                 }
+                if (e is Expressions.ConstructorExp)
+                {
+                    var t = (Expressions.ConstructorExp)e;
+                    var funval = Environment.LookUp(t.ConstructorName, env);
+                    var arg = EvalExpressions(env, t.Arg);
+                    if (funval is ExprValue.ProcV)
+                    {
+                        var newenv = Environment.Extend(((ExprValue.ProcV)funval).Id, arg,
+                            ((ExprValue.ProcV)funval).Env);
+                        return EvalExpressions(newenv, ((ExprValue.ProcV)funval).Body);
+                    }
+                    else if (funval is ExprValue.BProcV)
+                    {
+                        return ((ExprValue.BProcV)funval).Proc(arg);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
+                    }
+                }
                 throw new NotSupportedException($"expression {e} cannot eval.");
             }
 
@@ -432,6 +453,18 @@ namespace MiniMAL
                 }
                 if (p is Toplevel.TypeDef)
                 {
+                    var td = p as Toplevel.TypeDef;
+                    if (td.Type is TypeExpressions.VariantType)
+                    {
+                        var vt = td.Type as TypeExpressions.VariantType;
+                        var index = 0;
+                        foreach (var member in vt.Members)
+                        {
+                            var constructor =(ExprValue)new ExprValue.ProcV("@p", new Expressions.TupleExp(new Expressions[] { new Expressions.IntLit(index), new Expressions.Var("@p") }),env);
+                            env = Environment.Extend(member.Item1, constructor, env);
+                            index++;
+                        }
+                    }
                     return new Result("", env, null);
                 }
                 throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");

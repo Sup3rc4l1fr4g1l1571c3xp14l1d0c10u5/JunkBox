@@ -115,7 +115,7 @@ namespace MiniMAL
 
             public class RecordExp : Expressions
             {
-                public Tuple<string,Expressions>[] Members { get; }
+                public Tuple<string, Expressions>[] Members { get; }
                 public RecordExp(Tuple<string, Expressions>[] members)
                 {
                     Members = members;
@@ -240,6 +240,22 @@ namespace MiniMAL
 
             }
 
+            /// <summary>
+            /// コンストラクタ式
+            /// </summary>
+            public class ConstructorExp : Expressions
+            {
+                public ConstructorExp(string constructorName, Expressions arg)
+                {
+                    this.ConstructorName = constructorName;
+                    this.Arg = arg;
+                }
+
+                public Expressions Arg { get; }
+
+                public string ConstructorName { get; }
+            }
+
             private static int Priolity(Expressions exp)
             {
                 if (exp is Var) { return 100; }
@@ -258,8 +274,9 @@ namespace MiniMAL
                 if (exp is LetRecExp) { return 100; }
                 if (exp is MatchExp) { return 1; }
                 if (exp is HaltExp) { return 2; }
-                                if (exp is TupleExp) { return 100; }
-throw new NotSupportedException();
+                if (exp is TupleExp) { return 100; }
+                if (exp is ConstructorExp) { return 2; }
+                throw new NotSupportedException();
 
             }
 
@@ -335,6 +352,12 @@ throw new NotSupportedException();
                     var e = (HaltExp)exp;
                     return $"halt \"{e.Message.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
                 }
+                if (exp is ConstructorExp)
+                {
+                    var e = (ConstructorExp)exp;
+                    return $"{e.ConstructorName} {ExpressionToString(p, e.Arg)}";
+                }
+
                 throw new NotSupportedException();
             }
 
@@ -349,6 +372,7 @@ throw new NotSupportedException();
             {
                 return ExpressionToString(0, this);
             }
+
         }
     }
 
