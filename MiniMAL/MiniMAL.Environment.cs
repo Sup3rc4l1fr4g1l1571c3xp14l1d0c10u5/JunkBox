@@ -45,18 +45,21 @@ namespace MiniMAL {
         public static Environment<T> Extend<T>(string x, T v, Environment<T> env) {
             return new Environment<T>(x, v, env);
         }
+
         public static T LookUp<T>(string x, Environment<T> env) {
             for (var e = env; e != Environment<T>.Empty; e = e.Next) {
                 if (e.Id == x) { return e.Value; }
             }
             throw new Exception.NotBound(x);
         }
+
         public static bool Contains<T>(string x, Environment<T> env) {
             for (var e = env; e != Environment<T>.Empty; e = e.Next) {
                 if (e.Id == x) { return true; }
             }
             return false;
         }
+
         public static Environment<T2> Map<T1, T2>(Func<T1, T2> f, Environment<T1> env) {
             List<Tuple<string, T2>> kv = new List<Tuple<string, T2>>();
             for (var e = env; e != Environment<T1>.Empty; e = e.Next) {

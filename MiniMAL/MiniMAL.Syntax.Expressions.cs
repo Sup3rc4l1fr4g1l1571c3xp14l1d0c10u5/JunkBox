@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 
@@ -247,13 +246,30 @@ namespace MiniMAL
             {
                 public ConstructorExp(string constructorName, Expressions arg)
                 {
-                    this.ConstructorName = constructorName;
-                    this.Arg = arg;
+                    ConstructorName = constructorName;
+                    Arg = arg;
                 }
 
                 public Expressions Arg { get; }
 
                 public string ConstructorName { get; }
+            }
+            /// <summary>
+            /// ヴァリアント式
+            /// </summary>
+            public class VariantExp : Expressions
+            {
+                public IntLit Tag { get; }
+                public StrLit TagName{ get; }
+                public Expressions Value { get; }
+
+                public VariantExp(StrLit tagName, IntLit tag, Expressions value)
+                {
+                    Tag = tag;
+                    TagName = tagName;
+                    Value = value;
+                }
+
             }
 
             private static int Priolity(Expressions exp)
@@ -274,8 +290,8 @@ namespace MiniMAL
                 if (exp is LetRecExp) { return 100; }
                 if (exp is MatchExp) { return 1; }
                 if (exp is HaltExp) { return 2; }
-                if (exp is TupleExp) { return 100; }
                 if (exp is ConstructorExp) { return 2; }
+                if (exp is VariantExp) { return 2; }
                 throw new NotSupportedException();
 
             }
@@ -356,6 +372,11 @@ namespace MiniMAL
                 {
                     var e = (ConstructorExp)exp;
                     return $"{e.ConstructorName} {ExpressionToString(p, e.Arg)}";
+                }
+                if (exp is VariantExp)
+                {
+                    var e = (VariantExp)exp;
+                    return $"{e.TagName} {ExpressionToString(p, e.Value)}";
                 }
 
                 throw new NotSupportedException();

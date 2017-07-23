@@ -62,3 +62,17 @@ match p with {x=a; y=b} -> (a,b);;
 
 type 'a maybe = Just of 'a | Nothing;;
 
+
+
+(* variant test *)
+
+type 'a list2 = Nil | Cons of ('a * 'a list2);;
+
+let l1 x = Cons (x, Nil);;
+
+type 'a list2 = Nil | Cons of ('a * 'a list2);;
+
+let l2 x = Cons (x, Nil);;
+
+l1 1 = l2 false;;
+

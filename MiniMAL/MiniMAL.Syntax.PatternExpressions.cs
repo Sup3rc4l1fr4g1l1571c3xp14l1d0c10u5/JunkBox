@@ -196,6 +196,28 @@ namespace MiniMAL
                     }
                 }
             }
+
+            /// <summary>
+            /// ヴァリアントパターン
+            /// </summary>
+            public class VariantP : PatternExpressions
+            {
+                public string ConstructorName { get; }
+                public PatternExpressions Body { get; }
+                public int ConstructorId { get; set; }
+
+                public VariantP(string constructorName, PatternExpressions body)
+                {
+                    ConstructorName = constructorName;
+                    Body = body;
+                }
+
+                public override string ToString()
+                {
+                    return $"{ConstructorName} {Body}";
+                }
+            }
+
         }
 
     }

@@ -144,7 +144,7 @@ namespace MiniMAL
                     {
                         get
                         {
-                            for (var p = this; p != Empty; p = p.Next)
+                            for (var p = this; ReferenceEquals(p, Empty) == false; p = p.Next)
                             {
                                 yield return p.Value;
                             }
@@ -180,7 +180,7 @@ namespace MiniMAL
                 /// </summary>
                 public class RecordV : ExprValue
                 {
-                    public Tuple<string,ExprValue>[] Members { get; }
+                    public Tuple<string, ExprValue>[] Members { get; }
 
                     public RecordV(Tuple<string, ExprValue>[] membera)
                     {
@@ -210,7 +210,7 @@ namespace MiniMAL
 
                     public override string ToString()
                     {
-                        if (this == None)
+                        if (ReferenceEquals(this, None))
                         {
                             return "None";
                         }
@@ -218,6 +218,27 @@ namespace MiniMAL
                         {
                             return $"Some {Value}";
                         }
+                    }
+                }
+
+                public class VariantV : ExprValue
+                {
+
+
+                    public string TagName { get; }
+                    public int Tag { get; }
+                    public ExprValue Value { get; }
+
+                    public VariantV(string tagName, int tag, ExprValue value)
+                    {
+                        TagName = tagName;
+                        Tag = tag;
+                        Value = value;
+                    }
+
+                    public override string ToString()
+                    {
+                        return $"{TagName} {Value}";
                     }
                 }
 
@@ -251,11 +272,17 @@ namespace MiniMAL
                     {
                         return true;
                     }
+                    if (arg1 is VariantV && arg2 is VariantV)
+                    {
+                        var i1 = (VariantV)arg1;
+                        var i2 = (VariantV)arg2;
+                        return i1.Tag == i2.Tag && Equals(i1.Value, i2.Value);
+                    }
                     if (arg1 is OptionV && arg2 is OptionV)
                     {
-                        if (arg1 == OptionV.None || arg2 == OptionV.None)
+                        if (ReferenceEquals(arg1, OptionV.None) || ReferenceEquals(arg2, OptionV.None))
                         {
-                            return arg2 == OptionV.None && arg1 == OptionV.None;
+                            return ReferenceEquals(arg2, OptionV.None) && ReferenceEquals(arg1, OptionV.None);
                         }
                         else
                         {
@@ -289,13 +316,13 @@ namespace MiniMAL
                 {
                     if (ReferenceEquals(null, obj)) return false;
                     if (ReferenceEquals(this, obj)) return true;
-                    if (obj.GetType() != this.GetType()) return false;
-                    return Equals(this,(ExprValue) obj);
+                    if (obj.GetType() != GetType()) return false;
+                    return Equals(this, (ExprValue)obj);
                 }
 
                 public override int GetHashCode()
                 {
-                    return this.GetType().GetHashCode();
+                    return GetType().GetHashCode();
                 }
 
             }

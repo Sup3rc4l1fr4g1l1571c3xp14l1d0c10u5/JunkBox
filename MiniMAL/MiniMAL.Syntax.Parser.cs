@@ -1,5 +1,4 @@
 using System;
-using System.CodeDom;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -202,14 +201,10 @@ namespace MiniMAL
                     (from t1 in Wild select (PatternExpressions)new PatternExpressions.WildP()),
                     (from t1 in Id select (PatternExpressions)new PatternExpressions.VarP(t1)),
                     (from t1 in None select (PatternExpressions)PatternExpressions.OptionP.None),
-                    (from t1 in Some
-                        from t2 in Combinator.Lazy(() => PatternExpr)
-                        select (PatternExpressions)new PatternExpressions.OptionP(t2)),
+                    (from t1 in Some from t2 in Combinator.Lazy(() => PatternExpr) select (PatternExpressions)new PatternExpressions.OptionP(t2)),
+                    (from t1 in ConstructorId from t2 in Combinator.Lazy(() => PatternExpr).Option() select (PatternExpressions)new PatternExpressions.VariantP(t1, t2??new PatternExpressions.UnitP())),
                     (from t1 in LParen from t2 in RParen select (PatternExpressions)new PatternExpressions.UnitP()),
-                    (from t1 in LParen
-                        from t2 in Combinator.Lazy(() => PatternCons.Repeat1(Comma))
-                        from t3 in RParen
-                        select t2.Length > 1 ? new PatternExpressions.TupleP(t2) : t2[0]),
+                    (from t1 in LParen from t2 in Combinator.Lazy(() => PatternCons.Repeat1(Comma)) from t3 in RParen select t2.Length > 1 ? new PatternExpressions.TupleP(t2) : t2[0]),
                     (from t1 in LBracket from t2 in RBracket select (PatternExpressions)PatternExpressions.ConsP.Empty),
                     (from t1 in LBrace
                      from t2 in Combinator.Lazy(() =>
@@ -267,20 +262,12 @@ namespace MiniMAL
                     from t1 in True select (Expressions)new Expressions.BoolLit(true),
                     from t1 in False select (Expressions)new Expressions.BoolLit(false),
                     from t1 in Id select (Expressions)new Expressions.Var(t1),
-                    from t1 in ConstructorId from t2 in Expr.Option() select (Expressions)new Expressions.ConstructorExp(t1,t2 ?? new Expressions.UnitLit()),
                     from t1 in None select (Expressions)Expressions.OptionExp.None,
-                    from t1 in Some
-                    from t2 in Combinator.Lazy(() => Expr)
-                    select (Expressions)new Expressions.OptionExp(t2),
+                    from t1 in Some from t2 in Combinator.Lazy(() => Expr) select (Expressions)new Expressions.OptionExp(t2),
+                    from t1 in ConstructorId from t2 in Combinator.Lazy(() => Expr).Option() select (Expressions)new Expressions.ConstructorExp(t1, t2 ?? new Expressions.UnitLit()),
                     from t1 in LParen from t2 in RParen select (Expressions)new Expressions.UnitLit(),
-                    from t1 in LParen
-                    from t2 in InfixOp
-                    from t3 in RParen
-                    select (Expressions)new Expressions.Var($"{t2}"),
-                    from t1 in LParen
-                    from t2 in Expr.Repeat1(Comma)
-                    from t3 in RParen
-                    select t2.Length > 1 ? new Expressions.TupleExp(t2) : t2[0],
+                    from t1 in LParen from t2 in InfixOp from t3 in RParen select (Expressions)new Expressions.Var($"{t2}"),
+                    from t1 in LParen from t2 in Expr.Repeat1(Comma) from t3 in RParen select t2.Length > 1 ? new Expressions.TupleExp(t2) : t2[0],
                     from t1 in LBracket from t2 in RBracket select (Expressions)new Expressions.EmptyListLit(),
                     from t1 in LBracket
                     from t2 in Expr.Repeat1(Semi)

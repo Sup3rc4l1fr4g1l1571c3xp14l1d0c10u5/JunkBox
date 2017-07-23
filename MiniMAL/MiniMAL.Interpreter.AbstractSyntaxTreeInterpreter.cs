@@ -1,5 +1,4 @@
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using MiniMAL.Syntax;
@@ -19,8 +18,10 @@ namespace MiniMAL
             /// <param name="pattern"></param>
             /// <param name="value"></param>
             /// <returns></returns>
-            private static Dictionary<string, ExprValue> EvalPatternExpressions(PatternExpressions pattern,
-                ExprValue value)
+            private static Dictionary<string, ExprValue> EvalPatternExpressions(
+                PatternExpressions pattern,
+                ExprValue value
+            )
             {
                 if (pattern is PatternExpressions.WildP)
                 {
@@ -28,7 +29,7 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.IntP && value is ExprValue.IntV)
                 {
-                    if (((PatternExpressions.IntP) pattern).Value == ((ExprValue.IntV) value).Value)
+                    if (((PatternExpressions.IntP)pattern).Value == ((ExprValue.IntV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -39,7 +40,7 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.StrP && value is ExprValue.StrV)
                 {
-                    if (((PatternExpressions.StrP) pattern).Value == ((ExprValue.StrV) value).Value)
+                    if (((PatternExpressions.StrP)pattern).Value == ((ExprValue.StrV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -50,7 +51,7 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.BoolP && value is ExprValue.BoolV)
                 {
-                    if (((PatternExpressions.BoolP) pattern).Value == ((ExprValue.BoolV) value).Value)
+                    if (((PatternExpressions.BoolP)pattern).Value == ((ExprValue.BoolV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -65,14 +66,14 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.VarP)
                 {
-                    return new Dictionary<string, ExprValue>() {{((PatternExpressions.VarP) pattern).Id, value}};
+                    return new Dictionary<string, ExprValue>() { { ((PatternExpressions.VarP)pattern).Id, value } };
                 }
                 if (pattern is PatternExpressions.ConsP && value is ExprValue.ListV)
                 {
-                    var p = (PatternExpressions.ConsP) pattern;
-                    var q = (ExprValue.ListV) value;
+                    var p = (PatternExpressions.ConsP)pattern;
+                    var q = (ExprValue.ListV)value;
                     var dic = new Dictionary<string, ExprValue>();
-                    if (q == ExprValue.ListV.Empty)
+                    if (ReferenceEquals(q, ExprValue.ListV.Empty))
                     {
                         if (p == PatternExpressions.ConsP.Empty)
                         {
@@ -109,12 +110,12 @@ namespace MiniMAL
                 }
                 if (pattern is PatternExpressions.OptionP && value is ExprValue.OptionV)
                 {
-                    var p = (PatternExpressions.OptionP) pattern;
-                    var q = (ExprValue.OptionV) value;
+                    var p = (PatternExpressions.OptionP)pattern;
+                    var q = (ExprValue.OptionV)value;
                     var dic = new Dictionary<string, ExprValue>();
-                    if (p == PatternExpressions.OptionP.None || q == ExprValue.OptionV.None)
+                    if (p == PatternExpressions.OptionP.None || ReferenceEquals(q, ExprValue.OptionV.None))
                     {
-                        if (p == PatternExpressions.OptionP.None && q == ExprValue.OptionV.None)
+                        if (p == PatternExpressions.OptionP.None && ReferenceEquals(q, ExprValue.OptionV.None))
                         {
                             return dic;
                         }
@@ -130,13 +131,16 @@ namespace MiniMAL
                         {
                             return null;
                         }
-                        dic = ret1.Aggregate(dic,
-                            (s, x) =>
-                            {
-                                s[x.Key] = x.Value;
-                                return s;
-                            });
-                        return dic;
+                        else
+                        {
+                            dic = ret1.Aggregate(dic,
+                                (s, x) =>
+                                {
+                                    s[x.Key] = x.Value;
+                                    return s;
+                                });
+                            return dic;
+                        }
                     }
                 }
                 if (pattern is PatternExpressions.TupleP && value is ExprValue.TupleV)
@@ -191,6 +195,29 @@ namespace MiniMAL
                     return dic;
 
                 }
+                if (pattern is PatternExpressions.VariantP && value is ExprValue.VariantV)
+                {
+                    var p = (PatternExpressions.VariantP)pattern;
+                    var q = (ExprValue.VariantV)value;
+                    var dic = new Dictionary<string, ExprValue>();
+
+                    if (p.ConstructorId != q.Tag)
+                    {
+                        return null;
+                    }
+                    var ret1 = EvalPatternExpressions(p.Body, q.Value);
+                    if (ret1 == null)
+                    {
+                        return null;
+                    }
+                    dic = ret1.Aggregate(dic, (s, x) =>
+                    {
+                        s[x.Key] = x.Value;
+                        return s;
+                    });
+                    return dic;
+
+                }
                 return null;
             }
 
@@ -204,7 +231,7 @@ namespace MiniMAL
             {
                 if (e is Expressions.Var)
                 {
-                    var x = ((Expressions.Var) e).Id;
+                    var x = ((Expressions.Var)e).Id;
                     try
                     {
                         return Environment.LookUp(x, env);
@@ -216,15 +243,15 @@ namespace MiniMAL
                 }
                 if (e is Expressions.IntLit)
                 {
-                    return new ExprValue.IntV(((Expressions.IntLit) e).Value);
+                    return new ExprValue.IntV(((Expressions.IntLit)e).Value);
                 }
                 if (e is Expressions.StrLit)
                 {
-                    return new ExprValue.StrV(((Expressions.StrLit) e).Value);
+                    return new ExprValue.StrV(((Expressions.StrLit)e).Value);
                 }
                 if (e is Expressions.BoolLit)
                 {
-                    return new ExprValue.BoolV(((Expressions.BoolLit) e).Value);
+                    return new ExprValue.BoolV(((Expressions.BoolLit)e).Value);
                 }
                 if (e is Expressions.EmptyListLit)
                 {
@@ -234,25 +261,19 @@ namespace MiniMAL
                 {
                     return new ExprValue.UnitV();
                 }
-                //if (e is Expressions.BuiltinOp)
-                //{
-                //    var op = ((Expressions.BuiltinOp)e).Op;
-                //    var args = ((Expressions.BuiltinOp)e).Exprs.Select(x => EvalExpressions(env, x)).ToArray();
-                //    return EvalBuiltinExpressions(op, args);
-                //}
                 if (e is Expressions.IfExp)
                 {
-                    var cond = EvalExpressions(env, ((Expressions.IfExp) e).Cond);
+                    var cond = EvalExpressions(env, ((Expressions.IfExp)e).Cond);
                     if (cond is ExprValue.BoolV)
                     {
-                        var v = ((ExprValue.BoolV) cond).Value;
+                        var v = ((ExprValue.BoolV)cond).Value;
                         if (v)
                         {
-                            return EvalExpressions(env, ((Expressions.IfExp) e).Then);
+                            return EvalExpressions(env, ((Expressions.IfExp)e).Then);
                         }
                         else
                         {
-                            return EvalExpressions(env, ((Expressions.IfExp) e).Else);
+                            return EvalExpressions(env, ((Expressions.IfExp)e).Else);
                         }
                     }
                     throw new NotSupportedException("Test expression must be boolean: if");
@@ -260,12 +281,12 @@ namespace MiniMAL
                 if (e is Expressions.LetExp)
                 {
                     var newenv = env;
-                    foreach (var bind in ((Expressions.LetExp) e).Binds)
+                    foreach (var bind in ((Expressions.LetExp)e).Binds)
                     {
                         var value = EvalExpressions(env, bind.Item2);
                         newenv = Environment.Extend(bind.Item1, value, newenv);
                     }
-                    return EvalExpressions(newenv, ((Expressions.LetExp) e).Body);
+                    return EvalExpressions(newenv, ((Expressions.LetExp)e).Body);
                 }
                 if (e is Expressions.LetRecExp)
                 {
@@ -273,12 +294,12 @@ namespace MiniMAL
                     var newenv = env;
                     var procs = new List<ExprValue.ProcV>();
 
-                    foreach (var bind in ((Expressions.LetRecExp) e).Binds)
+                    foreach (var bind in ((Expressions.LetRecExp)e).Binds)
                     {
                         var value = EvalExpressions(dummyenv, bind.Item2);
                         if (value is ExprValue.ProcV)
                         {
-                            procs.Add((ExprValue.ProcV) value);
+                            procs.Add((ExprValue.ProcV)value);
                         }
                         newenv = Environment.Extend(bind.Item1, value, newenv);
                     }
@@ -287,25 +308,25 @@ namespace MiniMAL
                     {
                         proc.BackPatchEnv(newenv);
                     }
-                    return EvalExpressions(newenv, ((Expressions.LetRecExp) e).Body);
+                    return EvalExpressions(newenv, ((Expressions.LetRecExp)e).Body);
                 }
                 if (e is Expressions.FunExp)
                 {
-                    return new ExprValue.ProcV(((Expressions.FunExp) e).Arg, ((Expressions.FunExp) e).Body, env);
+                    return new ExprValue.ProcV(((Expressions.FunExp)e).Arg, ((Expressions.FunExp)e).Body, env);
                 }
                 if (e is Expressions.AppExp)
                 {
-                    var funval = EvalExpressions(env, ((Expressions.AppExp) e).Fun);
-                    var arg = EvalExpressions(env, ((Expressions.AppExp) e).Arg);
+                    var funval = EvalExpressions(env, ((Expressions.AppExp)e).Fun);
+                    var arg = EvalExpressions(env, ((Expressions.AppExp)e).Arg);
                     if (funval is ExprValue.ProcV)
                     {
-                        var newenv = Environment.Extend(((ExprValue.ProcV) funval).Id, arg,
-                            ((ExprValue.ProcV) funval).Env);
-                        return EvalExpressions(newenv, ((ExprValue.ProcV) funval).Body);
+                        var newenv = Environment.Extend(((ExprValue.ProcV)funval).Id, arg,
+                            ((ExprValue.ProcV)funval).Env);
+                        return EvalExpressions(newenv, ((ExprValue.ProcV)funval).Body);
                     }
                     else if (funval is ExprValue.BProcV)
                     {
-                        return ((ExprValue.BProcV) funval).Proc(arg);
+                        return ((ExprValue.BProcV)funval).Proc(arg);
                     }
                     else
                     {
@@ -314,8 +335,8 @@ namespace MiniMAL
                 }
                 if (e is Expressions.MatchExp)
                 {
-                    var val = EvalExpressions(env, ((Expressions.MatchExp) e).Exp);
-                    foreach (var pattern in ((Expressions.MatchExp) e).Patterns)
+                    var val = EvalExpressions(env, ((Expressions.MatchExp)e).Exp);
+                    foreach (var pattern in ((Expressions.MatchExp)e).Patterns)
                     {
                         var ret = EvalPatternExpressions(pattern.Item1, val);
                         if (ret != null)
@@ -328,7 +349,7 @@ namespace MiniMAL
                 }
                 if (e is Expressions.TupleExp)
                 {
-                    var t = (Expressions.TupleExp) e;
+                    var t = (Expressions.TupleExp)e;
                     return new ExprValue.TupleV(t.Members.Select(x => EvalExpressions(env, x)).ToArray());
                 }
                 if (e is Expressions.OptionExp)
@@ -339,18 +360,18 @@ namespace MiniMAL
                     }
                     else
                     {
-                        return new ExprValue.OptionV(EvalExpressions(env, ((Expressions.OptionExp) e).Expr));
+                        return new ExprValue.OptionV(EvalExpressions(env, ((Expressions.OptionExp)e).Expr));
                     }
                 }
                 if (e is Expressions.HaltExp)
                 {
-                    throw new Exception.HaltException(((Expressions.HaltExp) e).Message);
+                    throw new Exception.HaltException(((Expressions.HaltExp)e).Message);
                 }
 
                 if (e is Expressions.RecordExp)
                 {
                     var t = (Expressions.RecordExp)e;
-                    return new ExprValue.RecordV(t.Members.Select(x => Tuple.Create(x.Item1,EvalExpressions(env, x.Item2))).ToArray());
+                    return new ExprValue.RecordV(t.Members.Select(x => Tuple.Create(x.Item1, EvalExpressions(env, x.Item2))).ToArray());
                 }
                 if (e is Expressions.ConstructorExp)
                 {
@@ -372,6 +393,11 @@ namespace MiniMAL
                         throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
                     }
                 }
+                if (e is Expressions.VariantExp)
+                {
+                    var t = (Expressions.VariantExp)e;
+                    return new ExprValue.VariantV(t.TagName.Value, (int)t.Tag.Value, EvalExpressions(env, t.Value));
+                }
                 throw new NotSupportedException($"expression {e} cannot eval.");
             }
 
@@ -379,7 +405,7 @@ namespace MiniMAL
             {
                 if (p is Toplevel.Binding.LetDecl)
                 {
-                    var d = (Toplevel.Binding.LetDecl) p;
+                    var d = (Toplevel.Binding.LetDecl)p;
                     var newenv = env;
                     var ret = new Result("", env, null);
 
@@ -392,7 +418,7 @@ namespace MiniMAL
                 }
                 if (p is Toplevel.Binding.LetRecDecl)
                 {
-                    var d = (Toplevel.Binding.LetRecDecl) p;
+                    var d = (Toplevel.Binding.LetRecDecl)p;
                     var newenv = env;
                     var ret = new Result("", env, null);
 
@@ -404,7 +430,7 @@ namespace MiniMAL
                         var v = EvalExpressions(dummyenv, bind.Item2);
                         if (v is ExprValue.ProcV)
                         {
-                            procs.Add((ExprValue.ProcV) v);
+                            procs.Add((ExprValue.ProcV)v);
                         }
                         newenv = Environment.Extend(bind.Item1, v, newenv);
                         ret = new Result(bind.Item1, newenv, v);
@@ -424,20 +450,20 @@ namespace MiniMAL
             {
                 if (p is Toplevel.Exp)
                 {
-                    var e = (Toplevel.Exp) p;
+                    var e = (Toplevel.Exp)p;
                     var v = EvalExpressions(env, e.Syntax);
                     return new Result("-", env, v);
                 }
                 if (p is Toplevel.ExternalDecl)
                 {
-                    var e = (Toplevel.ExternalDecl) p;
+                    var e = (Toplevel.ExternalDecl)p;
                     var val = Environment.LookUp(e.Symbol, builtins);
                     var newenv = Environment.Extend(e.Id, val, env);
                     return new Result(e.Id, newenv, val);
                 }
                 if (p is Toplevel.Binding)
                 {
-                    var ds = (Toplevel.Binding) p;
+                    var ds = (Toplevel.Binding)p;
                     var newenv = env;
                     Result ret = new Result("", env, null);
                     foreach (var d in ds.Entries)
@@ -460,7 +486,7 @@ namespace MiniMAL
                         var index = 0;
                         foreach (var member in vt.Members)
                         {
-                            var constructor =(ExprValue)new ExprValue.ProcV("@p", new Expressions.TupleExp(new Expressions[] { new Expressions.IntLit(index), new Expressions.Var("@p") }),env);
+                            var constructor = (ExprValue)new ExprValue.ProcV("@p", new Expressions.VariantExp(new Expressions.StrLit(member.Item1), new Expressions.IntLit(index), new Expressions.Var("@p")), env);
                             env = Environment.Extend(member.Item1, constructor, env);
                             index++;
                         }

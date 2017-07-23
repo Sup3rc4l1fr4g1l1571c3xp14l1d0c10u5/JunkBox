@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using MiniMAL.Syntax;
 
 namespace MiniMAL {
     public static partial class Typing {
@@ -75,19 +74,23 @@ namespace MiniMAL {
 
             public class TyVariant : Type
             {
-                public Tuple<string, Type>[] Members { get; }
-                public TyVariant(Tuple<string, Type>[] members)
+                public string Name { get; }
+                public Tuple<string, Type>[] Members { get; set;  }
+                public TyVariant(string name)
                 {
-                    Members = members;
+                    Name = name;
                 }
             }
             public class TyTypeRef : Type
             {
                 public string Name { get; }
-                public Type Type { get; set; }
-                public TyTypeRef(string name)
+                public Type Type { get; }
+                public Type[] TyParams { get; }
+                public TyTypeRef(string name, Type type, Type[] tyParams)
                 {
                     Name = name;
+                    Type = type;
+                    TyParams = tyParams;
                 }
             }
 
@@ -160,11 +163,15 @@ namespace MiniMAL {
                     var i2 = (TyVariant)arg2;
                     return ReferenceEquals(i1.Members, i2.Members);
                 }
-                if (arg1 is TyTypeRef && arg2 is TyTypeRef)
+                if (arg1 is TyTypeRef)
                 {
                     var i1 = (TyTypeRef)arg1;
+                    return Equals(i1.Type, arg2);
+                }
+                if (arg2 is TyTypeRef)
+                {
                     var i2 = (TyTypeRef)arg2;
-                    return (i1.Name == i2.Name) && (ReferenceEquals(i1.Type, i2.Type));
+                    return Equals(arg1, i2.Type);
                 }
                 return false;
             }
@@ -323,6 +330,13 @@ namespace MiniMAL {
                     {
                         buffer.Append("(");
                     }
+                    buffer.Append("(");
+                    tt.TyParams.Aggregate("", (s, x) =>{
+                        buffer.Append(s);
+                        type_stringizer(vars, buffer, 2, x);
+                        return ", ";
+                    });
+                    buffer.Append(")");
                     buffer.Append(tt.Name);
                     if (priority > 2)
                     {
@@ -416,13 +430,14 @@ namespace MiniMAL {
             if (typ is Type.TyVariant)
             {
                 var ty1 = ((Type.TyVariant)typ);
-                return new Type.TyVariant(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
+                return ty1;
             }
             if (typ is Type.TyTypeRef)
             {
-                // Todo: 型適用をどうするか考えること
-                // （ほかの要素と同様に適用してしまうと再帰型バリアントの場合に無限ループとなる）
-                return typ;
+                var ty1 = ((Type.TyTypeRef)typ);
+                var tyParams = ty1.TyParams.Select(x => resolve_type(substs, x)).ToArray();
+                var tyType = resolve_type(substs, ty1.Type);
+                return new Type.TyTypeRef(ty1.Name, tyType, tyParams);
             }
             return typ;
         }
@@ -477,7 +492,17 @@ namespace MiniMAL {
                 var f = (Type.TyTuple)ty;
                 return f.Members.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Union(freevar_ty(x), s));
             }
-            // ToDo: TyVariantとTyTypeDefについてはどうすればいいかわからない
+            if (ty is Type.TyVariant)
+            {
+                // 来ないはず
+                //var f = (Type.TyVariant)ty;
+                throw new NotSupportedException();
+            }
+            if (ty is Type.TyTypeRef)
+            {
+                var f = (Type.TyTypeRef)ty;
+                return f.TyParams.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Union(freevar_ty(x), s));
+            }
             return Set<Type.TyVar>.Empty;
         }
 
@@ -570,15 +595,12 @@ namespace MiniMAL {
                 var f1 = (Type.TyVariant)eqs.Value.Type1;
                 var f2 = (Type.TyVariant)eqs.Value.Type2;
 
-                if (f1.Members.Length != f2.Members.Length)
+                if (!ReferenceEquals(f1, f2))
                 {
                     throw new Exception.TypingException("Type missmatch");
                 }
+                return Unify(eqs.Next);
 
-                var neweqs = f1.Members.Zip(f2.Members, Tuple.Create).Aggregate(
-                    eqs.Next,
-                    (s, x) => LinkedList.Extend(new TypeEquality(x.Item1.Item2, x.Item2.Item2), s));
-                return Unify(neweqs);
             }
             if (eqs.Value.Type1 is Type.TyVar && eqs.Value.Type2 is Type.TyVar) {
                 var v1 = (Type.TyVar)eqs.Value.Type1;
@@ -600,155 +622,43 @@ namespace MiniMAL {
                 return LinkedList.Concat(eqs2, Unify(subst_eqs(eqs2, rest)));
             }
             if (eqs.Value.Type2 is Type.TyVar) {
-                var v1 = (Type.TyVar)eqs.Value.Type2;
+                var v2 = (Type.TyVar)eqs.Value.Type2;
                 var ty = eqs.Value.Type1;
                 var rest = eqs.Next;
-                if (Set.Member(v1, freevar_ty(ty))) {
+                if (Set.Member(v2, freevar_ty(ty))) {
                     throw new Exception.TypingException("Recursive type");
                 }
-                var eqs2 = LinkedList.Create(new TypeSubst(v1, ty));
+                var eqs2 = LinkedList.Create(new TypeSubst(v2, ty));
                 return LinkedList.Concat(eqs2, Unify(subst_eqs(eqs2, rest)));
+            }
+            if (eqs.Value.Type1 is Type.TyTypeRef && eqs.Value.Type2 is Type.TyTypeRef)
+            {
+                var v1 = (Type.TyTypeRef)eqs.Value.Type1;
+                var v2 = (Type.TyTypeRef)eqs.Value.Type2;
+                if (!Type.Equals(v1.Type, v2.Type))
+                {
+                    throw new Exception.TypingException("Type missmatch");
+                }
+                    return Unify(
+                        v1.TyParams.Zip(v2.TyParams, (x, y) => new TypeEquality(x, y))
+                                   .Aggregate(eqs.Next, (s, x) => LinkedList.Extend(x, s))
+                    );
             }
             if (eqs.Value.Type1 is Type.TyTypeRef)
             {
-                if (ReferenceEquals(eqs.Value.Type1, eqs.Value.Type2))
-                {
-                    return Unify(eqs.Next);
-                }
-                var eqs2 = LinkedList.Extend(new TypeEquality(((Type.TyTypeRef)eqs.Value.Type1).Type, eqs.Value.Type2), eqs.Next);
+                var v1 = (Type.TyTypeRef)eqs.Value.Type1;
+                var eqs2 = LinkedList.Extend(new TypeEquality(v1.Type, eqs.Value.Type2), eqs.Next);
                 return Unify(eqs2);
             }
             if (eqs.Value.Type2 is Type.TyTypeRef)
             {
-                if (ReferenceEquals(eqs.Value.Type1, eqs.Value.Type2))
-                {
-                    return Unify(eqs.Next);
-                }
-                var eqs2 = LinkedList.Extend(new TypeEquality(eqs.Value.Type1, ((Type.TyTypeRef)eqs.Value.Type2).Type), eqs.Next);
+                var v2 = (Type.TyTypeRef)eqs.Value.Type2;
+                var eqs2 = LinkedList.Extend(new TypeEquality(eqs.Value.Type1, v2.Type), eqs.Next);
                 return Unify(eqs2);
             }
             throw new Exception.TypingException($"Cannot unify type: {eqs.Value.Type1} and {eqs.Value.Type2}");
         }
 
-        /// <summary>
-        ///     パターンマッチの評価
-        /// </summary>
-        /// <param name="pattern"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        private static Tuple<LinkedList<TypeEquality>, Dictionary<string, Type>> EvalPatternExpressions(
-        PatternExpressions pattern, Type value) {
-            if (pattern is PatternExpressions.WildP) {
-                return Tuple.Create(
-                    LinkedList<TypeEquality>.Empty, 
-                    new Dictionary<string, Type>()
-                );
-            }
-            if (pattern is PatternExpressions.IntP) {
-                return Tuple.Create(
-                    LinkedList.Create(new TypeEquality(value, new Type.TyInt())),
-                    new Dictionary<string, Type>()
-                );
-            }
-            if (pattern is PatternExpressions.StrP) {
-                return Tuple.Create(
-                    LinkedList.Create(new TypeEquality(value, new Type.TyStr())),
-                    new Dictionary<string, Type>()
-                );
-            }
-            if (pattern is PatternExpressions.BoolP)
-            {
-                return Tuple.Create(
-                    LinkedList.Create(new TypeEquality(value, new Type.TyBool())),
-                    new Dictionary<string, Type>()
-                );
-            }
-            if (pattern is PatternExpressions.OptionP) {
-                if (pattern == PatternExpressions.OptionP.None) {
-                    var tyitem = Type.TyVar.Fresh();
-                    return Tuple.Create(
-                        LinkedList.Create(
-                            new TypeEquality(value, new Type.TyOption(tyitem))
-                        ),
-                        new Dictionary<string, Type>()
-                    );
-                } else {
-                    var p = (PatternExpressions.OptionP)pattern;
-                    var tyitem = Type.TyVar.Fresh();
-                    var ret1 = EvalPatternExpressions(p.Value, tyitem);
-                    return Tuple.Create(
-                        LinkedList.Concat(
-                            LinkedList.Create( new TypeEquality(value,new Type.TyOption(tyitem)) ),
-                            ret1.Item1
-                        ),
-                        ret1.Item2
-                    );
-                }
-            }
-            if (pattern is PatternExpressions.UnitP) {
-                return Tuple.Create(
-                LinkedList.Create(new TypeEquality(value, new Type.TyUnit())),
-                new Dictionary<string, Type>()
-                );
-            }
-            if (pattern is PatternExpressions.VarP) {
-                return Tuple.Create(
-                    LinkedList<TypeEquality>.Empty,
-                    new Dictionary<string, Type> { { ((PatternExpressions.VarP)pattern).Id, value } }
-                );
-            }
-            if (pattern is PatternExpressions.ConsP) {
-                var p = (PatternExpressions.ConsP)pattern;
-                if (p == PatternExpressions.ConsP.Empty) {
-                    return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, new Type.TyList(Type.TyVar.Fresh()))),
-                        new Dictionary<string, Type>()
-                    );
-                } else {
-                    var tyitem = Type.TyVar.Fresh();
-                    var tyList = new Type.TyList(tyitem);
-                    var ret1 = EvalPatternExpressions(p.Value, tyitem);
-                    var ret2 = EvalPatternExpressions(p.Next, tyList);
-                    return Tuple.Create(
-                        LinkedList.Concat(
-                            LinkedList.Create(new TypeEquality(tyList, value)),
-                            ret1.Item1,
-                            ret2.Item1
-                        ),
-                        ret2.Item2.Aggregate(new Dictionary<string,Type>(ret1.Item2), (s, x) => { s[x.Key] = x.Value; return s; })
-                    );
-                }
-            }
-            if (pattern is PatternExpressions.TupleP) {
-                var p = (PatternExpressions.TupleP)pattern;
-
-                var members = p.Members.Select(x => Tuple.Create(x, Type.TyVar.Fresh())).ToArray();
-                var tupleType = new Type.TyTuple(members.Select(x => (Type)x.Item2).ToArray());
-
-                var eqs = LinkedList.Create(new TypeEquality(value, tupleType));
-                var binds = new Dictionary<string, Type>();
-                foreach (var ptv in members) {
-                    var patexpr = ptv.Item1;
-                    var pattyvar = ptv.Item2;
-
-                    var ret = EvalPatternExpressions(patexpr, pattyvar);
-                    var pateqs = ret.Item1;
-                    var patbind = ret.Item2;
-
-                    eqs = LinkedList.Concat(pateqs, eqs);
-                    binds = patbind.Aggregate(binds, (s, x) => {
-                        s[x.Key] = x.Value;
-                        return s;
-                    });
-                }
-                return Tuple.Create(
-                eqs,
-                binds
-                );
-            }
-
-            return null;
-        }
 
     }
 }
