@@ -229,271 +229,263 @@ namespace MiniMAL
             /// <returns></returns>
             private static ExprValue EvalExpressions(Environment<ExprValue> env, Expressions e)
             {
-                if (e is Expressions.Var)
-                {
-                    var x = ((Expressions.Var)e).Id;
-                    try
+                return Expressions.Match(
+                    Var: (exp) =>
                     {
-                        return Environment.LookUp(x, env);
-                    }
-                    catch (Exception.NotBound)
-                    {
-                        throw new Exception.NotBound($"Variable not bound: {x}");
-                    }
-                }
-                if (e is Expressions.IntLit)
-                {
-                    return new ExprValue.IntV(((Expressions.IntLit)e).Value);
-                }
-                if (e is Expressions.StrLit)
-                {
-                    return new ExprValue.StrV(((Expressions.StrLit)e).Value);
-                }
-                if (e is Expressions.BoolLit)
-                {
-                    return new ExprValue.BoolV(((Expressions.BoolLit)e).Value);
-                }
-                if (e is Expressions.EmptyListLit)
-                {
-                    return ExprValue.ListV.Empty;
-                }
-                if (e is Expressions.UnitLit)
-                {
-                    return new ExprValue.UnitV();
-                }
-                if (e is Expressions.IfExp)
-                {
-                    var cond = EvalExpressions(env, ((Expressions.IfExp)e).Cond);
-                    if (cond is ExprValue.BoolV)
-                    {
-                        var v = ((ExprValue.BoolV)cond).Value;
-                        if (v)
+                        var x = exp.Id;
+                        try
                         {
-                            return EvalExpressions(env, ((Expressions.IfExp)e).Then);
+                            return Environment.LookUp(x, env);
+                        }
+                        catch (Exception.NotBound)
+                        {
+                            throw new Exception.NotBound($"Variable not bound: {x}");
+                        }
+                    },
+                    IntLit: (exp) =>
+                    {
+                        return new ExprValue.IntV(exp.Value);
+                    },
+                    StrLit: (exp) =>
+                    {
+                        return new ExprValue.StrV(exp.Value);
+                    },
+                    BoolLit: (exp) =>
+                    {
+                        return new ExprValue.BoolV(exp.Value);
+                    },
+                    EmptyListLit: (exp) =>
+                    {
+                        return ExprValue.ListV.Empty;
+                    },
+                    UnitLit: (exp) =>
+                    {
+                        return new ExprValue.UnitV();
+                    },
+                    IfExp: (exp) =>
+                    {
+                        var cond = EvalExpressions(env, exp.Cond);
+                        if (cond is ExprValue.BoolV)
+                        {
+                            var v = ((ExprValue.BoolV) cond).Value;
+                            if (v)
+                            {
+                                return EvalExpressions(env, exp.Then);
+                            }
+                            else
+                            {
+                                return EvalExpressions(env, exp.Else);
+                            }
+                        }
+                        throw new NotSupportedException("Test expression must be boolean: if");
+                    },
+                    LetExp: (exp) =>
+                    {
+                        var newenv = env;
+                        foreach (var bind in exp.Binds)
+                        {
+                            var value = EvalExpressions(env, bind.Item2);
+                            newenv = Environment.Extend(bind.Item1, value, newenv);
+                        }
+                        return EvalExpressions(newenv, exp.Body);
+                    },
+                    LetRecExp: (exp) =>
+                    {
+                        var dummyenv = Environment<ExprValue>.Empty;
+                        var newenv = env;
+                        var procs = new List<ExprValue.ProcV>();
+
+                        foreach (var bind in exp.Binds)
+                        {
+                            var value = EvalExpressions(dummyenv, bind.Item2);
+                            if (value is ExprValue.ProcV)
+                            {
+                                procs.Add((ExprValue.ProcV) value);
+                            }
+                            newenv = Environment.Extend(bind.Item1, value, newenv);
+                        }
+
+                        foreach (var proc in procs)
+                        {
+                            proc.BackPatchEnv(newenv);
+                        }
+                        return EvalExpressions(newenv, exp.Body);
+                    },
+                    FunExp: (exp) =>
+                    {
+                        return new ExprValue.ProcV(exp.Arg, exp.Body, env);
+                    },
+                    AppExp: (exp) =>
+                    {
+                        var funval = EvalExpressions(env, exp.Fun);
+                        var arg = EvalExpressions(env, exp.Arg);
+                        if (funval is ExprValue.ProcV)
+                        {
+                            var newenv = Environment.Extend(((ExprValue.ProcV) funval).Id, arg,
+                                ((ExprValue.ProcV) funval).Env);
+                            return EvalExpressions(newenv, ((ExprValue.ProcV) funval).Body);
+                        }
+                        else if (funval is ExprValue.BProcV)
+                        {
+                            return ((ExprValue.BProcV) funval).Proc(arg);
                         }
                         else
                         {
-                            return EvalExpressions(env, ((Expressions.IfExp)e).Else);
+                            throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
                         }
-                    }
-                    throw new NotSupportedException("Test expression must be boolean: if");
-                }
-                if (e is Expressions.LetExp)
-                {
-                    var newenv = env;
-                    foreach (var bind in ((Expressions.LetExp)e).Binds)
+                    },
+                    MatchExp: (exp) =>
                     {
-                        var value = EvalExpressions(env, bind.Item2);
-                        newenv = Environment.Extend(bind.Item1, value, newenv);
-                    }
-                    return EvalExpressions(newenv, ((Expressions.LetExp)e).Body);
-                }
-                if (e is Expressions.LetRecExp)
-                {
-                    var dummyenv = Environment<ExprValue>.Empty;
-                    var newenv = env;
-                    var procs = new List<ExprValue.ProcV>();
-
-                    foreach (var bind in ((Expressions.LetRecExp)e).Binds)
-                    {
-                        var value = EvalExpressions(dummyenv, bind.Item2);
-                        if (value is ExprValue.ProcV)
+                        var val = EvalExpressions(env, exp.Exp);
+                        foreach (var pattern in exp.Patterns)
                         {
-                            procs.Add((ExprValue.ProcV)value);
+                            var ret = EvalPatternExpressions(pattern.Item1, val);
+                            if (ret != null)
+                            {
+                                var newenv = ret.Aggregate(env, (s, x) => Environment.Extend(x.Key, x.Value, s));
+                                return EvalExpressions(newenv, pattern.Item2);
+                            }
                         }
-                        newenv = Environment.Extend(bind.Item1, value, newenv);
-                    }
-
-                    foreach (var proc in procs)
+                        throw new NotSupportedException($"value {val} is not match.");
+                    },
+                    TupleExp: (exp) =>
                     {
-                        proc.BackPatchEnv(newenv);
-                    }
-                    return EvalExpressions(newenv, ((Expressions.LetRecExp)e).Body);
-                }
-                if (e is Expressions.FunExp)
-                {
-                    return new ExprValue.ProcV(((Expressions.FunExp)e).Arg, ((Expressions.FunExp)e).Body, env);
-                }
-                if (e is Expressions.AppExp)
-                {
-                    var funval = EvalExpressions(env, ((Expressions.AppExp)e).Fun);
-                    var arg = EvalExpressions(env, ((Expressions.AppExp)e).Arg);
-                    if (funval is ExprValue.ProcV)
+                        return new ExprValue.TupleV(exp.Members.Select(x => EvalExpressions(env, x)).ToArray());
+                    },
+                    OptionExp: (exp) =>
                     {
-                        var newenv = Environment.Extend(((ExprValue.ProcV)funval).Id, arg,
-                            ((ExprValue.ProcV)funval).Env);
-                        return EvalExpressions(newenv, ((ExprValue.ProcV)funval).Body);
-                    }
-                    else if (funval is ExprValue.BProcV)
-                    {
-                        return ((ExprValue.BProcV)funval).Proc(arg);
-                    }
-                    else
-                    {
-                        throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
-                    }
-                }
-                if (e is Expressions.MatchExp)
-                {
-                    var val = EvalExpressions(env, ((Expressions.MatchExp)e).Exp);
-                    foreach (var pattern in ((Expressions.MatchExp)e).Patterns)
-                    {
-                        var ret = EvalPatternExpressions(pattern.Item1, val);
-                        if (ret != null)
+                        if (exp == Expressions.OptionExp.None)
                         {
-                            var newenv = ret.Aggregate(env, (s, x) => Environment.Extend(x.Key, x.Value, s));
-                            return EvalExpressions(newenv, pattern.Item2);
+                            return ExprValue.OptionV.None;
                         }
-                    }
-                    throw new NotSupportedException($"value {val} is not match.");
-                }
-                if (e is Expressions.TupleExp)
-                {
-                    var t = (Expressions.TupleExp)e;
-                    return new ExprValue.TupleV(t.Members.Select(x => EvalExpressions(env, x)).ToArray());
-                }
-                if (e is Expressions.OptionExp)
-                {
-                    if (e == Expressions.OptionExp.None)
+                        else
+                        {
+                            return new ExprValue.OptionV(EvalExpressions(env, exp.Expr));
+                        }
+                    },
+                    HaltExp: (exp) =>
                     {
-                        return ExprValue.OptionV.None;
-                    }
-                    else
-                    {
-                        return new ExprValue.OptionV(EvalExpressions(env, ((Expressions.OptionExp)e).Expr));
-                    }
-                }
-                if (e is Expressions.HaltExp)
-                {
-                    throw new Exception.HaltException(((Expressions.HaltExp)e).Message);
-                }
+                        throw new Exception.HaltException(exp.Message);
+                    },
 
-                if (e is Expressions.RecordExp)
-                {
-                    var t = (Expressions.RecordExp)e;
-                    return new ExprValue.RecordV(t.Members.Select(x => Tuple.Create(x.Item1, EvalExpressions(env, x.Item2))).ToArray());
-                }
-                if (e is Expressions.ConstructorExp)
-                {
-                    var t = (Expressions.ConstructorExp)e;
-                    var funval = Environment.LookUp(t.ConstructorName, env);
-                    var arg = EvalExpressions(env, t.Arg);
-                    if (funval is ExprValue.ProcV)
+                    RecordExp: (exp) =>
                     {
-                        var newenv = Environment.Extend(((ExprValue.ProcV)funval).Id, arg,
-                            ((ExprValue.ProcV)funval).Env);
-                        return EvalExpressions(newenv, ((ExprValue.ProcV)funval).Body);
-                    }
-                    else if (funval is ExprValue.BProcV)
+                        return new ExprValue.RecordV(exp.Members
+                            .Select(x => Tuple.Create(x.Item1, EvalExpressions(env, x.Item2))).ToArray());
+                    },
+                    ConstructorExp: (exp) =>
                     {
-                        return ((ExprValue.BProcV)funval).Proc(arg);
-                    }
-                    else
+                        var funval = Environment.LookUp(exp.ConstructorName, env);
+                        var arg = EvalExpressions(env, exp.Arg);
+                        if (funval is ExprValue.ProcV)
+                        {
+                            var newenv = Environment.Extend(((ExprValue.ProcV) funval).Id, arg,
+                                ((ExprValue.ProcV) funval).Env);
+                            return EvalExpressions(newenv, ((ExprValue.ProcV) funval).Body);
+                        }
+                        else if (funval is ExprValue.BProcV)
+                        {
+                            return ((ExprValue.BProcV) funval).Proc(arg);
+                        }
+                        else
+                        {
+                            throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
+                        }
+                    },
+                    VariantExp: (exp) =>
                     {
-                        throw new NotSupportedException($"{funval.GetType().FullName} cannot eval.");
-                    }
-                }
-                if (e is Expressions.VariantExp)
-                {
-                    var t = (Expressions.VariantExp)e;
-                    return new ExprValue.VariantV(t.TagName.Value, (int)t.Tag.Value, EvalExpressions(env, t.Value));
-                }
-                throw new NotSupportedException($"expression {e} cannot eval.");
+                        return new ExprValue.VariantV(exp.TagName.Value, (int)exp.Tag.Value,
+                            EvalExpressions(env, exp.Value));
+                    },
+                    Other: (exp) => throw new NotSupportedException($"expression {exp} cannot eval.")
+                )(e);
             }
 
             private static Result eval_declEntry(Environment<ExprValue> env, Toplevel.Binding.DeclBase p)
             {
-                if (p is Toplevel.Binding.LetDecl)
-                {
-                    var d = (Toplevel.Binding.LetDecl)p;
-                    var newenv = env;
-                    var ret = new Result("", env, null);
-
-                    foreach (var bind in d.Binds)
+                return Toplevel.Binding.DeclBase.Match(
+                    LetDecl: (d) =>
                     {
-                        var v = EvalExpressions(newenv, bind.Item2);
-                        ret = new Result(bind.Item1, Environment.Extend(bind.Item1, v, ret.Env), v);
-                    }
-                    return ret;
-                }
-                if (p is Toplevel.Binding.LetRecDecl)
-                {
-                    var d = (Toplevel.Binding.LetRecDecl)p;
-                    var newenv = env;
-                    var ret = new Result("", env, null);
+                        var newenv = env;
+                        var ret = new Result("", env, null);
 
-                    var dummyenv = Environment<ExprValue>.Empty;
-                    var procs = new List<ExprValue.ProcV>();
-
-                    foreach (var bind in d.Binds)
-                    {
-                        var v = EvalExpressions(dummyenv, bind.Item2);
-                        if (v is ExprValue.ProcV)
+                        foreach (var bind in d.Binds)
                         {
-                            procs.Add((ExprValue.ProcV)v);
+                            var v = EvalExpressions(newenv, bind.Item2);
+                            ret = new Result(bind.Item1, Environment.Extend(bind.Item1, v, ret.Env), v);
                         }
-                        newenv = Environment.Extend(bind.Item1, v, newenv);
-                        ret = new Result(bind.Item1, newenv, v);
-                    }
-
-                    foreach (var proc in procs)
+                        return ret;
+                    },
+                    LetRecDecl: (d) =>
                     {
-                        proc.BackPatchEnv(newenv);
-                    }
-                    return ret;
-                }
-                throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
+                        var newenv = env;
+                        var ret = new Result("", env, null);
+
+                        var dummyenv = Environment<ExprValue>.Empty;
+                        var procs = new List<ExprValue.ProcV>();
+
+                        foreach (var bind in d.Binds)
+                        {
+                            var v = EvalExpressions(dummyenv, bind.Item2);
+                            var procv = v as ExprValue.ProcV;
+                            if (procv != null)
+                            {
+                                procs.Add(procv);
+                            }
+                            newenv = Environment.Extend(bind.Item1, v, newenv);
+                            ret = new Result(bind.Item1, newenv, v);
+                        }
+
+                        foreach (var proc in procs)
+                        {
+                            proc.BackPatchEnv(newenv);
+                        }
+                        return ret;
+                    },
+                    Other: (e) => throw new NotSupportedException($"{e.GetType().FullName} cannot eval.")
+                )(p);
+                
             }
 
-            public static Result eval_decl(Environment<ExprValue> env, Environment<ExprValue> builtins,
-                Toplevel p)
+            public static Result eval_decl(Environment<ExprValue> env, Environment<ExprValue> builtins, Toplevel p)
             {
-                if (p is Toplevel.Exp)
-                {
-                    var e = (Toplevel.Exp)p;
-                    var v = EvalExpressions(env, e.Syntax);
-                    return new Result("-", env, v);
-                }
-                if (p is Toplevel.ExternalDecl)
-                {
-                    var e = (Toplevel.ExternalDecl)p;
-                    var val = Environment.LookUp(e.Symbol, builtins);
-                    var newenv = Environment.Extend(e.Id, val, env);
-                    return new Result(e.Id, newenv, val);
-                }
-                if (p is Toplevel.Binding)
-                {
-                    var ds = (Toplevel.Binding)p;
-                    var newenv = env;
-                    Result ret = new Result("", env, null);
-                    foreach (var d in ds.Entries)
-                    {
-                        ret = eval_declEntry(newenv, d);
-                        newenv = ret.Env;
-                    }
-                    return ret;
-                }
-                if (p is Toplevel.Empty)
-                {
-                    return new Result("", env, null);
-                }
-                if (p is Toplevel.TypeDef)
-                {
-                    var td = p as Toplevel.TypeDef;
-                    if (td.Type is TypeExpressions.VariantType)
-                    {
-                        var vt = td.Type as TypeExpressions.VariantType;
-                        var index = 0;
-                        foreach (var member in vt.Members)
+                return Toplevel.Match(
+                    Empty: (e) => new Result("", env, null),
+                    Exp: (e) => {
+                        var v = EvalExpressions(env, e.Syntax);
+                        return new Result("-", env, v);
+                    },
+                    Binding: (e) => {
+                        var newenv = env;
+                        Result ret = new Result("", env, null);
+                        foreach (var d in e.Entries)
                         {
-                            var constructor = (ExprValue)new ExprValue.ProcV("@p", new Expressions.VariantExp(new Expressions.StrLit(member.Item1), new Expressions.IntLit(index), new Expressions.Var("@p")), env);
-                            env = Environment.Extend(member.Item1, constructor, env);
-                            index++;
+                            ret = eval_declEntry(newenv, d);
+                            newenv = ret.Env;
                         }
-                    }
-                    return new Result("", env, null);
-                }
-                throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
+                        return ret;
+                    },
+                    TypeDef: (e) => {
+                        var vt = e.Type as TypeExpressions.VariantType;
+                        if (vt != null)
+                        {
+                            var index = 0;
+                            foreach (var member in vt.Members)
+                            {
+                                var constructor = (ExprValue)new ExprValue.ProcV("@p", new Expressions.VariantExp(new Expressions.StrLit(member.Item1), new Expressions.IntLit(index), new Expressions.Var("@p")), env);
+                                env = Environment.Extend(member.Item1, constructor, env);
+                                index++;
+                            }
+                        }
+                        return new Result("", env, null);
+                    },
+                    ExternalDecl: (e) =>{
+                        var val = Environment.LookUp(e.Symbol, builtins);
+                        var newenv = Environment.Extend(e.Id, val, env);
+                        return new Result(e.Id, newenv, val);
+                    },
+                    Other: (e) => throw new NotSupportedException($"{e.GetType().FullName} cannot eval.")
+                )(p);
             }
         }
     }

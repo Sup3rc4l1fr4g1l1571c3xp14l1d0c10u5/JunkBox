@@ -96,7 +96,6 @@
     <Compile Include="MiniMAL.Syntax.PatternExpressions.Compiler.cs" />
     <Compile Include="MiniMAL.Syntax.PatternExpressions.cs" />
     <Compile Include="MiniMAL.Typing.PolymorphicTyping.cs" />
-    <Compile Include="MiniMAL.Typing.MonomorphicTyping.cs" />
     <Compile Include="MiniMAL.Interpreter.SecdMachineInterpreter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

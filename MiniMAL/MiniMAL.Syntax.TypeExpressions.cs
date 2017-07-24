@@ -187,6 +187,42 @@ namespace MiniMAL
                     return $"({string.Join(", ", Params.Select(x => x.ToString()))}) {Base}";
                 }
             }
+
+            public static Func<TypeExpressions, TResult> Match<TResult>(
+                Func<TypeVar, TResult> TypeVar,
+                Func<IntType, TResult> IntType,
+                Func<BoolType, TResult> BoolType,
+                Func<StrType, TResult> StrType,
+                Func<UnitType, TResult> UnitType,
+                Func<ListType, TResult> ListType,
+                Func<OptionType, TResult> OptionType,
+                Func<TupleType, TResult> TupleType,
+                Func<RecordType, TResult> RecordType,
+                Func<VariantType, TResult> VariantType,
+                Func<FuncType, TResult> FuncType,
+                Func<TypeName, TResult> TypeName,
+                Func<TypeConstruct, TResult> TypeConstruct,
+                Func<TypeExpressions, TResult> Other
+            )
+            {
+                return (obj) =>
+                {
+                    if (obj is TypeVar) { return TypeVar((TypeVar)obj); }
+                    if (obj is IntType) { return IntType((IntType)obj); }
+                    if (obj is BoolType) { return BoolType((BoolType)obj); }
+                    if (obj is StrType) { return StrType((StrType)obj); }
+                    if (obj is UnitType) { return UnitType((UnitType)obj); }
+                    if (obj is ListType) { return ListType((ListType)obj); }
+                    if (obj is OptionType) { return OptionType((OptionType)obj); }
+                    if (obj is TupleType) { return TupleType((TupleType)obj); }
+                    if (obj is RecordType) { return RecordType((RecordType)obj); }
+                    if (obj is VariantType) { return VariantType((VariantType)obj); }
+                    if (obj is FuncType) { return FuncType((FuncType)obj); }
+                    if (obj is TypeName) { return TypeName((TypeName)obj); }
+                    if (obj is TypeConstruct) { return TypeConstruct((TypeConstruct)obj); }
+                    return Other(obj);
+                };
+            }
         }
     }
 }

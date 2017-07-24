@@ -477,11 +477,11 @@ namespace MiniMAL
                                     from t2 in Let
                                     from t3 in Rec
                                     from t4 in LetBind.Repeat1(And)
-                                    select (Toplevel.Binding.DeclBase)new Toplevel.Binding.LetRecDecl(t4)
+                                    select (Toplevel.Binding.DeclBase)new Toplevel.Binding.DeclBase.LetRecDecl(t4)
                                 ), (
                                     from t2 in Let
                                     from t4 in LetBind.Repeat1(And)
-                                    select (Toplevel.Binding.DeclBase)new Toplevel.Binding.LetDecl(t4)
+                                    select (Toplevel.Binding.DeclBase)new Toplevel.Binding.DeclBase.LetDecl(t4)
                                 )
                             ),
                             1

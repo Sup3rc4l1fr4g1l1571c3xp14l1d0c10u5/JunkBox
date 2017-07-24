@@ -112,6 +112,9 @@ namespace MiniMAL
                 }
             }
 
+            /// <summary>
+            /// レコード式
+            /// </summary>
             public class RecordExp : Expressions
             {
                 public Tuple<string, Expressions>[] Members { get; }
@@ -254,13 +257,14 @@ namespace MiniMAL
 
                 public string ConstructorName { get; }
             }
+
             /// <summary>
             /// ヴァリアント式
             /// </summary>
             public class VariantExp : Expressions
             {
                 public IntLit Tag { get; }
-                public StrLit TagName{ get; }
+                public StrLit TagName { get; }
                 public Expressions Value { get; }
 
                 public VariantExp(StrLit tagName, IntLit tag, Expressions value)
@@ -272,40 +276,87 @@ namespace MiniMAL
 
             }
 
+
+            public static Func<Expressions, TResult> Match<TResult>(
+                Func<Var, TResult> Var,
+                Func<IntLit, TResult> IntLit,
+                Func<StrLit, TResult> StrLit,
+                Func<BoolLit, TResult> BoolLit,
+                Func<EmptyListLit, TResult> EmptyListLit,
+                Func<OptionExp, TResult> OptionExp,
+                Func<UnitLit, TResult> UnitLit,
+                Func<TupleExp, TResult> TupleExp,
+                Func<RecordExp, TResult> RecordExp,
+                Func<IfExp, TResult> IfExp,
+                Func<LetExp, TResult> LetExp,
+                Func<FunExp, TResult> FunExp,
+                Func<AppExp, TResult> AppExp,
+                Func<LetRecExp, TResult> LetRecExp,
+                Func<MatchExp, TResult> MatchExp,
+                Func<HaltExp, TResult> HaltExp,
+                Func<ConstructorExp, TResult> ConstructorExp,
+                Func<VariantExp, TResult> VariantExp,
+                Func<Expressions, TResult> Other)
+            {
+                return (e) =>
+                {
+                    if (e is Var) { return Var((Var)e); }
+                    if (e is IntLit) { return IntLit((IntLit)e); }
+                    if (e is StrLit) { return StrLit((StrLit)e); }
+                    if (e is BoolLit) { return BoolLit((BoolLit)e); }
+                    if (e is EmptyListLit) { return EmptyListLit((EmptyListLit)e); }
+                    if (e is OptionExp) { return OptionExp((OptionExp)e); }
+                    if (e is UnitLit) { return UnitLit((UnitLit)e); }
+                    if (e is TupleExp) { return TupleExp((TupleExp)e); }
+                    if (e is RecordExp) { return RecordExp((RecordExp)e); }
+                    if (e is IfExp) { return IfExp((IfExp)e); }
+                    if (e is LetExp) { return LetExp((LetExp)e); }
+                    if (e is FunExp) { return FunExp((FunExp)e); }
+                    if (e is AppExp) { return AppExp((AppExp)e); }
+                    if (e is LetRecExp) { return LetRecExp((LetRecExp)e); }
+                    if (e is MatchExp) { return MatchExp((MatchExp)e); }
+                    if (e is HaltExp) { return HaltExp((HaltExp)e); }
+                    if (e is ConstructorExp) { return ConstructorExp((ConstructorExp)e); }
+                    if (e is VariantExp) { return VariantExp((VariantExp)e); }
+                    return Other(e);
+                };
+            }
+
             private static int Priolity(Expressions exp)
             {
-                if (exp is Var) { return 100; }
-                if (exp is IntLit) { return 100; }
-                if (exp is StrLit) { return 100; }
-                if (exp is BoolLit) { return 100; }
-                if (exp is EmptyListLit) { return 100; }
-                if (exp is OptionExp) { return 100; }
-                if (exp is UnitLit) { return 100; }
-                if (exp is TupleExp) { return 100; }
-                if (exp is RecordExp) { return 100; }
-                if (exp is IfExp) { return 3; }
-                if (exp is LetExp) { return 100; }
-                if (exp is FunExp) { return 1; }
-                if (exp is AppExp) { return 2; }
-                if (exp is LetRecExp) { return 100; }
-                if (exp is MatchExp) { return 1; }
-                if (exp is HaltExp) { return 2; }
-                if (exp is ConstructorExp) { return 2; }
-                if (exp is VariantExp) { return 2; }
-                throw new NotSupportedException();
-
+                return Match(
+                    Var: (e) => 100,
+                    IntLit: (e) => 100,
+                    StrLit: (e) => 100,
+                    BoolLit: (e) => 100,
+                    EmptyListLit: (e) => 100,
+                    OptionExp: (e) => 100,
+                    UnitLit: (e) => 100,
+                    TupleExp: (e) => 100,
+                    RecordExp: (e) => 100,
+                    IfExp: (e) => 3,
+                    LetExp: (e) => 100,
+                    FunExp: (e) => 1,
+                    AppExp: (e) => 2,
+                    LetRecExp: (e) => 100,
+                    MatchExp: (e) => 1,
+                    HaltExp: (e) => 2,
+                    ConstructorExp: (e) => 2,
+                    VariantExp: (e) => 2,
+                    Other: (e) => throw new NotSupportedException()
+                )(exp);
             }
 
             private static string ExpressionToStringBody(int p, Expressions exp)
             {
-                if (exp is Var) { return $"{((Var)exp).Id}"; }
-                if (exp is IntLit) { return $"{((IntLit)exp).Value}"; }
-                if (exp is StrLit) { return $"\"{((StrLit)exp).Value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\""; }
-                if (exp is BoolLit) { return $"{((BoolLit)exp).Value}"; }
-                if (exp is EmptyListLit) { return "[]"; }
-                if (exp is OptionExp)
+                return Match(
+                    Var: (e) => { return $"{e.Id}"; },
+                IntLit: (e) => { return $"{e.Value}"; },
+                StrLit: (e) => { return $"\"{e.Value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\""; },
+                BoolLit: (e) => { return $"{e.Value}"; },
+                EmptyListLit: (e) => { return "[]"; },
+                OptionExp: (e) =>
                 {
-                    var e = (OptionExp)exp;
                     if (ReferenceEquals(e, OptionExp.None))
                     {
                         return "None";
@@ -318,68 +369,57 @@ namespace MiniMAL
                     {
                         return "Some " + ExpressionToString(p, e.Expr);
                     }
-                }
-                if (exp is UnitLit)
+                },
+                UnitLit: (e) =>
                 {
                     return "()";
-                }
-                if (exp is TupleExp)
+                },
+                TupleExp: (e) =>
                 {
-                    var e = (TupleExp)exp;
                     return "(" + string.Join(",", e.Members.Select(x => x.ToString())) + ")";
-                }
-                if (exp is RecordExp)
+                },
+                RecordExp: (e) =>
                 {
-                    var e = (RecordExp)exp;
                     return "{" + string.Join(",", e.Members.Select(x => $"{x.Item1.ToString()} = {x.Item2.ToString()}")) + "}";
-                }
-                if (exp is IfExp)
+                },
+                IfExp: (e) =>
                 {
-                    var e = (IfExp)exp;
                     return $"if {ExpressionToString(p, e.Cond)} then {ExpressionToString(p, e.Then)} else {ExpressionToString(p, e.Else)}";
-                }
-                if (exp is LetExp)
+                },
+                LetExp: (e) =>
                 {
-                    var e = (LetExp)exp;
                     return $"let {string.Join(" and ", e.Binds.Select(x => $"{x.Item1} = {ExpressionToString(0, x.Item2)}"))} in {ExpressionToString(0, e.Body)}";
-                }
-                if (exp is FunExp)
+                },
+                FunExp: (e) =>
                 {
-                    var e = (FunExp)exp;
                     return $"fun ({e.Arg} : {e.ArgTy}) : {e.BodyTy} -> {ExpressionToString(0, e.Body)}";
-                }
-                if (exp is AppExp)
+                },
+                AppExp: (e) =>
                 {
-                    var e = (AppExp)exp;
                     return $"{ExpressionToString(p, e.Fun)} {ExpressionToString(p, e.Arg)}";
-                }
-                if (exp is LetRecExp)
+                },
+                LetRecExp: (e) =>
                 {
-                    var e = (LetRecExp)exp;
                     return $"let rec {string.Join(" and ", e.Binds.Select(x => $"{x.Item1} = {ExpressionToString(0, x.Item2)}"))} in {ExpressionToString(0, e.Body)}";
-                }
-                if (exp is MatchExp)
+                },
+                MatchExp: (e) =>
                 {
-                    var e = (MatchExp)exp;
                     return $"match {ExpressionToString(0, e.Exp)} with {string.Join("| ", e.Patterns.Select(x => $"{x.Item1} -> {x.Item2}"))}";
-                }
-                if (exp is HaltExp)
+                },
+                HaltExp: (e) =>
                 {
-                    var e = (HaltExp)exp;
                     return $"halt \"{e.Message.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
-                }
-                if (exp is ConstructorExp)
+                },
+                ConstructorExp: (e) =>
                 {
-                    var e = (ConstructorExp)exp;
                     return $"{e.ConstructorName} {ExpressionToString(p, e.Arg)}";
-                }
-                if (exp is VariantExp)
+                },
+                VariantExp: (e) =>
                 {
-                    var e = (VariantExp)exp;
                     return $"{e.TagName} {ExpressionToString(p, e.Value)}";
-                }
-
-                throw new NotSupportedException();
+                },
+                Other: (e) => throw new NotSupportedException()
+                )(exp);
             }
 
             private static string ExpressionToString(int pri, Expressions exp)

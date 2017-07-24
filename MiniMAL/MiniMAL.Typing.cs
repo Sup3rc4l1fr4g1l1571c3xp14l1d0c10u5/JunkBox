@@ -65,10 +65,11 @@ namespace MiniMAL {
 
             public class TyRecord : Type
             {
-                public Tuple<string, Type>[] Members { get; }
-                public TyRecord(Tuple<string, Type>[] members)
+                public string Name { get; }
+                public Tuple<string, Type>[] Members { get; set; }
+                public TyRecord(string name)
                 {
-                    Members = members;
+                    Name = name;
                 }
             }
 
@@ -425,7 +426,7 @@ namespace MiniMAL {
             if (typ is Type.TyRecord)
             {
                 var ty1 = ((Type.TyRecord)typ);
-                return new Type.TyRecord(ty1.Members.Select(x => Tuple.Create(x.Item1, resolve_type(substs, x.Item2))).ToArray());
+                return ty1;
             }
             if (typ is Type.TyVariant)
             {
@@ -579,16 +580,23 @@ namespace MiniMAL {
             {
                 var f1 = (Type.TyRecord)eqs.Value.Type1;
                 var f2 = (Type.TyRecord)eqs.Value.Type2;
-
+#if false
                 if (f1.Members.Length != f2.Members.Length)
                 {
                     throw new Exception.TypingException("Type missmatch");
                 }
 
-                var neweqs = f1.Members.Zip(f2.Members, Tuple.Create).Aggregate(
+                var neweqs = f1.Members.Zip(f2.Members, (x,y) => new TypeEquality(x.Item2, x.Item2)).Aggregate(
                     eqs.Next,
-                    (s, x) => LinkedList.Extend(new TypeEquality(x.Item1.Item2, x.Item2.Item2), s));
+                    (s, x) => LinkedList.Extend(x, s));
                 return Unify(neweqs);
+#else
+                if (!ReferenceEquals(f1, f2))
+                {
+                    throw new Exception.TypingException("Type missmatch");
+                }
+                return Unify(eqs.Next);
+#endif
             }
             if (eqs.Value.Type1 is Type.TyVariant && eqs.Value.Type2 is Type.TyVariant)
             {

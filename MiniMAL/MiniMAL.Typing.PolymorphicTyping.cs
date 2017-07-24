@@ -32,7 +32,7 @@ namespace MiniMAL
                 }
             }
 
-            public static Set<Type.TyVar> freevar_tyenv(Environment<TypeScheme> tyenv)
+            private static Set<Type.TyVar> freevar_tyenv(Environment<TypeScheme> tyenv)
             {
                 return Environment.FoldLeft(
                     (s, x) => Set.Union(freevar_tysc(tyenv.Value.Vars, tyenv.Value.Type), s),
@@ -41,7 +41,7 @@ namespace MiniMAL
                 );
             }
 
-            public static TypeScheme tysc_of_ty(Type ty)
+            private static TypeScheme tysc_of_ty(Type ty)
             {
                 return new TypeScheme(Set<Type.TyVar>.Empty, ty);
             }
@@ -98,364 +98,343 @@ namespace MiniMAL
                 Environment<TypeScheme> env,
                 Environment<TypeScheme> tyEnv,
                 Dictionary<string, Type.TyVar> dic,
-                Expressions e
+                Expressions exp
             )
             {
-                if (e is Expressions.Var)
-                {
-                    var vid = ((Expressions.Var)e).Id;
-                    try
+                return Expressions.Match(
+                    Var: (e) =>
                     {
-                        var ret = Environment.LookUp(vid, env);
-                        var vars = ret.Vars;
-                        var ty = ret.Type;
+                        var vid = e.Id;
+                        try
+                        {
+                            var ret = Environment.LookUp(vid, env);
+                            var vars = ret.Vars;
+                            var ty = ret.Type;
 
-                        var subst = Set.Fold(
-                            (s, x) => LinkedList.Extend(new TypeSubst(x, Type.TyVar.Fresh()), s),
-                            LinkedList<TypeSubst>.Empty,
-                            vars
-                        );
-                        return Tuple.Create(LinkedList<TypeSubst>.Empty, subst_type(subst, ty));
-                    }
-                    catch (Exception.NotBound)
+                            var subst = Set.Fold(
+                                (s, x) => LinkedList.Extend(new TypeSubst(x, Type.TyVar.Fresh()), s),
+                                LinkedList<TypeSubst>.Empty,
+                                vars
+                            );
+                            return Tuple.Create(LinkedList<TypeSubst>.Empty, subst_type(subst, ty));
+                        }
+                        catch (Exception.NotBound)
+                        {
+                            throw new Exception.NotBound($"Variable not bound: {vid}");
+                        }
+
+                    },
+                    IntLit: (e) =>
                     {
-                        throw new Exception.NotBound($"Variable not bound: {vid}");
-                    }
-                }
-                if (e is Expressions.IntLit)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)new Type.TyInt()
-                    );
-                }
-                if (e is Expressions.StrLit)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)new Type.TyStr()
-                    );
-                }
-                if (e is Expressions.BoolLit)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)new Type.TyBool()
-                    );
-                }
-                if (e is Expressions.EmptyListLit)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)new Type.TyList(Type.TyVar.Fresh())
-                    );
-                }
-                if (e is Expressions.UnitLit)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)new Type.TyUnit()
-                    );
-                }
-                if (e is Expressions.IfExp)
-                {
-                    var cond = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp)e).Cond);
-                    var then = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp)e).Then);
-                    var @else = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp)e).Else);
-                    var s = LinkedList.Concat(
-                        LinkedList.Create(new TypeEquality(cond.Item2, new Type.TyBool())),
-                        LinkedList.Create(new TypeEquality(then.Item2, @else.Item2)),
-                        eqs_of_subst(cond.Item1),
-                        eqs_of_subst(then.Item1),
-                        eqs_of_subst(@else.Item1)
-                    );
-                    var eqs = Unify(s);
-                    return Tuple.Create(
-                        eqs,
-                        subst_type(eqs, then.Item2)
-                    );
-                }
-                if (e is Expressions.LetExp)
-                {
-                    var exp = (Expressions.LetExp)e;
-
-
-                    var bindret = EvalLetBind(env, tyEnv, dic, exp.Binds, null);
-                    var substs = bindret.Item1;
-                    var newenv = bindret.Item2;
-
-                    {
-                        var v = EvalExpressions(newenv, tyEnv, dic, exp.Body);
-                        var s = v.Item1;
-                        var ty = v.Item2;
-                        var eqs = eqs_of_subst(LinkedList.Concat(substs, s));
-
-                        var s3 = Unify(eqs);
-                        return Tuple.Create(
-                            s3,
-                            subst_type(s3, ty)
-                        );
-                    }
-                }
-                if (e is Expressions.LetRecExp)
-                {
-                    var exp = (Expressions.LetRecExp)e;
-
-                    var bindret = EvalLetRecBind(env, tyEnv, dic, exp.Binds, null);
-                    var substs = bindret.Item1;
-                    var newenv = bindret.Item2;
-                    var eqs = bindret.Item3;
-
-
-                    {
-                        var v = EvalExpressions(newenv, tyEnv, dic, exp.Body);
-                        var s = v.Item1;
-                        var ty = v.Item2;
-                        eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
-
-                        var s3 = Unify(eqs);
-                        return Tuple.Create(
-                            s3,
-                            subst_type(s3, ty)
-                        );
-                    }
-                }
-                if (e is Expressions.FunExp)
-                {
-                    var exp = (Expressions.FunExp)e;
-
-                    // 関数定義から読み取った型
-                    var fundecty = EvalTypeExpressions(
-                        new TypeExpressions.FuncType(exp.ArgTy, exp.BodyTy),
-                        tyEnv,
-                        dic
-                    ) as Type.TyFunc;
-
-                    // 関数の型
-                    var argty = Type.TyVar.Fresh();
-                    var newenv = Environment.Extend(exp.Arg, tysc_of_ty(argty), env);
-                    var funv = EvalExpressions(newenv, tyEnv, dic, exp.Body);
-                    var st = funv.Item1;
-                    var ty = funv.Item2;
-                    var funty = (Type)new Type.TyFunc(argty, ty);
-
-
-                    var eq = LinkedList.Concat(
-                        eqs_of_subst(st),
-                        LinkedList.Create(
-                            new TypeEquality(funty, fundecty)
-                        )
-                    );
-
-                    var eqs = Unify(eq);
-
-
-                    return Tuple.Create(
-                        eqs,
-                        subst_type(eqs, funty)
-                    );
-                }
-                if (e is Expressions.AppExp)
-                {
-                    var exp = (Expressions.AppExp)e;
-
-                    var v1 = EvalExpressions(env, tyEnv, dic, exp.Fun);
-                    var s1 = v1.Item1;
-                    var ty1 = v1.Item2;
-
-                    var v2 = EvalExpressions(env, tyEnv, dic, exp.Arg);
-                    var s2 = v2.Item1;
-                    var ty2 = v2.Item2;
-
-                    var domty = Type.TyVar.Fresh();
-
-                    var eqs = LinkedList.Concat(
-                        eqs_of_subst(s1),
-                        eqs_of_subst(s2),
-                        LinkedList.Create(new TypeEquality(ty1, new Type.TyFunc(ty2, domty)))
-                    );
-                    var s3 = Unify(eqs);
-                    return Tuple.Create(
-                        s3,
-                        subst_type(s3, domty)
-                    );
-                }
-                if (e is Expressions.MatchExp)
-                {
-                    var exp = (Expressions.MatchExp)e;
-
-                    var domty = Type.TyVar.Fresh();
-
-                    // 式の型推論
-                    var v1 = EvalExpressions(env, tyEnv, dic, exp.Exp);
-                    var st = v1.Item1;
-                    var ty = v1.Item2;
-
-                    var eqs = eqs_of_subst(st);
-                    foreach (var pattern in exp.Patterns)
-                    {
-                        var pt = pattern.Item1;
-                        var ex = pattern.Item2;
-
-                        // パターン式から型等式と束縛を導出
-                        var v2 = EvalPatternExpressions(pt, tyEnv, ty);
-                        var eqs1 = v2.Item1;
-                        var binds1 = v2.Item2;
-
-                        // 束縛を環境に結合
-                        var env1 = binds1.Aggregate(env, (s, x) => Environment.Extend(x.Key, tysc_of_ty(x.Value), s));
-
-                        // 本体から型等式と戻り値型を導出
-                        var v3 = EvalExpressions(env1, tyEnv, dic, ex);
-                        var se = v3.Item1;
-                        var tye = v3.Item2;
-
-                        eqs = LinkedList.Concat(
-                            LinkedList.Create(new TypeEquality(tye, domty)),
-                            eqs1,
-                            eqs_of_subst(se),
-                            eqs
-                        );
-                    }
-
-                    var s3 = Unify(eqs);
-
-                    return Tuple.Create(
-                        s3,
-                        subst_type(s3, domty)
-                    );
-                }
-                if (e is Expressions.TupleExp)
-                {
-                    var exp = (Expressions.TupleExp)e;
-                    var tyMembers = exp.Members.Select(x => EvalExpressions(env, tyEnv, dic, x)).ToArray();
-                    var ss = tyMembers.Aggregate(LinkedList<TypeEquality>.Empty,
-                        (s, x) => LinkedList.Concat(s, eqs_of_subst(x.Item1)));
-                    var eqs = Unify(ss);
-
-                    return Tuple.Create(
-                        eqs,
-                        (Type)new Type.TyTuple(tyMembers.Select(x => subst_type(eqs, x.Item2)).ToArray())
-                    );
-                }
-                if (e is Expressions.OptionExp)
-                {
-                    var exp = (Expressions.OptionExp)e;
-                    if (exp == Expressions.OptionExp.None)
-                    {
-                        var domty = Type.TyVar.Fresh();
                         return Tuple.Create(
                             LinkedList<TypeSubst>.Empty,
-                            (Type)new Type.TyOption(domty)
+                            (Type) new Type.TyInt()
                         );
-                    }
-                    else
+                    },
+                    StrLit: (e) =>
                     {
-                        var mem = EvalExpressions(env, tyEnv, dic, exp.Expr);
-                        var ss = eqs_of_subst(mem.Item1);
-                        var ty = mem.Item2;
+                        return Tuple.Create(
+                            LinkedList<TypeSubst>.Empty,
+                            (Type) new Type.TyStr()
+                        );
+                    },
+                    BoolLit: (e) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList<TypeSubst>.Empty,
+                            (Type) new Type.TyBool()
+                        );
+                    },
+                    EmptyListLit: (e) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList<TypeSubst>.Empty,
+                            (Type) new Type.TyList(Type.TyVar.Fresh())
+                        );
+                    },
+                    OptionExp: (e) =>
+                    {
+                        if (e == Expressions.OptionExp.None)
+                        {
+                            var domty = Type.TyVar.Fresh();
+                            return Tuple.Create(
+                                LinkedList<TypeSubst>.Empty,
+                                (Type) new Type.TyOption(domty)
+                            );
+                        }
+                        else
+                        {
+                            var mem = EvalExpressions(env, tyEnv, dic, e.Expr);
+                            var ss = eqs_of_subst(mem.Item1);
+                            var ty = mem.Item2;
+                            var eqs = Unify(ss);
+
+                            return Tuple.Create(
+                                eqs,
+                                (Type) new Type.TyOption(subst_type(eqs, ty))
+                            );
+                        }
+                    },
+                    UnitLit: (e) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList<TypeSubst>.Empty,
+                            (Type) new Type.TyUnit()
+                        );
+                    },
+                    TupleExp: (e) =>
+                    {
+                        var tyMembers = e.Members.Select(x => EvalExpressions(env, tyEnv, dic, x)).ToArray();
+                        var ss = tyMembers.Aggregate(LinkedList<TypeEquality>.Empty,
+                            (s, x) => LinkedList.Concat(s, eqs_of_subst(x.Item1)));
                         var eqs = Unify(ss);
 
                         return Tuple.Create(
                             eqs,
-                            (Type)new Type.TyOption(subst_type(eqs, ty))
+                            (Type) new Type.TyTuple(tyMembers.Select(x => subst_type(eqs, x.Item2)).ToArray())
                         );
-                    }
-                }
-                if (e is Expressions.HaltExp)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeSubst>.Empty,
-                        (Type)Type.TyVar.Fresh()
-                    );
-                }
-
-                if (e is Expressions.RecordExp)
-                {
-                    var exp = (Expressions.RecordExp)e;
-
-                    for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
+                    },
+                    RecordExp: (e) =>
                     {
-                        //var tyRef = it.Value.Type as Type.TyTypeRef;
-                        //if (tyRef == null)
-                        //{
-                        //    continue;
-                        //}
-                        //var ty = tyRef.Type;
-
-                        var tyRec = it.Value.Type as Type.TyRecord;
-                        if (tyRec == null)
+                        for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
                         {
-                            continue;
-                        }
-                        if (tyRec.Members.Select(x => x.Item1).SequenceEqual(exp.Members.Select(x => x.Item1)) == false)
-                        {
-                            continue;
-                        }
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var ty = tyRef.Type;
+                            var tyRecord = ty as Type.TyRecord;
+                            if (tyRecord == null)
+                            {
+                                continue;
+                            }
+                            if (tyRecord.Members.Select(x => x.Item1).SequenceEqual(e.Members.Select(x => x.Item1)) ==
+                                false)
+                            {
+                                continue;
+                            }
 
-                        var tyRecVar = new Type.TyRecord(((Type.TyRecord)tyRec).Members
-                            .Select(x => Tuple.Create(x.Item1, (Type)Type.TyVar.Fresh())).ToArray());
-                        var tyRecTy = (Type.TyRecord)tyRec;
-                        var ret = exp.Members.Select(x => EvalExpressions(env, tyEnv, dic, x.Item2)).ToArray();
-                        var tyExp = new Type.TyRecord(exp.Members.Select(x => x.Item1)
-                            .Zip(ret.Select(x => x.Item2), Tuple.Create).ToArray());
+                            var tyMembers = e.Members.Select(x => EvalExpressions(env, tyEnv, dic, x.Item2)).ToArray();
+
+                            var eqs = LinkedList.Concat(
+                                LinkedList.Create(tyMembers.Select(x => x.Item2)
+                                    .Zip(tyRecord.Members.Select(x => x.Item2), (x, y) => new TypeEquality(x, y))
+                                    .ToArray()),
+                                LinkedList.Concat(tyMembers.Select(x => eqs_of_subst(x.Item1)).ToArray())
+                            );
+
+                            var eqs2 = Unify(eqs);
+
+                            return Tuple.Create(eqs2, subst_type(eqs2, tyRef));
+
+                        }
+                        throw new Exception.NotBound($"Record not bound: {exp}");
+                    },
+                    IfExp: (e) =>
+                    {
+                        var cond = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Cond);
+                        var then = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Then);
+                        var @else = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Else);
+                        var s = LinkedList.Concat(
+                            LinkedList.Create(new TypeEquality(cond.Item2, new Type.TyBool())),
+                            LinkedList.Create(new TypeEquality(then.Item2, @else.Item2)),
+                            eqs_of_subst(cond.Item1),
+                            eqs_of_subst(then.Item1),
+                            eqs_of_subst(@else.Item1)
+                        );
+                        var eqs = Unify(s);
+                        return Tuple.Create(
+                            eqs,
+                            subst_type(eqs, then.Item2)
+                        );
+                    },
+                    LetExp: (e) =>
+                    {
+                        var bindret = EvalLetBind(env, tyEnv, dic, e.Binds, null);
+                        var substs = bindret.Item1;
+                        var newenv = bindret.Item2;
+
+                        {
+                            var v = EvalExpressions(newenv, tyEnv, dic, e.Body);
+                            var s = v.Item1;
+                            var ty = v.Item2;
+                            var eqs = eqs_of_subst(LinkedList.Concat(substs, s));
+
+                            var s3 = Unify(eqs);
+                            return Tuple.Create(
+                                s3,
+                                subst_type(s3, ty)
+                            );
+                        }
+                    },
+                    FunExp: (e) =>
+                    {
+                        // 関数定義から読み取った型
+                        var fundecty = EvalTypeExpressions(
+                            new TypeExpressions.FuncType(e.ArgTy, e.BodyTy),
+                            tyEnv,
+                            dic
+                        ) as Type.TyFunc;
+
+                        // 関数の型
+                        var argty = Type.TyVar.Fresh();
+                        var newenv = Environment.Extend(e.Arg, tysc_of_ty(argty), env);
+                        var funv = EvalExpressions(newenv, tyEnv, dic, e.Body);
+                        var st = funv.Item1;
+                        var ty = funv.Item2;
+                        var funty = (Type) new Type.TyFunc(argty, ty);
+
+
+                        var eq = LinkedList.Concat(
+                            eqs_of_subst(st),
+                            LinkedList.Create(
+                                new TypeEquality(funty, fundecty)
+                            )
+                        );
+
+                        var eqs = Unify(eq);
+
+
+                        return Tuple.Create(
+                            eqs,
+                            subst_type(eqs, funty)
+                        );
+                    },
+                    AppExp: (e) =>
+                    {
+                        var v1 = EvalExpressions(env, tyEnv, dic, e.Fun);
+                        var s1 = v1.Item1;
+                        var ty1 = v1.Item2;
+
+                        var v2 = EvalExpressions(env, tyEnv, dic, e.Arg);
+                        var s2 = v2.Item1;
+                        var ty2 = v2.Item2;
+
+                        var domty = Type.TyVar.Fresh();
 
                         var eqs = LinkedList.Concat(
-                            LinkedList.Create(
-                                new TypeEquality(tyRecVar, tyExp),
-                                new TypeEquality(tyExp, tyRecTy)
-                            ),
-                            LinkedList.Concat(ret.Select(x => eqs_of_subst(x.Item1)).ToArray())
+                            eqs_of_subst(s1),
+                            eqs_of_subst(s2),
+                            LinkedList.Create(new TypeEquality(ty1, new Type.TyFunc(ty2, domty)))
                         );
-
-                        var eqs2 = Unify(eqs);
-
-                        return Tuple.Create(eqs2, subst_type(eqs2, tyRecVar));
-                    }
-
-                    throw new Exception.NotBound($"Record not bound: {exp}");
-
-                }
-                if (e is Expressions.ConstructorExp)
-                {
-                    var exp = (Expressions.ConstructorExp)e;
-
-                    for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
+                        var s3 = Unify(eqs);
+                        return Tuple.Create(
+                            s3,
+                            subst_type(s3, domty)
+                        );
+                    },
+                    LetRecExp: (e) =>
                     {
-                        var tyRef = it.Value.Type as Type.TyTypeRef;
-                        if (tyRef == null)
+                        var bindret = EvalLetRecBind(env, tyEnv, dic, e.Binds, null);
+                        var substs = bindret.Item1;
+                        var newenv = bindret.Item2;
+                        var eqs = bindret.Item3;
+
+
                         {
-                            continue;
+                            var v = EvalExpressions(newenv, tyEnv, dic, e.Body);
+                            var s = v.Item1;
+                            var ty = v.Item2;
+                            eqs = LinkedList.Concat(eqs_of_subst(s), eqs);
+
+                            var s3 = Unify(eqs);
+                            return Tuple.Create(
+                                s3,
+                                subst_type(s3, ty)
+                            );
                         }
-                        var ty = tyRef.Type;
-                        var tyVariant = ty as Type.TyVariant;
-                        if (tyVariant == null)
+                    },
+                    MatchExp: (e) =>
+                    {
+                        var domty = Type.TyVar.Fresh();
+
+                        // 式の型推論
+                        var v1 = EvalExpressions(env, tyEnv, dic, e.Exp);
+                        var st = v1.Item1;
+                        var ty = v1.Item2;
+
+                        var eqs = eqs_of_subst(st);
+                        foreach (var pattern in e.Patterns)
                         {
-                            continue;
-                        }
-                        var constructor = tyVariant.Members.FirstOrDefault(x => x.Item1 == exp.ConstructorName);
-                        if (constructor == null)
-                        {
-                            continue;
+                            var pt = pattern.Item1;
+                            var ex = pattern.Item2;
+
+                            // パターン式から型等式と束縛を導出
+                            var v2 = EvalPatternExpressions(pt, tyEnv, ty);
+                            var eqs1 = v2.Item1;
+                            var binds1 = v2.Item2;
+
+                            // 束縛を環境に結合
+                            var env1 = binds1.Aggregate(env,
+                                (s, x) => Environment.Extend(x.Key, tysc_of_ty(x.Value), s));
+
+                            // 本体から型等式と戻り値型を導出
+                            var v3 = EvalExpressions(env1, tyEnv, dic, ex);
+                            var se = v3.Item1;
+                            var tye = v3.Item2;
+
+                            eqs = LinkedList.Concat(
+                                LinkedList.Create(new TypeEquality(tye, domty)),
+                                eqs1,
+                                eqs_of_subst(se),
+                                eqs
+                            );
                         }
 
-                        var tyArg = EvalExpressions(env, tyEnv, dic, exp.Arg);
+                        var s3 = Unify(eqs);
 
-                        var eqs = LinkedList.Extend(
-                            new TypeEquality(constructor.Item2, tyArg.Item2),
-                            eqs_of_subst(tyArg.Item1)
+                        return Tuple.Create(
+                            s3,
+                            subst_type(s3, domty)
                         );
+                    },
+                    HaltExp: (e) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList<TypeSubst>.Empty,
+                            (Type) Type.TyVar.Fresh()
+                        );
+                    },
+                    ConstructorExp: (e) =>
+                    {
+                        for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
+                        {
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var ty = tyRef.Type;
+                            var tyVariant = ty as Type.TyVariant;
+                            if (tyVariant == null)
+                            {
+                                continue;
+                            }
+                            var constructor = tyVariant.Members.FirstOrDefault(x => x.Item1 == e.ConstructorName);
+                            if (constructor == null)
+                            {
+                                continue;
+                            }
 
-                        var eqs2 = Unify(eqs);
+                            var tyArg = EvalExpressions(env, tyEnv, dic, e.Arg);
 
-                        return Tuple.Create(eqs2, subst_type(eqs2, tyRef));
+                            var eqs = LinkedList.Extend(
+                                new TypeEquality(constructor.Item2, tyArg.Item2),
+                                eqs_of_subst(tyArg.Item1)
+                            );
 
-                    }
+                            var eqs2 = Unify(eqs);
 
-                    throw new Exception.NotBound($"Record not bound: {exp}");
-                }
+                            return Tuple.Create(eqs2, subst_type(eqs2, tyRef));
 
-                throw new NotSupportedException($"expression {e} cannot eval.");
+                        }
+
+                        throw new Exception.NotBound($"Record not bound: {e}");
+                    },
+                    VariantExp: (e) => { throw new Exception.RuntimeErrorException("ここには到達しないはず。"); },
+                    Other: (e) => { throw new NotSupportedException($"expression {e} cannot eval."); }
+                )(exp);
             }
 
             private static Tuple<LinkedList<TypeSubst>, Environment<TypeScheme>, LinkedList<TypeEquality>>
@@ -523,89 +502,89 @@ namespace MiniMAL
             }
 
 
-            private static Result eval_declEntry(Environment<TypeScheme> env, Environment<TypeScheme> tyEnv,
-                Dictionary<string, Type.TyVar> dic, Toplevel.Binding.DeclBase p)
+            private static Result eval_declEntry(
+                Environment<TypeScheme> env, 
+                Environment<TypeScheme> tyEnv,
+                Dictionary<string, Type.TyVar> dic, 
+                Toplevel.Binding.DeclBase p)
             {
-                if (p is Toplevel.Binding.LetDecl)
-                {
-                    var decl = (Toplevel.Binding.LetDecl)p;
-
-                    var ret = new Result("", env, tyEnv, null);
-                    var bindret = EvalLetBind(env, tyEnv, dic, decl.Binds,
-                        (id, ev, ty) => ret = new Result(id, ev, tyEnv, ty));
-                    var substs = bindret.Item1;
-                    var newenv = bindret.Item2;
-
+                return Toplevel.Binding.DeclBase.Match(
+                    LetDecl: (decl) =>
                     {
-                        var s3 = Unify(eqs_of_subst(substs));
-                        return new Result(ret.Id, newenv, tyEnv, subst_type(s3, ret.Value));
-                    }
-                }
-                if (p is Toplevel.Binding.LetRecDecl)
-                {
-                    var decl = (Toplevel.Binding.LetRecDecl)p;
+                        var ret = new Result("", env, tyEnv, null);
+                        var bindret = EvalLetBind(env, tyEnv, dic, decl.Binds,
+                            (id, ev, ty) => ret = new Result(id, ev, tyEnv, ty));
+                        var substs = bindret.Item1;
+                        var newenv = bindret.Item2;
 
-                    var ret = new Result("", env, tyEnv, null);
-                    var bindret = EvalLetRecBind(env, tyEnv, dic, decl.Binds,
-                        (id, ev, ty) => ret = new Result(id, ev, tyEnv, ty));
-                    var substs = bindret.Item1;
-                    var newenv = bindret.Item2;
-                    var eqs = bindret.Item3;
-
+                        {
+                            var s3 = Unify(eqs_of_subst(substs));
+                            return new Result(ret.Id, newenv, tyEnv, subst_type(s3, ret.Value));
+                        }
+                    },
+                    LetRecDecl: (decl) =>
                     {
-                        var s3 = Unify(eqs_of_subst(substs));
-                        return new Result(ret.Id, newenv, tyEnv, subst_type(s3, ret.Value));
-                    }
-                }
-                throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
-            }
+                        var ret = new Result("", env, tyEnv, null);
+                        var bindret = EvalLetRecBind(env, tyEnv, dic, decl.Binds,
+                            (id, ev, ty) => ret = new Result(id, ev, tyEnv, ty));
+                        var substs = bindret.Item1;
+                        var newenv = bindret.Item2;
+                        var eqs = bindret.Item3;
+
+                        {
+                            var s3 = Unify(eqs_of_subst(substs));
+                            return new Result(ret.Id, newenv, tyEnv, subst_type(s3, ret.Value));
+                        }
+                    },
+                    Other: (decl) => throw new NotSupportedException($"{p.GetType().FullName} cannot eval.")
+                )(p);
+        }
 
             public static Result eval_decl(
                 Environment<TypeScheme> env,
                 Environment<TypeScheme> tyEnv,
                 Toplevel p)
             {
-                if (p is Toplevel.Exp)
-                {
-                    var e = (Toplevel.Exp)p;
-                    var v = EvalExpressions(env, tyEnv, new Dictionary<string, Type.TyVar>(), e.Syntax);
-                    return new Result("-", env, tyEnv, v.Item2);
-                }
-                if (p is Toplevel.ExternalDecl)
-                {
-                    var e = (Toplevel.ExternalDecl)p;
-                    var dic = new Dictionary<string, Type.TyVar>();
-                    var ty = EvalTypeExpressions(e.Type, tyEnv, dic);
-                    var tysc = new TypeScheme(dic.Values.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x, s)),
-                        ty);
-                    var newenv = Environment.Extend(e.Id, tysc, env);
-                    return new Result(e.Id, newenv, tyEnv, ty);
-                }
-                if (p is Toplevel.Binding)
-                {
-                    var ds = (Toplevel.Binding)p;
-                    var newenv = env;
-                    var dic = new Dictionary<string, Type.TyVar>();
-                    var ret = new Result("", env, tyEnv, null);
-                    foreach (var d in ds.Entries)
+                return Toplevel.Match(
+                    Empty: (e) =>
                     {
-                        ret = eval_declEntry(newenv, tyEnv, dic, d);
-                        newenv = ret.Env;
-                    }
-                    return ret;
-                }
-                if (p is Toplevel.TypeDef)
-                {
-                    var e = (Toplevel.TypeDef)p;
-                    var ret = EvalTypeDef(env, tyEnv, e);
+                        return new Result("", env, tyEnv, null);
+                    },
+                    Exp: (e) =>
+                    {
+                        var v = EvalExpressions(env, tyEnv, new Dictionary<string, Type.TyVar>(), e.Syntax);
+                        return new Result("-", env, tyEnv, v.Item2);
+                    },
+                    Binding: (e) =>
+                    {
+                        var newenv = env;
+                        var dic = new Dictionary<string, Type.TyVar>();
+                        var ret = new Result("", env, tyEnv, null);
+                        foreach (var d in e.Entries)
+                        {
+                            ret = eval_declEntry(newenv, tyEnv, dic, d);
+                            newenv = ret.Env;
+                        }
+                        return ret;
+                    },
+                    TypeDef: (e) =>
+                    {
+                        var ret = EvalTypeDef(env, tyEnv, e);
 
-                    return new Result(e.Id, ret.Item1, ret.Item2, ret.Item3);
-                }
-                if (p is Toplevel.Empty)
-                {
-                    return new Result("", env, tyEnv, null);
-                }
-                throw new NotSupportedException($"{p.GetType().FullName} cannot eval.");
+                        return new Result(e.Id, ret.Item1, ret.Item2, ret.Item3);
+                    },
+                    ExternalDecl: (e) =>
+                    {
+                        var dic = new Dictionary<string, Type.TyVar>();
+                        var ty = EvalTypeExpressions(e.Type, tyEnv, dic);
+                        var tysc = new TypeScheme(dic.Values.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x, s)),
+                            ty);
+                        var newenv = Environment.Extend(e.Id, tysc, env);
+                        return new Result(e.Id, newenv, tyEnv, ty);
+                    },
+                    Other: (e) => throw new NotSupportedException($"{p.GetType().FullName} cannot eval.")
+
+                )(p);
             }
 
             private static Type EvalTypeExpressions(
@@ -614,110 +593,112 @@ namespace MiniMAL
                 Dictionary<string, Type.TyVar> vars
             )
             {
-                if (expressions is TypeExpressions.TypeVar)
-                {
-                    var e = (TypeExpressions.TypeVar)expressions;
-                    if (vars.ContainsKey(e.Id))
+                return TypeExpressions.Match(
+                    TypeVar: (e) =>
                     {
-                        return vars[e.Id];
-                    }
-                    else if (e.Id.StartsWith("'"))
-                    {
-                        vars[e.Id] = Type.TyVar.Fresh();
-                        return vars[e.Id];
-                    }
-                    else
-                    {
-                        return Type.TyVar.Fresh();
-                    }
-                }
-                if (expressions is TypeExpressions.IntType)
-                {
-                    return (new Type.TyInt());
-                }
-                if (expressions is TypeExpressions.BoolType)
-                {
-                    return (new Type.TyBool());
-                }
-                if (expressions is TypeExpressions.StrType)
-                {
-                    return (new Type.TyStr());
-                }
-                if (expressions is TypeExpressions.UnitType)
-                {
-                    return (new Type.TyUnit());
-                }
-                if (expressions is TypeExpressions.ListType)
-                {
-                    var e = (TypeExpressions.ListType)expressions;
-                    var tysc = EvalTypeExpressions(e.Type, tyEnv, vars);
-                    return new Type.TyList(tysc);
-                }
-                if (expressions is TypeExpressions.OptionType)
-                {
-                    var e = (TypeExpressions.OptionType)expressions;
-                    var tysc = EvalTypeExpressions(e.Type, tyEnv, vars);
-                    return new Type.TyOption(tysc);
-                }
-                if (expressions is TypeExpressions.TupleType)
-                {
-                    var e = (TypeExpressions.TupleType)expressions;
-                    var tyscs = e.Members.Select(x => EvalTypeExpressions(x, tyEnv, vars)).ToArray();
-                    return new Type.TyTuple(tyscs);
-                }
-                if (expressions is TypeExpressions.FuncType)
-                {
-                    var e = (TypeExpressions.FuncType)expressions;
-                    var tysc1 = EvalTypeExpressions(e.DomainType, tyEnv, vars);
-                    var tysc2 = EvalTypeExpressions(e.RangeType, tyEnv, vars);
-                    return new Type.TyFunc(tysc1, tysc2);
-                }
-                if (expressions is TypeExpressions.TypeName)
-                {
-                    throw new NotImplementedException();
-                }
-                if (expressions is TypeExpressions.TypeConstruct)
-                {
-                    var e = (TypeExpressions.TypeConstruct)expressions;
-                    if (e.Base.Name == "list")
-                    {
-                        if (e.Params.Length != 1)
+                        if (vars.ContainsKey(e.Id))
                         {
-                            throw new Exception.InvalidArgumentNumException();
+                            return vars[e.Id];
                         }
-                        var tysc = EvalTypeExpressions(e.Params[0], tyEnv, vars);
+                        else if (e.Id.StartsWith("'"))
+                        {
+                            vars[e.Id] = Type.TyVar.Fresh();
+                            return vars[e.Id];
+                        }
+                        else
+                        {
+                            return Type.TyVar.Fresh();
+                        }
+                    },
+                    IntType: (e) =>
+                    {
+                        return (new Type.TyInt());
+                    },
+                    BoolType: (e) =>
+                    {
+                        return (new Type.TyBool());
+                    },
+                    StrType: (e) =>
+                    {
+                        return (new Type.TyStr());
+                    },
+                    UnitType: (e) =>
+                    {
+                        return (new Type.TyUnit());
+                    },
+                    ListType: (e) =>
+                    {
+                        var tysc = EvalTypeExpressions(e.Type, tyEnv, vars);
                         return new Type.TyList(tysc);
-                    }
-                    if (e.Base.Name == "option")
+                    },
+                    OptionType: (e) =>
                     {
-                        if (e.Params.Length != 1)
-                        {
-                            throw new Exception.InvalidArgumentNumException();
-                        }
-                        var tysc = EvalTypeExpressions(e.Params[0], tyEnv, vars);
+                        var tysc = EvalTypeExpressions(e.Type, tyEnv, vars);
                         return new Type.TyOption(tysc);
-                    }
+                    },
+                    TupleType: (e) =>
                     {
-                        var tyscBase = Environment.LookUp(e.Base.Name, tyEnv);
-                        if (Set.Count(tyscBase.Vars) != e.Params.Length)
+                        var tyscs = e.Members.Select(x => EvalTypeExpressions(x, tyEnv, vars)).ToArray();
+                        return new Type.TyTuple(tyscs);
+                    },
+                    RecordType: (e) => {
+                        throw new Exception.RuntimeErrorException("ここにはこないはず。");
+                    },
+                    VariantType: (e) => {
+                        throw new Exception.RuntimeErrorException("ここにはこないはず。");
+                    },
+                    FuncType: (e) =>
+                    {
+                        var tysc1 = EvalTypeExpressions(e.DomainType, tyEnv, vars);
+                        var tysc2 = EvalTypeExpressions(e.RangeType, tyEnv, vars);
+                        return new Type.TyFunc(tysc1, tysc2);
+                    },
+                    TypeName: (e) =>
+                    {
+                        throw new NotImplementedException();
+                    },
+                    TypeConstruct: (e) =>
+                    {
+                        if (e.Base.Name == "list")
                         {
-                            throw new Exception.TypingException("type param count missmatch.");
-                        }
-                        var tyArgs = e.Params.Select(x => EvalTypeExpressions(x, tyEnv, vars)).ToArray();
-                        var ss = Set.Fold((s, x) =>
+                            if (e.Params.Length != 1)
                             {
-                                s.Add(x);
-                                return s;
-                            }, new List<Type.TyVar>(), tyscBase.Vars)
-                            .Reverse<Type.TyVar>()
-                            .Zip(tyArgs, (x, y) => new TypeSubst(x, y))
-                            .Aggregate(LinkedList<TypeSubst>.Empty, (s, x) => LinkedList.Extend(x, s));
-                        return subst_type(ss, tyscBase.Type);
-                    }
+                                throw new Exception.InvalidArgumentNumException();
+                            }
+                            var tysc = EvalTypeExpressions(e.Params[0], tyEnv, vars);
+                            return new Type.TyList(tysc);
+                        }
+                        if (e.Base.Name == "option")
+                        {
+                            if (e.Params.Length != 1)
+                            {
+                                throw new Exception.InvalidArgumentNumException();
+                            }
+                            var tysc = EvalTypeExpressions(e.Params[0], tyEnv, vars);
+                            return new Type.TyOption(tysc);
+                        }
+                        {
+                            var tyscBase = Environment.LookUp(e.Base.Name, tyEnv);
+                            if (Set.Count(tyscBase.Vars) != e.Params.Length)
+                            {
+                                throw new Exception.TypingException("type param count missmatch.");
+                            }
+                            var tyArgs = e.Params.Select(x => EvalTypeExpressions(x, tyEnv, vars)).ToArray();
+                            var ss = Set.Fold((s, x) =>
+                                {
+                                    s.Add(x);
+                                    return s;
+                                }, new List<Type.TyVar>(), tyscBase.Vars)
+                                .Reverse<Type.TyVar>()
+                                .Zip(tyArgs, (x, y) => new TypeSubst(x, y))
+                                .Aggregate(LinkedList<TypeSubst>.Empty, (s, x) => LinkedList.Extend(x, s));
+                            return subst_type(ss, tyscBase.Type);
+                        }
 
-                    throw new NotImplementedException();
-                }
-                throw new NotSupportedException();
+                        throw new NotImplementedException();
+                    },
+                    Other: (e) => throw new NotSupportedException()
+                )(expressions);
             }
 
 
@@ -734,12 +715,20 @@ namespace MiniMAL
                 if (expressions is TypeExpressions.RecordType)
                 {
                     var e = (TypeExpressions.RecordType)expressions;
+                    var ty = new Type.TyRecord(typedef.Id);
+                    var tyRef = new Type.TyTypeRef(typedef.Id, ty, vars.Select(x => (Type)x.Item2).ToArray());
+                    var tysc = new TypeScheme(vars.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x.Item2, s)), tyRef);
+                    tyEnv = Environment.Extend(typedef.Id, tysc, tyEnv);
                     var mems = e.Members.Select(x => Tuple.Create(x.Item1, EvalTypeExpressions(x.Item2, tyEnv, dic)))
                         .ToArray();
-                    var ty = new Type.TyRecord(mems);
-                    var tysc = new TypeScheme(vars.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x.Item2, s)), ty);
-                    tyEnv = Environment.Extend(typedef.Id, tysc, tyEnv);
-                    return Tuple.Create(env, tyEnv, (Type)ty);
+                    if (typedef.Vars.OrderBy(x => x).SequenceEqual(dic.Keys.OrderBy(x => x)) == false)
+                    {
+                        throw new Exception.NotBound("type vars missmatch.");
+                    }
+
+                    ty.Members = mems;
+
+                    return Tuple.Create(env, tyEnv, (Type)tyRef);
                 }
                 if (expressions is TypeExpressions.VariantType)
                 {
@@ -915,33 +904,28 @@ namespace MiniMAL
 
                     for (var it = tyEnv; it != Environment<PolymorphicTyping.TypeScheme>.Empty; it = it.Next)
                     {
-                        //var tyRef = it.Value.Type as Type.TyTypeRef;
-                        //if (tyRef == null)
-                        //{
-                        //    continue;
-                        //}
-                        //var ty = tyRef.Type;
-
-                        var tyRec = it.Value.Type as Type.TyRecord;
-                        if (tyRec == null)
+                        var tyRef = it.Value.Type as Type.TyTypeRef;
+                        if (tyRef == null)
                         {
                             continue;
                         }
-                        if (tyRec.Members.Select(x => x.Item1).SequenceEqual(p.Members.Select(x => x.Item1)) == false)
+                        var ty = tyRef.Type;
+
+                        var tyRecord = ty as Type.TyRecord;
+                        if (tyRecord == null)
                         {
                             continue;
                         }
-                        var members = p.Members.Select(x => Tuple.Create(x.Item1, x.Item2, Type.TyVar.Fresh())).ToArray();
-                        var recordType = new Type.TyRecord(members.Select(x => Tuple.Create(x.Item1, (Type)x.Item3)).ToArray());
+                        if (tyRecord.Members.Select(x => x.Item1).SequenceEqual(p.Members.Select(x => x.Item1)) == false)
+                        {
+                            continue;
+                        }
 
-                        var eqs = LinkedList.Create(new TypeEquality(value, recordType));
+                        var eqs = LinkedList.Create(new TypeEquality(value, tyRef));
                         var binds = new Dictionary<string, Type>();
-                        foreach (var ptv in members)
+                        foreach (var pq in tyRecord.Members.Select(x => x.Item2).Zip(p.Members.Select(x => x.Item2), Tuple.Create))
                         {
-                            var patexpr = ptv.Item2;
-                            var pattyvar = ptv.Item3;
-
-                            var ret = EvalPatternExpressions(patexpr, tyEnv, pattyvar);
+                            var ret = EvalPatternExpressions(pq.Item2, tyEnv, pq.Item1);
                             var pateqs = ret.Item1;
                             var patbind = ret.Item2;
 
@@ -957,6 +941,7 @@ namespace MiniMAL
                             binds
                         );
                     }
+
 
                     throw new Exception.NotBound($"Record not bound: {p}");
 

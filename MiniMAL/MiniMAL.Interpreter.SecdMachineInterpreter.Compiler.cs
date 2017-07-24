@@ -211,9 +211,9 @@ namespace MiniMAL
                         var codes = new List<LinkedList<Instructions>>();
                         foreach (var d in decls)
                         {
-                            if (d is Toplevel.Binding.LetDecl)
+                            if (d is Toplevel.Binding.DeclBase.LetDecl)
                             {
-                                var e = d as Toplevel.Binding.LetDecl;
+                                var e = d as Toplevel.Binding.DeclBase.LetDecl;
 
                                 var newenv = LinkedList<string>.Empty;
                                 foreach (var bind in e.Binds.Reverse())
@@ -232,9 +232,9 @@ namespace MiniMAL
 
                                 continue;
                             }
-                            if (d is Toplevel.Binding.LetRecDecl)
+                            if (d is Toplevel.Binding.DeclBase.LetRecDecl)
                             {
-                                var e = d as Toplevel.Binding.LetRecDecl;
+                                var e = d as Toplevel.Binding.DeclBase.LetRecDecl;
 
                                 var newenv = LinkedList<string>.Empty;
                                 foreach (var bind in e.Binds.Reverse())
