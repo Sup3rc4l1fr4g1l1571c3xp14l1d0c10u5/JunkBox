@@ -27,9 +27,9 @@ namespace MiniMAL
                 {
                     return new Dictionary<string, ExprValue>();
                 }
-                if (pattern is PatternExpressions.IntP && value is ExprValue.IntV)
+                if (pattern is PatternExpressions.IntP)
                 {
-                    if (((PatternExpressions.IntP)pattern).Value == ((ExprValue.IntV)value).Value)
+                    if (value is ExprValue.IntV && ((PatternExpressions.IntP)pattern).Value == ((ExprValue.IntV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -38,9 +38,9 @@ namespace MiniMAL
                         return null;
                     }
                 }
-                if (pattern is PatternExpressions.StrP && value is ExprValue.StrV)
+                if (pattern is PatternExpressions.StrP)
                 {
-                    if (((PatternExpressions.StrP)pattern).Value == ((ExprValue.StrV)value).Value)
+                    if (value is ExprValue.StrV && ((PatternExpressions.StrP)pattern).Value == ((ExprValue.StrV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -49,9 +49,9 @@ namespace MiniMAL
                         return null;
                     }
                 }
-                if (pattern is PatternExpressions.BoolP && value is ExprValue.BoolV)
+                if (pattern is PatternExpressions.BoolP)
                 {
-                    if (((PatternExpressions.BoolP)pattern).Value == ((ExprValue.BoolV)value).Value)
+                    if (value is ExprValue.BoolV && ((PatternExpressions.BoolP)pattern).Value == ((ExprValue.BoolV)value).Value)
                     {
                         return new Dictionary<string, ExprValue>();
                     }
@@ -60,9 +60,13 @@ namespace MiniMAL
                         return null;
                     }
                 }
-                if (pattern is PatternExpressions.UnitP && value is ExprValue.UnitV)
+                if (pattern is PatternExpressions.UnitP)
                 {
-                    return new Dictionary<string, ExprValue>();
+                    if (value is ExprValue.UnitV) {
+                        return new Dictionary<string, ExprValue>();
+                    } else {
+                        return null;
+                    }
                 }
                 if (pattern is PatternExpressions.VarP)
                 {
@@ -401,6 +405,7 @@ namespace MiniMAL
                 )(e);
             }
 
+            /// let もしくは let rec の評価
             private static Result eval_declEntry(Environment<ExprValue> env, Toplevel.Binding.DeclBase p)
             {
                 return Toplevel.Binding.DeclBase.Match(
@@ -447,6 +452,7 @@ namespace MiniMAL
                 
             }
 
+            /// Todo: eval_toplevelへリネーム
             public static Result eval_decl(Environment<ExprValue> env, Environment<ExprValue> builtins, Toplevel p)
             {
                 return Toplevel.Match(
