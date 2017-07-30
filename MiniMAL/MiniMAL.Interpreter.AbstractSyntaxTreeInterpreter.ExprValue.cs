@@ -176,7 +176,7 @@ namespace MiniMAL
                 }
 
                 /// <summary>
-                /// タプル
+                /// レコード
                 /// </summary>
                 public class RecordV : ExprValue
                 {

@@ -218,6 +218,38 @@ namespace MiniMAL
                 }
             }
 
+            public static Func<PatternExpressions, TResult> Match<TResult>(
+                Func<WildP, TResult> WildP,
+                Func<VarP, TResult> VarP,
+                Func<IntP, TResult> IntP,
+                Func<StrP, TResult> StrP,
+                Func<BoolP, TResult> BoolP,
+                Func<UnitP, TResult> UnitP,
+                Func<ConsP, TResult> ConsP,
+                Func<TupleP, TResult> TupleP,
+                Func<RecordP, TResult> RecordP,
+                Func<OptionP, TResult> OptionP,
+                Func<VariantP, TResult> VariantP,
+                Func<PatternExpressions, TResult> Other
+            )
+            {
+                return (obj) =>
+                {
+                    if (obj is WildP) { return WildP((WildP)obj); }
+                    if (obj is VarP) { return VarP((VarP)obj); }
+                    if (obj is IntP) { return IntP((IntP)obj); }
+                    if (obj is StrP) { return StrP((StrP)obj); }
+                    if (obj is BoolP) { return BoolP((BoolP)obj); }
+                    if (obj is UnitP) { return UnitP((UnitP)obj); }
+                    if (obj is ConsP) { return ConsP((ConsP)obj); }
+                    if (obj is TupleP) { return TupleP((TupleP)obj); }
+                    if (obj is RecordP) { return RecordP((RecordP)obj); }
+                    if (obj is OptionP) { return OptionP((OptionP)obj); }
+                    if (obj is VariantP) { return VariantP((VariantP)obj); }
+                    return Other(obj);
+                };
+            }
+
         }
 
     }

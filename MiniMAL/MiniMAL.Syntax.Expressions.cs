@@ -124,6 +124,39 @@ namespace MiniMAL
                 }
             }
 
+            /// <summary>
+            /// レコードのメンバアクセス式
+            /// </summary> 
+            public class MemberExp : Expressions
+            {
+                public MemberExp(Expressions expr, string member)
+                {
+                    this.Expression = expr;
+                    this.Member = member;
+                }
+
+                public string Member { get; }
+
+                public Expressions Expression { get; }
+            }
+
+            /// <summary>
+            /// 破壊的代入式
+            /// </summary> 
+            public class DestructiveUpdateExp : Expressions
+            {
+                public DestructiveUpdateExp(Expressions expr, string member, Expressions value)
+                {
+                    this.Expression = expr;
+                    this.Member = member;
+                    this.Value = value;
+                }
+
+                public string Member { get; }
+
+                public Expressions Expression { get; }
+                public Expressions Value { get; }
+            }
 
             /// <summary>
             /// if式
@@ -287,6 +320,8 @@ namespace MiniMAL
                 Func<UnitLit, TResult> UnitLit,
                 Func<TupleExp, TResult> TupleExp,
                 Func<RecordExp, TResult> RecordExp,
+                Func<MemberExp, TResult> MemberExp,
+                Func<DestructiveUpdateExp, TResult> DestructiveUpdateExp,
                 Func<IfExp, TResult> IfExp,
                 Func<LetExp, TResult> LetExp,
                 Func<FunExp, TResult> FunExp,
@@ -309,6 +344,8 @@ namespace MiniMAL
                     if (e is UnitLit) { return UnitLit((UnitLit)e); }
                     if (e is TupleExp) { return TupleExp((TupleExp)e); }
                     if (e is RecordExp) { return RecordExp((RecordExp)e); }
+                    if (e is MemberExp) { return MemberExp((MemberExp)e); }
+                    if (e is DestructiveUpdateExp) { return DestructiveUpdateExp((DestructiveUpdateExp)e); }
                     if (e is IfExp) { return IfExp((IfExp)e); }
                     if (e is LetExp) { return LetExp((LetExp)e); }
                     if (e is FunExp) { return FunExp((FunExp)e); }
@@ -334,6 +371,8 @@ namespace MiniMAL
                     UnitLit: (e) => 100,
                     TupleExp: (e) => 100,
                     RecordExp: (e) => 100,
+                    MemberExp: (e) => 2,
+                    DestructiveUpdateExp:(e) => 2,
                     IfExp: (e) => 3,
                     LetExp: (e) => 100,
                     FunExp: (e) => 1,
@@ -381,6 +420,14 @@ namespace MiniMAL
                 RecordExp: (e) =>
                 {
                     return "{" + string.Join(",", e.Members.Select(x => $"{x.Item1.ToString()} = {x.Item2.ToString()}")) + "}";
+                },
+                MemberExp:(e) =>
+                {
+                    return $"{ExpressionToString(p, e.Expression)}.{e.Member}";
+                },
+                DestructiveUpdateExp: (e) =>
+                {
+                    return $"{ExpressionToString(p, e.Expression)}.{e.Member} <- {e.Value}";
                 },
                 IfExp: (e) =>
                 {

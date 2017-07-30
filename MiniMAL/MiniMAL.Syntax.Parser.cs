@@ -63,6 +63,7 @@ namespace MiniMAL
             private static readonly Parser<string> Bool = WS.Then(Ident.Where(x => x == "bool"));
             private static readonly Parser<string> String = WS.Then(Ident.Where(x => x == "string"));
             private static readonly Parser<string> Unit = WS.Then(Ident.Where(x => x == "unit"));
+            private static readonly Parser<string> Mutable = WS.Then(Ident.Where(x => x == "mutable"));
             private static readonly Parser<string> External = WS.Then(Ident.Where(x => x == "external"));
             private static readonly Parser<string> Of = WS.Then(Ident.Where(x => x == "of"));
 
@@ -75,7 +76,7 @@ namespace MiniMAL
 
             private static readonly Parser<string> ReservedWords = Combinator.Choice(True, False, If, Then, Else, Let,
                 Rec, In, And, Fun, Match, With, Type,
-                Int, Bool, String, Unit, External, Of, Some, None);
+                Int, Bool, String, Unit, Mutable, External, Of, Some, None);
 
             private static readonly Parser<string> Id = WS.Then(ReservedWords.Not()).Then(Ident);
 
@@ -98,11 +99,13 @@ namespace MiniMAL
             private static readonly Parser<string> Semi = WS.Then(Combinator.Token(";"));
             private static readonly Parser<string> SemiSemi = WS.Then(Combinator.Token(";;"));
             private static readonly Parser<string> RArrow = WS.Then(Combinator.Token("->"));
+            private static readonly Parser<string> LArrow = WS.Then(Combinator.Token("<-"));
             private static readonly Parser<string> Bar = WS.Then(Combinator.Token("|"));
             private static readonly Parser<string> Comma = WS.Then(Combinator.Token(","));
             private static readonly Parser<string> Quote = WS.Then(Combinator.Token("'"));
             private static readonly Parser<string> Wild = WS.Then(Combinator.Token("_"));
             private static readonly Parser<string> Eq = WS.Then(Combinator.Token("="));
+            private static readonly Parser<string> Dot = WS.Then(Combinator.Token("."));
             private static readonly Parser<string> ColCol = WS.Then(Combinator.Token("::"));
 
             private static readonly Parser<char> InfixOpChar = Combinator.AnyChar("!%&*+-/<=>?@^|:");
@@ -261,7 +264,15 @@ namespace MiniMAL
                     from t1 in StrV select (Expressions)new Expressions.StrLit(t1),
                     from t1 in True select (Expressions)new Expressions.BoolLit(true),
                     from t1 in False select (Expressions)new Expressions.BoolLit(false),
-                    from t1 in Id select (Expressions)new Expressions.Var(t1),
+                    from t1 in Id.Repeat1(Dot)
+                    from t2 in LArrow.Then(Expr).Option()
+                    where (t2 != null && t1.Length > 1) || (t2 == null)
+                    let t = t1.First()
+                    let ts = t1.Skip(1)
+                    let e1 = ts.Aggregate((Expressions)new Expressions.Var(t),(s,x) => new Expressions.MemberExp(s,x))
+                    let e2 = ((t2 != null && t1.Length > 1) ? e1 as Expressions.MemberExp : null)
+                    let e3 = e2 != null ? (Expressions)new Expressions.DestructiveUpdateExp(e2.Expression, e2.Member, t2) : e1
+                    select e3,
                     from t1 in None select (Expressions)Expressions.OptionExp.None,
                     from t1 in Some from t2 in Combinator.Lazy(() => Expr) select (Expressions)new Expressions.OptionExp(t2),
                     from t1 in ConstructorId from t2 in Combinator.Lazy(() => Expr).Option() select (Expressions)new Expressions.ConstructorExp(t1, t2 ?? new Expressions.UnitLit()),
@@ -423,10 +434,11 @@ namespace MiniMAL
             private static readonly Parser<TypeExpressions> RecordTypeExpr =
                 from t1 in LBrace
                 from t2 in Combinator.Lazy(() =>
-                    from t3 in Id
-                    from t4 in Colon
-                    from t5 in TypeExpr
-                    select Tuple.Create(t3, t5)
+                    from t3 in Mutable.Option().Select(x => x != null)
+                    from t4 in Id
+                    from t5 in Colon
+                    from t6 in TypeExpr
+                    select Tuple.Create(t3, t4, t6)
                 ).Repeat1(Semi)
                 from t6 in RBrace
                 select (TypeExpressions) new TypeExpressions.RecordType(t2);

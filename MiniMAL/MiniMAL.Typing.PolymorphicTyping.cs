@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using MiniMAL.Syntax;
 
 namespace MiniMAL
@@ -69,6 +70,34 @@ namespace MiniMAL
                 return new TypeScheme(ids, ty);
             }
 
+            //多相的: 定数式, fun 式, それらの値の tuple, それらの値の変更不可能なデータ構造
+            //単相的: 変更可能データ構造, let 式、関数適用の結果, etc. . .
+            public static bool IsValue(Expressions expr)
+            {
+                return Expressions.Match(
+                    Var: (e) => true,
+                    IntLit: (e) => true,
+                    StrLit: (e) => true,
+                    BoolLit: (e) => true,
+                    EmptyListLit: (e) => true,
+                    OptionExp: (e) => true,
+                    UnitLit: (e) => true,
+                    TupleExp: (e) => true,
+                    RecordExp: (e) => false,
+                    MemberExp: (e) => true,
+                    DestructiveUpdateExp: (e) => false,
+                    IfExp: (e) => true,
+                    LetExp: (e) => false,
+                    FunExp: (e) => true,
+                    AppExp: (e) => false,
+                    LetRecExp: (e) => true,
+                    MatchExp: (e) => false,
+                    HaltExp: (e) => false,
+                    ConstructorExp: (e) => false,
+                    VariantExp: (e) => false,
+                    Other: (e) => throw new NotSupportedException()
+                )(expr);
+            }
             /// <summary>
             ///     評価結果
             /// </summary>
@@ -209,7 +238,7 @@ namespace MiniMAL
                             {
                                 continue;
                             }
-                            if (tyRecord.Members.Select(x => x.Item1).SequenceEqual(e.Members.Select(x => x.Item1)) ==
+                            if (tyRecord.Members.Select(x => x.Item2).SequenceEqual(e.Members.Select(x => x.Item1)) ==
                                 false)
                             {
                                 continue;
@@ -219,7 +248,7 @@ namespace MiniMAL
 
                             var eqs = LinkedList.Concat(
                                 LinkedList.Create(tyMembers.Select(x => x.Item2)
-                                    .Zip(tyRecord.Members.Select(x => x.Item2), (x, y) => new TypeEquality(x, y))
+                                    .Zip(tyRecord.Members.Select(x => x.Item3), (x, y) => new TypeEquality(x, y))
                                     .ToArray()),
                                 LinkedList.Concat(tyMembers.Select(x => eqs_of_subst(x.Item1)).ToArray())
                             );
@@ -231,11 +260,88 @@ namespace MiniMAL
                         }
                         throw new Exception.NotBound($"Record not bound: {exp}");
                     },
+                    MemberExp: (e) =>
+                    {
+                        for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
+                        {
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var tyRecord = tyRef.Type as Type.TyRecord;
+                            if (tyRecord == null)
+                            {
+                                continue;
+                            }
+                            var member = tyRecord.Members.FirstOrDefault(x => x.Item2 == e.Member);
+                            if (member == null)
+                            {
+                                continue;
+                            }
+
+                            var ty = EvalExpressions(env, tyEnv, dic, e.Expression);
+
+                            var eqs =
+                                LinkedList.Extend(
+                                        new TypeEquality(ty.Item2, tyRecord),
+                                        eqs_of_subst(ty.Item1)
+                                    );
+                            var eqs2 = Unify(eqs);
+
+                            return Tuple.Create(eqs2, subst_type(eqs2, member.Item3));
+
+                        }
+                        throw new Exception.NotBound($"Record not bound: {exp}");
+                    },
+                    DestructiveUpdateExp: (e) =>
+                    {
+                        for (var it = tyEnv; it != Environment<TypeScheme>.Empty; it = it.Next)
+                        {
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var tyRecord = tyRef.Type as Type.TyRecord;
+                            if (tyRecord == null)
+                            {
+                                continue;
+                            }
+                            var member = tyRecord.Members.FirstOrDefault(x => x.Item2 == e.Member);
+                            if (member == null)
+                            {
+                                continue;
+                            }
+                            if (member.Item1 == false)
+                            {
+                                throw new Exception.NotBound($"Record member is immutable: {exp}.{member}");
+                            }
+
+                            var ty1 = EvalExpressions(env, tyEnv, dic, e.Expression);
+                            var ty2 = EvalExpressions(env, tyEnv, dic, e.Value);
+
+                            var eqs =
+                                LinkedList.Concat(
+                                    LinkedList.Create(
+                                        new TypeEquality(ty1.Item2, tyRecord),
+                                        new TypeEquality(ty2.Item2, member.Item3)
+                                    ),
+                                    eqs_of_subst(ty1.Item1),
+                                    eqs_of_subst(ty2.Item1)
+                                );
+                            var eqs2 = Unify(eqs);
+
+                            return Tuple.Create(eqs2, (Type)new Type.TyUnit());
+
+                        }
+                        throw new Exception.NotBound($"Record not bound: {exp}");
+                    },
                     IfExp: (e) =>
                     {
-                        var cond = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Cond);
-                        var then = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Then);
-                        var @else = EvalExpressions(env, tyEnv, dic, ((Expressions.IfExp) e).Else);
+                        var cond = EvalExpressions(env, tyEnv, dic, e.Cond);
+                        var then = EvalExpressions(env, tyEnv, dic, e.Then);
+                        var @else = EvalExpressions(env, tyEnv, dic, e.Else);
                         var s = LinkedList.Concat(
                             LinkedList.Create(new TypeEquality(cond.Item2, new Type.TyBool())),
                             LinkedList.Create(new TypeEquality(then.Item2, @else.Item2)),
@@ -470,7 +576,9 @@ namespace MiniMAL
                 var newenv = env;
                 foreach (var bind in binds)
                 {
-                    var tysc = Closure(subst_type(substBinds, bind.Item3), env, substBinds);
+                    var ty = subst_type(substBinds, bind.Item3);
+                    //var tysc = (IsValue(bind.Item2)) ? Closure(ty, env, substBinds) : tysc_of_ty(ty);
+                    var tysc = Closure(ty, env, substBinds);
                     newenv = Environment.Extend(bind.Item1, tysc, newenv);
                     hook?.Invoke(bind.Item1, newenv, tysc.Type);
                 }
@@ -493,6 +601,9 @@ namespace MiniMAL
                     var ty = v.Item2;
                     substs = LinkedList.Concat(s, substs);
                     var ctys = Closure(ty, env, s);
+                    var ctys2 = IsValue(bind.Item2) ? ctys : tysc_of_ty(ctys.Type);
+                    var weakpoly = IsValue(bind.Item2) ? Set<Type.TyVar>.Empty : ctys.Vars;
+
                     var newctys = new TypeScheme(dic.Aggregate(ctys.Vars, (ss, x) => Set.Remove(x.Value, ss)),
                         ctys.Type);
                     newenv = MiniMAL.Environment.Extend(bind.Item1, newctys, newenv);
@@ -719,7 +830,7 @@ namespace MiniMAL
                     var tyRef = new Type.TyTypeRef(typedef.Id, ty, vars.Select(x => (Type)x.Item2).ToArray());
                     var tysc = new TypeScheme(vars.Aggregate(Set<Type.TyVar>.Empty, (s, x) => Set.Insert(x.Item2, s)), tyRef);
                     tyEnv = Environment.Extend(typedef.Id, tysc, tyEnv);
-                    var mems = e.Members.Select(x => Tuple.Create(x.Item1, EvalTypeExpressions(x.Item2, tyEnv, dic)))
+                    var mems = e.Members.Select(x => Tuple.Create(x.Item1, x.Item2, EvalTypeExpressions(x.Item3, tyEnv, dic)))
                         .ToArray();
                     if (typedef.Vars.OrderBy(x => x).SequenceEqual(dic.Keys.OrderBy(x => x)) == false)
                     {
@@ -774,158 +885,112 @@ namespace MiniMAL
                 Environment<TypeScheme> tyEnv,
                 Type value)
             {
-                if (pattern is PatternExpressions.WildP)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeEquality>.Empty,
-                        new Dictionary<string, Type>()
-                    );
-                }
-                if (pattern is PatternExpressions.IntP)
-                {
-                    return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, new Type.TyInt())),
-                        new Dictionary<string, Type>()
-                    );
-                }
-                if (pattern is PatternExpressions.StrP)
-                {
-                    return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, new Type.TyStr())),
-                        new Dictionary<string, Type>()
-                    );
-                }
-                if (pattern is PatternExpressions.BoolP)
-                {
-                    return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, new Type.TyBool())),
-                        new Dictionary<string, Type>()
-                    );
-                }
-                if (pattern is PatternExpressions.OptionP)
-                {
-                    if (pattern == PatternExpressions.OptionP.None)
+                return PatternExpressions.Match(
+                    WildP: (p) =>
                     {
-                        var tyitem = Type.TyVar.Fresh();
                         return Tuple.Create(
-                            LinkedList.Create(
-                                new TypeEquality(value, new Type.TyOption(tyitem))
-                            ),
+                            LinkedList<TypeEquality>.Empty,
                             new Dictionary<string, Type>()
                         );
-                    }
-                    else
-                    {
-                        var p = (PatternExpressions.OptionP)pattern;
-                        var tyitem = Type.TyVar.Fresh();
-                        var ret1 = EvalPatternExpressions(p.Value, tyEnv, tyitem);
-                        return Tuple.Create(
-                            LinkedList.Concat(
-                                LinkedList.Create(new TypeEquality(value, new Type.TyOption(tyitem))),
-                                ret1.Item1
-                            ),
-                            ret1.Item2
-                        );
-                    }
-                }
-                if (pattern is PatternExpressions.UnitP)
-                {
-                    return Tuple.Create(
-                        LinkedList.Create(new TypeEquality(value, new Type.TyUnit())),
-                        new Dictionary<string, Type>()
-                    );
-                }
-                if (pattern is PatternExpressions.VarP)
-                {
-                    return Tuple.Create(
-                        LinkedList<TypeEquality>.Empty,
-                        new Dictionary<string, Type> { { ((PatternExpressions.VarP)pattern).Id, value } }
-                    );
-                }
-                if (pattern is PatternExpressions.ConsP)
-                {
-                    var p = (PatternExpressions.ConsP)pattern;
-                    if (p == PatternExpressions.ConsP.Empty)
+                    },
+                    IntP: (p) =>
                     {
                         return Tuple.Create(
-                            LinkedList.Create(new TypeEquality(value, new Type.TyList(Type.TyVar.Fresh()))),
+                            LinkedList.Create(new TypeEquality(value, new Type.TyInt())),
                             new Dictionary<string, Type>()
                         );
-                    }
-                    else
+                    },
+                    StrP: (p) =>
                     {
-                        var tyitem = Type.TyVar.Fresh();
-                        var tyList = new Type.TyList(tyitem);
-                        var ret1 = EvalPatternExpressions(p.Value, tyEnv, tyitem);
-                        var ret2 = EvalPatternExpressions(p.Next, tyEnv, tyList);
                         return Tuple.Create(
-                            LinkedList.Concat(
-                                LinkedList.Create(new TypeEquality(tyList, value)),
-                                ret1.Item1,
-                                ret2.Item1
-                            ),
-                            ret2.Item2.Aggregate(new Dictionary<string, Type>(ret1.Item2), (s, x) => { s[x.Key] = x.Value; return s; })
+                            LinkedList.Create(new TypeEquality(value, new Type.TyStr())),
+                            new Dictionary<string, Type>()
                         );
-                    }
-                }
-                if (pattern is PatternExpressions.TupleP)
-                {
-                    var p = (PatternExpressions.TupleP)pattern;
-
-                    var members = p.Members.Select(x => Tuple.Create(x, Type.TyVar.Fresh())).ToArray();
-                    var tupleType = new Type.TyTuple(members.Select(x => (Type)x.Item2).ToArray());
-
-                    var eqs = LinkedList.Create(new TypeEquality(value, tupleType));
-                    var binds = new Dictionary<string, Type>();
-                    foreach (var ptv in members)
+                    },
+                    BoolP: (p) =>
                     {
-                        var patexpr = ptv.Item1;
-                        var pattyvar = ptv.Item2;
-
-                        var ret = EvalPatternExpressions(patexpr, tyEnv, pattyvar);
-                        var pateqs = ret.Item1;
-                        var patbind = ret.Item2;
-
-                        eqs = LinkedList.Concat(pateqs, eqs);
-                        binds = patbind.Aggregate(binds, (s, x) =>
-                        {
-                            s[x.Key] = x.Value;
-                            return s;
-                        });
-                    }
-                    return Tuple.Create(
-                        eqs,
-                        binds
-                    );
-                }
-                if (pattern is PatternExpressions.RecordP)
-                {
-                    var p = (PatternExpressions.RecordP)pattern;
-
-                    for (var it = tyEnv; it != Environment<PolymorphicTyping.TypeScheme>.Empty; it = it.Next)
+                        return Tuple.Create(
+                            LinkedList.Create(new TypeEquality(value, new Type.TyBool())),
+                            new Dictionary<string, Type>()
+                        );
+                    },
+                    OptionP: (p) =>
                     {
-                        var tyRef = it.Value.Type as Type.TyTypeRef;
-                        if (tyRef == null)
+                        if (p == PatternExpressions.OptionP.None)
                         {
-                            continue;
+                            var tyitem = Type.TyVar.Fresh();
+                            return Tuple.Create(
+                                LinkedList.Create(
+                                    new TypeEquality(value, new Type.TyOption(tyitem))
+                                ),
+                                new Dictionary<string, Type>()
+                            );
                         }
-                        var ty = tyRef.Type;
+                        else
+                        {
+                            var tyitem = Type.TyVar.Fresh();
+                            var ret1 = EvalPatternExpressions(p.Value, tyEnv, tyitem);
+                            return Tuple.Create(
+                                LinkedList.Concat(
+                                    LinkedList.Create(new TypeEquality(value, new Type.TyOption(tyitem))),
+                                    ret1.Item1
+                                ),
+                                ret1.Item2
+                            );
+                        }
+                    },
+                    UnitP: (p) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList.Create(new TypeEquality(value, new Type.TyUnit())),
+                            new Dictionary<string, Type>()
+                        );
+                    },
+                    VarP: (p) =>
+                    {
+                        return Tuple.Create(
+                            LinkedList<TypeEquality>.Empty,
+                            new Dictionary<string, Type> { { p.Id, value } }
+                        );
+                    },
+                    ConsP: (p) =>
+                    {
+                        if (p == PatternExpressions.ConsP.Empty)
+                        {
+                            return Tuple.Create(
+                                LinkedList.Create(new TypeEquality(value, new Type.TyList(Type.TyVar.Fresh()))),
+                                new Dictionary<string, Type>()
+                            );
+                        }
+                        else
+                        {
+                            var tyitem = Type.TyVar.Fresh();
+                            var tyList = new Type.TyList(tyitem);
+                            var ret1 = EvalPatternExpressions(p.Value, tyEnv, tyitem);
+                            var ret2 = EvalPatternExpressions(p.Next, tyEnv, tyList);
+                            return Tuple.Create(
+                                LinkedList.Concat(
+                                    LinkedList.Create(new TypeEquality(tyList, value)),
+                                    ret1.Item1,
+                                    ret2.Item1
+                                ),
+                                ret2.Item2.Aggregate(new Dictionary<string, Type>(ret1.Item2), (s, x) => { s[x.Key] = x.Value; return s; })
+                            );
+                        }
+                    },
+                    TupleP: (p) =>
+                    {
+                        var members = p.Members.Select(x => Tuple.Create(x, Type.TyVar.Fresh())).ToArray();
+                        var tupleType = new Type.TyTuple(members.Select(x => (Type)x.Item2).ToArray());
 
-                        var tyRecord = ty as Type.TyRecord;
-                        if (tyRecord == null)
-                        {
-                            continue;
-                        }
-                        if (tyRecord.Members.Select(x => x.Item1).SequenceEqual(p.Members.Select(x => x.Item1)) == false)
-                        {
-                            continue;
-                        }
-
-                        var eqs = LinkedList.Create(new TypeEquality(value, tyRef));
+                        var eqs = LinkedList.Create(new TypeEquality(value, tupleType));
                         var binds = new Dictionary<string, Type>();
-                        foreach (var pq in tyRecord.Members.Select(x => x.Item2).Zip(p.Members.Select(x => x.Item2), Tuple.Create))
+                        foreach (var ptv in members)
                         {
-                            var ret = EvalPatternExpressions(pq.Item2, tyEnv, pq.Item1);
+                            var patexpr = ptv.Item1;
+                            var pattyvar = ptv.Item2;
+
+                            var ret = EvalPatternExpressions(patexpr, tyEnv, pattyvar);
                             var pateqs = ret.Item1;
                             var patbind = ret.Item2;
 
@@ -940,63 +1005,103 @@ namespace MiniMAL
                             eqs,
                             binds
                         );
-                    }
-
-
-                    throw new Exception.NotBound($"Record not bound: {p}");
-
-                }
-                if (pattern is PatternExpressions.VariantP)
-                {
-                    var p = (PatternExpressions.VariantP)pattern;
-
-                    for (var it = tyEnv; it != Environment<PolymorphicTyping.TypeScheme>.Empty; it = it.Next)
+                    },
+                    RecordP: (p) =>
                     {
-                        var tyRef = it.Value.Type as Type.TyTypeRef;
-                        if (tyRef == null)
+                        for (var it = tyEnv; it != Environment<PolymorphicTyping.TypeScheme>.Empty; it = it.Next)
                         {
-                            continue;
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var ty = tyRef.Type;
+
+                            var tyRecord = ty as Type.TyRecord;
+                            if (tyRecord == null)
+                            {
+                                continue;
+                            }
+                            if (tyRecord.Members.Select(x => x.Item2).SequenceEqual(p.Members.Select(x => x.Item1)) == false)
+                            {
+                                continue;
+                            }
+
+                            var eqs = LinkedList.Create(new TypeEquality(value, tyRef));
+                            var binds = new Dictionary<string, Type>();
+                            foreach (var pq in tyRecord.Members.Select(x => x.Item3).Zip(p.Members.Select(x => x.Item2), Tuple.Create))
+                            {
+                                var ret = EvalPatternExpressions(pq.Item2, tyEnv, pq.Item1);
+                                var pateqs = ret.Item1;
+                                var patbind = ret.Item2;
+
+                                eqs = LinkedList.Concat(pateqs, eqs);
+                                binds = patbind.Aggregate(binds, (s, x) =>
+                                {
+                                    s[x.Key] = x.Value;
+                                    return s;
+                                });
+                            }
+                            return Tuple.Create(
+                                eqs,
+                                binds
+                            );
                         }
-                        var ty = tyRef.Type;
 
-                        var tyVari = ty as Type.TyVariant;
-                        if (tyVari == null)
+
+                        throw new Exception.NotBound($"Record not bound: {p}");
+
+                    },
+                    VariantP: (p) =>
+                    {
+                        for (var it = tyEnv; it != Environment<PolymorphicTyping.TypeScheme>.Empty; it = it.Next)
                         {
-                            continue;
+                            var tyRef = it.Value.Type as Type.TyTypeRef;
+                            if (tyRef == null)
+                            {
+                                continue;
+                            }
+                            var ty = tyRef.Type;
+
+                            var tyVari = ty as Type.TyVariant;
+                            if (tyVari == null)
+                            {
+                                continue;
+                            }
+                            var constructor = tyVari.Members.FirstOrDefault(x => x.Item1 == p.ConstructorName);
+                            if (constructor == null)
+                            {
+                                continue;
+                            }
+                            var tagId = Array.IndexOf(tyVari.Members, constructor);
+                            p.ConstructorId = tagId;
+
+                            var eqs = LinkedList.Create(new TypeEquality(value, tyRef));
+                            var binds = new Dictionary<string, Type>();
+
+                            var ret = EvalPatternExpressions(p.Body, tyEnv, constructor.Item2);
+                            var pateqs = ret.Item1;
+                            var patbind = ret.Item2;
+
+                            eqs = LinkedList.Concat(pateqs, eqs);
+                            binds = patbind.Aggregate(binds, (s, x) =>
+                            {
+                                s[x.Key] = x.Value;
+                                return s;
+                            });
+
+                            return Tuple.Create(
+                                eqs,
+                                binds
+                            );
                         }
-                        var constructor = tyVari.Members.FirstOrDefault(x => x.Item1 == p.ConstructorName);
-                        if (constructor == null)
-                        {
-                            continue;
-                        }
-                        var tagId = Array.IndexOf(tyVari.Members, constructor);
-                        p.ConstructorId = tagId;
 
-                        var eqs = LinkedList.Create(new TypeEquality(value, tyRef));
-                        var binds = new Dictionary<string, Type>();
+                        throw new Exception.NotBound($"Record not bound: {p}");
 
-                        var ret = EvalPatternExpressions(p.Body, tyEnv, constructor.Item2);
-                        var pateqs = ret.Item1;
-                        var patbind = ret.Item2;
+                    },
+                    Other: (p) => { throw new System.NotSupportedException(); }
 
-                        eqs = LinkedList.Concat(pateqs, eqs);
-                        binds = patbind.Aggregate(binds, (s, x) =>
-                        {
-                            s[x.Key] = x.Value;
-                            return s;
-                        });
-
-                        return Tuple.Create(
-                            eqs,
-                            binds
-                        );
-                    }
-
-                    throw new Exception.NotBound($"Record not bound: {p}");
-
-                }
-
-                throw new System.NotSupportedException();
+                )(pattern);
             }
 
         }

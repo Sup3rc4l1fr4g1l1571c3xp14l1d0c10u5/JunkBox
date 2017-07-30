@@ -66,7 +66,7 @@ namespace MiniMAL {
             public class TyRecord : Type
             {
                 public string Name { get; }
-                public Tuple<string, Type>[] Members { get; set; }
+                public Tuple<bool, string, Type>[] Members { get; set; }
                 public TyRecord(string name)
                 {
                     Name = name;
@@ -293,8 +293,8 @@ namespace MiniMAL {
                     tt.Members.Aggregate("", (s, x) =>
                     {
                         buffer.Append(s);
-                        buffer.Append($"{x.Item1}=");
-                        type_stringizer(vars, buffer, 2, x.Item2);
+                        buffer.Append($"{(x.Item1 ? "mutable ":"")}{x.Item2}=");
+                        type_stringizer(vars, buffer, 2, x.Item3);
                         return "; ";
                     });
                     buffer.Append("}");
@@ -349,11 +349,46 @@ namespace MiniMAL {
                 throw new NotSupportedException();
             }
 
-            public override string ToString() {
+            public override string ToString()
+            {
                 var sb = new StringBuilder();
-                var dic = new Dictionary<int,string>();
+                var dic = new Dictionary<int, string>();
                 type_stringizer(dic, sb, 0, this);
                 return sb.ToString();
+            }
+
+            public static Func<Type,TResult> Match<TResult>(
+                Func<TyVar, TResult> TyVar,
+                Func<TyUnit, TResult> TyUnit,
+                Func<TyInt, TResult> TyInt,
+                Func<TyBool, TResult> TyBool,
+                Func<TyStr, TResult> TyStr,
+                Func<TyTuple, TResult> TyTuple,
+                Func<TyList, TResult> TyList,
+                Func<TyOption, TResult> TyOption,
+                Func<TyFunc, TResult> TyFunc,
+                Func<TyRecord, TResult> TyRecord,
+                Func<TyVariant, TResult> TyVariant,
+                Func<TyTypeRef, TResult> TyTypeRef,
+                Func<Type, TResult> Other
+                )
+            {
+                return (ty) =>
+                {
+                    if (ty is TyVar) { return TyVar((TyVar)ty); }
+                    if (ty is TyUnit) { return TyUnit((TyUnit)ty); }
+                    if (ty is TyInt) { return TyInt((TyInt)ty); }
+                    if (ty is TyBool) { return TyBool((TyBool)ty); }
+                    if (ty is TyStr) { return TyStr((TyStr)ty); }
+                    if (ty is TyTuple) { return TyTuple((TyTuple)ty); }
+                    if (ty is TyList) { return TyList((TyList)ty); }
+                    if (ty is TyOption) { return TyOption((TyOption)ty); }
+                    if (ty is TyFunc) { return TyFunc((TyFunc)ty); }
+                    if (ty is TyRecord) { return TyRecord((TyRecord)ty); }
+                    if (ty is TyVariant) { return TyVariant((TyVariant)ty); }
+                    if (ty is TyTypeRef) { return TyTypeRef((TyTypeRef)ty); }
+                    return Other(ty);
+                };
             }
         }
 

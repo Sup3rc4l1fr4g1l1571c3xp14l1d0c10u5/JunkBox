@@ -111,15 +111,15 @@ namespace MiniMAL
 
             public class RecordType : TypeExpressions
             {
-                public Tuple<string, TypeExpressions>[] Members { get; }
+                public Tuple<bool, string, TypeExpressions>[] Members { get; }
 
-                public RecordType(Tuple<string, TypeExpressions>[] members)
+                public RecordType(Tuple<bool, string, TypeExpressions>[] members)
                 {
                     Members = members;
                 }
                 public override string ToString()
                 {
-                    return $"{{{string.Join("; ", Members.Select(x => $"{x.Item1} : {x.Item2.ToString()}"))}}}";
+                    return $"{{{string.Join("; ", Members.Select(x => $"{(x.Item1?"mutable ":"")}{x.Item2} : {x.Item3.ToString()}"))}}}";
                 }
 
             }

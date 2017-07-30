@@ -23,206 +23,228 @@ namespace MiniMAL
                 ExprValue value
             )
             {
-                if (pattern is PatternExpressions.WildP)
-                {
-                    return new Dictionary<string, ExprValue>();
-                }
-                if (pattern is PatternExpressions.IntP)
-                {
-                    if (value is ExprValue.IntV && ((PatternExpressions.IntP)pattern).Value == ((ExprValue.IntV)value).Value)
+                return PatternExpressions.Match(
+                    WildP: (p) =>
                     {
                         return new Dictionary<string, ExprValue>();
-                    }
-                    else
+                    },
+                    IntP: (p) =>
                     {
-                        return null;
-                    }
-                }
-                if (pattern is PatternExpressions.StrP)
-                {
-                    if (value is ExprValue.StrV && ((PatternExpressions.StrP)pattern).Value == ((ExprValue.StrV)value).Value)
-                    {
-                        return new Dictionary<string, ExprValue>();
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                if (pattern is PatternExpressions.BoolP)
-                {
-                    if (value is ExprValue.BoolV && ((PatternExpressions.BoolP)pattern).Value == ((ExprValue.BoolV)value).Value)
-                    {
-                        return new Dictionary<string, ExprValue>();
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                if (pattern is PatternExpressions.UnitP)
-                {
-                    if (value is ExprValue.UnitV) {
-                        return new Dictionary<string, ExprValue>();
-                    } else {
-                        return null;
-                    }
-                }
-                if (pattern is PatternExpressions.VarP)
-                {
-                    return new Dictionary<string, ExprValue>() { { ((PatternExpressions.VarP)pattern).Id, value } };
-                }
-                if (pattern is PatternExpressions.ConsP && value is ExprValue.ListV)
-                {
-                    var p = (PatternExpressions.ConsP)pattern;
-                    var q = (ExprValue.ListV)value;
-                    var dic = new Dictionary<string, ExprValue>();
-                    if (ReferenceEquals(q, ExprValue.ListV.Empty))
-                    {
-                        if (p == PatternExpressions.ConsP.Empty)
+                        var v = value as ExprValue.IntV;
+                        if (v != null && p.Value == v.Value)
                         {
+                            return new Dictionary<string, ExprValue>();
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    },
+                    StrP: (p) =>
+                    {
+                        var v = value as ExprValue.StrV;
+                        if (v != null && p.Value == v.Value)
+                        {
+                            return new Dictionary<string, ExprValue>();
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    },
+                    BoolP: (p) =>
+                    {
+                        var v = value as ExprValue.BoolV;
+                        if (v != null && p.Value == v.Value)
+                        {
+                            return new Dictionary<string, ExprValue>();
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    },
+                    UnitP: (p) =>
+                    {
+                        if (value is ExprValue.UnitV)
+                        {
+                            return new Dictionary<string, ExprValue>();
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    },
+                    VarP: (p) =>
+                    {
+                        return new Dictionary<string, ExprValue>() {{p.Id, value}};
+                    },
+                    ConsP: (p) =>
+                    {
+                        var v = value as ExprValue.ListV;
+                        if (v != null)
+                        {
+                            var dic = new Dictionary<string, ExprValue>();
+                            if (ReferenceEquals(v, ExprValue.ListV.Empty))
+                            {
+                                if (p == PatternExpressions.ConsP.Empty)
+                                {
+                                    return dic;
+                                }
+                                else
+                                {
+                                    return null;
+                                }
+                            }
+                            var ret1 = EvalPatternExpressions(p.Value, v.Value);
+                            if (ret1 == null)
+                            {
+                                return null;
+                            }
+                            dic = ret1.Aggregate(dic, (s, x) =>
+                            {
+                                s[x.Key] = x.Value;
+                                return s;
+                            });
+
+                            var ret2 = EvalPatternExpressions(p.Next, v.Next);
+                            if (ret2 == null)
+                            {
+                                return null;
+                            }
+                            dic = ret2.Aggregate(dic, (s, x) =>
+                            {
+                                s[x.Key] = x.Value;
+                                return s;
+                            });
+
                             return dic;
                         }
-                        else
-                        {
-                            return null;
-                        }
-                    }
-                    var ret1 = EvalPatternExpressions(p.Value, q.Value);
-                    if (ret1 == null)
-                    {
                         return null;
-                    }
-                    dic = ret1.Aggregate(dic, (s, x) =>
+                    },
+                    OptionP: (p) =>
                     {
-                        s[x.Key] = x.Value;
-                        return s;
-                    });
-
-                    var ret2 = EvalPatternExpressions(p.Next, q.Next);
-                    if (ret2 == null)
-                    {
+                        var v = value as ExprValue.OptionV;
+                        if (v != null)
+                        {
+                            var dic = new Dictionary<string, ExprValue>();
+                            if (p == PatternExpressions.OptionP.None || ReferenceEquals(v, ExprValue.OptionV.None))
+                            {
+                                if (p == PatternExpressions.OptionP.None && ReferenceEquals(v, ExprValue.OptionV.None))
+                                {
+                                    return dic;
+                                }
+                                else
+                                {
+                                    return null;
+                                }
+                            }
+                            else
+                            {
+                                var ret1 = EvalPatternExpressions(p.Value, v.Value);
+                                if (ret1 == null)
+                                {
+                                    return null;
+                                }
+                                else
+                                {
+                                    dic = ret1.Aggregate(dic,
+                                        (s, x) =>
+                                        {
+                                            s[x.Key] = x.Value;
+                                            return s;
+                                        });
+                                    return dic;
+                                }
+                            }
+                        }
                         return null;
-                    }
-                    dic = ret2.Aggregate(dic, (s, x) =>
+                    },
+                    TupleP: (p) =>
                     {
-                        s[x.Key] = x.Value;
-                        return s;
-                    });
+                        var v = value as ExprValue.TupleV;
+                        if (v != null)
+                        {
+                            var dic = new Dictionary<string, ExprValue>();
 
-                    return dic;
-                }
-                if (pattern is PatternExpressions.OptionP && value is ExprValue.OptionV)
-                {
-                    var p = (PatternExpressions.OptionP)pattern;
-                    var q = (ExprValue.OptionV)value;
-                    var dic = new Dictionary<string, ExprValue>();
-                    if (p == PatternExpressions.OptionP.None || ReferenceEquals(q, ExprValue.OptionV.None))
-                    {
-                        if (p == PatternExpressions.OptionP.None && ReferenceEquals(q, ExprValue.OptionV.None))
-                        {
-                            return dic;
-                        }
-                        else
-                        {
-                            return null;
-                        }
-                    }
-                    else
-                    {
-                        var ret1 = EvalPatternExpressions(p.Value, q.Value);
-                        if (ret1 == null)
-                        {
-                            return null;
-                        }
-                        else
-                        {
-                            dic = ret1.Aggregate(dic,
-                                (s, x) =>
+                            if (p.Members.Length != v.Members.Length)
+                            {
+                                return null;
+                            }
+                            foreach (var pq in p.Members.Zip(v.Members, Tuple.Create))
+                            {
+                                var ret1 = EvalPatternExpressions(pq.Item1, pq.Item2);
+                                if (ret1 == null)
+                                {
+                                    return null;
+                                }
+                                dic = ret1.Aggregate(dic, (s, x) =>
                                 {
                                     s[x.Key] = x.Value;
                                     return s;
                                 });
+                            }
                             return dic;
                         }
-                    }
-                }
-                if (pattern is PatternExpressions.TupleP && value is ExprValue.TupleV)
-                {
-                    var p = (PatternExpressions.TupleP)pattern;
-                    var q = (ExprValue.TupleV)value;
-                    var dic = new Dictionary<string, ExprValue>();
-
-                    if (p.Members.Length != q.Members.Length)
-                    {
                         return null;
-                    }
-                    foreach (var pq in p.Members.Zip(q.Members, Tuple.Create))
+                    },
+                    RecordP: (p) =>
                     {
-                        var ret1 = EvalPatternExpressions(pq.Item1, pq.Item2);
-                        if (ret1 == null)
+                        var v = value as ExprValue.RecordV;
+                        if (v != null)
                         {
-                            return null;
+                            var dic = new Dictionary<string, ExprValue>();
+
+                            if (p.Members.Length != v.Members.Length)
+                            {
+                                return null;
+                            }
+                            foreach (var pq in p.Members.Zip(v.Members, Tuple.Create))
+                            {
+                                var ret1 = EvalPatternExpressions(pq.Item1.Item2, pq.Item2.Item2);
+                                if (ret1 == null)
+                                {
+                                    return null;
+                                }
+                                dic = ret1.Aggregate(dic, (s, x) =>
+                                {
+                                    s[x.Key] = x.Value;
+                                    return s;
+                                });
+                            }
+                            return dic;
+
                         }
-                        dic = ret1.Aggregate(dic, (s, x) =>
-                        {
-                            s[x.Key] = x.Value;
-                            return s;
-                        });
-                    }
-                    return dic;
-
-                }
-                if (pattern is PatternExpressions.RecordP && value is ExprValue.RecordV)
-                {
-                    var p = (PatternExpressions.RecordP)pattern;
-                    var q = (ExprValue.RecordV)value;
-                    var dic = new Dictionary<string, ExprValue>();
-
-                    if (p.Members.Length != q.Members.Length)
-                    {
                         return null;
-                    }
-                    foreach (var pq in p.Members.Zip(q.Members, Tuple.Create))
+                    },
+                    VariantP: (p) =>
                     {
-                        var ret1 = EvalPatternExpressions(pq.Item1.Item2, pq.Item2.Item2);
-                        if (ret1 == null)
+                        var v = value as ExprValue.VariantV;
+                        if (v != null)
                         {
-                            return null;
+                            var dic = new Dictionary<string, ExprValue>();
+
+                            if (p.ConstructorId != v.Tag)
+                            {
+                                return null;
+                            }
+                            var ret1 = EvalPatternExpressions(p.Body, v.Value);
+                            if (ret1 == null)
+                            {
+                                return null;
+                            }
+                            dic = ret1.Aggregate(dic, (s, x) =>
+                            {
+                                s[x.Key] = x.Value;
+                                return s;
+                            });
+                            return dic;
                         }
-                        dic = ret1.Aggregate(dic, (s, x) =>
-                        {
-                            s[x.Key] = x.Value;
-                            return s;
-                        });
-                    }
-                    return dic;
-
-                }
-                if (pattern is PatternExpressions.VariantP && value is ExprValue.VariantV)
-                {
-                    var p = (PatternExpressions.VariantP)pattern;
-                    var q = (ExprValue.VariantV)value;
-                    var dic = new Dictionary<string, ExprValue>();
-
-                    if (p.ConstructorId != q.Tag)
-                    {
                         return null;
-                    }
-                    var ret1 = EvalPatternExpressions(p.Body, q.Value);
-                    if (ret1 == null)
-                    {
-                        return null;
-                    }
-                    dic = ret1.Aggregate(dic, (s, x) =>
-                    {
-                        s[x.Key] = x.Value;
-                        return s;
-                    });
-                    return dic;
+                    },
+                    Other: (p) => { return null; }
+                )(pattern);
 
-                }
-                return null;
             }
 
             /// <summary>
@@ -376,6 +398,23 @@ namespace MiniMAL
                     {
                         return new ExprValue.RecordV(exp.Members
                             .Select(x => Tuple.Create(x.Item1, EvalExpressions(env, x.Item2))).ToArray());
+                    },
+                    MemberExp: (exp) =>
+                    {
+                        var v = EvalExpressions(env, exp.Expression);
+                        System.Diagnostics.Debug.Assert(v is ExprValue.RecordV);
+                        var recv = ((ExprValue.RecordV) v);
+                        return recv.Members.First(x => x.Item1 == exp.Member).Item2;
+                    },
+                    DestructiveUpdateExp: (exp) =>
+                    {
+                        var v1 = EvalExpressions(env, exp.Expression);
+                        var v2 = EvalExpressions(env, exp.Value);
+                        System.Diagnostics.Debug.Assert(v1 is ExprValue.RecordV);
+                        var recv = ((ExprValue.RecordV) v1);
+                        var idx = recv.Members.TakeWhile(x => x.Item1 != exp.Member).Count();
+                        recv.Members[idx] = Tuple.Create(recv.Members[idx].Item1, v2);
+                        return new ExprValue.UnitV();
                     },
                     ConstructorExp: (exp) =>
                     {
