@@ -1,11 +1,16 @@
-﻿using System;
+﻿/**!
+# Implement AdaBoost
+
+- Original code is https://github.com/yamaguchi23/adaboost
+- test data is http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html
+
+!**/
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-
-// original code is https://github.com/yamaguchi23/adaboost
-// test data is http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html
 
 namespace AdaBoost
 {
@@ -25,11 +30,10 @@ namespace AdaBoost
 
             if (parameter.Verbose)
             {
-                string[] boostingTypeName = new[] { "discrete", "real", "gentle" };
                 Console.Error.WriteLine();
                 Console.Error.WriteLine($"Traing data:  {parameter.TrainingDataFilename}");
                 Console.Error.WriteLine($"Output model: {parameter.OutputModelFilename}");
-                Console.Error.WriteLine($"   Type:      {boostingTypeName[parameter.BoostingType]}");
+                Console.Error.WriteLine($"   Type:      {parameter.BoostingType}");
                 Console.Error.WriteLine($"   #rounds:   {parameter.RoundTotal}");
                 Console.Error.WriteLine();
             }
@@ -99,7 +103,7 @@ namespace AdaBoost
 
 
             double accuracyAll = (double)(positiveCorrectTotal + negativeCorrectTotal) / (positiveTotal + negativeTotal);
-            Console.Write($"Accuracy = {accuracyAll}");
+            Console.WriteLine($"Accuracy = {accuracyAll}");
             Console.Write($" ({positiveCorrectTotal + negativeCorrectTotal} / { positiveTotal + negativeTotal})");
             Console.Write($"  positive: {(double)(positiveCorrectTotal) / positiveTotal}");
             Console.Write($" ({positiveCorrectTotal} / {positiveTotal}), ");
@@ -113,14 +117,14 @@ namespace AdaBoost
         public bool Verbose { get; }
         public string TrainingDataFilename { get; }
         public string OutputModelFilename { get; }
-        public int BoostingType { get; }
+        public AdaBoost.BoostingType BoostingType { get; }
         public int RoundTotal { get; }
 
         public AdaBoostTrainParameter(
             bool verbose,
             string trainingDataFilename,
             string outputModelFilename,
-            int boostingType,
+            AdaBoost.BoostingType boostingType,
             int roundTotal
         )
         {
@@ -135,7 +139,7 @@ namespace AdaBoost
         {
             Console.Error.WriteLine("usage: abtrain [options] training_set_file [model_file]");
             Console.Error.WriteLine("options:");
-            Console.Error.WriteLine("   -t: type of boosting (0:discrete, 1:real, 2:gentle) [default:2]");
+            Console.Error.WriteLine("   -t: type of boosting (discrete, real, gentle) [default:gentle]");
             Console.Error.WriteLine("   -r: the number of rounds [default:100]");
             Console.Error.WriteLine("   -v: verbose");
 
@@ -145,7 +149,7 @@ namespace AdaBoost
         public static AdaBoostTrainParameter ParseCommandline(string[] args)
         {
             var verbose = false;
-            var boostingType = 2;
+            var boostingType = AdaBoost.BoostingType.Gentle;
             var roundTotal = 1000;
 
             // Options
@@ -163,7 +167,7 @@ namespace AdaBoost
                         {
                             ++argIndex;
                             if (argIndex >= args.Length) { Exit(); throw new Exception(); }
-                            if (int.TryParse(args[argIndex], out boostingType) == false || boostingType < 0 || boostingType > 2)
+                            if (Enum.TryParse(args[argIndex], true, out boostingType) == false)
                             {
                                 Console.Error.WriteLine("error: invalid type of boosting");
                                 Exit();
@@ -322,57 +326,61 @@ namespace AdaBoost
 
         public static SampleDataFile Load(string sampleDataFilename)
         {
-            var dataFile = new StreamReader(sampleDataFilename);
             var featureElementList = new List<List<FeatureElement>>();
             var labelList = new List<int>();
-
             int featureDimension = 0;
 
-            string lineBuffer;
-            while ((lineBuffer = dataFile.ReadLine()) != null)
+            using (var dataFile = new StreamReader(sampleDataFilename))
             {
-                var tokens = Regex.Split(lineBuffer, @"\s+");
-
-                if (int.TryParse(tokens[0], out int label) == false)
+                for (;;)
                 {
-                    Console.Error.WriteLine($"error: bad format in data file ({sampleDataFilename})");
-                    return null;
-                }
-                labelList.Add(label);
-
-                List<FeatureElement> featureElements = new List<FeatureElement>();
-                foreach (var tok in tokens.Skip(1))
-                {
-                    var iv = tok.Split(":".ToCharArray());
-
-                    if (iv.Length < 2)
+                    string lineBuffer = dataFile.ReadLine();
+                    if (lineBuffer == null)
                     {
                         break;
                     }
-                    var indexChar = iv[0];
-                    var valueChar = iv[1];
-                    if (String.IsNullOrEmpty(valueChar))
-                    {
-                        break;
-                    }
+                    var tokens = Regex.Split(lineBuffer, @"\s+");
 
-                    if (int.TryParse(indexChar, out int index) == false ||
-                        double.TryParse(valueChar, out double value) == false)
+                    if (int.TryParse(tokens[0], out int label) == false)
                     {
                         Console.Error.WriteLine($"error: bad format in data file ({sampleDataFilename})");
                         return null;
                     }
-                    FeatureElement newElement = new FeatureElement(index, value);
-                    featureElements.Add(newElement);
-                    if (newElement.Index > featureDimension)
-                    {
-                        featureDimension = newElement.Index;
-                    }
-                }
-                featureElementList.Add(featureElements);
+                    labelList.Add(label);
 
+                    List<FeatureElement> featureElements = new List<FeatureElement>();
+                    foreach (var tok in tokens.Skip(1))
+                    {
+                        var iv = tok.Split(":".ToCharArray());
+
+                        if (iv.Length < 2)
+                        {
+                            break;
+                        }
+                        var indexChar = iv[0];
+                        var valueChar = iv[1];
+                        if (String.IsNullOrEmpty(valueChar))
+                        {
+                            break;
+                        }
+
+                        if (int.TryParse(indexChar, out int index) == false ||
+                            double.TryParse(valueChar, out double value) == false)
+                        {
+                            Console.Error.WriteLine($"error: bad format in data file ({sampleDataFilename})");
+                            return null;
+                        }
+                        FeatureElement newElement = new FeatureElement(index, value);
+                        featureElements.Add(newElement);
+                        if (newElement.Index > featureDimension)
+                        {
+                            featureDimension = newElement.Index;
+                        }
+                    }
+                    featureElementList.Add(featureElements);
+
+                }
             }
-            dataFile.Dispose();
 
             int sampleTotal = featureElementList.Count;
 
@@ -389,6 +397,7 @@ namespace AdaBoost
                     sampleFeatures[sampleIndex][n] = featureElementList[sampleIndex][elementIndex].Value;
                 }
             }
+
             return new SampleDataFile(sampleFeatures, sampleLabels);
         }
     }
@@ -419,7 +428,7 @@ namespace AdaBoost
             }
         };
 
-        public AdaBoost(int boostingType = 2)
+        public AdaBoost(BoostingType boostingType = BoostingType.Gentle)
         {
             _boostingType = boostingType;
             _featureTotal = 0;
@@ -427,9 +436,16 @@ namespace AdaBoost
 
         }
 
-        public void SetBoostingType(int boostingType)
+        public enum BoostingType
         {
-            if (boostingType < 0 || boostingType > 2)
+            Discrete = 0,
+            Real,
+            Gentle
+        }
+
+        public void SetBoostingType(BoostingType boostingType)
+        {
+            if (Enum.IsDefined(typeof(BoostingType), boostingType) == false)
             {
                 throw new Exception("error: invalid type of boosting");
             }
@@ -623,7 +639,7 @@ namespace AdaBoost
             for (var d = 0; d < _featureTotal; ++d)
             {
                 //List<SampleElement> featureElements = Enumerable.Range(0, _sampleTotal).Select(x => new SampleElement(sampleIndex: x, sampleValue: _samples[x][d])).ToList();
-                List<SampleElement> featureElements = _samples.Select((x,i) => new SampleElement(sampleIndex: i, sampleValue: x[d])).ToList();
+                List<SampleElement> featureElements = _samples.Select((x, i) => new SampleElement(sampleIndex: i, sampleValue: x[d])).ToList();
                 featureElements.Sort();
                 //_sortedSampleIndices.Add(Enumerable.Range(0, _sampleTotal).Select(x => featureElements[x].SampleIndex).ToList());
                 _sortedSampleIndices.Add(featureElements.Select(x => x.SampleIndex).ToList());
@@ -756,33 +772,35 @@ namespace AdaBoost
             out double outputSmaller
         )
         {
-            if (_boostingType == 0)
+            switch (_boostingType)
             {
-                // Discrete AdaBoost
-                if (weightLabelSumLarger > 0)
-                {
-                    outputLarger = 1.0;
-                    outputSmaller = -1.0;
-                }
-                else
-                {
-                    outputLarger = -1.0;
-                    outputSmaller = 1.0;
-                }
-            }
-            else if (_boostingType == 1)
-            {
-                // Real AdaBoost
-                const double epsilonReal = 0.0001;
-                outputLarger = Math.Log((positiveWeightSumLarger + epsilonReal) / (negativeWeightSumLarger + epsilonReal)) / 2.0;
-                outputSmaller = Math.Log((_positiveWeightSum - positiveWeightSumLarger + epsilonReal)
-                                    / (_negativeWeightSum - negativeWeightSumLarger + epsilonReal)) / 2.0;
-            }
-            else
-            {
-                // Gentle AdaBoost
-                outputLarger = weightLabelSumLarger / weightSumLarger;
-                outputSmaller = (_weightLabelSum - weightLabelSumLarger) / (_weightSum - weightSumLarger);
+                case BoostingType.Discrete:
+                    // Discrete AdaBoost
+                    if (weightLabelSumLarger > 0)
+                    {
+                        outputLarger = 1.0;
+                        outputSmaller = -1.0;
+                    }
+                    else
+                    {
+                        outputLarger = -1.0;
+                        outputSmaller = 1.0;
+                    }
+                    break;
+                case BoostingType.Real:
+                    // Real AdaBoost
+                    const double epsilonReal = 0.0001;
+                    outputLarger = Math.Log((positiveWeightSumLarger + epsilonReal) / (negativeWeightSumLarger + epsilonReal)) / 2.0;
+                    outputSmaller = Math.Log((_positiveWeightSum - positiveWeightSumLarger + epsilonReal)
+                                             / (_negativeWeightSum - negativeWeightSumLarger + epsilonReal)) / 2.0;
+                    break;
+                case BoostingType.Gentle:
+                    // Gentle AdaBoost
+                    outputLarger = weightLabelSumLarger / weightSumLarger;
+                    outputSmaller = (_weightLabelSum - weightLabelSumLarger) / (_weightSum - weightSumLarger);
+                    break;
+                default:
+                    throw new Exception("_boostingType is out of range.");
             }
         }
 
@@ -794,29 +812,30 @@ namespace AdaBoost
         )
         {
             double error;
-            if (_boostingType == 0)
+            switch (_boostingType)
             {
-                // Discrete AdaBoost
-                error = positiveWeightSumLarger * (1.0 - outputLarger) / 2.0
-                        + (_positiveWeightSum - positiveWeightSumLarger) * (1.0 - outputSmaller) / 2.0
-                        + negativeWeightSumLarger * (-1.0 - outputLarger) / -2.0
-                        + (_negativeWeightSum - negativeWeightSumLarger) * (-1.0 - outputSmaller) / -2.0;
-            }
-            else if (_boostingType == 1)
-            {
-                // Real AdaBoost
-                error = positiveWeightSumLarger * Math.Exp(-outputLarger)
-                        + (_positiveWeightSum - positiveWeightSumLarger) * Math.Exp(-outputSmaller)
-                        + negativeWeightSumLarger * Math.Exp(outputLarger)
-                        + (_negativeWeightSum - negativeWeightSumLarger) * Math.Exp(outputSmaller);
-            }
-            else
-            {
-                // Gentle AdaBoost
-                error = positiveWeightSumLarger * (1.0 - outputLarger) * (1.0 - outputLarger)
-                        + (_positiveWeightSum - positiveWeightSumLarger) * (1.0 - outputSmaller) * (1.0 - outputSmaller)
-                        + negativeWeightSumLarger * (-1.0 - outputLarger) * (-1.0 - outputLarger)
-                        + (_negativeWeightSum - negativeWeightSumLarger) * (-1.0 - outputSmaller) * (-1.0 - outputSmaller);
+                case BoostingType.Discrete:
+                    // Discrete AdaBoost
+                    error = positiveWeightSumLarger * (1.0 - outputLarger) / 2.0
+                            + (_positiveWeightSum - positiveWeightSumLarger) * (1.0 - outputSmaller) / 2.0
+                            + negativeWeightSumLarger * (-1.0 - outputLarger) / -2.0
+                            + (_negativeWeightSum - negativeWeightSumLarger) * (-1.0 - outputSmaller) / -2.0;
+                    break;
+                case BoostingType.Real:
+                    // Real AdaBoost
+                    error = positiveWeightSumLarger * Math.Exp(-outputLarger)
+                            + (_positiveWeightSum - positiveWeightSumLarger) * Math.Exp(-outputSmaller)
+                            + negativeWeightSumLarger * Math.Exp(outputLarger)
+                            + (_negativeWeightSum - negativeWeightSumLarger) * Math.Exp(outputSmaller);
+                    break;
+                case BoostingType.Gentle:
+                    error = positiveWeightSumLarger * (1.0 - outputLarger) * (1.0 - outputLarger)
+                            + (_positiveWeightSum - positiveWeightSumLarger) * (1.0 - outputSmaller) * (1.0 - outputSmaller)
+                            + negativeWeightSumLarger * (-1.0 - outputLarger) * (-1.0 - outputLarger)
+                            + (_negativeWeightSum - negativeWeightSumLarger) * (-1.0 - outputSmaller) * (-1.0 - outputSmaller);
+                    break;
+                default:
+                    throw new Exception("_boostingType is out of range.");
             }
 
             return error;
@@ -840,7 +859,7 @@ namespace AdaBoost
             }
         }
 
-        private int _boostingType;
+        private BoostingType _boostingType;
         private int _featureTotal;
         private readonly List<DecisionStump> _weakClassifiers = new List<DecisionStump>();
 

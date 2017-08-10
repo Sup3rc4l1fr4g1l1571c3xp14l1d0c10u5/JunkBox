@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8">
+		<title>README.md</title>
+		<meta name="description" content="README.md">
+		<link rel="stylesheet" href="./github-markdown-css/github-markdown.css" crossorigin="anonymous" />
+		<link rel="stylesheet" href="./highlight/styles/github.css" crossorigin="anonymous" />
+		<style>
+			.markdown {
+				display: inline-block;
+				white-space: normal;
+				font-style: normal;
+			}
+			.markdown:before{
+				content: "/**!";
+			}
+			.markdown:after{
+				content: "!**/";
+			}
+			.markdown * {
+				padding: 0;
+				margin: 0;
+			}
+			.markdown ul {
+				-webkit-padding-start: 1.5em;
+			}
+		</style>
+		<script type="text/javascript" src="./jquery/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+		<script type="text/javascript" src="./marked/0.3.6/marked.min.js" crossorigin="anonymous"></script>
+		<script type="text/javascript" src="./highlight/highlight.pack.js" crossorigin="anonymous"></script>
+		<script>
+			$(function () {
+				$.ajax({
+					url: "./main.cs",
+					cache: false,
+					dataType: "text",
+					success: function(text){
+						marked.setOptions({
+							renderer: new marked.Renderer(),
+							gfm: true,
+							tables: true,
+							breaks: false,
+							pedantic: false,
+							sanitize: true,
+							smartLists: true,
+							smartypants: false,
+						});
+						$("#source").text(text);
+						hljs.highlightBlock($("#source")[0]);
+						$('.hljs-comment').each (function () { 
+							var lines = $(this).html().split('\n');
+							if (/^\s*\/\*\*!/.test(lines[0]) && /^\s*!\*\*\//.test(lines[lines.length-1])) {
+								var innerlines = lines.slice(1,lines.length-1);
+								var chomp = Number.MAX_VALUE;
+								for (var index in innerlines) {
+									var match = (/^(\s*)/).exec(innerlines[index]);
+									if (chomp > match[1].length) {
+										chomp = match[1].length;
+									}
+								}
+								for (var index in innerlines) {
+									innerlines[index] = innerlines[index].slice(chomp);
+								}
+								$(this).html(marked(innerlines.join("\n"))); 
+								$(this).addClass('markdown');
+							}
+						});
+					}
+				});
+			});
+		</script>
+	</head>
+	<body>
+		<pre><code id="source" class="csharp"></code></pre>
+	</body>
+</html>
