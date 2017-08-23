@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8">
+
+		<script src="./jquery/jquery-3.2.1.min.js"></script>
+
+		<script src="./popper.js/1.12.0/dist/umd/popper.min.js"></script>
+
+		<link rel="stylesheet" href="./bootstrap/4.0.0-beta/bootstrap.min.css" />
+		<script src="./bootstrap/4.0.0-beta/bootstrap.min.js"></script>
+
+		<style>
+			html, body {
+				height: 100%;
+				margin: 0;
+			}
+			body { 
+				padding-top: 56px; 
+			}
+			.nav-tabs {
+				border: 0px none black; 
+			}
+			.nav-tabs .nav-link, .btn, .btn-lg {
+				border-radius: 0;
+			}
+			.nav-tabs > .nav-link:focus, .nav-tabs > .nav-link:hover {
+				border: 1px solid #FFF; 
+			}
+			.nav-tabs > .nav-item {
+				margin-bottom: 0px; 
+			}
+			.nav-tabs > .nav-item > .active {
+				background-color: #CCC; 
+				border: 1px solid #CCC; 
+			}
+
+			.blocklyTreeRow {
+				height: 50px;
+				line-height: 50px;
+			}
+			
+			textarea {
+				overflow: scroll;
+				resize: none;
+				font-family: monospace;
+			}
+			
+			#preview {
+				frameBorder: 0;
+				scrolling: yes;
+				width: 100%;
+				height: 100%;
+				sandbox: allow-scripts allow-same-origin;
+			}
+		</style>
+
+<script>
+function createViewHtml(data) {
+	var lines = [
+		'<!doctype html>',
+		'<html lang="ja" manifest="cache.manifest">',
+		'<head>',
+		'<meta charset="utf-8"/>',
+		//'<base href="http://whelp.0t0.jp/jedeite/" />',
+		'<title>Jedeite - preview</title>',
+		'<s' + 'cript type="text/javascript" src="./jquery/jquery-3.2.1.slim.min.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript" src="./opal/opal-0.10.5.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript" src="./opal/opal-parser.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript" src="./opal/opal-browser.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript" src="./opal/opal-source-maps.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript" src="./graphicsjs/graphics.min.js"></s' + 'cript>',
+		'<s' + 'cript type="text/javascript">',
+		data.js,
+		'</s' + 'cript>',
+		'<s' + 'cript type="text/ruby">',
+		data.ruby,
+		'</s' + 'cript>',
+		'<style type="text/css">',
+		data.css,
+		'</style>',
+		'</head>',
+		'<body>',
+		data.html,
+		'</body>',
+		'</html>'
+	];
+	return lines.join("\r\n");
+}
+
+function update_result() {
+	var previewData = {};
+	previewData.js   = $('#js-code').val();
+	previewData.ruby = $('#ruby-code').val();
+	previewData.css  = $('#css-code').val();
+	previewData.html = $('#html-code').val();
+	$('#preview').attr('srcdoc', createViewHtml(previewData));
+}
+
+$(function () {
+	$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+		var activated_tab = e.target;
+		var previous_tab = e.relatedTarget;
+		if (activated_tab.hash == '#tab5') {
+			update_result();
+		} else if (previous_tab.hash == '#tab5') {
+			$('#preview').attr('srcdoc','');
+		}
+	});
+	
+	$.ajax( { url: 'js.txt'  , type: 'get', cache: false, dataType: 'text' } ).done( function (data) { $('#js-code'  ).val(data); }).fail( function () { $('#js-code'  ).val('failed.'); } );
+	$.ajax( { url: 'ruby.txt', type: 'get', cache: false, dataType: 'text' } ).done( function (data) { $('#ruby-code').val(data); }).fail( function () { $('#ruby-code').val('failed.'); } );
+	$.ajax( { url: 'css.txt' , type: 'get', cache: false, dataType: 'text' } ).done( function (data) { $('#css-code' ).val(data); }).fail( function () { $('#css-code' ).val('failed.'); } );
+	$.ajax( { url: 'html.txt', type: 'get', cache: false, dataType: 'text' } ).done( function (data) { $('#html-code').val(data); }).fail( function () { $('#html-code').val('failed.'); } );
+});
+</script>
+
+	</head>
+<body>
+
+	<nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+		<a class="navbar-brand" href="#">Web ruby</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+		<div class="collapse navbar-collapse" id="navbarsExampleDefault">
+			<ul class="navbar-nav mr-auto">
+				<li class="nav-item active">
+					<a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="#">Link</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link disabled" href="#">Disabled</a>
+				</li>
+				<li class="nav-item dropdown">
+					<a class="nav-link dropdown-toggle" href="http://example.com" id="dropdown01" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Dropdown</a>
+					<div class="dropdown-menu" aria-labelledby="dropdown01">
+						<a id='run' class="dropdown-item" href="#">実行</a>
+						<a class="dropdown-item" href="#">Another action</a>
+						<a class="dropdown-item" href="#">Something else here</a>
+					</div>
+				</li>
+			</ul>
+			<form class="form-inline my-2 my-lg-0">
+				<input class="form-control mr-sm-2" type="text" placeholder="Search" aria-label="Search">
+				<button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+			</form>
+		</div>
+	</nav>
+	<div class="container-fluid" style="padding: 0px; width: 100%; height:100%">
+		<div class="tab-content" style="padding: 0px; width: 100%; height: calc(100% - 42px)">
+			<div id="tab1" class="tab-pane active" style="width: 100%; height:100%">
+				<textarea id="html-code" style="width: 100%; height:100%"></textarea>
+			</div>
+			<div id="tab2" class="tab-pane" style="width: 100%; height:100%">
+				<textarea id="css-code" style="width: 100%; height:100%"></textarea>
+			</div>
+			<div id="tab3" class="tab-pane" style="width: 100%; height:100%">
+				<textarea id="ruby-code" style="width: 100%; height:100%"></textarea>
+			</div>
+			<div id="tab4" class="tab-pane" style="width: 100%; height:100%">
+				<textarea id="js-code" style="width: 100%; height:100%"></textarea>
+			</div>
+			<div id="tab5" class="tab-pane" style="width: 100%; height:100%">
+				<iframe id="preview"></iframe>
+			</div>
+		</div>
+		<ul class="nav nav-tabs" style="padding: 0px; width: 100%; height:calc(42px); background-color: #EEEEEE">
+			<li class="nav-item">
+				<a href="#tab1" class="nav-link active" data-toggle="tab">HTML</a>
+			</li>
+			<li class="nav-item">
+				<a href="#tab2" class="nav-link" data-toggle="tab">CSS</a>
+			</li>
+			<li class="nav-item">
+				<a href="#tab3" class="nav-link" data-toggle="tab">Ruby</a>
+			</li>
+			<li class="nav-item">
+				<a href="#tab4" class="nav-link" data-toggle="tab">JavaScript</a>
+			</li>
+			<li class="nav-item">
+				<a href="#tab5" class="nav-link" data-toggle="tab">Result</a>
+			</li>
+		</ul>
+	</div>
+</body>
+</html>
+
+
