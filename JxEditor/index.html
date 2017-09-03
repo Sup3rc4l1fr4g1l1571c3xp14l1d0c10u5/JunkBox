@@ -1,0 +1,743 @@
+﻿<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0">
+    <title>Canvas Text Editor</title>
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <script type="text/javascript">var module = {};</script>
+    <script type="text/javascript" src="./js/FontMetrics.js"></script>
+    <script type="text/javascript" src="./js/Document.js"></script>
+    <script type="text/javascript" src="./js/Selection.js"></script>
+    <script type="text/javascript" src="./js/CanvasTextEditor.js"></script>
+<script>
+    
+    function marge(x, y) {
+        var ret = {};
+        for (var key in x) {
+            ret[key] = x[key];
+        }
+        for (var key in y) {
+            ret[key] = y[key];
+        }
+        return ret;
+    }
+
+    var keypad_layout = [
+        {
+            'id': 'main',
+            'layout': [
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "ESC", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F1", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F2", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F3", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F4", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F5", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F6", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F7", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F8", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F9", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F10", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F11", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "F12", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '1em',
+                    buttons: [
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "`", "fontsize": "1em", "width": "2em" },
+                        { "id": "1", "fontsize": "1em", "width": "2em" },
+                        { "id": "2", "fontsize": "1em", "width": "2em" },
+                        { "id": "3", "fontsize": "1em", "width": "2em" },
+                        { "id": "4", "fontsize": "1em", "width": "2em" },
+                        { "id": "5", "fontsize": "1em", "width": "2em" },
+                        { "id": "6", "fontsize": "1em", "width": "2em" },
+                        { "id": "7", "fontsize": "1em", "width": "2em" },
+                        { "id": "8", "fontsize": "1em", "width": "2em" },
+                        { "id": "9", "fontsize": "1em", "width": "2em" },
+                        { "id": "0", "fontsize": "1em", "width": "2em" },
+                        { "id": "-", "fontsize": "1em", "width": "2em" },
+                        { "id": "=", "fontsize": "1em", "width": "2em" },
+                        { "id": "BackSpace", "fontsize": "0.8em", "width": "4em" }
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "Tab", "fontsize": "0.8em", "width": "3em" },
+                        { "id": "q", "fontsize": "1em", "width": "2em" },
+                        { "id": "w", "fontsize": "1em", "width": "2em" },
+                        { "id": "e", "fontsize": "1em", "width": "2em" },
+                        { "id": "r", "fontsize": "1em", "width": "2em" },
+                        { "id": "t", "fontsize": "1em", "width": "2em" },
+                        { "id": "y", "fontsize": "1em", "width": "2em" },
+                        { "id": "u", "fontsize": "1em", "width": "2em" },
+                        { "id": "i", "fontsize": "1em", "width": "2em" },
+                        { "id": "o", "fontsize": "1em", "width": "2em" },
+                        { "id": "p", "fontsize": "1em", "width": "2em" },
+                        { "id": "[", "fontsize": "1em", "width": "2em" },
+                        { "id": "]", "fontsize": "1em", "width": "2em" },
+                        { "id": "\\", "fontsize": "1em", "width": "3em" }
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "CapsLock", "fontsize": "0.8em", "width": "4em" },
+                        { "id": "a", "fontsize": "1em", "width": "2em" },
+                        { "id": "s", "fontsize": "1em", "width": "2em" },
+                        { "id": "d", "fontsize": "1em", "width": "2em" },
+                        { "id": "f", "fontsize": "1em", "width": "2em" },
+                        { "id": "g", "fontsize": "1em", "width": "2em" },
+                        { "id": "h", "fontsize": "1em", "width": "2em" },
+                        { "id": "j", "fontsize": "1em", "width": "2em" },
+                        { "id": "k", "fontsize": "1em", "width": "2em" },
+                        { "id": "l", "fontsize": "1em", "width": "2em" },
+                        { "id": ";", "fontsize": "1em", "width": "2em" },
+                        { "id": "'", "fontsize": "1em", "width": "2em" },
+                        { "id": "Enter", "fontsize": "0.8em", "width": "4em" }
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "LShift", "fontsize": "0.8em", "width": "5em" },
+                        { "id": "z", "fontsize": "1em", "width": "2em" },
+                        { "id": "x", "fontsize": "1em", "width": "2em" },
+                        { "id": "c", "fontsize": "1em", "width": "2em" },
+                        { "id": "v", "fontsize": "1em", "width": "2em" },
+                        { "id": "b", "fontsize": "1em", "width": "2em" },
+                        { "id": "n", "fontsize": "1em", "width": "2em" },
+                        { "id": "m", "fontsize": "1em", "width": "2em" },
+                        { "id": ",", "fontsize": "1em", "width": "2em" },
+                        { "id": ".", "fontsize": "1em", "width": "2em" },
+                        { "id": "/", "fontsize": "1em", "width": "2em" },
+                        { "id": "RShift", "fontsize": "0.8em", "width": "5em" }
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "LCtrl", "fontsize": "1em", "width": "3em" },
+                        { "id": "Fn", "fontsize": "1em", "width": "2em" },
+                        { "id": "LOs", "fontsize": "1em", "width": "2em" },
+                        { "id": "LAlt", "fontsize": "1em", "width": "2em" },
+                        { "id": "SPace", "fontsize": "1em", "width": "12em" },
+                        { "id": "RAlt", "fontsize": "1em", "width": "3em" },
+                        { "id": "ROs", "fontsize": "1em", "width": "2em" },
+                        { "id": "Menu", "fontsize": "1em", "width": "2em" },
+                        { "id": "RCtrl", "fontsize": "1em", "width": "3em" },
+                    ]
+                }
+            ]
+        },
+        {
+            'id': 'sub',
+            'layout': [
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "PrintScreen", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "ScrollLock", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "Pause", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '1em',
+                    buttons: [
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "Insert", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "Home", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "PageUp", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "Delete", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "End", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "PageDown", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "ArrowUp", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                },
+                {
+                    height: '2em',
+                    buttons: [
+                        { "id": "ArrowLeft", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "ArrowDown", "fontsize": "0.7em", "width": "2em" },
+                        { "id": "ArrowRight", "fontsize": "0.7em", "width": "2em" },
+                    ]
+                }
+            ]
+        }
+    ];
+    var normalView = {
+        "ESC": "ESC",
+        "F1": "F1",
+        "F2": "F2",
+        "F3": "F3",
+        "F4": "F4",
+        "F5": "F5",
+        "F6": "F6",
+        "F7": "F7",
+        "F8": "F8",
+        "F9": "F9",
+        "F10": "F10",
+        "F11": "F11",
+        "F12": "F12",
+        "`": "`",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7": "7",
+        "8": "8",
+        "9": "9",
+        "0": "0",
+        "-": "-",
+        "=": "=",
+        "BackSpace": "back",
+        "Tab": "tab",
+        "q": "q",
+        "w": "w",
+        "e": "e",
+        "r": "r",
+        "t": "t",
+        "y": "y",
+        "u": "u",
+        "i": "i",
+        "o": "o",
+        "p": "p",
+        "[": "[",
+        "]": "]",
+        "\\": "\\",
+        "CapsLock": "caps",
+        "a": "a",
+        "s": "s",
+        "d": "d",
+        "f": "f",
+        "g": "g",
+        "h": "h",
+        "j": "j",
+        "k": "k",
+        "l": "l",
+        ";": ";",
+        "'": "'",
+        "Enter": "enter",
+        "LShift": "shift",
+        "z": "z",
+        "x": "x",
+        "c": "c",
+        "v": "v",
+        "b": "b",
+        "n": "n",
+        "m": "m",
+        ",": ",",
+        ".": ".",
+        "/": "/",
+        "RShift": "shift",
+        "LCtrl": "ctrl",
+        "Fn": "fn",
+        "LOs": "os",
+        "LAlt": "alt",
+        "SPace": "space",
+        "RAlt": "alt",
+        "ROs": "os",
+        "Menu": "menu",
+        "RCtrl": "ctrl",
+        "PrintScreen": "PrtSc",
+        "ScrollLock": "ScrLk",
+        "Pause": "Pause",
+        "Insert": "Ins",
+        "Home": "Home",
+        "PageUp": "PgUp",
+        "Delete": "Del",
+        "End": "End",
+        "PageDown": "PgDn",
+        "ArrowUp": "↑",
+        "ArrowLeft": "←",
+        "ArrowDown": "↓",
+        "ArrowRight": "→",
+    };
+    var shiftViewDiff = {
+        "`": "~",
+        "1": "!",
+        "2": "@",
+        "3": "#",
+        "4": "$",
+        "5": "%",
+        "6": "^",
+        "7": "&",
+        "8": "*",
+        "9": "(",
+        "0": ")",
+        "-": "_",
+        "=": "+",
+        "q": "Q",
+        "w": "W",
+        "e": "E",
+        "r": "R",
+        "t": "T",
+        "y": "Y",
+        "u": "U",
+        "i": "I",
+        "o": "O",
+        "p": "P",
+        "[": "{",
+        "]": "}",
+        "\\": "|",
+        "a": "A",
+        "s": "S",
+        "d": "D",
+        "f": "F",
+        "g": "G",
+        "h": "H",
+        "j": "J",
+        "k": "K",
+        "l": "L",
+        ";": ":",
+        "'": "\"",
+        "z": "Z",
+        "x": "X",
+        "c": "C",
+        "v": "V",
+        "b": "B",
+        "n": "N",
+        "m": "M",
+        ",": "<",
+        ".": ">",
+        "/": "?",
+    };
+    var shiftView = marge(normalView, shiftViewDiff);
+</script>
+<script type="text/javascript" charset="utf-8">
+    function Clipboard(id) {
+        var clipboardElement = document.createElement('textarea');
+        clipboardElement.id = id;
+        clipboardElement.style.display = 'none';
+        clipboardElement.style.position = 'absolute';
+        clipboardElement.style.top = 100;
+        clipboardElement.style.left = 0;
+        document.body.appendChild(clipboardElement);
+        this.element = clipboardElement;
+    }
+    Clipboard.prototype.SetData = function (data) {
+        this.element.value = data;
+        var range = document.createRange();
+        range.selectNode(this.element);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+    }
+    Clipboard.prototype.GetData = function () {
+        var range = document.createRange();
+        range.selectNode(this.element);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('paste');
+        return this.element.value;
+    }
+</script>
+
+    <script type="text/javascript" charset="utf-8">
+        function VirtualKeyboard(id, keyboard) {
+            var self = this;
+            var keyboardElement = document.createElement('section');
+            keyboardElement.classList.add('Keyboard');
+
+            var keymap = {};
+            keyboard.forEach(function (part) {
+                var partElement = document.createElement('section');
+                partElement.classList.add('Part');
+                partElement.id = part.id;
+                part.layout.forEach(function (line) {
+                    var lineElement = document.createElement('div');
+                    lineElement.classList.add('Line');
+                    line.buttons.forEach(function (button) {
+                        var keyElement = self._createKey(line, button, keymap);
+                        lineElement.appendChild(keyElement);
+                    });
+                    partElement.appendChild(lineElement);
+                });
+                keyboardElement.appendChild(partElement);
+            });
+            this.domElement = keyboardElement;
+            this.events = {};
+            this.keyMap = keymap;
+        }
+        VirtualKeyboard.prototype.getDomElement = function () {
+            return this.domElement;
+        }
+        VirtualKeyboard.prototype.setKeyView = function (view) {
+            for (var key in view) {
+                if (this.keyMap[key] != undefined) {
+                    this.keyMap[key].setKeyText(view[key]);
+                }
+            }
+        }
+        VirtualKeyboard.prototype._createKey = function (line, button, keymap) {
+            var self = this;
+            if (button.id == undefined || button.id === "") {
+                var buttonElement = document.createElement('span');
+                buttonElement.classList.add("Padding");
+                buttonElement.style['width'] = button.width;
+                buttonElement.style['height'] = line.height;
+                buttonElement.style['line-height'] = line.height;
+                return buttonElement;
+            } else {
+                var textElement = document.createElement('span');
+                textElement.style['font-size'] = button.fontsize;
+                textElement.style['line-height'] = button.fontsize;
+                textElement.innerText = button.id;
+
+                var buttonElement = document.createElement('div');
+                buttonElement.classList.add("Button");
+                buttonElement.style['width'] = button.width;
+                buttonElement.style['height'] = line.height;
+                buttonElement.style['line-height'] = line.height;
+                var releaseHandler, downHandler;
+                releaseHandler = function (e) {
+                    e.preventDefault();
+                    if (self.events.keyup != null) {
+                        self.events.keyup(button.id, textElement.innerText);
+                    }
+                    buttonElement.classList.remove('Down');
+
+                    buttonElement.removeEventListener("touchstart", downHandler);
+                    buttonElement.removeEventListener("mousedown", downHandler);
+                    buttonElement.removeEventListener("touchend", releaseHandler);
+                    buttonElement.removeEventListener("mouseup", releaseHandler);
+                    document.removeEventListener("touchend", releaseHandler);
+                    document.removeEventListener("mouseup", releaseHandler);
+                    buttonElement.addEventListener("touchstart", downHandler, false);
+                    buttonElement.addEventListener("mousedown", downHandler, false);
+                    return false;
+                }
+                downHandler = function (e) {
+                    e.preventDefault();
+                    if (self.events.keydown != null) {
+                        self.events.keydown(button.id, textElement.innerText);
+                    }
+                    buttonElement.classList.add('Down');
+
+                    buttonElement.removeEventListener("touchstart", downHandler);
+                    buttonElement.removeEventListener("mousedown", downHandler);
+                    buttonElement.removeEventListener("touchend", releaseHandler);
+                    buttonElement.removeEventListener("mouseup", releaseHandler);
+                    buttonElement.addEventListener("touchend", releaseHandler, false);
+                    buttonElement.addEventListener("mouseup", releaseHandler, false);
+                    document.addEventListener("touchend", releaseHandler, false);
+                    document.addEventListener("mouseup", releaseHandler, false);
+                    return false;
+                }
+                buttonElement.addEventListener("touchstart", downHandler, false);
+                buttonElement.addEventListener("mousedown", downHandler, false);
+
+                buttonElement.appendChild(textElement);
+                keymap[button.id] = { dom: buttonElement, id: button.Id, setKeyText: function (str) { textElement.innerText = str; } }
+                return buttonElement;
+            }
+        }
+        VirtualKeyboard.prototype.addEventListener = function (event, func) {
+            this.events[event] = func;
+        }
+        VirtualKeyboard.prototype.removeEventListener = function (event, func) {
+            if (this.events[event] === func) {
+                delete this.events[event];
+            }
+        }
+
+    </script>
+
+    <script type="text/javascript" charset="utf-8">
+        document.addEventListener('DOMContentLoaded', function () {
+            var clipboard = new Clipboard('clipboard');
+
+
+            var keyboard = new VirtualKeyboard('keypad', keypad_layout);
+            keyboard.setKeyView(normalView);
+
+            var keyboardElement = document.getElementById('keypad');
+            keyboardElement.appendChild(keyboard.getDomElement());
+
+            var KeyStatus = {};
+            keyboard.addEventListener('keydown', function (id, text) {
+                var e = {};
+                e.preventDefault = function () { }
+
+                switch (id) {
+                case 'ESC':
+                case 'F1':
+                case 'F2':
+                case 'F3':
+                case 'F4':
+                case 'F5':
+                case 'F6':
+                case 'F7':
+                case 'F8':
+                case 'F9':
+                case 'F10':
+                case 'F11':
+                case 'F12':
+                    break;
+                case 'BackSpace':
+                    e.keyCode = 8;
+                    editor.keydown(e);
+                    break;
+                case 'Tab':
+                    e.keyCode = 9;
+                    editor.keydown(e);
+                    break;
+                case 'CapsLock':
+                    break;
+                case 'Enter':
+                    e.keyCode = 13;
+                    editor.keydown(e);
+                    break;
+                case 'LShift':
+                    KeyStatus['LShift'] = true;
+                    if (KeyStatus['LShift'] == true || KeyStatus['RShift'] == true) {
+                        keyboard.setKeyView(shiftView);
+                        e.keyCode = 16;
+                        editor.addKeyModifier(e);
+                    }
+                    break;
+                case 'RShift':
+                    KeyStatus['RShift'] = true;
+                    if (KeyStatus['LShift'] == true || KeyStatus['RShift'] == true) {
+                        keyboard.setKeyView(shiftView);
+                        e.keyCode = 16;
+                        editor.addKeyModifier(e);
+                    }
+                    break;
+                case 'LCtrl':
+                    KeyStatus['LCtrl'] = true;
+                    break;
+                case 'RCtrl':
+                    KeyStatus['RCtrl'] = true;
+                    break;
+                case 'Fn':
+                case 'LOs':
+                case 'LAlt':
+                    break;
+                case 'SPace':
+                    e.target = {};
+                    e.target.value = " " + '\n';
+                    editor.handleInput(e);
+                    break;
+                case 'RAlt':
+                case 'ROs':
+                case 'Menu':
+                case 'PrintScreen':
+                case 'ScrollLock':
+                case 'Pause':
+                case 'Insert':
+                case 'Home':
+                case 'PageUp':
+                    break;
+                case 'Delete':
+                    e.keyCode = 46;
+                    editor.keydown(e);
+                    break;
+                case 'End':
+                case 'PageDown':
+                    break;
+                case 'ArrowUp':
+                    e.keyCode = 38;
+                    editor.keydown(e);
+                    break;
+                case 'ArrowLeft':
+                    e.keyCode = 37;
+                    editor.keydown(e);
+                    break;
+                case 'ArrowDown':
+                    e.keyCode = 40;
+                    editor.keydown(e);
+                    break;
+                case 'ArrowRight':
+                    e.keyCode = 39;
+                    editor.keydown(e);
+                    break;
+
+                default:
+                    if (KeyStatus['LCtrl'] == true || KeyStatus['RCtrl'] == true) {
+                        if (id == 'c') {
+                            clipboard.SetData(editor.getSelectedText());
+                            break;
+                        }
+                        if (id == 'x') {
+                            clipboard.SetData(editor.getSelectedText());
+                            editor.insertTextAtCurrentPosition('');
+                            break;
+                        }
+                        if (id == 'v') {
+                            var text = clipboard.GetData();
+                            editor.insertTextAtCurrentPosition(text);
+                            break;
+                        }
+                    }
+                    e.target = {};
+                    e.target.value = text + '\n';
+                    editor.handleInput(e);
+                    break;
+                }
+            });
+
+            keyboard.addEventListener('keyup', function (id, text) {
+                var e = {};
+                e.preventDefault = function () { }
+                switch (id) {
+                case 'LShift':
+                    KeyStatus['LShift'] = false;
+                    if (KeyStatus['LShift'] != true && KeyStatus['RShift'] != true) {
+                        keyboard.setKeyView(normalView);
+                        e.keyCode = 16;
+                        editor.removeKeyModifier(e);
+                    }
+                    break;
+                case 'RShift':
+                    KeyStatus['RShift'] = false;
+                    if (KeyStatus['LShift'] != true && KeyStatus['RShift'] != true) {
+                        keyboard.setKeyView(normalView);
+                        e.keyCode = 16;
+                        editor.removeKeyModifier(e);
+                    }
+                    break;
+                case 'LCtrl':
+                    KeyStatus['LCtrl'] = true;
+                    break;
+                case 'RCtrl':
+                    KeyStatus['RCtrl'] = true;
+                    break;
+                default:
+                    break;
+
+                }
+            });
+
+            var text = '';
+            if (false) {
+                var characterCount = 0;
+                var aCharCode = 'a'.charCodeAt(0);
+                for (var i = 0; i < 100; i++) {
+                    characterCount = Math.floor(Math.random() * 120);
+                    for (var j = 0; j < characterCount; j++) {
+                        text += String.fromCharCode(aCharCode + Math.floor(Math.random() * 26));
+                    };
+                    text += '\n';
+                };
+            }
+            var mainElement = document.getElementById('main');
+            var mainClientRect = mainElement.getBoundingClientRect();
+            var keyboardClientRect = keyboardElement.getBoundingClientRect();
+            var canvasWidth = mainClientRect.width | 0;
+            var canvasHeight = (mainClientRect.height - keyboardClientRect.height) | 0;
+            var doc = new Document(text);
+            var editor = new CanvasTextEditor(doc, { width: canvasWidth, height: canvasHeight });
+            document.getElementById('editor').appendChild(editor.getEl());
+            editor.focus();
+
+            //screen.addEventListener("orientationchange", function () { });
+
+        }, false);
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            border: 0 none transparent;
+            border-style: inset;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+
+        .Keyboard {
+            display: inline-block;
+        }
+
+            .Keyboard > .Part {
+                display: inline-flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+            }
+
+                .Keyboard > .Part > .Line {
+                    position: relative;
+                    display: inline-flex;
+                    flex-direction: row;
+                    flex-wrap: nowrap;
+                    justify-content: space-between;
+                }
+
+                    .Keyboard > .Part > .Line > .Button {
+                        display: inline-flex;
+                        border: 1px black solid;
+                        text-align: center;
+                        border-radius: 0.3em;
+                        justify-content: center;
+                        align-items: center;
+                    }
+
+                    .Keyboard > .Part > .Line > .Down {
+                        background-color: skyblue;
+                    }
+
+                    .Keyboard > .Part > .Line > .Padding {
+                        display: inline-flex;
+                        border: 1px solid transparent;
+                        text-align: center;
+                        border-radius: 0.3em;
+                        justify-content: center;
+                        align-items: center;
+                    }
+    </style>
+</head>
+<body style="background-color: black" oncontextmenu='return false;' oncopy='return false;' onmousedown='return false;'>
+    <section id='main' style="display: flex; flex-direction: column-reverse; background-color: white; align-items: center; width: 100vw; height:100vh">
+        <section id="keypad" style="display: flex"></section>
+        <section id="editor" style="display: flex"></section>
+    </section>
+</body>
+</html>
