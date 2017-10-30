@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
-namespace CParser2 {
+namespace cc {
     public abstract class SyntaxNode
     {
         public abstract class Expression : SyntaxNode
@@ -39,61 +39,66 @@ namespace CParser2 {
 
                 public class AddressExpression : UnaryExpression
                 {
-                    private string v;
-                    private Expression x;
+                    public string @operator { get; }
+                    public Expression operand { get; }
 
-                    public AddressExpression(string v, Expression x)
+
+                    public AddressExpression(string @operator, Expression operand)
                     {
-                        this.v = v;
-                        this.x = x;
+                        this.@operator = @operator;
+                        this.operand = operand;
                     }
                 }
 
                 public class IndirectionExpression : UnaryExpression
                 {
-                    private string v;
-                    private Expression x;
+                    public string @operator { get; }
+                    public Expression operand { get; }
 
-                    public IndirectionExpression(string v, Expression x)
+
+                    public IndirectionExpression(string @operator, Expression operand)
                     {
-                        this.v = v;
-                        this.x = x;
+                        this.@operator = @operator;
+                        this.operand = operand;
                     }
                 }
 
                 public class UnaryArithmeticExpression : UnaryExpression
                 {
-                    private string _1;
-                    private Expression _2;
+                    public string @operator { get; }
+                    public Expression operand { get; }
 
-                    public UnaryArithmeticExpression(string _1, Expression _2)
+
+                    public UnaryArithmeticExpression(string @operator, Expression operand)
                     {
-                        this._1 = _1;
-                        this._2 = _2;
+                        this.@operator = @operator;
+                        this.operand = operand;
                     }
                 }
 
                 public class SizeofExpression : UnaryExpression
                 {
-                    private string v;
-                    private Expression x;
+                    public string @operator { get; }
+                    public Expression operand { get; }
 
-                    public SizeofExpression(string v, Expression x)
+
+                    public SizeofExpression(string @operator, Expression operand)
                     {
-                        this.v = v;
-                        this.x = x;
+                        this.@operator = @operator;
+                        this.operand = operand;
                     }
                 }
 
                 public class SizeofTypeExpression : UnaryExpression
                 {
-                    private string _1;
-                    private TypeName _3;
+                    public string @operator { get; }
+                    public TypeName operand { get; }
 
-                    public SizeofTypeExpression(string _1, TypeName _3)
+
+                    public SizeofTypeExpression(string @operator, TypeName operand)
                     {
-                        this._1 = _1;
-                        this._3 = _3;
+                        this.@operator = @operator;
+                        this.operand = operand;
                     }
                 }
 
@@ -103,41 +108,41 @@ namespace CParser2 {
             {
                 public class ObjectSpecifier : PrimaryExpression
                 {
-                    private string x;
+                    public string identifier { get; }
 
-                    public ObjectSpecifier(string x)
+                    public ObjectSpecifier(string identifier)
                     {
-                        this.x = x;
+                        this.identifier = identifier;
                     }
                 }
 
                 public class ConstantSpecifier : PrimaryExpression
                 {
-                    private string x;
+                    public string constant { get; }
 
-                    public ConstantSpecifier(string x)
+                    public ConstantSpecifier(string constant)
                     {
-                        this.x = x;
+                        this.constant = constant;
                     }
                 }
 
                 public class StringLiteralSpecifier : PrimaryExpression
                 {
-                    private string x;
+                    public string literal { get; }
 
-                    public StringLiteralSpecifier(string x)
+                    public StringLiteralSpecifier(string literal)
                     {
-                        this.x = x;
+                        this.literal = literal;
                     }
                 }
 
                 public class GroupedExpression : PrimaryExpression
                 {
-                    private Expression x;
+                    public Expression expression { get; }
 
-                    public GroupedExpression(Expression x)
+                    public GroupedExpression(Expression expression)
                     {
-                        this.x = x;
+                        this.expression = expression;
                     }
                 }
 
@@ -174,10 +179,10 @@ namespace CParser2 {
                     public Expression expression { get; }
                     public string identifier { get; }
 
-                    public MemberAccessByValueExpression(Expression x, string _11)
+                    public MemberAccessByValueExpression(Expression expression, string identifier)
                     {
-                        expression = x;
-                        identifier = _11;
+                        this.expression = expression;
+                        this.identifier = identifier;
                     }
                 }
 
@@ -186,10 +191,10 @@ namespace CParser2 {
                     public Expression expression { get; }
                     public string identifier { get; }
 
-                    public MemberAccessByPointerExpression(Expression x, string _11)
+                    public MemberAccessByPointerExpression(Expression expression, string identifier)
                     {
-                        expression = x;
-                        identifier = _11;
+                        this.expression = expression;
+                        this.identifier = identifier;
                     }
                 }
 
@@ -215,13 +220,13 @@ namespace CParser2 {
 
                 public class CompoundLiteralExpression : PostfixExpression
                 {
-                    private TypeName _3;
-                    private string _7;
+                    public TypeName type_name { get; }
+                    public string initializers { get; }
 
-                    public CompoundLiteralExpression(TypeName _3, string _7)
+                    public CompoundLiteralExpression(TypeName typeName, string initializers)
                     {
-                        this._3 = _3;
-                        this._7 = _7;
+                        this.type_name = typeName;
+                        this.initializers = initializers;
                     }
                 }
 
@@ -229,215 +234,113 @@ namespace CParser2 {
 
             public abstract class BinaryExpression : Expression
             {
+                public string op { get; }
+                public Expression lhs_operand { get; }
+                public Expression rhs_operand { get; }
+
+                protected BinaryExpression(string op, Expression lhs_operand, Expression rhs_operand)
+                {
+                    this.op = op;
+                    this.lhs_operand = lhs_operand;
+                    this.rhs_operand = rhs_operand;
+                }
 
                 public class CompoundAssignmentExpression : BinaryExpression
                 {
-                    private Expression _1;
-                    private string _2;
-                    private Expression _3;
-
-                    public CompoundAssignmentExpression(string _2, Expression _1, Expression _3)
-                    {
-                        this._2 = _2;
-                        this._1 = _1;
-                        this._3 = _3;
-                    }
+                    public CompoundAssignmentExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class SimpleAssignmentExpression : BinaryExpression
                 {
-                    private Expression _1;
-                    private string _2;
-                    private Expression _3;
-
-                    public SimpleAssignmentExpression(string _2, Expression _1, Expression _3)
-                    {
-                        this._2 = _2;
-                        this._1 = _1;
-                        this._3 = _3;
-                    }
-                }
-
-                public class ConditionalExpression : BinaryExpression
-                {
-                    private Expression _1;
-                    private string _3;
-                    private Expression _4;
-                    private Expression _6;
-
-                    public ConditionalExpression(Expression _1, Expression _4, Expression _6, string _3)
-                    {
-                        this._1 = _1;
-                        this._4 = _4;
-                        this._6 = _6;
-                        this._3 = _3;
-                    }
+                    public SimpleAssignmentExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class LogicalOrExpression : BinaryExpression
                 {
-                    private Expression s;
-                    private string v;
-                    private Expression y;
-
-                    public LogicalOrExpression(string v, Expression s, Expression y)
-                    {
-                        this.v = v;
-                        this.s = s;
-                        this.y = y;
-                    }
+                    public LogicalOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class LogicalAndExpression : BinaryExpression
                 {
-                    private Expression s;
-                    private string v;
-                    private Expression y;
-
-                    public LogicalAndExpression(string v, Expression s, Expression y)
-                    {
-                        this.v = v;
-                        this.s = s;
-                        this.y = y;
-                    }
+                    public LogicalAndExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class InclusiveOrExpression : BinaryExpression
                 {
-                    private Expression s;
-                    private string v;
-                    private Expression y;
-
-                    public InclusiveOrExpression(string v, Expression s, Expression y)
-                    {
-                        this.v = v;
-                        this.s = s;
-                        this.y = y;
-                    }
+                    public InclusiveOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class ExclusiveOrExpression : BinaryExpression
                 {
-                    private Expression s;
-                    private string v;
-                    private Expression y;
-
-                    public ExclusiveOrExpression(string v, Expression s, Expression y)
-                    {
-                        this.v = v;
-                        this.s = s;
-                        this.y = y;
-                    }
+                    public ExclusiveOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class AndExpression : BinaryExpression
                 {
-                    private Expression s;
-                    private string v;
-                    private Expression y;
-
-                    public AndExpression(string v, Expression s, Expression y)
-                    {
-                        this.v = v;
-                        this.s = s;
-                        this.y = y;
-                    }
+                    public AndExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class EqualityExpression : BinaryExpression
                 {
-                    private string item1;
-                    private Expression item2;
-                    private Expression s;
-
-                    public EqualityExpression(string item1, Expression s, Expression item2)
-                    {
-                        this.item1 = item1;
-                        this.s = s;
-                        this.item2 = item2;
-                    }
+                    public EqualityExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class RelationalExpression : BinaryExpression
                 {
-                    private string item1;
-                    private Expression item2;
-                    private Expression s;
-
-                    public RelationalExpression(string item1, Expression s, Expression item2)
-                    {
-                        this.item1 = item1;
-                        this.s = s;
-                        this.item2 = item2;
-                    }
+                    public RelationalExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class ShiftExpression : BinaryExpression
                 {
-                    private string item1;
-                    private Expression item2;
-                    private Expression s;
-
-                    public ShiftExpression(string item1, Expression s, Expression item2)
-                    {
-                        this.item1 = item1;
-                        this.s = s;
-                        this.item2 = item2;
-                    }
+                    public ShiftExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class AdditiveExpression : BinaryExpression
                 {
-                    private string item1;
-                    private Expression item2;
-                    private Expression s;
-
-                    public AdditiveExpression(string item1, Expression s, Expression item2)
-                    {
-                        this.item1 = item1;
-                        this.s = s;
-                        this.item2 = item2;
-                    }
+                    public AdditiveExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) { }
                 }
 
                 public class MultiplicativeExpression : BinaryExpression
                 {
-                    private string item1;
-                    private Expression item2;
-                    private Expression s;
-
-                    public MultiplicativeExpression(string item1, Expression s, Expression item2)
-                    {
-                        this.item1 = item1;
-                        this.s = s;
-                        this.item2 = item2;
-                    }
+                    public MultiplicativeExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {}
                 }
+            }
 
+            public class ConditionalExpression : Expression
+            {
+                public Expression condition { get; }
+                public Expression then_expression { get; }
+                public Expression else_expression { get; }
+
+                public ConditionalExpression(Expression condition, Expression thenExpression, Expression elseExpression)
+                {
+                    this.condition = condition;
+                    this.then_expression = thenExpression;
+                    this.else_expression = elseExpression;
+                }
             }
 
             public class CommaSeparatedExpression : Expression
             {
-                private Expression[] x;
+                public Expression[] exprs { get; }
 
-                public CommaSeparatedExpression(Expression[] x)
+                public CommaSeparatedExpression(Expression[] exprs)
                 {
-                    this.x = x;
+                    this.exprs = exprs;
                 }
             }
 
             public class CastExpression : Expression
             {
-                private Expression s;
-                private TypeName x;
+                public Expression operand { get; }
+                public TypeName type_name { get; }
 
-                public CastExpression(TypeName x, Expression s)
+                public CastExpression(TypeName typeName, Expression operand)
                 {
-                    this.x = x;
-                    this.s = s;
+                    this.type_name = typeName;
+                    this.operand = operand;
                 }
             }
-
         }
 
         public class Declaration : SyntaxNode
@@ -551,65 +454,65 @@ namespace CParser2 {
 
                 return type_dcls;
             }
+        }
 
-            private class TypeDeclarationBuilder
+        public class TypeDeclarationBuilder
+        {
+            public TypeDeclarationBuilder()
             {
-                public TypeDeclarationBuilder()
+                type_declarations = new List<TypeDeclaration>();
+            }
+
+            public List<TypeDeclaration> type_declarations { get; }
+
+            public void visit_StandardTypeSpecifier(TypeSpecifier.StandardTypeSpecifier node)
+            {
+            }
+
+            public void visit_TypedefTypeSpecifier(TypeSpecifier.TypedefTypeSpecifier node)
+            {
+            }
+
+            public void visit_StructSpecifier(TypeSpecifier.StructSpecifier node)
+            {
+                if (node.struct_declarations != null)
                 {
-                    type_declarations = new List<TypeDeclaration>();
-                }
-
-                public List<TypeDeclaration> type_declarations { get; }
-
-                public void visit_StandardTypeSpecifier(TypeSpecifier.StandardTypeSpecifier node)
-                {
-                }
-
-                public void visit_TypedefTypeSpecifier(TypeSpecifier.TypedefTypeSpecifier node)
-                {
-                }
-
-                public void visit_StructSpecifier(TypeSpecifier.StructSpecifier node)
-                {
-                    if (node.struct_declarations != null)
-                    {
-                        foreach (var child in node.struct_declarations) { child.accept(this); }
-                        type_declarations.Add(new TypeDeclaration.StructTypeDeclaration(node));
-                    }
-                }
-
-                public void visit_UnionSpecifier(TypeSpecifier.UnionSpecifier node)
-                {
-                    if (node.struct_declarations != null)
-                    {
-                        foreach (var child in node.struct_declarations) { child.accept(this); }
-                        type_declarations.Add(new TypeDeclaration.UnionTypeDeclaration(node));
-                    }
-                }
-
-                public void visit_EnumSpecifier(EnumSpecifier node)
-                {
-                    if (node.enumerators != null)
-                    {
-                        type_declarations.Add(new TypeDeclaration.EnumTypeDeclaration(node));
-                    }
-                }
-
-                //private void  visit_typeof_type_specifier(TypeDeclarationBuilder node) {
-                //}
-
-                public void visit_StructDeclaration(StructDeclaration node)
-                {
-                    node.specifier_qualifier_list.accept(this);
-                }
-
-                public void visit_SpecifierQualifierList(SpecifierQualifierList node)
-                {
-                    foreach (var child in node.type_specifiers) { child.accept(this); };
+                    foreach (var child in node.struct_declarations) { child.accept(this); }
+                    type_declarations.Add(new TypeDeclaration.StructTypeDeclaration(node));
                 }
             }
 
+            public void visit_UnionSpecifier(TypeSpecifier.UnionSpecifier node)
+            {
+                if (node.struct_declarations != null)
+                {
+                    foreach (var child in node.struct_declarations) { child.accept(this); }
+                    type_declarations.Add(new TypeDeclaration.UnionTypeDeclaration(node));
+                }
+            }
+
+            public void visit_EnumSpecifier(EnumSpecifier node)
+            {
+                if (node.enumerators != null)
+                {
+                    type_declarations.Add(new TypeDeclaration.EnumTypeDeclaration(node));
+                }
+            }
+
+            //private void  visit_typeof_type_specifier(TypeDeclarationBuilder node) {
+            //}
+
+            public void visit_StructDeclaration(StructDeclaration node)
+            {
+                node.specifier_qualifier_list.accept(this);
+            }
+
+            public void visit_SpecifierQualifierList(SpecifierQualifierList node)
+            {
+                foreach (var child in node.type_specifiers) { child.accept(this); };
+            }
         }
+
 
         public class FunctionDeclaration : SyntaxNode
         {
@@ -999,26 +902,28 @@ namespace CParser2 {
         public class EnumSpecifier : TypeSpecifier
         {
             public string identifier { get; }
-            private bool v2;
             public Enumerator[] enumerators { get; }
+            public bool trailing_comma { get; }
+            public bool anonymous { get; }
 
-            public EnumSpecifier(string v1, Enumerator[] _6, bool v2)
+            public EnumSpecifier(string identifier, Enumerator[] enumerators, bool trailingComma, bool anonymous)
             {
-                identifier = v1;
-                enumerators = _6;
-                this.v2 = v2;
+                this.identifier = identifier;
+                this.enumerators = enumerators;
+                this.trailing_comma = trailingComma;
+                this.anonymous = anonymous;
             }
         }
 
         public class Enumerator
         {
-            private string _1;
-            private object _2;
+            public string identifier { get; }
+            public Expression expression { get; }
 
-            public Enumerator(string _1, object _2)
+            public Enumerator(string identifier, Expression expression)
             {
-                this._1 = _1;
-                this._2 = _2;
+                this.identifier = identifier;
+                this.expression = expression;
             }
         }
 
@@ -1382,37 +1287,35 @@ namespace CParser2 {
             {
                 public class DefaultLabeledStatement : LabeledStatement
                 {
-                    private Expression _2;
-                    private Statement _4;
+                    public Statement statement { get; }
 
-                    public DefaultLabeledStatement(Expression _2, Statement _4)
+                    public DefaultLabeledStatement(Statement statement)
                     {
-                        this._2 = _2;
-                        this._4 = _4;
+                        this.statement = statement;
                     }
                 }
 
                 public class CaseLabeledStatement : LabeledStatement
                 {
-                    private Expression _2;
-                    private Statement _4;
+                    public Expression expression { get; }
+                    public Statement statement { get; }
 
-                    public CaseLabeledStatement(Expression _2, Statement _4)
+                    public CaseLabeledStatement(Expression expression, Statement statement)
                     {
-                        this._2 = _2;
-                        this._4 = _4;
+                        this.expression = expression;
+                        this.statement = statement;
                     }
                 }
 
                 public class GenericLabeledStatement : LabeledStatement
                 {
-                    private string _1;
-                    private Statement _3;
+                    public string label { get; }
+                    public Statement statement { get; }
 
-                    public GenericLabeledStatement(string _1, Statement _3)
+                    public GenericLabeledStatement(string label, Statement statement)
                     {
-                        this._1 = _1;
-                        this._3 = _3;
+                        this.label = label;
+                        this.statement = statement;
                     }
                 }
 
@@ -1420,21 +1323,21 @@ namespace CParser2 {
 
             public class CompoundStatement : Statement
             {
-                private SyntaxNode[] _2;
+                public SyntaxNode[] block_items { get; }
 
-                public CompoundStatement(SyntaxNode[] _2)
+                public CompoundStatement(SyntaxNode[] blockItems)
                 {
-                    this._2 = _2;
+                    this.block_items = blockItems;
                 }
             }
 
             public class ExpressionStatement : Statement
             {
-                private Expression _1;
+                public Expression expression { get; }
 
-                public ExpressionStatement(Expression _1)
+                public ExpressionStatement(Expression expression)
                 {
-                    this._1 = _1;
+                    this.expression = expression;
                 }
             }
 
@@ -1442,27 +1345,27 @@ namespace CParser2 {
             {
                 public class IfStatement : SelectionStatement
                 {
-                    private Expression _3;
-                    private Statement _5;
-                    private Statement _6;
+                    public Expression expression { get; }
+                    public Statement then_statement { get; }
+                    public Statement else_statement { get; }
 
-                    public IfStatement(Expression _3, Statement _5, Statement _6)
+                    public IfStatement(Expression expression, Statement thenStatement, Statement elseStatement)
                     {
-                        this._3 = _3;
-                        this._5 = _5;
-                        this._6 = _6;
+                        this.expression = expression;
+                        this.then_statement = thenStatement;
+                        this.else_statement = elseStatement;
                     }
                 }
 
                 public class SwitchStatement : SelectionStatement
                 {
-                    private Expression _3;
-                    private Statement _5;
+                    public Expression expression { get; }
+                    public Statement statement { get; }
 
-                    public SwitchStatement(Expression _3, Statement _5)
+                    public SwitchStatement(Expression expression, Statement statement)
                     {
-                        this._3 = _3;
-                        this._5 = _5;
+                        this.expression = expression;
+                        this.statement = statement;
                     }
                 }
 
@@ -1472,53 +1375,57 @@ namespace CParser2 {
             {
                 public class C99ForStatement : IterationStatement
                 {
-                    private Declaration _3;
-                    private Statement _4;
-                    private Expression _5;
+                    public Declaration declaration { get; }
+                    public Statement condition_statement { get; }
+                    public Expression expression { get; }
+                    public Statement body_statement { get; }
 
-                    public C99ForStatement(Declaration _3, Statement _4, Expression _5)
+                    public C99ForStatement(Declaration declaration, Statement condition_statement, Expression expression, Statement body_statement)
                     {
-                        this._3 = _3;
-                        this._4 = _4;
-                        this._5 = _5;
+                        this.declaration = declaration;
+                        this.condition_statement = condition_statement;
+                        this.expression = expression;
+                        this.body_statement = body_statement;
                     }
                 }
 
                 public class ForStatement : IterationStatement
                 {
-                    private Statement _3;
-                    private Statement _4;
-                    private Expression _5;
+                    public Statement initial_statement { get; }
+                    public Statement condition_statement { get; }
+                    public Expression expression { get; }
+                    public Statement body_statement { get; }
 
-                    public ForStatement(Statement _3, Statement _4, Expression _5)
+                    public ForStatement(Statement initial_statement, Statement condition_statement, Expression expression, Statement body_statement)
                     {
-                        this._3 = _3;
-                        this._4 = _4;
-                        this._5 = _5;
+                        this.initial_statement = initial_statement;
+                        this.condition_statement = condition_statement;
+                        this.expression = expression;
+                        this.body_statement = body_statement;
                     }
                 }
 
                 public class DoStatement : IterationStatement
                 {
-                    private Statement _2;
-                    private Expression _5;
+                    public Statement statement { get; }
+                    public Expression expression { get; }
 
-                    public DoStatement(Statement _2, Expression _5)
+                    public DoStatement(Statement statement, Expression expression)
                     {
-                        this._2 = _2;
-                        this._5 = _5;
+                        this.statement = statement;
+                        this.expression = expression;
                     }
                 }
 
                 public class WhileStatement : IterationStatement
                 {
-                    private Expression _3;
-                    private Statement _5;
+                    public Expression expression { get; }
+                    public Statement statement { get; }
 
-                    public WhileStatement(Expression _3, Statement _5)
+                    public WhileStatement(Expression expression, Statement statement)
                     {
-                        this._3 = _3;
-                        this._5 = _5;
+                        this.expression = expression;
+                        this.statement = statement;
                     }
                 }
 
@@ -1529,11 +1436,11 @@ namespace CParser2 {
             {
                 public class ReturnStatement : JumpStatement
                 {
-                    private Expression _2;
+                    public Expression expression { get; }
 
-                    public ReturnStatement(Expression _2)
+                    public ReturnStatement(Expression expression)
                     {
-                        this._2 = _2;
+                        this.expression = expression;
                     }
                 }
 
@@ -1547,11 +1454,11 @@ namespace CParser2 {
 
                 public class GotoStatement : JumpStatement
                 {
-                    private string _2;
+                    private string identifier;
 
-                    public GotoStatement(string _2)
+                    public GotoStatement(string identifier)
                     {
-                        this._2 = _2;
+                        this.identifier = identifier;
                     }
                 }
 
@@ -1570,13 +1477,26 @@ namespace CParser2 {
 
         public class TypeName : SyntaxNode
         {
-            private SpecifierQualifierList _1;
-            private Declarator.AbstractDeclarator _2;
+            public SpecifierQualifierList specifier_qualifier_list { get; }
+            public Declarator.AbstractDeclarator abstract_declarator { get; }
+            public TypeDeclaration type_declaration { get; }
 
-            public TypeName(SpecifierQualifierList _1, Declarator.AbstractDeclarator _2)
+            public TypeName(SpecifierQualifierList specifierQualifierList, Declarator.AbstractDeclarator abstractDeclarator)
             {
-                this._1 = _1;
-                this._2 = _2;
+                this.specifier_qualifier_list = specifierQualifierList;
+                this.abstract_declarator = abstractDeclarator;
+                this.type_declaration = build_type_declaration(specifierQualifierList);
+            }
+
+            private TypeDeclaration build_type_declaration(SpecifierQualifierList spec_qual_list) { 
+                foreach (var type_spec in spec_qual_list.type_specifiers) {
+                    var builder = new TypeDeclarationBuilder();
+                    type_spec.accept(builder);
+                    if (builder.type_declarations.Any()) {
+                        return builder.type_declarations.First();
+                    }
+                }
+                return null;
             }
         }
 

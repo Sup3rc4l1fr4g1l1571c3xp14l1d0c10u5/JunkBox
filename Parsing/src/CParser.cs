@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Parsing;
 
-namespace CParser2 {
+namespace cc {
     public static class CParser
     {
         public class ParserStatus {
@@ -30,7 +30,7 @@ namespace CParser2 {
             );
 
         public static readonly Parser<string> whitespace =
-            Combinator.AnyChar(" \t\v\r\n\f").String();
+            Combinator.AnyChar(" \t\v\f").String();
 
         public static readonly Parser<string> block_comment = 
             from _1 in Combinator.Token("/*")
@@ -38,7 +38,8 @@ namespace CParser2 {
             from _3 in Combinator.Token("*/")
             select _1 + _2 + _3;
 
-        public static readonly Parser<string> line_comment = from _1 in Combinator.Token("//")
+        public static readonly Parser<string> line_comment = 
+            from _1 in Combinator.Token("//")
             from _2 in new_line.Not().Then(Combinator.AnyChar()).Many().String()
             from _3 in new_line
             select _1 + _2 + _3;
@@ -48,8 +49,38 @@ namespace CParser2 {
             line_comment
         );
 
+        public static readonly Parser<string> directive_space = Combinator.Choice(block_comment, whitespace);
+
+        public static readonly Parser<string> pragma_line_directive =
+            from _3 in directive_space.Many().Then(Combinator.Token("line"))
+            from _4 in directive_space.Many(1).Then(Combinator.Lazy(() => digits.Select(int.Parse)))
+            from _5 in directive_space.Many(1).Then(Combinator.Token("\""))
+            from _6 in Combinator.Choice(
+                Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
+                Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
+            ).Many(1).Select(String.Concat)
+            from _7 in Combinator.Token("\"")
+            from _8 in directive_space.Many().Then(new_line)
+            select "\n"; // Tuple.Create(_6, _4);
+
+        public static readonly Parser<string> pragma_unknowndirective =
+            from _1 in new_line.Not().Then(Combinator.AnyChar()).Many().String()
+            from _2 in new_line
+            select "\n"; // Tuple.Create(_6, _4);
+
+        public static readonly Parser<string> directive =
+            from _1 in Combinator.Tap((source, pos, failedpos, status) => pos.Column)
+            where _1 == 1
+            from _2 in directive_space.Many().Then(Combinator.Token("#"))
+            from _3 in Combinator.Choice(pragma_line_directive, pragma_unknowndirective)
+            select _3;
+
+
         public static readonly Parser<string> space = Combinator.Choice(
-            new_line, whitespace, comment
+            directive,
+            new_line, 
+            whitespace, 
+            comment
         );
 
         public static readonly Parser<string> spaces = space.Many(1).Select(String.Concat);
@@ -60,7 +91,7 @@ namespace CParser2 {
         public static readonly Parser<string> digits = digit.Many(1).String();
         public static readonly Parser<string> isdigits = digit.Many().String();
 
-        public static readonly Parser<char> alpha = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z'));
+        public static readonly Parser<char> identpart = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_'));
         public static readonly Parser<char> xdigit = Combinator.AnyChar("0123456789ABCDEFabcdef");
 
         public static readonly Parser<string> exponent = 
@@ -78,8 +109,8 @@ namespace CParser2 {
 
         public static readonly Parser<string> identifier =
             from _0 in isspaces
-            from _1 in alpha
-            from _2 in Combinator.Choice(alpha, digit).Many().String()
+            from _1 in identpart
+            from _2 in Combinator.Choice(identpart, digit).Many().String()
             from _3 in isspaces
             select _1 + _2;
 
@@ -140,54 +171,55 @@ namespace CParser2 {
         public static readonly Parser<string> constant =
             isspaces.Then(
                 Combinator.Choice(
+                    string_constant,
+                    float_constant,
                     hex_constant,
                     octal_constant,
-                    decimal_constant,
-                    float_constant,
-                    string_constant
+                    decimal_constant
                 )
             ).Skip(isspaces);
 
-        public static readonly Parser<string> auto_keyword = isspaces.Then(Combinator.Token("auto").Skip(isspaces));
-        public static readonly Parser<string> break_keyword = isspaces.Then(Combinator.Token("break").Skip(isspaces));
-        public static readonly Parser<string> case_keyword = isspaces.Then(Combinator.Token("case").Skip(isspaces));
-        public static readonly Parser<string> char_keyword = isspaces.Then(Combinator.Token("char").Skip(isspaces));
-        public static readonly Parser<string> const_keyword = isspaces.Then(Combinator.Token("const").Skip(isspaces));
-        public static readonly Parser<string> continue_keyword = isspaces.Then(Combinator.Token("continue").Skip(isspaces));
-        public static readonly Parser<string> default_keyword = isspaces.Then(Combinator.Token("default").Skip(isspaces));
-        public static readonly Parser<string> do_keyword = isspaces.Then(Combinator.Token("do").Skip(isspaces));
-        public static readonly Parser<string> double_keyword = isspaces.Then(Combinator.Token("double").Skip(isspaces));
-        public static readonly Parser<string> else_keyword = isspaces.Then(Combinator.Token("else").Skip(isspaces));
-        public static readonly Parser<string> enum_keyword = isspaces.Then(Combinator.Token("enum").Skip(isspaces));
-        public static readonly Parser<string> extern_keyword = isspaces.Then(Combinator.Token("extern").Skip(isspaces));
-        public static readonly Parser<string> float_keyword = isspaces.Then(Combinator.Token("float").Skip(isspaces));
-        public static readonly Parser<string> for_keyword = isspaces.Then(Combinator.Token("for").Skip(isspaces));
-        public static readonly Parser<string> goto_keyword = isspaces.Then(Combinator.Token("goto").Skip(isspaces));
-        public static readonly Parser<string> if_keyword = isspaces.Then(Combinator.Token("if").Skip(isspaces));
-        public static readonly Parser<string> int_keyword = isspaces.Then(Combinator.Token("int").Skip(isspaces));
-        public static readonly Parser<string> long_keyword = isspaces.Then(Combinator.Token("long").Skip(isspaces));
-        public static readonly Parser<string> register_keyword = isspaces.Then(Combinator.Token("register").Skip(isspaces));
-        public static readonly Parser<string> return_keyword = isspaces.Then(Combinator.Token("return").Skip(isspaces));
-        public static readonly Parser<string> short_keyword = isspaces.Then(Combinator.Token("short").Skip(isspaces));
-        public static readonly Parser<string> signed_keyword = isspaces.Then(Combinator.Token("signed").Skip(isspaces));
-        public static readonly Parser<string> sizeof_keyword = isspaces.Then(Combinator.Token("sizeof").Skip(isspaces));
-        public static readonly Parser<string> static_keyword = isspaces.Then(Combinator.Token("static").Skip(isspaces));
-        public static readonly Parser<string> struct_keyword = isspaces.Then(Combinator.Token("struct").Skip(isspaces));
-        public static readonly Parser<string> switch_keyword = isspaces.Then(Combinator.Token("switch").Skip(isspaces));
-        public static readonly Parser<string> typedef_keyword = isspaces.Then(Combinator.Token("typedef").Skip(isspaces));
-        public static readonly Parser<string> union_keyword = isspaces.Then(Combinator.Token("union").Skip(isspaces));
-        public static readonly Parser<string> unsigned_keyword = isspaces.Then(Combinator.Token("unsigned").Skip(isspaces));
-        public static readonly Parser<string> void_keyword = isspaces.Then(Combinator.Token("void").Skip(isspaces));
-        public static readonly Parser<string> volatile_keyword = isspaces.Then(Combinator.Token("volatile").Skip(isspaces));
-        public static readonly Parser<string> while_keyword = isspaces.Then(Combinator.Token("while").Skip(isspaces));
+        public static readonly Parser<string> auto_keyword = identifier.Where(x => x == "auto");
+        public static readonly Parser<string> break_keyword = identifier.Where(x => x == "break");
+        public static readonly Parser<string> case_keyword = identifier.Where(x => x == "case");
+        public static readonly Parser<string> char_keyword = identifier.Where(x => x == "char");
+        public static readonly Parser<string> const_keyword = identifier.Where(x => x == "const");
+        public static readonly Parser<string> continue_keyword = identifier.Where(x => x == "continue");
+        public static readonly Parser<string> default_keyword = identifier.Where(x => x == "default");
+        public static readonly Parser<string> do_keyword = identifier.Where(x => x == "do");
+        public static readonly Parser<string> double_keyword = identifier.Where(x => x == "double");
+        public static readonly Parser<string> else_keyword = identifier.Where(x => x == "else");
+        public static readonly Parser<string> enum_keyword = identifier.Where(x => x == "enum");
+        public static readonly Parser<string> extern_keyword = identifier.Where(x => x == "extern");
+        public static readonly Parser<string> float_keyword = identifier.Where(x => x == "float");
+        public static readonly Parser<string> for_keyword = identifier.Where(x => x == "for");
+        public static readonly Parser<string> goto_keyword = identifier.Where(x => x == "goto");
+        public static readonly Parser<string> if_keyword = identifier.Where(x => x == "if");
+        public static readonly Parser<string> int_keyword = identifier.Where(x => x == "int");
+        public static readonly Parser<string> long_keyword = identifier.Where(x => x == "long");
+        public static readonly Parser<string> register_keyword = identifier.Where(x => x == "register");
+        public static readonly Parser<string> return_keyword = identifier.Where(x => x == "return");
+        public static readonly Parser<string> short_keyword = identifier.Where(x => x == "short");
+        public static readonly Parser<string> signed_keyword = identifier.Where(x => x == "signed");
+        public static readonly Parser<string> sizeof_keyword = identifier.Where(x => x == "sizeof");
+        public static readonly Parser<string> static_keyword = identifier.Where(x => x == "static");
+        public static readonly Parser<string> struct_keyword = identifier.Where(x => x == "struct");
+        public static readonly Parser<string> switch_keyword = identifier.Where(x => x == "switch");
+        public static readonly Parser<string> typedef_keyword = identifier.Where(x => x == "typedef");
+        public static readonly Parser<string> union_keyword = identifier.Where(x => x == "union");
+        public static readonly Parser<string> unsigned_keyword = identifier.Where(x => x == "unsigned");
+        public static readonly Parser<string> void_keyword = identifier.Where(x => x == "void");
+        public static readonly Parser<string> volatile_keyword = identifier.Where(x => x == "volatile");
+        public static readonly Parser<string> while_keyword = identifier.Where(x => x == "while");
 
-        public static readonly Parser<string> bool_keyword = isspaces.Then(Combinator.Token("_Bool").Skip(isspaces));
-        public static readonly Parser<string> complex_keyword = isspaces.Then(Combinator.Token("_Complex").Skip(isspaces));
-        public static readonly Parser<string> imaginary_keyword = isspaces.Then(Combinator.Token("_Imaginary").Skip(isspaces));
-        public static readonly Parser<string> restrict_keyword = isspaces.Then(Combinator.Token("restrict").Skip(isspaces));
-        public static readonly Parser<string> inline_keyword = isspaces.Then(Combinator.Token("inline").Skip(isspaces));
+        public static readonly Parser<string> bool_keyword = identifier.Where(x => x == "_Bool");
+        public static readonly Parser<string> complex_keyword = identifier.Where(x => x == "_Complex");
+        public static readonly Parser<string> imaginary_keyword = identifier.Where(x => x == "_Imaginary");
+        public static readonly Parser<string> restrict_keyword = identifier.Where(x => x == "restrict");
+        public static readonly Parser<string> inline_keyword = identifier.Where(x => x == "inline");
+        public static readonly Parser<string> builtin_va_list_keyword = identifier.Where(x => x == "__builtin_va_list");
 
-    public static readonly Parser<string> typedef_name = Combinator.Choice(
+        public static readonly Parser<string> typedef_name = Combinator.Choice(
             auto_keyword,
             break_keyword,
             case_keyword,
@@ -224,8 +256,9 @@ namespace CParser2 {
             complex_keyword,
             imaginary_keyword,
             restrict_keyword,
-            inline_keyword
-        ).Not().Then(identifier).Where((x,s) => LinkedList.First(y => (y.Item1 == x), ((ParserStatus)s).typedefed_list) != null);
+            inline_keyword,
+            builtin_va_list_keyword
+        ).Not().Then(identifier).Memoize().Where((x,s) => LinkedList.First(y => (y.Item1 == x), ((ParserStatus)s).typedefed_list) != null);
 
 
         public static readonly Parser<string> ellipsis = isspaces.Then(Combinator.Token("...").Skip(isspaces));
@@ -238,16 +271,17 @@ namespace CParser2 {
         public static readonly Parser<string> question_mark = isspaces.Then(Combinator.Token("?").Skip(isspaces));
 
         public static readonly Parser<string> string_literal =
-            from _0 in isspace
+            isspace.Then(
             from _1 in Combinator.Token("L").Option()
             from _2 in Combinator.Token("\"")
             from _3 in Combinator.Choice(
                 Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
                 Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
-            ).Many(1)
+            ).Many()
             from _4 in Combinator.Token("\"")
             from _5 in isspaces
-            select _1 + _2 + _3 + 4;
+            select _1 + _2 + _3 + 4
+            ).Many(1).Select(string.Concat);
 
         public static readonly Parser<string> left_brace =
             isspaces.Then(Combinator.Choice(Combinator.Token("{"), Combinator.Token("<%")).Skip(isspaces));
@@ -331,7 +365,48 @@ namespace CParser2 {
 
         #region Syntax rules
 
-        public static readonly Parser<string> IDENTIFIER = identifier;
+        public static readonly Parser<string> IDENTIFIER =
+            Combinator.Choice(
+                auto_keyword,
+                break_keyword,
+                case_keyword,
+                char_keyword,
+                const_keyword,
+                continue_keyword,
+                default_keyword,
+                do_keyword,
+                double_keyword,
+                else_keyword,
+                enum_keyword,
+                extern_keyword,
+                float_keyword,
+                for_keyword,
+                goto_keyword,
+                if_keyword,
+                int_keyword,
+                long_keyword,
+                register_keyword,
+                return_keyword,
+                short_keyword,
+                signed_keyword,
+                sizeof_keyword,
+                static_keyword,
+                struct_keyword,
+                switch_keyword,
+                typedef_keyword,
+                union_keyword,
+                unsigned_keyword,
+                void_keyword,
+                volatile_keyword,
+                while_keyword,
+                bool_keyword,
+                complex_keyword,
+                imaginary_keyword,
+                restrict_keyword,
+                inline_keyword,
+                builtin_va_list_keyword
+            ).Not().Then(identifier).Memoize();
+
         public static readonly Parser<string> TYPEDEF_NAME = typedef_name;
         public static readonly Parser<string> CONSTANT = constant;
 
@@ -503,7 +578,7 @@ namespace CParser2 {
                     from _4 in expression
                     from _5 in colon
                     from _6 in conditional_expression
-                    select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(_1, _4, _6, _3)
+                    select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(_1, _4, _6)
                 ).Option()
                 select _2 ?? _1
             )
@@ -515,6 +590,7 @@ namespace CParser2 {
                 from _2 in assign
                 from _3 in assignment_expression
                 select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression(_2, _1, _3),
+
                 from _1 in cast_expression
                 from _2 in compound_assignment_operator
                 from _3 in assignment_expression
@@ -604,7 +680,7 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.TypeSpecifier> type_specifier = Combinator.Lazy(() => Combinator.Choice(
                 Combinator.Choice(void_keyword, char_keyword, short_keyword, int_keyword, long_keyword, float_keyword,
-                    double_keyword, signed_keyword, unsigned_keyword, bool_keyword, complex_keyword, imaginary_keyword,
+                    double_keyword, signed_keyword, unsigned_keyword, bool_keyword, complex_keyword, imaginary_keyword, builtin_va_list_keyword,
                     typedef_name).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
                 struct_or_union_specifier.Select(x => x),
                 enum_specifier.Select(x => (SyntaxNode.TypeSpecifier)x)
@@ -679,14 +755,14 @@ namespace CParser2 {
                     from _6 in enumerator_list
                     from _7 in comma.Option()
                     from _8 in right_brace
-                    select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null)).Option()
-                select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false),
+                    select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)).Option()
+                select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false),
 
                 from _5 in left_brace
                 from _6 in enumerator_list
                 from _7 in comma.Option()
                 from _8 in right_brace
-                select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null)
+                select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
             )
             select _2
         );
@@ -792,13 +868,20 @@ namespace CParser2 {
         );
 
         public static readonly Parser<string[]> pointer = Combinator.Lazy(() => Combinator.Choice(
-                from _1 in multiply select new[] { _1 },
-                from _1 in multiply from _2 in type_qualifier_list select _2.Concat(new[] { _1 }).ToArray(),
-                from _1 in multiply from _2 in pointer select _2.Concat(new[] { _1 }).ToArray(),
                 from _1 in multiply
                 from _2 in type_qualifier_list
                 from _3 in pointer
-                select _2.Concat(new[] { _1 }).Concat(_3).ToArray()
+                select _2.Concat(new[] { _1 }).Concat(_3).ToArray(),
+
+                from _1 in multiply
+                from _2 in type_qualifier_list
+                select _2.Concat(new[] { _1 }).ToArray(),
+                
+                from _1 in multiply
+                from _2 in pointer
+                select _2.Concat(new[] { _1 }).ToArray(),
+                
+                from _1 in multiply select new[] { _1 }
             )
         );
 
@@ -940,7 +1023,7 @@ namespace CParser2 {
             from _1 in designation.Option()
             from _2 in initializer
             select Tuple.Create(_1, _2)
-        ).Many(1));
+        ).Repeat1(comma));
 
         public static readonly Parser<SyntaxNode.Initializer.Designator[]> designation = Combinator.Lazy(() => designator_list.Skip(assign));
 
@@ -975,10 +1058,9 @@ namespace CParser2 {
             from _4 in statement
             select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement(_2, _4),
             from _1 in default_keyword
-            from _2 in constant_expression
             from _3 in colon
             from _4 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement(_2, _4)
+            select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement(_4)
         ));
 
         public static readonly Parser<string> label_name = Combinator.Lazy(() => Combinator.Choice(IDENTIFIER, TYPEDEF_NAME));
@@ -1018,8 +1100,7 @@ namespace CParser2 {
             select (SyntaxNode.Statement)new SyntaxNode.Statement.SelectionStatement.IfStatement(_3, _5, _6),
             from _1 in switch_keyword
             from _2 in left_paren
-            from _3 in expression.Select(x =>
-            {
+            from _3 in expression.Select(x => {
                 x.full = true;
                 return x;
             })
@@ -1031,50 +1112,50 @@ namespace CParser2 {
         public static readonly Parser<SyntaxNode.Statement> iteration_statement = Combinator.Lazy(() => Combinator.Choice(
             from _1 in while_keyword
             from _2 in left_paren
-            from _3 in expression.Select(x =>
-            {
+            from _3 in expression.Select(x => {
                 x.full = true;
                 return x;
             })
             from _4 in right_paren
             from _5 in statement
             select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.WhileStatement(_3, _5),
+            
             from _1 in do_keyword
             from _2 in statement
             from _3 in while_keyword
             from _4 in left_paren
-            from _5 in expression.Select(x =>
-            {
+            from _5 in expression.Select(x => {
                 x.full = true;
                 return x;
             })
             from _6 in right_paren
             from _7 in semicolon
             select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.DoStatement(_2, _5),
-            from _1 in for_keyword
-            from _2 in left_paren
-            from _3 in expression_statement
-            from _4 in expression_statement
-            from _5 in expression.Select(x =>
-            {
-                x.full = true;
-                return x;
-            }).Option()
-            from _6 in right_paren
-            from _7 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.ForStatement(_3, _4, _5),
+            
             from _1 in for_keyword
             from _2 in left_paren
             from _3 in declaration
             from _4 in expression_statement
-            from _5 in expression.Select(x =>
-            {
+            from _5 in expression.Select(x => {
                 x.full = true;
                 return x;
             }).Option()
             from _6 in right_paren
             from _7 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.C99ForStatement(_3, _4, _5)
+            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.C99ForStatement(_3, _4, _5, _7),
+
+            from _1 in for_keyword
+            from _2 in left_paren
+            from _3 in expression_statement
+            from _4 in expression_statement
+            from _5 in expression.Select(x => {
+                x.full = true;
+                return x;
+            }).Option()
+            from _6 in right_paren
+            from _7 in statement
+            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.ForStatement(_3, _4, _5, _7)
+
         ));
 
         public static readonly Parser<SyntaxNode.Statement> jump_statement = Combinator.Lazy(() => Combinator.Choice(
