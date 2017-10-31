@@ -2,19 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using CParser2;
 using Parsing;
 
-namespace cc {
+namespace CParser2 {
     public static class CParser
     {
         public class ParserStatus {
-            public LinkedList<Tuple<string, SyntaxNode>> typedefed_list { get; }
+            public CParser2.LinkedList<Tuple<string, SyntaxNode>> typedefed_list { get; }
 
             public ParserStatus()
             {
-                this.typedefed_list = LinkedList<Tuple<string, SyntaxNode>>.Empty;
+                this.typedefed_list = CParser2.LinkedList<Tuple<string, SyntaxNode>>.Empty;
             }
-            public ParserStatus(LinkedList<Tuple<string, SyntaxNode>> typedefed_list)
+            public ParserStatus(CParser2.LinkedList<Tuple<string, SyntaxNode>> typedefed_list)
             {
                 this.typedefed_list = typedefed_list;
             }
@@ -1078,11 +1079,14 @@ namespace cc {
                 statement.Select(x => (SyntaxNode)x) /*, local_function_definition.Select(x => (SyntaxNode)x) */));
 
         public static readonly Parser<SyntaxNode.Statement> expression_statement = Combinator.Lazy(() =>
-            from _1 in expression.Select(x =>
+            from _1 in (
+                from __2 in Combinator.Tap((src, pos, fpos, st) => true)
+                from __1 in expression
+                select eval(() =>
             {
-                x.full = true;
-                return x;
-            }).Option()
+                __1.full = true;
+                return __1;
+            })).Option()
             from _2 in semicolon
             select (SyntaxNode.Statement)new SyntaxNode.Statement.ExpressionStatement(_1));
 

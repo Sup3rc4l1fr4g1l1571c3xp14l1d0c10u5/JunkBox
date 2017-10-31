@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace cc
+namespace CParser2
 {
     /// <summary>
     /// 連結リスト

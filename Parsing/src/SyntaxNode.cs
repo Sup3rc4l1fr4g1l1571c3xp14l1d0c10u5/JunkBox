@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
-namespace cc {
+namespace CParser2 {
     public abstract class SyntaxNode
     {
         public abstract class Expression : SyntaxNode
@@ -532,8 +532,8 @@ namespace cc {
 
         public class VariableDeclaration : SyntaxNode
         {
-            private DeclarationSpecifiers declaration_specifiers;
-            private Declarator declarator;
+            public DeclarationSpecifiers declaration_specifiers { get; }
+            public Declarator declarator { get; }
 
             public string identifier
             {
@@ -1111,7 +1111,7 @@ namespace cc {
 
                 public class AnsiFunctionDeclarator : FunctionDeclarator
                 {
-                    private ParameterTypeList parameter_type_list;
+                    public ParameterTypeList parameter_type_list { get; }
 
                     public override string[] identifier_list
                     {
@@ -1454,7 +1454,7 @@ namespace cc {
 
                 public class GotoStatement : JumpStatement
                 {
-                    private string identifier;
+                    public string identifier { get; }
 
                     public GotoStatement(string identifier)
                     {
