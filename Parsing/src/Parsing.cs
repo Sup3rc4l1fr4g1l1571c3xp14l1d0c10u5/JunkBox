@@ -8,26 +8,35 @@ using System.Text;
 
 namespace Parsing {
     public class Source {
+        /// <summary>
+        /// 読み取った入力を格納するバッファ
+        /// </summary>
         private StringBuilder Buffer { get; }
 
+        /// <summary>
+        /// 入力ストリーム
+        /// </summary>
         private TextReader Reader { get; }
 
-        public bool Eos {
-            get { return Buffer.Length == 0 && Eof; }
-        }
+        /// <summary>
+        /// 入力の終端に到達したら真
+        /// </summary>
+        public bool Eof { get; private set; }
 
-        public virtual string Name { get; } // 名前
+        /// <summary>
+        /// 入力ソース名
+        /// </summary>
+        public string Name { get; } // 名前
 
-        private bool Eof { get; set; }
 
         public Source(string name, TextReader reader) {
-            Name = name;
-            Reader = reader;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            Reader = reader ?? throw new ArgumentNullException(nameof(reader));
             Buffer = new StringBuilder();
             Eof = false;
         }
 
-        public virtual int this[int index] {
+        public int this[int index] {
             get {
                 if (Buffer.Length <= index) {
                     if (Eof == false) {
@@ -54,24 +63,27 @@ namespace Parsing {
             return true;
         }
 
-        public void Discard(int start) {
-            Buffer.Remove(0, start);
-        }
-
-        public void DiscardAll() {
-            Buffer.Clear();
-        }
     }
 
 
     /// <summary>
     ///     パーサの位置情報
     /// </summary>
-    public class Position {
+    public class Position : IComparer<Position> {
         public int Index { get; } // 文字列上の位置
         public int Row { get; } // 行
         public int Column { get; } // 列
         private char PrevChar { get; }
+
+        public int Compare(Position x, Position y) {
+            if (x == null && y == null) { return 0; }
+            if (x == null             ) { return 1; }
+            if (             y == null) { return -1; }
+            return x.Index.CompareTo(y.Index);
+        }
+
+        public static bool operator >(Position lhs, Position rhs) => lhs.Index > rhs.Index;
+        public static bool operator <(Position lhs, Position rhs) => lhs.Index < rhs.Index;
 
         public override bool Equals(object obj) {
             return (obj as Position)?.Index == Index;
@@ -151,16 +163,6 @@ namespace Parsing {
 
             return new Position(index, row, col, prevChar);
         }
-        public Position MostFar(Position p) {
-            return Index > p.Index ? this : p;
-        }
-
-        public Position Discard(int index) {
-            if (Index < index) {
-                throw new IndexOutOfRangeException(nameof(index));
-            }
-            return new Position(Index - index, Row, Column, PrevChar);
-        }
     }
 
     /// <summary>
@@ -225,7 +227,7 @@ namespace Parsing {
             if (Success != other.Success) {
                 return false;
             }
-            if (Position.Index != other.Position.Index) {
+            if (!Equals(Position, other.Position)) {
                 return false;
             }
             if (Value is IStructuralEquatable) {
@@ -287,7 +289,7 @@ namespace Parsing {
         /// <returns></returns>
         public static Parser<T> Empty<T>() {
             return (target, position, failedPosition, status) => {
-                var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
+                var fpos = (position > failedPosition) ? position : failedPosition;
                 return Result<T>.Reject(default(T), position, fpos, status);
             };
         }
@@ -308,8 +310,8 @@ namespace Parsing {
                 if (target.StartsWith(position.Index, str)) {
                     return Result<string>.Accept(str, position.Inc(str), failedPosition, status);
                 } else {
-                    var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
-                    return Result<string>.Reject(null, position, fpos, status);
+                    var newFailedPosition = (position > failedPosition) ? position : failedPosition;
+                    return Result<string>.Reject(null, position, newFailedPosition, status);
                 }
             };
         }
@@ -336,28 +338,33 @@ namespace Parsing {
 
                 var result = new List<T>();
 
-                var pos = position;
-                var fpos = failedPosition;
-                var st = status;
+                var currentPosition = position;
+                var currentFailedPosition = failedPosition;
+                var currentStatus = status;
+
                 for (; ; )
                 {
-                    var parsed = parser(target, pos, fpos, st);
-                    if (parsed.FailedPosition.Index > fpos.Index) {
-                        fpos = parsed.FailedPosition;
-                    }
+                    var parsed = parser(target, currentPosition, currentFailedPosition, currentStatus);
+
+                    // 読み取り失敗位置はより読み進んでいる方を採用
+                    currentFailedPosition = (parsed.FailedPosition > currentFailedPosition) ? parsed.FailedPosition : currentFailedPosition;
+
                     if (!parsed.Success) {
-                        fpos = (fpos.Index > position.Index) ? fpos : position;
+                        // 読み取りに失敗したので、読み取り開始位置と読み取り失敗位置のうち、より読み進んでいる方をManyパーサの読み取り失敗位置として採用
+                        currentFailedPosition = (currentFailedPosition > currentPosition) ? currentFailedPosition : currentPosition;
                         break;
+                    } else {
+                        // 読み取りに成功したので情報を更新
+                        result.Add(parsed.Value); // 結果を格納
+                        currentPosition = parsed.Position; // 読み取り位置を更新する
+                        currentStatus = parsed.Status;
                     }
-                    result.Add(parsed.Value); // 結果を格納
-                    pos = parsed.Position; // 読み取り位置を更新する
-                    st = parsed.Status;
                 }
-                var ret = result.ToArray();
-                if (min >= 0 && ret.Length < min || max >= 0 && ret.Length > max) {
-                    return Result<T[]>.Reject(new T[0], position, fpos, status);
+
+                if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
+                    return Result<T[]>.Reject(new T[0], position, currentFailedPosition, status);
                 } else {
-                    return Result<T[]>.Accept(ret, pos, fpos, st);
+                    return Result<T[]>.Accept(result.ToArray(), currentPosition, currentFailedPosition, currentStatus);
                 }
             });
         }
@@ -381,19 +388,16 @@ namespace Parsing {
                 }
 
                 var lastFailedPosition = failedPosition;
-                var lastStatus = status;
                 foreach (var parser in parsers) {
-                    var parsed = parser(target, position, lastFailedPosition, lastStatus);
-                    if (parsed.FailedPosition.Index > lastFailedPosition.Index) {
-                        lastFailedPosition = parsed.FailedPosition;
-                    }
-                    lastStatus = parsed.Status;
+                    var parsed = parser(target, position, lastFailedPosition, status);
+                    lastFailedPosition = (parsed.FailedPosition > lastFailedPosition) ? parsed.FailedPosition : lastFailedPosition;
+
                     if (parsed.Success) {
                         return parsed;
                     }
                 }
-                var fpos = (position.Index > lastFailedPosition.Index) ? position : lastFailedPosition;
-                return Result<T>.Reject(default(T), position, fpos, status);
+                var newFailedPosition = (position > lastFailedPosition) ? position : lastFailedPosition;
+                return Result<T>.Reject(default(T), position, newFailedPosition, status);
             };
         }
 
@@ -416,26 +420,26 @@ namespace Parsing {
                 }
                 var result = new List<T>();
 
-                var pos = position;
-                var fpos = failedPosition;
-                var st = status;
+                var currentPosition = position;
+                var currentFailedPosition = failedPosition;
+                var currentStatus = status;
 
                 foreach (var parser in parsers) {
-                    var parsed = parser(target, pos, fpos, st);
-                    fpos = parsed.FailedPosition;
+                    var parsed = parser(target, currentPosition, currentFailedPosition, currentStatus);
+                    currentFailedPosition = parsed.FailedPosition;
 
                     if (parsed.Success) {
                         result.Add(parsed.Value);
-                        pos = parsed.Position;
-                        st = parsed.Status;
+                        currentPosition = parsed.Position;
+                        currentStatus = parsed.Status;
                     } else {
-                        if (pos.Index > fpos.Index) {
-                            fpos = pos;
+                        if (currentPosition > currentFailedPosition) {
+                            currentFailedPosition = currentPosition;
                         }
-                        return Result<T[]>.Reject(null, position, fpos, status);
+                        return Result<T[]>.Reject(null, position, currentFailedPosition, status);
                     }
                 }
-                return Result<T[]>.Accept(result.ToArray(), pos, fpos, st);
+                return Result<T[]>.Accept(result.ToArray(), currentPosition, currentFailedPosition, currentStatus);
             };
         }
 #if false /// <summary>
@@ -485,8 +489,8 @@ namespace Parsing {
                 }
                 var ch = target[position.Index];
                 if (ch == -1) {
-                    var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
-                    return Result<char>.Reject(default(char), position, fpos, status);
+                    var newFailedPosition = (position > failedPosition) ? position : failedPosition;
+                    return Result<char>.Reject(default(char), position, newFailedPosition, status);
                 } else {
                     return Result<char>.Accept((char)ch, position.Inc((char)ch), failedPosition, status);
                 }
@@ -512,8 +516,8 @@ namespace Parsing {
                 if (ch != -1 && dict.Contains((char)ch)) {
                     return Result<char>.Accept((char)ch, position.Inc((char)ch), failedPosition, status);
                 } else {
-                    var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
-                    return Result<char>.Reject(default(char), position, fpos, status);
+                    var newFailedPosition = (position > failedPosition) ? position : failedPosition;
+                    return Result<char>.Reject(default(char), position, newFailedPosition, status);
                 }
             };
         }
@@ -536,8 +540,8 @@ namespace Parsing {
                 if (ch != -1 && pred((char)ch)) {
                     return Result<char>.Accept((char)ch, position.Inc((char)ch), failedPosition, status);
                 } else {
-                    var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
-                    return Result<char>.Reject(default(char), position, fpos, status);
+                    var newFailedPosition = (position > failedPosition) ? position : failedPosition;
+                    return Result<char>.Reject(default(char), position, newFailedPosition, status);
                 }
             };
         }
@@ -553,8 +557,8 @@ namespace Parsing {
                 }
                 var ch = target[position.Index];
                 if (ch != -1) {
-                    var fpos = (position.Index > failedPosition.Index) ? position : failedPosition;
-                    return Result<char>.Reject(default(char), position, fpos, status);
+                    var newFailedPosition = (position > failedPosition) ? position : failedPosition;
+                    return Result<char>.Reject(default(char), position, newFailedPosition, status);
                 } else {
                     return Result<char>.Accept((char)ch, position, failedPosition, status);
                 }
@@ -581,10 +585,8 @@ namespace Parsing {
                 Result<T> parsed;
                 if (memoization.TryGetValue(key, out parsed)) {
                     // メモ化してもFailedPositionについてはチェック
-                    var fpos = (failedPosition.Index > parsed.FailedPosition.Index)
-                        ? failedPosition
-                        : parsed.FailedPosition;
-                    return new Result<T>(parsed.Success, parsed.Value, parsed.Position, fpos, parsed.Status);
+                    var newFailedPosition = (failedPosition > parsed.FailedPosition) ? failedPosition : parsed.FailedPosition;
+                    return new Result<T>(parsed.Success, parsed.Value, parsed.Position, newFailedPosition, parsed.Status);
                 }
 
                 parsed = parser(target, position, failedPosition, status);
@@ -701,8 +703,8 @@ namespace Parsing {
                 if (parsed.Success) {
                     return Result<TOutput>.Accept(fn(parsed.Value), parsed.Position, parsed.FailedPosition, parsed.Status);
                 } else {
-                    var fpos = (position.Index > parsed.FailedPosition.Index) ? position : parsed.FailedPosition;
-                    return Result<TOutput>.Reject(default(TOutput), position, fpos, status);
+                    var newFailedPosition = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    return Result<TOutput>.Reject(default(TOutput), position, newFailedPosition, status);
                 }
             };
         }
@@ -725,12 +727,12 @@ namespace Parsing {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                var res = parser(target, position, failedPosition, status);
-                if (!res.Success || !fn(res.Value)) {
-                    var fpos = (position.Index > res.FailedPosition.Index) ? position : res.FailedPosition;
-                    return Result<T>.Reject(default(T), position, fpos, status);
+                var parsed = parser(target, position, failedPosition, status);
+                if (!parsed.Success || !fn(parsed.Value)) {
+                    var newFailedPosition = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    return Result<T>.Reject(default(T), position, newFailedPosition, status);
                 }
-                return Result<T>.Accept(res.Value, res.Position, res.FailedPosition, res.Status);
+                return Result<T>.Accept(parsed.Value, parsed.Position, parsed.FailedPosition, parsed.Status);
             };
         }
 
@@ -747,12 +749,12 @@ namespace Parsing {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                var res = parser(target, position, failedPosition, status);
-                if (!res.Success || !fn(res.Value, res.Status)) {
-                    var fpos = (position.Index > res.FailedPosition.Index) ? position : res.FailedPosition;
-                    return Result<T>.Reject(default(T), position, fpos, status);
+                var parsed = parser(target, position, failedPosition, status);
+                if (!parsed.Success || !fn(parsed.Value, parsed.Status)) {
+                    var newFailedPosition = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    return Result<T>.Reject(default(T), position, newFailedPosition, status);
                 } else {
-                    return Result<T>.Accept(res.Value, res.Position, res.FailedPosition, res.Status);
+                    return Result<T>.Accept(parsed.Value, parsed.Position, parsed.FailedPosition, parsed.Status);
                 }
             };
         }
@@ -775,8 +777,8 @@ namespace Parsing {
                 if (parsed.Success == false) {
                     return Result<T>.Accept(default(T), position, parsed.FailedPosition, status);
                 } else {
-                    var fpos = (position.Index > parsed.FailedPosition.Index) ? position : parsed.FailedPosition;
-                    return Result<T>.Reject(default(T), position, fpos, status);
+                    var newFailedPosition = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    return Result<T>.Reject(default(T), position, newFailedPosition, status);
                 }
             };
         }
@@ -869,18 +871,18 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(projector));
             }
             return (target, position, failedPosition, status) => {
-                var res = parser(target, position, failedPosition, status);
-                if (!res.Success) {
-                    var fpos = (position.Index > res.FailedPosition.Index) ? position : res.FailedPosition;
-                    return Result<TOutput>.Reject(default(TOutput), position, fpos, status);
+                var parsed1 = parser(target, position, failedPosition, status);
+                if (!parsed1.Success) {
+                    var newFailedPosition = (position > parsed1.FailedPosition) ? position : parsed1.FailedPosition;
+                    return Result<TOutput>.Reject(default(TOutput), position, newFailedPosition, status);
                 }
 
-                var tmp = selector(res.Value)(target, res.Position, res.FailedPosition, res.Status);
-                if (!tmp.Success) {
-                    var fpos = (position.Index > tmp.FailedPosition.Index) ? position : tmp.FailedPosition;
-                    return Result<TOutput>.Reject(default(TOutput), position, fpos, status);
+                var parsed2 = selector(parsed1.Value)(target, parsed1.Position, parsed1.FailedPosition, parsed1.Status);
+                if (!parsed2.Success) {
+                    var newFailedPosition = (position > parsed2.FailedPosition) ? position : parsed2.FailedPosition;
+                    return Result<TOutput>.Reject(default(TOutput), position, newFailedPosition, status);
                 }
-                return Result<TOutput>.Accept(projector(res.Value, tmp.Value), tmp.Position, tmp.FailedPosition, tmp.Status);
+                return Result<TOutput>.Accept(projector(parsed1.Value, parsed2.Value), parsed2.Position, parsed2.FailedPosition, parsed2.Status);
             };
         }
 

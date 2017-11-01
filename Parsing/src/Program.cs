@@ -23,6 +23,7 @@ namespace CParser2
                     var ret = CParser.translation_unit(target, Position.Empty, Position.Empty, new CParser.ParserStatus());
                     sw.Stop();
                     Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
+                    ret.Value.Save("ast.xml");
                 }
 
             }

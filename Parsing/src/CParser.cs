@@ -2,21 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using CParser2;
 using Parsing;
 
 namespace CParser2 {
-    public static class CParser
-    {
+    public static class CParser {
         public class ParserStatus {
-            public CParser2.LinkedList<Tuple<string, SyntaxNode>> typedefed_list { get; }
+            public LinkedList<Tuple<string, SyntaxNode>> typedefed_list { get; }
 
-            public ParserStatus()
-            {
-                this.typedefed_list = CParser2.LinkedList<Tuple<string, SyntaxNode>>.Empty;
+            public ParserStatus() {
+                this.typedefed_list = LinkedList<Tuple<string, SyntaxNode>>.Empty;
             }
-            public ParserStatus(CParser2.LinkedList<Tuple<string, SyntaxNode>> typedefed_list)
-            {
+            public ParserStatus(LinkedList<Tuple<string, SyntaxNode>> typedefed_list) {
                 this.typedefed_list = typedefed_list;
             }
         }
@@ -30,27 +26,27 @@ namespace CParser2 {
                 Combinator.Token("\n")
             );
 
-        public static readonly Parser<string> whitespace =
-            Combinator.AnyChar(" \t\v\f").String();
+        public static readonly Parser<string> whitespaces =
+            Combinator.AnyChar(" \t\v\f").Many(1).String();
 
-        public static readonly Parser<string> block_comment = 
+        public static readonly Parser<string> block_comment =
             from _1 in Combinator.Token("/*")
             from _2 in Combinator.Token("*/").Not().Then(Combinator.AnyChar()).Many().String()
             from _3 in Combinator.Token("*/")
             select _1 + _2 + _3;
 
-        public static readonly Parser<string> line_comment = 
+        public static readonly Parser<string> line_comment =
             from _1 in Combinator.Token("//")
             from _2 in new_line.Not().Then(Combinator.AnyChar()).Many().String()
             from _3 in new_line
             select _1 + _2 + _3;
 
         public static readonly Parser<string> comment = Combinator.Choice(
-            block_comment, 
+            block_comment,
             line_comment
         );
 
-        public static readonly Parser<string> directive_space = Combinator.Choice(block_comment, whitespace);
+        public static readonly Parser<string> directive_space = Combinator.Choice(block_comment, whitespaces);
 
         public static readonly Parser<string> pragma_line_directive =
             from _3 in directive_space.Many().Then(Combinator.Token("line"))
@@ -79,8 +75,8 @@ namespace CParser2 {
 
         public static readonly Parser<string> space = Combinator.Choice(
             directive,
-            new_line, 
-            whitespace, 
+            new_line,
+            whitespaces,
             comment
         );
 
@@ -92,13 +88,14 @@ namespace CParser2 {
         public static readonly Parser<string> digits = digit.Many(1).String();
         public static readonly Parser<string> isdigits = digit.Many().String();
 
-        public static readonly Parser<char> identpart = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_'));
+        public static readonly Parser<char> identpart_x  = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_'));
+        public static readonly Parser<char> identpart_xs = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_') || ('0' <= x && x <= '9'));
         public static readonly Parser<char> xdigit = Combinator.AnyChar("0123456789ABCDEFabcdef");
 
-        public static readonly Parser<string> exponent = 
+        public static readonly Parser<string> exponent =
             from _1 in Combinator.AnyChar("eE").String()
             from _2 in Combinator.AnyChar("+-").Option().String()
-            from _3 in digit.Many(1).String()
+            from _3 in digits
             select _1 + _2 + _3;
 
         public static readonly Parser<char> float_size = Combinator.AnyChar("fFlL");
@@ -109,11 +106,11 @@ namespace CParser2 {
         public static readonly Parser<string> isint_size = int_size.Option();
 
         public static readonly Parser<string> identifier =
-            from _0 in isspaces
-            from _1 in identpart
-            from _2 in Combinator.Choice(identpart, digit).Many().String()
-            from _3 in isspaces
-            select _1 + _2;
+            from _1 in isspaces
+            from _2 in identpart_x
+            from _3 in identpart_xs.Many().String()
+            from _4 in isspaces
+            select _2 + _3;
 
         public static readonly Parser<string> hex_constant =
             from _1 in Combinator.Choice(Combinator.Token("0x"), Combinator.Token("0X"))
@@ -136,7 +133,6 @@ namespace CParser2 {
             select _1 + _2;
 
         public static readonly Parser<string> string_constant =
-            from _0 in isspaces
             from _1 in Combinator.Token("L").Option()
             from _2 in Combinator.Token("'")
             from _3 in Combinator.Choice(
@@ -218,49 +214,50 @@ namespace CParser2 {
         public static readonly Parser<string> imaginary_keyword = identifier.Where(x => x == "_Imaginary");
         public static readonly Parser<string> restrict_keyword = identifier.Where(x => x == "restrict");
         public static readonly Parser<string> inline_keyword = identifier.Where(x => x == "inline");
+
         public static readonly Parser<string> builtin_va_list_keyword = identifier.Where(x => x == "__builtin_va_list");
 
-        public static readonly Parser<string> typedef_name = Combinator.Choice(
-            auto_keyword,
-            break_keyword,
-            case_keyword,
-            char_keyword,
-            const_keyword,
-            continue_keyword,
-            default_keyword,
-            do_keyword,
-            double_keyword,
-            else_keyword,
-            enum_keyword,
-            extern_keyword,
-            float_keyword,
-            for_keyword,
-            goto_keyword,
-            if_keyword,
-            int_keyword,
-            long_keyword,
-            register_keyword,
-            return_keyword,
-            short_keyword,
-            signed_keyword,
-            sizeof_keyword,
-            static_keyword,
-            struct_keyword,
-            switch_keyword,
-            typedef_keyword,
-            union_keyword,
-            unsigned_keyword,
-            void_keyword,
-            volatile_keyword,
-            while_keyword,
-            bool_keyword,
-            complex_keyword,
-            imaginary_keyword,
-            restrict_keyword,
-            inline_keyword,
-            builtin_va_list_keyword
-        ).Not().Then(identifier).Memoize().Where((x,s) => LinkedList.First(y => (y.Item1 == x), ((ParserStatus)s).typedefed_list) != null);
 
+        public static readonly HashSet<string> reserved_words = new HashSet<string>() {
+            "auto",
+            "break",
+            "case",
+            "char",
+            "const",
+            "continue",
+            "default",
+            "do",
+            "double",
+            "else",
+            "enum",
+            "extern",
+            "float",
+            "for",
+            "goto",
+            "if",
+            "int",
+            "long",
+            "register",
+            "return",
+            "short",
+            "signed",
+            "sizeof",
+            "static",
+            "struct",
+            "switch",
+            "typedef",
+            "union",
+            "unsigned",
+            "void",
+            "volatile",
+            "while",
+            "_Bool",
+            "_Complex",
+            "_Imaginary",
+            "restrict",
+            "inline",
+            "__builtin_va_list",
+        };
 
         public static readonly Parser<string> ellipsis = isspaces.Then(Combinator.Token("...").Skip(isspaces));
         public static readonly Parser<string> semicolon = isspaces.Then(Combinator.Token(";").Skip(isspaces));
@@ -362,54 +359,14 @@ namespace CParser2 {
         public static readonly Parser<string> inverse =
             isspaces.Then(Combinator.Token("~").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces));
 
+        public static readonly Parser<string> IDENTIFIER = identifier.Where(x => !reserved_words.Contains(x));
+        public static readonly Parser<string> TYPEDEF_NAME = identifier.Where((x, s) => !reserved_words.Contains(x) && LinkedList.First(y => (y.Item1 == x), ((ParserStatus)s).typedefed_list) != null);
+        public static readonly Parser<string> CONSTANT = constant;
+
         #endregion
 
         #region Syntax rules
 
-        public static readonly Parser<string> IDENTIFIER =
-            Combinator.Choice(
-                auto_keyword,
-                break_keyword,
-                case_keyword,
-                char_keyword,
-                const_keyword,
-                continue_keyword,
-                default_keyword,
-                do_keyword,
-                double_keyword,
-                else_keyword,
-                enum_keyword,
-                extern_keyword,
-                float_keyword,
-                for_keyword,
-                goto_keyword,
-                if_keyword,
-                int_keyword,
-                long_keyword,
-                register_keyword,
-                return_keyword,
-                short_keyword,
-                signed_keyword,
-                sizeof_keyword,
-                static_keyword,
-                struct_keyword,
-                switch_keyword,
-                typedef_keyword,
-                union_keyword,
-                unsigned_keyword,
-                void_keyword,
-                volatile_keyword,
-                while_keyword,
-                bool_keyword,
-                complex_keyword,
-                imaginary_keyword,
-                restrict_keyword,
-                inline_keyword,
-                builtin_va_list_keyword
-            ).Not().Then(identifier).Memoize();
-
-        public static readonly Parser<string> TYPEDEF_NAME = typedef_name;
-        public static readonly Parser<string> CONSTANT = constant;
 
         //#
         //# Expressions
@@ -646,15 +603,13 @@ namespace CParser2 {
             )
         );
 
-        public static readonly Parser<SyntaxNode.DeclarationSpecifiers> declaration_specifiers = Combinator.Lazy(() => Combinator
-            .Choice(
-                storage_class_specifier.Select(x =>
-                    (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.storage_class_specifier = x; })),
+        public static readonly Parser<SyntaxNode.DeclarationSpecifiers> declaration_specifiers = Combinator.Lazy(() => 
+            Combinator.Choice(
+                storage_class_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.storage_class_specifier = x; })),
                 type_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.type_specifiers.Add(x); })),
                 type_qualifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.type_qualifiers.Add(x); })),
                 function_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.function_specifier = x; }))
-            ).Many(1).Select(x => x.Aggregate(new SyntaxNode.DeclarationSpecifiers(), (s, y) =>
-            {
+            ).Many(1).Select(x => x.Aggregate(new SyntaxNode.DeclarationSpecifiers(), (s, y) => {
                 y(s);
                 return s;
             }))
@@ -682,7 +637,7 @@ namespace CParser2 {
         public static readonly Parser<SyntaxNode.TypeSpecifier> type_specifier = Combinator.Lazy(() => Combinator.Choice(
                 Combinator.Choice(void_keyword, char_keyword, short_keyword, int_keyword, long_keyword, float_keyword,
                     double_keyword, signed_keyword, unsigned_keyword, bool_keyword, complex_keyword, imaginary_keyword, builtin_va_list_keyword,
-                    typedef_name).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
+                    TYPEDEF_NAME).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
                 struct_or_union_specifier.Select(x => x),
                 enum_specifier.Select(x => (SyntaxNode.TypeSpecifier)x)
             )
@@ -713,7 +668,7 @@ namespace CParser2 {
 
         private static string create_anon_tag_name(string _1)
         {
-            return $"_#{_1}{anonCounter++}";
+            return $"#<{_1} id='{anonCounter++}'>";
         }
 
         public static readonly Parser<SyntaxNode.StructDeclaration[]> struct_declaration_list =
@@ -1214,14 +1169,10 @@ namespace CParser2 {
                     from _1 in declaration_specifiers
                     from _2 in declarator
                     from _3 in compound_statement
-                    select (_2 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator)
-                        ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
-                        : (_2 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)
-                            ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2,
-                                new List<SyntaxNode.Declaration>(), _3)
-                            : (_2 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator)
-                                ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
-                                : null
+                    select (_2 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator       ) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
+                         : (_2 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator      ) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2, new List<SyntaxNode.Declaration>(), _3)
+                         : (_2 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
+                         : null
                 ),
                 (
                     from _1 in declarator
