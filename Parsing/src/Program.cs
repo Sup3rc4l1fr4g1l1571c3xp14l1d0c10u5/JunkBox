@@ -16,14 +16,13 @@ namespace CParser2
                     var ret = CParser.expression_statement(target, Position.Empty, Position.Empty, new CParser.ParserStatus());
                 }
                 using (var reader = new StreamReader(arg)) {
-                    var target = new Source("", reader);
-
                     var sw = new System.Diagnostics.Stopwatch();
                     sw.Start();
-                    var ret = CParser.translation_unit(target, Position.Empty, Position.Empty, new CParser.ParserStatus());
+                    var ret = CParser.Parse(reader);
                     sw.Stop();
+                    Console.WriteLine($"Result: {(ret.Success?"Success" : $"Failed at {ret.FailedPosition}")}");
                     Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
-                    ret.Value.Save("ast.xml");
+                    //ret?.Value.Save("ast.xml");
                 }
 
             }

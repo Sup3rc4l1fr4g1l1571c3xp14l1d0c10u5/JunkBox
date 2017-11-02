@@ -331,7 +331,7 @@ namespace Parsing {
                 throw new ArgumentException("min < max");
             }
 
-            return Memoize((target, position, failedPosition, status) => {
+            return ((target, position, failedPosition, status) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
@@ -574,14 +574,14 @@ namespace Parsing {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
-            Dictionary<Tuple<Source, Position>, Result<T>> memoization = new Dictionary<Tuple<Source, Position>, Result<T>>();
+            Dictionary<Tuple<Source, Position, object>, Result<T>> memoization = new Dictionary<Tuple<Source, Position, object>, Result<T>>();
 
             return (target, position, failedPosition, status) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
 
-                var key = Tuple.Create(target, position);
+                var key = Tuple.Create(target, position, status);
                 Result<T> parsed;
                 if (memoization.TryGetValue(key, out parsed)) {
                     // メモ化してもFailedPositionについてはチェック
@@ -591,6 +591,31 @@ namespace Parsing {
 
                 parsed = parser(target, position, failedPosition, status);
                 memoization.Add(key, parsed);
+                return parsed;
+            };
+        }
+
+        static Dictionary<string,List<Tuple<Position,bool>>> TraceInfo = new Dictionary<string, List<Tuple<Position, bool>>>();
+
+        /// <summary>
+        ///     パーサのトレース（デバッグ・チューニング用）
+        /// </summary>
+        /// <param name="parser">パーサ</param>
+        /// <returns></returns>
+        public static Parser<T> Trace<T>(string caption, Parser<T> parser) {
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
+            }
+
+            TraceInfo[caption] = new List<Tuple<Position, bool>>();
+
+            return (target, position, failedPosition, status) => {
+                if (target == null) {
+                    throw new ArgumentNullException(nameof(target));
+                }
+
+                var parsed = parser(target, position, failedPosition, status);
+                TraceInfo[caption].Add(Tuple.Create(position, parsed.Success));
                 return parsed;
             };
         }
@@ -612,7 +637,7 @@ namespace Parsing {
                 }
 
                 if (parser == null) {
-                    parser = Memoize(fn());
+                    parser = (fn());
                     if (parser == null) {
                         throw new Exception("fn() result is null.");
                     }
@@ -801,9 +826,9 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(rhs));
             }
             return
-                from _4 in self
-                from _5 in rhs
-                select _5;
+                from _1 in self
+                from _2 in rhs
+                select _2;
         }
 
         /// <summary>

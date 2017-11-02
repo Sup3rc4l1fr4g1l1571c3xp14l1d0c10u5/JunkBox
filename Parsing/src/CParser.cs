@@ -12,6 +12,7 @@ namespace CParser2 {
             public ParserStatus() {
                 this.typedefed_list = LinkedList<Tuple<string, SyntaxNode>>.Empty;
             }
+
             public ParserStatus(LinkedList<Tuple<string, SyntaxNode>> typedefed_list) {
                 this.typedefed_list = typedefed_list;
             }
@@ -41,12 +42,14 @@ namespace CParser2 {
             from _3 in new_line
             select _1 + _2 + _3;
 
-        public static readonly Parser<string> comment = Combinator.Choice(
-            block_comment,
-            line_comment
-        );
+        public static readonly Parser<string> comment =
+            Combinator.Choice(
+                block_comment,
+                line_comment
+            );
 
-        public static readonly Parser<string> directive_space = Combinator.Choice(block_comment, whitespaces);
+        public static readonly Parser<string> directive_space =
+            Combinator.Choice(block_comment, whitespaces);
 
         public static readonly Parser<string> pragma_line_directive =
             from _3 in directive_space.Many().Then(Combinator.Token("line"))
@@ -73,24 +76,33 @@ namespace CParser2 {
             select _3;
 
 
-        public static readonly Parser<string> space = Combinator.Choice(
-            directive,
-            new_line,
-            whitespaces,
-            comment
-        );
+        public static readonly Parser<string> space =
+            Combinator.Choice(
+                directive,
+                new_line,
+                whitespaces,
+                comment
+            );
 
-        public static readonly Parser<string> spaces = space.Many(1).Select(String.Concat);
-        public static readonly Parser<string> isspace = space.Option();
-        public static readonly Parser<string> isspaces = space.Many().Select(String.Concat);
+        //public static readonly Parser<string> spaces = space.Many(1).Select(String.Concat);
+        //public static readonly Parser<string> isspace = space.Option();
+        public static readonly Parser<string> isspaces = space.Many().Select(String.Concat).Memoize();
 
-        public static readonly Parser<char> digit = Combinator.AnyChar("0123456789");
+        public static readonly Parser<char> digit =
+            Combinator.AnyChar("0123456789");
+
         public static readonly Parser<string> digits = digit.Many(1).String();
         public static readonly Parser<string> isdigits = digit.Many().String();
 
-        public static readonly Parser<char> identpart_x  = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_'));
-        public static readonly Parser<char> identpart_xs = Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_') || ('0' <= x && x <= '9'));
-        public static readonly Parser<char> xdigit = Combinator.AnyChar("0123456789ABCDEFabcdef");
+        public static readonly Parser<char> identpart_x =
+            Combinator.AnyChar(x => ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_'));
+
+        public static readonly Parser<char> identpart_xs =
+            Combinator.AnyChar(x =>
+                ('a' <= x && x <= 'z') || ('A' <= x && x <= 'Z') || (x == '_') || ('0' <= x && x <= '9'));
+
+        public static readonly Parser<char> xdigit =
+            Combinator.AnyChar("0123456789ABCDEFabcdef");
 
         public static readonly Parser<string> exponent =
             from _1 in Combinator.AnyChar("eE").String()
@@ -98,19 +110,24 @@ namespace CParser2 {
             from _3 in digits
             select _1 + _2 + _3;
 
-        public static readonly Parser<char> float_size = Combinator.AnyChar("fFlL");
-        public static readonly Parser<string> int_size = Combinator.AnyChar("uUlL").Many(1).String();
+        public static readonly Parser<char> float_size =
+            Combinator.AnyChar("fFlL");
+
+        public static readonly Parser<string> int_size =
+            Combinator.AnyChar("uUlL").Many(1).String();
 
         public static readonly Parser<string> isexponent = exponent.Option();
         public static readonly Parser<char> isfloat_size = float_size.Option();
         public static readonly Parser<string> isint_size = int_size.Option();
 
         public static readonly Parser<string> identifier =
-            from _1 in isspaces
-            from _2 in identpart_x
-            from _3 in identpart_xs.Many().String()
-            from _4 in isspaces
-            select _2 + _3;
+            Combinator.Memoize(
+                from _1 in isspaces
+                from _2 in identpart_x
+                from _3 in identpart_xs.Many().String()
+                from _4 in isspaces
+                select _2 + _3
+            );
 
         public static readonly Parser<string> hex_constant =
             from _1 in Combinator.Choice(Combinator.Token("0x"), Combinator.Token("0X"))
@@ -269,16 +286,16 @@ namespace CParser2 {
         public static readonly Parser<string> question_mark = isspaces.Then(Combinator.Token("?").Skip(isspaces));
 
         public static readonly Parser<string> string_literal =
-            isspace.Then(
-            from _1 in Combinator.Token("L").Option()
-            from _2 in Combinator.Token("\"")
-            from _3 in Combinator.Choice(
-                Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
-                Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
-            ).Many()
-            from _4 in Combinator.Token("\"")
-            from _5 in isspaces
-            select _1 + _2 + _3 + 4
+            isspaces.Then(
+                from _1 in Combinator.Token("L").Option()
+                from _2 in Combinator.Token("\"")
+                from _3 in Combinator.Choice(
+                    Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
+                    Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
+                ).Many()
+                from _4 in Combinator.Token("\"")
+                from _5 in isspaces
+                select _1 + _2 + _3 + 4
             ).Many(1).Select(string.Concat);
 
         public static readonly Parser<string> left_brace =
@@ -294,7 +311,9 @@ namespace CParser2 {
             isspaces.Then(Combinator.Choice(Combinator.Token("]"), Combinator.Token(":>")).Skip(isspaces));
 
 
-        public static readonly Parser<string> right_shift_assign = isspaces.Then(Combinator.Token(">>=").Skip(isspaces));
+        public static readonly Parser<string> right_shift_assign = isspaces.Then(Combinator.Token(">>=").Skip(isspaces))
+            ;
+
         public static readonly Parser<string> left_shift_assign = isspaces.Then(Combinator.Token("<<=").Skip(isspaces));
         public static readonly Parser<string> add_assign = isspaces.Then(Combinator.Token("+=").Skip(isspaces));
         public static readonly Parser<string> subtract_assign = isspaces.Then(Combinator.Token("-=").Skip(isspaces));
@@ -360,839 +379,1077 @@ namespace CParser2 {
             isspaces.Then(Combinator.Token("~").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces));
 
         public static readonly Parser<string> IDENTIFIER = identifier.Where(x => !reserved_words.Contains(x));
-        public static readonly Parser<string> TYPEDEF_NAME = identifier.Where((x, s) => !reserved_words.Contains(x) && LinkedList.First(y => (y.Item1 == x), ((ParserStatus)s).typedefed_list) != null);
+
+        public static readonly Parser<string> TYPEDEF_NAME = identifier.Where((x, s) =>
+            !reserved_words.Contains(x) &&
+            LinkedList.First(y => (y.Item1 == x), ((ParserStatus) s).typedefed_list) != null);
+
         public static readonly Parser<string> CONSTANT = constant;
 
         #endregion
 
         #region Syntax rules
 
-
         //#
         //# Expressions
         //#
 
-        public static readonly Parser<SyntaxNode.Expression> primary_expression = Combinator.Lazy(() => Combinator.Choice(
-            IDENTIFIER.Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.ObjectSpecifier(x)),
-            CONSTANT.Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.ConstantSpecifier(x)),
-            string_literal.Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.StringLiteralSpecifier(x)),
-            //NULL.Select(x => (SyntaxNode.Expression)new NullConstantSpecifier(x)),
-            left_paren.Then(expression).Skip(right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.GroupedExpression(x))
-            //left_paren.Then(compound_statement).Skip(right_paren).Select(x => (SyntaxNode.Expression)new ErrorExpression(x))
-        ));
+        public static readonly Parser<SyntaxNode.Expression> primary_expression =
+            Combinator.Trace("primary_expression",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        IDENTIFIER.Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.PrimaryExpression.ObjectSpecifier(x)),
+                        CONSTANT.Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.PrimaryExpression.ConstantSpecifier(x)),
+                        string_literal.Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.PrimaryExpression.StringLiteralSpecifier(x)),
+                        //NULL.Select(x => (SyntaxNode.Expression)new NullConstantSpecifier(x)),
+                        left_paren.Then(expression).Skip(right_paren).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.PrimaryExpression.GroupedExpression(x))
+                        //left_paren.Then(compound_statement).Skip(right_paren).Select(x => (SyntaxNode.Expression)new ErrorExpression(x))
+                    )
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.Expression> postfix_expression = Combinator.Lazy(() =>
-            from _1 in Combinator.Choice(
-                from _2 in left_paren
-                from _3 in type_name
-                from _4 in right_paren
-                from _5 in left_brace
-                from _6 in initializer_list
-                from _7 in comma.Option()
-                from _8 in right_brace
-                select (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression(_3, _7),
-                primary_expression
-            )
-            from _9 in Combinator.Choice(
-                from _10 in left_bracket
-                from _11 in expression
-                from _12 in right_bracket
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.ArraySubscriptExpression(x, _11)),
-                from _10 in left_paren
-                from _11 in argument_expression_list.Option()
-                from _12 in right_paren
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x =>
-                    (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.FunctionCallExpression(x, _11 ?? new SyntaxNode.Expression[0])),
-                from _10 in member_access
-                from _11 in IDENTIFIER
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByValueExpression(x, _11)),
-                from _10 in pointer_access
-                from _11 in IDENTIFIER
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByPointerExpression(x, _11)),
-                //from _10 in member_access
-                //from _11 in CONSTANT
-                //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new BitAccessByValueExpression(x, _11)),
-                //from _10 in pointer_access
-                //from _11 in CONSTANT
-                //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new BitAccessByPointerExpression(x, _11)),
-                from _10 in inc
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixIncrementExpression(x)),
-                from _10 in dec
-                select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixDecrementExpression(x))
-            ).Many()
-            select _9.Aggregate(_1, (s, x) => x(s))
-        );
+        public static readonly Parser<SyntaxNode.Expression> postfix_expression =
+            Combinator.Trace("postfix_expression",
+                Combinator.Lazy(() =>
+                    from _1 in Combinator.Choice(
+                        from _2 in left_paren
+                        from _3 in type_name
+                        from _4 in right_paren
+                        from _5 in left_brace
+                        from _6 in initializer_list
+                        from _7 in comma.Option()
+                        from _8 in right_brace
+                        select (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression(_3, _7)
+                        ,
+                        primary_expression
+                    )
+                    from _9 in Combinator.Choice(
+                        from _10 in left_bracket
+                        from _11 in expression
+                        from _12 in right_bracket
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.ArraySubscriptExpression(x, _11))
+                        ,
+                        from _10 in left_paren
+                        from _11 in argument_expression_list.Option()
+                        from _12 in right_paren
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.FunctionCallExpression(x, _11 ?? new SyntaxNode.Expression[0]))
+                        ,
+                        from _10 in member_access
+                        from _11 in IDENTIFIER
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.MemberAccessByValueExpression(x, _11))
+                        ,
+                        from _10 in pointer_access
+                        from _11 in IDENTIFIER
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.MemberAccessByPointerExpression(x, _11))
+                        ,
+                        //from _10 in member_access
+                        //from _11 in CONSTANT
+                        //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new BitAccessByValueExpression(x, _11)),
+                        //from _10 in pointer_access
+                        //from _11 in CONSTANT
+                        //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new BitAccessByPointerExpression(x, _11)),
+                        from _10 in inc
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.PostfixIncrementExpression(x))
+                        ,
+                        from _10 in dec
+                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new SyntaxNode.Expression.PostfixExpression.PostfixDecrementExpression(x))
+                    ).Many()
+                    select _9.Aggregate(_1, (s, x) => x(s))
+                )
+            );
 
         public static readonly Parser<SyntaxNode.Expression[]> argument_expression_list =
-            Combinator.Lazy(() => assignment_expression.Repeat1(comma));
+            Combinator.Trace("argument_expression_list",
+                Combinator.Lazy(() => assignment_expression.Repeat1(comma))
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> unary_expression = Combinator.Lazy(() => Combinator.Choice(
-            inc.Then(unary_expression).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixIncrementExpression("++", x)),
-            dec.Then(unary_expression).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixDecrementExpression("--", x)),
-            binary_and.Then(cast_expression).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.AddressExpression("&", x)),
-            multiply.Then(cast_expression).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.IndirectionExpression("*", x)),
-            from _1 in unary_arithmetic_operator
-            from _2 in cast_expression
-            select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression(_1, _2),
-            sizeof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofExpression("sizeof", x)),
-            from _1 in sizeof_keyword
-            from _2 in left_paren
-            from _3 in type_name
-            from _4 in right_paren
-            select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofTypeExpression(_1, _3),
-            //alighof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression)new AlignofExpression("alignof", x)),
-            //from _1 in alighof_keyword from _2 in left_paren from _3 in type_name from _4 in right_paren select (SyntaxNode.Expression)new AlignofTypeExpression(_1, _3)
-            postfix_expression
-        ));
+        public static readonly Parser<SyntaxNode.Expression> unary_expression =
+            Combinator.Trace("unary_expression",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        inc.Then(unary_expression).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.PrefixIncrementExpression("++", x))
+                        ,
+                        dec.Then(unary_expression).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.PrefixDecrementExpression("--", x))
+                        ,
+                        binary_and.Then(cast_expression).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.AddressExpression("&", x))
+                        ,
+                        multiply.Then(cast_expression).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.IndirectionExpression("*", x))
+                        ,
+                        from _1 in unary_arithmetic_operator
+                        from _2 in cast_expression
+                        select (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression(_1, _2)
+                        ,
+                        sizeof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.SizeofExpression("sizeof", x))
+                        ,
+                        from _1 in sizeof_keyword
+                        from _2 in left_paren
+                        from _3 in type_name
+                        from _4 in right_paren
+                        select (SyntaxNode.Expression) new SyntaxNode.Expression.UnaryExpression.SizeofTypeExpression(_1, _3)
+                        ,
+                        //alighof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression)new AlignofExpression("alignof", x)),
+                        //from _1 in alighof_keyword from _2 in left_paren from _3 in type_name from _4 in right_paren select (SyntaxNode.Expression)new AlignofTypeExpression(_1, _3)
+                        postfix_expression
+                    )
+                )
+            );
 
-        public static readonly Parser<string> unary_arithmetic_operator = Combinator.Lazy(() =>
-            Combinator.Choice(add, subtract, inverse, negate)
-        );
+        public static readonly Parser<string> unary_arithmetic_operator =
+            Combinator.Trace("unary_arithmetic_operator",
+                Combinator.Choice(add, subtract, inverse, negate)
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> cast_expression = Combinator.Lazy(() =>
-            from _1 in left_paren.Then(type_name).Skip(right_paren).Many()
-            from _2 in unary_expression
-            select _1.Reverse().Aggregate(_2, (s, x) => new SyntaxNode.Expression.CastExpression(x, s))
-        );
+        public static readonly Parser<SyntaxNode.Expression> cast_expression =
+            Combinator.Trace("cast_expression",
+                Combinator.Lazy(() =>
+                    from _1 in left_paren.Then(type_name).Skip(right_paren).Many()
+                    from _2 in unary_expression
+                    select _1.Reverse().Aggregate(_2, (s, x) => new SyntaxNode.Expression.CastExpression(x, s))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> multiplicative_expression = Combinator.Lazy(() =>
-            from _1 in cast_expression
-            from _2 in (
-                from _3 in Combinator.Choice(multiply, divide, modulus)
-                from _4 in cast_expression
-                select Tuple.Create(_3, _4)
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression(x.Item1, s, x.Item2))
-        );
+        public static readonly Parser<SyntaxNode.Expression> multiplicative_expression =
+            Combinator.Trace("multiplicative_expression",
+                Combinator.Lazy(() =>
+                    from _1 in cast_expression
+                    from _2 in (
+                        from _3 in Combinator.Choice(multiply, divide, modulus)
+                        from _4 in cast_expression
+                        select Tuple.Create(_3, _4)
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression(x.Item1, s, x.Item2))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> additive_expression = Combinator.Lazy(() =>
-            from _1 in multiplicative_expression
-            from _2 in (
-                from _3 in Combinator.Choice(add, subtract)
-                from _4 in multiplicative_expression
-                select Tuple.Create(_3, _4)
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.AdditiveExpression(x.Item1, s, x.Item2))
-        );
+        public static readonly Parser<SyntaxNode.Expression> additive_expression =
+            Combinator.Trace("additive_expression",
+                Combinator.Lazy(() =>
+                    from _1 in multiplicative_expression
+                    from _2 in (
+                        from _3 in Combinator.Choice(add, subtract)
+                        from _4 in multiplicative_expression
+                        select Tuple.Create(_3, _4)
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.AdditiveExpression(x.Item1, s, x.Item2))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> shift_expression = Combinator.Lazy(() =>
-            from _1 in additive_expression
-            from _2 in (
-                from _3 in Combinator.Choice(left_shift, right_shift)
-                from _4 in additive_expression
-                select Tuple.Create(_3, _4)
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.ShiftExpression(x.Item1, s, x.Item2))
-        );
+        public static readonly Parser<SyntaxNode.Expression> shift_expression =
+            Combinator.Trace("shift_expression",
+                Combinator.Lazy(() =>
+                    from _1 in additive_expression
+                    from _2 in (
+                        from _3 in Combinator.Choice(left_shift, right_shift)
+                        from _4 in additive_expression
+                        select Tuple.Create(_3, _4)
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.ShiftExpression(x.Item1, s, x.Item2))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> relational_expression = Combinator.Lazy(() =>
-            from _1 in shift_expression
-            from _2 in (
-                from _3 in Combinator.Choice(less_equal, less, greater_equal, greater)
-                from _4 in shift_expression
-                select Tuple.Create(_3, _4)
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.RelationalExpression(x.Item1, s, x.Item2))
-        );
+        public static readonly Parser<SyntaxNode.Expression> relational_expression =
+            Combinator.Trace("relational_expression",
+                Combinator.Lazy(() =>
+                    from _1 in shift_expression
+                    from _2 in (
+                        from _3 in Combinator.Choice(less_equal, less, greater_equal, greater)
+                        from _4 in shift_expression
+                        select Tuple.Create(_3, _4)
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.RelationalExpression(x.Item1, s, x.Item2))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> equality_expression = Combinator.Lazy(() =>
-            from _1 in relational_expression
-            from _2 in (
-                from _3 in Combinator.Choice(equal, not_equal)
-                from _4 in relational_expression
-                select Tuple.Create(_3, _4)
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.EqualityExpression(x.Item1, s, x.Item2))
-        );
+        public static readonly Parser<SyntaxNode.Expression> equality_expression =
+            Combinator.Trace("equality_expression",
+                Combinator.Lazy(() =>
+                    from _1 in relational_expression
+                    from _2 in (
+                        from _3 in Combinator.Choice(equal, not_equal)
+                        from _4 in relational_expression
+                        select Tuple.Create(_3, _4)
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => new SyntaxNode.Expression.BinaryExpression.EqualityExpression(x.Item1, s, x.Item2))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> and_expression = Combinator.Lazy(() =>
-            equality_expression.Repeat1(binary_and).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.AndExpression("&", s, y)))
-        );
+        public static readonly Parser<SyntaxNode.Expression> and_expression =
+            Combinator.Trace("and_expression",
+                Combinator.Lazy(() =>
+                    equality_expression.Repeat1(binary_and).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.AndExpression("&", s, y)))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> exclusive_or_expression = Combinator.Lazy(() =>
-            and_expression.Repeat1(xor).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.ExclusiveOrExpression("^", s, y)))
-        );
+        public static readonly Parser<SyntaxNode.Expression> exclusive_or_expression =
+            Combinator.Trace("exclusive_or_expression",
+                Combinator.Lazy(() =>
+                    and_expression.Repeat1(xor).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.ExclusiveOrExpression("^", s, y)))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> inclusive_or_expression = Combinator.Lazy(() =>
-            exclusive_or_expression.Repeat1(binary_or)
-                .Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.InclusiveOrExpression("|", s, y)))
-        );
+        public static readonly Parser<SyntaxNode.Expression> inclusive_or_expression =
+            Combinator.Trace("inclusive_or_expression",
+                Combinator.Lazy(() =>
+                    exclusive_or_expression.Repeat1(binary_or).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.InclusiveOrExpression("|", s, y)))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> logical_and_expression = Combinator.Lazy(() =>
-            inclusive_or_expression.Repeat1(logical_and)
-                .Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalAndExpression("&&", s, y)))
-        );
+        public static readonly Parser<SyntaxNode.Expression> logical_and_expression =
+            Combinator.Trace("logical_and_expression",
+                Combinator.Lazy(() =>
+                    inclusive_or_expression.Repeat1(logical_and) .Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalAndExpression("&&", s, y)))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> logical_or_expression = Combinator.Lazy(() =>
-            logical_and_expression.Repeat1(logical_or)
-                .Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalOrExpression("||", s, y)))
-        );
+        public static readonly Parser<SyntaxNode.Expression> logical_or_expression =
+            Combinator.Trace("logical_or_expression",
+                Combinator.Lazy(() =>
+                    logical_and_expression.Repeat1(logical_or).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalOrExpression("||", s, y)))
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Expression> conditional_expression = Combinator.Lazy(() =>
-            Combinator.Choice(
-                from _1 in logical_or_expression
-                from _2 in (
-                    from _3 in question_mark
-                    from _4 in expression
-                    from _5 in colon
-                    from _6 in conditional_expression
-                    select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(_1, _4, _6)
-                ).Option()
-                select _2 ?? _1
-            )
-        );
+        public static readonly Parser<SyntaxNode.Expression> conditional_expression =
+            Combinator.Trace("conditional_expression",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        from _1 in logical_or_expression
+                        from _2 in (
+                            from _3 in question_mark
+                            from _4 in expression
+                            from _5 in colon
+                            from _6 in conditional_expression
+                            select (SyntaxNode.Expression) new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(
+                                _1, _4, _6)
+                        ).Option()
+                        select _2 ?? _1
+                    )
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.Expression> assignment_expression = Combinator.Lazy(() =>
-            Combinator.Choice(
-                from _1 in cast_expression
-                from _2 in assign
-                from _3 in assignment_expression
-                select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression(_2, _1, _3),
+        public static readonly Parser<SyntaxNode.Expression> assignment_expression =
+            Combinator.Trace("assignment_expression",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        from _1 in cast_expression
+                        from _2 in assign
+                        from _3 in assignment_expression
+                        select (SyntaxNode.Expression) new SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression(_2, _1, _3)
+                        ,
+                        from _1 in cast_expression
+                        from _2 in compound_assignment_operator
+                        from _3 in assignment_expression
+                        select (SyntaxNode.Expression) new SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression(_2, _1, _3)
+                        ,
+                        conditional_expression
+                    )
+                )
+            ).Memoize();
 
-                from _1 in cast_expression
-                from _2 in compound_assignment_operator
-                from _3 in assignment_expression
-                select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression(_2, _1, _3),
-                conditional_expression
+        public static readonly Parser<string> compound_assignment_operator =
+            Combinator.Trace("compound_assignment_operator",
+                Combinator.Choice(
+                    multiply_assign, divide_assign, modulus_assign, add_assign, subtract_assign,
+                    left_shift_assign, right_shift_assign, binary_and_assign, binary_or_assign, xor_assign
+                )
+            );
 
-            )
-        );
+        public static readonly Parser<SyntaxNode.Expression> expression =
+            Combinator.Trace("expression",
+                Combinator.Lazy(() =>
+                    assignment_expression.Repeat1(comma).Select(x => (x.Length == 1) ? x[0] : (SyntaxNode.Expression) new SyntaxNode.Expression.CommaSeparatedExpression(x))
+                )
+            ).Memoize();
 
-        public static readonly Parser<string> compound_assignment_operator = Combinator.Lazy(() =>
-            Combinator.Choice(
-                multiply_assign, divide_assign, modulus_assign, add_assign, subtract_assign,
-                left_shift_assign, right_shift_assign, binary_and_assign, binary_or_assign, xor_assign
-            )
-        );
-
-        public static readonly Parser<SyntaxNode.Expression> expression = Combinator.Lazy(() =>
-            assignment_expression.Repeat1(comma)
-                .Select(x => (x.Length == 1) ? x[0] : (SyntaxNode.Expression)new SyntaxNode.Expression.CommaSeparatedExpression(x))
-        );
-
-        public static readonly Parser<SyntaxNode.Expression> constant_expression = Combinator.Lazy(() =>
-            conditional_expression
-        );
+        public static readonly Parser<SyntaxNode.Expression> constant_expression =
+            Combinator.Trace("constant_expression",
+                Combinator.Lazy(() =>
+                    conditional_expression
+                )
+            ).Memoize();
 
         //#
         //# Declarations
         //#
 
-        public static readonly Parser<SyntaxNode.Declaration> declaration = Combinator.Lazy(() =>
-            from _1 in declaration_specifiers
-            from _2 in init_declarator_list.Option().Select(x => x ?? new SyntaxNode.InitDeclarator[0])
-            from _3 in semicolon
-            select new SyntaxNode.Declaration(_1, _2)
-        ).Action(success: x => {
-            var ps = (ParserStatus)x.Status;
-            var list = ps.typedefed_list;
-            foreach (var item in x.Value.items)
-            {
-                if (item is SyntaxNode.TypeDeclaration.TypedefDeclaration)
-                {
-                    list = LinkedList.Extend(Tuple.Create(((SyntaxNode.TypeDeclaration.TypedefDeclaration)item).identifier, item), ps.typedefed_list);
-                }
-            }
-            return new ParserStatus(list);
-        });
+        public static readonly Parser<SyntaxNode.Declaration> declaration =
+            Combinator.Trace("declaration",
+                Combinator.Lazy(() =>
+                    from _1 in declaration_specifiers
+                    from _2 in init_declarator_list.Option().Select(x => x ?? new SyntaxNode.InitDeclarator[0])
+                    from _3 in semicolon
+                    select new SyntaxNode.Declaration(_1, _2)
+                ).Action(success: x => {
+                    var ps = (ParserStatus) x.Status;
+                    var list = ps.typedefed_list;
+                    foreach (var item in x.Value.items) {
+                        if (item is SyntaxNode.TypeDeclaration.TypedefDeclaration) {
+                            list = LinkedList.Extend( Tuple.Create(((SyntaxNode.TypeDeclaration.TypedefDeclaration) item).identifier, item), ps.typedefed_list);
+                        }
+                    }
+                    return new ParserStatus(list);
+                })
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.Declaration> global_declaration = Combinator.Lazy(() => Combinator.Choice(
-                declaration,
-                init_declarator_list.Skip(semicolon).Select(x => new SyntaxNode.Declaration(null, x)),
-                semicolon.Select(x => (SyntaxNode.Declaration)null) // # NOTE: To accept extra semicolons in the global scope.
-            )
-        );
+        public static readonly Parser<SyntaxNode.Declaration> global_declaration =
+            Combinator.Trace("global_declaration",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        declaration,
+                        init_declarator_list.Skip(semicolon).Select(x => new SyntaxNode.Declaration(null, x)),
+                        semicolon.Select(x => (SyntaxNode.Declaration) null) // # NOTE: To accept extra semicolons in the global scope.
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.DeclarationSpecifiers> declaration_specifiers = Combinator.Lazy(() => 
-            Combinator.Choice(
-                storage_class_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.storage_class_specifier = x; })),
-                type_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.type_specifiers.Add(x); })),
-                type_qualifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.type_qualifiers.Add(x); })),
-                function_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>)(y => { y.function_specifier = x; }))
-            ).Many(1).Select(x => x.Aggregate(new SyntaxNode.DeclarationSpecifiers(), (s, y) => {
-                y(s);
-                return s;
-            }))
-        );
+        public static readonly Parser<SyntaxNode.DeclarationSpecifiers> declaration_specifiers =
+            Combinator.Trace("declaration_specifiers",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        storage_class_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>) (y => { y.storage_class_specifier = x; })),
+                        type_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>) (y => { y.type_specifiers.Add(x); })),
+                        type_qualifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>) (y => { y.type_qualifiers.Add(x); })),
+                        function_specifier.Select(x => (Action<SyntaxNode.DeclarationSpecifiers>) (y => { y.function_specifier = x; }))
+                    ).Many(1).Select(x => x.Aggregate(new SyntaxNode.DeclarationSpecifiers(), (s, y) => {
+                        y(s);
+                        return s;
+                    }))
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.InitDeclarator[]> init_declarator_list = Combinator.Lazy(
-            () => init_declarator.Repeat1(comma)
-        );
+        public static readonly Parser<SyntaxNode.InitDeclarator[]> init_declarator_list =
+            Combinator.Trace("init_declarator_list",
+                Combinator.Lazy(
+                    () => init_declarator.Repeat1(comma)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.InitDeclarator> init_declarator = Combinator.Lazy(() =>
-            from _1 in declarator
-            from _2 in assign.Then(initializer).Option()
-            select new SyntaxNode.InitDeclarator(_1, _2)
-        );
+        public static readonly Parser<SyntaxNode.InitDeclarator> init_declarator =
+            Combinator.Trace("init_declarator",
+                Combinator.Lazy(() =>
+                    from _1 in declarator
+                    from _2 in assign.Then(initializer).Option()
+                    select new SyntaxNode.InitDeclarator(_1, _2)
+                )
+            );
 
-        public static readonly Parser<string> storage_class_specifier = Combinator.Lazy(() => Combinator.Choice(
-                typedef_keyword,
-                extern_keyword,
-                static_keyword,
-                auto_keyword,
-                register_keyword
-            )
-        );
+        public static readonly Parser<string> storage_class_specifier =
+            Combinator.Trace("storage_class_specifier",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        typedef_keyword,
+                        extern_keyword,
+                        static_keyword,
+                        auto_keyword,
+                        register_keyword
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.TypeSpecifier> type_specifier = Combinator.Lazy(() => Combinator.Choice(
-                Combinator.Choice(void_keyword, char_keyword, short_keyword, int_keyword, long_keyword, float_keyword,
-                    double_keyword, signed_keyword, unsigned_keyword, bool_keyword, complex_keyword, imaginary_keyword, builtin_va_list_keyword,
-                    TYPEDEF_NAME).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
-                struct_or_union_specifier.Select(x => x),
-                enum_specifier.Select(x => (SyntaxNode.TypeSpecifier)x)
-            )
-        );
+        public static readonly Parser<SyntaxNode.TypeSpecifier> type_specifier =
+            Combinator.Trace("type_specifier",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        Combinator.Choice(
+                            void_keyword, 
+                            char_keyword, 
+                            short_keyword, 
+                            int_keyword, 
+                            long_keyword,
+                            float_keyword,
+                            double_keyword, 
+                            signed_keyword, 
+                            unsigned_keyword, 
+                            bool_keyword, 
+                            complex_keyword,
+                            imaginary_keyword, 
+                            builtin_va_list_keyword,
+                            TYPEDEF_NAME
+                        ).Select(x => (SyntaxNode.TypeSpecifier) new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
+                        struct_or_union_specifier.Select(x => x),
+                        enum_specifier.Select(x => (SyntaxNode.TypeSpecifier) x)
+                    )
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.TypeSpecifier> struct_or_union_specifier = Combinator.Lazy(() =>
-            Combinator.Choice(
-                from _1 in struct_keyword
-                from _2 in IDENTIFIER.Option()
-                from _3 in left_brace
-                from _4 in struct_declaration_list
-                from _5 in right_brace
-                select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _4, _2 != null),
-                from _1 in union_keyword
-                from _2 in IDENTIFIER.Option()
-                from _3 in left_brace.Then(struct_declaration_list).Skip(right_brace)
-                select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null),
-                from _1 in struct_keyword
-                from _2 in IDENTIFIER
-                select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2, null, false),
-                from _1 in union_keyword
-                from _2 in IDENTIFIER
-                select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2, null, false)
-            )
-        );
+        public static readonly Parser<SyntaxNode.TypeSpecifier> struct_or_union_specifier =
+            Combinator.Trace("struct_or_union_specifier",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        from _1 in struct_keyword
+                        from _2 in IDENTIFIER.Option()
+                        from _3 in left_brace
+                        from _4 in struct_declaration_list
+                        from _5 in right_brace
+                        select (SyntaxNode.TypeSpecifier) new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _4, _2 != null),
+                        from _1 in union_keyword
+                        from _2 in IDENTIFIER.Option()
+                        from _3 in left_brace.Then(struct_declaration_list).Skip(right_brace)
+                        select (SyntaxNode.TypeSpecifier) new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null),
+                        from _1 in struct_keyword
+                        from _2 in IDENTIFIER
+                        select (SyntaxNode.TypeSpecifier) new SyntaxNode.TypeSpecifier.StructSpecifier(_2, null, false),
+                        from _1 in union_keyword
+                        from _2 in IDENTIFIER
+                        select (SyntaxNode.TypeSpecifier) new SyntaxNode.TypeSpecifier.UnionSpecifier(_2, null, false)
+                    )
+                )
+            );
 
         static ulong anonCounter;
 
-        private static string create_anon_tag_name(string _1)
-        {
+        private static string create_anon_tag_name(string _1) {
             return $"#<{_1} id='{anonCounter++}'>";
         }
 
         public static readonly Parser<SyntaxNode.StructDeclaration[]> struct_declaration_list =
-            Combinator.Lazy(() => struct_declaration.Many());
+            Combinator.Trace("struct_declaration_list",
+                Combinator.Lazy(() => struct_declaration.Many())
+            );
 
-        public static readonly Parser<SyntaxNode.StructDeclaration> struct_declaration = Combinator.Lazy(() =>
-            from _1 in specifier_qualifier_list
-            from _2 in struct_declarator_list.Option().Select(x => x ?? new SyntaxNode.StructDeclarator[0])
-            from _3 in semicolon
-            select new SyntaxNode.StructDeclaration(_1, _2)
-        );
+        public static readonly Parser<SyntaxNode.StructDeclaration> struct_declaration =
+            Combinator.Trace("struct_declaration",
+                Combinator.Lazy(() =>
+                    from _1 in specifier_qualifier_list
+                    from _2 in struct_declarator_list.Option().Select(x => x ?? new SyntaxNode.StructDeclarator[0])
+                    from _3 in semicolon
+                    select new SyntaxNode.StructDeclaration(_1, _2)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.SpecifierQualifierList> specifier_qualifier_list = Combinator.Lazy(() => Combinator.Choice(
-                type_specifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => { y.type_specifiers.Add(x); })),
-                type_qualifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => { y.type_qualifiers.Add(x); }))
-            ).Many(1).Select(x => x.Aggregate(new SyntaxNode.SpecifierQualifierList(), (s, y) =>
-            {
-                y(s);
-                return s;
-            }))
-        );
+        public static readonly Parser<SyntaxNode.SpecifierQualifierList> specifier_qualifier_list =
+            Combinator.Trace("specifier_qualifier_list",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        type_specifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>) (y => { y.type_specifiers.Add(x); })),
+                        type_qualifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>) (y => { y.type_qualifiers.Add(x); }))
+                    ).Many(1).Select(x => x.Aggregate(new SyntaxNode.SpecifierQualifierList(), (s, y) => {
+                        y(s);
+                        return s;
+                    }))
+                )
+            ).Memoize();
 
         public static readonly Parser<SyntaxNode.StructDeclarator[]> struct_declarator_list =
-            Combinator.Lazy(() => struct_declarator.Repeat1(comma));
+            Combinator.Trace("struct_declarator_list",
+                Combinator.Lazy(() => struct_declarator.Repeat1(comma))
+            );
 
-        public static readonly Parser<SyntaxNode.StructDeclarator> struct_declarator = Combinator.Lazy(() => Combinator.Choice(
-                from _1 in declarator
-                from _2 in colon.Then(constant_expression).Option()
-                select new SyntaxNode.StructDeclarator(_1, _2),
-                from _2 in colon.Then(constant_expression)
-                select new SyntaxNode.StructDeclarator(null, _2)
-            )
-        );
+        public static readonly Parser<SyntaxNode.StructDeclarator> struct_declarator =
+            Combinator.Trace("struct_declarator",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in declarator
+                        from _2 in colon.Then(constant_expression).Option()
+                        select new SyntaxNode.StructDeclarator(_1, _2),
+                        from _2 in colon.Then(constant_expression)
+                        select new SyntaxNode.StructDeclarator(null, _2)
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.EnumSpecifier> enum_specifier = Combinator.Lazy(() =>
-            from _1 in enum_keyword
-            from _2 in Combinator.Choice(
-                from _3 in IDENTIFIER
-                from _4 in (from _5 in left_brace
-                    from _6 in enumerator_list
-                    from _7 in comma.Option()
-                    from _8 in right_brace
-                    select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)).Option()
-                select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false),
+        public static readonly Parser<SyntaxNode.EnumSpecifier> enum_specifier =
+            Combinator.Trace("enum_specifier",
+                Combinator.Lazy(() =>
+                    from _1 in enum_keyword
+                    from _2 in Combinator.Choice(
+                        from _3 in IDENTIFIER
+                        from _4 in (
+                            from _5 in left_brace
+                            from _6 in enumerator_list
+                            from _7 in comma.Option()
+                            from _8 in right_brace
+                            select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)
+                        ).Option()
+                        select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false),
+                        from _5 in left_brace
+                        from _6 in enumerator_list
+                        from _7 in comma.Option()
+                        from _8 in right_brace
+                        select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
+                    )
+                    select _2
+                )
+            );
 
-                from _5 in left_brace
-                from _6 in enumerator_list
-                from _7 in comma.Option()
-                from _8 in right_brace
-                select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
-            )
-            select _2
-        );
+        public static readonly Parser<SyntaxNode.Enumerator[]> enumerator_list =
+            Combinator.Trace("enumerator_list",
+                Combinator.Lazy(() => enumerator.Repeat1(comma))
+            );
 
-        public static readonly Parser<SyntaxNode.Enumerator[]> enumerator_list = Combinator.Lazy(() => enumerator.Repeat1(comma));
-
-        public static readonly Parser<SyntaxNode.Enumerator> enumerator = Combinator.Lazy(() =>
-            from _1 in enumerator_name
-            from _2 in assign.Then(constant_expression).Option()
-            select new SyntaxNode.Enumerator(_1, _2)
-        );
+        public static readonly Parser<SyntaxNode.Enumerator> enumerator =
+            Combinator.Trace("enumerator",
+                Combinator.Lazy(() =>
+                    from _1 in enumerator_name
+                    from _2 in assign.Then(constant_expression).Option()
+                    select new SyntaxNode.Enumerator(_1, _2)
+                )
+            );
 
         public static readonly Parser<string> enumerator_name =
-            Combinator.Lazy(() => Combinator.Choice(IDENTIFIER, TYPEDEF_NAME));
+            Combinator.Trace("enumerator_name",
+                Combinator.Lazy(() => Combinator.Choice(IDENTIFIER, TYPEDEF_NAME))
+            );
 
         public static readonly Parser<string> type_qualifier =
-            Combinator.Lazy(() => Combinator.Choice(const_keyword, volatile_keyword, restrict_keyword));
+            Combinator.Trace("type_qualifier",
+                Combinator.Lazy(() => Combinator.Choice(const_keyword, volatile_keyword, restrict_keyword))
+            );
 
-        public static readonly Parser<string> function_specifier = Combinator.Lazy(() => inline_keyword);
+        public static readonly Parser<string> function_specifier =
+            Combinator.Trace("function_specifier",
+                Combinator.Lazy(() => inline_keyword)
+            );
 
-        public static T eval<T>(Func<T> pred)
-        {
+        public static T eval<T>(Func<T> pred) {
             return pred();
         }
 
-        public static readonly Parser<SyntaxNode.Declarator> declarator = Combinator.Lazy(() =>
-            from _1 in pointer.Option()
-            from _2 in direct_declarator
-            select eval(() =>
-            {
-                _2.pointer = _1;
-                _2.full = true;
-                return _2;
-            })
-        );
+        public static readonly Parser<SyntaxNode.Declarator> declarator =
+            Combinator.Trace("declarator",
+                Combinator.Lazy(() =>
+                    from _1 in pointer.Option()
+                    from _2 in direct_declarator
+                    select eval(() => {
+                        _2.pointer = _1;
+                        _2.full = true;
+                        return _2;
+                    })
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.Declarator> direct_declarator = Combinator.Lazy(() =>
-            from _1 in Combinator.Choice(
-                IDENTIFIER.Select(x => (SyntaxNode.Declarator)new SyntaxNode.Declarator.IdentifierDeclarator(x)),
-                left_paren.Then(declarator).Skip(right_paren).Select(x => (SyntaxNode.Declarator)new SyntaxNode.Declarator.GroupedDeclarator(x))
-            )
-            from _2 in Combinator.Choice(
-                from _3 in left_bracket
-                from _4 in type_qualifier_list.Then(assignment_expression)
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x =>
-                {
-                    _4.full = true;
-                    return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
-                }),
-                from _3 in left_bracket
-                from _4 in type_qualifier_list
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.ArrayDeclarator(x, null); }),
-                from _3 in left_bracket
-                from _4 in assignment_expression
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x =>
-                {
-                    _4.full = true;
-                    return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
-                }),
-                from _3 in left_bracket
-                from _4 in static_keyword.Then(type_qualifier_list).Then(assignment_expression)
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x =>
-                {
-                    _4.full = true;
-                    return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
-                }),
-                from _3 in left_bracket
-                from _4 in type_qualifier_list.Then(static_keyword).Then(assignment_expression)
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x =>
-                {
-                    _4.full = true;
-                    return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
-                }),
-                from _3 in left_bracket
-                from _4 in type_qualifier_list.Then(multiply)
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.ArrayDeclarator(x, null); }),
-                from _3 in left_bracket
-                from _4 in multiply
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.ArrayDeclarator(x, null); }),
-                from _3 in left_bracket
-                from _5 in right_bracket
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.ArrayDeclarator(x, null); }),
-                from _3 in left_paren
-                from _4 in parameter_type_list
-                from _5 in right_paren
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator(x, _4); }),
-                from _3 in left_paren
-                from _4 in identifier_list
-                from _5 in right_paren
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator(x, _4); }),
-                from _3 in left_paren
-                from _5 in right_paren
-                select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>)(x => { return new SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator(x); })
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => x(s))
-        );
+        public static readonly Parser<SyntaxNode.Declarator> direct_declarator =
+            Combinator.Trace("direct_declarator",
+                Combinator.Lazy(() =>
+                    from _1 in Combinator.Choice(
+                        IDENTIFIER.Select(x => (SyntaxNode.Declarator) new SyntaxNode.Declarator.IdentifierDeclarator(x)),
+                        left_paren.Then(declarator).Skip(right_paren).Select(x => (SyntaxNode.Declarator) new SyntaxNode.Declarator.GroupedDeclarator(x))
+                    )
+                    from _2 in Combinator.Choice(
+                        from _3 in left_bracket
+                        from _4 in type_qualifier_list.Then(assignment_expression)
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            _4.full = true;
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in type_qualifier_list
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, null);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in assignment_expression
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            _4.full = true;
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in static_keyword.Then(type_qualifier_list).Then(assignment_expression)
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            _4.full = true;
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in type_qualifier_list.Then(static_keyword).Then(assignment_expression)
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            _4.full = true;
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, _4);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in type_qualifier_list.Then(multiply)
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, null);
+                        }),
+                        from _3 in left_bracket
+                        from _4 in multiply
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, null);
+                        }),
+                        from _3 in left_bracket
+                        from _5 in right_bracket
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.ArrayDeclarator(x, null);
+                        }),
+                        from _3 in left_paren
+                        from _4 in parameter_type_list
+                        from _5 in right_paren
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator(x, _4);
+                        }),
+                        from _3 in left_paren
+                        from _4 in identifier_list
+                        from _5 in right_paren
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator(x, _4);
+                        }),
+                        from _3 in left_paren
+                        from _5 in right_paren
+                        select (Func<SyntaxNode.Declarator, SyntaxNode.Declarator>) (x => {
+                            return new SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator(x);
+                        })
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => x(s))
+                )
+            ).Memoize();
 
-        public static readonly Parser<string[]> pointer = Combinator.Lazy(() => Combinator.Choice(
-                from _1 in multiply
-                from _2 in type_qualifier_list
-                from _3 in pointer
-                select _2.Concat(new[] { _1 }).Concat(_3).ToArray(),
+        public static readonly Parser<string[]> pointer =
+            Combinator.Trace("pointer",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in multiply
+                        from _2 in type_qualifier_list
+                        from _3 in pointer
+                        select _2.Concat(new[] {_1}).Concat(_3).ToArray(),
+                        from _1 in multiply
+                        from _2 in type_qualifier_list
+                        select _2.Concat(new[] {_1}).ToArray(),
+                        from _1 in multiply
+                        from _2 in pointer
+                        select _2.Concat(new[] {_1}).ToArray(),
+                        from _1 in multiply select new[] {_1}
+                    )
+                )
+            ).Memoize();
 
-                from _1 in multiply
-                from _2 in type_qualifier_list
-                select _2.Concat(new[] { _1 }).ToArray(),
-                
-                from _1 in multiply
-                from _2 in pointer
-                select _2.Concat(new[] { _1 }).ToArray(),
-                
-                from _1 in multiply select new[] { _1 }
-            )
-        );
+        public static readonly Parser<string[]> type_qualifier_list =
+            Combinator.Trace("type_qualifier_list",
+                Combinator.Lazy(() => type_qualifier.Many(1))
+            ).Memoize();
 
-        public static readonly Parser<string[]> type_qualifier_list = Combinator.Lazy(() => type_qualifier.Many(1));
-
-        public static readonly Parser<SyntaxNode.ParameterTypeList> parameter_type_list = Combinator.Lazy(() =>
-            from _1 in parameter_list
-            from _2 in comma.Then(ellipsis).Option()
-            select new SyntaxNode.ParameterTypeList(_1, _2 != null)
-        );
+        public static readonly Parser<SyntaxNode.ParameterTypeList> parameter_type_list =
+            Combinator.Trace("parameter_type_list",
+                Combinator.Lazy(() =>
+                    from _1 in parameter_list
+                    from _2 in comma.Then(ellipsis).Option()
+                    select new SyntaxNode.ParameterTypeList(_1, _2 != null)
+                )
+            );
 
         public static readonly Parser<SyntaxNode.ParameterDeclaration[]> parameter_list =
-            Combinator.Lazy(() => parameter_declaration.Repeat1(comma));
+            Combinator.Trace("parameter_list",
+                Combinator.Lazy(() => parameter_declaration.Repeat1(comma))
+            );
 
-        public static readonly Parser<SyntaxNode.ParameterDeclaration> parameter_declaration = Combinator.Lazy(() =>
-            from _1 in declaration_specifiers
-            from _2 in Combinator.Choice(declarator, abstract_declarator.Select(x => (SyntaxNode.Declarator)x))
-                .Option()
-            select new SyntaxNode.ParameterDeclaration(_1, _2));
+        public static readonly Parser<SyntaxNode.ParameterDeclaration> parameter_declaration =
+            Combinator.Trace("parameter_declaration",
+                Combinator.Lazy(() =>
+                    from _1 in declaration_specifiers
+                    from _2 in Combinator.Choice(
+                        declarator, 
+                        abstract_declarator.Select(x => (SyntaxNode.Declarator) x)
+                    ).Option()
+                    select new SyntaxNode.ParameterDeclaration(_1, _2)
+                )
+            );
 
-        public static readonly Parser<string[]> identifier_list = Combinator.Lazy(() => IDENTIFIER.Repeat1(comma));
+        public static readonly Parser<string[]> identifier_list =
+            Combinator.Trace("identifier_list",
+                Combinator.Lazy(() => IDENTIFIER.Repeat1(comma))
+            );
 
-        public static readonly Parser<SyntaxNode.TypeName> type_name = Combinator.Lazy(() =>
-            from _1 in specifier_qualifier_list
-            from _2 in abstract_declarator.Option()
-            select new SyntaxNode.TypeName(_1, _2));
+        public static readonly Parser<SyntaxNode.TypeName> type_name =
+            Combinator.Trace("type_name",
+                Combinator.Lazy(() =>
+                    from _1 in specifier_qualifier_list
+                    from _2 in abstract_declarator.Option()
+                    select new SyntaxNode.TypeName(_1, _2)
+                )
+            ).Memoize();
 
-        public static readonly Parser<SyntaxNode.Declarator.AbstractDeclarator> abstract_declarator = Combinator.Lazy(() =>
-            Combinator.Choice(
-                from _1 in pointer
-                from _2 in direct_abstract_declarator.Option()
-                select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) { full = true },
-                from _2 in direct_abstract_declarator
-                select eval(() =>
-                {
-                    _2.full = true;
-                    return _2;
-                })
-            ));
-
-
-        public static readonly Parser<SyntaxNode.Declarator.AbstractDeclarator> direct_abstract_declarator = Combinator.Lazy(() =>
-            from _1 in Combinator.Choice(
-                from _2 in left_paren
-                from _3 in abstract_declarator
-                from _4 in right_paren
-                select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator(_3),
-
-                from _2 in left_bracket
-                from _4 in right_bracket
-                select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, null),
-
-                from _2 in left_bracket
-                from _3 in assignment_expression
-                from _4 in right_bracket
-                select eval(() =>
-                {
-                    _3.full = true;
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, _3);
-                }),
-
-                from _2 in left_bracket
-                from _3 in multiply
-                from _4 in right_bracket
-                select eval(() => { return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, null); }),
-
-                from _2 in left_paren
-                from _4 in right_paren
-                select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(null, null),
-
-                from _2 in left_paren
-                from _3 in parameter_type_list
-                from _4 in right_paren
-                select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(null, _3)
-            )
-            from _2 in Combinator.Choice(
-                from _2 in left_bracket
-                from _4 in right_bracket
-                select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>)(x =>
-                {
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, null);
-                }),
-
-                from _2 in left_bracket
-                from _3 in assignment_expression
-                from _4 in right_bracket
-                select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>)(x =>
-                {
-                    _3.full = true;
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, _3);
-                }),
-
-                from _2 in left_bracket
-                from _3 in multiply
-                from _4 in right_bracket
-                select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>)(x =>
-                {
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, null);
-                }),
-
-                from _2 in left_paren
-                from _4 in right_paren
-                select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>)(x =>
-                {
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(x, null);
-                }),
-
-                from _2 in left_paren
-                from _3 in parameter_type_list
-                from _4 in right_paren
-                select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>)(x =>
-                {
-                    return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(x, _3);
-                })
-
-            ).Many()
-            select _2.Aggregate(_1, (s, x) => x(s)));
+        public static readonly Parser<SyntaxNode.Declarator.AbstractDeclarator> abstract_declarator =
+            Combinator.Trace("abstract_declarator",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        from _1 in pointer
+                        from _2 in direct_abstract_declarator.Option()
+                        select (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) {full = true},
+                        from _2 in direct_abstract_declarator
+                        select eval(() => {
+                            _2.full = true;
+                            return _2;
+                        })
+                    )
+                )
+            ).Memoize();
 
 
-        public static readonly Parser<SyntaxNode.Initializer> initializer = Combinator.Lazy(() => Combinator.Choice(
-            // 普通の定数値初期化
-            assignment_expression.Select(x =>
-            {
-                x.full = true;
-                return new SyntaxNode.Initializer(x, null);
-            }),
-            // 複合初期化
-            from _1 in left_brace
-            from _2 in (
-                from _3 in initializer_list
-                from _4 in comma.Option()
-                select _3
-            ).Option()
-            from _5 in right_brace
-            select new SyntaxNode.Initializer(null, _2)
-        ));
+        public static readonly Parser<SyntaxNode.Declarator.AbstractDeclarator> direct_abstract_declarator =
+            Combinator.Trace("direct_abstract_declarator",
+                Combinator.Lazy(() =>
+                    from _1 in Combinator.Choice(
+                        from _2 in left_paren
+                        from _3 in abstract_declarator
+                        from _4 in right_paren
+                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator(_3),
+                        from _2 in left_bracket
+                        from _4 in right_bracket
+                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, null),
+                        from _2 in left_bracket
+                        from _3 in assignment_expression
+                        from _4 in right_bracket
+                        select eval(() => {
+                            _3.full = true;
+                            return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, _3);
+                        }),
+                        from _2 in left_bracket
+                        from _3 in multiply
+                        from _4 in right_bracket
+                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(null, null),
+                        from _2 in left_paren
+                        from _4 in right_paren
+                        select (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(null, null),
+                        from _2 in left_paren
+                        from _3 in parameter_type_list
+                        from _4 in right_paren
+                        select (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(null, _3)
+                    )
+                    from _2 in Combinator.Choice(
+                        from _2 in left_bracket
+                        from _4 in right_bracket
+                        select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>) (
+                            x => (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, null)
+                        ),
+                        from _2 in left_bracket
+                        from _3 in assignment_expression
+                        from _4 in right_bracket
+                        select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>) (
+                            x => {
+                                _3.full = true;
+                                return (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, _3);
+                            }),
+                        from _2 in left_bracket
+                        from _3 in multiply
+                        from _4 in right_bracket
+                        select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>) (
+                            x => {
+                                return (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.ArrayAbstractDeclarator(x, null);
+                            }),
+                        from _2 in left_paren
+                        from _4 in right_paren
+                        select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>) (
+                            x => {
+                                return (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(x, null);
+                            }),
+                        from _2 in left_paren
+                        from _3 in parameter_type_list
+                        from _4 in right_paren
+                        select (Func<SyntaxNode.Declarator.AbstractDeclarator, SyntaxNode.Declarator.AbstractDeclarator>) (
+                            x => {
+                                return (SyntaxNode.Declarator.AbstractDeclarator) new SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator(x, _3);
+                            })
+                    ).Many()
+                    select _2.Aggregate(_1, (s, x) => x(s))
+                )
+            ).Memoize();
 
-        public static readonly Parser<Tuple<SyntaxNode.Initializer.Designator[], SyntaxNode.Initializer>[]> initializer_list = Combinator.Lazy(() => (
-            from _1 in designation.Option()
-            from _2 in initializer
-            select Tuple.Create(_1, _2)
-        ).Repeat1(comma));
 
-        public static readonly Parser<SyntaxNode.Initializer.Designator[]> designation = Combinator.Lazy(() => designator_list.Skip(assign));
+        public static readonly Parser<SyntaxNode.Initializer> initializer =
+            Combinator.Trace("initializer",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        // 普通の定数値初期化
+                        assignment_expression.Select(x => {
+                            x.full = true;
+                            return new SyntaxNode.Initializer(x, null);
+                        }),
+                        // 複合初期化
+                        from _1 in left_brace
+                        from _2 in (
+                            from _3 in initializer_list
+                            from _4 in comma.Option()
+                            select _3
+                        ).Option()
+                        from _5 in right_brace
+                        select new SyntaxNode.Initializer(null, _2)
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Initializer.Designator[]> designator_list = Combinator.Lazy(() => designator.Many(1));
+        public static readonly Parser<Tuple<SyntaxNode.Initializer.Designator[], SyntaxNode.Initializer>[]> initializer_list =
+            Combinator.Trace("initializer_list",
+                Combinator.Lazy(() => (
+                        from _1 in designation.Option()
+                        from _2 in initializer
+                        select Tuple.Create(_1, _2)
+                    ).Repeat1(comma)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Initializer.Designator> designator = Combinator.Lazy(() => Combinator.Choice(
-            left_bracket.Then(constant_expression).Skip(right_bracket).Select(x => (SyntaxNode.Initializer.Designator)new SyntaxNode.Initializer.Designator.IndexDesignator(x)),
-            member_access.Then(IDENTIFIER).Select(x => (SyntaxNode.Initializer.Designator)new SyntaxNode.Initializer.Designator.MemberDesignator(x))
-        ));
+        public static readonly Parser<SyntaxNode.Initializer.Designator[]> designation =
+            Combinator.Trace("designation",
+                Combinator.Lazy(() => designator_list.Skip(assign))
+            );
+
+        public static readonly Parser<SyntaxNode.Initializer.Designator[]> designator_list =
+            Combinator.Trace("designator_list",
+                Combinator.Lazy(() => designator.Many(1))
+            );
+
+        public static readonly Parser<SyntaxNode.Initializer.Designator> designator =
+            Combinator.Trace("designator",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        left_bracket.Then(constant_expression).Skip(right_bracket).Select(x => (SyntaxNode.Initializer.Designator) new SyntaxNode.Initializer.Designator.IndexDesignator(x)),
+                        member_access.Then(IDENTIFIER).Select(x => (SyntaxNode.Initializer.Designator) new SyntaxNode.Initializer.Designator.MemberDesignator(x))
+                    )
+                )
+            );
 
         //#
         //# Statements
         //#
 
-        public static readonly Parser<SyntaxNode.Statement> statement = Combinator.Lazy(() => Combinator.Choice(
-            labeled_statement,
-            compound_statement,
-            expression_statement,
-            selection_statement,
-            iteration_statement,
-            jump_statement
-        ));
+        public static readonly Parser<SyntaxNode.Statement> statement =
+            Combinator.Trace("statement",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        labeled_statement,
+                        compound_statement,
+                        expression_statement,
+                        selection_statement,
+                        iteration_statement,
+                        jump_statement
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Statement> labeled_statement = Combinator.Lazy(() => Combinator.Choice(
-            from _1 in label_name
-            from _2 in colon
-            from _3 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.GenericLabeledStatement(_1, _3),
-            from _1 in case_keyword
-            from _2 in constant_expression
-            from _3 in colon
-            from _4 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement(_2, _4),
-            from _1 in default_keyword
-            from _3 in colon
-            from _4 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement(_4)
-        ));
+        public static readonly Parser<SyntaxNode.Statement> labeled_statement =
+            Combinator.Trace("labeled_statement",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in label_name
+                        from _2 in colon
+                        from _3 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.LabeledStatement.GenericLabeledStatement(_1, _3),
+                        from _1 in case_keyword
+                        from _2 in constant_expression
+                        from _3 in colon
+                        from _4 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement(_2, _4),
+                        from _1 in default_keyword
+                        from _3 in colon
+                        from _4 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement(_4)
+                    )
+                )
+            );
 
-        public static readonly Parser<string> label_name = Combinator.Lazy(() => Combinator.Choice(IDENTIFIER, TYPEDEF_NAME));
+        public static readonly Parser<string> label_name =
+            Combinator.Trace("label_name",
+                Combinator.Lazy(() => Combinator.Choice(IDENTIFIER, TYPEDEF_NAME))
+            );
 
-        public static readonly Parser<SyntaxNode.Statement> compound_statement = Combinator.Lazy(() =>
-            from _1 in left_brace
-            from _2 in block_item_list.Option()
-            from _3 in right_brace
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.CompoundStatement(_2));
+        public static readonly Parser<SyntaxNode.Statement> compound_statement =
+            Combinator.Trace("compound_statement",
+                Combinator.Lazy(() =>
+                    from _1 in left_brace
+                    from _2 in block_item_list.Option()
+                    from _3 in right_brace
+                    select (SyntaxNode.Statement) new SyntaxNode.Statement.CompoundStatement(_2)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode[]> block_item_list = Combinator.Lazy(() => block_item.Many(1));
+        public static readonly Parser<SyntaxNode[]> block_item_list =
+            Combinator.Trace("block_item_list",
+                Combinator.Lazy(() => block_item.Many(1))
+            );
 
-        public static readonly Parser<SyntaxNode> block_item = Combinator.Lazy(() =>
-            Combinator.Choice(declaration.Select(x => (SyntaxNode)x),
-                statement.Select(x => (SyntaxNode)x) /*, local_function_definition.Select(x => (SyntaxNode)x) */));
+        public static readonly Parser<SyntaxNode> block_item =
+            Combinator.Trace("block_item",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(declaration.Select(x => (SyntaxNode) x), statement.Select(x => (SyntaxNode) x) /*, local_function_definition.Select(x => (SyntaxNode)x) */)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Statement> expression_statement = Combinator.Lazy(() =>
-            from _1 in (
-                from __2 in Combinator.Tap((src, pos, fpos, st) => true)
-                from __1 in expression
-                select eval(() =>
-            {
-                __1.full = true;
-                return __1;
-            })).Option()
-            from _2 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.ExpressionStatement(_1));
+        public static readonly Parser<SyntaxNode.Statement> expression_statement =
+            Combinator.Trace("expression_statement",
+                Combinator.Lazy(() =>
+                    from _1 in (
+                        from __2 in Combinator.Tap((src, pos, fpos, st) => true)
+                        from __1 in expression
+                        select eval(() => {
+                            __1.full = true;
+                            return __1;
+                        })).Option()
+                    from _2 in semicolon
+                    select (SyntaxNode.Statement) new SyntaxNode.Statement.ExpressionStatement(_1)
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Statement> selection_statement = Combinator.Lazy(() => Combinator.Choice(
-            from _1 in if_keyword
-            from _2 in left_paren
-            from _3 in expression.Select(x =>
-            {
-                x.full = true;
-                return x;
-            })
-            from _4 in right_paren
-            from _5 in statement
-            from _6 in else_keyword.Then(statement).Option()
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.SelectionStatement.IfStatement(_3, _5, _6),
-            from _1 in switch_keyword
-            from _2 in left_paren
-            from _3 in expression.Select(x => {
-                x.full = true;
-                return x;
-            })
-            from _4 in right_paren
-            from _5 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.SelectionStatement.SwitchStatement(_3, _5)
-        ));
+        public static readonly Parser<SyntaxNode.Statement> selection_statement =
+            Combinator.Trace("selection_statement",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in if_keyword
+                        from _2 in left_paren
+                        from _3 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        })
+                        from _4 in right_paren
+                        from _5 in statement
+                        from _6 in else_keyword.Then(statement).Option()
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.SelectionStatement.IfStatement(_3, _5, _6),
+                        from _1 in switch_keyword
+                        from _2 in left_paren
+                        from _3 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        })
+                        from _4 in right_paren
+                        from _5 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.SelectionStatement.SwitchStatement(_3, _5)
+                    )
+                )
+            );
 
-        public static readonly Parser<SyntaxNode.Statement> iteration_statement = Combinator.Lazy(() => Combinator.Choice(
-            from _1 in while_keyword
-            from _2 in left_paren
-            from _3 in expression.Select(x => {
-                x.full = true;
-                return x;
-            })
-            from _4 in right_paren
-            from _5 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.WhileStatement(_3, _5),
-            
-            from _1 in do_keyword
-            from _2 in statement
-            from _3 in while_keyword
-            from _4 in left_paren
-            from _5 in expression.Select(x => {
-                x.full = true;
-                return x;
-            })
-            from _6 in right_paren
-            from _7 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.DoStatement(_2, _5),
-            
-            from _1 in for_keyword
-            from _2 in left_paren
-            from _3 in declaration
-            from _4 in expression_statement
-            from _5 in expression.Select(x => {
-                x.full = true;
-                return x;
-            }).Option()
-            from _6 in right_paren
-            from _7 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.C99ForStatement(_3, _4, _5, _7),
+        public static readonly Parser<SyntaxNode.Statement> iteration_statement =
+            Combinator.Trace("iteration_statement",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in while_keyword
+                        from _2 in left_paren
+                        from _3 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        })
+                        from _4 in right_paren
+                        from _5 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.IterationStatement.WhileStatement(_3, _5),
+                        from _1 in do_keyword
+                        from _2 in statement
+                        from _3 in while_keyword
+                        from _4 in left_paren
+                        from _5 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        })
+                        from _6 in right_paren
+                        from _7 in semicolon
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.IterationStatement.DoStatement(_2, _5),
+                        from _1 in for_keyword
+                        from _2 in left_paren
+                        from _3 in declaration
+                        from _4 in expression_statement
+                        from _5 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        }).Option()
+                        from _6 in right_paren
+                        from _7 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.IterationStatement.C99ForStatement(_3, _4, _5, _7),
+                        from _1 in for_keyword
+                        from _2 in left_paren
+                        from _3 in expression_statement
+                        from _4 in expression_statement
+                        from _5 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        }).Option()
+                        from _6 in right_paren
+                        from _7 in statement
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.IterationStatement.ForStatement(_3, _4, _5, _7)
+                    )
+                )
+            );
 
-            from _1 in for_keyword
-            from _2 in left_paren
-            from _3 in expression_statement
-            from _4 in expression_statement
-            from _5 in expression.Select(x => {
-                x.full = true;
-                return x;
-            }).Option()
-            from _6 in right_paren
-            from _7 in statement
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.IterationStatement.ForStatement(_3, _4, _5, _7)
-
-        ));
-
-        public static readonly Parser<SyntaxNode.Statement> jump_statement = Combinator.Lazy(() => Combinator.Choice(
-            from _1 in goto_keyword
-            from _2 in label_name
-            from _3 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.JumpStatement.GotoStatement(_2),
-            //from _1 in goto_keyword
-            //from _2 in multiply
-            //from _3 in label_name
-            //from _4 in semicolon
-            //select (Statement)new ErrorStatement(_2,_3),
-            from _1 in continue_keyword
-            from _2 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.JumpStatement.ContinueStatement(),
-            from _1 in break_keyword
-            from _2 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.JumpStatement.BreakStatement(),
-            from _1 in return_keyword
-            from _2 in expression.Select(x =>
-            {
-                x.full = true;
-                return x;
-            }).Option()
-            from _3 in semicolon
-            select (SyntaxNode.Statement)new SyntaxNode.Statement.JumpStatement.ReturnStatement(_2)
-        ));
+        public static readonly Parser<SyntaxNode.Statement> jump_statement =
+            Combinator.Trace("jump_statement",
+                Combinator.Lazy(() => 
+                    Combinator.Choice(
+                        from _1 in goto_keyword
+                        from _2 in label_name
+                        from _3 in semicolon
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.JumpStatement.GotoStatement(_2),
+                        //from _1 in goto_keyword
+                        //from _2 in multiply
+                        //from _3 in label_name
+                        //from _4 in semicolon
+                        //select (Statement)new ErrorStatement(_2,_3),
+                        from _1 in continue_keyword
+                        from _2 in semicolon
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.JumpStatement.ContinueStatement(),
+                        from _1 in break_keyword
+                        from _2 in semicolon
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.JumpStatement.BreakStatement(),
+                        from _1 in return_keyword
+                        from _2 in expression.Select(x => {
+                            x.full = true;
+                            return x;
+                        }).Option()
+                        from _3 in semicolon
+                        select (SyntaxNode.Statement) new SyntaxNode.Statement.JumpStatement.ReturnStatement(_2)
+                    )
+                )
+            );
 
         //#
         //# External definitions
         //#
         public static readonly Parser<SyntaxNode.TranslationUnit> translation_unit =
-            Combinator.Lazy(() => external_declaration.Many(1).Select(x => new SyntaxNode.TranslationUnit(x)));
+            Combinator.Trace("translation_unit",
+                Combinator.Lazy(() => external_declaration.Many(1).Select(x => new SyntaxNode.TranslationUnit(x)))
+            );
 
-        public static readonly Parser<SyntaxNode> external_declaration = Combinator.Lazy(() =>
-            Combinator.Choice(
-                function_definition.Select(x => (SyntaxNode)x),
-                global_declaration.Select(x => (SyntaxNode)x)
-            )
-        );
-
-        public static readonly Parser<SyntaxNode.Definition.FunctionDefinition> function_definition = Combinator.Lazy(() =>
-            Combinator.Choice(
-                (
-                    from _1 in declaration_specifiers
-                    from _2 in declarator
-                    from _3 in declaration_list
-                    from _4 in compound_statement
-                    select (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2, _3.ToList(), _4)
-                ),
-                (
-                    from _1 in declaration_specifiers
-                    from _2 in declarator
-                    from _3 in compound_statement
-                    select (_2 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator       ) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
-                         : (_2 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator      ) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2, new List<SyntaxNode.Declaration>(), _3)
-                         : (_2 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator) ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
-                         : null
-                ),
-                (
-                    from _1 in declarator
-                    from _2 in declaration_list
-                    from _3 in compound_statement
-                    select (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(null, _1, _2.ToList(), _3)
-                ),
-                (
-                    from _1 in declarator
-                    from _2 in compound_statement
-                    select (_1 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator)
-                        ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(null, _1, _2)
-                        : (_1 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)
-                            ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(null, _1,
-                                new List<SyntaxNode.Declaration>(), _2)
-                            : (_1 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator)
-                                ? (SyntaxNode.Definition.FunctionDefinition)new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(null, _1, _2)
-                                : null
+        public static readonly Parser<SyntaxNode> external_declaration =
+            Combinator.Trace("external_declaration",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        function_definition.Select(x => (SyntaxNode) x),
+                        global_declaration.Select(x => (SyntaxNode) x)
+                    )
                 )
-            ));
+            );
+
+        public static readonly Parser<SyntaxNode.Definition.FunctionDefinition> function_definition =
+            Combinator.Trace("function_definition",
+                Combinator.Lazy(() =>
+                    Combinator.Choice(
+                        (
+                            from _1 in declaration_specifiers
+                            from _2 in declarator
+                            from _3 in declaration_list
+                            from _4 in compound_statement
+                            select (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2, _3.ToList(), _4)
+                        ),
+                        (
+                            from _1 in declaration_specifiers
+                            from _2 in declarator
+                            from _3 in compound_statement
+                            select (_2 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
+                                : (_2 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(_1, _2, new List<SyntaxNode.Declaration>(), _3)
+                                : (_2 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(_1, _2, _3)
+                                : null
+                        ),
+                        (
+                            from _1 in declarator
+                            from _2 in declaration_list
+                            from _3 in compound_statement
+                            select (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(null, _1, _2.ToList(), _3)
+                        ),
+                        (
+                            from _1 in declarator
+                            from _2 in compound_statement
+                            select (_1 is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(null, _1, _2)
+                                : (_1 is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition(null, _1, new List<SyntaxNode.Declaration>(), _2)
+                                : (_1 is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator)
+                                ? (SyntaxNode.Definition.FunctionDefinition) new SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition(null, _1, _2)
+                                : null
+                        )
+                    )
+                )
+            );
 
         //local_function_definition
         //    : declaration_specifiers declarator declaration_list compound_statement
@@ -1220,17 +1477,20 @@ namespace CParser2 {
         //      }
         //    ;
 
-        public static readonly Parser<SyntaxNode.Declaration[]> declaration_list = Combinator.Lazy(() => declaration.Many(1));
+        public static readonly Parser<SyntaxNode.Declaration[]> declaration_list =
+            Combinator.Trace("declaration_list",
+                Combinator.Lazy(() => declaration.Many(1))
+            );
 
 
         //end
 
         #endregion
 
-        public static Result<SyntaxNode.TranslationUnit> Parse(TextReader reader)
-        {
+        public static Result<SyntaxNode.TranslationUnit> Parse(TextReader reader) {
             var target = new Source("", reader);
-            return translation_unit(target, Position.Empty, Position.Empty, new ParserStatus());
+            return translation_unit.Skip(isspaces).Skip(Combinator.EoF())(target, Position.Empty, Position.Empty,
+                new ParserStatus());
         }
     }
 }
