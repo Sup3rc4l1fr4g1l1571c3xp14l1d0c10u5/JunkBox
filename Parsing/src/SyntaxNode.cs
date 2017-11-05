@@ -514,6 +514,19 @@ namespace CParser2 {
                     this.operand = operand;
                 }
             }
+
+            [DataContract]
+            internal class ErrorExpression : Expression {
+
+                [DataMember]
+                public Statement statement {
+                    get; private set;
+                }
+
+                public ErrorExpression(Statement x) {
+                    this.statement = x;
+                }
+            }
         }
 
         [DataContract]

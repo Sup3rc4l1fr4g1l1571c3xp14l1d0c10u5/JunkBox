@@ -1,3 +1,5 @@
+//#define TraceParser
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 //using System.Text.RegularExpressions;
+
 
 namespace Parsing {
     public class Source {
@@ -30,8 +33,10 @@ namespace Parsing {
 
 
         public Source(string name, TextReader reader) {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            Reader = reader ?? throw new ArgumentNullException(nameof(reader));
+            if (name == null) {throw new ArgumentNullException(nameof(name)); }
+            if (reader == null) {throw new ArgumentNullException(nameof(reader)); }
+            Name = name;
+            Reader = reader;
             Buffer = new StringBuilder();
             Eof = false;
         }
@@ -283,15 +288,21 @@ namespace Parsing {
     /// </summary>
     public static class Combinator {
         /// <summary>
-        ///     常に失敗する空のパーサ
+        ///     常に成功/失敗する空のパーサ
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public static Parser<T> Empty<T>() {
-            return (target, position, failedPosition, status) => {
-                var fpos = (position > failedPosition) ? position : failedPosition;
-                return Result<T>.Reject(default(T), position, fpos, status);
-            };
+        public static Parser<T> Empty<T>(bool success) {
+            if (success) {
+                return (target, position, failedPosition, status) => {
+                    return Result<T>.Accept(default(T), position, failedPosition, status);
+                };
+            } else {
+                return (target, position, failedPosition, status) => {
+                    var fpos = (position > failedPosition) ? position : failedPosition;
+                    return Result<T>.Reject(default(T), position, fpos, status);
+                };
+            }
         }
 
         /// <summary>
@@ -393,7 +404,7 @@ namespace Parsing {
                     lastFailedPosition = (parsed.FailedPosition > lastFailedPosition) ? parsed.FailedPosition : lastFailedPosition;
 
                     if (parsed.Success) {
-                        return parsed;
+                        return Result<T>.Accept(parsed.Value, parsed.Position, lastFailedPosition, parsed.Status);
                     }
                 }
                 var newFailedPosition = (position > lastFailedPosition) ? position : lastFailedPosition;
@@ -565,6 +576,42 @@ namespace Parsing {
             };
         }
 
+        private class MemoizeKey {
+            private readonly Source _target;
+            private readonly Position _position;
+            private readonly object _status;
+            private readonly int _hashCode;
+
+            public MemoizeKey(Source target, Position position, object status) {
+                _target = target;
+                _position = position;
+                _status = status;
+                _hashCode = -118752591;
+                _hashCode = _hashCode * -1521134295 + EqualityComparer<Source>.Default.GetHashCode(_target);
+                _hashCode = _hashCode * -1521134295 + EqualityComparer<Position>.Default.GetHashCode(_position);
+                _hashCode = _hashCode * -1521134295 + EqualityComparer<object>.Default.GetHashCode(_status);
+            }
+
+            private bool Equals(MemoizeKey other) {
+                if (other == null) {
+                    return false;
+                    
+                }
+                return _target.Equals(other._target)
+                       && _position.Equals(other._position)
+                       && Object.Equals(_status, other._status);
+            }
+            public override bool Equals(object obj) {
+                if (obj == null) { return false; }
+                if (ReferenceEquals(this, obj)) { return true; }
+                return Equals(obj as MemoizeKey);
+            }
+
+            public override int GetHashCode() {
+                return _hashCode;
+            }
+        }
+
         /// <summary>
         ///     パーサをメモ化するパーサを生成
         /// </summary>
@@ -574,14 +621,14 @@ namespace Parsing {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
-            Dictionary<Tuple<Source, Position, object>, Result<T>> memoization = new Dictionary<Tuple<Source, Position, object>, Result<T>>();
+            Dictionary<MemoizeKey, Result<T>> memoization = new Dictionary<MemoizeKey, Result<T>>();
 
             return (target, position, failedPosition, status) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
 
-                var key = Tuple.Create(target, position, status);
+                var key = new MemoizeKey(target, position, status);
                 Result<T> parsed;
                 if (memoization.TryGetValue(key, out parsed)) {
                     // メモ化してもFailedPositionについてはチェック
@@ -595,7 +642,7 @@ namespace Parsing {
             };
         }
 
-        static Dictionary<string,List<Tuple<Position,bool>>> TraceInfo = new Dictionary<string, List<Tuple<Position, bool>>>();
+        public static Dictionary<string,List<Tuple<Position,bool>>> TraceInfo = new Dictionary<string, List<Tuple<Position, bool>>>();
 
         /// <summary>
         ///     パーサのトレース（デバッグ・チューニング用）
@@ -603,6 +650,7 @@ namespace Parsing {
         /// <param name="parser">パーサ</param>
         /// <returns></returns>
         public static Parser<T> Trace<T>(string caption, Parser<T> parser) {
+#if TraceParser
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
@@ -618,6 +666,9 @@ namespace Parsing {
                 TraceInfo[caption].Add(Tuple.Create(position, parsed.Success));
                 return parsed;
             };
+#else
+            return parser;
+#endif
         }
 
         /// <summary>
@@ -696,17 +747,17 @@ namespace Parsing {
         /// <returns></returns>
         public static Parser<T> Action<T>(
             this Parser<T> parser,
-            Action<Source, Position, Position, object> begin = null,
-            Func<Result<T>, object> success = null,
-            Func<Result<T>, object> failed = null) {
+            Func<Source, Position, Position, object, object> enter = null,
+            Func<Result<T>, object> leave = null
+        ) {
             return (target, position, failedPosition, status) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
-                begin?.Invoke(target, position, failedPosition, status);
-                var parsed = parser(target, position, failedPosition, status);
-                var newstatus = parsed.Success ? success?.Invoke(parsed) : failed?.Invoke(parsed);
-                return new Result<T>(parsed.Success, parsed.Value, parsed.Position, parsed.FailedPosition, newstatus);
+                var newstatus1 = (enter != null) ? enter.Invoke(target, position, failedPosition, status) : status;
+                var parsed     = parser(target, position, failedPosition, newstatus1);
+                var newstatus2 = (leave != null) ? leave.Invoke(parsed) : parsed.Status;
+                return new Result<T>(parsed.Success, parsed.Value, parsed.Position, parsed.FailedPosition, newstatus2);
             };
         }
 
@@ -879,8 +930,7 @@ namespace Parsing {
     ///     パーサコンビネータをLINQ式で扱えるようにするための拡張メソッド
     /// </summary>
     public static class CombinatorMonad {
-        public static Parser<TOutput> Select<TInput, TOutput>(this Parser<TInput> parser,
-            Func<TInput, TOutput> selector) {
+        public static Parser<TOutput> Select<TInput, TOutput>(this Parser<TInput> parser, Func<TInput, TOutput> selector) {
             return parser.Map(selector);
         }
 
