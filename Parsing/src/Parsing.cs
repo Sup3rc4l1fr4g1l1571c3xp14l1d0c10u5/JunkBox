@@ -1,4 +1,4 @@
-//#define TraceParser
+#define TraceParser
 
 using System;
 using System.Collections;
@@ -223,54 +223,6 @@ namespace Parsing {
             return new Result<T>(false, value, position, failedPosition, status);
         }
 
-        /// <summary>
-        ///     otherとの比較を行う
-        /// </summary>
-        /// <param name="other"></param>
-        /// <returns></returns>
-        protected bool Equals(Result<T> other) {
-            if (Success != other.Success) {
-                return false;
-            }
-            if (!Equals(Position, other.Position)) {
-                return false;
-            }
-            if (Value is IStructuralEquatable) {
-                return ((IStructuralEquatable)Value).Equals(other.Value, StructuralComparisons.StructuralEqualityComparer);
-            }
-            return Equals(Value, other.Value);
-        }
-
-        /// <summary>
-        ///     objとの比較を行う
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public override bool Equals(object obj) {
-            if (ReferenceEquals(null, obj)) {
-                return false;
-            }
-            if (ReferenceEquals(this, obj)) {
-                return true;
-            }
-            if (obj.GetType() != GetType()) {
-                return false;
-            }
-            return Equals((Result<T>)obj);
-        }
-
-        /// <summary>
-        ///     インスタンスのハッシュ値を返す
-        /// </summary>
-        /// <returns></returns>
-        public override int GetHashCode() {
-            unchecked {
-                var hashCode = Success.GetHashCode();
-                hashCode = (hashCode * 397) ^ Position.Index;
-                hashCode = (hashCode * 397) ^ (Value != null ? Value.GetHashCode() : 0);
-                return hashCode;
-            }
-        }
     }
 
     /// <summary>
@@ -634,11 +586,11 @@ namespace Parsing {
                     // メモ化してもFailedPositionについてはチェック
                     var newFailedPosition = (failedPosition > parsed.FailedPosition) ? failedPosition : parsed.FailedPosition;
                     return new Result<T>(parsed.Success, parsed.Value, parsed.Position, newFailedPosition, parsed.Status);
+                } else { 
+                    parsed = parser(target, position, failedPosition, status);
+                    memoization.Add(key, parsed);
+                    return parsed;
                 }
-
-                parsed = parser(target, position, failedPosition, status);
-                memoization.Add(key, parsed);
-                return parsed;
             };
         }
 
@@ -688,7 +640,7 @@ namespace Parsing {
                 }
 
                 if (parser == null) {
-                    parser = (fn());
+                    parser = fn();
                     if (parser == null) {
                         throw new Exception("fn() result is null.");
                     }
@@ -721,6 +673,41 @@ namespace Parsing {
         }
 
         /// <summary>
+        ///     パーサのマッチ結果に対する絞り込みを行う
+        /// </summary>
+        /// <param name="parser">マッチ結果を生成するパーサ</param>
+        /// <param name="subParser">マッチ結果に対するパーサ</param>
+        /// <returns></returns>
+        public static Parser<T> Narrow<T>(this Parser<T> parser, Parser<T> subParser) {
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
+            }
+            if (subParser == null) {
+                throw new ArgumentNullException(nameof(subParser));
+            }
+            return (target, position, failedPosition, status) => {
+                if (target == null) {
+                    throw new ArgumentNullException(nameof(target));
+                }
+
+                var parsed1 = parser(target, position, failedPosition, status);
+                var newFailedPosition1 = (failedPosition > parsed1.FailedPosition) ? failedPosition : parsed1.FailedPosition;
+                if (!parsed1.Success) {
+                    return Result<T>.Reject(default(T), position, newFailedPosition1, status);
+                }
+
+                var parsed2 = subParser(target, position, newFailedPosition1, status);
+                var newFailedPosition2 = (newFailedPosition1 > parsed2.FailedPosition) ? newFailedPosition1 : parsed2.FailedPosition;
+
+                if (!parsed2.Success || !parsed1.Position.Equals(parsed2.Position)) {
+                    return Result<T>.Reject(default(T), position, newFailedPosition2, status);
+                }
+
+                return parsed2;
+            };
+        }
+
+        /// <summary>
         ///     入力を処理せずパーサの状態を覗き見するパーサを生成する（デバッグや入力の位置情報を取得するときに役に立つ）
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -741,9 +728,8 @@ namespace Parsing {
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="parser"></param>
-        /// <param name="begin"></param>
-        /// <param name="success"></param>
-        /// <param name="failed"></param>
+        /// <param name="enter"></param>
+        /// <param name="leave"></param>
         /// <returns></returns>
         public static Parser<T> Action<T>(
             this Parser<T> parser,

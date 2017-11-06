@@ -142,7 +142,7 @@ namespace CParser2 {
         public static readonly Parser<string> isspaces =
             Combinator.Trace("isspaces",
                 space.Many().Select(String.Concat)
-            );
+            ).Memoize();
 
         public static readonly Parser<char> digit =
             Combinator.Trace("digit",
@@ -261,6 +261,7 @@ namespace CParser2 {
                     from _1 in digits
                     from _2 in exponent
                     from _3 in isfloat_size.String()
+                    from _4 in isspaces
                     select _1 + _2 + _3
                     ,
                     from _1 in isdigits
@@ -268,6 +269,7 @@ namespace CParser2 {
                     from _3 in digits
                     from _4 in isexponent
                     from _5 in isfloat_size.String()
+                    from _6 in isspaces
                     select _1 + _2 + _3 + _4 + _5
                     ,
                     from _1 in digits
@@ -275,6 +277,7 @@ namespace CParser2 {
                     from _3 in isdigits
                     from _4 in isexponent
                     from _5 in isfloat_size.String()
+                    from _6 in isspaces
                     select _1 + _2 + _3 + _4 + _5
                 )
             );
@@ -299,6 +302,7 @@ namespace CParser2 {
                         ,
                         identpart_xs.String()
                     ).Many().Select(string.Concat)
+                from _3 in isspaces
                 select _1 + _2
             ).Memoize();
 
@@ -308,22 +312,13 @@ namespace CParser2 {
                 isspaces.Then(
                     Combinator.Choice(
                         string_constant,
-                        //float_constant,
-                        //hex_constant,
-                        //octal_constant,
-                        //decimal_constant
-                        preprocessing_numbers.Where(x => 
+                        preprocessing_numbers.Narrow(
                             Combinator.Choice(
                                 float_constant, 
                                 hex_constant, 
                                 octal_constant, 
                                 decimal_constant
-                            ).Skip(Combinator.EoF())(
-                                new Source("",new StringReader(x)), 
-                                Position.Empty, 
-                                Position.Empty,
-                                null
-                            ).Success
+                            )
                         )
                     )
                 ).Skip(isspaces)
@@ -597,14 +592,14 @@ namespace CParser2 {
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression(_1, _2)
                         ,
                         from _1 in sizeof_keyword
-                        from _2 in unary_expression
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofExpression(_1, _2)
-                        ,
-                        from _1 in sizeof_keyword
                         from _2 in left_paren
                         from _3 in type_name
                         from _4 in right_paren
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofTypeExpression(_1, _3)
+                        ,
+                        from _1 in sizeof_keyword
+                        from _2 in unary_expression
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofExpression(_1, _2)
                         ,
                         //alighof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression)new AlignofExpression("alignof", x)),
                         //from _1 in alighof_keyword from _2 in left_paren from _3 in type_name from _4 in right_paren select (SyntaxNode.Expression)new AlignofTypeExpression(_1, _3)
@@ -708,7 +703,7 @@ namespace CParser2 {
                         from _3 in question_mark
                         from _4 in expression
                         from _5 in colon
-                        from _6 in conditional_expression
+                        from _6 in Combinator.Lazy( () => conditional_expression )
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(_1, _4, _6)
                     ).Option()
                     select _2 ?? _1
@@ -721,11 +716,11 @@ namespace CParser2 {
                     from _1 in cast_expression
                     from _2 in Combinator.Choice<SyntaxNode.Expression>(
                         from __1 in assign
-                        from __2 in assignment_expression
+                        from __2 in Combinator.Lazy(() => assignment_expression)
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression(__1, _1, __2)
                         ,
                         from __1 in compound_assignment_operator
-                        from __2 in assignment_expression
+                        from __2 in Combinator.Lazy(() => assignment_expression)
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression(__1, _1, __2)
                     )
                     select _2
@@ -865,18 +860,20 @@ namespace CParser2 {
                     Combinator.Choice(
                         from _1 in struct_keyword
                         from _2 in IDENTIFIER.Option()
-                        from _4 in struct_declaration_list
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _4, _2 != null),
+                        from _3 in struct_declaration_list.Option()
+                        where _2 != null || _3 != null
+                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null),
                         from _1 in union_keyword
                         from _2 in IDENTIFIER.Option()
-                        from _3 in struct_declaration_list
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null),
-                        from _1 in struct_keyword
-                        from _2 in IDENTIFIER
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2, null, false),
-                        from _1 in union_keyword
-                        from _2 in IDENTIFIER
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2, null, false)
+                        from _3 in struct_declaration_list.Option()
+                        where _2 != null || _3 != null
+                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null)
+                        //from _1 in struct_keyword
+                        //from _2 in IDENTIFIER
+                        //select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2, null, false),
+                        //from _1 in union_keyword
+                        //from _2 in IDENTIFIER
+                        //select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2, null, false)
                     )
                 )
             );
@@ -1172,7 +1169,8 @@ namespace CParser2 {
                     Combinator.Choice(
                         from _1 in pointer
                         from _2 in direct_abstract_declarator.Option()
-                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) { full = true },
+                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) { full = true }
+                        ,
                         from _2 in direct_abstract_declarator
                         select eval(() => {
                             _2.full = true;
@@ -1348,7 +1346,7 @@ namespace CParser2 {
 
         public static readonly Parser<string> label_name =
             Combinator.Trace("label_name",
-                Combinator.Choice(IDENTIFIER, TYPEDEF_NAME)
+                IDENTIFIER
             );
 
         public static readonly Parser<SyntaxNode.Statement> labeled_statement =

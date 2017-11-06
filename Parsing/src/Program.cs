@@ -31,10 +31,12 @@ namespace CParser2
                     sw.Start();
                     var ret = CParser.Parse(reader);
                     sw.Stop();
-                    Console.WriteLine($"Result: {(ret.Success?"Success" : $"Failed at {ret.FailedPosition}")}");
+                    Console.WriteLine($"Result: {(ret.Success ? "Success" : $"Failed at {ret.FailedPosition}")}");
+                    Console.WriteLine($"Position: {ret.Position}");
+                    Console.WriteLine($"Failed Position: {ret.FailedPosition}");
                     Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
-                    //return;
                     //Console.ReadLine();
+                    //return;
                     //ret?.Value.Save("ast.xml");
 
 
