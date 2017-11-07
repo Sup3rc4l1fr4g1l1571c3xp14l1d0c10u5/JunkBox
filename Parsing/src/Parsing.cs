@@ -1,4 +1,4 @@
-#define TraceParser
+//#define TraceParser
 
 using System;
 using System.Collections;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using CParser2;
 //using System.Text.RegularExpressions;
 
 
@@ -76,8 +77,9 @@ namespace Parsing {
     /// </summary>
     public class Position : IComparer<Position> {
         public int Index { get; } // 文字列上の位置
-        public int Row { get; } // 行
-        public int Column { get; } // 列
+        public string FileName { get; } // 見かけ上のファイル
+        public int Row { get; } // 見かけ上のファイル上の行
+        public int Column { get; } // 見かけ上のファイル上の列
         private char PrevChar { get; }
 
         public int Compare(Position x, Position y) {
@@ -89,6 +91,8 @@ namespace Parsing {
 
         public static bool operator >(Position lhs, Position rhs) => lhs.Index > rhs.Index;
         public static bool operator <(Position lhs, Position rhs) => lhs.Index < rhs.Index;
+        public static bool operator >=(Position lhs, Position rhs) => lhs.Index >= rhs.Index;
+        public static bool operator <=(Position lhs, Position rhs) => lhs.Index <= rhs.Index;
 
         public override bool Equals(object obj) {
             return (obj as Position)?.Index == Index;
@@ -98,18 +102,22 @@ namespace Parsing {
             return Index;
         }
 
-        private Position(int index, int row, int column, char prevChar) {
+        private Position(int index, string filename, int row, int column, char prevChar) {
             Index = index;
+            FileName = filename;
             Row = row;
             Column = column;
             PrevChar = prevChar;
         }
 
         public override string ToString() {
-            return $"({Row}:{Column})";
+            return $"{FileName} ({Row}:{Column})";
         }
 
-        public static Position Empty { get; } = new Position(0, 1, 1, '\0');
+        public static Position Empty { get; } = new Position(0, "", 1, 1, '\0');
+        public Position Reposition(string filename, int row, int column) {
+            return new Position(Index, filename, row, column, PrevChar);
+        }
 
         public Position Inc(string substr) {
             var row = Row;
@@ -138,7 +146,7 @@ namespace Parsing {
                 }
                 prevChar = t;
             }
-            return new Position(index, row, col, prevChar);
+            return new Position(index, FileName, row, col, prevChar);
         }
         public Position Inc(char t) {
             var row = Row;
@@ -166,18 +174,31 @@ namespace Parsing {
             }
             prevChar = t;
 
-            return new Position(index, row, col, prevChar);
+            return new Position(index, FileName, row, col, prevChar);
         }
     }
 
     /// <summary>
     ///     パーサコンビネータの結果
     /// </summary>
-    public class Result<T> {
+    public abstract class Result<T> {
+        public class Just : Result<T> {
+            public Just(T value, Position position, Position failedPosition, object status) : base(value, position, failedPosition, status) {
+            }
+
+            public override bool Success { get { return true; } }
+        }
+        public class None : Result<T> {
+            public None(T value, Position position, Position failedPosition, object status) : base(value, position, failedPosition, status) {
+            }
+
+            public override bool Success { get { return false; } }
+        }
+
         /// <summary>
         ///     パーサがマッチした場合は真、それ以外の場合は偽となる
         /// </summary>
-        public bool Success { get; }
+        public abstract bool Success { get; }
 
         /// <summary>
         ///     パーサがマッチした際は次の読み取り位置を示す
@@ -185,7 +206,7 @@ namespace Parsing {
         public Position Position { get; }
 
         /// <summary>
-        ///     パーサを最も読み住めることができた位置
+        ///     パーサを最も読み進めることができた位置
         /// </summary>
         public Position FailedPosition { get; }
 
@@ -202,13 +223,11 @@ namespace Parsing {
         /// <summary>
         ///     コンストラクタ
         /// </summary>
-        /// <param name="success">パーサがマッチした場合は真、それ以外の場合は偽</param>
         /// <param name="value">パーサがマッチした際の次の読み取り位置</param>
         /// <param name="position">パーサがマッチした際の値</param>
         /// <param name="failedPosition"></param>
         /// <param name="status"></param>
-        public Result(bool success, T value, Position position, Position failedPosition, object status) {
-            Success = success;
+        protected Result(T value, Position position, Position failedPosition, object status) {
             Value = value;
             Position = position;
             FailedPosition = failedPosition;
@@ -216,11 +235,11 @@ namespace Parsing {
         }
 
         public static Result<T> Accept(T value, Position position, Position failedPosition, object status) {
-            return new Result<T>(true, value, position, failedPosition, status);
+            return new Result<T>.Just(value, position, failedPosition, status);
         }
 
         public static Result<T> Reject(T value, Position position, Position failedPosition, object status) {
-            return new Result<T>(false, value, position, failedPosition, status);
+            return new Result<T>.None(value, position, failedPosition, status);
         }
 
     }
@@ -232,6 +251,7 @@ namespace Parsing {
     /// <param name="target">パース対象文字列</param>
     /// <param name="position">現在の位置</param>
     /// <param name="failedPosition">最も読み進めることに成功した失敗位置</param>
+    /// <param name="status">セマンティックアクションの結果</param>
     /// <returns></returns>
     public delegate Result<T> Parser<T>(Source target, Position position, Position failedPosition, object status);
 
@@ -585,16 +605,21 @@ namespace Parsing {
                 if (memoization.TryGetValue(key, out parsed)) {
                     // メモ化してもFailedPositionについてはチェック
                     var newFailedPosition = (failedPosition > parsed.FailedPosition) ? failedPosition : parsed.FailedPosition;
-                    return new Result<T>(parsed.Success, parsed.Value, parsed.Position, newFailedPosition, parsed.Status);
-                } else { 
-                    parsed = parser(target, position, failedPosition, status);
-                    memoization.Add(key, parsed);
-                    return parsed;
+                    if (parsed.Success) {
+                        return Result<T>.Accept(parsed.Value, parsed.Position, newFailedPosition, parsed.Status);
+                    } else {
+                        return Result<T>.Reject(parsed.Value, parsed.Position, newFailedPosition, parsed.Status);
+                    }
                 }
+
+                parsed = parser(target, position, failedPosition, status);
+                memoization.Add(key, parsed);
+                return parsed;
             };
         }
 
-        public static Dictionary<string,List<Tuple<Position,bool>>> TraceInfo = new Dictionary<string, List<Tuple<Position, bool>>>();
+        public static Dictionary<string, List<Tuple<Position, bool>>> TraceInfo = new Dictionary<string, List<Tuple<Position, bool>>>();
+        public static Stack<string> TraceStack = new Stack<string>();
 
         /// <summary>
         ///     パーサのトレース（デバッグ・チューニング用）
@@ -614,8 +639,10 @@ namespace Parsing {
                     throw new ArgumentNullException(nameof(target));
                 }
 
+                TraceStack.Push(caption);
                 var parsed = parser(target, position, failedPosition, status);
                 TraceInfo[caption].Add(Tuple.Create(position, parsed.Success));
+                TraceStack.Pop();
                 return parsed;
             };
 #else
@@ -624,7 +651,7 @@ namespace Parsing {
         }
 
         /// <summary>
-        ///     再帰パーサ用の遅延評価パーサを生成
+        ///     遅延評価パーサを生成
         /// </summary>
         /// <param name="fn">遅延評価するパーサ</param>
         /// <returns></returns>
@@ -673,37 +700,36 @@ namespace Parsing {
         }
 
         /// <summary>
-        ///     パーサのマッチ結果に対する絞り込みを行う
+        ///     parserでマッチした範囲に対する絞り込みを行うパーサを生成する
         /// </summary>
-        /// <param name="parser">マッチ結果を生成するパーサ</param>
-        /// <param name="subParser">マッチ結果に対するパーサ</param>
+        /// <param name="parser">パーサ</param>
+        /// <param name="parser">絞り込むパーサ</param>
         /// <returns></returns>
-        public static Parser<T> Narrow<T>(this Parser<T> parser, Parser<T> subParser) {
+        public static Parser<T> Refinement<T>(this Parser<T> parser, Parser<T> reparser) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
-            }
-            if (subParser == null) {
-                throw new ArgumentNullException(nameof(subParser));
             }
             return (target, position, failedPosition, status) => {
                 if (target == null) {
                     throw new ArgumentNullException(nameof(target));
                 }
 
-                var parsed1 = parser(target, position, failedPosition, status);
-                var newFailedPosition1 = (failedPosition > parsed1.FailedPosition) ? failedPosition : parsed1.FailedPosition;
-                if (!parsed1.Success) {
-                    return Result<T>.Reject(default(T), position, newFailedPosition1, status);
+                var parsed = parser(target, position, failedPosition, status);
+                    if (!parsed.Success) {
+                    var newFailedPosition = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    return Result<T>.Reject(default(T), position, newFailedPosition, status);
                 }
 
-                var parsed2 = subParser(target, position, newFailedPosition1, status);
-                var newFailedPosition2 = (newFailedPosition1 > parsed2.FailedPosition) ? newFailedPosition1 : parsed2.FailedPosition;
-
-                if (!parsed2.Success || !parsed1.Position.Equals(parsed2.Position)) {
+                // 絞り込みを行う
+                var reparsed = reparser(target, position, failedPosition, status);
+                if (!reparsed.Success || (!parsed.Position.Equals(reparsed.Position))) {
+                    var newFailedPosition1 = (position > parsed.FailedPosition) ? position : parsed.FailedPosition;
+                    var newFailedPosition2 = (newFailedPosition1 > reparsed.FailedPosition) ? newFailedPosition1 : reparsed.FailedPosition;
                     return Result<T>.Reject(default(T), position, newFailedPosition2, status);
                 }
 
-                return parsed2;
+                return reparsed;
+
             };
         }
 
@@ -728,8 +754,9 @@ namespace Parsing {
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="parser"></param>
-        /// <param name="enter"></param>
-        /// <param name="leave"></param>
+        /// <param name="begin"></param>
+        /// <param name="success"></param>
+        /// <param name="failed"></param>
         /// <returns></returns>
         public static Parser<T> Action<T>(
             this Parser<T> parser,
@@ -743,7 +770,11 @@ namespace Parsing {
                 var newstatus1 = (enter != null) ? enter.Invoke(target, position, failedPosition, status) : status;
                 var parsed     = parser(target, position, failedPosition, newstatus1);
                 var newstatus2 = (leave != null) ? leave.Invoke(parsed) : parsed.Status;
-                return new Result<T>(parsed.Success, parsed.Value, parsed.Position, parsed.FailedPosition, newstatus2);
+                if (parsed.Success) {
+                    return Result<T>.Accept(parsed.Value, parsed.Position, parsed.FailedPosition, newstatus2);
+                } else {
+                    return Result<T>.Reject(parsed.Value, parsed.Position, parsed.FailedPosition, newstatus2);
+                }
             };
         }
 
@@ -895,33 +926,144 @@ namespace Parsing {
         /// </summary>
         /// <typeparam name="T1"></typeparam>
         /// <typeparam name="T2"></typeparam>
-        /// <param name="self"></param>
+        /// <param name="parser"></param>
         /// <param name="separator">区切り要素</param>
         /// <returns></returns>
-        public static Parser<T1[]> Repeat1<T1, T2>(this Parser<T1> self, Parser<T2> separator) {
-            if (self == null) {
-                throw new ArgumentNullException(nameof(self));
+        public static Parser<T1[]> Separate<T1, T2>(this Parser<T1> parser, Parser<T2> separator, int min = -1, int max = -1) {
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
             }
             if (separator == null) {
                 throw new ArgumentNullException(nameof(separator));
             }
+            if (min >= 0 && max >= 0 && min > max) {
+                throw new ArgumentException("min < max");
+            }
+
+            return ((target, position, failedPosition, status) => {
+                if (target == null) {
+                    throw new ArgumentNullException(nameof(target));
+                }
+
+                var result = new List<T1>();
+
+                var currentPosition = position;
+                var currentFailedPosition = failedPosition;
+                var currentStatus = status;
+
+                // 最初の要素を読み取り
+                var parsed0 = parser(target, currentPosition, currentFailedPosition, currentStatus);
+
+                // 読み取り失敗位置はより読み進んでいる方を採用
+                currentFailedPosition = (parsed0.FailedPosition > currentFailedPosition) ? parsed0.FailedPosition : currentFailedPosition;
+
+                if (!parsed0.Success) {
+                    // 読み取りに失敗したので、読み取り開始位置と読み取り失敗位置のうち、より読み進んでいる方をManyパーサの読み取り失敗位置として採用し、読み取り処理終了
+                    currentFailedPosition = (currentFailedPosition > currentPosition) ? currentFailedPosition : currentPosition;
+                } else {
+                    // 読み取りに成功したので情報を更新
+                    result.Add(parsed0.Value); // 結果を格納
+                    currentPosition = parsed0.Position; // 読み取り位置を更新する
+                    currentStatus = parsed0.Status;
+
+                    for (;;) {
+                        // 区切り要素を読み取り
+                        var parsed1 = separator(target, currentPosition, currentFailedPosition, currentStatus);
+
+                        // 読み取り失敗位置はより読み進んでいる方を採用
+                        currentFailedPosition = (parsed1.FailedPosition > currentFailedPosition) ? parsed1.FailedPosition : currentFailedPosition;
+
+                        if (!parsed1.Success) {
+                            // 読み取りに失敗したので、読み取り開始位置と読み取り失敗位置のうち、より読み進んでいる方をManyパーサの読み取り失敗位置として採用し、読み取り処理終了
+                            currentFailedPosition = (currentFailedPosition > currentPosition) ? currentFailedPosition : currentPosition;
+                            break;
+                        }
+
+                        // 読み取りに成功したので次の要素を読み取り
+                        var parsed2 = parser(target, parsed1.Position, currentFailedPosition, parsed1.Status);
+
+                        // 読み取り失敗位置はより読み進んでいる方を採用
+                        currentFailedPosition = (parsed2.FailedPosition > currentFailedPosition) ? parsed2.FailedPosition : currentFailedPosition;
+
+                        if (!parsed2.Success) {
+                            // 読み取りに失敗したので、読み取り開始位置と読み取り失敗位置のうち、より読み進んでいる方をManyパーサの読み取り失敗位置として採用し、読み取り処理終了
+                            currentFailedPosition = (currentFailedPosition > currentPosition) ? currentFailedPosition : currentPosition;
+                            break;
+                        } else {
+                            // 読み取りに成功したので情報更新
+                            result.Add(parsed2.Value); // 結果を格納
+                            currentPosition = parsed2.Position; // 読み取り位置を更新する
+                            currentStatus = parsed2.Status;
+                        }
+                    }
+
+                }
+
+
+                if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
+                    return Result<T1[]>.Reject(new T1[0], position, currentFailedPosition, status);
+                } else {
+                    return Result<T1[]>.Accept(result.ToArray(), currentPosition, currentFailedPosition, currentStatus);
+                }
+            });
+        }
+
+
+        /// <summary>
+        /// 括弧などで括る構文を容易に記述するためのパーサ
+        /// </summary>
+        /// <typeparam name="T1"></typeparam>
+        /// <typeparam name="T2"></typeparam>
+        /// <typeparam name="T3"></typeparam>
+        /// <param name="left"></param>
+        /// <param name="parser"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        public static Parser<T2> Quote<T1, T2, T3>(Parser<T1> left, Parser<T2> parser, Parser<T3> right) {
+            if (left == null) {
+                throw new ArgumentNullException(nameof(left));
+            }
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
+            }
+            if (right == null) {
+                throw new ArgumentNullException(nameof(right));
+            }
             return
-                from _1 in self
-                from _2 in separator.Then(self).Many()
-                select new[] { _1 }.Concat(_2).ToArray();
+                from _1 in left
+                from _2 in parser
+                from _3 in right
+                select _2;
+        }
+
+        /// <summary>
+        /// C言語の#lineディレクティブのようにファイル中での見かけ上の行列位置を変更するためのパーサ
+        /// </summary>
+        /// <param name="fn"></param>
+        /// <returns></returns>
+        public static Parser<object> Reposition(Func<Position, Position> fn) {
+            return (target, position, failedPosition, status) => {
+                return Result<object>.Accept(null, fn(position), failedPosition, status);
+            };
         }
     }
 
     /// <summary>
     ///     パーサコンビネータをLINQ式で扱えるようにするための拡張メソッド
     /// </summary>
-    public static class CombinatorMonad {
-        public static Parser<TOutput> Select<TInput, TOutput>(this Parser<TInput> parser, Func<TInput, TOutput> selector) {
+    public static class Linq {
+        public static Parser<TOutput> Select<TInput, TOutput>(
+            this Parser<TInput> parser, 
+            Func<TInput, TOutput> selector
+        ) {
             return parser.Map(selector);
         }
 
-        public static Parser<TOutput> SelectMany<TInput, T, TOutput>(this Parser<TInput> parser,
-            Func<TInput, Parser<T>> selector, Func<TInput, T, TOutput> projector) {
+        public static Parser<TOutput> SelectMany<TInput, T, TOutput>(
+            this Parser<TInput> parser,
+            Func<TInput, Parser<T>> selector, 
+            Func<TInput, T, TOutput> projector
+        ) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }

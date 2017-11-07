@@ -71,10 +71,11 @@ namespace CParser2 {
 
         public static readonly Parser<string> block_comment =
             Combinator.Trace("block_comment",
-                from _1 in Combinator.Token("/*")
-                from _2 in Combinator.Token("*/").Not().Then(Combinator.AnyChar()).Many().String()
-                from _3 in Combinator.Token("*/")
-                select _1 + _2 + _3
+                Combinator.Quote(
+                    Combinator.Token("/*"), 
+                    Combinator.Token("*/").Not().Then(Combinator.AnyChar()).Many().String(),
+                    Combinator.Token("*/")
+                )
             );
 
         public static readonly Parser<string> line_comment =
@@ -100,8 +101,22 @@ namespace CParser2 {
 
         public static readonly Parser<string> pragma_line_directive =
             Combinator.Trace("pragma_line_directive",
-                from _1 in directive_space.Many().Then(Combinator.Token("line"))
-                from _2 in directive_space.Many(1).Then(Combinator.Lazy(() => digits.Select(int.Parse)))
+                    from _1 in directive_space.Many().Then(Combinator.Token("line"))
+                    from _2 in directive_space.Many(1).Then(Combinator.Lazy(() => digits))
+                    from _3 in directive_space.Many(1).Then(Combinator.Token("\""))
+                    from _4 in Combinator.Choice(
+                        Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
+                        Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
+                    ).Many(1).Select(String.Concat)
+                    from _5 in Combinator.Token("\"")
+                    from _6 in directive_space.Many().Then(new_line)
+                    from _7 in Combinator.Reposition((position) => position.Reposition(_4, int.Parse(_2), 1))
+                    select "\n"
+            );
+
+        public static readonly Parser<string> pragma_gccline_directive =
+            Combinator.Trace("pragma_gccline_directive",
+                from _2 in directive_space.Many(1).Then(Combinator.Lazy(() => digits))
                 from _3 in directive_space.Many(1).Then(Combinator.Token("\""))
                 from _4 in Combinator.Choice(
                     Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
@@ -109,6 +124,7 @@ namespace CParser2 {
                 ).Many(1).Select(String.Concat)
                 from _5 in Combinator.Token("\"")
                 from _6 in directive_space.Many().Then(new_line)
+                from _7 in Combinator.Reposition((position) => position.Reposition(_4, int.Parse(_2), 1))
                 select "\n" // Tuple.Create(_6, _4)
             );
 
@@ -124,7 +140,7 @@ namespace CParser2 {
                 from _1 in Combinator.Tap((source, pos, failedpos, status) => pos.Column)
                 where _1 == 1
                 from _2 in directive_space.Many().Then(Combinator.Token("#"))
-                from _3 in Combinator.Choice(pragma_line_directive, pragma_unknowndirective)
+                from _3 in Combinator.Choice(pragma_line_directive, pragma_gccline_directive, pragma_unknowndirective)
                 select _3
             );
 
@@ -221,7 +237,6 @@ namespace CParser2 {
                 from _1 in Combinator.Choice(Combinator.Token("0x"), Combinator.Token("0X"))
                 from _2 in xdigit.Many(1).String()
                 from _3 in isint_size
-                from _4 in isspaces
                 select _1 + _2 + _3
             );
 
@@ -230,7 +245,6 @@ namespace CParser2 {
                 from _1 in Combinator.Token("0")
                 from _2 in digits
                 from _3 in isint_size
-                from _4 in isspaces
                 select _1 + _2 + _3
             );
 
@@ -238,7 +252,6 @@ namespace CParser2 {
             Combinator.Trace("decimal_constant",
                 from _1 in digits
                 from _2 in isint_size
-                from _3 in isspaces
                 select _1 + _2
             );
 
@@ -251,7 +264,6 @@ namespace CParser2 {
                     Combinator.AnyChar(@"'").Not().Then(Combinator.AnyChar()).String()
                 ).Many(1)
                 from _4 in Combinator.Token("'")
-                from _5 in isspaces
                 select _1 + _2 + _3 + 4
             );
 
@@ -261,7 +273,6 @@ namespace CParser2 {
                     from _1 in digits
                     from _2 in exponent
                     from _3 in isfloat_size.String()
-                    from _4 in isspaces
                     select _1 + _2 + _3
                     ,
                     from _1 in isdigits
@@ -269,7 +280,6 @@ namespace CParser2 {
                     from _3 in digits
                     from _4 in isexponent
                     from _5 in isfloat_size.String()
-                    from _6 in isspaces
                     select _1 + _2 + _3 + _4 + _5
                     ,
                     from _1 in digits
@@ -277,14 +287,13 @@ namespace CParser2 {
                     from _3 in isdigits
                     from _4 in isexponent
                     from _5 in isfloat_size.String()
-                    from _6 in isspaces
                     select _1 + _2 + _3 + _4 + _5
                 )
             );
 
-        public static readonly Parser<string> preprocessing_numbers =
-            Combinator.Trace("preprocessing_numbers",
-                from _1 in 
+        public static readonly Parser<string> preprocessing_number =
+            Combinator.Trace("preprocessing_number",
+                from _1 in
                     Combinator.Choice(
                         digit.String()
                         ,
@@ -302,9 +311,8 @@ namespace CParser2 {
                         ,
                         identpart_xs.String()
                     ).Many().Select(string.Concat)
-                from _3 in isspaces
                 select _1 + _2
-            ).Memoize();
+            );
 
 
         public static readonly Parser<string> constant =
@@ -312,11 +320,11 @@ namespace CParser2 {
                 isspaces.Then(
                     Combinator.Choice(
                         string_constant,
-                        preprocessing_numbers.Narrow(
+                        preprocessing_number.Refinement(
                             Combinator.Choice(
-                                float_constant, 
-                                hex_constant, 
-                                octal_constant, 
+                                float_constant,
+                                hex_constant,
+                                octal_constant,
                                 decimal_constant
                             )
                         )
@@ -406,14 +414,14 @@ namespace CParser2 {
             "__builtin_va_list",
         };
 
-        public static readonly Parser<string> ellipsis = Combinator.Trace("ellipsis", isspaces.Then(Combinator.Token("...").Skip(isspaces)));
-        public static readonly Parser<string> semicolon = Combinator.Trace("semicolon", isspaces.Then(Combinator.Token(";").Skip(isspaces)));
-        public static readonly Parser<string> comma = Combinator.Trace("comma", isspaces.Then(Combinator.Token(",").Skip(isspaces)));
-        public static readonly Parser<string> colon = Combinator.Trace("colon", isspaces.Then(Combinator.Token(":").Skip(isspaces)));
-        public static readonly Parser<string> left_paren = Combinator.Trace("left_paren", isspaces.Then(Combinator.Token("(").Skip(isspaces)));
-        public static readonly Parser<string> right_paren = Combinator.Trace("right_paren", isspaces.Then(Combinator.Token(")").Skip(isspaces)));
-        public static readonly Parser<string> member_access = Combinator.Trace("member_access", isspaces.Then(Combinator.Token(".").Skip(isspaces)));
-        public static readonly Parser<string> question_mark = Combinator.Trace("question_mark", isspaces.Then(Combinator.Token("?").Skip(isspaces)));
+        public static readonly Parser<string> ellipsis = Combinator.Trace("ellipsis", Combinator.Quote(isspaces, Combinator.Token("..."), isspaces));
+        public static readonly Parser<string> semicolon = Combinator.Trace("semicolon", Combinator.Quote(isspaces, Combinator.Token(";"), isspaces));
+        public static readonly Parser<string> comma = Combinator.Trace("comma", Combinator.Quote(isspaces, Combinator.Token(","), isspaces));
+        public static readonly Parser<string> colon = Combinator.Trace("colon", Combinator.Quote(isspaces, Combinator.Token(":"), isspaces));
+        public static readonly Parser<string> left_paren = Combinator.Trace("left_paren", Combinator.Quote(isspaces, Combinator.Token("("), isspaces));
+        public static readonly Parser<string> right_paren = Combinator.Trace("right_paren", Combinator.Quote(isspaces, Combinator.Token(")"), isspaces));
+        public static readonly Parser<string> member_access = Combinator.Trace("member_access", Combinator.Quote(isspaces, Combinator.Token("."), isspaces));
+        public static readonly Parser<string> question_mark = Combinator.Trace("question_mark", Combinator.Quote(isspaces, Combinator.Token("?"), isspaces));
 
         public static readonly Parser<string> string_literal =
             Combinator.Trace("string_literal",
@@ -423,59 +431,59 @@ namespace CParser2 {
                     from _3 in Combinator.Choice(
                         Combinator.Token("\\").Then(Combinator.AnyChar()).Select(x => $@"\{x}"),
                         Combinator.AnyChar("\"").Not().Then(Combinator.AnyChar()).String()
-                    ).Many()
+                    ).Many().Select(String.Concat)
                     from _4 in Combinator.Token("\"")
                     from _5 in isspaces
-                    select _1 + _2 + _3 + 4
+                    select _1 + _2 + _3 + _4
                 ).Many(1).Select(string.Concat)
             );
 
-        public static readonly Parser<string> left_brace = Combinator.Trace("left_brace", isspaces.Then(Combinator.Choice(Combinator.Token("{"), Combinator.Token("<%")).Skip(isspaces)));
-        public static readonly Parser<string> right_brace = Combinator.Trace("right_brace", isspaces.Then(Combinator.Choice(Combinator.Token("}"), Combinator.Token("%>")).Skip(isspaces)));
+        public static readonly Parser<string> left_brace = Combinator.Trace("left_brace", Combinator.Quote(isspaces, Combinator.Choice(Combinator.Token("{"), Combinator.Token("<%")), isspaces));
+        public static readonly Parser<string> right_brace = Combinator.Trace("right_brace", Combinator.Quote(isspaces, Combinator.Choice(Combinator.Token("}"), Combinator.Token("%>")), isspaces));
 
-        public static readonly Parser<string> left_bracket = Combinator.Trace("left_bracket", isspaces.Then(Combinator.Choice(Combinator.Token("["), Combinator.Token("<:")).Skip(isspaces)));
-        public static readonly Parser<string> right_bracket = Combinator.Trace("right_bracket", isspaces.Then(Combinator.Choice(Combinator.Token("]"), Combinator.Token(":>")).Skip(isspaces)));
+        public static readonly Parser<string> left_bracket = Combinator.Trace("left_bracket", Combinator.Quote(isspaces, Combinator.Choice(Combinator.Token("["), Combinator.Token("<:")), isspaces));
+        public static readonly Parser<string> right_bracket = Combinator.Trace("right_bracket", Combinator.Quote(isspaces, Combinator.Choice(Combinator.Token("]"), Combinator.Token(":>")), isspaces));
 
-        public static readonly Parser<string> right_shift_assign = Combinator.Trace("right_shift_assign", isspaces.Then(Combinator.Token(">>=").Skip(isspaces)));
-        public static readonly Parser<string> left_shift_assign = Combinator.Trace("left_shift_assign", isspaces.Then(Combinator.Token("<<=").Skip(isspaces)));
+        public static readonly Parser<string> right_shift_assign = Combinator.Trace("right_shift_assign", Combinator.Quote(isspaces, Combinator.Token(">>="), isspaces));
+        public static readonly Parser<string> left_shift_assign = Combinator.Trace("left_shift_assign", Combinator.Quote(isspaces, Combinator.Token("<<="), isspaces));
 
-        public static readonly Parser<string> add_assign = Combinator.Trace("add_assign", isspaces.Then(Combinator.Token("+=").Skip(isspaces)));
-        public static readonly Parser<string> subtract_assign = Combinator.Trace("subtract_assign", isspaces.Then(Combinator.Token("-=").Skip(isspaces)));
-        public static readonly Parser<string> multiply_assign = Combinator.Trace("multiply_assign", isspaces.Then(Combinator.Token("*=").Skip(isspaces)));
-        public static readonly Parser<string> divide_assign = Combinator.Trace("divide_assign", isspaces.Then(Combinator.Token("/=").Skip(isspaces)));
-        public static readonly Parser<string> modulus_assign = Combinator.Trace("modulus_assign", isspaces.Then(Combinator.Token("%=").Skip(isspaces)));
-        public static readonly Parser<string> binary_and_assign = Combinator.Trace("binary_and_assign", isspaces.Then(Combinator.Token("&=").Skip(isspaces)));
-        public static readonly Parser<string> xor_assign = Combinator.Trace("xor_assign", isspaces.Then(Combinator.Token("^=").Skip(isspaces)));
-        public static readonly Parser<string> binary_or_assign = Combinator.Trace("binary_or_assign", isspaces.Then(Combinator.Token("|=").Skip(isspaces)));
-        public static readonly Parser<string> inc = Combinator.Trace("inc", isspaces.Then(Combinator.Token("++").Skip(isspaces)));
-        public static readonly Parser<string> dec = Combinator.Trace("dec", isspaces.Then(Combinator.Token("--").Skip(isspaces)));
-        public static readonly Parser<string> pointer_access = Combinator.Trace("pointer_access", isspaces.Then(Combinator.Token("->").Skip(isspaces)));
-        public static readonly Parser<string> logical_and = Combinator.Trace("logical_and", isspaces.Then(Combinator.Token("&&").Skip(isspaces)));
-        public static readonly Parser<string> logical_or = Combinator.Trace("logical_or", isspaces.Then(Combinator.Token("||").Skip(isspaces)));
-        public static readonly Parser<string> less_equal = Combinator.Trace("less_equal", isspaces.Then(Combinator.Token("<=").Skip(isspaces)));
-        public static readonly Parser<string> greater_equal = Combinator.Trace("greater_equal", isspaces.Then(Combinator.Token(">=").Skip(isspaces)));
-        public static readonly Parser<string> equal = Combinator.Trace("equal", isspaces.Then(Combinator.Token("==").Skip(isspaces)));
-        public static readonly Parser<string> not_equal = Combinator.Trace("not_equal", isspaces.Then(Combinator.Token("!=").Skip(isspaces)));
+        public static readonly Parser<string> add_assign = Combinator.Trace("add_assign", Combinator.Quote(isspaces, Combinator.Token("+="), isspaces));
+        public static readonly Parser<string> subtract_assign = Combinator.Trace("subtract_assign", Combinator.Quote(isspaces, Combinator.Token("-="), isspaces));
+        public static readonly Parser<string> multiply_assign = Combinator.Trace("multiply_assign", Combinator.Quote(isspaces, Combinator.Token("*="), isspaces));
+        public static readonly Parser<string> divide_assign = Combinator.Trace("divide_assign", Combinator.Quote(isspaces, Combinator.Token("/="), isspaces));
+        public static readonly Parser<string> modulus_assign = Combinator.Trace("modulus_assign", Combinator.Quote(isspaces, Combinator.Token("%="), isspaces));
+        public static readonly Parser<string> binary_and_assign = Combinator.Trace("binary_and_assign", Combinator.Quote(isspaces, Combinator.Token("&="), isspaces));
+        public static readonly Parser<string> xor_assign = Combinator.Trace("xor_assign", Combinator.Quote(isspaces, Combinator.Token("^="), isspaces));
+        public static readonly Parser<string> binary_or_assign = Combinator.Trace("binary_or_assign", Combinator.Quote(isspaces, Combinator.Token("|="), isspaces));
+        public static readonly Parser<string> inc = Combinator.Trace("inc", Combinator.Quote(isspaces, Combinator.Token("++"), isspaces));
+        public static readonly Parser<string> dec = Combinator.Trace("dec", Combinator.Quote(isspaces, Combinator.Token("--"), isspaces));
+        public static readonly Parser<string> pointer_access = Combinator.Trace("pointer_access", Combinator.Quote(isspaces, Combinator.Token("->"), isspaces));
+        public static readonly Parser<string> logical_and = Combinator.Trace("logical_and", Combinator.Quote(isspaces, Combinator.Token("&&"), isspaces));
+        public static readonly Parser<string> logical_or = Combinator.Trace("logical_or", Combinator.Quote(isspaces, Combinator.Token("||"), isspaces));
+        public static readonly Parser<string> less_equal = Combinator.Trace("less_equal", Combinator.Quote(isspaces, Combinator.Token("<="), isspaces));
+        public static readonly Parser<string> greater_equal = Combinator.Trace("greater_equal", Combinator.Quote(isspaces, Combinator.Token(">="), isspaces));
+        public static readonly Parser<string> equal = Combinator.Trace("equal", Combinator.Quote(isspaces, Combinator.Token("=="), isspaces));
+        public static readonly Parser<string> not_equal = Combinator.Trace("not_equal", Combinator.Quote(isspaces, Combinator.Token("!="), isspaces));
 
-        public static readonly Parser<string> assign = Combinator.Trace("assign", isspaces.Then(Combinator.Token("=").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> add = Combinator.Trace("add", isspaces.Then(Combinator.Token("+").Skip(Combinator.AnyChar("+=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> subtract = Combinator.Trace("subtract", isspaces.Then(Combinator.Token("-").Skip(Combinator.AnyChar("-=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> multiply = Combinator.Trace("multiply", isspaces.Then(Combinator.Token("*").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> divide = Combinator.Trace("divide", isspaces.Then(Combinator.Token("/").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> modulus = Combinator.Trace("modulus", isspaces.Then(Combinator.Token("%").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> less = Combinator.Trace("less", isspaces.Then(Combinator.Token("<").Skip(Combinator.AnyChar("<=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> greater = Combinator.Trace("greater", isspaces.Then(Combinator.Token(">").Skip(Combinator.AnyChar(">=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> negate = Combinator.Trace("negate", isspaces.Then(Combinator.Token("!").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> binary_or = Combinator.Trace("binary_or", isspaces.Then(Combinator.Token("|").Skip(Combinator.AnyChar("|=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> binary_and = Combinator.Trace("binary_and", isspaces.Then(Combinator.Token("&").Skip(Combinator.AnyChar("&=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> xor = Combinator.Trace("xor", isspaces.Then(Combinator.Token("^").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> left_shift = Combinator.Trace("left_shift", isspaces.Then(Combinator.Token("<<").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> right_shift = Combinator.Trace("right_shift", isspaces.Then(Combinator.Token(">>").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
-        public static readonly Parser<string> inverse = Combinator.Trace("inverse", isspaces.Then(Combinator.Token("~").Skip(Combinator.AnyChar("=").Not()).Skip(isspaces)));
+        public static readonly Parser<string> assign = Combinator.Trace("assign", Combinator.Quote(isspaces, Combinator.Token("=").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> add = Combinator.Trace("add", Combinator.Quote(isspaces, Combinator.Token("+").Skip(Combinator.AnyChar("+=").Not()), isspaces));
+        public static readonly Parser<string> subtract = Combinator.Trace("subtract", Combinator.Quote(isspaces, Combinator.Token("-").Skip(Combinator.AnyChar("-=").Not()), isspaces));
+        public static readonly Parser<string> multiply = Combinator.Trace("multiply", Combinator.Quote(isspaces, Combinator.Token("*").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> divide = Combinator.Trace("divide", Combinator.Quote(isspaces, Combinator.Token("/").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> modulus = Combinator.Trace("modulus", Combinator.Quote(isspaces, Combinator.Token("%").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> less = Combinator.Trace("less", Combinator.Quote(isspaces, Combinator.Token("<").Skip(Combinator.AnyChar("<=").Not()), isspaces));
+        public static readonly Parser<string> greater = Combinator.Trace("greater", Combinator.Quote(isspaces, Combinator.Token(">").Skip(Combinator.AnyChar(">=").Not()), isspaces));
+        public static readonly Parser<string> negate = Combinator.Trace("negate", Combinator.Quote(isspaces, Combinator.Token("!").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> binary_or = Combinator.Trace("binary_or", Combinator.Quote(isspaces, Combinator.Token("|").Skip(Combinator.AnyChar("|=").Not()), isspaces));
+        public static readonly Parser<string> binary_and = Combinator.Trace("binary_and", Combinator.Quote(isspaces, Combinator.Token("&").Skip(Combinator.AnyChar("&=").Not()), isspaces));
+        public static readonly Parser<string> xor = Combinator.Trace("xor", Combinator.Quote(isspaces, Combinator.Token("^").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> left_shift = Combinator.Trace("left_shift", Combinator.Quote(isspaces, Combinator.Token("<<").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> right_shift = Combinator.Trace("right_shift", Combinator.Quote(isspaces, Combinator.Token(">>").Skip(Combinator.AnyChar("=").Not()), isspaces));
+        public static readonly Parser<string> inverse = Combinator.Trace("inverse", Combinator.Quote(isspaces, Combinator.Token("~").Skip(Combinator.AnyChar("=").Not()), isspaces));
 
         public static readonly Parser<string> IDENTIFIER =
             Combinator.Trace("IDENTIFIER",
-                identifier.Where(x => !reserved_words.Contains(x))
+                identifier.Where(x => reserved_words.Contains(x) == false)
             );
 
         public static readonly Parser<string> TYPEDEF_NAME =
@@ -500,66 +508,50 @@ namespace CParser2 {
                     CONSTANT.Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.ConstantSpecifier(x)),
                     string_literal.Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.StringLiteralSpecifier(x)),
                     //NULL.Select(x => (SyntaxNode.Expression)new NullConstantSpecifier(x)),
-                    left_paren.Then(Combinator.Lazy(() => expression)).Skip(right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.GroupedExpression(x)),
-                    left_paren.Then(Combinator.Lazy(() => compound_statement)).Skip(right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.ErrorExpression(x))
+                    Combinator.Quote(left_paren, Combinator.Lazy(() => expression), right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.GroupedExpression(x)),
+                    Combinator.Quote(left_paren, Combinator.Lazy(() => compound_statement), right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.ErrorExpression(x))
                 )
             ).Memoize();
 
         public static readonly Parser<SyntaxNode.Expression> postfix_expression =
             Combinator.Trace("postfix_expression",
-                Combinator.Lazy(() =>
-                    from _1 in Combinator.Choice(
-                        from _2 in left_paren
-                        from _3 in type_name
-                        from _4 in right_paren
-                        from _5 in left_brace
-                        from _6 in initializer_list
-                        from _7 in comma.Option()
-                        from _8 in right_brace
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression(_3, _7)
-                        ,
-                        primary_expression
-                    )
-                    from _9 in Combinator.Choice(
-                        from _10 in left_bracket
-                        from _11 in expression
-                        from _12 in right_bracket
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.ArraySubscriptExpression(x, _11))
-                        ,
-                        from _10 in left_paren
-                        from _11 in argument_expression_list.Option()
-                        from _12 in right_paren
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.FunctionCallExpression(x, _11 ?? new SyntaxNode.Expression[0]))
-                        ,
-                        from _10 in member_access
-                        from _11 in IDENTIFIER
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByValueExpression(x, _11))
-                        ,
-                        from _10 in pointer_access
-                        from _11 in IDENTIFIER
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByPointerExpression(x, _11))
-                        ,
-                        //from _10 in member_access
-                        //from _11 in CONSTANT
-                        //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new BitAccessByValueExpression(x, _11))
-                        //,
-                        //from _10 in pointer_access
-                        //from _11 in CONSTANT
-                        //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new BitAccessByPointerExpression(x, _11))
-                        //,
-                        from _10 in inc
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixIncrementExpression(x))
-                        ,
-                        from _10 in dec
-                        select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixDecrementExpression(x))
-                    ).Many()
-                    select _9.Aggregate(_1, (s, x) => x(s))
+                from _1 in Combinator.Choice(
+                    from _2 in Combinator.Quote(left_paren, Combinator.Lazy(() => type_name), right_paren)
+                    from _5 in Combinator.Quote(left_brace, Combinator.Lazy(() => initializer_list).Skip(comma.Option()), right_brace)
+                    select (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression(_2, _5)
+                    ,
+                    primary_expression
                 )
-            );
-
-        public static readonly Parser<SyntaxNode.Expression[]> argument_expression_list =
-            Combinator.Trace("argument_expression_list",
-                Combinator.Lazy(() => assignment_expression.Repeat1(comma))
+                from _9 in Combinator.Choice(
+                    from _10 in Combinator.Quote(left_bracket, Combinator.Lazy(() => expression), right_bracket)
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.ArraySubscriptExpression(x, _10))
+                    ,
+                    from _10 in Combinator.Quote(left_paren, Combinator.Lazy(() => argument_expression_list), right_paren)
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.FunctionCallExpression(x, _10))
+                    ,
+                    from _10 in member_access
+                    from _11 in IDENTIFIER
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByValueExpression(x, _11))
+                    ,
+                    from _10 in pointer_access
+                    from _11 in IDENTIFIER
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.MemberAccessByPointerExpression(x, _11))
+                    ,
+                    //from _10 in member_access
+                    //from _11 in CONSTANT
+                    //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>) (x => (SyntaxNode.Expression) new BitAccessByValueExpression(x, _11))
+                    //,
+                    //from _10 in pointer_access
+                    //from _11 in CONSTANT
+                    //select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new BitAccessByPointerExpression(x, _11))
+                    //,
+                    from _10 in inc
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixIncrementExpression(x))
+                    ,
+                    from _10 in dec
+                    select (Func<SyntaxNode.Expression, SyntaxNode.Expression>)(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PostfixExpression.PostfixDecrementExpression(x))
+                ).Many()
+                select _9.Aggregate(_1, (s, x) => x(s))
             );
 
         public static readonly Parser<string> unary_arithmetic_operator =
@@ -569,48 +561,45 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.Expression> unary_expression =
             Combinator.Trace("unary_expression",
-                Combinator.Lazy(() =>
+                
                     Combinator.Choice(
                         from _1 in inc
-                        from _2 in unary_expression
-                        select  (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixIncrementExpression(_1, _2)
+                        from _2 in Combinator.Lazy(() => unary_expression)
+                        select  (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixIncrementExpression(_2)
                         ,
                         from _1 in dec
-                        from _2 in unary_expression
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixDecrementExpression(_1, _2)
+                        from _2 in Combinator.Lazy(() => unary_expression)
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.PrefixDecrementExpression(_2)
                         ,
                         from _1 in binary_and
-                        from _2 in cast_expression
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.AddressExpression(_1, _2)
+                        from _2 in Combinator.Lazy(() => cast_expression)
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.AddressExpression(_2)
                         ,
                         from _1 in multiply
-                        from _2 in cast_expression
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.IndirectionExpression(_1, _2)
+                        from _2 in Combinator.Lazy(() => cast_expression)
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.IndirectionExpression(_2)
                         ,
                         from _1 in unary_arithmetic_operator
-                        from _2 in cast_expression
+                        from _2 in Combinator.Lazy(() => cast_expression)
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression(_1, _2)
                         ,
                         from _1 in sizeof_keyword
-                        from _2 in left_paren
-                        from _3 in type_name
-                        from _4 in right_paren
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofTypeExpression(_1, _3)
+                        from _2 in Combinator.Quote(left_paren, Combinator.Lazy(() => type_name), right_paren)
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofTypeExpression(_2)
                         ,
                         from _1 in sizeof_keyword
-                        from _2 in unary_expression
-                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofExpression(_1, _2)
+                        from _2 in Combinator.Lazy(() => unary_expression)
+                        select (SyntaxNode.Expression)new SyntaxNode.Expression.UnaryExpression.SizeofExpression(_2)
                         ,
                         //alighof_keyword.Then(unary_expression).Select(x => (SyntaxNode.Expression)new AlignofExpression("alignof", x)),
                         //from _1 in alighof_keyword from _2 in left_paren from _3 in type_name from _4 in right_paren select (SyntaxNode.Expression)new AlignofTypeExpression(_1, _3)
                         postfix_expression
                     )
-                )
             );
 
         public static readonly Parser<SyntaxNode.Expression> cast_expression =
             Combinator.Trace("cast_expression",
-                from _1 in left_paren.Then(Combinator.Lazy(() => type_name)).Skip(right_paren).Many()
+                from _1 in Combinator.Quote(left_paren, Combinator.Lazy(() => type_name), right_paren).Many()
                 from _2 in unary_expression
                 select _1.Reverse().Aggregate(_2, (s, x) => new SyntaxNode.Expression.CastExpression(x, s))
             ).Memoize();
@@ -672,27 +661,27 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.Expression> and_expression =
             Combinator.Trace("and_expression",
-                equality_expression.Repeat1(binary_and).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.AndExpression("&", s, y)))
+                equality_expression.Separate(binary_and, min: 1).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.AndExpression("&", s, y)))
             );
 
         public static readonly Parser<SyntaxNode.Expression> exclusive_or_expression =
             Combinator.Trace("exclusive_or_expression",
-                and_expression.Repeat1(xor).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.ExclusiveOrExpression("^", s, y)))
+                and_expression.Separate(xor, min: 1).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.ExclusiveOrExpression("^", s, y)))
             );
 
         public static readonly Parser<SyntaxNode.Expression> inclusive_or_expression =
             Combinator.Trace("inclusive_or_expression",
-                exclusive_or_expression.Repeat1(binary_or).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.InclusiveOrExpression("|", s, y)))
+                exclusive_or_expression.Separate(binary_or, min: 1).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.InclusiveOrExpression("|", s, y)))
             );
 
         public static readonly Parser<SyntaxNode.Expression> logical_and_expression =
             Combinator.Trace("logical_and_expression",
-                inclusive_or_expression.Repeat1(logical_and).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalAndExpression("&&", s, y)))
+                inclusive_or_expression.Separate(logical_and, min: 1).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalAndExpression("&&", s, y)))
             );
 
         public static readonly Parser<SyntaxNode.Expression> logical_or_expression =
             Combinator.Trace("logical_or_expression",
-                logical_and_expression.Repeat1(logical_or).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalOrExpression("||", s, y)))
+                logical_and_expression.Separate(logical_or, min: 1).Select(x => x.Aggregate((s, y) => new SyntaxNode.Expression.BinaryExpression.LogicalOrExpression("||", s, y)))
             );
 
         public static readonly Parser<SyntaxNode.Expression> conditional_expression =
@@ -703,7 +692,7 @@ namespace CParser2 {
                         from _3 in question_mark
                         from _4 in expression
                         from _5 in colon
-                        from _6 in Combinator.Lazy( () => conditional_expression )
+                        from _6 in conditional_expression
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.ConditionalExpression(_1, _4, _6)
                     ).Option()
                     select _2 ?? _1
@@ -716,11 +705,11 @@ namespace CParser2 {
                     from _1 in cast_expression
                     from _2 in Combinator.Choice<SyntaxNode.Expression>(
                         from __1 in assign
-                        from __2 in Combinator.Lazy(() => assignment_expression)
+                        from __2 in assignment_expression
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression(__1, _1, __2)
                         ,
                         from __1 in compound_assignment_operator
-                        from __2 in Combinator.Lazy(() => assignment_expression)
+                        from __2 in assignment_expression
                         select (SyntaxNode.Expression)new SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression(__1, _1, __2)
                     )
                     select _2
@@ -728,6 +717,11 @@ namespace CParser2 {
                     Combinator.Empty<SyntaxNode.Expression>(true).Then(conditional_expression)
                 )
             ).Memoize();
+
+        public static readonly Parser<SyntaxNode.Expression[]> argument_expression_list =
+            Combinator.Trace("argument_expression_list",
+                assignment_expression.Separate(comma)
+            );
 
         public static readonly Parser<string> compound_assignment_operator =
             Combinator.Trace("compound_assignment_operator",
@@ -739,7 +733,7 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.Expression> expression =
             Combinator.Trace("expression",
-                assignment_expression.Repeat1(comma).Select(x => (x.Length == 1) ? x[0] : (SyntaxNode.Expression)new SyntaxNode.Expression.CommaSeparatedExpression(x))
+                assignment_expression.Separate(comma, min: 1).Select(x => (x.Length == 1) ? x[0] : (SyntaxNode.Expression)new SyntaxNode.Expression.CommaSeparatedExpression(x))
             ).Memoize();
 
         public static readonly Parser<SyntaxNode.Expression> constant_expression =
@@ -812,7 +806,7 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.InitDeclarator[]> init_declarator_list =
             Combinator.Trace("init_declarator_list",
-                init_declarator.Repeat1(comma)
+                init_declarator.Separate(comma, min: 1)
             );
 
 
@@ -830,51 +824,34 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.TypeSpecifier> type_specifier =
             Combinator.Trace("type_specifier",
-                Combinator.Lazy(() =>
+                Combinator.Choice(
                     Combinator.Choice(
-                        Combinator.Choice(
-                            void_keyword,
-                            char_keyword,
-                            short_keyword,
-                            int_keyword,
-                            long_keyword,
-                            float_keyword,
-                            double_keyword,
-                            signed_keyword,
-                            unsigned_keyword,
-                            bool_keyword,
-                            complex_keyword,
-                            imaginary_keyword,
-                            builtin_va_list_keyword,
-                            TYPEDEF_NAME
-                        ).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
-                        struct_or_union_specifier.Select(x => x),
-                        enum_specifier.Select(x => (SyntaxNode.TypeSpecifier)x)
-                    )
+                        void_keyword,
+                        char_keyword,
+                        short_keyword,
+                        int_keyword,
+                        long_keyword,
+                        float_keyword,
+                        double_keyword,
+                        signed_keyword,
+                        unsigned_keyword,
+                        bool_keyword,
+                        complex_keyword,
+                        imaginary_keyword,
+                        builtin_va_list_keyword,
+                        TYPEDEF_NAME
+                    ).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
+                    Combinator.Lazy(() => struct_or_union_specifier).Select(x => x),
+                    Combinator.Lazy(() => enum_specifier).Select(x => (SyntaxNode.TypeSpecifier)x)
                 )
             ).Memoize();
 
-        public static readonly Parser<SyntaxNode.TypeSpecifier> struct_or_union_specifier =
-            Combinator.Trace("struct_or_union_specifier",
-                Combinator.Lazy(() =>
-                    Combinator.Choice(
-                        from _1 in struct_keyword
-                        from _2 in IDENTIFIER.Option()
-                        from _3 in struct_declaration_list.Option()
-                        where _2 != null || _3 != null
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null),
-                        from _1 in union_keyword
-                        from _2 in IDENTIFIER.Option()
-                        from _3 in struct_declaration_list.Option()
-                        where _2 != null || _3 != null
-                        select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _3, _2 != null)
-                        //from _1 in struct_keyword
-                        //from _2 in IDENTIFIER
-                        //select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2, null, false),
-                        //from _1 in union_keyword
-                        //from _2 in IDENTIFIER
-                        //select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2, null, false)
-                    )
+        public static readonly Parser<string> type_qualifier =
+            Combinator.Trace("type_qualifier",
+                Combinator.Choice(
+                    const_keyword,
+                    volatile_keyword,
+                    restrict_keyword
                 )
             );
 
@@ -886,19 +863,17 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.SpecifierQualifierList> specifier_qualifier_list =
             Combinator.Trace("specifier_qualifier_list",
-                Combinator.Lazy(() =>
-                    Combinator.Choice(
-                        type_specifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => {
-                            y.type_specifiers.Add(x);
-                        })),
-                        type_qualifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => {
-                            y.type_qualifiers.Add(x);
-                        }))
-                    ).Many(1).Select(x => x.Aggregate(new SyntaxNode.SpecifierQualifierList(), (s, y) => {
-                        y(s);
-                        return s;
+                Combinator.Choice(
+                    type_specifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => {
+                        y.type_specifiers.Add(x);
+                    })),
+                    type_qualifier.Select(x => (Action<SyntaxNode.SpecifierQualifierList>)(y => {
+                        y.type_qualifiers.Add(x);
                     }))
-                )
+                ).Many(1).Select(x => x.Aggregate(new SyntaxNode.SpecifierQualifierList(), (s, y) => {
+                    y(s);
+                    return s;
+                }))
             ).Memoize();
 
         public static readonly Parser<SyntaxNode.StructDeclarator> struct_declarator =
@@ -910,7 +885,7 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.StructDeclarator[]> struct_declarator_list =
             Combinator.Trace("struct_declarator_list",
-                struct_declarator.Repeat1(comma)
+                struct_declarator.Separate(comma, min: 1)
             );
 
         public static readonly Parser<SyntaxNode.StructDeclaration> struct_declaration =
@@ -930,14 +905,24 @@ namespace CParser2 {
             ).Memoize();
 
 
-
-        public static readonly Parser<string> enumerator_name =
-            Combinator.Trace("enumerator_name",
+        public static readonly Parser<SyntaxNode.TypeSpecifier> struct_or_union_specifier =
+            Combinator.Trace("struct_or_union_specifier",
                 Combinator.Choice(
-                    IDENTIFIER,
-                    TYPEDEF_NAME
+                    from _1 in struct_keyword
+                    from _2 in IDENTIFIER.Option()
+                    from _4 in struct_declaration_list.Option()
+                    where _2 != null || _4 != null
+                    select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StructSpecifier(_2 ?? create_anon_tag_name(_1), _4, _2 != null),
+                    from _1 in union_keyword
+                    from _2 in IDENTIFIER.Option()
+                    from _4 in struct_declaration_list.Option()
+                    where _2 != null || _4 != null
+                    select (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.UnionSpecifier(_2 ?? create_anon_tag_name(_1), _4, _2 != null)
                 )
             );
+
+        public static readonly Parser<string> enumerator_name =
+            Combinator.Trace("enumerator_name", IDENTIFIER );
 
         public static readonly Parser<SyntaxNode.Enumerator> enumerator =
             Combinator.Trace("enumerator",
@@ -949,42 +934,32 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.Enumerator[]> enumerator_list =
             Combinator.Trace("enumerator_list",
-                enumerator.Repeat1(comma)
+                enumerator.Separate(comma, min: 1)
             );
 
         public static readonly Parser<SyntaxNode.EnumSpecifier> enum_specifier =
             Combinator.Trace("enum_specifier",
-                Combinator.Lazy(() =>
-                    from _1 in enum_keyword
-                    from _2 in Combinator.Choice(
-                        from _3 in IDENTIFIER
-                        from _4 in Combinator.Option(
-                            from _5 in left_brace
-                            from _6 in enumerator_list
-                            from _7 in comma.Option()
-                            from _8 in right_brace
-                            select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)
-                        )
-                        select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false)
-                        ,
+                from _1 in enum_keyword
+                from _2 in Combinator.Choice(
+                    from _3 in IDENTIFIER
+                    from _4 in Combinator.Option(
                         from _5 in left_brace
                         from _6 in enumerator_list
                         from _7 in comma.Option()
                         from _8 in right_brace
-                        select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
+                        select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)
                     )
-                    select _2
+                    select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false)
+                    ,
+                    from _5 in left_brace
+                    from _6 in enumerator_list
+                    from _7 in comma.Option()
+                    from _8 in right_brace
+                    select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
                 )
+                select _2
             );
 
-        public static readonly Parser<string> type_qualifier =
-            Combinator.Trace("type_qualifier",
-                Combinator.Choice(
-                    const_keyword, 
-                    volatile_keyword, 
-                    restrict_keyword
-                )
-            );
 
         public static readonly Parser<string[]> type_qualifier_list =
             Combinator.Trace("type_qualifier_list",
@@ -1093,7 +1068,7 @@ namespace CParser2 {
                 Combinator.Lazy(() =>
                     from _1 in Combinator.Choice(
                         IDENTIFIER.Select(x => (SyntaxNode.Declarator)new SyntaxNode.Declarator.IdentifierDeclarator(x)),
-                        left_paren.Then(declarator).Skip(right_paren).Select(x => (SyntaxNode.Declarator)new SyntaxNode.Declarator.GroupedDeclarator(x))
+                        Combinator.Quote(left_paren, declarator,right_paren).Select(x => (SyntaxNode.Declarator)new SyntaxNode.Declarator.GroupedDeclarator(x))
                     )
                     from _2 in Combinator.Choice(
                         direct_array_declarator,
@@ -1139,7 +1114,7 @@ namespace CParser2 {
 
         public static readonly Parser<SyntaxNode.ParameterDeclaration[]> parameter_list =
             Combinator.Trace("parameter_list",
-                parameter_declaration.Repeat1(comma)
+                parameter_declaration.Separate(comma, min: 1)
             );
 
         public static readonly Parser<SyntaxNode.ParameterTypeList> parameter_type_list =
@@ -1151,7 +1126,7 @@ namespace CParser2 {
 
         public static readonly Parser<string[]> identifier_list =
             Combinator.Trace("identifier_list",
-                IDENTIFIER.Repeat1(comma)
+                IDENTIFIER.Separate(comma, min: 1)
             );
 
         public static readonly Parser<SyntaxNode.TypeName> type_name =
@@ -1169,8 +1144,7 @@ namespace CParser2 {
                     Combinator.Choice(
                         from _1 in pointer
                         from _2 in direct_abstract_declarator.Option()
-                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) { full = true }
-                        ,
+                        select (SyntaxNode.Declarator.AbstractDeclarator)new SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator(_2, _1) { full = true },
                         from _2 in direct_abstract_declarator
                         select eval(() => {
                             _2.full = true;
@@ -1278,11 +1252,6 @@ namespace CParser2 {
             Combinator.Trace("initializer",
                 Combinator.Lazy(() => 
                     Combinator.Choice(
-                        // 普通の定数値初期化
-                        assignment_expression.Select(x => {
-                            x.full = true;
-                            return new SyntaxNode.Initializer(x, null);
-                        }),
                         // 複合初期化
                         from _1 in left_brace
                         from _2 in (
@@ -1292,6 +1261,12 @@ namespace CParser2 {
                         ).Option()
                         from _5 in right_brace
                         select new SyntaxNode.Initializer(null, _2)
+                        ,
+                        // 普通の定数値初期化
+                        assignment_expression.Select(x => {
+                            x.full = true;
+                            return new SyntaxNode.Initializer(x, null);
+                        })
                     )
                 )
             );
@@ -1302,7 +1277,7 @@ namespace CParser2 {
                         from _1 in designation.Option()
                         from _2 in initializer
                         select Tuple.Create(_1, _2)
-                    ).Repeat1(comma)
+                    ).Separate(comma, min: 1)
                 )
             );
 
@@ -1320,7 +1295,7 @@ namespace CParser2 {
             Combinator.Trace("designator",
                 Combinator.Lazy(() => 
                     Combinator.Choice(
-                        left_bracket.Then(constant_expression).Skip(right_bracket).Select(x => (SyntaxNode.Initializer.Designator) new SyntaxNode.Initializer.Designator.IndexDesignator(x)),
+                        Combinator.Quote(left_bracket, constant_expression, right_bracket).Select(x => (SyntaxNode.Initializer.Designator) new SyntaxNode.Initializer.Designator.IndexDesignator(x)),
                         member_access.Then(IDENTIFIER).Select(x => (SyntaxNode.Initializer.Designator) new SyntaxNode.Initializer.Designator.MemberDesignator(x))
                     )
                 )
@@ -1345,9 +1320,7 @@ namespace CParser2 {
             );
 
         public static readonly Parser<string> label_name =
-            Combinator.Trace("label_name",
-                IDENTIFIER
-            );
+            Combinator.Trace("label_name", IDENTIFIER );
 
         public static readonly Parser<SyntaxNode.Statement> labeled_statement =
             Combinator.Trace("labeled_statement",
@@ -1618,8 +1591,13 @@ namespace CParser2 {
 
         public static Result<SyntaxNode.TranslationUnit> Parse(TextReader reader) {
             var target = new Source("", reader);
-            return translation_unit.Skip(isspaces).Skip(Combinator.EoF())(target, Position.Empty, Position.Empty,
-                new ParserStatus());
+            var parser = (
+                from _1 in translation_unit
+                from _2 in isspaces
+                from _3 in Combinator.EoF()
+                select _1
+            );
+            return parser(target, Position.Empty, Position.Empty, new ParserStatus());
         }
     }
 }

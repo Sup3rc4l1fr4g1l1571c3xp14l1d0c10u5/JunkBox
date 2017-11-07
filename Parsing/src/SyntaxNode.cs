@@ -25,17 +25,12 @@ namespace CParser2 {
                 public class PrefixIncrementExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public Expression operand {
                         get; private set;
                     }
 
-                    public PrefixIncrementExpression(string @operator, Expression operand) {
+                    public PrefixIncrementExpression(Expression operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -44,17 +39,12 @@ namespace CParser2 {
                 public class PrefixDecrementExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public Expression operand {
                         get; private set;
                     }
 
-                    public PrefixDecrementExpression(string @operator, Expression operand) {
+                    public PrefixDecrementExpression(Expression operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -63,18 +53,13 @@ namespace CParser2 {
                 public class AddressExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public Expression operand {
                         get; private set;
                     }
 
 
-                    public AddressExpression(string @operator, Expression operand) {
+                    public AddressExpression(Expression operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -83,18 +68,13 @@ namespace CParser2 {
                 public class IndirectionExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public Expression operand {
                         get; private set;
                     }
 
 
-                    public IndirectionExpression(string @operator, Expression operand) {
+                    public IndirectionExpression(Expression operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -123,18 +103,13 @@ namespace CParser2 {
                 public class SizeofExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public Expression operand {
                         get; private set;
                     }
 
 
-                    public SizeofExpression(string @operator, Expression operand) {
+                    public SizeofExpression(Expression operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -143,18 +118,13 @@ namespace CParser2 {
                 public class SizeofTypeExpression : UnaryExpression {
 
                     [DataMember]
-                    public string @operator {
-                        get; private set;
-                    }
-                    [DataMember]
                     public TypeName operand {
                         get; private set;
                     }
 
 
-                    public SizeofTypeExpression(string @operator, TypeName operand) {
+                    public SizeofTypeExpression(TypeName operand) {
 
-                        this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
@@ -337,11 +307,11 @@ namespace CParser2 {
                         get; private set;
                     }
                     [DataMember]
-                    public string initializers {
+                    public Tuple<SyntaxNode.Initializer.Designator[], SyntaxNode.Initializer>[] initializers {
                         get; private set;
                     }
 
-                    public CompoundLiteralExpression(TypeName typeName, string initializers) {
+                    public CompoundLiteralExpression(TypeName typeName, Tuple<SyntaxNode.Initializer.Designator[], SyntaxNode.Initializer>[] initializers) {
 
                         this.type_name = typeName;
                         this.initializers = initializers;
@@ -516,7 +486,7 @@ namespace CParser2 {
             }
 
             [DataContract]
-            internal class ErrorExpression : Expression {
+            public class ErrorExpression : Expression {
 
                 [DataMember]
                 public Statement statement {
@@ -1343,17 +1313,20 @@ namespace CParser2 {
         public abstract class Declarator {
 
             [DataMember]
-            public abstract Declarator @base {
-                get; protected set;
+            public Declarator @base {
+                get; private set;
             }
+
             [DataMember]
             public bool full {
                 get; set;
             }
+
             [DataMember]
             public string[] pointer {
                 get; set;
             }
+
             [DataMember]
             public abstract string identifier {
                 get; protected set;
@@ -1386,13 +1359,12 @@ namespace CParser2 {
                 }
             }
 
+            protected Declarator(Declarator @base) {
+                this.@base = @base;
+            }
+
             [DataContract]
             public class GroupedDeclarator : Declarator {
-
-                [DataMember]
-                public override Declarator @base {
-                    get; protected set;
-                }
 
                 public override string identifier {
 
@@ -1423,9 +1395,7 @@ namespace CParser2 {
                 }
 
 
-                public GroupedDeclarator(Declarator x) {
-
-                    @base = x;
+                public GroupedDeclarator(Declarator @base) : base(@base) {
                 }
 
                 public override ParameterTypeList innermost_parameter_type_list {
@@ -1441,13 +1411,6 @@ namespace CParser2 {
             [DataContract]
             public class IdentifierDeclarator : Declarator {
 
-                public override Declarator @base {
-                    get {
-                        return null;
-                    }
-                    protected set {
-                    }
-                }
                 [DataMember]
                 public override string identifier {
                     get; protected set;
@@ -1472,8 +1435,7 @@ namespace CParser2 {
                 }
 
 
-                public IdentifierDeclarator(string x) {
-
+                public IdentifierDeclarator(string x): base(null) { 
                     identifier = x;
                 }
                 public override ParameterTypeList innermost_parameter_type_list {
@@ -1509,10 +1471,6 @@ namespace CParser2 {
                 }
 
                 [DataMember]
-                public override Declarator @base {
-                    get; protected set;
-                }
-                [DataMember]
                 public Expression size_expression {
                     get; private set;
                 }
@@ -1528,9 +1486,7 @@ namespace CParser2 {
                     return stack.FirstOrDefault() == "function";
                 }
 
-                public ArrayDeclarator(Declarator x, Expression _4) {
-
-                    @base = x;
+                public ArrayDeclarator(Declarator @base, Expression _4) : base(@base) {
                     size_expression = _4;
                 }
                 public override ParameterTypeList innermost_parameter_type_list {
@@ -1556,10 +1512,6 @@ namespace CParser2 {
                     }
                 }
 
-                [DataMember]
-                public override Declarator @base {
-                    get; protected set;
-                }
 
                 public override bool isfunction(Stack<string> stack = null) {
 
@@ -1573,9 +1525,7 @@ namespace CParser2 {
                 }
 
 
-                protected FunctionDeclarator(Declarator dbase) {
-
-                    @base = dbase;
+                protected FunctionDeclarator(Declarator @base) : base(@base) {
                 }
 
                 [DataContract]
@@ -1591,7 +1541,7 @@ namespace CParser2 {
 
                     }
 
-                    public AbbreviatedFunctionDeclarator(Declarator dbase) : base(dbase) {
+                    public AbbreviatedFunctionDeclarator(Declarator @base) : base(@base) {
 
                     }
                     public override ParameterTypeList innermost_parameter_type_list {
@@ -1614,7 +1564,7 @@ namespace CParser2 {
                         get; protected set;
                     }
 
-                    public KandRFunctionDeclarator(Declarator x, string[] _4) : base(x) {
+                    public KandRFunctionDeclarator(Declarator @base, string[] _4) : base(@base) {
 
                         identifier_list = _4;
                     }
@@ -1648,7 +1598,7 @@ namespace CParser2 {
 
                     }
 
-                    public AnsiFunctionDeclarator(Declarator dbase, ParameterTypeList parameterTypeList) : base(dbase) {
+                    public AnsiFunctionDeclarator(Declarator @base, ParameterTypeList parameterTypeList) : base(@base) {
 
                         parameter_type_list = parameterTypeList;
                     }
@@ -1667,6 +1617,8 @@ namespace CParser2 {
 
             [DataContract]
             public abstract class AbstractDeclarator : Declarator {
+                protected AbstractDeclarator(Declarator @base) : base(@base) {
+                }
 
                 public override string identifier {
 
@@ -1688,10 +1640,6 @@ namespace CParser2 {
                 [DataContract]
                 public class FunctionAbstractDeclarator : AbstractDeclarator {
 
-                    [DataMember]
-                    public override Declarator @base {
-                        get; protected set;
-                    }
                     public override bool isfunction(Stack<string> stack = null) {
 
                         stack = stack ?? new Stack<string>();
@@ -1715,9 +1663,7 @@ namespace CParser2 {
 
                     }
 
-                    public FunctionAbstractDeclarator(AbstractDeclarator p1, ParameterTypeList p2) {
-
-                        @base = p1;
+                    public FunctionAbstractDeclarator(AbstractDeclarator @base, ParameterTypeList p2): base(@base) {
                         parameter_type_list = p2;
                     }
                     public override ParameterTypeList innermost_parameter_type_list {
@@ -1734,11 +1680,6 @@ namespace CParser2 {
                 [DataContract]
                 public class ArrayAbstractDeclarator : AbstractDeclarator {
 
-                    [DataMember]
-                    public override Declarator @base {
-                        get; protected set;
-
-                    }
                     public override bool isfunction(Stack<string> stack = null) {
 
                         stack = stack ?? new Stack<string>();
@@ -1761,9 +1702,8 @@ namespace CParser2 {
 
                     }
 
-                    public ArrayAbstractDeclarator(AbstractDeclarator p1, object p2) {
+                    public ArrayAbstractDeclarator(AbstractDeclarator @base, object p2) : base(@base) {
 
-                        @base = p1;
                         this.p2 = p2;
                     }
 
@@ -1780,11 +1720,6 @@ namespace CParser2 {
                 [DataContract]
                 public class GroupedAbstractDeclarator : AbstractDeclarator {
 
-                    [DataMember]
-                    public override Declarator @base {
-                        get; protected set;
-                    }
-
                     public override bool isfunction(Stack<string> stack = null) {
 
                         return @base.isfunction(null);
@@ -1800,10 +1735,9 @@ namespace CParser2 {
 
                     }
 
-                    public GroupedAbstractDeclarator(AbstractDeclarator _3) {
-
-                        @base = _3;
+                    public GroupedAbstractDeclarator(AbstractDeclarator @base) : base(@base) {
                     }
+
                     public override ParameterTypeList innermost_parameter_type_list {
 
                         get {
@@ -1818,10 +1752,6 @@ namespace CParser2 {
                 [DataContract]
                 public class PointerAbstractDeclarator : AbstractDeclarator {
 
-                    [DataMember]
-                    public override Declarator @base {
-                        get; protected set;
-                    }
                     public override bool isfunction(Stack<string> stack = null) {
 
                         stack = stack ?? new Stack<string>();
@@ -1840,9 +1770,7 @@ namespace CParser2 {
 
                     }
 
-                    public PointerAbstractDeclarator(AbstractDeclarator _2, string[] _1) {
-
-                        @base = _2;
+                    public PointerAbstractDeclarator(AbstractDeclarator @base, string[] _1) : base(@base) {
                         pointer = _1;
                     }
                     public override ParameterTypeList innermost_parameter_type_list {
