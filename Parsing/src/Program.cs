@@ -13,6 +13,7 @@ namespace CParser2 {
     class Program {
         static void Main(string[] args) {
 
+
             foreach (var arg in args) {
                 //using (var reader = new System.IO.StringReader(@"<>=")) {
                 //    var target = new Source("", reader);
@@ -21,15 +22,17 @@ namespace CParser2 {
                 using (var reader = new StreamReader(arg)) {
                     var sw = new System.Diagnostics.Stopwatch();
                     sw.Start();
-                    var ret = CParser.Parse(reader);
+                    var ret = CParser.Parse(reader, (status, result, succpos, failpos) => {
+                        Console.WriteLine($"Result: {(status ? "Success" : $"Failed")}");
+                        Console.WriteLine($"Position: {succpos}");
+                        Console.WriteLine($"FailedPosition: {failpos}");
+                        return result;
+                    });
                     sw.Stop();
-                    Console.WriteLine($"Result: {(ret.Success ? "Success" : $"Failed")}");
-                    Console.WriteLine($"Position: {ret.Position}");
-                    Console.WriteLine($"FailedPosition: {ret.FailedPosition}");
                     Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
-                    Console.ReadLine();
+                    //Console.ReadLine();
                     return;
-                    ret?.Value.Save("ast.xml");
+                    ret?.Save("ast.xml");
 
 
                     // 分析
@@ -74,6 +77,7 @@ namespace CParser2 {
             }
 
         }
+
     }
 }
 
