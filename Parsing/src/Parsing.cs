@@ -6,9 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using CParser2;
-//using System.Text.RegularExpressions;
-
 
 namespace Parsing {
     public class Source {
@@ -81,12 +78,12 @@ namespace Parsing {
             return true;
         }
 
-        public string SubString(int start, int length) {
+        public string Substring(int start, int length) {
             var sb = new StringBuilder();
             for (var i = 0; i < length; i++) {
-                var ch = this[start+i];
-                if (ch == -1) {
-                    break;
+                var ch = this[i + start];
+                if (this[i + start] == -1) {
+                    return null;
                 }
                 sb.Append((char)ch);
             }
@@ -167,22 +164,20 @@ namespace Parsing {
             foreach (var t in substr) {
                 switch (t) {
                     case '\n':
-                        index += 1;
                         if (prevChar != '\r') {
                             row++;
                             col = 1;
                         }
                         break;
                     case '\r':
-                        index += 1;
                         row++;
                         col = 1;
                         break;
                     default:
-                        index += 1;
                         col += 1;
                         break;
                 }
+                index += 1;
                 prevChar = t;
             }
             return new Position(index, FileName, row, col, prevChar);
@@ -195,22 +190,20 @@ namespace Parsing {
 
             switch (t) {
                 case '\n':
-                    index += 1;
                     if (prevChar != '\r') {
                         row++;
                         col = 1;
                     }
                     break;
                 case '\r':
-                    index += 1;
                     row++;
                     col = 1;
                     break;
                 default:
-                    index += 1;
                     col += 1;
                     break;
             }
+            index += 1;
             prevChar = t;
 
             return new Position(index, FileName, row, col, prevChar);
@@ -222,7 +215,7 @@ namespace Parsing {
     /// </summary>
 
     public abstract class Result<T> {
-        public class Some : Result<T> {
+        public sealed class Some : Result<T> {
             public Some(T value, Position position, object status) : base(status) {
                 Position = position;
                 Value = value;
@@ -242,7 +235,7 @@ namespace Parsing {
             }
 
         }
-        public class None : Result<T> {
+        public sealed class None : Result<T> {
             public None(object status) : base(status) {
             }
 
@@ -342,51 +335,78 @@ namespace Parsing {
     /// <param name="status"></param>
     /// <returns></returns>
     public delegate Result<T> Parser<T>(Context context, Position position, object status);
-    
+
+    /// <summary>
+    /// パーサに合致する範囲を示す型。字句解析で使うとメモリの無駄が減る。
+    /// </summary>
+    public struct MatchRegion {
+        public Position Start { get; }
+        public Position End { get; }
+        public MatchRegion(Position start, Position end) {
+            Start = start;
+            End = end;
+        }
+    }
+
     /// <summary>
     ///     パーサコンビネータ
     /// </summary>
     public static class Combinator {
 
 
-        public static class Parser {
-            /// <summary>
-            ///     常に成功/失敗する空のパーサ
-            /// </summary>
-            /// <typeparam name="T"></typeparam>
-            /// <returns></returns>
-            public static Parser<T> Empty<T>(bool success) {
-                if (success) {
-                    return (context, position, status) => Result<T>.Accept(default(T), position, status);
-                } else {
-                    return (context, position, status) => {
-                        context.handleFailed(position);
-                        return Result<T>.Reject(status);
-                    };
-                }
-            }
-
-            /// <summary>
-            ///     単純な文字列を受理するパーサを生成
-            /// </summary>
-            /// <param name="str">受理する文字列</param>
-            /// <returns>パーサ</returns>
-            public static Parser<string> Token(string str) {
-                if (str == null) {
-                    throw new ArgumentNullException(nameof(str));
-                }
+        /// <summary>
+        ///     常に成功/失敗する空のパーサ
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static Parser<T> Empty<T>(bool success) {
+            if (success) {
+                return (context, position, status) => Result<T>.Accept(default(T), position, status);
+            } else {
                 return (context, position, status) => {
-                    if (context.target == null) {
-                        throw new ArgumentNullException(nameof(context.target));
-                    }
-                    if (context.target.StartsWith(position.Index, str)) {
-                        return Result<string>.Accept(str, position.Inc(str), status);
-                    } else {
-                        context.handleFailed(position);
-                        return Result<string>.Reject(status);
-                    }
+                    context.handleFailed(position);
+                    return Result<T>.Reject(status);
                 };
             }
+        }
+
+        /// <summary>
+        ///     単純な文字列を受理するパーサを生成
+        /// </summary>
+        /// <param name="str">受理する文字列</param>
+        /// <returns>パーサ</returns>
+        public static Parser<string> Token(string str) {
+            if (str == null) {
+                throw new ArgumentNullException(nameof(str));
+            }
+            return (context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+                if (context.target.StartsWith(position.Index, str)) {
+                    return Result<string>.Accept(str, position.Inc(str), status);
+                } else {
+                    context.handleFailed(position);
+                    return Result<string>.Reject(status);
+                }
+            };
+        }
+        public static Parser<MatchRegion> TokenRange(string str) {
+            if (str == null) {
+                throw new ArgumentNullException(nameof(str));
+            }
+            return (context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+                if (context.target.StartsWith(position.Index, str)) {
+                    var newPosition = position.Inc(str);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                } else {
+                    context.handleFailed(position);
+                    return Result<MatchRegion>.Reject(status);
+                }
+            };
         }
 
         /// <summary>
@@ -396,7 +416,7 @@ namespace Parsing {
         /// <param name="min"></param>
         /// <param name="max"></param>
         /// <returns>パーサ</returns>
-        public static Parser<T[]> Many<T>(this Parser<T> parser, int min = -1, int max = -1) {
+        public static Parser<IReadOnlyList<T>> Many<T>(this Parser<T> parser, int min = -1, int max = -1) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
@@ -429,9 +449,57 @@ namespace Parsing {
                 }
 
                 if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
-                    return Result<T[]>.Reject(status);
+                    return Result<IReadOnlyList<T>>.Reject(status);
                 } else {
-                    return Result<T[]>.Accept(result.ToArray(), currentPosition, currentStatus);
+                    return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentStatus);
+                }
+            });
+        }
+
+        /// <summary>
+        ///     パーサparserが受理する文字列の繰り返しを受理できるパーサを生成する
+        /// </summary>
+        /// <param name="parser">パーサ</param>
+        /// <param name="min"></param>
+        /// <param name="max"></param>
+        /// <returns>パーサ</returns>
+        public static Parser<MatchRegion> ManyRange(this Parser<MatchRegion> parser, int min = -1, int max = -1) {
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
+            }
+            if (min >= 0 && max >= 0 && min > max) {
+                throw new ArgumentException("min < max");
+            }
+
+            return ((context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+
+                var start = position;
+                var resultCount = 0;
+
+                var currentPosition = position;
+                var currentStatus = status;
+
+                for (;;) {
+                    var parsed = parser(context, currentPosition, currentStatus);
+
+                    if (!parsed.Success) {
+                        // 読み取りに失敗
+                        break;
+                    } else {
+                        // 読み取りに成功
+                        resultCount++; // 結果を格納
+                        currentPosition = parsed.Position; // 読み取り位置を更新する
+                        currentStatus = parsed.Status;
+                    }
+                }
+
+                if (min >= 0 && resultCount < min || max >= 0 && resultCount > max) {
+                    return Result<MatchRegion>.Reject(status);
+                } else {
+                    return Result<MatchRegion>.Accept(new MatchRegion(start, currentPosition), currentPosition, currentStatus);
                 }
             });
         }
@@ -460,6 +528,7 @@ namespace Parsing {
                         return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
                     }
                 }
+
                 return Result<T>.Reject(status);
             };
         }
@@ -469,7 +538,7 @@ namespace Parsing {
         /// </summary>
         /// <param name="parsers"></param>
         /// <returns></returns>
-        public static Parser<T[]> Seq<T>(params Parser<T>[] parsers) {
+        public static Parser<IReadOnlyList<T>> Seq<T>(params Parser<T>[] parsers) {
             if (parsers == null) {
                 throw new ArgumentNullException(nameof(parsers));
             }
@@ -494,48 +563,41 @@ namespace Parsing {
                         currentPosition = parsed.Position;
                         currentStatus = parsed.Status;
                     } else {
-                        return Result<T[]>.Reject(status);
+                        return Result<IReadOnlyList<T>>.Reject(status);
                     }
                 }
-                return Result<T[]>.Accept(result.ToArray(), currentPosition, currentStatus);
+                return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentStatus);
             };
         }
 
-#if false /// <summary>
-/// 正規表現(System.Text.RegularExpressions.Regex)を用いるパーサを生成する
-/// </summary>
-/// <param name="pattern">正規表現パターン</param>
-/// <param name="options">正規表現オプション</param>
-/// <returns></returns>
-        public static Parser<string> Regex(string pattern, RegexOptions options = 0) {
-            if (pattern == null) {
-                throw new ArgumentNullException(nameof(pattern));
+        public static Parser<MatchRegion> Seq(params Parser<MatchRegion>[] parsers) {
+            if (parsers == null) {
+                throw new ArgumentNullException(nameof(parsers));
             }
-
-            Regex regexp;
-            try {
-                regexp = new Regex("^(?:" + pattern + ")", options | RegexOptions.Compiled);
-            } catch (Exception e) {
-                throw new ArgumentException(@"Invalid regular expression or options value.", e);
+            if (parsers.Any(x => x == null)) {
+                throw new ArgumentNullException(nameof(parsers));
             }
 
             return (context, position, status) => {
                 if (context.target == null) {
                     throw new ArgumentNullException(nameof(context.target));
                 }
-                if (position.Index >= context.target.Length) {
-                    return Result<string>.Reject( null, position, failedPosition.MostFar(position));
-                }
+                var currentPosition = position;
+                var currentStatus = status;
 
-                var match = regexp.Match(context.target.Substring(position.Index));
-                if (match.Success) {
-                    return Result<string>.Accept( match.Value, position.Inc(match.Value), failedPosition);
-                } else {
-                    return Result<string>.Reject( null, position, failedPosition.MostFar(position));
+                foreach (var parser in parsers) {
+                    var parsed = parser(context, currentPosition, currentStatus);
+
+                    if (parsed.Success) {
+                        currentPosition = parsed.Position;
+                        currentStatus = parsed.Status;
+                    } else {
+                        return Result<MatchRegion>.Reject(status);
+                    }
                 }
+                return Result<MatchRegion>.Accept(new MatchRegion(position,currentPosition), currentPosition, currentStatus);
             };
         }
-#endif
 
         /// <summary>
         ///     任意の一文字に一致するパーサを生成する
@@ -552,6 +614,21 @@ namespace Parsing {
                     return Result<char>.Reject(status);
                 } else {
                     return Result<char>.Accept((char)ch, position.Inc((char)ch), status);
+                }
+            };
+        }
+        public static Parser<MatchRegion> AnyCharRange() {
+            return (context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+                var ch = context.target[position.Index];
+                if (ch == -1) {
+                    context.handleFailed(position);
+                    return Result<MatchRegion>.Reject(status);
+                } else {
+                    var newPosition = position.Inc((char)ch);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position,newPosition), newPosition, status);
                 }
             };
         }
@@ -581,6 +658,27 @@ namespace Parsing {
             };
         }
 
+        public static Parser<MatchRegion> AnyCharRange(string str) {
+            if (str == null) {
+                throw new ArgumentNullException(nameof(str));
+            }
+            var dict = new HashSet<char>(str.ToCharArray());
+
+            return (context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+                var ch = context.target[position.Index];
+                if (ch != -1 && dict.Contains((char)ch)) {
+                    var newPosition = position.Inc((char)ch);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                } else {
+                    context.handleFailed(position);
+                    return Result<MatchRegion>.Reject(status);
+                }
+            };
+        }
+
         /// <summary>
         ///     述語 pred が真になる一文字に一致するパーサを生成する
         /// </summary>
@@ -601,6 +699,25 @@ namespace Parsing {
                 } else {
                     context.handleFailed(position);
                     return Result<char>.Reject(status);
+                }
+            };
+        }
+        public static Parser<MatchRegion> AnyCharRange(Func<char, bool> pred) {
+            if (pred == null) {
+                throw new ArgumentNullException(nameof(pred));
+            }
+
+            return (context, position, status) => {
+                if (context.target == null) {
+                    throw new ArgumentNullException(nameof(context.target));
+                }
+                var ch = context.target[position.Index];
+                if (ch != -1 && pred((char)ch)) {
+                    var newPosition = position.Inc((char)ch);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                } else {
+                    context.handleFailed(position);
+                    return Result<MatchRegion>.Reject(status);
                 }
             };
         }
@@ -627,14 +744,10 @@ namespace Parsing {
         private struct MemoizeKey {
             private readonly int _position;
             private readonly object _status;
-            private readonly int _hashCode;
 
             public MemoizeKey(int position, object status) {
                 _position = position;
                 _status = status;
-                _hashCode = -118752591;
-                _hashCode = _hashCode * -1521134295 + EqualityComparer<int>.Default.GetHashCode(_position);
-                _hashCode = _hashCode * -1521134295 + EqualityComparer<object>.Default.GetHashCode(_status);
             }
 
             public override bool Equals(object obj) {
@@ -645,7 +758,7 @@ namespace Parsing {
             }
 
             public override int GetHashCode() {
-                return _hashCode;
+                return _position;
             }
         }
 
@@ -984,7 +1097,7 @@ namespace Parsing {
         /// <param name="parser"></param>
         /// <param name="separator">区切り要素</param>
         /// <returns></returns>
-        public static Parser<T1[]> Separate<T1, T2>(this Parser<T1> parser, Parser<T2> separator, int min = -1, int max = -1) {
+        public static Parser<IReadOnlyList<T1>> Separate<T1, T2>(this Parser<T1> parser, Parser<T2> separator, int min = -1, int max = -1) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
@@ -1042,9 +1155,9 @@ namespace Parsing {
 
 
                 if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
-                    return Result<T1[]>.Reject(status);
+                    return Result<IReadOnlyList<T1>>.Reject(status);
                 } else {
-                    return Result<T1[]>.Accept(result.ToArray(), currentPosition, currentStatus);
+                    return Result<IReadOnlyList<T1>>.Accept(result, currentPosition, currentStatus);
                 }
             });
         }
@@ -1181,8 +1294,24 @@ namespace Parsing {
             return parser.Select(x => new string(x));
         }
 
+        public static Parser<string> String(this Parser<IReadOnlyList<char>> parser) {
+            return parser.Select(x => System.String.Concat(x));
+        }
+
         public static Parser<string> String(this Parser<char> parser) {
             return parser.Select(x => x == '\0' ? "" : x.ToString());
+        }
+
+        public static Parser<string> String(this Parser<MatchRegion> parser) {
+            return 
+                from _1 in parser
+                from _2 in Combinator.Tap((context, position, status) => context.target.Substring(_1.Start.Index, _1.End.Index - _1.Start.Index))
+                select _2;
+        }
+
+        public static T Tap<T>(this T self, Action<T> pred) {
+            pred(self);
+            return self;
         }
     }
 

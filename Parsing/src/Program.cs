@@ -23,16 +23,19 @@ namespace CParser2 {
                     var sw = new System.Diagnostics.Stopwatch();
                     sw.Start();
                     var ret = CParser.Parse(reader, (status, result, succpos, failpos) => {
+                        sw.Stop();
+                        Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
                         Console.WriteLine($"Result: {(status ? "Success" : $"Failed")}");
                         Console.WriteLine($"Position: {succpos}");
                         Console.WriteLine($"FailedPosition: {failpos}");
+                        if (status) {
+                            //System.IO.File.WriteAllText("ast.c", new WriterVisitor().Write(result));
+                            //result.Save("ast.xml");
+                        }
                         return result;
                     });
-                    sw.Stop();
-                    Console.WriteLine($"Time: {sw.ElapsedMilliseconds}ms");
                     //Console.ReadLine();
                     return;
-                    ret?.Save("ast.xml");
 
 
                     // 分析
