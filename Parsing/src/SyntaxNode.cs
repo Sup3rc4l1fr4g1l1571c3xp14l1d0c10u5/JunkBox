@@ -10,7 +10,7 @@ namespace CParser2 {
 
     public class WriterVisitor {
         public WriterVisitor() {
-            
+
         }
         public string Write(SyntaxNode node) {
             return node.Accept<string>(this);
@@ -53,7 +53,7 @@ namespace CParser2 {
             return $"{ self.expression.Accept<string>(this)}[{self.array_subscript.Accept<string>(this)}]";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.FunctionCallExpression self) {
-            return $"{ self.expression.Accept<string>(this)}({string.Join(", ", self.argument_expressions.Select(x => x.Accept<string>(this)))})";
+            return $"{ self.expression.Accept<string>(this)}({string.Join(", ", self.argument_expression_list.Select(x => x.Accept<string>(this)))})";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.MemberAccessByValueExpression self) {
             return $"{ self.expression.Accept<string>(this)}.{self.identifier}";
@@ -71,46 +71,46 @@ namespace CParser2 {
             return $"(type_name) {{ {string.Join(", ", self.initializers.Select(x => ($"{x.Item1.Accept<string>(this)} = {x.Item2.Accept<string>(this)}")))} }})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.SimpleAssignmentExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} = { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.LogicalOrExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} || { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.LogicalAndExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} && { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.InclusiveOrExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} | { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.ExclusiveOrExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} ^ { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.AndExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} & { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.EqualityExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.RelationalExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.ShiftExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.AdditiveExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.op} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.ConditionalExpression self) {
             return $"({ self.condition.Accept<string>(this)} ? {self.then_expression.Accept<string>(this)} : { self.else_expression.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.CommaSeparatedExpression self) {
-            return $"({string.Join(", ", self.exprs.Select(x => $"{x.Accept<string>(this)}"))})";
+            return $"({string.Join(", ", self.expressions.Select(x => $"{x.Accept<string>(this)}"))})";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.CastExpression self) {
             var cast_type = self.type_name.Accept<string>(this);
@@ -179,11 +179,11 @@ namespace CParser2 {
         }
         public string Visit(SyntaxNode.DeclarationSpecifiers self) {
             List<string> specs = new List<string>();
-            if (self.storage_class_specifier != null) { specs.Add(self.storage_class_specifier); }
-            if (self.type_qualifiers != null) { specs.AddRange(self.type_qualifiers); }
+            if (self.storage_class_specifier != SyntaxNode.StorageClassSpecifierKind.none) { specs.Add(self.storage_class_specifier.ToString()); }
+            if (self.type_qualifiers != null) { specs.AddRange(self.type_qualifiers.Select(x => x.ToString())); }
             if (self.type_specifiers != null) { specs.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this))); }
-            if (self.function_specifier != null) { specs.Add(self.function_specifier); }
-            return String.Join(" ", specs);
+            if (self.function_specifier != SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none) { specs.Add(self.function_specifier.ToString()); }
+            return String.Join(" ", specs.Where(x => !string.IsNullOrWhiteSpace(x)));
         }
         public string Visit(SyntaxNode.TypeDeclaration.InitDeclarator self) {
             return $"{self.declarator.Accept<string>(this)}" + (self.initializer != null ? " = " + self.initializer.Accept<string>(this) : "");
@@ -213,16 +213,16 @@ namespace CParser2 {
         public string Visit(SyntaxNode.SpecifierQualifierList self) {
             var items = new List<string>();
             if (self.type_qualifiers != null) {
-                items.AddRange(self.type_qualifiers);
+                items.AddRange(self.type_qualifiers.Select(x => x.ToString()));
             }
             if (self.type_specifiers != null) {
                 items.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this)));
             }
             return String.Join(" ", items);
         }
-        public string Visit(SyntaxNode.StructDeclarator self) {
-            if (self.expression != null) {
-                return $"{self.declarator.Accept<string>(this)} : {self.expression.Accept<string>(this)}";
+        public string Visit(SyntaxNode.StructMemberDeclarator self) {
+            if (self.bitfield_expr != null) {
+                return $"{self.declarator.Accept<string>(this)} : {self.bitfield_expr.Accept<string>(this)}";
             } else {
                 return $"{self.declarator.Accept<string>(this)}";
             }
@@ -245,7 +245,7 @@ namespace CParser2 {
             return ptr + self.identifier;
         }
         public string Visit(SyntaxNode.Declarator.ArrayDeclarator self) {
-            var ptr  = (self.pointer == null) ? "" : (String.Join(" ", self.pointer) + " ");
+            var ptr = (self.pointer == null) ? "" : (String.Join(" ", self.pointer) + " ");
             var sz = (self.size_expression == null) ? "" : self.size_expression.Accept<string>(this);
             return $"{ptr}{self.@base.Accept<string>(this)}[{sz}]";
         }
@@ -268,7 +268,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator self) {
             var parts = new List<string>();
             if (self.pointer != null) {
-                parts.AddRange(self.pointer);
+                parts.AddRange(self.pointer.Select(x => x.ToString()));
             }
             if (self.@base != null) {
                 parts.Add(self.@base.Accept<string>(this));
@@ -290,7 +290,7 @@ namespace CParser2 {
             return $"";
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement self) {
-            return $"default:\r\n"+self.statement.Accept<string>(this);
+            return $"default:\r\n" + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement self) {
             return $"case {self.expression.Accept<string>(this)}:\r\n" + self.statement.Accept<string>(this);
@@ -360,7 +360,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.Initializer self) {
             var inits = new List<string>();
             if (self.initializers != null) {
-                inits.AddRange(self.initializers.Select(x => (x.Item1 != null ? x.Item1.Accept<string>(this) + " = "  : "") + x.Item2.Accept<string>(this) + ",\r\n"));
+                inits.AddRange(self.initializers.Select(x => (x.Item1 != null ? x.Item1.Accept<string>(this) + " = " : "") + x.Item2.Accept<string>(this) + ",\r\n"));
             }
             return self.expression.Accept<string>(this) + (inits.Any() ? "{" + String.Concat(inits) + "}" : "");
         }
@@ -373,25 +373,29 @@ namespace CParser2 {
 
     }
 
-    [DataContract]
     public abstract class SyntaxNode {
 
-        [DataContract]
+        /// <summary>
+        /// 式
+        /// </summary>
         public abstract class Expression : SyntaxNode {
 
             public bool full {
                 get; set;
             }
 
-            [DataContract]
+            /// <summary>
+            /// 単項演算子式
+            /// </summary>
             public abstract class UnaryExpression : Expression {
 
-                [DataContract]
+                /// <summary>
+                /// 前置インクリメント演算子式
+                /// </summary>
                 public class PrefixIncrementExpression : UnaryExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
                     public PrefixIncrementExpression(Expression operand) {
@@ -400,12 +404,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 前置デクリメント演算子式
+                /// </summary>
                 public class PrefixDecrementExpression : UnaryExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
                     public PrefixDecrementExpression(Expression operand) {
@@ -414,12 +419,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 参照演算子式
+                /// </summary>
                 public class AddressExpression : UnaryExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
 
@@ -429,12 +435,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 間接参照演算子式
+                /// </summary>
                 public class IndirectionExpression : UnaryExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
 
@@ -444,34 +451,41 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 単項算術演算子式
+                /// </summary>
                 public class UnaryArithmeticExpression : UnaryExpression {
 
-                    [DataMember]
-                    public string @operator {
-                        get; private set;
+                    public enum OperatorKind {
+                        Add,
+                        Subtract,
+                        Inverse,
+                        Negate
                     }
-                    [DataMember]
+
+                    public OperatorKind @operator {
+                        get; 
+                    }
+
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
-
-                    public UnaryArithmeticExpression(string @operator, Expression operand) {
+                    public UnaryArithmeticExpression(OperatorKind @operator, Expression operand) {
 
                         this.@operator = @operator;
                         this.operand = operand;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 式に対するsizeof演算子式
+                /// </summary>
                 public class SizeofExpression : UnaryExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
-
 
                     public SizeofExpression(Expression operand) {
 
@@ -479,14 +493,14 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 型に対するsizeof演算子式
+                /// </summary>
                 public class SizeofTypeExpression : UnaryExpression {
 
-                    [DataMember]
                     public TypeName operand {
-                        get; private set;
+                        get; 
                     }
-
 
                     public SizeofTypeExpression(TypeName operand) {
 
@@ -496,15 +510,18 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
+            /// <summary>
+            /// 一次式
+            /// </summary>
             public abstract class PrimaryExpression : Expression {
 
-                [DataContract]
+                /// <summary>
+                /// オブジェクト指定子(識別子要素)
+                /// </summary>
                 public class ObjectSpecifier : PrimaryExpression {
 
-                    [DataMember]
                     public string identifier {
-                        get; private set;
+                        get; 
                     }
 
                     public ObjectSpecifier(string identifier) {
@@ -513,12 +530,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 定数指定子
+                /// </summary>
                 public class ConstantSpecifier : PrimaryExpression {
 
-                    [DataMember]
                     public string constant {
-                        get; private set;
+                        get; 
                     }
 
                     public ConstantSpecifier(string constant) {
@@ -527,12 +545,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 文字定数指定子
+                /// </summary>
                 public class StringLiteralSpecifier : PrimaryExpression {
 
-                    [DataMember]
                     public string literal {
-                        get; private set;
+                        get; 
                     }
 
                     public StringLiteralSpecifier(string literal) {
@@ -541,12 +560,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// グループ化式
+                /// </summary>
                 public class GroupedExpression : PrimaryExpression {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
 
                     public GroupedExpression(Expression expression) {
@@ -557,19 +577,28 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
+            /// <summary>
+            /// 後置式
+            /// </summary>
             public abstract class PostfixExpression : Expression {
 
-                [DataContract]
+                /// <summary>
+                /// 配列添字式
+                /// </summary>
                 public class ArraySubscriptExpression : PostfixExpression {
 
-                    [DataMember]
+                    /// <summary>
+                    /// 左辺式
+                    /// </summary>
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
+
+                    /// <summary>
+                    /// 添字式
+                    /// </summary>
                     public Expression array_subscript {
-                        get; private set;
+                        get; 
                     }
 
                     public ArraySubscriptExpression(Expression expression, Expression arraySubscript) {
@@ -579,35 +608,49 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 関数呼び出し式
+                /// </summary>
                 public class FunctionCallExpression : PostfixExpression {
 
-                    [DataMember]
-                    public IReadOnlyList<Expression> argument_expressions {
-                        get; private set;
-                    }
-                    [DataMember]
-                    public Expression expression {
-                        get; private set;
+                    /// <summary>
+                    /// 引数式列
+                    /// </summary>
+                    public IReadOnlyList<Expression> argument_expression_list {
+                        get; 
                     }
 
-                    public FunctionCallExpression(Expression expression, IReadOnlyList<Expression> argumentExpressions) {
+                    /// <summary>
+                    /// 左辺式
+                    /// </summary>
+                    public Expression expression {
+                        get; 
+                    }
+
+                    public FunctionCallExpression(Expression expression, IReadOnlyList<Expression> argumentExpressionList) {
 
                         this.expression = expression;
-                        argument_expressions = argumentExpressions;
+                        argument_expression_list = argumentExpressionList;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// メンバーアクセス演算子
+                /// </summary>
                 public class MemberAccessByValueExpression : PostfixExpression {
 
-                    [DataMember]
+                    /// <summary>
+                    /// 左辺式
+                    /// </summary>
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
+
+                    /// <summary>
+                    /// メンバー名
+                    /// </summary>
                     public string identifier {
-                        get; private set;
+                        get; 
                     }
 
                     public MemberAccessByValueExpression(Expression expression, string identifier) {
@@ -617,16 +660,23 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// メンバー間接参照アクセス演算子
+                /// </summary>
                 public class MemberAccessByPointerExpression : PostfixExpression {
 
-                    [DataMember]
+                    /// <summary>
+                    /// 左辺式
+                    /// </summary>
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
+
+                    /// <summary>
+                    /// メンバー名
+                    /// </summary>
                     public string identifier {
-                        get; private set;
+                        get; 
                     }
 
                     public MemberAccessByPointerExpression(Expression expression, string identifier) {
@@ -636,12 +686,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 後置インクリメント演算子
+                /// </summary>
                 public class PostfixIncrementExpression : PostfixExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
                     public PostfixIncrementExpression(Expression operand) {
@@ -650,12 +701,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 後置デクリメント演算子
+                /// </summary>
                 public class PostfixDecrementExpression : PostfixExpression {
 
-                    [DataMember]
                     public Expression operand {
-                        get; private set;
+                        get; 
                     }
 
                     public PostfixDecrementExpression(Expression x) {
@@ -664,16 +716,23 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 複合リテラル式
+                /// </summary>
                 public class CompoundLiteralExpression : PostfixExpression {
 
-                    [DataMember]
+                    /// <summary>
+                    /// 型名
+                    /// </summary>
                     public TypeName type_name {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
+
+                    /// <summary>
+                    /// 初期化式
+                    /// </summary>
                     public IReadOnlyList<Tuple<IReadOnlyList<SyntaxNode.Initializer.Designator>, SyntaxNode.Initializer>> initializers {
-                        get; private set;
+                        get; 
                     }
 
                     public CompoundLiteralExpression(TypeName typeName, IReadOnlyList<Tuple<IReadOnlyList<SyntaxNode.Initializer.Designator>, SyntaxNode.Initializer>> initializers) {
@@ -685,128 +744,187 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
+            /// <summary>
+            /// 二項演算子式
+            /// </summary>
             public abstract class BinaryExpression : Expression {
 
-                [DataMember]
-                public string op {
-                    get; private set;
-                }
-                [DataMember]
                 public Expression lhs_operand {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
                 public Expression rhs_operand {
-                    get; private set;
+                    get; 
                 }
 
-                protected BinaryExpression(string op, Expression lhs_operand, Expression rhs_operand) {
-
-                    this.op = op;
+                protected BinaryExpression(Expression lhs_operand, Expression rhs_operand) {
                     this.lhs_operand = lhs_operand;
                     this.rhs_operand = rhs_operand;
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 複合代入式
+                /// </summary>
                 public class CompoundAssignmentExpression : BinaryExpression {
+                    public enum OperatorKind {
+                        multiply_assign, divide_assign, modulus_assign, add_assign, subtract_assign,
+                        left_shift_assign, right_shift_assign, binary_and_assign, binary_or_assign, xor_assign
+                    }
 
-                    public CompoundAssignmentExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public OperatorKind @operator { get; }
+
+                    public CompoundAssignmentExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 単純代入式
+                /// </summary>
                 public class SimpleAssignmentExpression : BinaryExpression {
 
-                    public SimpleAssignmentExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public SimpleAssignmentExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 論理 OR 演算子式
+                /// </summary>
                 public class LogicalOrExpression : BinaryExpression {
 
-                    public LogicalOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public LogicalOrExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 論理 AND 演算子式
+                /// </summary>
                 public class LogicalAndExpression : BinaryExpression {
 
-                    public LogicalAndExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public LogicalAndExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// ビットごとの包括的 OR 演算子式
+                /// </summary>
                 public class InclusiveOrExpression : BinaryExpression {
 
-                    public InclusiveOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public InclusiveOrExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// ビットごとの排他的 OR 演算子式
+                /// </summary>
                 public class ExclusiveOrExpression : BinaryExpression {
 
-                    public ExclusiveOrExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public ExclusiveOrExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// ビットごとの AND 演算子式
+                /// </summary>
                 public class AndExpression : BinaryExpression {
 
-                    public AndExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public AndExpression(Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 等値演算子式
+                /// </summary>
                 public class EqualityExpression : BinaryExpression {
+                    public enum OperatorKind {
+                        equal, not_equal
+                    }
 
-                    public EqualityExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public OperatorKind @operator { get; }
+
+                    public EqualityExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 関係演算子式
+                /// </summary>
                 public class RelationalExpression : BinaryExpression {
 
-                    public RelationalExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public enum OperatorKind {
+                        less_equal, less, greater_equal, greater
+                    }
+
+                    public OperatorKind @operator { get; }
+
+                    public RelationalExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// ビット処理シフト演算子
+                /// </summary>
                 public class ShiftExpression : BinaryExpression {
+                    public enum OperatorKind {
+                        left_shift, right_shift
+                    }
+                    public OperatorKind @operator { get; }
 
-                    public ShiftExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public ShiftExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 加法演算子式
+                /// </summary>
                 public class AdditiveExpression : BinaryExpression {
+                    public enum OperatorKind {
+                        add, subtract
+                    }
 
-                    public AdditiveExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public OperatorKind @operator { get; }
+
+                    public AdditiveExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 乗算演算子式
+                /// </summary>
                 public class MultiplicativeExpression : BinaryExpression {
+                    public enum OperatorKind {
+                        multiply, divide, modulus
+                    }
 
-                    public MultiplicativeExpression(string op, Expression lhs_operand, Expression rhs_operand) : base(op, lhs_operand, rhs_operand) {
+                    public OperatorKind @operator { get; }
+
+                    public MultiplicativeExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
+                        this.@operator = op;
                     }
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 条件式演算子式
+            /// </summary>
             public class ConditionalExpression : Expression {
 
-                [DataMember]
+                /// <summary>
+                /// 条件式
+                /// </summary>
                 public Expression condition {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
+
                 public Expression then_expression {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
+
                 public Expression else_expression {
-                    get; private set;
+                    get; 
                 }
 
                 public ConditionalExpression(Expression condition, Expression thenExpression, Expression elseExpression) {
@@ -817,30 +935,38 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 順次評価演算子式
+            /// </summary>
             public class CommaSeparatedExpression : Expression {
 
-                [DataMember]
-                public IReadOnlyList<Expression> exprs {
-                    get; private set;
+                public IReadOnlyList<Expression> expressions {
+                    get; 
                 }
 
-                public CommaSeparatedExpression(IReadOnlyList<Expression> exprs) {
+                public CommaSeparatedExpression(IReadOnlyList<Expression> expressions) {
 
-                    this.exprs = exprs;
+                    this.expressions = expressions;
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// キャスト演算子式
+            /// </summary>
             public class CastExpression : Expression {
 
-                [DataMember]
+                /// <summary>
+                /// キャスト対象の式
+                /// </summary>
                 public Expression operand {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
+
+                /// <summary>
+                /// キャスト先の型
+                /// </summary>
                 public TypeName type_name {
-                    get; private set;
+                    get; 
                 }
 
                 public CastExpression(TypeName typeName, Expression operand) {
@@ -850,12 +976,13 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// エラー式（構文解析器内部専用）
+            /// </summary>
             public class ErrorExpression : Expression {
 
-                [DataMember]
                 public Statement statement {
-                    get; private set;
+                    get; 
                 }
 
                 public ErrorExpression(Statement x) {
@@ -864,20 +991,64 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+
+        /// <summary>
+        /// ストレージクラスの種別
+        /// </summary>
+        public enum StorageClassSpecifierKind {
+            none,
+            typedef_keyword,
+            extern_keyword,
+            static_keyword,
+            auto_keyword,
+            register_keyword
+        }
+
+        /// <summary>
+        /// 型修飾子
+        /// </summary>
+        public enum TypeQualifierKind {
+            none,
+            const_keyword,
+            volatile_keyword,
+            restrict_keyword
+        }
+
+        /// <summary>
+        /// 型修飾子(ポインタ部で使用する場合)
+        /// </summary>
+        public enum TypeQualifierKindWithPointer {
+            none,
+            const_keyword,
+            volatile_keyword,
+            restrict_keyword,
+            pointer_keyword
+        }
+
+        /// <summary>
+        /// 宣言
+        /// </summary>
         public class Declaration : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 宣言指定子
+            /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 初期化子のリスト
+            /// </summary>
             public IReadOnlyList<InitDeclarator> init_declarators {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 宣言指定子と初期化子から得られる型宣言・関数宣言・変数宣言・変数定義
+            /// </summary>
             public IReadOnlyList<SyntaxNode> items {
-                get; private set;
+                get; 
             }
 
             public Declaration(DeclarationSpecifiers _1, IReadOnlyList<InitDeclarator> _2) {
@@ -898,10 +1069,16 @@ namespace CParser2 {
                 return ret.ToArray();
             }
 
+            /// <summary>
+            /// 初期化子中から変数定義を抽出
+            /// </summary>
+            /// <param name="dcl_specs"></param>
+            /// <param name="init_dcrs"></param>
+            /// <returns></returns>
             private static List<Definition.VariableDefinition> build_variable_definition(DeclarationSpecifiers dcl_specs, IReadOnlyList<InitDeclarator> init_dcrs) {
 
                 var var_defs = new List<Definition.VariableDefinition>();
-                if (dcl_specs != null && (dcl_specs.storage_class_specifier == "extern" || dcl_specs.storage_class_specifier == "typedef") ) {
+                if (dcl_specs != null && (dcl_specs.storage_class_specifier == StorageClassSpecifierKind.extern_keyword || dcl_specs.storage_class_specifier == StorageClassSpecifierKind.typedef_keyword)) {
 
                     return var_defs;
                 }
@@ -916,11 +1093,16 @@ namespace CParser2 {
                 return var_defs;
             }
 
-
+            /// <summary>
+            /// 初期化子中から変数宣言を抽出
+            /// </summary>
+            /// <param name="dcl_specs"></param>
+            /// <param name="init_dcrs"></param>
+            /// <returns></returns>
             private static List<VariableDeclaration> build_variable_declaration(DeclarationSpecifiers dcl_specs, IReadOnlyList<InitDeclarator> init_dcrs) {
 
                 var var_dcls = new List<VariableDeclaration>();
-                if (dcl_specs == null || dcl_specs.storage_class_specifier != "extern") {
+                if (dcl_specs == null || dcl_specs.storage_class_specifier != StorageClassSpecifierKind.extern_keyword) {
 
                     return var_dcls;
                 }
@@ -936,10 +1118,16 @@ namespace CParser2 {
                 return var_dcls;
             }
 
+            /// <summary>
+            /// 初期化子中から関数宣言を抽出
+            /// </summary>
+            /// <param name="dcl_specs"></param>
+            /// <param name="init_dcrs"></param>
+            /// <returns></returns>
             private static List<FunctionDeclaration> build_function_declaration(DeclarationSpecifiers dcl_specs, IReadOnlyList<InitDeclarator> init_dcrs) {
 
                 var func_dcls = new List<FunctionDeclaration>();
-                if (dcl_specs != null && dcl_specs.storage_class_specifier == "typedef") {
+                if (dcl_specs != null && dcl_specs.storage_class_specifier  == StorageClassSpecifierKind.typedef_keyword) {
 
                     return func_dcls;
                 }
@@ -954,6 +1142,12 @@ namespace CParser2 {
                 return func_dcls;
             }
 
+            /// <summary>
+            /// 宣言指定子中からタグ付き型宣言とtypedef宣言を抽出
+            /// </summary>
+            /// <param name="dcl_specs"></param>
+            /// <param name="init_dcrs"></param>
+            /// <returns></returns>
             private static List<TypeDeclaration> build_type_declaration(DeclarationSpecifiers dcl_specs, IReadOnlyList<InitDeclarator> init_dcrs) {
 
                 var type_dcls = new List<TypeDeclaration>();
@@ -961,20 +1155,17 @@ namespace CParser2 {
 
                     return type_dcls;
                 }
-                dcl_specs.type_specifiers.ForEach(type_spec => {
 
+                // タグ付き型宣言を処理
+                dcl_specs.type_specifiers.ForEach(type_spec => {
                     var builder = new TypeDeclarationBuilder();
                     type_spec.Accept(builder);
                     type_dcls.AddRange(builder.type_declarations);
                 });
 
-                var sc = dcl_specs.storage_class_specifier;
-
-                if (sc == "typedef") {
-
+                // typedef宣言を処理
+                if (dcl_specs.storage_class_specifier == StorageClassSpecifierKind.typedef_keyword) {
                     foreach (var init_dcr in init_dcrs) {
-
-                        var id = init_dcr.declarator.identifier;
                         type_dcls.Add(new TypeDeclaration.TypedefDeclaration(dcl_specs, init_dcr));
                     }
                 }
@@ -983,6 +1174,9 @@ namespace CParser2 {
             }
         }
 
+        /// <summary>
+        /// 型宣言中に含まれる構造体・共用体・列挙型を探して個々の型宣言を構築するヘルパークラス
+        /// </summary>
         public class TypeDeclarationBuilder {
 
             public TypeDeclarationBuilder() {
@@ -990,77 +1184,123 @@ namespace CParser2 {
                 type_declarations = new List<TypeDeclaration>();
             }
 
+            /// <summary>
+            /// 型宣言中に含まれる構造体・共用体・列挙型を探し、個々の型宣言として生成した物
+            /// </summary>
             public List<TypeDeclaration> type_declarations {
-                get; 
+                get;
             }
 
+            /// <summary>
+            /// 基本型指定子を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(TypeSpecifier.StandardTypeSpecifier node) {
-
+                // なにもしない
             }
 
+            /// <summary>
+            /// typedef型指定子を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(TypeSpecifier.TypedefTypeSpecifier node) {
-
+                // なにもしない
             }
 
+            /// <summary>
+            /// 構造体型指定子を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(TypeSpecifier.StructSpecifier node) {
-
                 if (node.struct_declarations != null) {
+                    // 構造体型指定子中にメンバ宣言リストがある場合
 
+                    // メンバ宣言リストの要素を個々に解析
                     foreach (var child in node.struct_declarations) {
                         child.Accept(this);
                     }
+
+                    // 構造体定義を生成して解析結果に追加する
                     type_declarations.Add(new TypeDeclaration.StructTypeDeclaration(node));
                 }
             }
 
+            /// <summary>
+            /// 共用体型指定子を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(TypeSpecifier.UnionSpecifier node) {
-
                 if (node.struct_declarations != null) {
+                    // 共用体型指定子中にメンバ宣言リストがある場合
 
+                    // メンバ宣言リストの要素を個々に解析
                     foreach (var child in node.struct_declarations) {
                         child.Accept(this);
                     }
+
+                    // 共用体定義を生成して解析結果に追加する
                     type_declarations.Add(new TypeDeclaration.UnionTypeDeclaration(node));
                 }
             }
 
+            /// <summary>
+            /// 列挙型指定子を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(EnumSpecifier node) {
 
                 if (node.enumerators != null) {
-
+                    // 列挙型指定子中にメンバ宣言リストがある場合
+                    // 列挙型定義を生成して解析結果に追加する
                     type_declarations.Add(new TypeDeclaration.EnumTypeDeclaration(node));
                 }
             }
 
-            //private void  Visit(TypeDeclarationBuilder node) {
-
-            //}
-
+            /// <summary>
+            /// 構造体宣言を解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(StructDeclaration node) {
 
+                // 構造体宣言の型指定子と型修飾子のリストを解析
                 node.specifier_qualifier_list.Accept(this);
             }
 
+            /// <summary>
+            /// 構造体宣言の型指定子と型修飾子のリストを解析
+            /// </summary>
+            /// <param name="node"></param>
             public void Visit(SpecifierQualifierList node) {
 
                 foreach (var child in node.type_specifiers) {
+                    // 型指定子と型修飾子を個々に解析
                     child.Accept(this);
                 };
             }
         }
 
-
-        [DataContract]
+        /// <summary>
+        /// 関数宣言
+        /// </summary>
         public class FunctionDeclaration : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 宣言指定子
+            /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 初期宣言子
+            /// </summary>
             public InitDeclarator init_declarator {
-                get; private set;
+                get; 
             }
+
+            /// <summary>
+            /// 宣言された関数名を初期宣言子から取得
+            /// </summary>
             public string identifier {
 
                 get {
@@ -1075,18 +1315,28 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 変数宣言
+        /// </summary>
         public class VariableDeclaration : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 宣言指定子
+            /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; private set;
-            }
-            [DataMember]
-            public Declarator declarator {
-                get; private set;
+                get; 
             }
 
+            /// <summary>
+            /// 宣言子
+            /// </summary>
+            public Declarator declarator {
+                get; 
+            }
+
+            /// <summary>
+            /// 宣言された関数名を宣言子から取得
+            /// </summary>
             public string identifier {
 
                 get {
@@ -1101,7 +1351,9 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 定義
+        /// </summary>
         public abstract class Definition : SyntaxNode {
 
             protected Definition(DeclarationSpecifiers dcl_specs) {
@@ -1109,25 +1361,37 @@ namespace CParser2 {
                 declaration_specifiers = dcl_specs;
             }
 
-            [DataMember]
+            /// <summary>
+            /// 宣言指定子
+            /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; private set;
+                get; 
             }
 
-            [DataContract]
+            /// <summary>
+            /// 関数定義
+            /// </summary>
             public abstract class FunctionDefinition : Definition {
 
-                [DataMember]
+                /// <summary>
+                /// 宣言子
+                /// </summary>
                 public Declarator declarator {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
+
+                /// <summary>
+                /// 引数定義のリスト
+                /// </summary>
                 public IReadOnlyList<ParameterDefinition> parameterDefinition {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
+
+                /// <summary>
+                /// 関数本体
+                /// </summary>
                 public Statement function_body {
-                    get; private set;
+                    get; 
                 }
 
                 protected FunctionDefinition(DeclarationSpecifiers dcl_specs, Declarator dcr, IReadOnlyList<ParameterDefinition> param_defs, Statement compound_stmt) : base(dcl_specs) {
@@ -1137,7 +1401,9 @@ namespace CParser2 {
                     function_body = compound_stmt;
                 }
 
-                [DataContract]
+                /// <summary>
+                /// K&Rスタイルの関数定義
+                /// </summary>
                 public class KandRFunctionDefinition : FunctionDefinition {
 
                     public KandRFunctionDefinition(DeclarationSpecifiers dcl_specs, Declarator dcr, List<Declaration> dcls,
@@ -1145,6 +1411,9 @@ namespace CParser2 {
 
                     }
 
+                    /// <summary>
+                    /// K&Rスタイルの引数名リスト部を取得
+                    /// </summary>
                     public IReadOnlyList<string> identifier_list {
 
                         get {
@@ -1152,6 +1421,12 @@ namespace CParser2 {
                         }
                     }
 
+                    /// <summary>
+                    /// 引数名リストと実引数宣言リストから引数宣言リストを生成する
+                    /// </summary>
+                    /// <param name="param_names"></param>
+                    /// <param name="dcls"></param>
+                    /// <returns></returns>
                     private static IReadOnlyList<ParameterDefinition> create_parameters(IReadOnlyList<string> param_names, List<Declaration> dcls) {
 
                         var param_defs = new List<ParameterDefinition>();
@@ -1168,27 +1443,11 @@ namespace CParser2 {
                         return param_defs;
                     }
 
-                    private static VariableDefinition find_variable_definition(List<Declaration> dcls, string name) {
-
-                        foreach (var dcl in dcls) {
-
-                            foreach (var var_def in dcl.items.Where(item => item is VariableDefinition).Cast<VariableDefinition>()) {
-
-                                if (var_def.identifier == name) {
-
-                                    return var_def;
-                                }
-                            }
-                        }
-                        {
-
-                            var dcl = implicit_parameter_definition(name);
-                            dcls.Add(dcl);
-                            Debug.Assert(dcl.items.First() is VariableDefinition);
-                            return dcl.items.First() as VariableDefinition;
-                        }
-                    }
-
+                    /// <summary>
+                    /// 変数定義から引数定義を生成して返す
+                    /// </summary>
+                    /// <param name="var_def"></param>
+                    /// <returns></returns>
                     private static ParameterDefinition variable_definition_to_parameter_definition(VariableDefinition var_def) {
 
                         var dcl_specs = var_def.declaration_specifiers;
@@ -1197,6 +1456,38 @@ namespace CParser2 {
                         return param_def;
                     }
 
+
+                    /// <summary>
+                    /// 実引数宣言リスト中から名前が name に一致する暗黙的引数宣言を探し、その中に生成されている変数定義要素を返す。
+                    /// 無い場合は暗黙的引数定義と見なし、暗黙的引数定義を実引数宣言リストに追加してから、その中に生成されている変数定義要素を返す。
+                    /// </summary>
+                    /// <param name="dcls"></param>
+                    /// <param name="name"></param>
+                    /// <returns></returns>
+                    private static VariableDefinition find_variable_definition(List<Declaration> dcls, string name) {
+
+                        foreach (var dcl in dcls) {
+                            foreach (var var_def in dcl.items.Where(item => item is VariableDefinition).Cast<VariableDefinition>()) {
+                                if (var_def.identifier == name) {
+                                    return var_def;
+                                }
+                            }
+                        }
+
+                        // 見つからなかった
+                        {
+                            var dcl = implicit_parameter_definition(name);
+                            dcls.Add(dcl);
+                            Debug.Assert(dcl.items.First() is VariableDefinition);
+                            return dcl.items.First() as VariableDefinition;
+                        }
+                    }
+
+                    /// <summary>
+                    /// 暗黙的引数定義となる宣言を生成して返す。
+                    /// </summary>
+                    /// <param name="id"></param>
+                    /// <returns></returns>
                     private static Declaration implicit_parameter_definition(string id) {
 
                         var init_dcr = new InitDeclarator(new Declarator.IdentifierDeclarator(id), null);
@@ -1205,7 +1496,9 @@ namespace CParser2 {
 
                 }
 
-                [DataContract]
+                /// <summary>
+                /// ANSIスタイルの関数定義
+                /// </summary>
                 public class AnsiFunctionDefinition : FunctionDefinition {
 
 
@@ -1214,6 +1507,11 @@ namespace CParser2 {
 
                     }
 
+                    /// <summary>
+                    /// 引数型リストから引数定義リストを作る
+                    /// </summary>
+                    /// <param name="param_type_list"></param>
+                    /// <returns></returns>
                     private static IReadOnlyList<ParameterDefinition> create_parameters(ParameterTypeList param_type_list) {
 
                         var ret = new List<ParameterDefinition>();
@@ -1234,12 +1532,10 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
             public class VariableDefinition : Definition {
 
-                [DataMember]
                 public InitDeclarator init_declarator {
-                    get; private set;
+                    get; 
                 }
 
                 public VariableDefinition(DeclarationSpecifiers dcl_specs, InitDeclarator init_dcr) : base(dcl_specs) {
@@ -1256,12 +1552,10 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
             public class ParameterDefinition : Definition {
 
-                [DataMember]
                 public Declarator declarator {
-                    get; private set;
+                    get; 
                 }
 
                 public ParameterDefinition(DeclarationSpecifiers dcl_specs, Declarator dcr) : base(dcl_specs) {
@@ -1289,24 +1583,28 @@ namespace CParser2 {
 
         }
 
-        [DataContract]
+        /// <summary>
+        /// 型宣言
+        /// </summary>
         public abstract class TypeDeclaration : SyntaxNode {
 
-            [DataMember]
             public abstract string identifier {
                 get; protected set;
             }
 
-            [DataContract]
+            /// <summary>
+            /// typedef 宣言
+            /// </summary>
             public class TypedefDeclaration : TypeDeclaration {
 
-                [DataMember]
+                /// <summary>
+                /// 宣言指定子
+                /// </summary>
                 public DeclarationSpecifiers declaration_specifiers {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
                 public InitDeclarator init_declarator {
-                    get; private set;
+                    get; 
                 }
                 public override string identifier {
 
@@ -1324,7 +1622,9 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 構造体型宣言
+            /// </summary>
             public class StructTypeDeclaration : TypeDeclaration {
 
                 public override string identifier {
@@ -1334,9 +1634,8 @@ namespace CParser2 {
                     protected set {
                     }
                 }
-                [DataMember]
                 public TypeSpecifier.StructSpecifier struct_specifier {
-                    get; private set;
+                    get; 
                 }
 
                 public StructTypeDeclaration(TypeSpecifier.StructSpecifier node) {
@@ -1345,7 +1644,9 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 共用体型宣言
+            /// </summary>
             public class UnionTypeDeclaration : TypeDeclaration {
 
                 public override string identifier {
@@ -1355,9 +1656,8 @@ namespace CParser2 {
                     protected set {
                     }
                 }
-                [DataMember]
                 public TypeSpecifier.UnionSpecifier union_specifier {
-                    get; private set;
+                    get; 
                 }
 
                 public UnionTypeDeclaration(TypeSpecifier.UnionSpecifier node) {
@@ -1366,18 +1666,19 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 列挙型宣言
+            /// </summary>
             public class EnumTypeDeclaration : TypeDeclaration {
 
                 public override string identifier {
                     get {
                         return enum_specifier.identifier;
                     }
-                    protected set {}
+                    protected set { }
                 }
-                [DataMember]
                 public EnumSpecifier enum_specifier {
-                    get; private set;
+                    get; 
                 }
 
                 public EnumTypeDeclaration(EnumSpecifier node) {
@@ -1387,33 +1688,64 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 宣言指定子
+        /// </summary>
         public class DeclarationSpecifiers {
-            [DataMember]
-            public string storage_class_specifier {
+
+            /// <summary>
+            /// 宣言指定子に付随するストレージクラス
+            /// </summary>
+            public StorageClassSpecifierKind storage_class_specifier {
                 get; internal set;
             }
-            [DataMember]
+
+            /// <summary>
+            /// 宣言指定子に付随する型指定子のリスト
+            /// </summary>
             public List<TypeSpecifier> type_specifiers {
-                get; private set;
+                get; 
             }
-            [DataMember]
-            public List<string> type_qualifiers {
-                get; private set;
+
+            /// <summary>
+            /// 宣言指定子に付随する型修飾子のリスト
+            /// </summary>
+            public List<TypeQualifierKind> type_qualifiers {
+                get; 
             }
-            [DataMember]
-            public string function_specifier {
+
+            /// <summary>
+            /// 関数指定子
+            /// </summary>
+            public enum FuntionSpecifierKind {
+                none,
+                inline_keyword
+            }
+
+            /// <summary>
+            /// 宣言指定子に付随する関数指定子
+            /// </summary>
+            public FuntionSpecifierKind function_specifier {
                 get; internal set;
             }
+
             public DeclarationSpecifiers() {
                 type_specifiers = new List<TypeSpecifier>();
-                type_qualifiers = new List<string>();
+                type_qualifiers = new List<TypeQualifierKind>();
             }
+
+            /// <summary>
+            /// 型指定子を伴う（明示的な宣言指定子）かどうか
+            /// </summary>
             public bool isexplicitly_typed {
                 get {
                     return !isimplicitly_typed;
                 }
             }
+
+            /// <summary>
+            /// 型指定子を伴わない（暗黙的な宣言指定子）かどうか
+            /// </summary>
             public bool isimplicitly_typed {
                 get {
                     return !type_specifiers.Any();
@@ -1422,16 +1754,16 @@ namespace CParser2 {
 
         }
 
-        [DataContract]
+        /// <summary>
+        /// 初期宣言子
+        /// </summary>
         public class InitDeclarator {
 
-            [DataMember]
             public Declarator declarator {
-                get; private set;
+                get; 
             }
-            [DataMember]
             public Initializer initializer {
-                get; private set;
+                get; 
             }
 
             public InitDeclarator(Declarator _1, Initializer _2) {
@@ -1441,63 +1773,87 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 型指定子
+        /// </summary>
         public abstract class TypeSpecifier {
 
-            [DataContract]
+            /// <summary>
+            /// 構造体型指定子
+            /// </summary>
             public class StructSpecifier : TypeSpecifier {
 
-                [DataMember]
+
+                /// <summary>
+                /// タグ名
+                /// </summary>
                 public string identifier {
-                    get; private set;
+                    get;
                 }
-                [DataMember]
-                public bool v2 {
-                    get; private set;
+
+                /// <summary>
+                /// 匿名型か否か
+                /// </summary>
+                public bool anonymous {
+                    get;
                 }
-                [DataMember]
+
+                /// <summary>
+                /// メンバ宣言リスト（nullの場合は不完全型）
+                /// </summary>
                 public IReadOnlyList<StructDeclaration> struct_declarations {
-                    get; private set;
+                    get;
                 }
 
-                public StructSpecifier(string v1, IReadOnlyList<StructDeclaration> _3, bool v2) {
+                public StructSpecifier(string identifier, IReadOnlyList<StructDeclaration> struct_declarations, bool anonymous) {
 
-                    identifier = v1;
-                    struct_declarations = _3;
-                    this.v2 = v2;
+                    this.identifier = identifier;
+                    this.struct_declarations = struct_declarations;
+                    this.anonymous = anonymous;
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 共用体型指定子
+            /// </summary>
             public class UnionSpecifier : TypeSpecifier {
 
-                [DataMember]
+                /// <summary>
+                /// タグ名
+                /// </summary>
                 public string identifier {
-                    get; private set;
+                    get; 
                 }
-                [DataMember]
-                public bool v2 {
-                    get; private set;
+
+                /// <summary>
+                /// 匿名型か否か
+                /// </summary>
+                public bool anonymous {
+                    get; 
                 }
-                [DataMember]
+
+                /// <summary>
+                /// メンバ宣言リスト（nullの場合は不完全型）
+                /// </summary>
                 public IReadOnlyList<StructDeclaration> struct_declarations {
-                    get; private set;
+                    get; 
                 }
 
-                public UnionSpecifier(string v1, IReadOnlyList<StructDeclaration> _3, bool v2) {
+                public UnionSpecifier(string identifier, IReadOnlyList<StructDeclaration> struct_declarations, bool anonymous) {
 
-                    identifier = v1;
-                    struct_declarations = _3;
-                    this.v2 = v2;
+                    this.identifier = identifier;
+                    this.struct_declarations = struct_declarations;
+                    this.anonymous = anonymous;
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 基本型指定子
+            /// </summary>
             public class StandardTypeSpecifier : TypeSpecifier {
 
-                [DataMember]
                 public string identifier {
-                    get; private set;
+                    get; 
                 }
 
                 public StandardTypeSpecifier(string s) {
@@ -1506,12 +1862,13 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// typedef型指定子
+            /// </summary>
             public class TypedefTypeSpecifier : TypeSpecifier {
 
-                [DataMember]
                 public string identifier {
-                    get; private set;
+                    get; 
                 }
 
                 public TypedefTypeSpecifier(string s) {
@@ -1521,30 +1878,38 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 構造体宣言
+        /// </summary>
         public class StructDeclaration {
 
-            [DataMember]
+            /// <summary>
+            /// 宣言の型指定子もしくは型修飾子リスト
+            /// </summary>
             public SpecifierQualifierList specifier_qualifier_list {
-                get; private set;
+                get; 
             }
-            [DataMember]
-            public IReadOnlyList<StructDeclarator> struct_declarators {
-                get; private set;
+            /// <summary>
+            /// メンバ宣言子リスト
+            /// </summary>
+            public IReadOnlyList<StructMemberDeclarator> struct_member_declarators {
+                get; 
             }
-            [DataMember]
+            /// <summary>
+            /// メンバ宣言リスト
+            /// </summary>
             public IReadOnlyList<MemberDeclaration> items {
-                get; private set;
+                get; 
             }
 
-            public StructDeclaration(SpecifierQualifierList _1, IReadOnlyList<StructDeclarator> _2) {
+            public StructDeclaration(SpecifierQualifierList _1, IReadOnlyList<StructMemberDeclarator> _2) {
 
                 specifier_qualifier_list = _1;
-                struct_declarators = _2;
+                struct_member_declarators = _2;
                 items = build_items(_1, _2);
             }
 
-            private IReadOnlyList<MemberDeclaration> build_items(SpecifierQualifierList spec_qual_list, IReadOnlyList<StructDeclarator> struct_dcrs) {
+            private IReadOnlyList<MemberDeclaration> build_items(SpecifierQualifierList spec_qual_list, IReadOnlyList<StructMemberDeclarator> struct_dcrs) {
 
                 // FIXME: Must support unnamed bit padding.
 
@@ -1556,94 +1921,117 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
         public class MemberDeclaration {
 
-            [DataMember]
             public SpecifierQualifierList specifier_qualifier_list {
-                get; private set;
+                get; 
             }
 
-            [DataMember]
-            public StructDeclarator struct_declarator {
-                get; private set;
+            public StructMemberDeclarator struct_member_declarator {
+                get; 
             }
 
-            //[DataMember] 
-            // public StructDeclarator type { 
+            // 
+            // public StructMemberDeclarator type { 
             //    get; 
             //}
 
-            public MemberDeclaration(SpecifierQualifierList spec_qual_list, StructDeclarator struct_dcr) {
+            public MemberDeclaration(SpecifierQualifierList spec_qual_list, StructMemberDeclarator struct_member_dcr) {
 
                 specifier_qualifier_list = spec_qual_list;
-                struct_declarator = struct_dcr;
+                struct_member_declarator = struct_member_dcr;
             }
 
             public string identifier() {
 
-                if (struct_declarator != null && struct_declarator.declarator != null) {
+                if (struct_member_declarator != null && struct_member_declarator.declarator != null) {
 
-                    return struct_declarator.declarator.identifier;
+                    return struct_member_declarator.declarator.identifier;
                 }
                 return null;
             }
 
         }
 
-        [DataContract]
+        /// <summary>
+        /// 型指定子と型修飾子のリスト
+        /// </summary>
         public class SpecifierQualifierList {
-            [DataMember]
+            /// <summary>
+            /// 型指定子リスト
+            /// </summary>
             public List<TypeSpecifier> type_specifiers {
-                get; private set;
+                get; 
             }
-            [DataMember]
-            public List<string> type_qualifiers {
-                get; private set;
+            /// <summary>
+            /// 型修飾子リスト
+            /// </summary>
+            public List<TypeQualifierKind> type_qualifiers {
+                get; 
             }
             public SpecifierQualifierList() {
                 type_specifiers = new List<TypeSpecifier>();
-                type_qualifiers = new List<string>();
+                type_qualifiers = new List<TypeQualifierKind>();
             }
         }
 
-        [DataContract]
-        public class StructDeclarator : SyntaxNode {
+        /// <summary>
+        /// 構造体メンバ宣言子
+        /// </summary>
+        public class StructMemberDeclarator : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 構造体メンバ宣言子に付随する宣言子
+            /// </summary>
             public Declarator declarator {
-                get; private set;
-            }
-            [DataMember]
-            public Expression expression {
-                get; private set;
+                get; 
             }
 
-            public StructDeclarator(Declarator _1, Expression _2) {
+            /// <summary>
+            /// 構造体メンバのビットフィールドサイズ指定
+            /// </summary>
+            public Expression bitfield_expr {
+                get; 
+            }
+
+            public StructMemberDeclarator(Declarator _1, Expression _2) {
 
                 declarator = _1;
-                expression = _2;
+                bitfield_expr = _2;
             }
         }
 
-        [DataContract]
-        public class EnumSpecifier : TypeSpecifier {
 
-            [DataMember]
+        /// <summary>
+        /// 列挙指定子
+        /// </summary>
+        public class EnumSpecifier : TypeSpecifier {
+            /// <summary>
+            /// タグ名
+            /// </summary>
             public string identifier {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 列挙子リスト
+            /// </summary>
             public IReadOnlyList<Enumerator> enumerators {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 列挙子リストの末尾のコンマの有無
+            /// </summary>
             public bool trailing_comma {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 匿名型か否か
+            /// </summary>
             public bool anonymous {
-                get; private set;
+                get; 
             }
 
             public EnumSpecifier(string identifier, IReadOnlyList<Enumerator> enumerators, bool trailingComma, bool anonymous) {
@@ -1655,16 +2043,23 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 列挙子
+        /// </summary>
         public class Enumerator {
 
-            [DataMember]
+            /// <summary>
+            /// 列挙子の名前
+            /// </summary>
             public string identifier {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 列挙子の値
+            /// </summary>
             public Expression expression {
-                get; private set;
+                get; 
             }
 
             public Enumerator(string identifier, Expression expression) {
@@ -1674,41 +2069,59 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 宣言子
+        /// </summary>
         public abstract class Declarator {
-
-            [DataMember]
+            /// <summary>
+            /// 宣言子の修飾対象となる宣言子
+            /// </summary>
             public Declarator @base {
-                get; private set;
+                get; 
             }
 
-            [DataMember]
             public bool full {
                 get; set;
             }
 
-            [DataMember]
-            public IReadOnlyList<string> pointer {
+            /// <summary>
+            /// 宣言子に付随するポインタを含む型修飾子のリスト
+            /// </summary>
+            public IReadOnlyList<TypeQualifierKindWithPointer> pointer {
                 get; set;
             }
 
-            [DataMember]
+            /// <summary>
+            /// 宣言子に付随する識別子
+            /// </summary>
             public abstract string identifier {
                 get; protected set;
             }
 
-            [DataMember]
+            /// <summary>
+            /// 宣言子に付随する識別子リスト
+            /// </summary>
             public abstract IReadOnlyList<string> identifier_list {
                 get; protected set;
             }
 
-            [DataMember]
+            /// <summary>
+            /// 宣言子が関数であるか判定
+            /// </summary>
+            /// <param name="stack"></param>
+            /// <returns></returns>
+            public abstract bool isfunction(Stack<string> stack = null);
+
+            /// <summary>
+            /// 宣言子に付随する最も内側にある引数型リスト
+            /// </summary>
             public abstract ParameterTypeList innermost_parameter_type_list {
                 get; protected set;
             }
 
-            public abstract bool isfunction(Stack<string> stack = null);
-
+            /// <summary>
+            /// 宣言子が抽象宣言子か判定
+            /// </summary>
             public virtual bool isabstract {
 
                 get {
@@ -1716,10 +2129,11 @@ namespace CParser2 {
                 }
             }
 
+            /// <summary>
+            ///  宣言子が変数である（＝関数ではない）か判定
+            /// </summary>
             public bool isvariable {
-
                 get {
-
                     return !isfunction();
                 }
             }
@@ -1728,9 +2142,15 @@ namespace CParser2 {
                 this.@base = @base;
             }
 
-            [DataContract]
+            /// <summary>
+            /// グループ化宣言子
+            /// </summary>
+            /// <remarks>丸括弧でグループ化された宣言子</remarks>
             public class GroupedDeclarator : Declarator {
 
+                /// <summary>
+                /// 宣言子に付随する識別子
+                /// </summary>
                 public override string identifier {
 
                     get {
@@ -1740,6 +2160,9 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// 宣言子に付随する識別子リスト
+                /// </summary>
                 public override IReadOnlyList<string> identifier_list {
 
                     get {
@@ -1749,6 +2172,11 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// 宣言子が関数であるか判定
+                /// </summary>
+                /// <param name="stack"></param>
+                /// <returns></returns>
                 public override bool isfunction(Stack<string> stack = null) {
 
                     stack = stack ?? new Stack<string>();
@@ -1759,10 +2187,9 @@ namespace CParser2 {
                     return stack.FirstOrDefault() == "function";
                 }
 
-
-                public GroupedDeclarator(Declarator @base) : base(@base) {
-                }
-
+                /// <summary>
+                /// 宣言子に付随する最も内側にある引数型リスト
+                /// </summary>
                 public override ParameterTypeList innermost_parameter_type_list {
 
                     get {
@@ -1771,18 +2198,26 @@ namespace CParser2 {
                     protected set {
                     }
                 }
+                public GroupedDeclarator(Declarator @base) : base(@base) {
+                }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 識別子宣言子
+            /// </summary>
             public class IdentifierDeclarator : Declarator {
 
-                [DataMember]
+                /// <summary>
+                /// 宣言子に付随する識別子
+                /// </summary>
                 public override string identifier {
                     get; protected set;
                 }
 
+                /// <summary>
+                /// 宣言子に付随する識別子リスト（null固定）
+                /// </summary>
                 public override IReadOnlyList<string> identifier_list {
-
                     get {
                         return null;
                     }
@@ -1790,6 +2225,11 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// 宣言子が関数であるか判定
+                /// </summary>
+                /// <param name="stack"></param>
+                /// <returns></returns>
                 public override bool isfunction(Stack<string> stack = null) {
 
                     stack = stack ?? new Stack<string>();
@@ -1799,26 +2239,30 @@ namespace CParser2 {
                     return stack.FirstOrDefault() == "function";
                 }
 
-
-                public IdentifierDeclarator(string x): base(null) { 
-                    identifier = x;
-                }
+                /// <summary>
+                /// 宣言子に付随する最も内側にある引数型リスト（null固定）
+                /// </summary>
                 public override ParameterTypeList innermost_parameter_type_list {
-
                     get {
-
                         return null;
                     }
                     protected set {
                     }
                 }
+                public IdentifierDeclarator(string x) : base(null) {
+                    identifier = x;
+                }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 配列宣言子
+            /// </summary>
             public class ArrayDeclarator : Declarator {
 
+                /// <summary>
+                /// 宣言子に付随する識別子
+                /// </summary>
                 public override string identifier {
-
                     get {
                         return @base.identifier;
                     }
@@ -1826,8 +2270,10 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// 宣言子に付随する識別子リスト
+                /// </summary>
                 public override IReadOnlyList<string> identifier_list {
-
                     get {
                         return @base.identifier_list;
                     }
@@ -1835,13 +2281,19 @@ namespace CParser2 {
                     }
                 }
 
-                [DataMember]
+                /// <summary>
+                /// サイズ（要素数）式
+                /// </summary>
                 public Expression size_expression {
-                    get; private set;
+                    get; 
                 }
 
+                /// <summary>
+                /// 宣言子が関数であるか判定
+                /// </summary>
+                /// <param name="stack"></param>
+                /// <returns></returns>
                 public override bool isfunction(Stack<string> stack = null) {
-
                     stack = stack ?? new Stack<string>();
                     if (pointer != null && pointer.Any()) {
                         stack.Push("pointer");
@@ -1851,25 +2303,31 @@ namespace CParser2 {
                     return stack.FirstOrDefault() == "function";
                 }
 
-                public ArrayDeclarator(Declarator @base, Expression _4) : base(@base) {
-                    size_expression = _4;
-                }
+                /// <summary>
+                /// 宣言子に付随する最も内側にある引数型リスト
+                /// </summary>
                 public override ParameterTypeList innermost_parameter_type_list {
-
                     get {
                         return @base.innermost_parameter_type_list;
                     }
                     protected set {
                     }
+                }
 
+                public ArrayDeclarator(Declarator @base, Expression size_expression) : base(@base) {
+                    this.size_expression = size_expression;
                 }
             }
 
-            [DataContract]
+            /// <summary>
+            /// 関数宣言子
+            /// </summary>
             public abstract class FunctionDeclarator : Declarator {
 
+                /// <summary>
+                /// 宣言子に付随する識別子
+                /// </summary>
                 public override string identifier {
-
                     get {
                         return @base.identifier;
                     }
@@ -1877,7 +2335,11 @@ namespace CParser2 {
                     }
                 }
 
-
+                /// <summary>
+                /// 宣言子が関数であるか判定
+                /// </summary>
+                /// <param name="stack"></param>
+                /// <returns></returns>
                 public override bool isfunction(Stack<string> stack = null) {
 
                     stack = stack ?? new Stack<string>();
@@ -1889,13 +2351,17 @@ namespace CParser2 {
                     return stack.FirstOrDefault() == "function";
                 }
 
-
                 protected FunctionDeclarator(Declarator @base) : base(@base) {
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 曖昧な関数宣言子
+                /// </summary>
                 public class AbbreviatedFunctionDeclarator : FunctionDeclarator {
 
+                    /// <summary>
+                    /// 宣言子に付随する識別子リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
 
                         get {
@@ -1904,55 +2370,70 @@ namespace CParser2 {
                         protected set {
                         }
 
+                    }
+
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
+                    public override ParameterTypeList innermost_parameter_type_list {
+                        get {
+                            return @base.innermost_parameter_type_list;
+                        }
+                        protected set {
+                        }
                     }
 
                     public AbbreviatedFunctionDeclarator(Declarator @base) : base(@base) {
 
                     }
-                    public override ParameterTypeList innermost_parameter_type_list {
-
-                        get {
-                            return @base.innermost_parameter_type_list;
-                        }
-                        protected set {
-                        }
-
-                    }
-
                 }
 
-                [DataContract]
+                /// <summary>
+                /// K&Rスタイルの関数宣言子
+                /// </summary>
                 public class KandRFunctionDeclarator : FunctionDeclarator {
 
-                    [DataMember]
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
                         get; protected set;
                     }
 
-                    public KandRFunctionDeclarator(Declarator @base, IReadOnlyList<string> _4) : base(@base) {
-
-                        identifier_list = _4;
-                    }
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override ParameterTypeList innermost_parameter_type_list {
 
                         get {
                             return @base.innermost_parameter_type_list;
                         }
-                        protected set {
+                        protected set  {
                         }
 
                     }
 
-                }
-
-                [DataContract]
-                public class AnsiFunctionDeclarator : FunctionDeclarator {
-
-                    [DataMember]
-                    public ParameterTypeList parameter_type_list {
-                        get; private set;
+                    public KandRFunctionDeclarator(Declarator @base, IReadOnlyList<string> identifier_list) : base(@base) {
+                        this.identifier_list = identifier_list;
                     }
 
+                }
+
+                /// <summary>
+                /// ANSIスタイルの関数宣言子
+                /// </summary>
+                public class AnsiFunctionDeclarator : FunctionDeclarator {
+
+                    /// <summary>
+                    /// 引数型リスト
+                    /// </summary>
+                    public ParameterTypeList parameter_type_list {
+                        get; 
+                    }
+
+                    /// <summary>
+                    /// 宣言子に付随する識別子リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
 
                         get {
@@ -1960,33 +2441,38 @@ namespace CParser2 {
                         }
                         protected set {
                         }
-
                     }
 
-                    public AnsiFunctionDeclarator(Declarator @base, ParameterTypeList parameterTypeList) : base(@base) {
-
-                        parameter_type_list = parameterTypeList;
-                    }
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override ParameterTypeList innermost_parameter_type_list {
-
                         get {
                             return @base.innermost_parameter_type_list ?? parameter_type_list;
                         }
                         protected set {
                         }
-
                     }
+                    public AnsiFunctionDeclarator(Declarator @base, ParameterTypeList parameterTypeList) : base(@base) {
+
+                        parameter_type_list = parameterTypeList;
+                    }
+
                 }
 
             }
 
-            [DataContract]
+            /// <summary>
+            /// 抽象宣言子(１つ以上のポインター、配列、または関数修飾子で構成される、識別子のない宣言子)
+            /// </summary>
             public abstract class AbstractDeclarator : Declarator {
                 protected AbstractDeclarator(Declarator @base) : base(@base) {
                 }
 
+                /// <summary>
+                /// 宣言子に付随する識別子（null固定）
+                /// </summary>
                 public override string identifier {
-
                     get {
                         return null;
                     }
@@ -1995,6 +2481,9 @@ namespace CParser2 {
 
                 }
 
+                /// <summary>
+                /// 宣言子が抽象宣言子か判定（true固定）
+                /// </summary>
                 public override bool isabstract {
 
                     get {
@@ -2002,9 +2491,16 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 抽象関数宣言子
+                /// </summary>
                 public class FunctionAbstractDeclarator : AbstractDeclarator {
 
+                    /// <summary>
+                    /// 宣言子が関数であるか判定
+                    /// </summary>
+                    /// <param name="stack"></param>
+                    /// <returns></returns>
                     public override bool isfunction(Stack<string> stack = null) {
 
                         stack = stack ?? new Stack<string>();
@@ -2013,11 +2509,16 @@ namespace CParser2 {
                         return stack.FirstOrDefault() == "function";
                     }
 
-                    [DataMember]
+                    /// <summary>
+                    /// 引数型リスト
+                    /// </summary>
                     public ParameterTypeList parameter_type_list {
-                        get; private set;
+                        get; 
                     }
 
+                    /// <summary>
+                    /// 宣言子に付随する識別子リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
 
                         get {
@@ -2028,23 +2529,32 @@ namespace CParser2 {
 
                     }
 
-                    public FunctionAbstractDeclarator(AbstractDeclarator @base, ParameterTypeList p2): base(@base) {
-                        parameter_type_list = p2;
-                    }
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override ParameterTypeList innermost_parameter_type_list {
-
                         get {
                             return @base.innermost_parameter_type_list ?? parameter_type_list;
                         }
                         protected set {
                         }
+                    }
 
+                    public FunctionAbstractDeclarator(AbstractDeclarator @base, ParameterTypeList p2) : base(@base) {
+                        parameter_type_list = p2;
                     }
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 抽象配列宣言子
+                /// </summary>
                 public class ArrayAbstractDeclarator : AbstractDeclarator {
 
+                    /// <summary>
+                    /// 宣言子が関数であるか判定
+                    /// </summary>
+                    /// <param name="stack"></param>
+                    /// <returns></returns>
                     public override bool isfunction(Stack<string> stack = null) {
 
                         stack = stack ?? new Stack<string>();
@@ -2053,11 +2563,16 @@ namespace CParser2 {
                         return stack.FirstOrDefault() == "function";
                     }
 
-                    [DataMember]
+                    /// <summary>
+                    /// サイズ（要素数）式
+                    /// </summary>
                     public Expression size_expression {
-                        get; private set;
+                        get; 
                     }
 
+                    /// <summary>
+                    /// 宣言子に付随する識別子リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
                         get {
                             return @base?.identifier_list;
@@ -2067,29 +2582,43 @@ namespace CParser2 {
 
                     }
 
-                    public ArrayAbstractDeclarator(AbstractDeclarator @base, Expression p2) : base(@base) {
-
-                        this.size_expression = p2;
-                    }
-
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override ParameterTypeList innermost_parameter_type_list {
                         get {
                             return @base?.innermost_parameter_type_list;
                         }
                         protected set {
                         }
-
                     }
+
+                    public ArrayAbstractDeclarator(AbstractDeclarator @base, Expression p2) : base(@base) {
+
+                        this.size_expression = p2;
+                    }
+
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 抽象グループ化宣言子
+                /// </summary>
+                /// <remarks>丸括弧でグループ化された抽象宣言子</remarks>
                 public class GroupedAbstractDeclarator : AbstractDeclarator {
 
+                    /// <summary>
+                    /// 宣言子が関数であるか判定
+                    /// </summary>
+                    /// <param name="stack"></param>
+                    /// <returns></returns>
                     public override bool isfunction(Stack<string> stack = null) {
 
                         return @base.isfunction(null);
                     }
 
+                    /// <summary>
+                    /// 宣言子に付随する識別子リスト
+                    /// </summary>
                     public override IReadOnlyList<string> identifier_list {
 
                         get {
@@ -2097,12 +2626,11 @@ namespace CParser2 {
                         }
                         protected set {
                         }
-
                     }
 
-                    public GroupedAbstractDeclarator(AbstractDeclarator @base) : base(@base) {
-                    }
-
+                    /// <summary>
+                    /// 宣言子に付随する最も内側にある引数型リスト
+                    /// </summary>
                     public override ParameterTypeList innermost_parameter_type_list {
 
                         get {
@@ -2112,9 +2640,15 @@ namespace CParser2 {
                         }
 
                     }
+
+                    public GroupedAbstractDeclarator(AbstractDeclarator @base) : base(@base) {
+                    }
+
                 }
 
-                [DataContract]
+                /// <summary>
+                /// 抽象ポインタ宣言子
+                /// </summary>
                 public class PointerAbstractDeclarator : AbstractDeclarator {
 
                     public override bool isfunction(Stack<string> stack = null) {
@@ -2135,7 +2669,7 @@ namespace CParser2 {
 
                     }
 
-                    public PointerAbstractDeclarator(AbstractDeclarator @base, IReadOnlyList<string> _1) : base(@base) {
+                    public PointerAbstractDeclarator(AbstractDeclarator @base, IReadOnlyList<TypeQualifierKindWithPointer> _1) : base(@base) {
                         pointer = _1;
                     }
                     public override ParameterTypeList innermost_parameter_type_list {
@@ -2151,16 +2685,23 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 引数型リスト
+        /// </summary>
         public class ParameterTypeList : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 可変長引数を持つか否か
+            /// </summary>
             public bool have_va_list {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 引数宣言のリスト
+            /// </summary>
             public IReadOnlyList<ParameterDeclaration> parameters {
-                get; private set;
+                get; 
             }
 
             public ParameterTypeList(IReadOnlyList<ParameterDeclaration> parameters, bool haveVaList) {
@@ -2170,16 +2711,23 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
+        /// <summary>
+        /// 引数宣言
+        /// </summary>
         public class ParameterDeclaration : SyntaxNode {
 
-            [DataMember]
+            /// <summary>
+            /// 宣言指定子
+            /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; private set;
+                get; 
             }
-            [DataMember]
+
+            /// <summary>
+            /// 宣言子
+            /// </summary>
             public Declarator declarator {
-                get; private set;
+                get; 
             }
 
             public ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers, Declarator declarator) {
@@ -2189,23 +2737,18 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
         public abstract class Statement : SyntaxNode {
 
-            [DataContract]
             public class ErrorStatement : Statement {
 
             }
 
-            [DataContract]
             public abstract class LabeledStatement : Statement {
 
-                [DataContract]
                 public class DefaultLabeledStatement : LabeledStatement {
 
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
 
                     public DefaultLabeledStatement(Statement statement) {
@@ -2214,16 +2757,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class CaseLabeledStatement : LabeledStatement {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
 
                     public CaseLabeledStatement(Expression expression, Statement statement) {
@@ -2233,16 +2773,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class GenericLabeledStatement : LabeledStatement {
 
-                    [DataMember]
                     public string label {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
 
                     public GenericLabeledStatement(string label, Statement statement) {
@@ -2254,12 +2791,10 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
             public class CompoundStatement : Statement {
 
-                [DataMember]
                 public IReadOnlyList<SyntaxNode> block_items {
-                    get; private set;
+                    get; 
                 }
 
                 public CompoundStatement(IReadOnlyList<SyntaxNode> blockItems) {
@@ -2268,12 +2803,10 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
             public class ExpressionStatement : Statement {
 
-                [DataMember]
                 public Expression expression {
-                    get; private set;
+                    get; 
                 }
 
                 public ExpressionStatement(Expression expression) {
@@ -2282,23 +2815,18 @@ namespace CParser2 {
                 }
             }
 
-            [DataContract]
             public abstract class SelectionStatement : Statement {
 
-                [DataContract]
                 public class IfStatement : SelectionStatement {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement then_statement {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement else_statement {
-                        get; private set;
+                        get; 
                     }
 
                     public IfStatement(Expression expression, Statement thenStatement, Statement elseStatement) {
@@ -2309,16 +2837,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class SwitchStatement : SelectionStatement {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
 
                     public SwitchStatement(Expression expression, Statement statement) {
@@ -2330,27 +2855,21 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
             public abstract class IterationStatement : Statement {
 
-                [DataContract]
                 public class C99ForStatement : IterationStatement {
 
-                    [DataMember]
                     public Declaration declaration {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement condition_statement {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement body_statement {
-                        get; private set;
+                        get; 
                     }
 
                     public C99ForStatement(Declaration declaration, Statement condition_statement, Expression expression, Statement body_statement) {
@@ -2362,24 +2881,19 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class ForStatement : IterationStatement {
 
-                    [DataMember]
                     public Statement initial_statement {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement condition_statement {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement body_statement {
-                        get; private set;
+                        get; 
                     }
 
                     public ForStatement(Statement initial_statement, Statement condition_statement, Expression expression, Statement body_statement) {
@@ -2391,16 +2905,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class DoStatement : IterationStatement {
 
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
 
                     public DoStatement(Statement statement, Expression expression) {
@@ -2410,16 +2921,13 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class WhileStatement : IterationStatement {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
-                    [DataMember]
                     public Statement statement {
-                        get; private set;
+                        get; 
                     }
 
                     public WhileStatement(Expression expression, Statement statement) {
@@ -2432,15 +2940,12 @@ namespace CParser2 {
 
             }
 
-            [DataContract]
             public abstract class JumpStatement : Statement {
 
-                [DataContract]
                 public class ReturnStatement : JumpStatement {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
 
                     public ReturnStatement(Expression expression) {
@@ -2449,22 +2954,18 @@ namespace CParser2 {
                     }
                 }
 
-                [DataContract]
                 public class BreakStatement : JumpStatement {
 
                 }
 
-                [DataContract]
                 public class ContinueStatement : JumpStatement {
 
                 }
 
-                [DataContract]
                 public class GotoStatement : JumpStatement {
 
-                    [DataMember]
                     public string identifier {
-                        get; private set;
+                        get; 
                     }
 
                     public GotoStatement(string identifier) {
@@ -2476,12 +2977,10 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
         public class TranslationUnit : SyntaxNode {
 
-            [DataMember]
             public IReadOnlyList<SyntaxNode> external_declarations {
-                get; private set;
+                get; 
             }
 
             public TranslationUnit(IReadOnlyList<SyntaxNode> externalDeclarations) {
@@ -2490,20 +2989,16 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
         public class TypeName : SyntaxNode {
 
-            [DataMember]
             public SpecifierQualifierList specifier_qualifier_list {
-                get; private set;
+                get; 
             }
-            [DataMember]
             public Declarator.AbstractDeclarator abstract_declarator {
-                get; private set;
+                get; 
             }
-            [DataMember]
             public TypeDeclaration type_declaration {
-                get; private set;
+                get; 
             }
 
             public TypeName(SpecifierQualifierList specifierQualifierList, Declarator.AbstractDeclarator abstractDeclarator) {
@@ -2527,16 +3022,13 @@ namespace CParser2 {
             }
         }
 
-        [DataContract]
         public class Initializer : SyntaxNode {
 
-            [DataMember]
             public Expression expression {
-                get; private set;
+                get; 
             }
-            [DataMember]
             public IReadOnlyList<Tuple<IReadOnlyList<Designator>, Initializer>> initializers {
-                get; private set;
+                get; 
             }
 
             public Initializer(Expression expression, IReadOnlyList<Tuple<IReadOnlyList<Designator>, Initializer>> initializers) {
@@ -2545,15 +3037,12 @@ namespace CParser2 {
                 this.initializers = initializers;
             }
 
-            [DataContract]
             public abstract class Designator {
 
-                [DataContract]
                 public class MemberDesignator : Designator {
 
-                    [DataMember]
                     public string identifier {
-                        get; private set;
+                        get; 
                     }
 
                     public MemberDesignator(string identifier) {
@@ -2561,12 +3050,10 @@ namespace CParser2 {
                         this.identifier = identifier;
                     }
                 }
-                [DataContract]
                 public class IndexDesignator : Designator {
 
-                    [DataMember]
                     public Expression expression {
-                        get; private set;
+                        get; 
                     }
 
                     public IndexDesignator(Expression expression) {
@@ -2577,36 +3064,119 @@ namespace CParser2 {
             }
         }
 
-        //
-        //
-        //
+    }
 
-        public void Save(string fileName) {
-            //XmlSerializerオブジェクトを作成
-
-            List<Type> known_types = new List<Type>();
-            List<Type> detected_types = new List<Type>() { typeof(SyntaxNode) };
-
-            while (detected_types.Any()) {
-                known_types.AddRange(detected_types);
-                detected_types = detected_types.SelectMany(x => x.GetNestedTypes()).Where(x => x.GetCustomAttributes().Any(y => y is DataContractAttribute)).ToList();
-            }
-
-            //オブジェクトの型を指定する
-            DataContractSerializer serializer = new DataContractSerializer(typeof(SyntaxNode), known_types.ToArray());
-
-            //書き込むファイルを開く（UTF-8 BOM無し）
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Encoding = new System.Text.UTF8Encoding(false);
-            settings.Indent = true;
-            using (XmlWriter xw = XmlWriter.Create(fileName, settings)) {
-                //シリアル化し、XMLファイルに保存する
-                serializer.WriteObject(xw, this);
-                //ファイルを閉じる
-                xw.Close();
+    public static class SyntaxNodeExt {
+        public static string ToString(this SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Add: return "+";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Subtract: return "-";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Inverse: return "~";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Negate: return "!";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.multiply_assign: return "*=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.divide_assign: return "/=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.modulus_assign: return "%=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.add_assign: return "+=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.subtract_assign: return "-=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.left_shift_assign: return "<<=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.right_shift_assign: return ">>=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_and_assign: return "&=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_or_assign: return "|=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.xor_assign: return "^=";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.equal: return "==";
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.not_equal: return "!=";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less_equal: return "<=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less: return "<";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater_equal: return ">=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater: return ">";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.left_shift: return "<<";
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.right_shift: return ">>";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.add: return "+";
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.subtract: return "-";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.multiply: return "*";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.divide: return "/";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.modulus: return "%";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.StorageClassSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.StorageClassSpecifierKind.none: return "";
+                case SyntaxNode.StorageClassSpecifierKind.typedef_keyword: return "typedef";
+                case SyntaxNode.StorageClassSpecifierKind.extern_keyword: return "extern";
+                case SyntaxNode.StorageClassSpecifierKind.static_keyword: return "static";
+                case SyntaxNode.StorageClassSpecifierKind.auto_keyword: return "auto";
+                case SyntaxNode.StorageClassSpecifierKind.register_keyword: return "register";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.TypeQualifierKind self) {
+            switch (self) {
+                case SyntaxNode.TypeQualifierKind.none: return "";
+                case SyntaxNode.TypeQualifierKind.const_keyword: return "const";
+                case SyntaxNode.TypeQualifierKind.volatile_keyword: return "volatile";
+                case SyntaxNode.TypeQualifierKind.restrict_keyword: return "restrict";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.TypeQualifierKindWithPointer self) {
+            switch (self) {
+                case SyntaxNode.TypeQualifierKindWithPointer.none: return "";
+                case SyntaxNode.TypeQualifierKindWithPointer.const_keyword: return "const";
+                case SyntaxNode.TypeQualifierKindWithPointer.volatile_keyword: return "volatile";
+                case SyntaxNode.TypeQualifierKindWithPointer.restrict_keyword: return "restrict";
+                case SyntaxNode.TypeQualifierKindWithPointer.pointer_keyword: return "pointer";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public static string ToString(this SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none: return "";
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.inline_keyword: return "inline";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
     }
 
     public static class VisitorExt {
@@ -2671,40 +3241,40 @@ namespace CParser2 {
 
             if (Memoise.TryGetValue(memoKey, out visitMethod) == false) {
                 var visitorMethods = visitor.GetType().GetMethods().Where(x => {
-                // 名前はVisit?
-                if (x.Name != "Visit") {
-                    return false;
+                    // 名前はVisit?
+                    if (x.Name != "Visit") {
+                        return false;
+                    }
+
+                    // 戻り値型が同じ？
+                    if (x.ReturnType.Equals(typeof(TResult)) == false) {
+                        return false;
+                    }
+
+                    // 引数は2個？
+                    var parameters = x.GetParameters();
+                    if (parameters.Length != 2) {
+                        return false;
+                    }
+
+                    // 第1引数がselfと同じ型？
+                    if (parameters[0].ParameterType.Equals(self.GetType()) == false) {
+                        return false;
+                    }
+
+                    // 第2引数がTArgumentと同じ型？
+                    if (parameters[1].ParameterType.Equals(typeof(TArgument)) == false) {
+                        return false;
+                    }
+
+                    return true;
+                }).ToArray();
+
+                if (visitorMethods.Length == 0) {
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TArgument).ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が実装されていません。");
+                } else if (visitorMethods.Length >= 2) {
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TArgument).ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が２個以上実装されています。");
                 }
-
-                // 戻り値型が同じ？
-                if (x.ReturnType.Equals(typeof(TResult)) == false) {
-                    return false;
-                }
-
-                // 引数は2個？
-                var parameters = x.GetParameters();
-                if (parameters.Length != 2) {
-                    return false;
-                }
-
-                // 第1引数がselfと同じ型？
-                if (parameters[0].ParameterType.Equals(self.GetType()) == false) {
-                    return false;
-                }
-
-                // 第2引数がTArgumentと同じ型？
-                if (parameters[1].ParameterType.Equals(typeof(TArgument)) == false) {
-                    return false;
-                }
-
-                return true;
-            }).ToArray();
-
-            if (visitorMethods.Length == 0) {
-                throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TArgument).ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が実装されていません。");
-            } else if (visitorMethods.Length >= 2) {
-                throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TArgument).ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が２個以上実装されています。");
-            }
                 visitMethod = visitorMethods.First();
                 Memoise[memoKey] = visitMethod;
             }
@@ -2721,35 +3291,35 @@ namespace CParser2 {
 
             if (Memoise.TryGetValue(memoKey, out visitMethod) == false) {
                 var visitorMethods = visitor.GetType().GetMethods().Where(x => {
-                // 名前はVisit?
-                if (x.Name != "Visit") {
-                    return false;
+                    // 名前はVisit?
+                    if (x.Name != "Visit") {
+                        return false;
+                    }
+
+                    // 戻り値型が同じ？
+                    if (x.ReturnType == typeof(TResult) == false) {
+                        return false;
+                    }
+
+                    // 引数は1個？
+                    var parameters = x.GetParameters();
+                    if (parameters.Length != 1) {
+                        return false;
+                    }
+
+                    // 第1引数がselfと同じ型？
+                    if (!(parameters[0].ParameterType == self.GetType())) {
+                        return false;
+                    }
+
+                    return true;
+                }).ToArray();
+
+                if (visitorMethods.Length == 0) {
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が実装されていません。");
+                } else if (visitorMethods.Length >= 2) {
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が２個以上実装されています。");
                 }
-
-                // 戻り値型が同じ？
-                if (x.ReturnType.Equals(typeof(TResult)) == false) {
-                    return false;
-                }
-
-                // 引数は1個？
-                var parameters = x.GetParameters();
-                if (parameters.Length != 1) {
-                    return false;
-                }
-
-                // 第1引数がselfと同じ型？
-                if (parameters[0].ParameterType.Equals(self.GetType()) == false) {
-                    return false;
-                }
-
-                return true;
-            }).ToArray();
-
-            if (visitorMethods.Length == 0) {
-                throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が実装されていません。");
-            } else if (visitorMethods.Length >= 2) {
-                throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Func<{self.GetType().ToString()},{typeof(TResult).ToString()}>型の メソッド Visit が２個以上実装されています。");
-            }
                 visitMethod = visitorMethods.First();
                 Memoise[memoKey] = visitMethod;
             }

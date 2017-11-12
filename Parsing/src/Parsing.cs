@@ -1,7 +1,6 @@
 //#define TraceParser
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -95,43 +94,71 @@ namespace Parsing {
     /// <summary>
     ///     パーサの位置情報
     /// </summary>
-    public class Position : IComparer<Position> {
+    /// <remarks>
+    /// パーサ中で非常に細かく生成・削除・コピーされるため、値型かつ16byte以下のサイズになるようにしてパフォーマンスを稼いでいる。
+    /// </remarks>
+    public struct Position : IComparer<Position>, IEquatable<Position> {
+        /// <summary>
+        /// 入力ソース上の位置
+        /// </summary>
         public int Index {
             get;
-        } // 文字列上の位置
-        public string FileName {
-            get;
-        } // 見かけ上のファイル
+        }
+
+        /// <summary>
+        /// 見かけ上のファイル行
+        /// </summary>
         public int Row {
             get;
-        } // 見かけ上のファイル上の行
+        }
+
+        /// <summary>
+        /// 見かけ上のファイル列
+        /// </summary>
         public int Column {
             get;
-        } // 見かけ上のファイル上の列
+        }
+
+        /// <summary>
+        /// 見かけ上のファイル名
+        /// </summary>
+        public string FileName {
+            get { return FileNameCache.ElementAtOrDefault(FileNameIndex); }
+        }
+
+        /// <summary>
+        /// ファイル名キャッシュテーブルのID
+        /// </summary>
+        private ushort FileNameIndex { get; }
+
+        /// <summary>
+        /// 直前の一文字
+        /// </summary>
         private char PrevChar {
             get;
         }
 
+        /// <summary>
+        /// ファイル名をキャッシュしておく静的領域（ファイル名は最大）
+        /// </summary>
+        private static readonly List<string> FileNameCache = new List<string>();
+
+        /// <summary>
+        /// 空の位置情報を示す唯一の値
+        /// </summary>
+        public static Position Empty { get; } = new Position(0, "", 1, 1, '\0');
+
         public int Compare(Position x, Position y) {
-            if (x == null && y == null) {
-                return 0;
-            }
-            if (x == null) {
-                return 1;
-            }
-            if (y == null) {
-                return -1;
-            }
             return x.Index.CompareTo(y.Index);
         }
 
-        public static bool operator >(Position lhs, Position rhs) => lhs.Index > rhs.Index;
-        public static bool operator <(Position lhs, Position rhs) => lhs.Index < rhs.Index;
-        public static bool operator >=(Position lhs, Position rhs) => lhs.Index >= rhs.Index;
-        public static bool operator <=(Position lhs, Position rhs) => lhs.Index <= rhs.Index;
+        public bool Equals(Position other) {
+            return Index == other.Index;
+        }
 
         public override bool Equals(object obj) {
-            return (obj as Position)?.Index == Index;
+            if (ReferenceEquals(null, obj)) return false;
+            return obj is Position && Equals((Position) obj);
         }
 
         public override int GetHashCode() {
@@ -140,7 +167,20 @@ namespace Parsing {
 
         private Position(int index, string filename, int row, int column, char prevChar) {
             Index = index;
-            FileName = filename;
+            Row = row;
+            Column = column;
+            PrevChar = prevChar;
+            var cachedIndex = FileNameCache.IndexOf(filename);
+            if (cachedIndex == -1) {
+                FileNameIndex = (ushort)FileNameCache.Count;
+                FileNameCache.Add(filename);
+            } else {
+                FileNameIndex = (ushort)cachedIndex;
+            }
+        }
+        private Position(int index, ushort filenameIndex, int row, int column, char prevChar) {
+            Index = index;
+            FileNameIndex = filenameIndex;
             Row = row;
             Column = column;
             PrevChar = prevChar;
@@ -150,7 +190,6 @@ namespace Parsing {
             return $"{FileName} ({Row}:{Column})";
         }
 
-        public static Position Empty { get; } = new Position(0, "", 1, 1, '\0');
         public Position Reposition(string filename, int row, int column) {
             return new Position(Index, filename, row, column, PrevChar);
         }
@@ -180,8 +219,9 @@ namespace Parsing {
                 index += 1;
                 prevChar = t;
             }
-            return new Position(index, FileName, row, col, prevChar);
+            return new Position(index, FileNameIndex, row, col, prevChar);
         }
+
         public Position Inc(char t) {
             var row = Row;
             var col = Column;
@@ -206,8 +246,9 @@ namespace Parsing {
             index += 1;
             prevChar = t;
 
-            return new Position(index, FileName, row, col, prevChar);
+            return new Position(index, FileNameIndex, row, col, prevChar);
         }
+
     }
 
     /// <summary>
@@ -216,9 +257,10 @@ namespace Parsing {
 
     public abstract class Result<T> {
         public sealed class Some : Result<T> {
-            public Some(T value, Position position, object status) : base(status) {
+            public Some(T value, Position position, object state) : base() {
                 Position = position;
                 Value = value;
+                State = state;
             }
 
             public override bool Success {
@@ -229,14 +271,16 @@ namespace Parsing {
             public override Position Position {
                 get;
             }
+            public override object State { get; }
 
             public override T Value {
                 get;
             }
 
         }
+
         public sealed class None : Result<T> {
-            public None(object status) : base(status) {
+            public None() : base() {
             }
 
             public override bool Success {
@@ -255,6 +299,14 @@ namespace Parsing {
                     return default(T);
                 }
             }
+
+            public override object State {
+                get {
+                    return null;
+                }
+            }
+
+            public static None Instance { get; } = new None();
         }
 
         /// <summary>
@@ -281,33 +333,31 @@ namespace Parsing {
         /// <summary>
         ///     パーサの状態を示すオブジェクト
         /// </summary>
-        public object Status {
+        public abstract object State {
             get;
         }
 
         /// <summary>
         ///     コンストラクタ
         /// </summary>
-        /// <param name="status"></param>
-        protected Result(object status) {
-            Status = status;
+        protected Result() {
         }
 
-        public static Result<T> Accept(T value, Position position, object status) {
-            return new Some(value, position, status);
+        public static Result<T> Accept(T value, Position position, object state) {
+            return new Some(value, position, state);
         }
 
-        public static Result<T> Reject(object status) {
-            return new None(status);
+        public static Result<T> Reject() {
+            return None.Instance;
         }
 
     }
 
     /// <summary>
-    /// パーサ全体の情報
+    /// パーサ全体のコンテキスト
     /// </summary>
     public class Context {
-        public Source target {
+        public Source source {
             get;
         }
         public Position failedPosition {
@@ -315,12 +365,12 @@ namespace Parsing {
         }
 
         public Context(Source source) {
-            target = source;
+            this.source = source;
             failedPosition = Position.Empty.Reposition(source.Name, 1, 1);
         }
 
-        public void handleFailed(Position position) {
-            if (position > failedPosition) {
+        public void MarkFailed(Position position) {
+            if (position.Index > failedPosition.Index) {
                 failedPosition = position;
             }
         }
@@ -332,9 +382,9 @@ namespace Parsing {
     /// <typeparam name="T">パース結果型</typeparam>
     /// <param name="context">パーサのコンテキスト</param>
     /// <param name="position">現在の位置</param>
-    /// <param name="status"></param>
+    /// <param name="state"></param>
     /// <returns></returns>
-    public delegate Result<T> Parser<T>(Context context, Position position, object status);
+    public delegate Result<T> Parser<T>(Context context, Position position, object state);
 
     /// <summary>
     /// パーサに合致する範囲を示す型。字句解析で使うとメモリの無駄が減る。
@@ -361,11 +411,11 @@ namespace Parsing {
         /// <returns></returns>
         public static Parser<T> Empty<T>(bool success) {
             if (success) {
-                return (context, position, status) => Result<T>.Accept(default(T), position, status);
+                return (context, position, state) => Result<T>.Accept(default(T), position, state);
             } else {
-                return (context, position, status) => {
-                    context.handleFailed(position);
-                    return Result<T>.Reject(status);
+                return (context, position, state) => {
+                    context.MarkFailed(position);
+                    return Result<T>.Reject();
                 };
             }
         }
@@ -379,15 +429,15 @@ namespace Parsing {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                if (context.target.StartsWith(position.Index, str)) {
-                    return Result<string>.Accept(str, position.Inc(str), status);
+                if (context.source.StartsWith(position.Index, str)) {
+                    return Result<string>.Accept(str, position.Inc(str), state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<string>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<string>.Reject();
                 }
             };
         }
@@ -395,16 +445,16 @@ namespace Parsing {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                if (context.target.StartsWith(position.Index, str)) {
+                if (context.source.StartsWith(position.Index, str)) {
                     var newPosition = position.Inc(str);
-                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<MatchRegion>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<MatchRegion>.Reject();
                 }
             };
         }
@@ -424,18 +474,18 @@ namespace Parsing {
                 throw new ArgumentException("min < max");
             }
 
-            return ((context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return ((context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 var result = new List<T>();
 
                 var currentPosition = position;
-                var currentStatus = status;
+                var currentState = state;
 
                 for (;;) {
-                    var parsed = parser(context, currentPosition, currentStatus);
+                    var parsed = parser(context, currentPosition, currentState);
 
                     if (!parsed.Success) {
                         // 読み取りに失敗
@@ -444,14 +494,14 @@ namespace Parsing {
                         // 読み取りに成功
                         result.Add(parsed.Value); // 結果を格納
                         currentPosition = parsed.Position; // 読み取り位置を更新する
-                        currentStatus = parsed.Status;
+                        currentState = parsed.State;
                     }
                 }
 
                 if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
-                    return Result<IReadOnlyList<T>>.Reject(status);
+                    return Result<IReadOnlyList<T>>.Reject();
                 } else {
-                    return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentStatus);
+                    return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentState);
                 }
             });
         }
@@ -471,19 +521,19 @@ namespace Parsing {
                 throw new ArgumentException("min < max");
             }
 
-            return ((context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return ((context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 var start = position;
                 var resultCount = 0;
 
                 var currentPosition = position;
-                var currentStatus = status;
+                var currentState = state;
 
                 for (;;) {
-                    var parsed = parser(context, currentPosition, currentStatus);
+                    var parsed = parser(context, currentPosition, currentState);
 
                     if (!parsed.Success) {
                         // 読み取りに失敗
@@ -492,14 +542,14 @@ namespace Parsing {
                         // 読み取りに成功
                         resultCount++; // 結果を格納
                         currentPosition = parsed.Position; // 読み取り位置を更新する
-                        currentStatus = parsed.Status;
+                        currentState = parsed.State;
                     }
                 }
 
                 if (min >= 0 && resultCount < min || max >= 0 && resultCount > max) {
-                    return Result<MatchRegion>.Reject(status);
+                    return Result<MatchRegion>.Reject();
                 } else {
-                    return Result<MatchRegion>.Accept(new MatchRegion(start, currentPosition), currentPosition, currentStatus);
+                    return Result<MatchRegion>.Accept(new MatchRegion(start, currentPosition), currentPosition, currentState);
                 }
             });
         }
@@ -517,19 +567,19 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(parsers));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 foreach (var parser in parsers) {
-                    var parsed = parser(context, position, status);
+                    var parsed = parser(context, position, state);
                     if (parsed.Success) {
-                        return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
+                        return Result<T>.Accept(parsed.Value, parsed.Position, parsed.State);
                     }
                 }
 
-                return Result<T>.Reject(status);
+                return Result<T>.Reject();
             };
         }
 
@@ -546,27 +596,27 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(parsers));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
                 var result = new List<T>();
 
                 var currentPosition = position;
-                var currentStatus = status;
+                var currentState = state;
 
                 foreach (var parser in parsers) {
-                    var parsed = parser(context, currentPosition, currentStatus);
+                    var parsed = parser(context, currentPosition, currentState);
 
                     if (parsed.Success) {
                         result.Add(parsed.Value);
                         currentPosition = parsed.Position;
-                        currentStatus = parsed.Status;
+                        currentState = parsed.State;
                     } else {
-                        return Result<IReadOnlyList<T>>.Reject(status);
+                        return Result<IReadOnlyList<T>>.Reject();
                     }
                 }
-                return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentStatus);
+                return Result<IReadOnlyList<T>>.Accept(result, currentPosition, currentState);
             };
         }
 
@@ -578,24 +628,24 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(parsers));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
                 var currentPosition = position;
-                var currentStatus = status;
+                var currentState = state;
 
                 foreach (var parser in parsers) {
-                    var parsed = parser(context, currentPosition, currentStatus);
+                    var parsed = parser(context, currentPosition, currentState);
 
                     if (parsed.Success) {
                         currentPosition = parsed.Position;
-                        currentStatus = parsed.Status;
+                        currentState = parsed.State;
                     } else {
-                        return Result<MatchRegion>.Reject(status);
+                        return Result<MatchRegion>.Reject();
                     }
                 }
-                return Result<MatchRegion>.Accept(new MatchRegion(position,currentPosition), currentPosition, currentStatus);
+                return Result<MatchRegion>.Accept(new MatchRegion(position,currentPosition), currentPosition, currentState);
             };
         }
 
@@ -604,31 +654,31 @@ namespace Parsing {
         /// </summary>
         /// <returns></returns>
         public static Parser<char> AnyChar() {
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch == -1) {
-                    context.handleFailed(position);
-                    return Result<char>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<char>.Reject();
                 } else {
-                    return Result<char>.Accept((char)ch, position.Inc((char)ch), status);
+                    return Result<char>.Accept((char)ch, position.Inc((char)ch), state);
                 }
             };
         }
-        public static Parser<MatchRegion> AnyCharRange() {
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+        public static Parser<MatchRegion> AnyCharRegion() {
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch == -1) {
-                    context.handleFailed(position);
-                    return Result<MatchRegion>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<MatchRegion>.Reject();
                 } else {
                     var newPosition = position.Inc((char)ch);
-                    return Result<MatchRegion>.Accept(new MatchRegion(position,newPosition), newPosition, status);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position,newPosition), newPosition, state);
                 }
             };
         }
@@ -644,39 +694,79 @@ namespace Parsing {
             }
             var dict = new HashSet<char>(str.ToCharArray());
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch != -1 && dict.Contains((char)ch)) {
-                    return Result<char>.Accept((char)ch, position.Inc((char)ch), status);
+                    return Result<char>.Accept((char)ch, position.Inc((char)ch), state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<char>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<char>.Reject();
                 }
             };
         }
 
-        public static Parser<MatchRegion> AnyCharRange(string str) {
+        public static Parser<MatchRegion> AnyCharRegion(string str) {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
             var dict = new HashSet<char>(str.ToCharArray());
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch != -1 && dict.Contains((char)ch)) {
                     var newPosition = position.Inc((char)ch);
-                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<MatchRegion>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<MatchRegion>.Reject();
                 }
             };
+        }
+
+        public static Parser<MatchRegion> AnyCharsRegion(string str, int min = -1, int max = -1) {
+            if (str == null) {
+                throw new ArgumentNullException(nameof(str));
+            }
+            if (min >= 0 && max >= 0 && min > max) {
+                throw new ArgumentException("min < max");
+            }
+            var dict = new HashSet<char>(str.ToCharArray());
+
+            return ((context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
+                }
+
+                var result = new StringBuilder();
+
+                var currentPosition = position.Index;
+
+                for (; ; ) {
+                    var ch = context.source[currentPosition];
+                    if (ch == -1 || !dict.Contains((char)ch)) {
+                        // 読み取りに失敗
+                        break;
+                    } else {
+                        // 読み取りに成功
+                        currentPosition++;
+                        result.Append((char)ch); // 結果を格納
+                    }
+                }
+
+                if (min >= 0 && result.Length < min || max >= 0 && result.Length > max) {
+                    return Result<MatchRegion>.Reject();
+                } else {
+                    var newPosition = position.Inc(result.ToString());
+
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
+                }
+            });
         }
 
         /// <summary>
@@ -689,76 +779,118 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(pred));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch != -1 && pred((char)ch)) {
-                    return Result<char>.Accept((char)ch, position.Inc((char)ch), status);
+                    return Result<char>.Accept((char)ch, position.Inc((char)ch), state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<char>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<char>.Reject();
                 }
             };
         }
-        public static Parser<MatchRegion> AnyCharRange(Func<char, bool> pred) {
+        public static Parser<MatchRegion> AnyCharRegion(Func<char, bool> pred) {
             if (pred == null) {
                 throw new ArgumentNullException(nameof(pred));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch != -1 && pred((char)ch)) {
                     var newPosition = position.Inc((char)ch);
-                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, status);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
                 } else {
-                    context.handleFailed(position);
-                    return Result<MatchRegion>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<MatchRegion>.Reject();
                 }
             };
         }
 
+        public static Parser<MatchRegion> AnyCharsRegion(Func<char, bool> pred, int min = -1, int max = -1) {
+            if (pred == null) {
+                throw new ArgumentNullException(nameof(pred));
+            }
+            if (min >= 0 && max >= 0 && min > max) {
+                throw new ArgumentException("min < max");
+            }
+
+            return ((context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
+                }
+
+                var result = new StringBuilder();
+
+                var currentPosition = position.Index;
+
+                for (; ; ) {
+                    var ch = context.source[currentPosition];
+                    if (ch == -1 || !pred((char)ch)) {
+                        // 読み取りに失敗
+                        break;
+                    } else {
+                        // 読み取りに成功
+                        currentPosition++;
+                        result.Append((char)ch); // 結果を格納
+                    }
+                }
+
+                if (min >= 0 && result.Length < min || max >= 0 && result.Length > max) {
+                    return Result<MatchRegion>.Reject();
+                } else {
+                    var newPosition = position.Inc(result.ToString());
+
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
+                }
+            });
+        }
         /// <summary>
         ///     EOFにマッチするパーサ
         /// </summary>
         /// <returns></returns>
         public static Parser<char> EoF() {
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var ch = context.target[position.Index];
+                var ch = context.source[position.Index];
                 if (ch != -1) {
-                    context.handleFailed(position);
-                    return Result<char>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<char>.Reject();
                 } else {
-                    return Result<char>.Accept((char)ch, position, status);
+                    return Result<char>.Accept((char)ch, position, state);
                 }
             };
         }
 
-        private struct MemoizeKey {
+        private struct MemoizeKey : IEquatable<MemoizeKey> {
             private readonly int _position;
-            private readonly object _status;
+            private readonly object _state;
 
-            public MemoizeKey(int position, object status) {
+            public MemoizeKey(int position, object state) {
                 _position = position;
-                _status = status;
+                _state = state;
             }
 
             public override bool Equals(object obj) {
-                if (obj == null) {
-                    return false;
-                }
-                return _position.Equals(((MemoizeKey)obj)._position) && Object.Equals(_status, ((MemoizeKey)obj)._status);
+                if (ReferenceEquals(null, obj)) return false;
+                return obj is MemoizeKey && Equals((MemoizeKey) obj);
             }
 
             public override int GetHashCode() {
-                return _position;
+                unchecked {
+                    return (_position * 397) ^ (_state != null ? _state.GetHashCode() : 0);
+                }
+            }
+
+            public bool Equals(MemoizeKey other) {
+                return _position == other._position && Equals(_state, other._state);
             }
         }
 
@@ -773,18 +905,18 @@ namespace Parsing {
             }
             Dictionary<MemoizeKey, Result<T>> memoization = new Dictionary<MemoizeKey, Result<T>>();
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
-                var key = new MemoizeKey(position.Index, status);
+                var key = new MemoizeKey(position.Index, state);
                 Result<T> parsed;
                 if (memoization.TryGetValue(key, out parsed)) {
                     return parsed;
                 }
 
-                parsed = parser(context, position, status);
+                parsed = parser(context, position, state);
                 memoization.Add(key, parsed);
                 return parsed;
             };
@@ -806,13 +938,13 @@ namespace Parsing {
 
             TraceInfo[caption] = new List<Tuple<Position, bool>>();
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 TraceStack.Push(caption);
-                var parsed = parser(context, position, status);
+                var parsed = parser(context, position, state);
                 TraceInfo[caption].Add(Tuple.Create(position, parsed.Success));
                 TraceStack.Pop();
                 return parsed;
@@ -833,9 +965,9 @@ namespace Parsing {
             }
 
             Parser<T> parser = null;
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 if (parser == null) {
@@ -844,7 +976,7 @@ namespace Parsing {
                         throw new Exception("fn() result is null.");
                     }
                 }
-                var ret = parser(context, position, status);
+                var ret = parser(context, position, state);
                 return ret;
             };
         }
@@ -858,15 +990,15 @@ namespace Parsing {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = parser(context, position, status);
+                var parsed = parser(context, position, state);
                 if (parsed.Success) {
                     return parsed;
                 } else {
-                    return Result<T>.Accept(default(T), position, status);
+                    return Result<T>.Accept(default(T), position, state);
                 }
             };
         }
@@ -875,26 +1007,26 @@ namespace Parsing {
         ///     parserでマッチした範囲に対する絞り込みを行うパーサを生成する
         /// </summary>
         /// <param name="parser">パーサ</param>
-        /// <param name="reparser">絞り込むパーサ</param>
+        /// <param name="reparser">絞り込むパーサ(絞り込むパーサが上位のパーサが受理した範囲と同じ範囲を完全に受理したときのみ絞り込み成功となる)</param>
         /// <returns></returns>
         public static Parser<T> Refinement<T>(this Parser<T> parser, Parser<T> reparser) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
-                var parsed = parser(context, position, status);
+                var parsed = parser(context, position, state);
                 if (!parsed.Success) {
-                    return Result<T>.Reject(status);
+                    return Result<T>.Reject();
                 }
 
                 // 絞り込みを行う
-                var reparsed = reparser(context, position, status);
+                var reparsed = reparser(context, position, state);
                 if (!reparsed.Success || (!parsed.Position.Equals(reparsed.Position))) {
-                    return Result<T>.Reject(status);
+                    return Result<T>.Reject();
                 }
 
                 return reparsed;
@@ -903,46 +1035,39 @@ namespace Parsing {
         }
 
         /// <summary>
-        ///     入力を処理せずパーサの状態を覗き見するパーサを生成する（デバッグや入力の位置情報を取得するときに役に立つ）
+        ///     入パーサの状態を覗き見するパーサを生成する（デバッグや入力の位置情報を取得するときに役に立つ）
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="pred"></param>
         /// <returns></returns>
         public static Parser<T> Tap<T>(Func<Context, Position, object, T> pred) {
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = pred(context, position, status);
-                return Result<T>.Accept(parsed, position, status);
+                var parsed = pred(context, position, state);
+                return Result<T>.Accept(parsed, position, state);
             };
         }
 
         /// <summary>
-        ///     入力を処理せずセマンティックアクションを実行するパーサを生成する。
+        ///     セマンティックアクションを実行するパーサを生成する。
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="parser"></param>
-        /// <param name="enter"></param>
-        /// <param name="leave"></param>
+        /// <param name="action"></param>
         /// <returns></returns>
-        public static Parser<T> Action<T>(
-            this Parser<T> parser,
-            Func<Context, Position, object, object> enter = null,
-            Func<Result<T>, object> leave = null
+        public static Parser<object> Action(
+            Func<object, object> action
         ) {
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            if (action == null) {
+                throw new ArgumentNullException(nameof(action));
+            }
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var newstatus1 = (enter != null) ? enter.Invoke(context, position, status) : status;
-                var parsed = parser(context, position, newstatus1);
-                var newstatus2 = (leave != null) ? leave.Invoke(parsed) : parsed.Status;
-                if (parsed.Success) {
-                    return Result<T>.Accept(parsed.Value, parsed.Position, newstatus2);
-                } else {
-                    return Result<T>.Reject(newstatus2);
-                }
+                var newState = action.Invoke(state);
+                return Result<object>.Accept(null, position, newState);
             };
         }
 
@@ -959,12 +1084,15 @@ namespace Parsing {
             if (fn == null) {
                 throw new ArgumentNullException(nameof(fn));
             }
-            return (context, position, status) => {
-                var parsed = parser(context, position, status);
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
+                }
+                var parsed = parser(context, position, state);
                 if (parsed.Success) {
-                    return Result<TOutput>.Accept(fn(parsed.Value), parsed.Position, parsed.Status);
+                    return Result<TOutput>.Accept(fn(parsed.Value), parsed.Position, parsed.State);
                 } else {
-                    return Result<TOutput>.Reject(status);
+                    return Result<TOutput>.Reject();
                 }
             };
         }
@@ -983,19 +1111,19 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(fn));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = parser(context, position, status);
+                var parsed = parser(context, position, state);
                 if (!parsed.Success) {
                     return parsed;
                 }
                 if (!fn(parsed.Value)) {
-                    context.handleFailed(position);
-                    return Result<T>.Reject(status);
+                    context.MarkFailed(position);
+                    return Result<T>.Reject();
                 }
-                return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
+                return Result<T>.Accept(parsed.Value, parsed.Position, parsed.State);
             };
         }
 
@@ -1008,15 +1136,15 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(fn));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = parser(context, position, status);
-                if (!parsed.Success || !fn(parsed.Value, parsed.Status)) {
-                    return Result<T>.Reject(status);
+                var parsed = parser(context, position, state);
+                if (!parsed.Success || !fn(parsed.Value, parsed.State)) {
+                    return Result<T>.Reject();
                 } else {
-                    return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
+                    return Result<T>.Accept(parsed.Value, parsed.Position, parsed.State);
                 }
             };
         }
@@ -1031,15 +1159,15 @@ namespace Parsing {
                 throw new ArgumentNullException(nameof(parser));
             }
 
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = parser(context, position, status);
+                var parsed = parser(context, position, state);
                 if (parsed.Success == false) {
-                    return Result<T>.Accept(default(T), position, status);
+                    return Result<T>.Accept(default(T), position, state);
                 } else {
-                    return Result<T>.Reject(status);
+                    return Result<T>.Reject();
                 }
             };
         }
@@ -1108,28 +1236,28 @@ namespace Parsing {
                 throw new ArgumentException("min < max");
             }
 
-            return ((context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
+            return ((context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
                 }
 
                 var result = new List<T1>();
 
                 var currentPosition = position;
-                var currentStatus = status;
+                var currentState = state;
 
                 // 最初の要素を読み取り
-                var parsed0 = parser(context, currentPosition, currentStatus);
+                var parsed0 = parser(context, currentPosition, currentState);
 
                 if (parsed0.Success) {
                     // 読み取りに成功したので情報を更新
                     result.Add(parsed0.Value); // 結果を格納
                     currentPosition = parsed0.Position; // 読み取り位置を更新する
-                    currentStatus = parsed0.Status;
+                    currentState = parsed0.State;
 
                     for (;;) {
                         // 区切り要素を読み取り
-                        var parsed1 = separator(context, currentPosition, currentStatus);
+                        var parsed1 = separator(context, currentPosition, currentState);
 
 
                         if (!parsed1.Success) {
@@ -1138,7 +1266,7 @@ namespace Parsing {
                         }
 
                         // 読み取りに成功したので次の要素を読み取り
-                        var parsed2 = parser(context, parsed1.Position, parsed1.Status);
+                        var parsed2 = parser(context, parsed1.Position, parsed1.State);
 
                         if (!parsed2.Success) {
                             // 読み取りに失敗したので、読み取り処理終了
@@ -1147,7 +1275,7 @@ namespace Parsing {
                             // 読み取りに成功したので情報更新
                             result.Add(parsed2.Value); // 結果を格納
                             currentPosition = parsed2.Position; // 読み取り位置を更新する
-                            currentStatus = parsed2.Status;
+                            currentState = parsed2.State;
                         }
                     }
 
@@ -1155,9 +1283,9 @@ namespace Parsing {
 
 
                 if (min >= 0 && result.Count < min || max >= 0 && result.Count > max) {
-                    return Result<IReadOnlyList<T1>>.Reject(status);
+                    return Result<IReadOnlyList<T1>>.Reject();
                 } else {
-                    return Result<IReadOnlyList<T1>>.Accept(result, currentPosition, currentStatus);
+                    return Result<IReadOnlyList<T1>>.Accept(result, currentPosition, currentState);
                 }
             });
         }
@@ -1196,7 +1324,7 @@ namespace Parsing {
         /// <param name="fn"></param>
         /// <returns></returns>
         public static Parser<object> Reposition(Func<Position, Position> fn) {
-            return (context, position, status) => Result<object>.Accept(null, fn(position), status);
+            return (context, position, state) => Result<object>.Accept(null, fn(position), state);
         }
 
     }
@@ -1226,66 +1354,26 @@ namespace Parsing {
             if (projector == null) {
                 throw new ArgumentNullException(nameof(projector));
             }
-            return (context, position, status) => {
-                var parsed1 = parser(context, position, status);
+            return (context, position, state) => {
+                var parsed1 = parser(context, position, state);
                 if (!parsed1.Success) {
-                    return Result<TOutput>.Reject(status);
+                    return Result<TOutput>.Reject();
                 }
 
-                var parsed2 = selector(parsed1.Value)(context, parsed1.Position, parsed1.Status);
+                var parsed2 = selector(parsed1.Value)(context, parsed1.Position, parsed1.State);
                 if (!parsed2.Success) {
-                    return Result<TOutput>.Reject(status);
+                    return Result<TOutput>.Reject();
                 }
-                return Result<TOutput>.Accept(projector(parsed1.Value, parsed2.Value), parsed2.Position, parsed2.Status);
+                return Result<TOutput>.Accept(projector(parsed1.Value, parsed2.Value), parsed2.Position, parsed2.State);
             };
         }
 
         public static Parser<T> Where<T>(this Parser<T> parser, Func<T, bool> selector) {
-            if (parser == null) {
-                throw new ArgumentNullException(nameof(parser));
-            }
-            if (selector == null) {
-                throw new ArgumentNullException(nameof(selector));
-            }
-
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
-                }
-                var parsed = parser(context, position, status);
-                if (!parsed.Success) {
-                    return parsed;
-                }
-                if (!selector(parsed.Value)) {
-                    context.handleFailed(position);
-                    return Result<T>.Reject(status);
-                }
-                return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
-            };
-        }
+            return parser.Filter(selector);
+         }
 
         public static Parser<T> Where<T>(this Parser<T> parser, Func<T, object, bool> selector) {
-            if (parser == null) {
-                throw new ArgumentNullException(nameof(parser));
-            }
-            if (selector == null) {
-                throw new ArgumentNullException(nameof(selector));
-            }
-
-            return (context, position, status) => {
-                if (context.target == null) {
-                    throw new ArgumentNullException(nameof(context.target));
-                }
-                var parsed = parser(context, position, status);
-                if (!parsed.Success) {
-                    return parsed;
-                }
-                if (!selector(parsed.Value, parsed.Status)) {
-                    context.handleFailed(position);
-                    return Result<T>.Reject(status);
-                }
-                return Result<T>.Accept(parsed.Value, parsed.Position, parsed.Status);
-            };
+            return parser.Filter(selector);
         }
     }
 
@@ -1303,10 +1391,18 @@ namespace Parsing {
         }
 
         public static Parser<string> String(this Parser<MatchRegion> parser) {
-            return 
-                from _1 in parser
-                from _2 in Combinator.Tap((context, position, status) => context.target.Substring(_1.Start.Index, _1.End.Index - _1.Start.Index))
-                select _2;
+            if (parser == null) {
+                throw new ArgumentNullException(nameof(parser));
+            }
+            return (context, position, state) => {
+                var parsed = parser(context, position, state);
+                if (!parsed.Success) {
+                    return Result<string>.Reject();
+                }
+                var region = parsed.Value;
+                var result = context.source.Substring(region.Start.Index, region.End.Index - region.Start.Index);
+                return Result<string>.Accept(result, parsed.Position, parsed.State);
+            };
         }
 
         public static T Tap<T>(this T self, Action<T> pred) {

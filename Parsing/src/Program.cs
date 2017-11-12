@@ -11,13 +11,16 @@ namespace CParser2 {
 
 
     class Program {
+
         static void Main(string[] args) {
+
+
 
 
             foreach (var arg in args) {
                 //using (var reader = new System.IO.StringReader(@"<>=")) {
-                //    var target = new Source("", reader);
-                //    var ret = CParser.symbol(target, Position.Empty, Position.Empty, new CParser.ParserStatus());
+                //    var source = new Source("", reader);
+                //    var ret = CParser.symbol(source, Position.Empty, Position.Empty, new CParser.ParserStatus());
                 //}
                 using (var reader = new StreamReader(arg)) {
                     var sw = new System.Diagnostics.Stopwatch();
@@ -29,8 +32,7 @@ namespace CParser2 {
                         Console.WriteLine($"Position: {succpos}");
                         Console.WriteLine($"FailedPosition: {failpos}");
                         if (status) {
-                            //System.IO.File.WriteAllText("ast.c", new WriterVisitor().Write(result));
-                            //result.Save("ast.xml");
+                            System.IO.File.WriteAllText("ast.c", new WriterVisitor().Write(result));
                         }
                         return result;
                     });
