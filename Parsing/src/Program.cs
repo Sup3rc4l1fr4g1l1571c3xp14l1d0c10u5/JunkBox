@@ -32,11 +32,11 @@ namespace CParser2 {
                         Console.WriteLine($"Position: {succpos}");
                         Console.WriteLine($"FailedPosition: {failpos}");
                         if (status) {
-                            System.IO.File.WriteAllText("ast.c", new WriterVisitor().Write(result));
+                            System.IO.File.WriteAllText("ast.c", new StringWriteVisitor().Write(result));
                         }
                         return result;
                     });
-                    //Console.ReadLine();
+                    Console.ReadLine();
                     return;
 
 

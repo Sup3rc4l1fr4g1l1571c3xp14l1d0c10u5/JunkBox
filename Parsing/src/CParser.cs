@@ -141,9 +141,9 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> new_line =
             Combinator.Trace("new_line",
                 Combinator.Choice(
-                    Combinator.TokenRange("\r\n"),
-                    Combinator.TokenRange("\r"),
-                    Combinator.TokenRange("\n")
+                    Combinator.TokenRegion("\r\n"),
+                    Combinator.TokenRegion("\r"),
+                    Combinator.TokenRegion("\n")
                 )
             );
 
@@ -155,17 +155,17 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> block_comment =
             Combinator.Trace("block_comment",
                 Combinator.Seq(
-                    Combinator.TokenRange("/*"),
-                    Combinator.TokenRange("*/").Not().Then(Combinator.AnyCharRegion()).ManyRange(),
-                    Combinator.TokenRange("*/")
+                    Combinator.TokenRegion("/*"),
+                    Combinator.TokenRegion("*/").Not().Then(Combinator.AnyCharRegion()).ManyRegion(),
+                    Combinator.TokenRegion("*/")
                 )
             );
 
         public static readonly Parser<MatchRegion> line_comment =
             Combinator.Trace("line_comment",
                 Combinator.Seq(
-                    Combinator.TokenRange("//"),
-                    new_line.Not().Then(Combinator.AnyCharRegion()).ManyRange(),
+                    Combinator.TokenRegion("//"),
+                    new_line.Not().Then(Combinator.AnyCharRegion()).ManyRegion(),
                     new_line
                 )
             );
@@ -185,32 +185,32 @@ namespace CParser2 {
 
         public static readonly Parser<MatchRegion> pragma_line_directive =
             Combinator.Trace("pragma_line_directive",
-                    from _1 in directive_space.ManyRange().Then(Combinator.TokenRange("line"))
-                    from _2 in directive_space.ManyRange(1).Then(digits).String()
-                    from _3 in directive_space.ManyRange(1).Then(Combinator.TokenRange("\""))
+                    from _1 in directive_space.ManyRegion().Then(Combinator.TokenRegion("line"))
+                    from _2 in directive_space.ManyRegion(1).Then(digits).String()
+                    from _3 in directive_space.ManyRegion(1).Then(Combinator.TokenRegion("\""))
                     from _4 in
                         Combinator.Choice(
-                            Combinator.TokenRange("\\").Then(Combinator.AnyCharRegion()),
+                            Combinator.TokenRegion("\\").Then(Combinator.AnyCharRegion()),
                             Combinator.AnyCharRegion("\"").Not().Then(Combinator.AnyCharRegion())
-                        ).ManyRange(1).String()
-                    from _5 in Combinator.TokenRange("\"")
-                    from _6 in directive_space.ManyRange().Then(new_line)
+                        ).ManyRegion(1).String()
+                    from _5 in Combinator.TokenRegion("\"")
+                    from _6 in directive_space.ManyRegion().Then(new_line)
                     from _7 in Combinator.Reposition((position) => position.Reposition(_4, int.Parse(_2), 1))
                     select new MatchRegion(_1.Start, _6.End)
             );
 
         public static readonly Parser<MatchRegion> pragma_gccline_directive =
             Combinator.Trace("pragma_gccline_directive",
-                    from _1 in directive_space.ManyRange(1)
+                    from _1 in directive_space.ManyRegion(1)
                     from _2 in digits.String()
-                    from _3 in directive_space.ManyRange(1).Then(Combinator.TokenRange("\""))
+                    from _3 in directive_space.ManyRegion(1).Then(Combinator.TokenRegion("\""))
                     from _4 in
                         Combinator.Choice(
-                            Combinator.TokenRange("\\").Then(Combinator.AnyCharRegion()),
+                            Combinator.TokenRegion("\\").Then(Combinator.AnyCharRegion()),
                             Combinator.AnyCharRegion("\"").Not().Then(Combinator.AnyCharRegion())
-                        ).ManyRange(1).String()
-                    from _5 in Combinator.TokenRange("\"")
-                    from _6 in directive_space.ManyRange().Then(new_line)
+                        ).ManyRegion(1).String()
+                    from _5 in Combinator.TokenRegion("\"")
+                    from _6 in directive_space.ManyRegion().Then(new_line)
                     from _7 in Combinator.Reposition((position) => position.Reposition(_4, int.Parse(_2), 1))
                     select new MatchRegion(_1.Start, _6.End)
             );
@@ -218,20 +218,19 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> pragma_unknowndirective =
             Combinator.Trace("pragma_unknowndirective",
                 Combinator.Seq(
-                    new_line.Not().Then(Combinator.AnyCharRegion()).ManyRange(),
+                    new_line.Not().Then(Combinator.AnyCharRegion()).ManyRegion(),
                     new_line
                 )
             );
 
         public static readonly Parser<MatchRegion> directive =
             Combinator.Trace("directive",
-                from _1 in Combinator.Tap((source, pos, status) => pos.Column)
-                where _1 == 1
+                from _1 in Combinator.Position()
+                where _1.Column == 1
                 from _2 in directive_space.Many().Then(Combinator.Token("#"))
                 from _3 in Combinator.Choice(pragma_line_directive, pragma_gccline_directive, pragma_unknowndirective)
                 select _3
             );
-
 
         public static readonly Parser<MatchRegion> space =
             Combinator.Trace("space",
@@ -245,7 +244,7 @@ namespace CParser2 {
 
         public static readonly Parser<MatchRegion> isspaces =
             Combinator.Trace("isspaces",
-                space.ManyRange()
+                space.ManyRegion()
             ).Memoize();
 
         public static readonly Parser<MatchRegion> identpart_x =
@@ -289,7 +288,7 @@ namespace CParser2 {
 
         public static readonly Parser<MatchRegion> int_size =
             Combinator.Trace("int_size",
-                Combinator.AnyCharRegion("uUlL").ManyRange(1)
+                Combinator.AnyCharRegion("uUlL").ManyRegion(1)
             );
 
         public static readonly Parser<MatchRegion> isint_size =
@@ -308,7 +307,7 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> hex_constant =
             Combinator.Trace("hex_constant",
                 Combinator.Seq(
-                    Combinator.Choice(Combinator.TokenRange("0x"), Combinator.TokenRange("0X")),
+                    Combinator.Choice(Combinator.TokenRegion("0x"), Combinator.TokenRegion("0X")),
                     xdigits,
                     isint_size
                 )
@@ -317,7 +316,7 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> octal_constant =
             Combinator.Trace("octal_constant",
                 Combinator.Seq(
-                    Combinator.TokenRange("0"),
+                    Combinator.TokenRegion("0"),
                     digits,
                     isint_size
                 )
@@ -334,13 +333,13 @@ namespace CParser2 {
         public static readonly Parser<MatchRegion> string_constant =
             Combinator.Trace("string_constant",
                 Combinator.Seq(
-                    Combinator.TokenRange("L").Option(),
-                    Combinator.TokenRange("'"),
+                    Combinator.TokenRegion("L").Option(),
+                    Combinator.TokenRegion("'"),
                     Combinator.Choice(
-                        Combinator.Seq(Combinator.TokenRange("\\"), Combinator.AnyCharRegion()),
+                        Combinator.Seq(Combinator.TokenRegion("\\"), Combinator.AnyCharRegion()),
                         Combinator.AnyCharRegion(@"'").Not().Then(Combinator.AnyCharRegion())
-                    ).ManyRange(1),
-                    Combinator.TokenRange("'")
+                    ).ManyRegion(1),
+                    Combinator.TokenRegion("'")
                 )
             );
 
@@ -355,7 +354,7 @@ namespace CParser2 {
                     ,
                     Combinator.Seq(
                         isdigits,
-                        Combinator.TokenRange("."),
+                        Combinator.TokenRegion("."),
                         digits,
                         isexponent,
                         isfloat_size
@@ -363,7 +362,7 @@ namespace CParser2 {
                     ,
                     Combinator.Seq(
                         digits,
-                        Combinator.TokenRange("."),
+                        Combinator.TokenRegion("."),
                         isdigits,
                         isexponent,
                         isfloat_size
@@ -375,7 +374,7 @@ namespace CParser2 {
             Combinator.Trace("preprocessing_number",
                 Combinator.Seq(
                     Combinator.Seq(
-                        Combinator.TokenRange(".").Option(), 
+                        Combinator.TokenRegion(".").Option(), 
                         digit
                     ),
                     Combinator.Choice(
@@ -383,9 +382,9 @@ namespace CParser2 {
                             Combinator.AnyCharRegion("eEpP"),
                             Combinator.AnyCharRegion("+-")
                         ),
-                        Combinator.TokenRange("."),
+                        Combinator.TokenRegion("."),
                         identpart_xs
-                    ).ManyRange()
+                    ).ManyRegion()
                 )
             );
 
@@ -408,20 +407,22 @@ namespace CParser2 {
                 select _2
             ).Memoize();
 
-        public static readonly Parser<string> string_literal =
+        public static readonly Parser<IReadOnlyList<string>> string_literal =
             Combinator.Trace("string_literal",
                 from _1 in isspaces
-                from _2 in 
-                    Combinator.Seq(
-                        Combinator.TokenRange("L").Option(),
-                        Combinator.TokenRange("\""),
+                from _2 in (
+                    from __1 in Combinator.Seq(
+                        Combinator.TokenRegion("L").Option(),
+                        Combinator.TokenRegion("\""),
                         Combinator.Choice(
-                            Combinator.Seq(Combinator.TokenRange("\\"), Combinator.AnyCharRegion()),
+                            Combinator.Seq(Combinator.TokenRegion("\\"), Combinator.AnyCharRegion()),
                             Combinator.AnyCharRegion("\"").Not().Then(Combinator.AnyCharRegion())
-                        ).ManyRange(),
-                        Combinator.TokenRange("\""),
-                        isspaces
-                    ).ManyRange(1).String()
+                        ).ManyRegion(),
+                        Combinator.TokenRegion("\"")
+                    ).String()
+                    from __2 in isspaces
+                    select __1
+                ).Many(1)
                 from _3 in isspaces
                 select _2
             );
@@ -591,7 +592,7 @@ namespace CParser2 {
                     Combinator.Quote(left_paren, Combinator.Lazy(() => expression), right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.PrimaryExpression.GroupedExpression(x)),
                     Combinator.Quote(left_paren, Combinator.Lazy(() => compound_statement), right_paren).Select(x => (SyntaxNode.Expression)new SyntaxNode.Expression.ErrorExpression(x))
                 )
-            ).Memoize();
+            );
 
         public static readonly Parser<SyntaxNode.Expression> postfix_expression =
             Combinator.Trace("postfix_expression",
@@ -857,7 +858,9 @@ namespace CParser2 {
                     from _1 in declaration_specifiers
                     from _2 in init_declarator_list.Option().Select(x => x ?? new SyntaxNode.InitDeclarator[0])
                     from _3 in semicolon
-                    let  _4 = new SyntaxNode.Declaration(_1, _2)
+                    let _4 = new SyntaxNode.Declaration(_1, _2)
+                    let __5 = new List<Tuple<string, CType>>()
+                    let __6 = _4.init_declarators.Select(x => TypeBuilder.Parse(_4.declaration_specifiers, x.declarator, null, new Scope(Scope.Empty), __5)).ToList()
                     from _5 in Combinator.Action(x => {
                         var ps = (ParserStatus)x;
                         foreach (var item in _4.items) {
@@ -930,19 +933,19 @@ namespace CParser2 {
             Combinator.Trace("type_specifier",
                 Combinator.Choice(
                     Combinator.Choice(
-                        void_keyword,
-                        char_keyword,
-                        short_keyword,
-                        int_keyword,
-                        long_keyword,
-                        float_keyword,
-                        double_keyword,
-                        signed_keyword,
-                        unsigned_keyword,
-                        bool_keyword,
-                        complex_keyword,
-                        imaginary_keyword,
-                        builtin_va_list_keyword
+                        void_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.void_keyword),
+                        char_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.char_keyword),
+                        short_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.short_keyword),
+                        int_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.int_keyword),
+                        long_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.long_keyword),
+                        float_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.float_keyword),
+                        double_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.double_keyword),
+                        signed_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.signed_keyword),
+                        unsigned_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.unsigned_keyword),
+                        bool_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.bool_keyword),
+                        complex_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.complex_keyword),
+                        imaginary_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.imaginary_keyword),
+                        builtin_va_list_keyword.Select(x => SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.builtin_va_list_keyword)
                     ).Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.StandardTypeSpecifier(x)),
                     TYPEDEF_NAME.Select(x => (SyntaxNode.TypeSpecifier)new SyntaxNode.TypeSpecifier.TypedefTypeSpecifier(x)),
                     Combinator.Lazy(() => struct_or_union_specifier).Select(x => x),
@@ -1003,7 +1006,7 @@ namespace CParser2 {
         static ulong anonCounter;
 
         private static string create_anon_tag_name(string _1) {
-            return $"#{_1}_{anonCounter++}";
+            return $"${_1}_{anonCounter++}";
         }
 
         public static readonly Parser<SyntaxNode.TypeSpecifier> struct_or_union_specifier =
@@ -1025,20 +1028,20 @@ namespace CParser2 {
         public static readonly Parser<string> enumerator_name =
             Combinator.Trace("enumerator_name", IDENTIFIER );
 
-        public static readonly Parser<SyntaxNode.Enumerator> enumerator =
+        public static readonly Parser<SyntaxNode.TypeSpecifier.EnumSpecifier.Enumerator> enumerator =
             Combinator.Trace("enumerator",
                 from _1 in enumerator_name
                 from _2 in assign.Then(constant_expression).Option()
-                select new SyntaxNode.Enumerator(_1, _2)
+                select new SyntaxNode.TypeSpecifier.EnumSpecifier.Enumerator(_1, _2)
             );
 
 
-        public static readonly Parser<IReadOnlyList<SyntaxNode.Enumerator>> enumerator_list =
+        public static readonly Parser<IReadOnlyList<SyntaxNode.TypeSpecifier.EnumSpecifier.Enumerator>> enumerator_list =
             Combinator.Trace("enumerator_list",
                 enumerator.Separate(comma, min: 1)
             );
 
-        public static readonly Parser<SyntaxNode.EnumSpecifier> enum_specifier =
+        public static readonly Parser<SyntaxNode.TypeSpecifier.EnumSpecifier> enum_specifier =
             Combinator.Trace("enum_specifier",
                 from _1 in enum_keyword
                 from _2 in Combinator.Choice(
@@ -1048,15 +1051,15 @@ namespace CParser2 {
                         from _6 in enumerator_list
                         from _7 in comma.Option()
                         from _8 in right_brace
-                        select new SyntaxNode.EnumSpecifier(_3, _6, _7 != null, false)
+                        select new SyntaxNode.TypeSpecifier.EnumSpecifier(_3, _6, _7 != null, false)
                     )
-                    select _4 ?? new SyntaxNode.EnumSpecifier(_3, null, false, false)
+                    select _4 ?? new SyntaxNode.TypeSpecifier.EnumSpecifier(_3, null, false, false)
                     ,
                     from _5 in left_brace
                     from _6 in enumerator_list
                     from _7 in comma.Option()
                     from _8 in right_brace
-                    select new SyntaxNode.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
+                    select new SyntaxNode.TypeSpecifier.EnumSpecifier(create_anon_tag_name(_1), _6, _7 != null, true)
                 )
                 select _2
             );
@@ -1650,6 +1653,7 @@ namespace CParser2 {
                     : null
             );
 
+
         public static readonly Parser<SyntaxNode> external_declaration =
             Combinator.Trace("external_declaration",
                 Combinator.Choice(
@@ -1681,4 +1685,5 @@ namespace CParser2 {
             return pred(ret.Success, ret.Value, ret.Position, target.failedPosition);
         }
     }
+
 }

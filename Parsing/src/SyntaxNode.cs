@@ -8,8 +8,8 @@ using System.Xml;
 
 namespace CParser2 {
 
-    public class WriterVisitor {
-        public WriterVisitor() {
+    public class StringWriteVisitor {
+        public StringWriteVisitor() {
 
         }
         public string Write(SyntaxNode node) {
@@ -29,7 +29,7 @@ namespace CParser2 {
             return $"(*{ self.operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression self) {
-            return $"{self.@operator}({ self.operand.Accept<string>(this)})";
+            return $"{self.@operator.ToCString()}({ self.operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.UnaryExpression.SizeofExpression self) {
             return $"sizeof({ self.operand.Accept<string>(this)})";
@@ -44,7 +44,7 @@ namespace CParser2 {
             return self.constant;
         }
         public string Visit(SyntaxNode.Expression.PrimaryExpression.StringLiteralSpecifier self) {
-            return self.literal;
+            return String.Join(" ", self.literal);
         }
         public string Visit(SyntaxNode.Expression.PrimaryExpression.GroupedExpression self) {
             return $"({ self.expression.Accept<string>(this)})";
@@ -68,7 +68,7 @@ namespace CParser2 {
             return $"({ self.operand.Accept<string>(this)}--)";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression self) {
-            return $"(type_name) {{ {string.Join(", ", self.initializers.Select(x => ($"{x.Item1.Accept<string>(this)} = {x.Item2.Accept<string>(this)}")))} }})";
+            return $"({self.type_name.Accept<string>(this)}) {{{Environment.NewLine + string.Join("," + Environment.NewLine, self.initializers.Select(x => ($"{x.Item1.Accept<string>(this)} = {x.Item2.Accept<string>(this)}"))) + Environment.NewLine }}})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression self) {
             return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
@@ -92,19 +92,19 @@ namespace CParser2 {
             return $"({ self.lhs_operand.Accept<string>(this)} & { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.EqualityExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.RelationalExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.ShiftExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.AdditiveExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.ConditionalExpression self) {
             return $"({ self.condition.Accept<string>(this)} ? {self.then_expression.Accept<string>(this)} : { self.else_expression.Accept<string>(this)})";
@@ -124,65 +124,77 @@ namespace CParser2 {
             if (self.items != null) {
                 items.AddRange(self.items.Select(x => x.Accept<string>(this)));
             }
-            return String.Concat(items);
+            return String.Join(Environment.NewLine, items.Select(x => x));
         }
         public string Visit(SyntaxNode.FunctionDeclaration self) {
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};\r\n";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};";
         }
         public string Visit(SyntaxNode.VariableDeclaration self) {
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)};\r\n";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)};";
         }
         public string Visit(SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition self) {
-            var pars = (self.parameterDefinition != null) ? "\r\n" + string.Concat(self.parameterDefinition.Select(x => x.Accept<string>(this) + ";\r\n")) : "";
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}{pars}{self.function_body.Accept<string>(this)}\r\n";
-            //return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}{pars}{self.function_body.Accept<string>(this)}\r\n";
+            var pars = (self.parameterDefinition != null) ? Environment.NewLine + string.Concat(self.parameterDefinition.Select(x => x.Accept<string>(this) + ";" + Environment.NewLine)) : "";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}{pars}{self.function_body.Accept<string>(this)}";
         }
         public string Visit(SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition self) {
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)} {self.function_body.Accept<string>(this)}\r\n";
-            //return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}({string.Join(", ", self.parameterDefinition.Select(x => x.Accept<string>(this)))}) {self.function_body.Accept<string>(this)}\r\n";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)} {self.function_body.Accept<string>(this)}";
         }
         public string Visit(SyntaxNode.Definition.VariableDefinition self) {
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};\r\n";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};";
         }
         public string Visit(SyntaxNode.Definition.ParameterDefinition self) {
             return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}";
         }
         public string Visit(SyntaxNode.TypeDeclaration.TypedefDeclaration self) {
-            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};\r\n";
+            return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};";
         }
+
+        HashSet<SyntaxNode> outputed = new HashSet<SyntaxNode>();
+
         public string Visit(SyntaxNode.TypeDeclaration.StructTypeDeclaration self) {
             var ss = self.struct_specifier;
-            if (ss.struct_declarations != null) {
+            if (ss.struct_declarations != null && !outputed.Contains(self)) {
+                outputed.Add(self);
                 var items = ss.struct_declarations.Select(x => x.Accept<string>(this)).ToList();
-                return $"struct {self.identifier} {{\r\n" + string.Concat(items) + "};\r\n";
+                return $"struct {self.identifier} {{" + Environment.NewLine + string.Concat(items.Select(x => x + Environment.NewLine)) + "};";
             } else {
-                return $"struct {self.identifier};\r\n";
+                return $"struct {self.identifier};";
             }
         }
         public string Visit(SyntaxNode.TypeDeclaration.UnionTypeDeclaration self) {
             var ss = self.union_specifier;
-            if (ss.struct_declarations != null) {
+            if (ss.struct_declarations != null && !outputed.Contains(self)) {
+                outputed.Add(self);
                 var items = ss.struct_declarations.Select(x => x.Accept<string>(this)).ToList();
-                return $"union {self.identifier} {{\r\n" + string.Concat(items) + "};\r\n";
+                return $"union {self.identifier} {{" + Environment.NewLine + string.Concat(items.Select(x => x + Environment.NewLine)) + "};";
             } else {
-                return $"union {self.identifier};\r\n";
+                return $"union {self.identifier};";
             }
         }
         public string Visit(SyntaxNode.TypeDeclaration.EnumTypeDeclaration self) {
             var ss = self.enum_specifier;
-            if (ss.enumerators != null) {
+            if (ss.enumerators != null && !outputed.Contains(self)) {
+                outputed.Add(self);
                 var items = ss.enumerators.Select(x => x.Accept<string>(this)).ToList();
-                return $"enum {self.identifier} {{\r\n" + string.Concat(items) + "};\r\n";
+                return $"enum {self.identifier} {{" + Environment.NewLine + string.Join("," + Environment.NewLine, items) + Environment.NewLine + "};";
             } else {
-                return $"enum {self.identifier};\r\n";
+                return $"enum {self.identifier};";
             }
         }
         public string Visit(SyntaxNode.DeclarationSpecifiers self) {
             List<string> specs = new List<string>();
-            if (self.storage_class_specifier != SyntaxNode.StorageClassSpecifierKind.none) { specs.Add(self.storage_class_specifier.ToString()); }
-            if (self.type_qualifiers != null) { specs.AddRange(self.type_qualifiers.Select(x => x.ToString())); }
-            if (self.type_specifiers != null) { specs.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this))); }
-            if (self.function_specifier != SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none) { specs.Add(self.function_specifier.ToString()); }
+            if (self.storage_class_specifier != SyntaxNode.StorageClassSpecifierKind.none) {
+                specs.Add(self.storage_class_specifier.ToCString());
+            }
+            if (self.type_qualifiers != null) {
+                specs.AddRange(self.type_qualifiers.Select(x => x.ToCString()));
+            }
+            if (self.type_specifiers != null) {
+                specs.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this)));
+            }
+            if (self.function_specifier != SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none) {
+                specs.Add(self.function_specifier.ToCString());
+            }
             return String.Join(" ", specs.Where(x => !string.IsNullOrWhiteSpace(x)));
         }
         public string Visit(SyntaxNode.TypeDeclaration.InitDeclarator self) {
@@ -195,7 +207,7 @@ namespace CParser2 {
             return $"union {self.identifier}";
         }
         public string Visit(SyntaxNode.TypeDeclaration.TypeSpecifier.StandardTypeSpecifier self) {
-            return $"{self.identifier}";
+            return $"{self.Kind.ToCString()}";
         }
         public string Visit(SyntaxNode.TypeDeclaration.TypeSpecifier.TypedefTypeSpecifier self) {
             return $"{self.identifier}";
@@ -203,9 +215,9 @@ namespace CParser2 {
         public string Visit(SyntaxNode.StructDeclaration self) {
             var items = new List<string>();
             if (self.items != null) {
-                items.AddRange(self.items.Select(x => x.Accept<string>(this) + ";\r\n"));
+                items.AddRange(self.items.Select(x => x.Accept<string>(this) + ";"));
             }
-            return String.Concat(items);
+            return String.Join(Environment.NewLine, items);
         }
         public string Visit(SyntaxNode.MemberDeclaration self) {
             return $"{ self.specifier_qualifier_list.Accept<string>(this)} { self.struct_declarator.Accept<string>(this)}";
@@ -213,39 +225,39 @@ namespace CParser2 {
         public string Visit(SyntaxNode.SpecifierQualifierList self) {
             var items = new List<string>();
             if (self.type_qualifiers != null) {
-                items.AddRange(self.type_qualifiers.Select(x => x.ToString()));
+                items.AddRange(self.type_qualifiers.Select(x => x.ToCString()));
             }
             if (self.type_specifiers != null) {
                 items.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this)));
             }
             return String.Join(" ", items);
         }
-        public string Visit(SyntaxNode.StructMemberDeclarator self) {
+        public string Visit(SyntaxNode.StructDeclarator self) {
             if (self.bitfield_expr != null) {
                 return $"{self.declarator.Accept<string>(this)} : {self.bitfield_expr.Accept<string>(this)}";
             } else {
                 return $"{self.declarator.Accept<string>(this)}";
             }
         }
-        public string Visit(SyntaxNode.EnumSpecifier self) {
+        public string Visit(SyntaxNode.TypeSpecifier.EnumSpecifier self) {
             string items = "";
             if (self.enumerators != null) {
-                items = " {\r\n" + String.Concat(self.enumerators.Select(x => x.Accept<string>(this) + ",\r\n")) + "}";
+                items = " {" + Environment.NewLine + String.Concat(self.enumerators.Select(x => x.Accept<string>(this) + "," + Environment.NewLine)) + "}";
             }
             return $"enum {self.identifier}{items};";
         }
-        public string Visit(SyntaxNode.Enumerator self) {
+        public string Visit(SyntaxNode.TypeSpecifier.EnumSpecifier.Enumerator self) {
             return self.identifier + ((self.expression != null) ? " = " + self.expression.Accept<string>(this) : "");
         }
         public string Visit(SyntaxNode.Declarator.GroupedDeclarator self) {
             return $"({self.@base.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Declarator.IdentifierDeclarator self) {
-            var ptr = (self.pointer) != null ? (String.Join(" ", self.pointer) + " ") : "";
+            var ptr = (self.pointer) != null ? (String.Join(" ", self.pointer.Select(x => x.ToCString())) + " ") : "";
             return ptr + self.identifier;
         }
         public string Visit(SyntaxNode.Declarator.ArrayDeclarator self) {
-            var ptr = (self.pointer == null) ? "" : (String.Join(" ", self.pointer) + " ");
+            var ptr = (self.pointer == null) ? "" : (String.Join(" ", self.pointer.Select(x => x.ToCString())) + " ");
             var sz = (self.size_expression == null) ? "" : self.size_expression.Accept<string>(this);
             return $"{ptr}{self.@base.Accept<string>(this)}[{sz}]";
         }
@@ -268,7 +280,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator self) {
             var parts = new List<string>();
             if (self.pointer != null) {
-                parts.AddRange(self.pointer.Select(x => x.ToString()));
+                parts.AddRange(self.pointer.Select(x => x.ToCString()));
             }
             if (self.@base != null) {
                 parts.Add(self.@base.Accept<string>(this));
@@ -276,7 +288,7 @@ namespace CParser2 {
             return string.Join(" ", parts);
         }
         public string Visit(SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator self) {
-            string p = (self.pointer != null) ? (String.Concat(self.pointer)) : "";
+            string p = (self.pointer != null) ? (String.Concat(self.pointer.Select(x => x.ToCString()))) : "";
             string b = self.@base != null ? self.@base.Accept<string>(this) : "";
             return $"({b}{p})";
         }
@@ -290,20 +302,22 @@ namespace CParser2 {
             return $"";
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement self) {
-            return $"default:\r\n" + self.statement.Accept<string>(this);
+            return $"default:" + Environment.NewLine + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement self) {
-            return $"case {self.expression.Accept<string>(this)}:\r\n" + self.statement.Accept<string>(this);
+            return $"case {self.expression.Accept<string>(this)}:" + Environment.NewLine + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.GenericLabeledStatement self) {
-            return $"{self.label}:\r\n" + self.statement.Accept<string>(this);
+            return $"{self.label}:" + Environment.NewLine + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.CompoundStatement self) {
             var items = new List<string>();
             items.Add("{");
-            if (self.block_items != null) { items.AddRange(self.block_items.Select(x => x.Accept<string>(this))); }
+            if (self.block_items != null) {
+                items.AddRange(self.block_items.Select(x => x.Accept<string>(this)));
+            }
             items.Add("}");
-            return String.Join("\r\n", items);
+            return String.Join(Environment.NewLine, items);
         }
         public string Visit(SyntaxNode.Statement.ExpressionStatement self) {
             return self.expression.Accept<string>(this) + ";";
@@ -341,7 +355,7 @@ namespace CParser2 {
             return $"goto {self.identifier};";
         }
         public string Visit(SyntaxNode.TranslationUnit self) {
-            return self.external_declarations != null ? String.Concat(self.external_declarations.Select(x => x.Accept<string>(this))) : "";
+            return self.external_declarations != null ? String.Join(Environment.NewLine, self.external_declarations.Select(x => x.Accept<string>(this))) : "";
         }
         public string Visit(SyntaxNode.TypeName self) {
             var parts = new List<string>();
@@ -360,9 +374,13 @@ namespace CParser2 {
         public string Visit(SyntaxNode.Initializer self) {
             var inits = new List<string>();
             if (self.initializers != null) {
-                inits.AddRange(self.initializers.Select(x => (x.Item1 != null ? x.Item1.Accept<string>(this) + " = " : "") + x.Item2.Accept<string>(this) + ",\r\n"));
+                inits.AddRange(self.initializers.Select(x => (x.Item1 != null ? x.Item1.Accept<string>(this) + " = " : "") + x.Item2.Accept<string>(this)));
+                return inits.Any() ? "{" + Environment.NewLine + String.Join("," + Environment.NewLine, inits) + Environment.NewLine + "}" : "{}";
+            } else if (self.expression != null) {
+                return self.expression.Accept<string>(this);
+            } else {
+                throw new Exception("Either initializer or expression must be specified.");
             }
-            return self.expression.Accept<string>(this) + (inits.Any() ? "{" + String.Concat(inits) + "}" : "");
         }
         public string Visit(SyntaxNode.Initializer.Designator.MemberDesignator self) {
             return "." + self.identifier;
@@ -395,7 +413,7 @@ namespace CParser2 {
                 public class PrefixIncrementExpression : UnaryExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public PrefixIncrementExpression(Expression operand) {
@@ -410,7 +428,7 @@ namespace CParser2 {
                 public class PrefixDecrementExpression : UnaryExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public PrefixDecrementExpression(Expression operand) {
@@ -425,7 +443,7 @@ namespace CParser2 {
                 public class AddressExpression : UnaryExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
 
@@ -441,7 +459,7 @@ namespace CParser2 {
                 public class IndirectionExpression : UnaryExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
 
@@ -464,11 +482,11 @@ namespace CParser2 {
                     }
 
                     public OperatorKind @operator {
-                        get; 
+                        get;
                     }
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public UnaryArithmeticExpression(OperatorKind @operator, Expression operand) {
@@ -484,7 +502,7 @@ namespace CParser2 {
                 public class SizeofExpression : UnaryExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public SizeofExpression(Expression operand) {
@@ -499,7 +517,7 @@ namespace CParser2 {
                 public class SizeofTypeExpression : UnaryExpression {
 
                     public TypeName operand {
-                        get; 
+                        get;
                     }
 
                     public SizeofTypeExpression(TypeName operand) {
@@ -521,7 +539,7 @@ namespace CParser2 {
                 public class ObjectSpecifier : PrimaryExpression {
 
                     public string identifier {
-                        get; 
+                        get;
                     }
 
                     public ObjectSpecifier(string identifier) {
@@ -536,7 +554,7 @@ namespace CParser2 {
                 public class ConstantSpecifier : PrimaryExpression {
 
                     public string constant {
-                        get; 
+                        get;
                     }
 
                     public ConstantSpecifier(string constant) {
@@ -546,15 +564,15 @@ namespace CParser2 {
                 }
 
                 /// <summary>
-                /// 文字定数指定子
+                /// 文字列リテラル指定子
                 /// </summary>
                 public class StringLiteralSpecifier : PrimaryExpression {
 
-                    public string literal {
-                        get; 
+                    public IReadOnlyList<string> literal {
+                        get;
                     }
 
-                    public StringLiteralSpecifier(string literal) {
+                    public StringLiteralSpecifier(IReadOnlyList<string> literal) {
 
                         this.literal = literal;
                     }
@@ -566,7 +584,7 @@ namespace CParser2 {
                 public class GroupedExpression : PrimaryExpression {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     public GroupedExpression(Expression expression) {
@@ -591,14 +609,14 @@ namespace CParser2 {
                     /// 左辺式
                     /// </summary>
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
                     /// 添字式
                     /// </summary>
                     public Expression array_subscript {
-                        get; 
+                        get;
                     }
 
                     public ArraySubscriptExpression(Expression expression, Expression arraySubscript) {
@@ -617,14 +635,14 @@ namespace CParser2 {
                     /// 引数式列
                     /// </summary>
                     public IReadOnlyList<Expression> argument_expression_list {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
                     /// 左辺式
                     /// </summary>
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     public FunctionCallExpression(Expression expression, IReadOnlyList<Expression> argumentExpressionList) {
@@ -643,14 +661,14 @@ namespace CParser2 {
                     /// 左辺式
                     /// </summary>
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
                     /// メンバー名
                     /// </summary>
                     public string identifier {
-                        get; 
+                        get;
                     }
 
                     public MemberAccessByValueExpression(Expression expression, string identifier) {
@@ -669,14 +687,14 @@ namespace CParser2 {
                     /// 左辺式
                     /// </summary>
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
                     /// メンバー名
                     /// </summary>
                     public string identifier {
-                        get; 
+                        get;
                     }
 
                     public MemberAccessByPointerExpression(Expression expression, string identifier) {
@@ -692,7 +710,7 @@ namespace CParser2 {
                 public class PostfixIncrementExpression : PostfixExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public PostfixIncrementExpression(Expression operand) {
@@ -707,7 +725,7 @@ namespace CParser2 {
                 public class PostfixDecrementExpression : PostfixExpression {
 
                     public Expression operand {
-                        get; 
+                        get;
                     }
 
                     public PostfixDecrementExpression(Expression x) {
@@ -725,14 +743,14 @@ namespace CParser2 {
                     /// 型名
                     /// </summary>
                     public TypeName type_name {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
                     /// 初期化式
                     /// </summary>
                     public IReadOnlyList<Tuple<IReadOnlyList<SyntaxNode.Initializer.Designator>, SyntaxNode.Initializer>> initializers {
-                        get; 
+                        get;
                     }
 
                     public CompoundLiteralExpression(TypeName typeName, IReadOnlyList<Tuple<IReadOnlyList<SyntaxNode.Initializer.Designator>, SyntaxNode.Initializer>> initializers) {
@@ -750,10 +768,10 @@ namespace CParser2 {
             public abstract class BinaryExpression : Expression {
 
                 public Expression lhs_operand {
-                    get; 
+                    get;
                 }
                 public Expression rhs_operand {
-                    get; 
+                    get;
                 }
 
                 protected BinaryExpression(Expression lhs_operand, Expression rhs_operand) {
@@ -770,7 +788,9 @@ namespace CParser2 {
                         left_shift_assign, right_shift_assign, binary_and_assign, binary_or_assign, xor_assign
                     }
 
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public CompoundAssignmentExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -839,7 +859,9 @@ namespace CParser2 {
                         equal, not_equal
                     }
 
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public EqualityExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -855,7 +877,9 @@ namespace CParser2 {
                         less_equal, less, greater_equal, greater
                     }
 
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public RelationalExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -869,7 +893,9 @@ namespace CParser2 {
                     public enum OperatorKind {
                         left_shift, right_shift
                     }
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public ShiftExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -884,7 +910,9 @@ namespace CParser2 {
                         add, subtract
                     }
 
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public AdditiveExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -899,7 +927,9 @@ namespace CParser2 {
                         multiply, divide, modulus
                     }
 
-                    public OperatorKind @operator { get; }
+                    public OperatorKind @operator {
+                        get;
+                    }
 
                     public MultiplicativeExpression(OperatorKind op, Expression lhs_operand, Expression rhs_operand) : base(lhs_operand, rhs_operand) {
                         this.@operator = op;
@@ -916,15 +946,15 @@ namespace CParser2 {
                 /// 条件式
                 /// </summary>
                 public Expression condition {
-                    get; 
+                    get;
                 }
 
                 public Expression then_expression {
-                    get; 
+                    get;
                 }
 
                 public Expression else_expression {
-                    get; 
+                    get;
                 }
 
                 public ConditionalExpression(Expression condition, Expression thenExpression, Expression elseExpression) {
@@ -941,7 +971,7 @@ namespace CParser2 {
             public class CommaSeparatedExpression : Expression {
 
                 public IReadOnlyList<Expression> expressions {
-                    get; 
+                    get;
                 }
 
                 public CommaSeparatedExpression(IReadOnlyList<Expression> expressions) {
@@ -959,14 +989,14 @@ namespace CParser2 {
                 /// キャスト対象の式
                 /// </summary>
                 public Expression operand {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
                 /// キャスト先の型
                 /// </summary>
                 public TypeName type_name {
-                    get; 
+                    get;
                 }
 
                 public CastExpression(TypeName typeName, Expression operand) {
@@ -982,7 +1012,7 @@ namespace CParser2 {
             public class ErrorExpression : Expression {
 
                 public Statement statement {
-                    get; 
+                    get;
                 }
 
                 public ErrorExpression(Statement x) {
@@ -1034,21 +1064,21 @@ namespace CParser2 {
             /// 宣言指定子
             /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 初期化子のリスト
             /// </summary>
             public IReadOnlyList<InitDeclarator> init_declarators {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 宣言指定子と初期化子から得られる型宣言・関数宣言・変数宣言・変数定義
             /// </summary>
             public IReadOnlyList<SyntaxNode> items {
-                get; 
+                get;
             }
 
             public Declaration(DeclarationSpecifiers _1, IReadOnlyList<InitDeclarator> _2) {
@@ -1127,7 +1157,7 @@ namespace CParser2 {
             private static List<FunctionDeclaration> build_function_declaration(DeclarationSpecifiers dcl_specs, IReadOnlyList<InitDeclarator> init_dcrs) {
 
                 var func_dcls = new List<FunctionDeclaration>();
-                if (dcl_specs != null && dcl_specs.storage_class_specifier  == StorageClassSpecifierKind.typedef_keyword) {
+                if (dcl_specs != null && dcl_specs.storage_class_specifier == StorageClassSpecifierKind.typedef_keyword) {
 
                     return func_dcls;
                 }
@@ -1247,7 +1277,7 @@ namespace CParser2 {
             /// 列挙型指定子を解析
             /// </summary>
             /// <param name="node"></param>
-            public void Visit(EnumSpecifier node) {
+            public void Visit(TypeSpecifier.EnumSpecifier node) {
 
                 if (node.enumerators != null) {
                     // 列挙型指定子中にメンバ宣言リストがある場合
@@ -1288,14 +1318,14 @@ namespace CParser2 {
             /// 宣言指定子
             /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 初期宣言子
             /// </summary>
             public InitDeclarator init_declarator {
-                get; 
+                get;
             }
 
             /// <summary>
@@ -1324,14 +1354,14 @@ namespace CParser2 {
             /// 宣言指定子
             /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 宣言子
             /// </summary>
             public Declarator declarator {
-                get; 
+                get;
             }
 
             /// <summary>
@@ -1365,7 +1395,7 @@ namespace CParser2 {
             /// 宣言指定子
             /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
@@ -1377,21 +1407,21 @@ namespace CParser2 {
                 /// 宣言子
                 /// </summary>
                 public Declarator declarator {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
                 /// 引数定義のリスト
                 /// </summary>
                 public IReadOnlyList<ParameterDefinition> parameterDefinition {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
                 /// 関数本体
                 /// </summary>
                 public Statement function_body {
-                    get; 
+                    get;
                 }
 
                 protected FunctionDefinition(DeclarationSpecifiers dcl_specs, Declarator dcr, IReadOnlyList<ParameterDefinition> param_defs, Statement compound_stmt) : base(dcl_specs) {
@@ -1402,7 +1432,7 @@ namespace CParser2 {
                 }
 
                 /// <summary>
-                /// K&Rスタイルの関数定義
+                /// K&amp;Rスタイルの関数定義
                 /// </summary>
                 public class KandRFunctionDefinition : FunctionDefinition {
 
@@ -1412,7 +1442,7 @@ namespace CParser2 {
                     }
 
                     /// <summary>
-                    /// K&Rスタイルの引数名リスト部を取得
+                    /// K&amp;Rスタイルの引数名リスト部を取得
                     /// </summary>
                     public IReadOnlyList<string> identifier_list {
 
@@ -1532,10 +1562,16 @@ namespace CParser2 {
                 }
             }
 
+            /// <summary>
+            /// 変数定義
+            /// </summary>
             public class VariableDefinition : Definition {
 
+                /// <summary>
+                /// 初期宣言子
+                /// </summary>
                 public InitDeclarator init_declarator {
-                    get; 
+                    get;
                 }
 
                 public VariableDefinition(DeclarationSpecifiers dcl_specs, InitDeclarator init_dcr) : base(dcl_specs) {
@@ -1543,8 +1579,10 @@ namespace CParser2 {
                     init_declarator = init_dcr;
                 }
 
+                /// <summary>
+                /// 初期宣言子中から変数名を取得
+                /// </summary>
                 public string identifier {
-
                     get {
                         return init_declarator.declarator.identifier;
                     }
@@ -1552,10 +1590,16 @@ namespace CParser2 {
 
             }
 
+            /// <summary>
+            /// 引数定義
+            /// </summary>
             public class ParameterDefinition : Definition {
 
+                /// <summary>
+                /// 宣言子
+                /// </summary>
                 public Declarator declarator {
-                    get; 
+                    get;
                 }
 
                 public ParameterDefinition(DeclarationSpecifiers dcl_specs, Declarator dcr) : base(dcl_specs) {
@@ -1563,6 +1607,9 @@ namespace CParser2 {
                     declarator = dcr;
                 }
 
+                /// <summary>
+                /// 宣言子中から引数名を取得（抽象宣言子の場合は引数名を持たないためnullが戻る）
+                /// </summary>
                 public string identifier {
 
                     get {
@@ -1601,11 +1648,19 @@ namespace CParser2 {
                 /// 宣言指定子
                 /// </summary>
                 public DeclarationSpecifiers declaration_specifiers {
-                    get; 
+                    get;
                 }
+
+                /// <summary>
+                /// 初期宣言子
+                /// </summary>
                 public InitDeclarator init_declarator {
-                    get; 
+                    get;
                 }
+
+                /// <summary>
+                /// 初期宣言子中からtypedef名を取得
+                /// </summary>
                 public override string identifier {
 
                     get {
@@ -1627,6 +1682,9 @@ namespace CParser2 {
             /// </summary>
             public class StructTypeDeclaration : TypeDeclaration {
 
+                /// <summary>
+                /// 構造体型指定子中から構造体タグ名を取得
+                /// </summary>
                 public override string identifier {
                     get {
                         return struct_specifier.identifier;
@@ -1634,13 +1692,25 @@ namespace CParser2 {
                     protected set {
                     }
                 }
+
+                /// <summary>
+                /// 構造体型指定子
+                /// </summary>
                 public TypeSpecifier.StructSpecifier struct_specifier {
-                    get; 
+                    get;
                 }
 
                 public StructTypeDeclaration(TypeSpecifier.StructSpecifier node) {
 
                     struct_specifier = node;
+                }
+
+                public class PseudoStructTypeDeclaration : StructTypeDeclaration {
+
+                    public PseudoStructTypeDeclaration(TypeSpecifier.StructSpecifier node) : base(node) {
+                    }
+                    public void mark_as_referred_by(object tok) {
+                    }
                 }
             }
 
@@ -1649,6 +1719,9 @@ namespace CParser2 {
             /// </summary>
             public class UnionTypeDeclaration : TypeDeclaration {
 
+                /// <summary>
+                /// 共用体型指定子中から共用体タグ名を取得
+                /// </summary>
                 public override string identifier {
                     get {
                         return union_specifier.identifier;
@@ -1656,13 +1729,25 @@ namespace CParser2 {
                     protected set {
                     }
                 }
+
+                /// <summary>
+                /// 共用体型指定子
+                /// </summary>
                 public TypeSpecifier.UnionSpecifier union_specifier {
-                    get; 
+                    get;
                 }
 
                 public UnionTypeDeclaration(TypeSpecifier.UnionSpecifier node) {
 
                     union_specifier = node;
+                }
+
+                public class PseudoUnionTypeDeclaration : UnionTypeDeclaration {
+
+                    public PseudoUnionTypeDeclaration(TypeSpecifier.UnionSpecifier node) : base(node) {
+                    }
+                    public void mark_as_referred_by(object tok) {
+                    }
                 }
             }
 
@@ -1671,19 +1756,45 @@ namespace CParser2 {
             /// </summary>
             public class EnumTypeDeclaration : TypeDeclaration {
 
+                /// <summary>
+                /// 列挙指定子中から共用体タグ名を取得
+                /// </summary>
                 public override string identifier {
                     get {
                         return enum_specifier.identifier;
                     }
-                    protected set { }
-                }
-                public EnumSpecifier enum_specifier {
-                    get; 
+                    protected set {
+                    }
                 }
 
-                public EnumTypeDeclaration(EnumSpecifier node) {
+                /// <summary>
+                /// 列挙指定子
+                /// </summary>
+                public TypeSpecifier.EnumSpecifier enum_specifier {
+                    get;
+                }
+
+                /// <summary>
+                /// 列挙指定子の列挙子リスト
+                /// </summary>
+                /// <param name=""></param>
+                /// <returns></returns>
+                public IReadOnlyList<TypeSpecifier.EnumSpecifier.Enumerator> enumerators {
+                    get {
+                        return enum_specifier.enumerators;
+                    }
+                }
+
+                public EnumTypeDeclaration(TypeSpecifier.EnumSpecifier node) {
 
                     enum_specifier = node;
+                }
+
+                public class PseudoEnumTypeDeclaration : EnumTypeDeclaration {
+                    public PseudoEnumTypeDeclaration(TypeSpecifier.EnumSpecifier node) : base(node) {
+                    }
+                    public void mark_as_referred_by(object tok) {
+                    }
                 }
             }
         }
@@ -1704,14 +1815,14 @@ namespace CParser2 {
             /// 宣言指定子に付随する型指定子のリスト
             /// </summary>
             public List<TypeSpecifier> type_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 宣言指定子に付随する型修飾子のリスト
             /// </summary>
             public List<TypeQualifierKind> type_qualifiers {
-                get; 
+                get;
             }
 
             /// <summary>
@@ -1759,11 +1870,14 @@ namespace CParser2 {
         /// </summary>
         public class InitDeclarator {
 
+            /// <summary>
+            /// 宣言子
+            /// </summary>
             public Declarator declarator {
-                get; 
+                get;
             }
             public Initializer initializer {
-                get; 
+                get;
             }
 
             public InitDeclarator(Declarator _1, Initializer _2) {
@@ -1822,21 +1936,21 @@ namespace CParser2 {
                 /// タグ名
                 /// </summary>
                 public string identifier {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
                 /// 匿名型か否か
                 /// </summary>
                 public bool anonymous {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
                 /// メンバ宣言リスト（nullの場合は不完全型）
                 /// </summary>
                 public IReadOnlyList<StructDeclaration> struct_declarations {
-                    get; 
+                    get;
                 }
 
                 public UnionSpecifier(string identifier, IReadOnlyList<StructDeclaration> struct_declarations, bool anonymous) {
@@ -1852,13 +1966,29 @@ namespace CParser2 {
             /// </summary>
             public class StandardTypeSpecifier : TypeSpecifier {
 
-                public string identifier {
-                    get; 
+                public enum StandardTypeSpecifierKind {
+                    void_keyword,
+                    char_keyword,
+                    short_keyword,
+                    int_keyword,
+                    long_keyword,
+                    float_keyword,
+                    double_keyword,
+                    signed_keyword,
+                    unsigned_keyword,
+                    bool_keyword,
+                    complex_keyword,
+                    imaginary_keyword,
+                    builtin_va_list_keyword
                 }
 
-                public StandardTypeSpecifier(string s) {
+                public StandardTypeSpecifierKind Kind {
+                    get;
+                }
 
-                    identifier = s;
+                public StandardTypeSpecifier(StandardTypeSpecifierKind s) {
+
+                    Kind = s;
                 }
             }
 
@@ -1868,12 +1998,79 @@ namespace CParser2 {
             public class TypedefTypeSpecifier : TypeSpecifier {
 
                 public string identifier {
-                    get; 
+                    get;
                 }
 
                 public TypedefTypeSpecifier(string s) {
 
                     identifier = s;
+                }
+            }
+
+            /// <summary>
+            /// 列挙指定子
+            /// </summary>
+            public class EnumSpecifier : TypeSpecifier {
+                /// <summary>
+                /// タグ名
+                /// </summary>
+                public string identifier {
+                    get;
+                }
+
+                /// <summary>
+                /// 列挙子リスト
+                /// </summary>
+                public IReadOnlyList<Enumerator> enumerators {
+                    get;
+                }
+
+                /// <summary>
+                /// 列挙子リストの末尾のコンマの有無
+                /// </summary>
+                public bool trailing_comma {
+                    get;
+                }
+
+                /// <summary>
+                /// 匿名型か否か
+                /// </summary>
+                public bool anonymous {
+                    get;
+                }
+
+                public EnumSpecifier(string identifier, IReadOnlyList<Enumerator> enumerators, bool trailingComma, bool anonymous) {
+
+                    this.identifier = identifier;
+                    this.enumerators = enumerators;
+                    this.trailing_comma = trailingComma;
+                    this.anonymous = anonymous;
+                }
+
+                /// <summary>
+                /// 列挙子
+                /// </summary>
+                public class Enumerator {
+
+                    /// <summary>
+                    /// 列挙子の名前
+                    /// </summary>
+                    public string identifier {
+                        get;
+                    }
+
+                    /// <summary>
+                    /// 列挙子の値
+                    /// </summary>
+                    public Expression expression {
+                        get;
+                    }
+
+                    public Enumerator(string identifier, Expression expression) {
+
+                        this.identifier = identifier;
+                        this.expression = expression;
+                    }
                 }
             }
         }
@@ -1887,29 +2084,29 @@ namespace CParser2 {
             /// 宣言の型指定子もしくは型修飾子リスト
             /// </summary>
             public SpecifierQualifierList specifier_qualifier_list {
-                get; 
+                get;
             }
             /// <summary>
             /// メンバ宣言子リスト
             /// </summary>
-            public IReadOnlyList<StructMemberDeclarator> struct_member_declarators {
-                get; 
+            public IReadOnlyList<StructDeclarator> struct_member_declarators {
+                get;
             }
             /// <summary>
             /// メンバ宣言リスト
             /// </summary>
             public IReadOnlyList<MemberDeclaration> items {
-                get; 
+                get;
             }
 
-            public StructDeclaration(SpecifierQualifierList _1, IReadOnlyList<StructMemberDeclarator> _2) {
+            public StructDeclaration(SpecifierQualifierList _1, IReadOnlyList<StructDeclarator> _2) {
 
                 specifier_qualifier_list = _1;
                 struct_member_declarators = _2;
                 items = build_items(_1, _2);
             }
 
-            private IReadOnlyList<MemberDeclaration> build_items(SpecifierQualifierList spec_qual_list, IReadOnlyList<StructMemberDeclarator> struct_dcrs) {
+            private IReadOnlyList<MemberDeclaration> build_items(SpecifierQualifierList spec_qual_list, IReadOnlyList<StructDeclarator> struct_dcrs) {
 
                 // FIXME: Must support unnamed bit padding.
 
@@ -1924,29 +2121,24 @@ namespace CParser2 {
         public class MemberDeclaration {
 
             public SpecifierQualifierList specifier_qualifier_list {
-                get; 
+                get;
             }
 
-            public StructMemberDeclarator struct_member_declarator {
-                get; 
+            public StructDeclarator struct_declarator {
+                get;
             }
 
-            // 
-            // public StructMemberDeclarator type { 
-            //    get; 
-            //}
-
-            public MemberDeclaration(SpecifierQualifierList spec_qual_list, StructMemberDeclarator struct_member_dcr) {
+            public MemberDeclaration(SpecifierQualifierList spec_qual_list, StructDeclarator struct_member_dcr) {
 
                 specifier_qualifier_list = spec_qual_list;
-                struct_member_declarator = struct_member_dcr;
+                struct_declarator = struct_member_dcr;
             }
 
             public string identifier() {
 
-                if (struct_member_declarator != null && struct_member_declarator.declarator != null) {
+                if (struct_declarator != null && struct_declarator.declarator != null) {
 
-                    return struct_member_declarator.declarator.identifier;
+                    return struct_declarator.declarator.identifier;
                 }
                 return null;
             }
@@ -1961,13 +2153,13 @@ namespace CParser2 {
             /// 型指定子リスト
             /// </summary>
             public List<TypeSpecifier> type_specifiers {
-                get; 
+                get;
             }
             /// <summary>
             /// 型修飾子リスト
             /// </summary>
             public List<TypeQualifierKind> type_qualifiers {
-                get; 
+                get;
             }
             public SpecifierQualifierList() {
                 type_specifiers = new List<TypeSpecifier>();
@@ -1976,96 +2168,28 @@ namespace CParser2 {
         }
 
         /// <summary>
-        /// 構造体メンバ宣言子
+        /// 構造体宣言子
         /// </summary>
-        public class StructMemberDeclarator : SyntaxNode {
+        public class StructDeclarator : SyntaxNode {
 
             /// <summary>
-            /// 構造体メンバ宣言子に付随する宣言子
+            /// 構造体宣言子に付随する宣言子
             /// </summary>
             public Declarator declarator {
-                get; 
+                get;
             }
 
             /// <summary>
-            /// 構造体メンバのビットフィールドサイズ指定
+            /// 構造体宣言子のビットフィールドサイズ
             /// </summary>
             public Expression bitfield_expr {
-                get; 
+                get;
             }
 
-            public StructMemberDeclarator(Declarator _1, Expression _2) {
+            public StructDeclarator(Declarator _1, Expression _2) {
 
                 declarator = _1;
                 bitfield_expr = _2;
-            }
-        }
-
-
-        /// <summary>
-        /// 列挙指定子
-        /// </summary>
-        public class EnumSpecifier : TypeSpecifier {
-            /// <summary>
-            /// タグ名
-            /// </summary>
-            public string identifier {
-                get; 
-            }
-
-            /// <summary>
-            /// 列挙子リスト
-            /// </summary>
-            public IReadOnlyList<Enumerator> enumerators {
-                get; 
-            }
-
-            /// <summary>
-            /// 列挙子リストの末尾のコンマの有無
-            /// </summary>
-            public bool trailing_comma {
-                get; 
-            }
-
-            /// <summary>
-            /// 匿名型か否か
-            /// </summary>
-            public bool anonymous {
-                get; 
-            }
-
-            public EnumSpecifier(string identifier, IReadOnlyList<Enumerator> enumerators, bool trailingComma, bool anonymous) {
-
-                this.identifier = identifier;
-                this.enumerators = enumerators;
-                this.trailing_comma = trailingComma;
-                this.anonymous = anonymous;
-            }
-        }
-
-        /// <summary>
-        /// 列挙子
-        /// </summary>
-        public class Enumerator {
-
-            /// <summary>
-            /// 列挙子の名前
-            /// </summary>
-            public string identifier {
-                get; 
-            }
-
-            /// <summary>
-            /// 列挙子の値
-            /// </summary>
-            public Expression expression {
-                get; 
-            }
-
-            public Enumerator(string identifier, Expression expression) {
-
-                this.identifier = identifier;
-                this.expression = expression;
             }
         }
 
@@ -2077,7 +2201,7 @@ namespace CParser2 {
             /// 宣言子の修飾対象となる宣言子
             /// </summary>
             public Declarator @base {
-                get; 
+                get;
             }
 
             public bool full {
@@ -2285,7 +2409,7 @@ namespace CParser2 {
                 /// サイズ（要素数）式
                 /// </summary>
                 public Expression size_expression {
-                    get; 
+                    get;
                 }
 
                 /// <summary>
@@ -2389,7 +2513,7 @@ namespace CParser2 {
                 }
 
                 /// <summary>
-                /// K&Rスタイルの関数宣言子
+                /// K&amp;Rスタイルの関数宣言子
                 /// </summary>
                 public class KandRFunctionDeclarator : FunctionDeclarator {
 
@@ -2408,7 +2532,7 @@ namespace CParser2 {
                         get {
                             return @base.innermost_parameter_type_list;
                         }
-                        protected set  {
+                        protected set {
                         }
 
                     }
@@ -2428,7 +2552,7 @@ namespace CParser2 {
                     /// 引数型リスト
                     /// </summary>
                     public ParameterTypeList parameter_type_list {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
@@ -2513,7 +2637,7 @@ namespace CParser2 {
                     /// 引数型リスト
                     /// </summary>
                     public ParameterTypeList parameter_type_list {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
@@ -2567,7 +2691,7 @@ namespace CParser2 {
                     /// サイズ（要素数）式
                     /// </summary>
                     public Expression size_expression {
-                        get; 
+                        get;
                     }
 
                     /// <summary>
@@ -2694,14 +2818,14 @@ namespace CParser2 {
             /// 可変長引数を持つか否か
             /// </summary>
             public bool have_va_list {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 引数宣言のリスト
             /// </summary>
             public IReadOnlyList<ParameterDeclaration> parameters {
-                get; 
+                get;
             }
 
             public ParameterTypeList(IReadOnlyList<ParameterDeclaration> parameters, bool haveVaList) {
@@ -2720,14 +2844,14 @@ namespace CParser2 {
             /// 宣言指定子
             /// </summary>
             public DeclarationSpecifiers declaration_specifiers {
-                get; 
+                get;
             }
 
             /// <summary>
             /// 宣言子
             /// </summary>
             public Declarator declarator {
-                get; 
+                get;
             }
 
             public ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers, Declarator declarator) {
@@ -2737,18 +2861,30 @@ namespace CParser2 {
             }
         }
 
+        /// <summary>
+        /// 文
+        /// </summary>
         public abstract class Statement : SyntaxNode {
 
+            /// <summary>
+            /// エラー文（構文解析器内部専用）
+            /// </summary>
             public class ErrorStatement : Statement {
 
             }
 
+            /// <summary>
+            /// ラベル付き文
+            /// </summary>
             public abstract class LabeledStatement : Statement {
 
+                /// <summary>
+                /// defaultラベル付き文
+                /// </summary>
                 public class DefaultLabeledStatement : LabeledStatement {
 
                     public Statement statement {
-                        get; 
+                        get;
                     }
 
                     public DefaultLabeledStatement(Statement statement) {
@@ -2757,13 +2893,16 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// caseラベル付き文
+                /// </summary>
                 public class CaseLabeledStatement : LabeledStatement {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement statement {
-                        get; 
+                        get;
                     }
 
                     public CaseLabeledStatement(Expression expression, Statement statement) {
@@ -2773,13 +2912,16 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// 一般ラベル付き文
+                /// </summary>
                 public class GenericLabeledStatement : LabeledStatement {
 
                     public string label {
-                        get; 
+                        get;
                     }
                     public Statement statement {
-                        get; 
+                        get;
                     }
 
                     public GenericLabeledStatement(string label, Statement statement) {
@@ -2791,10 +2933,13 @@ namespace CParser2 {
 
             }
 
+            /// <summary>
+            /// 複文
+            /// </summary>
             public class CompoundStatement : Statement {
 
                 public IReadOnlyList<SyntaxNode> block_items {
-                    get; 
+                    get;
                 }
 
                 public CompoundStatement(IReadOnlyList<SyntaxNode> blockItems) {
@@ -2803,10 +2948,13 @@ namespace CParser2 {
                 }
             }
 
+            /// <summary>
+            /// 式文
+            /// </summary>
             public class ExpressionStatement : Statement {
 
                 public Expression expression {
-                    get; 
+                    get;
                 }
 
                 public ExpressionStatement(Expression expression) {
@@ -2815,18 +2963,24 @@ namespace CParser2 {
                 }
             }
 
+            /// <summary>
+            /// 選択文
+            /// </summary>
             public abstract class SelectionStatement : Statement {
 
+                /// <summary>
+                /// if文
+                /// </summary>
                 public class IfStatement : SelectionStatement {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement then_statement {
-                        get; 
+                        get;
                     }
                     public Statement else_statement {
-                        get; 
+                        get;
                     }
 
                     public IfStatement(Expression expression, Statement thenStatement, Statement elseStatement) {
@@ -2837,13 +2991,16 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// switch文
+                /// </summary>
                 public class SwitchStatement : SelectionStatement {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement statement {
-                        get; 
+                        get;
                     }
 
                     public SwitchStatement(Expression expression, Statement statement) {
@@ -2855,21 +3012,27 @@ namespace CParser2 {
 
             }
 
+            /// <summary>
+            /// 反復文
+            /// </summary>
             public abstract class IterationStatement : Statement {
 
+                /// <summary>
+                /// C99形式のfor文
+                /// </summary>
                 public class C99ForStatement : IterationStatement {
 
                     public Declaration declaration {
-                        get; 
+                        get;
                     }
                     public Statement condition_statement {
-                        get; 
+                        get;
                     }
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement body_statement {
-                        get; 
+                        get;
                     }
 
                     public C99ForStatement(Declaration declaration, Statement condition_statement, Expression expression, Statement body_statement) {
@@ -2881,19 +3044,22 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// C89形式のfor文
+                /// </summary>
                 public class ForStatement : IterationStatement {
 
                     public Statement initial_statement {
-                        get; 
+                        get;
                     }
                     public Statement condition_statement {
-                        get; 
+                        get;
                     }
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement body_statement {
-                        get; 
+                        get;
                     }
 
                     public ForStatement(Statement initial_statement, Statement condition_statement, Expression expression, Statement body_statement) {
@@ -2905,13 +3071,16 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// do-while文
+                /// </summary>
                 public class DoStatement : IterationStatement {
 
                     public Statement statement {
-                        get; 
+                        get;
                     }
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     public DoStatement(Statement statement, Expression expression) {
@@ -2921,13 +3090,17 @@ namespace CParser2 {
                     }
                 }
 
+
+                /// <summary>
+                /// while文
+                /// </summary>
                 public class WhileStatement : IterationStatement {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
                     public Statement statement {
-                        get; 
+                        get;
                     }
 
                     public WhileStatement(Expression expression, Statement statement) {
@@ -2940,12 +3113,18 @@ namespace CParser2 {
 
             }
 
+            /// <summary>
+            /// ジャンプ文
+            /// </summary>
             public abstract class JumpStatement : Statement {
 
+                /// <summary>
+                /// return文
+                /// </summary>
                 public class ReturnStatement : JumpStatement {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     public ReturnStatement(Expression expression) {
@@ -2954,18 +3133,27 @@ namespace CParser2 {
                     }
                 }
 
+                /// <summary>
+                /// break文
+                /// </summary>
                 public class BreakStatement : JumpStatement {
 
                 }
 
+                /// <summary>
+                /// continue文
+                /// </summary>
                 public class ContinueStatement : JumpStatement {
 
                 }
 
+                /// <summary>
+                /// goto文
+                /// </summary>
                 public class GotoStatement : JumpStatement {
 
                     public string identifier {
-                        get; 
+                        get;
                     }
 
                     public GotoStatement(string identifier) {
@@ -2977,10 +3165,13 @@ namespace CParser2 {
             }
         }
 
+        /// <summary>
+        /// 翻訳単位
+        /// </summary>
         public class TranslationUnit : SyntaxNode {
 
             public IReadOnlyList<SyntaxNode> external_declarations {
-                get; 
+                get;
             }
 
             public TranslationUnit(IReadOnlyList<SyntaxNode> externalDeclarations) {
@@ -2989,16 +3180,19 @@ namespace CParser2 {
             }
         }
 
+        /// <summary>
+        /// 型名
+        /// </summary>
         public class TypeName : SyntaxNode {
 
             public SpecifierQualifierList specifier_qualifier_list {
-                get; 
+                get;
             }
             public Declarator.AbstractDeclarator abstract_declarator {
-                get; 
+                get;
             }
             public TypeDeclaration type_declaration {
-                get; 
+                get;
             }
 
             public TypeName(SpecifierQualifierList specifierQualifierList, Declarator.AbstractDeclarator abstractDeclarator) {
@@ -3022,27 +3216,49 @@ namespace CParser2 {
             }
         }
 
+        /// <summary>
+        /// 初期化子
+        /// </summary>
         public class Initializer : SyntaxNode {
 
+            /// <summary>
+            /// 指示子を伴わない初期化リテラル
+            /// </summary>
+            /// <remarks>
+            /// expression と initializers は排他
+            /// </remarks>
             public Expression expression {
-                get; 
+                get;
             }
+
+            /// <summary>
+            /// 指示子を伴う初期化リテラル
+            /// </summary>
+            /// <remarks>
+            /// expression と initializers は排他
+            /// </remarks>
             public IReadOnlyList<Tuple<IReadOnlyList<Designator>, Initializer>> initializers {
-                get; 
+                get;
             }
 
             public Initializer(Expression expression, IReadOnlyList<Tuple<IReadOnlyList<Designator>, Initializer>> initializers) {
-
+                System.Diagnostics.Debug.Assert((expression != null && initializers == null) || (expression == null && initializers != null));
                 this.expression = expression;
                 this.initializers = initializers;
             }
 
+            /// <summary>
+            /// 指示子
+            /// </summary>
             public abstract class Designator {
 
+                /// <summary>
+                /// メンバー指示子
+                /// </summary>
                 public class MemberDesignator : Designator {
 
                     public string identifier {
-                        get; 
+                        get;
                     }
 
                     public MemberDesignator(string identifier) {
@@ -3050,10 +3266,14 @@ namespace CParser2 {
                         this.identifier = identifier;
                     }
                 }
+
+                /// <summary>
+                /// インデクス指示子
+                /// </summary>
                 public class IndexDesignator : Designator {
 
                     public Expression expression {
-                        get; 
+                        get;
                     }
 
                     public IndexDesignator(Expression expression) {
@@ -3063,121 +3283,202 @@ namespace CParser2 {
                 }
             }
         }
-
     }
 
     public static class SyntaxNodeExt {
-        public static string ToString(this SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Add: return "+";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Subtract: return "-";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Inverse: return "~";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Negate: return "!";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Add:
+                    return "+";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Subtract:
+                    return "-";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Inverse:
+                    return "~";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Negate:
+                    return "!";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.multiply_assign: return "*=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.divide_assign: return "/=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.modulus_assign: return "%=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.add_assign: return "+=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.subtract_assign: return "-=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.left_shift_assign: return "<<=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.right_shift_assign: return ">>=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_and_assign: return "&=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_or_assign: return "|=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.xor_assign: return "^=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.multiply_assign:
+                    return "*=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.divide_assign:
+                    return "/=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.modulus_assign:
+                    return "%=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.add_assign:
+                    return "+=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.subtract_assign:
+                    return "-=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.left_shift_assign:
+                    return "<<=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.right_shift_assign:
+                    return ">>=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_and_assign:
+                    return "&=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_or_assign:
+                    return "|=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.xor_assign:
+                    return "^=";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.equal: return "==";
-                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.not_equal: return "!=";
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.equal:
+                    return "==";
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.not_equal:
+                    return "!=";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less_equal: return "<=";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less: return "<";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater_equal: return ">=";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater: return ">";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less_equal:
+                    return "<=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less:
+                    return "<";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater_equal:
+                    return ">=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater:
+                    return ">";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.left_shift: return "<<";
-                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.right_shift: return ">>";
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.left_shift:
+                    return "<<";
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.right_shift:
+                    return ">>";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.add: return "+";
-                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.subtract: return "-";
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.add:
+                    return "+";
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.subtract:
+                    return "-";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind self) {
+        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind self) {
             switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.multiply: return "*";
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.divide: return "/";
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.modulus: return "%";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.multiply:
+                    return "*";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.divide:
+                    return "/";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.modulus:
+                    return "%";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.StorageClassSpecifierKind self) {
+        public static string ToCString(this SyntaxNode.StorageClassSpecifierKind self) {
             switch (self) {
-                case SyntaxNode.StorageClassSpecifierKind.none: return "";
-                case SyntaxNode.StorageClassSpecifierKind.typedef_keyword: return "typedef";
-                case SyntaxNode.StorageClassSpecifierKind.extern_keyword: return "extern";
-                case SyntaxNode.StorageClassSpecifierKind.static_keyword: return "static";
-                case SyntaxNode.StorageClassSpecifierKind.auto_keyword: return "auto";
-                case SyntaxNode.StorageClassSpecifierKind.register_keyword: return "register";
+                case SyntaxNode.StorageClassSpecifierKind.none:
+                    return "";
+                case SyntaxNode.StorageClassSpecifierKind.typedef_keyword:
+                    return "typedef";
+                case SyntaxNode.StorageClassSpecifierKind.extern_keyword:
+                    return "extern";
+                case SyntaxNode.StorageClassSpecifierKind.static_keyword:
+                    return "static";
+                case SyntaxNode.StorageClassSpecifierKind.auto_keyword:
+                    return "auto";
+                case SyntaxNode.StorageClassSpecifierKind.register_keyword:
+                    return "register";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.TypeQualifierKind self) {
+        public static string ToCString(this SyntaxNode.TypeQualifierKind self) {
             switch (self) {
-                case SyntaxNode.TypeQualifierKind.none: return "";
-                case SyntaxNode.TypeQualifierKind.const_keyword: return "const";
-                case SyntaxNode.TypeQualifierKind.volatile_keyword: return "volatile";
-                case SyntaxNode.TypeQualifierKind.restrict_keyword: return "restrict";
+                case SyntaxNode.TypeQualifierKind.none:
+                    return "";
+                case SyntaxNode.TypeQualifierKind.const_keyword:
+                    return "const";
+                case SyntaxNode.TypeQualifierKind.volatile_keyword:
+                    return "volatile";
+                case SyntaxNode.TypeQualifierKind.restrict_keyword:
+                    return "restrict";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.TypeQualifierKindWithPointer self) {
+        public static string ToCString(this SyntaxNode.TypeQualifierKindWithPointer self) {
             switch (self) {
-                case SyntaxNode.TypeQualifierKindWithPointer.none: return "";
-                case SyntaxNode.TypeQualifierKindWithPointer.const_keyword: return "const";
-                case SyntaxNode.TypeQualifierKindWithPointer.volatile_keyword: return "volatile";
-                case SyntaxNode.TypeQualifierKindWithPointer.restrict_keyword: return "restrict";
-                case SyntaxNode.TypeQualifierKindWithPointer.pointer_keyword: return "pointer";
+                case SyntaxNode.TypeQualifierKindWithPointer.none:
+                    return "";
+                case SyntaxNode.TypeQualifierKindWithPointer.const_keyword:
+                    return "const";
+                case SyntaxNode.TypeQualifierKindWithPointer.volatile_keyword:
+                    return "volatile";
+                case SyntaxNode.TypeQualifierKindWithPointer.restrict_keyword:
+                    return "restrict";
+                case SyntaxNode.TypeQualifierKindWithPointer.pointer_keyword:
+                    return "*";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-        public static string ToString(this SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind self) {
+        public static string ToCString(this SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind self) {
             switch (self) {
-                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none: return "";
-                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.inline_keyword: return "inline";
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none:
+                    return "";
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.inline_keyword:
+                    return "inline";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(self), self, null);
             }
         }
-    }
+        public static string ToCString(this SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.void_keyword:
+                    return "void";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.char_keyword:
+                    return "char";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.short_keyword:
+                    return "short";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.int_keyword:
+                    return "int";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.long_keyword:
+                    return "long";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.float_keyword:
+                    return "float";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.double_keyword:
+                    return "double";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.signed_keyword:
+                    return "signed";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.unsigned_keyword:
+                    return "unsigned";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.bool_keyword:
+                    return "bool";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.complex_keyword:
+                    return "_Complex";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.imaginary_keyword:
+                    return "_Imaginary";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.builtin_va_list_keyword:
+                    return "__builtin_va_list";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+
+        public static string ToCString(this SyntaxNode self) {
+            return self.Accept<string>(new StringWriteVisitor());
+        }
+        public static string ToCString(this SyntaxNode.TypeSpecifier self) {
+            return self.Accept<string>(new StringWriteVisitor());
+        }    }
 
     public static class VisitorExt {
 

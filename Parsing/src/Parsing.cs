@@ -7,7 +7,12 @@ using System.Linq;
 using System.Text;
 
 namespace Parsing {
+
+    /// <summary>
+    /// 入力ソースを表現するクラス
+    /// </summary>
     public class Source {
+
         /// <summary>
         /// 読み取った入力を格納するバッファ
         /// </summary>
@@ -34,8 +39,7 @@ namespace Parsing {
         /// </summary>
         public string Name {
             get;
-        } // 名前
-
+        }
 
         public Source(string name, TextReader reader) {
             if (name == null) {
@@ -123,13 +127,17 @@ namespace Parsing {
         /// 見かけ上のファイル名
         /// </summary>
         public string FileName {
-            get { return FileNameCache.ElementAtOrDefault(FileNameIndex); }
+            get {
+                return FileNameCache.ElementAtOrDefault(FileNameIndex);
+            }
         }
 
         /// <summary>
         /// ファイル名キャッシュテーブルのID
         /// </summary>
-        private ushort FileNameIndex { get; }
+        private ushort FileNameIndex {
+            get;
+        }
 
         /// <summary>
         /// 直前の一文字
@@ -157,8 +165,9 @@ namespace Parsing {
         }
 
         public override bool Equals(object obj) {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is Position && Equals((Position) obj);
+            if (ReferenceEquals(null, obj))
+                return false;
+            return obj is Position && Equals((Position)obj);
         }
 
         public override int GetHashCode() {
@@ -271,7 +280,9 @@ namespace Parsing {
             public override Position Position {
                 get;
             }
-            public override object State { get; }
+            public override object State {
+                get;
+            }
 
             public override T Value {
                 get;
@@ -280,7 +291,7 @@ namespace Parsing {
         }
 
         public sealed class None : Result<T> {
-            public None() : base() {
+            private None() : base() {
             }
 
             public override bool Success {
@@ -354,12 +365,19 @@ namespace Parsing {
     }
 
     /// <summary>
-    /// パーサ全体のコンテキスト
+    /// パーサが使うグローバルなコンテキスト
     /// </summary>
     public class Context {
+        /// <summary>
+        /// 入力ソース
+        /// </summary>
         public Source source {
             get;
         }
+
+        /// <summary>
+        /// 最も読み進めることができた失敗位置
+        /// </summary>
         public Position failedPosition {
             get; private set;
         }
@@ -369,6 +387,10 @@ namespace Parsing {
             failedPosition = Position.Empty.Reposition(source.Name, 1, 1);
         }
 
+        /// <summary>
+        /// 失敗位置を記録
+        /// </summary>
+        /// <param name="position"></param>
         public void MarkFailed(Position position) {
             if (position.Index > failedPosition.Index) {
                 failedPosition = position;
@@ -377,7 +399,7 @@ namespace Parsing {
     }
 
     /// <summary>
-    ///     パーサを表すデリゲート
+    ///     パーサを表すデリゲート 
     /// </summary>
     /// <typeparam name="T">パース結果型</typeparam>
     /// <param name="context">パーサのコンテキスト</param>
@@ -390,8 +412,12 @@ namespace Parsing {
     /// パーサに合致する範囲を示す型。字句解析で使うとメモリの無駄が減る。
     /// </summary>
     public struct MatchRegion {
-        public Position Start { get; }
-        public Position End { get; }
+        public Position Start {
+            get;
+        }
+        public Position End {
+            get;
+        }
         public MatchRegion(Position start, Position end) {
             Start = start;
             End = end;
@@ -402,7 +428,6 @@ namespace Parsing {
     ///     パーサコンビネータ
     /// </summary>
     public static class Combinator {
-
 
         /// <summary>
         ///     常に成功/失敗する空のパーサ
@@ -441,7 +466,8 @@ namespace Parsing {
                 }
             };
         }
-        public static Parser<MatchRegion> TokenRange(string str) {
+
+        public static Parser<MatchRegion> TokenRegion(string str) {
             if (str == null) {
                 throw new ArgumentNullException(nameof(str));
             }
@@ -513,7 +539,7 @@ namespace Parsing {
         /// <param name="min"></param>
         /// <param name="max"></param>
         /// <returns>パーサ</returns>
-        public static Parser<MatchRegion> ManyRange(this Parser<MatchRegion> parser, int min = -1, int max = -1) {
+        public static Parser<MatchRegion> ManyRegion(this Parser<MatchRegion> parser, int min = -1, int max = -1) {
             if (parser == null) {
                 throw new ArgumentNullException(nameof(parser));
             }
@@ -645,7 +671,7 @@ namespace Parsing {
                         return Result<MatchRegion>.Reject();
                     }
                 }
-                return Result<MatchRegion>.Accept(new MatchRegion(position,currentPosition), currentPosition, currentState);
+                return Result<MatchRegion>.Accept(new MatchRegion(position, currentPosition), currentPosition, currentState);
             };
         }
 
@@ -678,7 +704,7 @@ namespace Parsing {
                     return Result<MatchRegion>.Reject();
                 } else {
                     var newPosition = position.Inc((char)ch);
-                    return Result<MatchRegion>.Accept(new MatchRegion(position,newPosition), newPosition, state);
+                    return Result<MatchRegion>.Accept(new MatchRegion(position, newPosition), newPosition, state);
                 }
             };
         }
@@ -747,7 +773,7 @@ namespace Parsing {
 
                 var currentPosition = position.Index;
 
-                for (; ; ) {
+                for (;;) {
                     var ch = context.source[currentPosition];
                     if (ch == -1 || !dict.Contains((char)ch)) {
                         // 読み取りに失敗
@@ -792,6 +818,7 @@ namespace Parsing {
                 }
             };
         }
+
         public static Parser<MatchRegion> AnyCharRegion(Func<char, bool> pred) {
             if (pred == null) {
                 throw new ArgumentNullException(nameof(pred));
@@ -829,7 +856,7 @@ namespace Parsing {
 
                 var currentPosition = position.Index;
 
-                for (; ; ) {
+                for (;;) {
                     var ch = context.source[currentPosition];
                     if (ch == -1 || !pred((char)ch)) {
                         // 読み取りに失敗
@@ -850,6 +877,7 @@ namespace Parsing {
                 }
             });
         }
+
         /// <summary>
         ///     EOFにマッチするパーサ
         /// </summary>
@@ -869,6 +897,9 @@ namespace Parsing {
             };
         }
 
+        /// <summary>
+        /// メモ化用のキー
+        /// </summary>
         private struct MemoizeKey : IEquatable<MemoizeKey> {
             private readonly int _position;
             private readonly object _state;
@@ -879,8 +910,9 @@ namespace Parsing {
             }
 
             public override bool Equals(object obj) {
-                if (ReferenceEquals(null, obj)) return false;
-                return obj is MemoizeKey && Equals((MemoizeKey) obj);
+                if (ReferenceEquals(null, obj))
+                    return false;
+                return obj is MemoizeKey && Equals((MemoizeKey)obj);
             }
 
             public override int GetHashCode() {
@@ -980,7 +1012,7 @@ namespace Parsing {
                 return ret;
             };
         }
- 
+
         /// <summary>
         ///     パーサをオプションとして扱うパーサを生成する
         /// </summary>
@@ -1035,18 +1067,17 @@ namespace Parsing {
         }
 
         /// <summary>
-        ///     入パーサの状態を覗き見するパーサを生成する（デバッグや入力の位置情報を取得するときに役に立つ）
+        ///     パーサの位置情報を取得する
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="pred"></param>
         /// <returns></returns>
-        public static Parser<T> Tap<T>(Func<Context, Position, object, T> pred) {
+        public static Parser<Position> Position() {
             return (context, position, state) => {
                 if (context?.source == null) {
                     throw new ArgumentNullException(nameof(context.source));
                 }
-                var parsed = pred(context, position, state);
-                return Result<T>.Accept(parsed, position, state);
+                return Result<Position>.Accept(position, position, state);
             };
         }
 
@@ -1189,7 +1220,7 @@ namespace Parsing {
             if (rhs == null) {
                 throw new ArgumentNullException(nameof(rhs));
             }
-            return 
+            return
                 from _1 in self
                 from _2 in rhs
                 select _2;
@@ -1370,7 +1401,7 @@ namespace Parsing {
 
         public static Parser<T> Where<T>(this Parser<T> parser, Func<T, bool> selector) {
             return parser.Filter(selector);
-         }
+        }
 
         public static Parser<T> Where<T>(this Parser<T> parser, Func<T, object, bool> selector) {
             return parser.Filter(selector);
