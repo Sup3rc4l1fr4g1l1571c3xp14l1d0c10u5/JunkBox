@@ -859,8 +859,6 @@ namespace CParser2 {
                     from _2 in init_declarator_list.Option().Select(x => x ?? new SyntaxNode.InitDeclarator[0])
                     from _3 in semicolon
                     let _4 = new SyntaxNode.Declaration(_1, _2)
-                    let __5 = new List<Tuple<string, CType>>()
-                    let __6 = _4.init_declarators.Select(x => TypeBuilder.Parse(_4.declaration_specifiers, x.declarator, null, new Scope(Scope.Empty), __5)).ToList()
                     from _5 in Combinator.Action(x => {
                         var ps = (ParserStatus)x;
                         foreach (var item in _4.items) {
@@ -1668,8 +1666,6 @@ namespace CParser2 {
                 select new SyntaxNode.TranslationUnit(_1)
             );
 
-
-        //end
 
 #endregion
 

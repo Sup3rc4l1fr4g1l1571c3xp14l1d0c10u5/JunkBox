@@ -9,13 +9,201 @@ using System.Xml;
 namespace CParser2 {
 
     public class StringWriteVisitor {
-        public StringWriteVisitor() {
 
-        }
-        public string Write(SyntaxNode node) {
+        private HashSet<SyntaxNode> outputed = new HashSet<SyntaxNode>();
+
+        public StringWriteVisitor() { }
+
+        public string ToString(SyntaxNode node) {
             return node.Accept<string>(this);
         }
 
+        public string Visit(SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Add:
+                    return "+";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Subtract:
+                    return "-";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Inverse:
+                    return "~";
+                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Negate:
+                    return "!";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.multiply_assign:
+                    return "*=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.divide_assign:
+                    return "/=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.modulus_assign:
+                    return "%=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.add_assign:
+                    return "+=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.subtract_assign:
+                    return "-=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.left_shift_assign:
+                    return "<<=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.right_shift_assign:
+                    return ">>=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_and_assign:
+                    return "&=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_or_assign:
+                    return "|=";
+                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.xor_assign:
+                    return "^=";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.equal:
+                    return "==";
+                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.not_equal:
+                    return "!=";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less_equal:
+                    return "<=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less:
+                    return "<";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater_equal:
+                    return ">=";
+                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater:
+                    return ">";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.left_shift:
+                    return "<<";
+                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.right_shift:
+                    return ">>";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.add:
+                    return "+";
+                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.subtract:
+                    return "-";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind self) {
+            switch (self) {
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.multiply:
+                    return "*";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.divide:
+                    return "/";
+                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.modulus:
+                    return "%";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.StorageClassSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.StorageClassSpecifierKind.none:
+                    return "";
+                case SyntaxNode.StorageClassSpecifierKind.typedef_keyword:
+                    return "typedef";
+                case SyntaxNode.StorageClassSpecifierKind.extern_keyword:
+                    return "extern";
+                case SyntaxNode.StorageClassSpecifierKind.static_keyword:
+                    return "static";
+                case SyntaxNode.StorageClassSpecifierKind.auto_keyword:
+                    return "auto";
+                case SyntaxNode.StorageClassSpecifierKind.register_keyword:
+                    return "register";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.TypeQualifierKind self) {
+            switch (self) {
+                case SyntaxNode.TypeQualifierKind.none:
+                    return "";
+                case SyntaxNode.TypeQualifierKind.const_keyword:
+                    return "const";
+                case SyntaxNode.TypeQualifierKind.volatile_keyword:
+                    return "volatile";
+                case SyntaxNode.TypeQualifierKind.restrict_keyword:
+                    return "restrict";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.TypeQualifierKindWithPointer self) {
+            switch (self) {
+                case SyntaxNode.TypeQualifierKindWithPointer.none:
+                    return "";
+                case SyntaxNode.TypeQualifierKindWithPointer.const_keyword:
+                    return "const";
+                case SyntaxNode.TypeQualifierKindWithPointer.volatile_keyword:
+                    return "volatile";
+                case SyntaxNode.TypeQualifierKindWithPointer.restrict_keyword:
+                    return "restrict";
+                case SyntaxNode.TypeQualifierKindWithPointer.pointer_keyword:
+                    return "*";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none:
+                    return "";
+                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.inline_keyword:
+                    return "inline";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
+        public string Visit(SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind self) {
+            switch (self) {
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.void_keyword:
+                    return "void";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.char_keyword:
+                    return "char";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.short_keyword:
+                    return "short";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.int_keyword:
+                    return "int";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.long_keyword:
+                    return "long";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.float_keyword:
+                    return "float";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.double_keyword:
+                    return "double";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.signed_keyword:
+                    return "signed";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.unsigned_keyword:
+                    return "unsigned";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.bool_keyword:
+                    return "bool";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.complex_keyword:
+                    return "_Complex";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.imaginary_keyword:
+                    return "_Imaginary";
+                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.builtin_va_list_keyword:
+                    return "__builtin_va_list";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
+            }
+        }
         public string Visit(SyntaxNode.Expression.UnaryExpression.PrefixIncrementExpression self) {
             return $"(++{ self.operand.Accept<string>(this)})";
         }
@@ -29,7 +217,7 @@ namespace CParser2 {
             return $"(*{ self.operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression self) {
-            return $"{self.@operator.ToCString()}({ self.operand.Accept<string>(this)})";
+            return $"{self.@operator.Accept<string>(this)}({ self.operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.UnaryExpression.SizeofExpression self) {
             return $"sizeof({ self.operand.Accept<string>(this)})";
@@ -68,7 +256,7 @@ namespace CParser2 {
             return $"({ self.operand.Accept<string>(this)}--)";
         }
         public string Visit(SyntaxNode.Expression.PostfixExpression.CompoundLiteralExpression self) {
-            return $"({self.type_name.Accept<string>(this)}) {{{Environment.NewLine + string.Join("," + Environment.NewLine, self.initializers.Select(x => ($"{x.Item1.Accept<string>(this)} = {x.Item2.Accept<string>(this)}"))) + Environment.NewLine }}})";
+            return $"({self.type_name.Accept<string>(this)}) {{{string.Join(", ", self.initializers.Select(x => ($"{x.Item1.Accept<string>(this)} = {x.Item2.Accept<string>(this)}"))) }}})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression self) {
             return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator} { self.rhs_operand.Accept<string>(this)})";
@@ -92,19 +280,19 @@ namespace CParser2 {
             return $"({ self.lhs_operand.Accept<string>(this)} & { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.EqualityExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.Accept<string>(this)} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.RelationalExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.Accept<string>(this)} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.ShiftExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.Accept<string>(this)} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.AdditiveExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.Accept<string>(this)} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression self) {
-            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.ToCString()} { self.rhs_operand.Accept<string>(this)})";
+            return $"({ self.lhs_operand.Accept<string>(this)} {self.@operator.Accept<string>(this)} { self.rhs_operand.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Expression.ConditionalExpression self) {
             return $"({ self.condition.Accept<string>(this)} ? {self.then_expression.Accept<string>(this)} : { self.else_expression.Accept<string>(this)})";
@@ -124,16 +312,17 @@ namespace CParser2 {
             if (self.items != null) {
                 items.AddRange(self.items.Select(x => x.Accept<string>(this)));
             }
-            return String.Join(Environment.NewLine, items.Select(x => x));
+            return String.Concat(items.Select(x => x));
         }
         public string Visit(SyntaxNode.FunctionDeclaration self) {
             return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};";
         }
         public string Visit(SyntaxNode.VariableDeclaration self) {
+            // 
             return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)};";
         }
         public string Visit(SyntaxNode.Definition.FunctionDefinition.KandRFunctionDefinition self) {
-            var pars = (self.parameterDefinition != null) ? Environment.NewLine + string.Concat(self.parameterDefinition.Select(x => x.Accept<string>(this) + ";" + Environment.NewLine)) : "";
+            var pars = (self.parameterDefinition != null) ? string.Concat(self.parameterDefinition.Select(x => x.Accept<string>(this) + "; ")) : "";
             return $"{self.declaration_specifiers.Accept<string>(this)} {self.declarator.Accept<string>(this)}{pars}{self.function_body.Accept<string>(this)}";
         }
         public string Visit(SyntaxNode.Definition.FunctionDefinition.AnsiFunctionDefinition self) {
@@ -148,17 +337,14 @@ namespace CParser2 {
         public string Visit(SyntaxNode.TypeDeclaration.TypedefDeclaration self) {
             return $"{self.declaration_specifiers.Accept<string>(this)} {self.init_declarator.Accept<string>(this)};";
         }
-
-        HashSet<SyntaxNode> outputed = new HashSet<SyntaxNode>();
-
         public string Visit(SyntaxNode.TypeDeclaration.StructTypeDeclaration self) {
             var ss = self.struct_specifier;
             if (ss.struct_declarations != null && !outputed.Contains(self)) {
                 outputed.Add(self);
                 var items = ss.struct_declarations.Select(x => x.Accept<string>(this)).ToList();
-                return $"struct {self.identifier} {{" + Environment.NewLine + string.Concat(items.Select(x => x + Environment.NewLine)) + "};";
+                return $"struct {self.identifier} {{ " + string.Concat(items) + " }; ";
             } else {
-                return $"struct {self.identifier};";
+                return $"struct {self.identifier}; ";
             }
         }
         public string Visit(SyntaxNode.TypeDeclaration.UnionTypeDeclaration self) {
@@ -166,9 +352,9 @@ namespace CParser2 {
             if (ss.struct_declarations != null && !outputed.Contains(self)) {
                 outputed.Add(self);
                 var items = ss.struct_declarations.Select(x => x.Accept<string>(this)).ToList();
-                return $"union {self.identifier} {{" + Environment.NewLine + string.Concat(items.Select(x => x + Environment.NewLine)) + "};";
+                return $"union {self.identifier} {{ " + string.Concat(items) + " }; ";
             } else {
-                return $"union {self.identifier};";
+                return $"union {self.identifier}; ";
             }
         }
         public string Visit(SyntaxNode.TypeDeclaration.EnumTypeDeclaration self) {
@@ -176,24 +362,24 @@ namespace CParser2 {
             if (ss.enumerators != null && !outputed.Contains(self)) {
                 outputed.Add(self);
                 var items = ss.enumerators.Select(x => x.Accept<string>(this)).ToList();
-                return $"enum {self.identifier} {{" + Environment.NewLine + string.Join("," + Environment.NewLine, items) + Environment.NewLine + "};";
+                return $"enum {self.identifier} {{ " + string.Join(", ", items) + " }; ";
             } else {
-                return $"enum {self.identifier};";
+                return $"enum {self.identifier}; ";
             }
         }
         public string Visit(SyntaxNode.DeclarationSpecifiers self) {
             List<string> specs = new List<string>();
             if (self.storage_class_specifier != SyntaxNode.StorageClassSpecifierKind.none) {
-                specs.Add(self.storage_class_specifier.ToCString());
+                specs.Add(self.storage_class_specifier.Accept<string>(this));
             }
             if (self.type_qualifiers != null) {
-                specs.AddRange(self.type_qualifiers.Select(x => x.ToCString()));
+                specs.AddRange(self.type_qualifiers.Select(x => x.Accept<string>(this)));
             }
             if (self.type_specifiers != null) {
                 specs.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this)));
             }
             if (self.function_specifier != SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none) {
-                specs.Add(self.function_specifier.ToCString());
+                specs.Add(self.function_specifier.Accept<string>(this));
             }
             return String.Join(" ", specs.Where(x => !string.IsNullOrWhiteSpace(x)));
         }
@@ -207,7 +393,7 @@ namespace CParser2 {
             return $"union {self.identifier}";
         }
         public string Visit(SyntaxNode.TypeDeclaration.TypeSpecifier.StandardTypeSpecifier self) {
-            return $"{self.Kind.ToCString()}";
+            return $"{self.Kind.Accept<string>(this)}";
         }
         public string Visit(SyntaxNode.TypeDeclaration.TypeSpecifier.TypedefTypeSpecifier self) {
             return $"{self.identifier}";
@@ -217,7 +403,7 @@ namespace CParser2 {
             if (self.items != null) {
                 items.AddRange(self.items.Select(x => x.Accept<string>(this) + ";"));
             }
-            return String.Join(Environment.NewLine, items);
+            return String.Concat(items);
         }
         public string Visit(SyntaxNode.MemberDeclaration self) {
             return $"{ self.specifier_qualifier_list.Accept<string>(this)} { self.struct_declarator.Accept<string>(this)}";
@@ -225,7 +411,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.SpecifierQualifierList self) {
             var items = new List<string>();
             if (self.type_qualifiers != null) {
-                items.AddRange(self.type_qualifiers.Select(x => x.ToCString()));
+                items.AddRange(self.type_qualifiers.Select(x => x.Accept<string>(this)));
             }
             if (self.type_specifiers != null) {
                 items.AddRange(self.type_specifiers.Select(x => x.Accept<string>(this)));
@@ -242,7 +428,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.TypeSpecifier.EnumSpecifier self) {
             string items = "";
             if (self.enumerators != null) {
-                items = " {" + Environment.NewLine + String.Concat(self.enumerators.Select(x => x.Accept<string>(this) + "," + Environment.NewLine)) + "}";
+                items = " { " + String.Join(", ", self.enumerators.Select(x => x.Accept<string>(this))) + "}";
             }
             return $"enum {self.identifier}{items};";
         }
@@ -253,11 +439,11 @@ namespace CParser2 {
             return $"({self.@base.Accept<string>(this)})";
         }
         public string Visit(SyntaxNode.Declarator.IdentifierDeclarator self) {
-            var ptr = (self.pointer) != null ? (String.Join(" ", self.pointer.Select(x => x.ToCString())) + " ") : "";
+            var ptr = (self.pointer) != null ? (String.Join(" ", self.pointer.Select(x => x.Accept<string>(this))) + " ") : "";
             return ptr + self.identifier;
         }
         public string Visit(SyntaxNode.Declarator.ArrayDeclarator self) {
-            var ptr = (self.pointer == null) ? "" : (String.Join(" ", self.pointer.Select(x => x.ToCString())) + " ");
+            var ptr = (self.pointer == null) ? "" : (String.Join(" ", self.pointer.Select(x => x.Accept<string>(this))) + " ");
             var sz = (self.size_expression == null) ? "" : self.size_expression.Accept<string>(this);
             return $"{ptr}{self.@base.Accept<string>(this)}[{sz}]";
         }
@@ -280,7 +466,7 @@ namespace CParser2 {
         public string Visit(SyntaxNode.Declarator.AbstractDeclarator.PointerAbstractDeclarator self) {
             var parts = new List<string>();
             if (self.pointer != null) {
-                parts.AddRange(self.pointer.Select(x => x.ToCString()));
+                parts.AddRange(self.pointer.Select(x => x.Accept<string>(this)));
             }
             if (self.@base != null) {
                 parts.Add(self.@base.Accept<string>(this));
@@ -288,7 +474,7 @@ namespace CParser2 {
             return string.Join(" ", parts);
         }
         public string Visit(SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator self) {
-            string p = (self.pointer != null) ? (String.Concat(self.pointer.Select(x => x.ToCString()))) : "";
+            string p = (self.pointer != null) ? (String.Concat(self.pointer.Select(x => x.Accept<string>(this)))) : "";
             string b = self.@base != null ? self.@base.Accept<string>(this) : "";
             return $"({b}{p})";
         }
@@ -302,13 +488,13 @@ namespace CParser2 {
             return $"";
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.DefaultLabeledStatement self) {
-            return $"default:" + Environment.NewLine + self.statement.Accept<string>(this);
+            return $"default: " + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.CaseLabeledStatement self) {
-            return $"case {self.expression.Accept<string>(this)}:" + Environment.NewLine + self.statement.Accept<string>(this);
+            return $"case {self.expression.Accept<string>(this)}: " +  self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.LabeledStatement.GenericLabeledStatement self) {
-            return $"{self.label}:" + Environment.NewLine + self.statement.Accept<string>(this);
+            return $"{self.label}: " + self.statement.Accept<string>(this);
         }
         public string Visit(SyntaxNode.Statement.CompoundStatement self) {
             var items = new List<string>();
@@ -317,7 +503,7 @@ namespace CParser2 {
                 items.AddRange(self.block_items.Select(x => x.Accept<string>(this)));
             }
             items.Add("}");
-            return String.Join(Environment.NewLine, items);
+            return String.Concat(items);
         }
         public string Visit(SyntaxNode.Statement.ExpressionStatement self) {
             return self.expression.Accept<string>(this) + ";";
@@ -355,7 +541,7 @@ namespace CParser2 {
             return $"goto {self.identifier};";
         }
         public string Visit(SyntaxNode.TranslationUnit self) {
-            return self.external_declarations != null ? String.Join(Environment.NewLine, self.external_declarations.Select(x => x.Accept<string>(this))) : "";
+            return self.external_declarations != null ? String.Concat(self.external_declarations.Select(x => x.Accept<string>(this))) : "";
         }
         public string Visit(SyntaxNode.TypeName self) {
             var parts = new List<string>();
@@ -375,7 +561,7 @@ namespace CParser2 {
             var inits = new List<string>();
             if (self.initializers != null) {
                 inits.AddRange(self.initializers.Select(x => (x.Item1 != null ? x.Item1.Accept<string>(this) + " = " : "") + x.Item2.Accept<string>(this)));
-                return inits.Any() ? "{" + Environment.NewLine + String.Join("," + Environment.NewLine, inits) + Environment.NewLine + "}" : "{}";
+                return inits.Any() ? "{ " + String.Join(", ", inits) + " }" : "{}";
             } else if (self.expression != null) {
                 return self.expression.Accept<string>(this);
             } else {
@@ -391,6 +577,9 @@ namespace CParser2 {
 
     }
 
+    /// <summary>
+    /// 構文木
+    /// </summary>
     public abstract class SyntaxNode {
 
         /// <summary>
@@ -1021,7 +1210,6 @@ namespace CParser2 {
             }
         }
 
-
         /// <summary>
         /// ストレージクラスの種別
         /// </summary>
@@ -1158,14 +1346,11 @@ namespace CParser2 {
 
                 var func_dcls = new List<FunctionDeclaration>();
                 if (dcl_specs != null && dcl_specs.storage_class_specifier == StorageClassSpecifierKind.typedef_keyword) {
-
                     return func_dcls;
                 }
 
                 foreach (var init_dcr in init_dcrs) {
-
                     if (init_dcr.declarator.isfunction()) {
-
                         func_dcls.Add(new FunctionDeclaration(dcl_specs, init_dcr));
                     }
                 }
@@ -1802,7 +1987,7 @@ namespace CParser2 {
         /// <summary>
         /// 宣言指定子
         /// </summary>
-        public class DeclarationSpecifiers {
+        public class DeclarationSpecifiers : SyntaxNode {
 
             /// <summary>
             /// 宣言指定子に付随するストレージクラス
@@ -1868,7 +2053,7 @@ namespace CParser2 {
         /// <summary>
         /// 初期宣言子
         /// </summary>
-        public class InitDeclarator {
+        public class InitDeclarator : SyntaxNode {
 
             /// <summary>
             /// 宣言子
@@ -1890,7 +2075,7 @@ namespace CParser2 {
         /// <summary>
         /// 型指定子
         /// </summary>
-        public abstract class TypeSpecifier {
+        public abstract class TypeSpecifier : SyntaxNode {
 
             /// <summary>
             /// 構造体型指定子
@@ -2076,9 +2261,9 @@ namespace CParser2 {
         }
 
         /// <summary>
-        /// 構造体宣言
+        /// 構造体中の宣言（構造体宣言子リストを持つ、つまり複数の宣言が重なり合っている）
         /// </summary>
-        public class StructDeclaration {
+        public class StructDeclaration : SyntaxNode {
 
             /// <summary>
             /// 宣言の型指定子もしくは型修飾子リスト
@@ -2087,13 +2272,13 @@ namespace CParser2 {
                 get;
             }
             /// <summary>
-            /// メンバ宣言子リスト
+            /// 構造体宣言子リスト
             /// </summary>
             public IReadOnlyList<StructDeclarator> struct_member_declarators {
                 get;
             }
             /// <summary>
-            /// メンバ宣言リスト
+            /// 個々の宣言要素毎に分割したメンバー宣言リスト
             /// </summary>
             public IReadOnlyList<MemberDeclaration> items {
                 get;
@@ -2118,12 +2303,21 @@ namespace CParser2 {
             }
         }
 
-        public class MemberDeclaration {
+        /// <summary>
+        /// 構造体中のメンバー宣言(StructDeclarationを解析して個々の構造体宣言子ごとにバラしたもの)
+        /// </summary>
+        public class MemberDeclaration : SyntaxNode {
 
+            /// <summary>
+            /// 宣言の型指定子もしくは型修飾子リスト
+            /// </summary>
             public SpecifierQualifierList specifier_qualifier_list {
                 get;
             }
 
+            /// <summary>
+            /// 構造体宣言子
+            /// </summary>
             public StructDeclarator struct_declarator {
                 get;
             }
@@ -2148,7 +2342,7 @@ namespace CParser2 {
         /// <summary>
         /// 型指定子と型修飾子のリスト
         /// </summary>
-        public class SpecifierQualifierList {
+        public class SpecifierQualifierList : SyntaxNode {
             /// <summary>
             /// 型指定子リスト
             /// </summary>
@@ -2194,9 +2388,9 @@ namespace CParser2 {
         }
 
         /// <summary>
-        /// 宣言子
+        /// 宣言子(ただ一つの識別子を含む)
         /// </summary>
-        public abstract class Declarator {
+        public abstract class Declarator : SyntaxNode {
             /// <summary>
             /// 宣言子の修飾対象となる宣言子
             /// </summary>
@@ -2209,35 +2403,35 @@ namespace CParser2 {
             }
 
             /// <summary>
-            /// 宣言子に付随するポインタを含む型修飾子のリスト
+            /// この宣言子を修飾するポインタを含む型修飾子のリスト
             /// </summary>
             public IReadOnlyList<TypeQualifierKindWithPointer> pointer {
                 get; set;
             }
 
             /// <summary>
-            /// 宣言子に付随する識別子
+            /// 宣言子中に存在する識別子（宣言子が抽象宣言子の場合はnull）
             /// </summary>
             public abstract string identifier {
                 get; protected set;
             }
 
             /// <summary>
-            /// 宣言子に付随する識別子リスト
+            /// （宣言子にK&Rスタイルの関数宣言が含まれている場合のみ）引数名リストを示す識別子リスト
             /// </summary>
             public abstract IReadOnlyList<string> identifier_list {
                 get; protected set;
             }
 
             /// <summary>
-            /// 宣言子が関数であるか判定
+            /// 宣言子が関数宣言であるか判定
             /// </summary>
             /// <param name="stack"></param>
             /// <returns></returns>
             public abstract bool isfunction(Stack<string> stack = null);
 
             /// <summary>
-            /// 宣言子に付随する最も内側にある引数型リスト
+            /// （宣言子にANSIスタイルの関数宣言が含まれている場合のみ）宣言子中の引数宣言リスト
             /// </summary>
             public abstract ParameterTypeList innermost_parameter_type_list {
                 get; protected set;
@@ -2254,7 +2448,7 @@ namespace CParser2 {
             }
 
             /// <summary>
-            ///  宣言子が変数である（＝関数ではない）か判定
+            ///  宣言子が変数宣言である（＝関数宣言ではない）か判定
             /// </summary>
             public bool isvariable {
                 get {
@@ -2479,7 +2673,7 @@ namespace CParser2 {
                 }
 
                 /// <summary>
-                /// 曖昧な関数宣言子
+                /// 引数列が空な関数宣言子（曖昧な宣言子）
                 /// </summary>
                 public class AbbreviatedFunctionDeclarator : FunctionDeclarator {
 
@@ -2596,7 +2790,7 @@ namespace CParser2 {
                 /// <summary>
                 /// 宣言子に付随する識別子（null固定）
                 /// </summary>
-                public override string identifier {
+                public sealed override string identifier {
                     get {
                         return null;
                     }
@@ -2608,7 +2802,7 @@ namespace CParser2 {
                 /// <summary>
                 /// 宣言子が抽象宣言子か判定（true固定）
                 /// </summary>
-                public override bool isabstract {
+                public sealed override bool isabstract {
 
                     get {
                         return true;
@@ -3285,206 +3479,11 @@ namespace CParser2 {
         }
     }
 
-    public static class SyntaxNodeExt {
-        public static string ToCString(this SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Add:
-                    return "+";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Subtract:
-                    return "-";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Inverse:
-                    return "~";
-                case SyntaxNode.Expression.UnaryExpression.UnaryArithmeticExpression.OperatorKind.Negate:
-                    return "!";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.multiply_assign:
-                    return "*=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.divide_assign:
-                    return "/=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.modulus_assign:
-                    return "%=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.add_assign:
-                    return "+=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.subtract_assign:
-                    return "-=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.left_shift_assign:
-                    return "<<=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.right_shift_assign:
-                    return ">>=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_and_assign:
-                    return "&=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.binary_or_assign:
-                    return "|=";
-                case SyntaxNode.Expression.BinaryExpression.CompoundAssignmentExpression.OperatorKind.xor_assign:
-                    return "^=";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.equal:
-                    return "==";
-                case SyntaxNode.Expression.BinaryExpression.EqualityExpression.OperatorKind.not_equal:
-                    return "!=";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less_equal:
-                    return "<=";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.less:
-                    return "<";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater_equal:
-                    return ">=";
-                case SyntaxNode.Expression.BinaryExpression.RelationalExpression.OperatorKind.greater:
-                    return ">";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.left_shift:
-                    return "<<";
-                case SyntaxNode.Expression.BinaryExpression.ShiftExpression.OperatorKind.right_shift:
-                    return ">>";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.add:
-                    return "+";
-                case SyntaxNode.Expression.BinaryExpression.AdditiveExpression.OperatorKind.subtract:
-                    return "-";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind self) {
-            switch (self) {
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.multiply:
-                    return "*";
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.divide:
-                    return "/";
-                case SyntaxNode.Expression.BinaryExpression.MultiplicativeExpression.OperatorKind.modulus:
-                    return "%";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.StorageClassSpecifierKind self) {
-            switch (self) {
-                case SyntaxNode.StorageClassSpecifierKind.none:
-                    return "";
-                case SyntaxNode.StorageClassSpecifierKind.typedef_keyword:
-                    return "typedef";
-                case SyntaxNode.StorageClassSpecifierKind.extern_keyword:
-                    return "extern";
-                case SyntaxNode.StorageClassSpecifierKind.static_keyword:
-                    return "static";
-                case SyntaxNode.StorageClassSpecifierKind.auto_keyword:
-                    return "auto";
-                case SyntaxNode.StorageClassSpecifierKind.register_keyword:
-                    return "register";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.TypeQualifierKind self) {
-            switch (self) {
-                case SyntaxNode.TypeQualifierKind.none:
-                    return "";
-                case SyntaxNode.TypeQualifierKind.const_keyword:
-                    return "const";
-                case SyntaxNode.TypeQualifierKind.volatile_keyword:
-                    return "volatile";
-                case SyntaxNode.TypeQualifierKind.restrict_keyword:
-                    return "restrict";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.TypeQualifierKindWithPointer self) {
-            switch (self) {
-                case SyntaxNode.TypeQualifierKindWithPointer.none:
-                    return "";
-                case SyntaxNode.TypeQualifierKindWithPointer.const_keyword:
-                    return "const";
-                case SyntaxNode.TypeQualifierKindWithPointer.volatile_keyword:
-                    return "volatile";
-                case SyntaxNode.TypeQualifierKindWithPointer.restrict_keyword:
-                    return "restrict";
-                case SyntaxNode.TypeQualifierKindWithPointer.pointer_keyword:
-                    return "*";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind self) {
-            switch (self) {
-                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.none:
-                    return "";
-                case SyntaxNode.DeclarationSpecifiers.FuntionSpecifierKind.inline_keyword:
-                    return "inline";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-        public static string ToCString(this SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind self) {
-            switch (self) {
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.void_keyword:
-                    return "void";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.char_keyword:
-                    return "char";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.short_keyword:
-                    return "short";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.int_keyword:
-                    return "int";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.long_keyword:
-                    return "long";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.float_keyword:
-                    return "float";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.double_keyword:
-                    return "double";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.signed_keyword:
-                    return "signed";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.unsigned_keyword:
-                    return "unsigned";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.bool_keyword:
-                    return "bool";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.complex_keyword:
-                    return "_Complex";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.imaginary_keyword:
-                    return "_Imaginary";
-                case SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.builtin_va_list_keyword:
-                    return "__builtin_va_list";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(self), self, null);
-            }
-        }
-
-        public static string ToCString(this SyntaxNode self) {
-            return self.Accept<string>(new StringWriteVisitor());
-        }
-        public static string ToCString(this SyntaxNode.TypeSpecifier self) {
-            return self.Accept<string>(new StringWriteVisitor());
-        }    }
-
     public static class VisitorExt {
 
         private static Dictionary<Tuple<int, Type, Type>, MethodInfo> Memoise = new Dictionary<Tuple<int, Type, Type>, MethodInfo>();
 
-        public static void Accept(this object self, object visitor) {
+        public static void Accept(this object self, object visitor, params object[] args) {
             if (self == null) {
                 return;
             }
@@ -3505,9 +3504,9 @@ namespace CParser2 {
                         return false;
                     }
 
-                    // 引数は1個？
+                    // 引数はargs+1と同じ個数？
                     var parameters = x.GetParameters();
-                    if (parameters.Length != 1) {
+                    if (parameters.Length != args.Length + 1) {
                         return false;
                     }
 
@@ -3516,19 +3515,24 @@ namespace CParser2 {
                         return false;
                     }
 
+                    // 第2引数以降はargsと同じ型？
+                    if (parameters.Skip(1).Zip(args, (y, z) => y.ParameterType.Equals(z.GetType())).All(y => y) == false) {
+                        return false;
+                    }
+
                     return true;
                 }).ToArray();
 
                 if (visitorMethods.Length == 0) {
-                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Action<{self.GetType().ToString()}>型の メソッド Visit が実装されていません。");
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Action<{string.Join(", ", new[] { self.GetType().ToString() }.Concat(args.Select(x => x.GetType().ToString())))}> 型の メソッド Visit が実装されていません。");
                 } else if (visitorMethods.Length >= 2) {
-                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Action<{self.GetType().ToString()}>型の メソッド Visit が２個以上実装されています。");
+                    throw new MissingMethodException($"型 {visitor.GetType().ToString()} には Action<{string.Join(", ", new[] { self.GetType().ToString() }.Concat(args.Select(x => x.GetType().ToString())))}>型の メソッド Visit が２個以上実装されています。");
                 }
 
                 visitMethod = visitorMethods.First();
                 Memoise[memoKey] = visitMethod;
             }
-            visitMethod.Invoke(visitor, new object[] { self });
+            visitMethod.Invoke(visitor, new object[] { self }.Concat(args).ToArray());
         }
 
         public static TResult Accept<TResult, TArgument>(this object self, object visitor, TArgument arg) {

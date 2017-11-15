@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,7 +9,7 @@ namespace CParser2 {
     public abstract class CType {
         public List<SyntaxNode.TypeQualifierKind> type_qualifier {
             get;
-        }
+        } = new List<SyntaxNode.TypeQualifierKind>();
 
         /// <summary>
         /// 型解析時にエラーとなったことを示す型
@@ -121,11 +121,11 @@ namespace CParser2 {
             /// 共用体型
             /// </summary>
             public class UnionType : TaggedType {
-                public List<Tuple<string, CType, int>> members {
+                public List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>> members {
                     get; set;
                 }
 
-                public UnionType(string tag, bool anonymous, List<Tuple<string, CType, int>> members) : base(tag, anonymous) {
+                public UnionType(string tag, bool anonymous, List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>> members) : base(tag, anonymous) {
                     this.members = members;
                 }
             }
@@ -134,11 +134,11 @@ namespace CParser2 {
             /// 構造体型
             /// </summary>
             public class StructType : TaggedType {
-                public List<Tuple<string, CType, int>> members {
+                public List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>> members {
                     get; set;
                 }
 
-                public StructType(string tag, bool anonymous, List<Tuple<string, CType, int>> members) : base(tag, anonymous) {
+                public StructType(string tag, bool anonymous, List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>> members) : base(tag, anonymous) {
                     this.members = members;
                 }
             }
@@ -168,11 +168,11 @@ namespace CParser2 {
         }
 
         public class FunctionType : CType {
-            public List<Tuple<string, CType>> args{ get; }
+            public List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>> args{ get; }
             public CType ty{ get; }
             public bool KAndR { get; }
 
-            public FunctionType(List<Tuple<string, CType>> args, CType ty, bool KAndR) {
+            public FunctionType(List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>> args, CType ty, bool KAndR) {
                 this.args = args;
                 this.ty = ty;
                 this.KAndR = KAndR;
@@ -189,7 +189,7 @@ namespace CParser2 {
             SyntaxNode.Declarator declarator,
             IReadOnlyList<SyntaxNode.Declaration> declaration_list,
             Scope currentScope,
-            List<Tuple<string, CType>> entry
+            List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>> entry
         ) {
             var ret = Parse(
                 declaration_specifiers.type_specifiers,
@@ -213,21 +213,22 @@ namespace CParser2 {
             SyntaxNode.Declarator declarator, 
             IReadOnlyList<SyntaxNode.Declaration> declaration_list, 
             Scope currentScope,
-            List<Tuple<string, CType>> entry
+            List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>> entry
         ) {
             // 宣言指定子を解析して型を取得
             var basetype = ParseTypeSpecifiers(type_specifiers, currentScope);
 
             // 型修飾子を適用
             var type_qualifier = type_qualifiers.Distinct().OrderBy(x => x).ToArray();
-            basetype.type_qualifier?.AddRange(type_qualifier);
+            basetype.type_qualifier.AddRange(type_qualifier);
 
             // basetypeを使って宣言子を解析して型を構築
-            var ret = ParseDeclarator(basetype, declarator, declaration_list, currentScope, entry);
+            var symbollist = new List<Tuple<string, CType >>();
+            var ret = ParseDeclarator(basetype, declarator, declaration_list, currentScope, symbollist);
 
-            //foreach (var e in entry) {
-            //    e.storage_class_specifier = storage_class_specifier;
-            //}
+            // ストレージクラスは名前に適用する
+            entry.AddRange(symbollist.Select(x => Tuple.Create(x.Item1, x.Item2, storage_class_specifier)));
+
             return ret;
         }
 
@@ -250,7 +251,7 @@ namespace CParser2 {
             // 解析スタックを評価して型を導出
             var rettype = parseActionStack.Aggregate(basetype, (s, x) => x(s, ret));
 
-            // declaration_listが存在する場合、K&Rスタイルの宣言
+            // declaration_listが存在する場合、関数宣言はK&Rスタイルの可能性がある
             if (declaration_list != null) {
                 var ft = rettype as CType.FunctionType;
                 if (ft == null) {
@@ -260,21 +261,24 @@ namespace CParser2 {
                     return new CType.InvalidType("K&R関数形式ではない");
                 }
 
-                // declaration_listから引数宣言リストを構築
-                var argdecls = new List<Tuple<string, CType>>();
+                // declaration_listから宣言リストを構築
+                var argdecls = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 foreach (var decl in declaration_list) {
                     foreach (var initdecl in decl.init_declarators) {
                         Parse(decl.declaration_specifiers, initdecl.declarator, new SyntaxNode.Declaration[0], currentScope, argdecls);
                     }
                 }
+                // 宣言リストと引数リストをマージする
                 var list = ft.args.Select(x => {
                     var entry = argdecls.FirstOrDefault(y => y.Item1 == x.Item1);
                     if (entry != null) {
                         return entry;
                     } else {
-                        return Tuple.Create(x.Item1, (CType)new CType.StandardType((CType.StandardType.TypeBit)0));
+                        return Tuple.Create(x.Item1, (CType)new CType.StandardType((CType.StandardType.TypeBit)0), SyntaxNode.StorageClassSpecifierKind.none);
                     }
                 }).ToList();
+
+                // マージした結果で引数リストを置き換える
                 ft.args.Clear();
                 ft.args.AddRange(list);
             }
@@ -300,16 +304,21 @@ namespace CParser2 {
         }
         private static void ParseDeclaratorInner(Stack<Func<CType, List<Tuple<string, CType>>, CType>> parseActionStack, SyntaxNode.Declarator declarator, Scope currentScope) {
             if (declarator is SyntaxNode.Declarator.GroupedDeclarator) {
+                // GroupedDeclarator は結合を示すだけなので中のDeclaratorを解析する
                 var decl = (SyntaxNode.Declarator.GroupedDeclarator)declarator;
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 return;
             }
+
             if (declarator is SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator) {
+                // GroupedAbstractDeclarator は GroupedDeclarator と同じ
                 var decl = (SyntaxNode.Declarator.AbstractDeclarator.GroupedAbstractDeclarator)declarator;
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 return;
             }
+
             if (declarator is SyntaxNode.Declarator.IdentifierDeclarator) {
+                // IdentifierDeclarator は 識別子なので名前表retに宣言identifier=tyとして登録する
                 var decl = (SyntaxNode.Declarator.IdentifierDeclarator)declarator;
                 parseActionStack.Push((ty, ret) => {
                     ty = ParseDeclaratorApplyTypeQualifierKindWithPointer(decl.pointer, ty);
@@ -318,6 +327,8 @@ namespace CParser2 {
                 });
                 return;
             }
+
+
             if (declarator is SyntaxNode.Declarator.ArrayDeclarator) {
                 var decl = (SyntaxNode.Declarator.ArrayDeclarator)declarator;
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
@@ -341,12 +352,13 @@ namespace CParser2 {
 
             if (declarator is SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator) {
                 var decl = (SyntaxNode.Declarator.FunctionDeclarator.AnsiFunctionDeclarator)declarator;
-                var args = new List<Tuple<string, CType>>();
+                var args = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 foreach (var parameter_decl in decl.parameter_type_list.parameters) {
-                    var names = new List<Tuple<string, CType>>();
+                    var names = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                     var ty = Parse(parameter_decl.declaration_specifiers, parameter_decl.declarator, new SyntaxNode.Declaration[0], currentScope, names);
                     var name = (names.Any()) ? names.First().Item1 : "";
-                    args.Add(Tuple.Create(name, ty));
+                    var sc = (names.Any()) ? names.First().Item3 : SyntaxNode.StorageClassSpecifierKind.none;
+                    args.Add(Tuple.Create(name, ty, sc));
                 }
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 parseActionStack.Push((ty, ret) => {
@@ -358,12 +370,13 @@ namespace CParser2 {
             }
             if (declarator is SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator) {
                 var decl = (SyntaxNode.Declarator.AbstractDeclarator.FunctionAbstractDeclarator)declarator;
-                var args = new List<Tuple<string, CType>>();
+                var args = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 foreach (var parameter_decl in decl.parameter_type_list.parameters) {
-                    var names = new List<Tuple<string, CType>>();
+                    var names = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                     var ty = Parse(parameter_decl.declaration_specifiers, parameter_decl.declarator, new SyntaxNode.Declaration[0], currentScope, names);
                     var name = (names.Any()) ? names.First().Item1 : "";
-                    args.Add(Tuple.Create(name, ty));
+                    var sc = (names.Any()) ? names.First().Item3 : SyntaxNode.StorageClassSpecifierKind.none;
+                    args.Add(Tuple.Create(name, ty, sc));
                 }
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 parseActionStack.Push((ty, ret) => {
@@ -375,9 +388,9 @@ namespace CParser2 {
             }
             if (declarator is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator) {
                 var decl = (SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)declarator;
-                var args = new List<Tuple<string, CType>>();
+                var args = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 foreach (var parameter_ident in decl.identifier_list) {
-                    args.Add(Tuple.Create(parameter_ident, (CType)null));
+                    args.Add(Tuple.Create(parameter_ident, (CType)null, SyntaxNode.StorageClassSpecifierKind.none));
                 }
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 parseActionStack.Push((ty, ret) => {
@@ -389,13 +402,13 @@ namespace CParser2 {
             }
             if (declarator is SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator) {
                 var decl = (SyntaxNode.Declarator.FunctionDeclarator.KandRFunctionDeclarator)declarator;
-                var args = new List<Tuple<string, CType>>();
+                var args = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 foreach (var parameter_ident in decl.identifier_list) {
-                    args.Add(Tuple.Create(parameter_ident, (CType)null));
+                    args.Add(Tuple.Create(parameter_ident, (CType)null, SyntaxNode.StorageClassSpecifierKind.none));
                 }
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 parseActionStack.Push((ty, ret) => {
-                    ty = new CType.FunctionType(args, ty, true);
+                    ty = new CType.FunctionType(args, ty, false);
                     ty = ParseDeclaratorApplyTypeQualifierKindWithPointer(decl.pointer, ty);
                     return ty;
                 });
@@ -403,7 +416,7 @@ namespace CParser2 {
             }
             if (declarator is SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator) {
                 var decl = (SyntaxNode.Declarator.FunctionDeclarator.AbbreviatedFunctionDeclarator)declarator;
-                var args = new List<Tuple<string, CType>>();
+                var args = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                 ParseDeclaratorInner(parseActionStack, decl.@base, currentScope);
                 parseActionStack.Push((ty, ret) => {
                     ty = new CType.FunctionType(args, ty, false);
@@ -445,7 +458,7 @@ namespace CParser2 {
 
             // 基本型指定子の場合は基本型の並びと見なして解析
             if (type_specifier_fst is SyntaxNode.TypeSpecifier.StandardTypeSpecifier) {
-                return ParseStandardSpecifier(type_specifiers);
+                return ParseStandardSpecifier(type_specifiers, currentScope);
             }
 
             // 構造体型指定子の場合は構造体型と見なして解析
@@ -481,20 +494,11 @@ namespace CParser2 {
                 var ts = type_specifier_fst as SyntaxNode.TypeSpecifier.TypedefTypeSpecifier;
 
                 // 名前表から識別子を探す
-                var identifier = currentScope.FindIdentifier(ts.identifier);
-                if (identifier == null) {
-                    return new CType.UndefinedType("未宣言の型");
-                }
-
-                // 識別子が型を示しているかチェック
-                if (!(identifier is Scope.IdentifierValue.Type)) {
-                    return new CType.UndefinedType("識別子は型でない");
-                }
-                var ty = (identifier as Scope.IdentifierValue.Type).type;
+                var ty = ResolvTypedef(ts, currentScope);
 
                 // 登録されている識別子が基本型の場合は基本型の処理に丸投げ
                 if (ty is CType.StandardType) {
-                    return ParseStandardSpecifier(type_specifiers);
+                    return ParseStandardSpecifier(type_specifiers,currentScope);
                 }
 
                 // それ以外の型の場合は複合型と見なす
@@ -507,6 +511,20 @@ namespace CParser2 {
 
             // ここには来ないはず
             return new CType.InvalidType("解釈不能な型");
+        }
+
+        private static CType ResolvTypedef(SyntaxNode.TypeSpecifier.TypedefTypeSpecifier ts, Scope currentScope) {
+            // 名前表から識別子を探す
+            var identifier = currentScope.FindIdentifier(ts.identifier);
+            if (identifier == null) {
+                return new CType.UndefinedType("未宣言の型");
+            }
+
+            // 識別子が型を示しているかチェック
+            if (!(identifier is Scope.IdentifierValue.Type)) {
+                return new CType.UndefinedType("識別子は型でない");
+            }
+            return (identifier as Scope.IdentifierValue.Type).type;
         }
 
         /// <summary>
@@ -615,12 +633,12 @@ namespace CParser2 {
 
             // 以降でメンバの解析を行って et にメンバを登録する。
             {
-                var items = new List<Tuple<string, CType,int>>();
+                var items = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>>();
                 System.Diagnostics.Debug.Assert(ts.struct_declarations != null);
                 var unionscope = new Scope(scope);
                 foreach (var declaration in ts.struct_declarations) {
                     foreach (var member_declarator in declaration.struct_member_declarators) {
-                        var ret = new List<Tuple<string, CType>>(); 
+                        var ret = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>(); 
                             Parse(
                             declaration.specifier_qualifier_list.type_specifiers,
                             declaration.specifier_qualifier_list.type_qualifiers,
@@ -631,8 +649,7 @@ namespace CParser2 {
                             unionscope,
                             ret
                         );
-
-                        items.AddRange(ret.Select(x => Tuple.Create(x.Item1, x.Item2, 1))); // member_declarator.bitfield_exprがビットフィールドサイズ
+                        items.AddRange(ret.Select(x => Tuple.Create(x.Item1, x.Item2, x.Item3, 1))); // member_declarator.bitfield_exprがビットフィールドサイズ
                     }
                 }
                 et.members = items;
@@ -685,12 +702,12 @@ namespace CParser2 {
 
             // 以降でメンバの解析を行って et にメンバを登録する。
             {
-                var items = new List<Tuple<string, CType, int>>();
+                var items = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind, int>>();
                 System.Diagnostics.Debug.Assert(ts.struct_declarations != null);
                 var unionscope = new Scope(scope);
                 foreach (var declaration in ts.struct_declarations) {
                     foreach (var member_declarator in declaration.struct_member_declarators) {
-                        var ret = new List<Tuple<string, CType>>();
+                        var ret = new List<Tuple<string, CType, SyntaxNode.StorageClassSpecifierKind>>();
                         Parse(
                             declaration.specifier_qualifier_list.type_specifiers,
                             declaration.specifier_qualifier_list.type_qualifiers,
@@ -701,7 +718,7 @@ namespace CParser2 {
                             unionscope,
                             ret
                         );
-                        items.AddRange(ret.Select(x => Tuple.Create(x.Item1, x.Item2, 1))); // member_declarator.bitfield_exprがビットフィールドサイズ
+                        items.AddRange(ret.Select(x => Tuple.Create(x.Item1, x.Item2, x.Item3, 1))); // member_declarator.bitfield_exprがビットフィールドサイズ
                     }
                 }
                 et.members = items;
@@ -714,21 +731,29 @@ namespace CParser2 {
         /// </summary>
         /// <param name="type_specifiers"></param>
         /// <returns></returns>
-        private static CType ParseStandardSpecifier(List<SyntaxNode.TypeSpecifier> type_specifiers) {
+        private static CType ParseStandardSpecifier(List<SyntaxNode.TypeSpecifier> type_specifiers, Scope currentScope) {
+            CType.StandardType.TypeBit bits = 0;
             HashSet<SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind> standardtype_specs = new HashSet<SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind>();
             foreach (var type_specifier in type_specifiers) {
                 if (type_specifier is SyntaxNode.TypeSpecifier.StandardTypeSpecifier) {
                     var ts = type_specifier as SyntaxNode.TypeSpecifier.StandardTypeSpecifier;
                     standardtype_specs.Add(ts.Kind);
                 } else if (type_specifier is SyntaxNode.TypeSpecifier.TypedefTypeSpecifier) {
-                    var ts = type_specifier as SyntaxNode.TypeSpecifier.StandardTypeSpecifier;
-                    standardtype_specs.Add(ts.Kind);
+                    var ts = type_specifier as SyntaxNode.TypeSpecifier.TypedefTypeSpecifier;
+                    // 名前表から識別子を探す
+                    var ty = ResolvTypedef(ts, currentScope);
+
+                    // 基本型以外はエラー
+                    if (!(ty is CType.StandardType)) {
+                        return ty;
+                    }
+                    // typedef済みをコピーしてしまう
+                    bits |= (ty as CType.StandardType).bits;
                 } else {
                     return new CType.InvalidType("組み合わせられない型指定子の組み合わせ");
                 }
             }
 
-            CType.StandardType.TypeBit bits = 0;
 
             // 符号（排他）
             bits |= standardtype_specs.Contains(SyntaxNode.TypeSpecifier.StandardTypeSpecifier.StandardTypeSpecifierKind.signed_keyword) ? CType.StandardType.TypeBit._signed : 0;

@@ -1082,6 +1082,21 @@ namespace Parsing {
         }
 
         /// <summary>
+        ///     パーサのStateを取得する
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="pred"></param>
+        /// <returns></returns>
+        public static Parser<object> State() {
+            return (context, position, state) => {
+                if (context?.source == null) {
+                    throw new ArgumentNullException(nameof(context.source));
+                }
+                return Result<object>.Accept(state, position, state);
+            };
+        }
+
+        /// <summary>
         ///     セマンティックアクションを実行するパーサを生成する。
         /// </summary>
         /// <typeparam name="T"></typeparam>

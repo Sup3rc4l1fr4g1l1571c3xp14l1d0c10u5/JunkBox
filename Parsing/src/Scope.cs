@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,7 +11,6 @@ namespace CParser2 {
 
         public static Scope Empty { get; } = new Scope();
 
-
         /// <summary>
         /// タグの名前空間
         /// </summary>
@@ -22,7 +21,7 @@ namespace CParser2 {
         /// <summary>
         /// 識別子の名前空間（宣言順序も必要になるのでリストを使う）
         /// </summary>
-        public List<Tuple<string, IdentifierValue,int>> identifiers {
+        public List<Tuple<string, IdentifierValue, SyntaxNode.StorageClassSpecifierKind, int>> identifiers {
             get;
         }
 
@@ -42,9 +41,17 @@ namespace CParser2 {
 
         public Scope(Scope parent) {
             tags = new List<Tuple<string, CType.TaggedType>>();
-            identifiers = new List<Tuple<string, IdentifierValue,int>>();
+            identifiers = new List<Tuple<string, IdentifierValue, SyntaxNode.StorageClassSpecifierKind,int>>();
             Parent = parent;
             scopes.Add(this);
+        }
+
+        public IdentifierValue FindIdentifierCurrent(string identifier) {
+            var entry = this.identifiers.LastOrDefault(x => x.Item1 == identifier);
+            if (entry != null) {
+                return entry.Item2;
+            }
+            return null;
         }
 
         /// <summary>
@@ -69,8 +76,12 @@ namespace CParser2 {
         /// </summary>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        public void AddIdentifier(string identifier, IdentifierValue p, int bit/*構造体・共用体のメンバ用*/) {
-            identifiers.Add(Tuple.Create(identifier, p, bit));
+        public void AddIdentifier(
+            string identifier, 
+            IdentifierValue p,
+            SyntaxNode.StorageClassSpecifierKind sc,
+            int bit/*構造体・共用体のメンバ用*/) {
+            identifiers.Add(Tuple.Create(identifier, p, sc, bit));
         }
 
         /// <summary>
@@ -84,8 +95,10 @@ namespace CParser2 {
                 public CType type {
                     get;
                 }
-                public Type(CType ctype) {
-                    this.type = ctype;
+                public SyntaxNode.StorageClassSpecifierKind StorageClass { get; }
+                public Type(CType type, SyntaxNode.StorageClassSpecifierKind sc) {
+                    this.type = type;
+                    this.StorageClass = sc;
                 }
             }
             /// <summary>
@@ -95,6 +108,7 @@ namespace CParser2 {
                 public CType.TaggedType.EnumType type {
                     get;
                 }
+
                 public int index {
                     get;
                 }
@@ -110,8 +124,15 @@ namespace CParser2 {
                 public CType type {
                     get;
                 }
-                public Variable(CType type) {
+                public SyntaxNode.StorageClassSpecifierKind StorageClass { get; }
+
+                public Instruction.Variable body {
+                    get; set;
+                }
+
+                public Variable(CType type, SyntaxNode.StorageClassSpecifierKind sc) {
                     this.type = type;
+                    this.StorageClass = sc;
                 }
             }
             /// <summary>
@@ -121,8 +142,31 @@ namespace CParser2 {
                 public CType type {
                     get;
                 }
-                public Function(CType type) {
+                public SyntaxNode.StorageClassSpecifierKind StorageClass { get; }
+                public Instruction.Label body {
+                    get; set;
+                }
+
+                public Function(CType type, SyntaxNode.StorageClassSpecifierKind sc) {
                     this.type = type;
+                    this.StorageClass = sc;
+                }
+            }
+
+            internal class Argument : IdentifierValue {
+                public CType type {
+                    get;
+                }
+                public SyntaxNode.StorageClassSpecifierKind StorageClass { get; }
+
+                public int index {
+                    get; 
+                }
+
+                public Argument(CType type, SyntaxNode.StorageClassSpecifierKind sc, int i) {
+                    this.type = type;
+                    this.StorageClass = sc;
+                    this.index = i;
                 }
             }
         }
@@ -144,6 +188,15 @@ namespace CParser2 {
             return null;
         }
 
+        public CType.TaggedType FindTaggedTypeCurrent(string identifier) {
+            var s = this;
+            var entry = s.tags.LastOrDefault(x => x.Item1 == identifier);
+            if (entry != null) {
+                return entry.Item2;
+            }
+            return null;
+        }
+
         /// <summary>
         /// 識別子を追加
         /// </summary>
@@ -152,6 +205,7 @@ namespace CParser2 {
         public void AddTaggedType(string identifier, CType.TaggedType p) {
             tags.Add(Tuple.Create(identifier, p));
         }
+
     }
 
 }
