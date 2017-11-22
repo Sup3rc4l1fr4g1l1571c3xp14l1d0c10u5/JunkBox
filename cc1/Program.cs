@@ -20,85 +20,6 @@ namespace AnsiCParser {
         }
     }
 
-    #region Collection Class
-
-    /// <summary>
-    /// リスト
-    /// </summary>
-    /// <typeparam name="TValue"></typeparam>
-    public class LinkedList<TValue> : IEnumerable<TValue> {
-        public TValue Value {
-            get;
-        }
-        public LinkedList<TValue> Parent {
-            get;
-        }
-        public static LinkedList<TValue> Empty { get; } = new LinkedList<TValue>();
-
-        public bool IsEmpty() {
-            return this.Parent == null;
-        }
-
-        protected LinkedList(TValue value, LinkedList<TValue> parent) {
-            this.Value = value;
-            this.Parent = parent;
-        }
-        protected LinkedList() {
-            this.Value = default(TValue);
-            this.Parent = null;
-        }
-        public LinkedList<TValue> Extend(TValue value) {
-            return new LinkedList<TValue>(value, this);
-        }
-
-        public bool Contains(TValue v) {
-            return this.Any(x => (v.Equals(x)));
-        }
-
-        public IEnumerator<TValue> GetEnumerator() {
-            var it = this;
-            while (!it.IsEmpty()) {
-                yield return it.Value;
-                it = it.Parent;
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() {
-            return GetEnumerator();
-        }
-
-    }
-
-    /// <summary>
-    /// リンク辞書
-    /// </summary>
-    /// <typeparam name="TKey"></typeparam>
-    /// <typeparam name="TValue"></typeparam>
-    public class LinkedDictionary<TKey, TValue> : LinkedList<KeyValuePair<TKey, TValue>> {
-        protected LinkedDictionary(TKey key, TValue value, LinkedDictionary<TKey, TValue> parent) : base(new KeyValuePair<TKey, TValue>(key, value), parent) { }
-        protected LinkedDictionary() : base() { }
-        public LinkedDictionary<TKey, TValue> Extend(TKey key, TValue value) {
-            return new LinkedDictionary<TKey, TValue>(key, value, this);
-        }
-        public static new LinkedDictionary<TKey, TValue> Empty { get; } = new LinkedDictionary<TKey, TValue>();
-
-        public bool ContainsKey(TKey key) {
-            return this.Any(x => (key.Equals(x.Key)));
-        }
-        public bool TryGetValue(TKey key, out TValue value) {
-            foreach (var kv in this) {
-                if (kv.Key.Equals(key)) {
-                    value = kv.Value;
-                    return true;
-                }
-            }
-            value = default(TValue);
-            return false;
-        }
-    }
-
-    #endregion
-
     /// <summary>
     /// 記憶クラス指定子
     /// </summary>
@@ -170,15 +91,19 @@ namespace AnsiCParser {
                 }
             }
         }
+
         public static TypeSpecifier TypeFlag(this TypeSpecifier self) {
             return TypeSpecifier.TypeMask & self;
         }
+
         public static TypeSpecifier SizeFlag(this TypeSpecifier self) {
             return TypeSpecifier.SizeMask & self;
         }
+
         public static TypeSpecifier SignFlag(this TypeSpecifier self) {
             return TypeSpecifier.SignMask & self;
         }
+
         public static TypeSpecifier Marge(this TypeSpecifier self, TypeSpecifier other) {
             TypeSpecifier type = TypeSpecifier.None;
 
@@ -408,7 +333,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public string Ident {
+                public string TagName {
                     get;
                 }
 
@@ -416,47 +341,61 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public List<Tuple<string, CType, AST.Expression>> struct_declarations {
+                public class MemberInfo {
+                    public string Ident { get; }
+                    public CType Type { get; }
+                    public int BitOffset { get; }
+                    public int BitSize { get; }
+
+                    public MemberInfo(string ident, CType type, int bitOffset, int bitSize) {
+                        Ident = ident;
+                        Type = type;
+                        BitOffset = bitOffset;
+                        BitSize = bitSize;
+                    }
+                }
+
+                public List<MemberInfo> struct_declarations {
                     get; internal set;
                 }
 
-                public StructUnionType(bool isStruct, string ident, bool is_anonymous) {
+                public StructUnionType(bool isStruct, string tagName, bool is_anonymous) {
                     this.IsStruct = isStruct;
-                    this.Ident = ident;
+                    this.TagName = tagName;
                     this.IsAnonymous = is_anonymous;
                 }
 
                 protected override void Fixup(CType ty) {
                     for (var i = 0; i < struct_declarations.Count; i++) {
                         var struct_declaration = struct_declarations[i];
-                        if (struct_declaration.Item2 is StubType) {
-                            struct_declarations[i] = Tuple.Create(struct_declaration.Item1, ty, struct_declaration.Item3);
+                        if (struct_declaration.Type is StubType) {
+                            struct_declarations[i] = new MemberInfo(struct_declaration.Ident, ty, struct_declaration.BitOffset, struct_declaration.BitSize);
                         } else {
-                            struct_declaration.Item2.Fixup(ty);
+                            struct_declaration.Type.Fixup(ty);
                         }
                     }
 
                     foreach (var struct_declaration in struct_declarations) {
-                        struct_declaration.Item2.Fixup(ty);
+                        struct_declaration.Type.Fixup(ty);
                     }
                 }
 
                 public override int Sizeof() {
                     // ビットフィールドは未実装
                     if (IsStruct) {
-                        return struct_declarations.Sum(x => x.Item2.Sizeof());
+                        return struct_declarations.Sum(x => x.Type.Sizeof());
                     } else {
-                        return struct_declarations.Max(x => x.Item2.Sizeof());
+                        return struct_declarations.Max(x => x.Type.Sizeof());
                     }
                 }
                 public override string ToString() {
                     var sb = new List<string>();
                     sb.Add(IsStruct ? "strunct" : "union");
-                    sb.Add(Ident);
+                    sb.Add(TagName);
                     if (struct_declarations != null) {
                         sb.Add("{");
                         sb.AddRange(struct_declarations.SelectMany(x =>
-                            new string[] { x.Item2?.ToString(), x.Item1, x.Item3 != null ? ":" : null, x.Item3?.ToString(), ";" }.Where(y => y != null)
+                            new string[] { x.Type?.ToString(), x.Ident, x.BitSize > 0 ? $":{x.BitSize}" : null, ";" }.Where(y => y != null)
                         ));
                         sb.Add("}");
                     }
@@ -819,13 +758,13 @@ namespace AnsiCParser {
                     if ((t1 as CType.TaggedType.StructUnionType).IsAnonymous != (t2 as CType.TaggedType.StructUnionType).IsAnonymous) {
                         return false;
                     }
-                    if ((t1 as CType.TaggedType.StructUnionType).Ident != (t2 as CType.TaggedType.StructUnionType).Ident) {
+                    if ((t1 as CType.TaggedType.StructUnionType).TagName != (t2 as CType.TaggedType.StructUnionType).TagName) {
                         return false;
                     }
                     if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Count != (t2 as CType.TaggedType.StructUnionType).struct_declarations.Count) {
                         return false;
                     }
-                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => EqualType(x.Item2, y.Item2)).All(x => x) == false) {
+                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => EqualType(x.Type, y.Type)).All(x => x) == false) {
                         return false;
                     }
                     return true;
@@ -1546,6 +1485,16 @@ namespace AnsiCParser {
                     this.functionDeclaration = functionDeclaration;
                 }
             }
+
+            internal class GccStatementExpression : Expression {
+                public Statement statements {
+                    get;
+                }
+
+                public GccStatementExpression(Statement statements) {
+                    this.statements = statements;
+                }
+            }
         }
 
         public abstract class Statement : AST {
@@ -1839,10 +1788,10 @@ namespace AnsiCParser {
     /// <typeparam name="TValue"></typeparam>
     public class Scope<TValue> {
         public static Scope<TValue> Empty { get; } = new Scope<TValue>();
-
-        private LinkedDictionary<string, TValue> entries = LinkedDictionary<string, TValue>.Empty;
-
         public Scope<TValue> Parent { get; } = Empty;
+
+#if false
+        private LinkedDictionary<string, TValue> entries = LinkedDictionary<string, TValue>.Empty;
 
         private Scope() {
         }
@@ -1879,6 +1828,50 @@ namespace AnsiCParser {
             value = default(TValue);
             return false;
         }
+#else
+        private List<Tuple<string, TValue>> entries = new List<Tuple<string, TValue>>();
+
+        private Scope() {
+        }
+
+        protected Scope(Scope<TValue> Parent) {
+            this.Parent = Parent;
+        }
+
+        public Scope<TValue> Extend() {
+            return new Scope<TValue>(this);
+        }
+
+        public void Add(string ident, TValue value) {
+            this.entries.Add(Tuple.Create(ident, value));
+        }
+
+        public bool ContainsKey(string v) {
+            var it = this;
+            while (it != null) {
+                if (it.entries.FindLast(x => x.Item1 == v) != null) {
+                    return true;
+                }
+                it = it.Parent;
+            }
+            return false;
+        }
+
+        public bool TryGetValue(string v, out TValue value) {
+            var it = this;
+            while (it != null) {
+                var val = it.entries.FindLast(x => x.Item1 == v);
+                if (val != null) {
+                    value = val.Item2;
+                    return true;
+                }
+                it = it.Parent;
+            }
+            value = default(TValue);
+            return false;
+        }
+
+#endif
     }
 
     public class Grammer {
@@ -1978,12 +1971,12 @@ namespace AnsiCParser {
         /// <summary>
         /// break命令についてのスコープ
         /// </summary>
-        private LinkedList<AST.Statement> break_scope = LinkedList<AST.Statement>.Empty;
+        private Stack<AST.Statement> break_scope = new Stack<AST.Statement>();
 
         /// <summary>
         /// continue命令についてのスコープ
         /// </summary>
-        private LinkedList<AST.Statement> continue_scope = LinkedList<AST.Statement>.Empty;
+        private Stack<AST.Statement> continue_scope = new Stack<AST.Statement>();
 
         //
         // lex spec
@@ -2474,23 +2467,9 @@ namespace AnsiCParser {
         private bool is_nexttoken(params char[] s) {
             return is_nexttoken(s.Select(x => (Token.TokenKind)x).ToArray());
         }
-        private bool is_identifier() {
-            return current_token().kind == Token.TokenKind.IDENTIFIER;
-        }
-        private bool is_tagname() {
-            return current_token().kind == Token.TokenKind.IDENTIFIER || current_token().kind == Token.TokenKind.TYPE_NAME;
-        }
-        private string tagname() {
-            if (is_tagname() == false) {
-                throw new Exception();
-            }
-            var ret = current_token().raw;
-            next_token();
-            return ret;
-        }
 
         private bool is_ENUMERATION_CONSTANT() {
-            if (!is_identifier()) {
+            if (!is_IDENTIFIER(false)) {
                 return false;
             }
             var ident = current_token();
@@ -2505,7 +2484,7 @@ namespace AnsiCParser {
         }
 
         private Tuple<string, CType, int> ENUMERATION_CONSTANT() {
-            var ident = IDENTIFIER();
+            var ident = IDENTIFIER(false);
             IdentifierValue v;
             if (ident_scope.TryGetValue(ident, out v) == false) {
                 throw new Exception();
@@ -2625,12 +2604,11 @@ namespace AnsiCParser {
             if (typeSpecifier != TypeSpecifier.None) {
                 if (baseType != null) {
                     throw new Exception("");
-                }
-                else {
+                } else {
                     baseType = new CType.BasicType(typeSpecifier);
                 }
             } else if (baseType == null) {
-                baseType  = new CType.BasicType(TypeSpecifier.None);
+                baseType = new CType.BasicType(TypeSpecifier.None);
             }
             baseType = new CType.TypeQualifierType(baseType, typeQualifier);
 
@@ -2669,8 +2647,8 @@ namespace AnsiCParser {
                                 if (typedef_scope.TryGetValue(ident, out tdecl)) {
                                     if (CType.EqualType(tdecl.Ctype, ctype) == false) {
                                         throw new Exception("再定義型の不一致");
-                                    }    
-                                } else { 
+                                    }
+                                } else {
                                     tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
                                     decl = tdecl;
                                     typedef_scope.Add(ident, tdecl);
@@ -2704,12 +2682,10 @@ namespace AnsiCParser {
                             if (ctype_fun.Arguments == null) {
                                 if (argmuents != null) {
                                     throw new Exception("K&Rの空の引数リストに対して引数宣言がある");
-                                }
-                                else {
+                                } else {
                                     // ANSIの引数指定なし関数
                                 }
-                            }
-                            else if (ctype_fun.Arguments.Any(x => x.Item2.IsImplicit())) {
+                            } else if (ctype_fun.Arguments.Any(x => x.Item2.IsImplicit())) {
                                 if (!ctype_fun.Arguments.All(x => x.Item2.IsImplicit())) {
                                 }
 
@@ -2721,9 +2697,8 @@ namespace AnsiCParser {
                                 var mapped = ctype_fun.Arguments.Select(x => {
                                     if (dic.ContainsKey(x.Item1)) {
                                         return Tuple.Create(x.Item1, dic[x.Item1].Ctype);
-                                    }
-                                    else {
-                                        return Tuple.Create(x.Item1, (CType) new CType.BasicType(TypeSpecifier.None));
+                                    } else {
+                                        return Tuple.Create(x.Item1, (CType)new CType.BasicType(TypeSpecifier.None));
                                     }
                                 }).ToList();
                                 ctype_fun.Arguments.Clear();
@@ -2737,8 +2712,7 @@ namespace AnsiCParser {
                         ret.Add(funcdecl);
                         ident_scope.Add(ident, new IdentifierValue.Declaration(funcdecl));
                         return ret;
-                    }
-                    else {
+                    } else {
                         throw new Exception("");
                     }
 
@@ -2806,8 +2780,8 @@ namespace AnsiCParser {
         private bool is_declaration_specifier(CType ctype, TypeSpecifier typeSpecifier) {
             return (is_storage_class_specifier() ||
                 (is_type_specifier() && ctype == null) ||
-                (is_struct_or_union_specifier() && ctype == null ) ||
-                (is_enum_specifier() && ctype == null ) ||
+                (is_struct_or_union_specifier() && ctype == null) ||
+                (is_enum_specifier() && ctype == null) ||
                 (is_TYPEDEF_NAME() && ctype == null && typeSpecifier == TypeSpecifier.None) ||
                 is_type_qualifier() ||
                 is_function_specifier());
@@ -2967,15 +2941,32 @@ namespace AnsiCParser {
             var struct_or_union = current_token().kind;
             Read(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
 
-            if (is_tagname()) {
-                var ident = tagname();
-                var ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, false);
+            if (is_IDENTIFIER(true)) {
+                var ident = IDENTIFIER(true);
                 // ctype を tag に 登録
-                tag_scope.Add(ident, ctype);
+                CType.TaggedType ctype;
                 if (Peek('{')) {
+                    CType.TaggedType.StructUnionType stype = null;
+                    if (tag_scope.TryGetValue(ident, out ctype) == false) {
+                        stype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, false);
+                        tag_scope.Add(ident, ctype);
+                    } else if (!(ctype is CType.TaggedType.StructUnionType)) {
+                        throw new Exception("別のタグ型として定義済み");
+                    } else if ((ctype as CType.TaggedType.StructUnionType).struct_declarations != null) {
+                        throw new Exception("再定義された");  // 定義は翻訳単位中に一つしか持てない。
+                    } else {
+                        stype = (ctype as CType.TaggedType.StructUnionType);
+                    }
+                    tag_scope.Add(ident, stype);
                     Read('{');
-                    ctype.struct_declarations = struct_declarations();
+                    stype.struct_declarations = struct_declarations();
                     Read('}');
+                    ctype = stype;
+                } else {
+                    if (tag_scope.TryGetValue(ident, out ctype) == false) {
+                        ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, false);
+                        tag_scope.Add(ident, ctype);
+                    }
                 }
                 return ctype;
             } else {
@@ -2989,8 +2980,8 @@ namespace AnsiCParser {
                 return ctype;
             }
         }
-        private List<Tuple<string, CType, AST.Expression>> struct_declarations() {
-            var items = new List<Tuple<string, CType, AST.Expression>>();
+        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declarations() {
+            var items = new List<CType.TaggedType.StructUnionType.MemberInfo>();
             items.AddRange(struct_declaration());
             while (is_struct_declaration()) {
                 items.AddRange(struct_declaration());
@@ -3002,7 +2993,7 @@ namespace AnsiCParser {
             return is_specifier_qualifiers();
         }
 
-        private List<Tuple<string, CType, AST.Expression>> struct_declaration() {
+        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declaration() {
             CType baseType = specifier_qualifiers();
             var ret = struct_declarator_list(baseType);
             Read(';');
@@ -3046,11 +3037,12 @@ namespace AnsiCParser {
             return decl;
         }
 
-        private bool is_specifier_qualifier() {
-            return (is_type_specifier() ||
-                is_struct_or_union_specifier() ||
-                is_enum_specifier() ||
-                is_TYPEDEF_NAME() ||
+        private bool is_specifier_qualifier(CType ctype, TypeSpecifier typeSpecifier) {
+            return (
+                (is_type_specifier() && ctype == null) ||
+                (is_struct_or_union_specifier() && ctype == null) ||
+                (is_enum_specifier() && ctype == null) ||
+                (is_TYPEDEF_NAME() && ctype == null && typeSpecifier == TypeSpecifier.None) ||
                 is_type_qualifier());
         }
 
@@ -3084,7 +3076,7 @@ namespace AnsiCParser {
             }
         }
         private bool is_specifier_qualifiers() {
-            return is_specifier_qualifier();
+            return is_specifier_qualifier(null, TypeSpecifier.None);
         }
 
         private CType specifier_qualifiers() {
@@ -3093,7 +3085,7 @@ namespace AnsiCParser {
             TypeQualifier typeQualifier = TypeQualifier.None;
 
             specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
-            while (is_specifier_qualifier()) {
+            while (is_specifier_qualifier(baseType, typeSpecifier)) {
                 specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
             }
 
@@ -3110,8 +3102,8 @@ namespace AnsiCParser {
         }
 
 
-        private List<Tuple<string, CType, AST.Expression>> struct_declarator_list(CType ctype) {
-            var ret = new List<Tuple<string, CType, AST.Expression>>();
+        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declarator_list(CType ctype) {
+            var ret = new List<CType.TaggedType.StructUnionType.MemberInfo>();
             ret.Add(struct_declarator(ctype));
             while (Peek(',')) {
                 Read(',');
@@ -3119,7 +3111,7 @@ namespace AnsiCParser {
             }
             return ret;
         }
-        private Tuple<string, CType, AST.Expression> struct_declarator(CType ctype) {
+        private CType.TaggedType.StructUnionType.MemberInfo struct_declarator(CType ctype) {
             Tuple<string, CType> decl = null;
             string ident = null;
             if (is_declarator()) {
@@ -3132,14 +3124,14 @@ namespace AnsiCParser {
                 Read(':');
                 expr = constant_expression();
             }
-            return Tuple.Create(ident, ctype, expr);
+            return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, 0, expr == null ? 0 :AST.ConstantEval(expr));
 
         }
         private CType enum_specifier() {
             Read(Token.TokenKind.ENUM);
 
-            if (is_tagname()) {
-                var ident = tagname();
+            if (is_IDENTIFIER(true)) {
+                var ident = IDENTIFIER(true);
                 var ctype = new CType.TaggedType.EnumType(ident, false);
                 // ctype を tag に 登録
                 tag_scope.Add(ident, ctype);
@@ -3177,11 +3169,11 @@ namespace AnsiCParser {
         }
 
         private bool is_enumerator() {
-            return is_identifier();
+            return is_IDENTIFIER(false);
         }
 
         private Tuple<string, int> enumerator(CType ctype, int i) {
-            var ident = IDENTIFIER();
+            var ident = IDENTIFIER(false);
             if (Peek('=')) {
                 Read('=');
                 var expr = constant_expression();
@@ -3200,7 +3192,7 @@ namespace AnsiCParser {
         }
 
         private bool is_direct_declarator() {
-            return Peek('(') || is_identifier() || is_tagname();    // ToDo: typedefの多重宣言に対するアドホックな修正。
+            return Peek('(') || is_IDENTIFIER(true);
         }
         private void direct_declarator(ref string ident, List<CType> stack, int index) {
             if (Peek('(')) {
@@ -3322,12 +3314,12 @@ namespace AnsiCParser {
         }
 
         private bool is_direct_declarator_or_direct_abstract_declarator() {
-            return is_identifier() || Peek('(', '[');
+            return is_IDENTIFIER(true) || Peek('(', '[');
         }
 
         private void direct_declarator_or_direct_abstract_declarator(ref string ident, List<CType> stack, int index) {
-            if (is_identifier()) {
-                ident = IDENTIFIER();
+            if (is_IDENTIFIER(true)) {
+                ident = IDENTIFIER(true);
                 more_dd_or_dad(stack, index);
             } else if (Peek('(')) {
                 Read('(');
@@ -3394,15 +3386,15 @@ namespace AnsiCParser {
         }
 
         private bool is_identifier_list() {
-            return is_identifier();
+            return is_IDENTIFIER(false);
         }
 
         private List<string> identifier_list() {
             var items = new List<string>();
-            items.Add(IDENTIFIER());
+            items.Add(IDENTIFIER(false));
             while (Peek(',')) {
                 Read(',');
-                items.Add(IDENTIFIER());
+                items.Add(IDENTIFIER(false));
             }
             return items;
         }
@@ -3411,9 +3403,9 @@ namespace AnsiCParser {
         private AST.Initializer initializer() {
             if (Peek('{')) {
                 Read('{');
-                var ret = initializer_list();
-                if (Peek(',')) {
-                    Read(',');
+                List<AST.Initializer> ret = null;
+                if (Peek('}') == false) {
+                    ret = initializer_list();
                 }
                 Read('}');
                 return new AST.Initializer.CompilxInitializer(ret);
@@ -3426,6 +3418,9 @@ namespace AnsiCParser {
             ret.Add(initializer());
             while (Peek(',')) {
                 Read(',');
+                if (Peek('}')) {
+                    break;
+                }
                 ret.Add(initializer());
             }
             return ret;
@@ -3516,8 +3511,12 @@ namespace AnsiCParser {
             }
         }
 
-        private string IDENTIFIER() {
-            if (is_identifier() == false) {
+        private bool is_IDENTIFIER(bool include_type_name) {
+            return current_token().kind == Token.TokenKind.IDENTIFIER || (include_type_name && current_token().kind == Token.TokenKind.TYPE_NAME);
+        }
+
+        private string IDENTIFIER(bool include_type_name) {
+            if (is_IDENTIFIER(include_type_name) == false) {
                 throw new Exception();
             }
             var ret = current_token().raw;
@@ -3527,7 +3526,7 @@ namespace AnsiCParser {
 
 
         private AST.Statement statement() {
-            if ((is_identifier() && is_nexttoken(':')) || Peek(Token.TokenKind.CASE, Token.TokenKind.DEFAULT)) {
+            if ((is_IDENTIFIER(true) && is_nexttoken(':')) || Peek(Token.TokenKind.CASE, Token.TokenKind.DEFAULT)) {
                 return labeled_statement();
             } else if (Peek('{')) {
                 return compound_statement();
@@ -3558,7 +3557,7 @@ namespace AnsiCParser {
                 var stmt = statement();
                 return new AST.Statement.DefaultStatement(stmt);
             } else {
-                var ident = IDENTIFIER();
+                var ident = IDENTIFIER(true);
                 Read(':');
                 var stmt = statement();
                 return new AST.Statement.GenericLabeledStatement(ident, stmt);
@@ -3617,9 +3616,9 @@ namespace AnsiCParser {
                 var cond = expression();
                 Read(')');
                 var ss = new AST.Statement.SwitchStatement(cond);
-                break_scope = break_scope.Extend(ss);
+                break_scope.Push(ss);
                 ss.Stmt = statement();
-                break_scope = break_scope.Parent;
+                break_scope.Pop();
                 return ss;
             }
             throw new Exception();
@@ -3631,21 +3630,21 @@ namespace AnsiCParser {
                 var cond = expression();
                 Read(')');
                 var ss = new AST.Statement.WhileStatement(cond);
-                break_scope = break_scope.Extend(ss);
-                continue_scope = continue_scope.Extend(ss);
+                break_scope.Push(ss);
+                continue_scope.Push(ss);
                 ss.Stmt = statement();
-                break_scope = break_scope.Parent;
-                continue_scope = continue_scope.Parent;
+                break_scope.Pop();
+                continue_scope.Pop();
                 return ss;
             }
             if (Peek(Token.TokenKind.DO)) {
                 Read(Token.TokenKind.DO);
                 var ss = new AST.Statement.DoWhileStatement();
-                break_scope = break_scope.Extend(ss);
-                continue_scope = continue_scope.Extend(ss);
+                break_scope.Push(ss);
+                continue_scope.Push(ss);
                 ss.Stmt = statement();
-                break_scope = break_scope.Parent;
-                continue_scope = continue_scope.Parent;
+                break_scope.Pop();
+                continue_scope.Pop();
                 Read(Token.TokenKind.WHILE);
                 Read('(');
                 ss.Cond = expression();
@@ -3664,11 +3663,11 @@ namespace AnsiCParser {
                 var update = Peek(')') ? (AST.Expression)null : expression();
                 Read(')');
                 var ss = new AST.Statement.ForStatement(init, cond, update);
-                break_scope = break_scope.Extend(ss);
-                continue_scope = continue_scope.Extend(ss);
+                break_scope.Push(ss);
+                continue_scope.Push(ss);
                 ss.Stmt = statement();
-                break_scope = break_scope.Parent;
-                continue_scope = continue_scope.Parent;
+                break_scope.Pop();
+                continue_scope.Pop();
                 return ss;
             }
             throw new Exception();
@@ -3677,19 +3676,19 @@ namespace AnsiCParser {
         private AST.Statement jump_statement() {
             if (Peek(Token.TokenKind.GOTO)) {
                 Read(Token.TokenKind.GOTO);
-                var label = IDENTIFIER();
+                var label = IDENTIFIER(true);
                 Read(';');
                 return new AST.Statement.GotoStatement(label);
             }
             if (Peek(Token.TokenKind.CONTINUE)) {
                 Read(Token.TokenKind.CONTINUE);
                 Read(';');
-                return new AST.Statement.ContinueStatement(continue_scope.Value);
+                return new AST.Statement.ContinueStatement(continue_scope.Peek());
             }
             if (Peek(Token.TokenKind.BREAK)) {
                 Read(Token.TokenKind.BREAK);
                 Read(';');
-                return new AST.Statement.BreakStatement(break_scope.Value);
+                return new AST.Statement.BreakStatement(break_scope.Peek());
             }
             if (Peek(Token.TokenKind.RETURN)) {
                 Read(Token.TokenKind.RETURN);
@@ -3725,11 +3724,12 @@ namespace AnsiCParser {
                     } else {
                         throw new Exception();
                     }
-                } 
+                }
                 next_token();
             }
             Read(';');
-            return new AST.Statement.EmptyStatement();;
+            return new AST.Statement.EmptyStatement();
+            ;
         }
         private AST.Expression expression() {
             var e = assignment_expression();
@@ -3945,6 +3945,9 @@ namespace AnsiCParser {
                     var saveCurrent = current;
                     Read('(');
                     if (is_type_name()) {
+                        if (line == 45581) {
+
+                        }
                         var ty = type_name();
                         Read(')');
                         return new AST.Expression.SizeofTypeExpression(ty);
@@ -3983,12 +3986,12 @@ namespace AnsiCParser {
             }
             if (Peek('.')) {
                 Read('.');
-                var ident = IDENTIFIER();
+                var ident = IDENTIFIER(false);
                 return more_postfix_expression(new AST.Expression.MemberDirectAccess(expr, ident));
             }
             if (Peek(Token.TokenKind.PTR_OP)) {
                 Read(Token.TokenKind.PTR_OP);
-                var ident = IDENTIFIER();
+                var ident = IDENTIFIER(false);
                 return more_postfix_expression(new AST.Expression.MemberIndirectAccess(expr, ident));
             }
             if (Peek(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
@@ -3999,8 +4002,8 @@ namespace AnsiCParser {
             return expr;
         }
         private AST.Expression primary_expression() {
-            if (is_identifier()) {
-                var ident = IDENTIFIER();
+            if (is_IDENTIFIER(false)) {
+                var ident = IDENTIFIER(false);
                 IdentifierValue value;
                 if (ident_scope.TryGetValue(ident, out value) == false) {
                     //throw new Exception("未宣言");
@@ -4030,12 +4033,20 @@ namespace AnsiCParser {
             }
             if (Peek('(')) {
                 Read('(');
-                var expr = expression();
-                Read(')');
-                return expr;
+                if (Peek('{')) {
+                    // gcc statement expression
+                    var statements = compound_statement();
+                    Read(')');
+                    return new AST.Expression.GccStatementExpression(statements);
+                } else {
+                    var expr = expression();
+                    Read(')');
+                    return expr;
+                }
             }
             throw new Exception();
         }
+
         private List<AST.Expression> argument_expression_list() {
             var ret = new List<AST.Expression>();
             ret.Add(assignment_expression());
