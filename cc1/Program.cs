@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
@@ -43,6 +43,7 @@ namespace AnsiCParser {
         Int = 0x0003,
         Float = 0x0004,
         Double = 0x0005,
+        _Bool = 0x0006,
         TypeMask = 0x000F,
         Short = 0x0010,
         Long = 0x0020,
@@ -50,7 +51,10 @@ namespace AnsiCParser {
         SizeMask = 0x00F0,
         Signed = 0x0100,
         Unsigned = 0x0200,
-        SignMask = 0x0F00,
+        SignMask = 0x0300,
+        _Complex = 0x0400,
+        _Imaginary = 0x0800,
+        CIMask = 0x0C00,
         Invalid = 0x1000,
     }
 
@@ -191,27 +195,140 @@ namespace AnsiCParser {
         public abstract int Sizeof();
 
         /// <summary>
-        /// 暗黙的int型なら真
-        /// </summary>
-        /// <returns></returns>
-        public abstract bool IsImplicit();
-
-        /// <summary>
-        /// 関数型なら真
-        /// </summary>
-        /// <returns></returns>
-        public abstract bool IsFunction();
-
-        /// <summary>
         /// 基本型
         /// </summary>
+        /// <remarks>
+        /// それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。型指定子の並びは，次に示すもののいずれか一つでなければならない.
+        /// - void
+        /// - char
+        /// - signed char
+        /// - unsigned char
+        /// - short，signed short，short int，signed short int
+        /// - unsigned short，unsigned short int
+        /// - int，signed，signed int
+        /// - unsigned，unsigned int
+        /// - long，signed long，long int，signed long int
+        /// - unsigned long，unsigned long int
+        /// - long long，signed long long，long long int，signed long long int
+        /// - unsigned long long，unsigned long long int
+        /// - float
+        /// - double
+        /// - long double
+        /// - _Bool
+        /// - float _Complex
+        /// - double _Complex
+        /// - long double _Complex
+        /// - float _Imaginary
+        /// - double _Imaginary
+        /// - long double _Imaginary
+        /// - 構造体共用体指定子
+        /// - 列挙型指定子
+        /// - 型定義名
+        /// </remarks>
         public class BasicType : CType {
-            public TypeSpecifier type_specifier {
+
+            public enum Kind {
+                KAndRImplicitInt,
+                Void,
+                Char,
+                SignedChar,
+                UnsignedChar,
+                SignedShortInt,
+                UnsignedShortInt,
+                SignedInt,
+                UnsignedInt,
+                SignedLongInt,
+                UnsignedLongInt,
+                SignedLongLongInt,
+                UnsignedLongLongInt,
+                Float,
+                Double,
+                LongDouble,
+                _Bool,
+                Float_Complex,
+                Double_Complex,
+                LongDouble_Complex,
+                Float_Imaginary,
+                Double_Imaginary,
+                LongDouble_Imaginary,
+
+            }
+            public Kind kind {
                 get;
             }
 
-            public BasicType(TypeSpecifier type_specifier) {
-                this.type_specifier = type_specifier;
+            private static Kind ToKind(TypeSpecifier type_specifier) {
+                switch (type_specifier) {
+                    case TypeSpecifier.None:
+                        return Kind.KAndRImplicitInt;
+                    case TypeSpecifier.Void:
+                        return Kind.Void;
+                    case TypeSpecifier.Char:
+                        return Kind.Char;
+                    case TypeSpecifier.Signed | TypeSpecifier.Char:
+                        return Kind.SignedChar;
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Char:
+                        return Kind.UnsignedChar;
+                    case TypeSpecifier.Short:
+                    case TypeSpecifier.Signed | TypeSpecifier.Short:
+                    case TypeSpecifier.Short | TypeSpecifier.Int:
+                    case TypeSpecifier.Signed | TypeSpecifier.Short | TypeSpecifier.Int:
+                        return Kind.SignedShortInt;
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Short:
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Short | TypeSpecifier.Int:
+                        return Kind.UnsignedShortInt;
+                    case TypeSpecifier.Int:
+                    case TypeSpecifier.Signed:
+                    case TypeSpecifier.Signed | TypeSpecifier.Int:
+                        return Kind.SignedInt;
+                    case TypeSpecifier.Unsigned:
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Int:
+                        return Kind.UnsignedInt;
+                    case TypeSpecifier.Long:
+                    case TypeSpecifier.Signed | TypeSpecifier.Long:
+                    case TypeSpecifier.Long | TypeSpecifier.Int:
+                    case TypeSpecifier.Signed | TypeSpecifier.Long | TypeSpecifier.Int:
+                        return Kind.SignedLongInt;
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Long:
+                    case TypeSpecifier.Unsigned | TypeSpecifier.Long | TypeSpecifier.Int:
+                        return Kind.UnsignedLongInt;
+                    case TypeSpecifier.LLong:
+                    case TypeSpecifier.Signed | TypeSpecifier.LLong:
+                    case TypeSpecifier.LLong | TypeSpecifier.Int:
+                    case TypeSpecifier.Signed | TypeSpecifier.LLong | TypeSpecifier.Int:
+                        return Kind.SignedLongLongInt;
+                    case TypeSpecifier.Unsigned | TypeSpecifier.LLong:
+                    case TypeSpecifier.Unsigned | TypeSpecifier.LLong | TypeSpecifier.Int:
+                        return Kind.UnsignedLongLongInt;
+                    case TypeSpecifier.Float:
+                        return Kind.Float;
+                    case TypeSpecifier.Double:
+                        return Kind.Double;
+                    case TypeSpecifier.Long | TypeSpecifier.Double:
+                        return Kind.LongDouble;
+                    case TypeSpecifier._Bool:
+                        return Kind._Bool;
+                    case TypeSpecifier.Float | TypeSpecifier._Complex:
+                        return Kind.Float_Complex;
+                    case TypeSpecifier.Double | TypeSpecifier._Complex:
+                        return Kind.Double_Complex;
+                    case TypeSpecifier.Long | TypeSpecifier.Double | TypeSpecifier._Complex:
+                        return Kind.LongDouble_Complex;
+                    case TypeSpecifier.Float | TypeSpecifier._Imaginary:
+                        return Kind.Float_Imaginary;
+                    case TypeSpecifier.Double | TypeSpecifier._Imaginary:
+                        return Kind.Double_Imaginary;
+                    case TypeSpecifier.Long | TypeSpecifier.Double | TypeSpecifier._Imaginary:
+                        return Kind.LongDouble_Imaginary;
+                    default:
+                        throw new Exception();
+                }
+            }
+
+            public BasicType(TypeSpecifier type_specifier) : this(ToKind(type_specifier)) {
+            }
+            public BasicType(Kind kind) {
+                this.kind = kind;
             }
 
             protected override void Fixup(CType ty) {
@@ -223,96 +340,63 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int Sizeof() {
-                switch (type_specifier.TypeFlag()) {
-                    case TypeSpecifier.Void:
-                        throw new Exception();
-                    case TypeSpecifier.Char:
-                        return 1;
-                    case TypeSpecifier.Short:
-                        return 2;
-                    case TypeSpecifier.Int:
-                    case TypeSpecifier.None:
-                        switch (type_specifier.SizeFlag()) {
-                            case TypeSpecifier.Short:
-                                return 2;
-                            case TypeSpecifier.None:
-                            case TypeSpecifier.Long:
-                                return 4;
-                            case TypeSpecifier.LLong:
-                                return 8;
-                            default:
-                                throw new Exception();
-                        }
-                    case TypeSpecifier.Float:
-                        return 4;
-                    case TypeSpecifier.Double:
-                        return type_specifier.SizeFlag() == TypeSpecifier.Long ? 12 : 8;
-                    default:
-                        throw new Exception();
+                switch (kind) {
+                    case Kind.KAndRImplicitInt: return 4;
+                    case Kind.Void: throw new Exception();
+                    case Kind.Char: return 1;
+                    case Kind.SignedChar: return 1;
+                    case Kind.UnsignedChar: return 1;
+                    case Kind.SignedShortInt: return 2;
+                    case Kind.UnsignedShortInt: return 2;
+                    case Kind.SignedInt: return 4;
+                    case Kind.UnsignedInt: return 4;
+                    case Kind.SignedLongInt: return 4;
+                    case Kind.UnsignedLongInt: return 4;
+                    case Kind.SignedLongLongInt: return 4;
+                    case Kind.UnsignedLongLongInt: return 4;
+                    case Kind.Float: return 4;
+                    case Kind.Double: return 8;
+                    case Kind.LongDouble: return 12;
+                    case Kind._Bool: return 1;
+                    case Kind.Float_Complex: return 4 * 2;
+                    case Kind.Double_Complex: return 8 * 2;
+                    case Kind.LongDouble_Complex: return 12 * 2;
+                    case Kind.Float_Imaginary: return 4;
+                    case Kind.Double_Imaginary: return 8;
+                    case Kind.LongDouble_Imaginary: return 12;
+                    default: throw new Exception();
                 }
-            }
-
-            public override bool IsImplicit() {
-                return type_specifier == TypeSpecifier.None;
-            }
-
-            public override bool IsFunction() {
-                return false;
             }
 
             public override string ToString() {
-                var sb = new List<string>();
-
-                switch (type_specifier.SignFlag()) {
-                    case TypeSpecifier.Signed:
-                        sb.Add("signed");
-                        break;
-                    case TypeSpecifier.Unsigned:
-                        sb.Add("unsigned");
-                        break;
-                    default:
-                        break;
+                switch (kind) {
+                    case Kind.KAndRImplicitInt: return "int";
+                    case Kind.Void: return "void";
+                    case Kind.Char: return "char";
+                    case Kind.SignedChar: return "signed char";
+                    case Kind.UnsignedChar: return "unsigned char";
+                    case Kind.SignedShortInt: return "signed short int";
+                    case Kind.UnsignedShortInt: return "unsigned short int";
+                    case Kind.SignedInt: return "signed int";
+                    case Kind.UnsignedInt: return "unsigned int";
+                    case Kind.SignedLongInt: return "signed long int";
+                    case Kind.UnsignedLongInt: return "unsigned long int";
+                    case Kind.SignedLongLongInt: return "signed long long int";
+                    case Kind.UnsignedLongLongInt: return "unsigned long long int";
+                    case Kind.Float: return "float";
+                    case Kind.Double: return "double";
+                    case Kind.LongDouble: return "long double";
+                    case Kind._Bool: return "_Bool";
+                    case Kind.Float_Complex: return "float _Complex";
+                    case Kind.Double_Complex: return "double _Complex";
+                    case Kind.LongDouble_Complex: return "long double _Complex";
+                    case Kind.Float_Imaginary: return "float _Imaginary";
+                    case Kind.Double_Imaginary: return "double _Imaginary";
+                    case Kind.LongDouble_Imaginary: return "long double _Imaginary";
+                    default: throw new Exception();
                 }
-
-                switch (type_specifier.SizeFlag()) {
-                    case TypeSpecifier.Short:
-                        sb.Add("short");
-                        break;
-                    case TypeSpecifier.Long:
-                        sb.Add("long");
-                        break;
-                    case TypeSpecifier.LLong:
-                        sb.Add("long");
-                        sb.Add("long");
-                        break;
-                    default:
-                        break;
-                }
-
-                switch (type_specifier.TypeFlag()) {
-                    case TypeSpecifier.Void:
-                        sb.Add("void");
-                        break;
-                    case TypeSpecifier.Char:
-                        sb.Add("char");
-                        break;
-                    case TypeSpecifier.Short:
-                        sb.Add("short");
-                        break;
-                    case TypeSpecifier.Int:
-                        sb.Add("int");
-                        break;
-                    case TypeSpecifier.Float:
-                        sb.Add("float");
-                        break;
-                    case TypeSpecifier.Double:
-                        sb.Add("double");
-                        break;
-                    default:
-                        break;
-                }
-                return String.Join(" ", sb);
             }
+
 
         }
 
@@ -320,38 +404,70 @@ namespace AnsiCParser {
         /// タグ付き型
         /// </summary>
         public abstract class TaggedType : CType {
-            public override bool IsImplicit() {
-                return false;
+
+            public string TagName {
+                get;
+            }
+            public bool IsAnonymous {
+                get;
             }
 
-            public override bool IsFunction() {
-                return false;
+            protected TaggedType(string tagName, bool isAnonymous) {
+                this.TagName = tagName;
+                this.IsAnonymous = isAnonymous;
             }
 
             public class StructUnionType : TaggedType {
-                public bool IsStruct {
-                    get;
+                public enum StructOrUnion {
+                    Struct,
+                    Union
                 }
-
-                public string TagName {
-                    get;
-                }
-
-                public bool IsAnonymous {
+                public StructOrUnion Kind {
                     get;
                 }
 
                 public class MemberInfo {
-                    public string Ident { get; }
-                    public CType Type { get; }
-                    public int BitOffset { get; }
-                    public int BitSize { get; }
+                    public string Ident {
+                        get;
+                    }
+                    public CType Type {
+                        get;
+                    }
+                    public int BitSize {
+                        get;
+                    }
 
-                    public MemberInfo(string ident, CType type, int bitOffset, int bitSize) {
+                    public MemberInfo(string ident, CType type, int? bitSize) {
+                        // 制約
+                        // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
+                        //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
+                        //   - 値が 0 の場合，その宣言に宣言子があってはならない。
+                        // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
+                        switch ((type.Unwrap() as CType.BasicType)?.kind) {
+                            case BasicType.Kind._Bool:
+                            case BasicType.Kind.SignedInt:
+                            case BasicType.Kind.UnsignedInt:
+                                break;
+                            default:
+                                throw new Exception("ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                        }
+                        if (bitSize.HasValue) {
+                            if (bitSize.Value < 0) {
+                                throw new Exception("ビットフィールドの幅の値は，0 以上でなければならない。");
+                            } else if (bitSize.Value > type.Sizeof() * 8) {
+                                throw new Exception("ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
+                            } else if (bitSize.Value == 0) {
+                                // 値が 0 の場合，その宣言に宣言子があってはならない。
+                                // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
+                                // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
+                                if (ident != null) {
+                                    throw new Exception("ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
+                                }
+                            }
+                        }
                         Ident = ident;
                         Type = type;
-                        BitOffset = bitOffset;
-                        BitSize = bitSize;
+                        BitSize = bitSize.Value;
                     }
                 }
 
@@ -359,17 +475,15 @@ namespace AnsiCParser {
                     get; internal set;
                 }
 
-                public StructUnionType(bool isStruct, string tagName, bool is_anonymous) {
-                    this.IsStruct = isStruct;
-                    this.TagName = tagName;
-                    this.IsAnonymous = is_anonymous;
+                public StructUnionType(StructOrUnion kind, string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
+                    this.Kind = kind;
                 }
 
                 protected override void Fixup(CType ty) {
                     for (var i = 0; i < struct_declarations.Count; i++) {
                         var struct_declaration = struct_declarations[i];
                         if (struct_declaration.Type is StubType) {
-                            struct_declarations[i] = new MemberInfo(struct_declaration.Ident, ty, struct_declaration.BitOffset, struct_declaration.BitSize);
+                            struct_declarations[i] = new MemberInfo(struct_declaration.Ident, ty, struct_declaration.BitSize);
                         } else {
                             struct_declaration.Type.Fixup(ty);
                         }
@@ -382,7 +496,7 @@ namespace AnsiCParser {
 
                 public override int Sizeof() {
                     // ビットフィールドは未実装
-                    if (IsStruct) {
+                    if (Kind == StructOrUnion.Struct) {
                         return struct_declarations.Sum(x => x.Type.Sizeof());
                     } else {
                         return struct_declarations.Max(x => x.Type.Sizeof());
@@ -390,7 +504,7 @@ namespace AnsiCParser {
                 }
                 public override string ToString() {
                     var sb = new List<string>();
-                    sb.Add(IsStruct ? "strunct" : "union");
+                    sb.Add((Kind == StructOrUnion.Struct) ? "strunct" : "union");
                     sb.Add(TagName);
                     if (struct_declarations != null) {
                         sb.Add("{");
@@ -408,19 +522,30 @@ namespace AnsiCParser {
             /// 列挙型
             /// </summary>
             public class EnumType : TaggedType {
-                public string Ident {
-                    get;
+
+                public class MemberInfo {
+                    public string Name {
+                        get;
+                    }
+                    public EnumType ParentType {
+                        get;
+                    }
+                    public int Value {
+                        get;
+                    }
+                    public MemberInfo(EnumType parentType, string name, int value) {
+                        ParentType = ParentType;
+                        Name = name;
+                        Value = value;
+                    }
                 }
-                public bool IsAnonymous {
-                    get;
-                }
-                public List<Tuple<string, int>> enumerator_list {
+
+
+                public List<MemberInfo> enumerator_list {
                     get; set;
                 }
 
-                public EnumType(string ident, bool isAnonymous) {
-                    this.Ident = ident;
-                    this.IsAnonymous = isAnonymous;
+                public EnumType(string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
                 }
 
                 protected override void Fixup(CType ty) {
@@ -430,17 +555,14 @@ namespace AnsiCParser {
                     return 4;
                 }
 
-                public override bool IsImplicit() {
-                    return false;
-                }
                 public override string ToString() {
                     var sb = new List<string>();
                     sb.Add("enum");
-                    sb.Add(Ident);
+                    sb.Add(TagName);
                     if (enumerator_list != null) {
                         sb.Add("{");
                         sb.AddRange(enumerator_list.SelectMany(x =>
-                            new string[] { x.Item1, "=", x.Item2.ToString(), "," }
+                            new string[] { x.Name, "=", x.Value.ToString(), "," }
                         ));
                         sb.Add("}");
                     }
@@ -457,12 +579,6 @@ namespace AnsiCParser {
             public override int Sizeof() {
                 throw new Exception();
             }
-            public override bool IsImplicit() {
-                throw new Exception();
-            }
-            public override bool IsFunction() {
-                throw new Exception();
-            }
             public override string ToString() {
                 return "$";
             }
@@ -472,10 +588,22 @@ namespace AnsiCParser {
         /// 関数型
         /// </summary>
         public class FunctionType : CType {
+
+            public class ArgumentInfo {
+                public string Name { get; }
+                public StorageClass Sc { get; }
+                public CType cType { get; }
+                public ArgumentInfo(string name, StorageClass sc, CType ctype) {
+                    Name = name;
+                    Sc = sc;
+                    cType = ctype;
+                }
+            }
+
             /// <summary>
             /// 引数型
             /// </summary>
-            public List<Tuple<string, CType>> Arguments {
+            public List<ArgumentInfo> Arguments {
                 get;
             }
 
@@ -493,7 +621,7 @@ namespace AnsiCParser {
                 get;
             }
 
-            public FunctionType(List<Tuple<string, CType>> arguments, bool hasVariadic, CType resultType) {
+            public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType) {
                 this.Arguments = arguments;
                 this.ResultType = resultType;
                 this.HasVariadic = hasVariadic;
@@ -511,19 +639,12 @@ namespace AnsiCParser {
                 throw new Exception();
             }
 
-            public override bool IsImplicit() {
-                return false;
-            }
-
-            public override bool IsFunction() {
-                return true;
-            }
             public override string ToString() {
                 var sb = new List<string>();
                 sb.Add(ResultType.ToString());
                 if (Arguments != null) {
                     sb.Add("(");
-                    sb.Add(String.Join(", ", Arguments.Select(x => x.Item2.ToString())));
+                    sb.Add(String.Join(", ", Arguments.Select(x => x.cType.ToString())));
                     if (HasVariadic) {
                         sb.Add(", ...");
                     }
@@ -558,13 +679,6 @@ namespace AnsiCParser {
                 return 4;
             }
 
-            public override bool IsImplicit() {
-                return false;
-            }
-
-            public override bool IsFunction() {
-                return false;
-            }
             public override string ToString() {
                 return "*" + cType.ToString();
             }
@@ -602,12 +716,6 @@ namespace AnsiCParser {
                 return (Length < 0) ? 4 : cType.Sizeof() * (Length);
             }
 
-            public override bool IsImplicit() {
-                return false;
-            }
-            public override bool IsFunction() {
-                return false;
-            }
             public override string ToString() {
                 return cType.ToString() + $"[{Length}]";
             }
@@ -633,12 +741,6 @@ namespace AnsiCParser {
                 return this.cType.Sizeof();
             }
 
-            public override bool IsImplicit() {
-                return false;
-            }
-            public override bool IsFunction() {
-                return false;
-            }
             public override string ToString() {
                 return Ident;
             }
@@ -652,7 +754,7 @@ namespace AnsiCParser {
                 get; private set;
             }
             public TypeQualifier type_qualifier {
-                get;
+                get; set;
             }
 
             public TypeQualifierType(CType baseType, TypeQualifier type_qualifier) {
@@ -672,12 +774,6 @@ namespace AnsiCParser {
                 return this.cType.Sizeof();
             }
 
-            public override bool IsImplicit() {
-                return this.cType.IsImplicit();
-            }
-            public override bool IsFunction() {
-                return false;
-            }
             public override string ToString() {
                 var sb = new List<string>();
                 sb.Add((type_qualifier & TypeQualifier.Const) != 0 ? "const" : null);
@@ -691,12 +787,12 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 型が同一型であるかどうかを比較する
+        /// 型が同一であるかどうかを比較する
         /// </summary>
         /// <param name="t1"></param>
         /// <param name="t2"></param>
         /// <returns></returns>
-        public static bool EqualType(CType t1, CType t2) {
+        public static bool Equals(CType t1, CType t2) {
             for (; ; ) {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
@@ -741,7 +837,7 @@ namespace AnsiCParser {
                     if ((t1 as CType.FunctionType).HasVariadic != (t2 as CType.FunctionType).HasVariadic) {
                         return false;
                     }
-                    if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => EqualType(x.Item2, y.Item2)).All(x => x) == false) {
+                    if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => Equals(x.cType, y.cType)).All(x => x) == false) {
                         return false;
                     }
                     t1 = (t1 as CType.FunctionType).ResultType;
@@ -752,7 +848,7 @@ namespace AnsiCParser {
                     throw new Exception();
                 }
                 if (t1 is CType.TaggedType.StructUnionType && t2 is CType.TaggedType.StructUnionType) {
-                    if ((t1 as CType.TaggedType.StructUnionType).IsStruct != (t2 as CType.TaggedType.StructUnionType).IsStruct) {
+                    if ((t1 as CType.TaggedType.StructUnionType).Kind != (t2 as CType.TaggedType.StructUnionType).Kind) {
                         return false;
                     }
                     if ((t1 as CType.TaggedType.StructUnionType).IsAnonymous != (t2 as CType.TaggedType.StructUnionType).IsAnonymous) {
@@ -764,13 +860,13 @@ namespace AnsiCParser {
                     if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Count != (t2 as CType.TaggedType.StructUnionType).struct_declarations.Count) {
                         return false;
                     }
-                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => EqualType(x.Type, y.Type)).All(x => x) == false) {
+                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => Equals(x.Type, y.Type)).All(x => x) == false) {
                         return false;
                     }
                     return true;
                 }
                 if (t1 is CType.BasicType && t2 is CType.BasicType) {
-                    if ((t1 as CType.BasicType).type_specifier != (t2 as CType.BasicType).type_specifier) {
+                    if ((t1 as CType.BasicType).kind != (t2 as CType.BasicType).kind) {
                         return false;
                     }
                     return true;
@@ -778,11 +874,719 @@ namespace AnsiCParser {
                 throw new Exception();
             }
         }
+    }
 
-        public class ExpressionValue {
+    /// <summary>
+    /// 規格書の用語に対応した定義の実装
+    /// </summary>
+    public static class Specification {
+        /// <summary>
+        /// 型別名と型修飾を無視した型を得る。
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        public static CType Unwrap(this CType self) {
+            for (; ; ) {
+                if (self is CType.TypedefedType) {
+                    self = (self as CType.TypedefedType).cType;
+                    continue;
+                } else if (self is CType.TypeQualifierType) {
+                    self = (self as CType.TypeQualifierType).cType;
+                    continue;
+                }
+                break;
+            }
+            return self;
+        }
 
+
+        // 6.2.5 型
+        // - オブジェクト型（object type）: オブジェクトを完全に規定する型（脚注：不完全型 (incomplete type) と関数型 (function type) 以外の サイズが確定している型）
+        // - 関数型（function type）: 関数を規定する型
+        // - 不完全型（incomplete type）: オブジェクトを規定する型で，その大きさを確定するのに必要な情報が欠けたもの
+        //                                void型                                完全にすることのできない不完全型とする
+        //                                大きさの分からない配列型              それ以降のその型の識別子の宣言（内部結合又は外部結合をもつ）で大きさを指定することによって，完全となる
+        //                                内容の分からない構造体型又は共用体型  同じ有効範囲のそれ以降の同じ構造体タグ又は共用体タグの宣言で，内容を定義することによって，その型のすべての宣言に関し完全となる
+        //                                
+        //
+        // - 標準符号付き整数型（standard signed integer type）: signed char，short int，int，long int 及び long long int の 5 種類
+        // - 拡張符号付き整数型（extended signed integer type）: 処理系が独自に定義する標準符号付き整数型
+        // - 符号付き整数型（signed integer type） : 標準符号付き整数型及び拡張符号付き整数型の総称
+        // - 標準符号無し整数型（standard unsigned integer type）: 型_Bool，及び標準符号付き整数型に対応する符号無し整数型
+        // - 拡張符号無し整数型（extended unsigned integer type）: 拡張符号付き整数型に対応する符号無し整数型
+        // - 符号無し整数型（unsigned integer type）: 標準符号無し整数型及び拡張符号無し整数型の総称
+        // - 標準整数型（standard integer type） : 標準符号付き整数型及び標準符号無し整数型の総称
+        // - 拡張整数型（extended integer type） : 拡張符号付き整数型及び拡張符号無し整数型の総称
+        //
+        // - 実浮動小数点型（real floating type）: float，double 及び long doubleの 3 種類
+        // - 複素数型（complex type） : float _Complex，double _Complex 及び long double _Complexの 3 種類
+        // - 浮動小数点型（floating type） : 実浮動小数点型及び複素数型の総称
+        // - 対応する実数型（corresponding real type） : 実浮動小数点型に対しては，同じ型を対応する実数型とする。複素数型に対しては，型名からキーワード_Complex を除いた型を，対応する実数型とする
+        //
+        // - 基本型（basic type） : 型 char，符号付き整数型，符号無し整数型及び浮動小数点型の総称
+        // - 文字型（character type） : 三つの型 char，signed char 及び unsigned char の総称
+        // - 列挙体（enumeration）: 名前付けられた整数定数値から成る。それぞれの列挙体は，異なる列挙型（enumerated type）を構成する
+        // - 整数型（integer type） : 型 char，符号付き整数型，符号無し整数型，及び列挙型の総称
+        // - 実数型（real type） : 整数型及び実浮動小数点型の総称
+        // - 算術型（arithmetic type） : 整数型及び浮動小数点型の総称
+        //
+        // - 派生型（derived type）は，オブジェクト型，関数型及び不完全型から幾つでも構成することができる
+        // - 派生型の種類は，次のとおり
+        //   - 配列型（array type） : 要素型（element type）から派生
+        //   - 構造体型（structure type） : メンバオブジェクトの空でない集合を順に割り付けたもの。各メンバは，名前を指定してもよく異なる型をもってもよい。
+        //   - 共用体型（union type） : 重なり合って割り付けたメンバオブジェクトの空でない集合。各メンバは，名前を指定してもよく異なる型をもってもよい。
+        //   - 関数型（function type） : 指定された返却値の型をもつ関数を表す。関数型は，その返却値の型，並びにその仮引数の個数及び型によって特徴付ける。
+        //   - ポインタ型（pointer type）: 被参照型（referenced type）と呼ぶ関数型，オブジェクト型又は不完全型から派生することができる
+        // - スカラ型（scalar type）: 算術型及びポインタ型の総称
+        // - 集成体型（aggregate type） : 配列型及び構造体型の総称
+        // - 派生宣言子型（derived declarator type） : 配列型，関数型及びポインタ型の総称
+        // - 型分類（type category） : 型が派生型を含む場合，最も外側の派生とし，型が派生型を含まない場合，その型自身とする
+        // - 非修飾型（unqualified type）: const，volatile，及びrestrict修飾子の一つ，二つ又は三つの組合せを持たない上記の型の総称。
+        // - 修飾型（qualified type）: const，volatile，及びrestrict修飾子の一つ，二つ又は三つの組合せを持つ上記の型の総称。一つの型の修飾版と非修飾版は，同じ型分類，同じ表現及び同じ境界調整要求をもつが，異なる型とする
+        //                             型修飾子をもつ型から派生したとしても，派生型はその型修飾子によって修飾されない。
+
+        /// <summary>
+        /// オブジェクト型（object type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// オブジェクトを完全に規定する型（脚注：不完全型 (incomplete type) と関数型 (function type) 以外の サイズが確定している型）
+        /// </remarks>
+        public static bool IsObjectType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return !(unwrappedSelf.IsFunctionType() || unwrappedSelf.IsIncompleteType());
+        }
+
+        /// <summary>
+        /// 関数型（function type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// 関数を規定する型
+        /// </remarks>
+        public static bool IsFunctionType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf is CType.FunctionType;
+        }
+
+        /// <summary>
+        /// 不完全型（incomplete type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// オブジェクトを規定する型で，その大きさを確定するのに必要な情報が欠けたもの
+        ///   void型                                完全にすることのできない不完全型とする
+        ///   大きさの分からない配列型              それ以降のその型の識別子の宣言（内部結合又は外部結合をもつ）で大きさを指定することによって，完全となる
+        ///   内容の分からない構造体型又は共用体型  同じ有効範囲のそれ以降の同じ構造体タグ又は共用体タグの宣言で，内容を定義することによって，その型のすべての宣言に関し完全となる
+        /// </remarks>
+        public static bool IsIncompleteType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            // void型  
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                return bt.kind == CType.BasicType.Kind.Void;
+            }
+            // 大きさの分からない配列型
+            if (unwrappedSelf is CType.ArrayType) {
+                var at = unwrappedSelf as CType.ArrayType;
+                if (at.Length == -1) {
+                    return true;
+                }
+                return at.cType.IsIncompleteType();
+            }
+            // 内容の分からない構造体型又は共用体型
+            if (unwrappedSelf is CType.TaggedType.StructUnionType) {
+                var sut = unwrappedSelf as CType.TaggedType.StructUnionType;
+                if (sut.struct_declarations == null) {
+                    return true;
+                }
+                return sut.struct_declarations.Any(x => x.Type.IsIncompleteType());
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 標準符号付き整数型（standard signed integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsStandardSignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.SignedChar:   // signed char
+                    case CType.BasicType.Kind.SignedShortInt:    // short int
+                    case CType.BasicType.Kind.SignedInt:    // int
+                    case CType.BasicType.Kind.SignedLongInt:    // long int
+                    case CType.BasicType.Kind.SignedLongLongInt:    // long long int
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 拡張符号付き整数型（extended signed integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsExtendedSignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return false;
+        }
+
+        /// <summary>
+        /// 符号付き整数型（signed integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsSignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsStandardSignedIntegerType() || unwrappedSelf.IsExtendedSignedIntegerType();
+        }
+
+        /// <summary>
+        /// 標準符号無し整数型（standard unsigned integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsStandardUnsignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.UnsignedChar:         // unsigned char
+                    case CType.BasicType.Kind.UnsignedShortInt:     // unsigned short int
+                    case CType.BasicType.Kind.UnsignedInt:          // unsigned int
+                    case CType.BasicType.Kind.UnsignedLongInt:      // unsigned long int
+                    case CType.BasicType.Kind.UnsignedLongLongInt:  // unsigned long long int
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 拡張符号無し整数型（extended unsigned integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsExtendedUnsignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return false;
+        }
+
+        /// <summary>
+        /// 符号無し整数型（unsigned integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsUnsignedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsStandardUnsignedIntegerType() || unwrappedSelf.IsExtendedUnsignedIntegerType();
+        }
+
+        /// <summary>
+        /// 標準整数型（standard integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsStandardIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsStandardSignedIntegerType() || unwrappedSelf.IsStandardUnsignedIntegerType();
+        }
+
+        /// <summary>
+        /// 拡張整数型（extended integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsExtendedIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsExtendedSignedIntegerType() || unwrappedSelf.IsExtendedUnsignedIntegerType();
+        }
+
+        /// <summary>
+        /// 実浮動小数点型（real floating type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsRealFloatingType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.Float:                // float
+                    case CType.BasicType.Kind.Double:               // double
+                    case CType.BasicType.Kind.LongDouble:           // long double
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 複素数型（complex type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsComplexType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.Float_Complex:                // float _Complex
+                    case CType.BasicType.Kind.Double_Complex:               // double _Complex
+                    case CType.BasicType.Kind.LongDouble_Complex:           // long double _Complex
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 浮動小数点型（floating type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsFloatingType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsRealFloatingType() || unwrappedSelf.IsComplexType();
+        }
+
+        /// <summary>
+        /// 対応する実数型(corresponding real type)を取得
+        /// </summary>
+        /// <returns></returns>
+        public static CType.BasicType GetCorrespondingRealType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf.IsRealFloatingType()) {
+                var bt = unwrappedSelf as CType.BasicType;
+                return bt;
+            } else if (unwrappedSelf.IsComplexType()) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.Float_Complex:
+                        return new CType.BasicType(CType.BasicType.Kind.Float);
+                    case CType.BasicType.Kind.Double_Complex:
+                        return new CType.BasicType(CType.BasicType.Kind.Double);
+                    case CType.BasicType.Kind.LongDouble_Complex:
+                        return new CType.BasicType(CType.BasicType.Kind.LongDouble);
+                    default:
+                        throw new Exception();
+                }
+            } else {
+                throw new Exception();
+            }
+        }
+
+
+        /// <summary>
+        /// 基本型（basic type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsBasicType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsSignedIntegerType() || unwrappedSelf.IsUnsignedIntegerType() || unwrappedSelf.IsFloatingType() || ((unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Char);
+        }
+
+
+        /// <summary>
+        /// 文字型（character type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsCharacterType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.BasicType) {
+                var bt = unwrappedSelf as CType.BasicType;
+                switch (bt.kind) {
+                    case CType.BasicType.Kind.Char:             // char
+                    case CType.BasicType.Kind.SignedChar:       // signed char
+                    case CType.BasicType.Kind.UnsignedChar:     // unsigned char
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 列挙型（enumerated type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsEnumeratedType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf is CType.TaggedType.EnumType;
+        }
+
+        /// <summary>
+        /// 整数型（integer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsIntegerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsSignedIntegerType() || unwrappedSelf.IsUnsignedIntegerType() || unwrappedSelf.IsEnumeratedType() || ((unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Char);
+        }
+
+        /// <summary>
+        /// 実数型（real type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsRealType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsIntegerType() || unwrappedSelf.IsRealFloatingType();
+        }
+
+        /// <summary>
+        /// 算術型（arithmetic type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsArithmeticType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsIntegerType() || unwrappedSelf.IsFloatingType();
+        }
+
+
+        /// <summary>
+        /// 配列型（array type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsArrayType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf is CType.ArrayType;
+        }
+
+        /// <summary>
+        /// 構造体型（structure type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsStructureType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct;
+        }
+
+        /// <summary>
+        /// 共用体型（union type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsUnionType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Union;
+        }
+
+        /// <summary>
+        /// ポインタ型（pointer type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsPointerType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf is CType.PointerType;
+        }
+
+        /// <summary>
+        /// 派生型（derived type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsDerivedType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsArrayType()
+                || unwrappedSelf.IsStructureType()
+                || unwrappedSelf.IsUnionType()
+                || unwrappedSelf.IsFunctionType()
+                || unwrappedSelf.IsPointerType()
+                ;
+        }
+
+        /// <summary>
+        /// 被参照型（referenced type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsReferencedType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsFunctionType()
+                || unwrappedSelf.IsObjectType()
+                || unwrappedSelf.IsIncompleteType()
+                ;
+        }
+
+        /// <summary>
+        /// スカラ型（scalar type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsScalarType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsArithmeticType()
+                || unwrappedSelf.IsPointerType()
+                || unwrappedSelf.IsIncompleteType()
+                ;
+        }
+
+        /// <summary>
+        /// 集成体型（aggregate type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsAggregateType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsStructureType()
+                || unwrappedSelf.IsArrayType()
+                ;
+        }
+
+
+        /// <summary>
+        /// 派生宣言子型（derived declarator type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsDerivedDeclaratorType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return unwrappedSelf.IsFunctionType()
+                || unwrappedSelf.IsArrayType()
+                || unwrappedSelf.IsPointerType()
+                ;
+        }
+
+        /// <summary>
+        /// 非修飾型（unqualified type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsUnqualifiedType(this CType self) {
+            return !(self is CType.TypeQualifierType);
+        }
+
+        /// <summary>
+        /// 修飾型（qualified type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsQualifiedType(this CType self) {
+            return self is CType.TypeQualifierType;
+        }
+
+        // 6.3 型変換
+        // 暗黙の型変換（implicit conversion）
+        // 明示的な型変換（explicit conversion）
+
+
+        /// <summary>
+        /// 整数変換の順位（integer conversion rank）
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// 6.3.1.1 論理型，文字型及び整数型
+        /// すべての整数型は，次のとおり定義される整数変換の順位（integer conversion rank）をもつ
+        /// - 二つの符号付き整数型は，同じ表現をもつ場合であっても，同じ順位をもってはならない。
+        /// - 符号付き整数型は，より小さい精度の符号付き整数型より高い順位をもたなければならない。
+        /// - long long int 型は long int 型より高い順位をもたなければならない。
+        ///   long int 型は int 型より高い順位をもたなければならない。
+        ///   int 型は short int 型より高い順位をもたなければならない。
+        ///   short int 型は signed char 型より高い順位をもたなければならない。
+        /// - ある符号無し整数型に対し，対応する符号付き整数型があれば，両方の型は同じ順位をもたなければならない。
+        /// - 標準整数型は，同じ幅の拡張整数型より高い順位をもたなければならない。
+        /// - char 型は，signed char 型及び unsigned char 型と同じ順位をもたなければならない。
+        /// - _Bool 型は，その他のすべての標準整数型より低い順位をもたなければならない。
+        /// - すべての列挙型は，それぞれと適合する整数型と同じ順位をもたなければならない（6.7.2.2 参照）。
+        /// - 精度の等しい拡張符号付き整数型同士の順位は処理系定義とするが，整数変換の順位を定める他の規則に従わなければならない。
+        /// - 任意の整数型 T1，T2，及び T3 について，T1 が T2 より高い順位をもち，かつ T2 が T3 より高い順位をもつならば，T1 は T3 より高い順位をもたなければならない。
+        /// </remarks>
+        public static int IntegerConversionRank(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf.IsIntegerType()) {
+                if (unwrappedSelf.IsEnumeratedType()) {
+                    // すべての列挙型は，それぞれと適合する整数型と同じ順位をもたなければならない（6.7.2.2 参照）。
+                    return -5;  // == signed int
+                } else {
+                    switch ((unwrappedSelf as CType.BasicType)?.kind) {
+                        case CType.BasicType.Kind.SignedLongLongInt:
+                        case CType.BasicType.Kind.UnsignedLongLongInt:
+                            //long long = unsigned long long
+                            //int64_t = uint64_t
+                            return -1;
+                        case CType.BasicType.Kind.SignedLongInt:
+                        case CType.BasicType.Kind.UnsignedLongInt:
+                            //long = unsigned long
+                            return -3;
+                        case CType.BasicType.Kind.SignedInt:
+                        case CType.BasicType.Kind.UnsignedInt:
+                            //int = unsigned int
+                            //int32_t = uint32_t
+                            return -5;
+                        case CType.BasicType.Kind.SignedShortInt:
+                        case CType.BasicType.Kind.UnsignedShortInt:
+                            //short = unsigned short
+                            //int16_t = uint16_t
+                            return -7;
+                        case CType.BasicType.Kind.Char:
+                        case CType.BasicType.Kind.SignedChar:
+                        case CType.BasicType.Kind.UnsignedChar:
+                            //char = signed char = unsigned char
+                            //int8_t = uint8_t
+                            return -9;
+                        case CType.BasicType.Kind._Bool:
+                            // bool
+                            return -11;
+                        default:
+                            return 0;
+                    }
+                }
+            } else {
+                return 0;
+            }
+        }
+
+
+        /// <summary>
+        ///  整数拡張（integer promotion）
+        /// </summary>
+        /// <param name="expr"></param>
+        public static AST.Expression IntegerPromotion(AST.Expression expr, int? bitfield = null) {
+            if (bitfield.HasValue == false) {
+                // ビットフィールドではない
+                // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
+                if (IntegerConversionRank(expr.Type) < -5) {
+                    // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                    if ((expr.Type.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.UnsignedInt) {
+                        // unsigned int でないと表現できない
+                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                    } else {
+                        // signed int で表現できる
+                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                    }
+                } else {
+                    // 拡張は不要
+                    return expr;
+                }
+            } else {
+                // ビットフィールドである
+                switch ((expr.Type.Unwrap() as CType.BasicType)?.kind) {
+                    // _Bool 型，int 型，signed int 型，又は unsigned int 型
+                    case CType.BasicType.Kind._Bool:
+                        // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
+                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                    case CType.BasicType.Kind.SignedInt:
+                        // 無条件でint型に変換できる
+                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                    case CType.BasicType.Kind.UnsignedInt:
+                        // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                        if (bitfield.Value == 4 * 8) {
+                            // unsigned int でないと表現できない
+                            return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                        } else {
+                            // signed int で表現できる
+                            return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        }
+                    default:
+                        throw new Exception("ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 通常の算術型変換（usual arithmetic conversion）
+        /// </summary>
+        public static CType UsualArithmeticConversion(ref AST.Expression lhs, ref AST.Expression rhs) {
+            var tyLhs = lhs.Type.Unwrap();
+            var tyRhs = rhs.Type.Unwrap();
+
+            var btLhs = tyLhs as CType.BasicType;
+            var btRhs = tyRhs as CType.BasicType;
+
+            if (btLhs == null || btRhs == null) {
+                throw new Exception();
+            }
+            if (btLhs.kind == btRhs.kind) {
+                return btLhs;
+            }
+
+            // まず，一方のオペランドの対応する実数型が long double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が long double となるように型変換する。
+
+            if (btLhs.GetCorrespondingRealType().kind == CType.BasicType.Kind.LongDouble) {
+                if (btRhs.IsComplexType()) {
+                    var retTy = new CType.BasicType(CType.BasicType.Kind.LongDouble_Complex);
+                    rhs = new AST.Expression.CastExpression(retTy, rhs);
+                    return retTy;
+                } else {
+                    rhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble), rhs);
+                    return btLhs;
+                }
+            } else if (btRhs.GetCorrespondingRealType().kind == CType.BasicType.Kind.LongDouble) {
+                if (btLhs.IsComplexType()) {
+                    lhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble_Complex), lhs);
+                    return btRhs;
+                }
+                else {
+                    lhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble), lhs);
+                    return btRhs;
+                }
+            }
+
+            foreach (var target in realTargets) {
+                if (btLhs.GetCorrespondingRealType().kind == target.Item1) {
+                    rhs = new AST.Expression.CastExpression(new CType.BasicType(btLhs.IsComplexType() ? target.Item2 : target.Item1), rhs);
+                    return btLhs;
+                }
+                if (btRhs.GetCorrespondingRealType().kind == target.Item1) {
+                    lhs = new AST.Expression.CastExpression(new CType.BasicType(btLhs.IsComplexType() ? target.Item2 : target.Item1), lhs);
+                    return btRhs;
+                }
+            }
+
+            // そうでない場合，整数拡張を両オペランドに対して行い，拡張後のオペランドに次の規則を適用する。
+            lhs = IntegerPromotion(lhs);
+            rhs = IntegerPromotion(rhs);
+
+            tyLhs = lhs.Type.Unwrap();
+            tyRhs = rhs.Type.Unwrap();
+
+            btLhs = tyLhs as CType.BasicType;
+            btRhs = tyRhs as CType.BasicType;
+
+            if (btLhs == null || btRhs == null) {
+                throw new Exception();
+            }
+            // 両方のオペランドが同じ型をもつ場合，更なる型変換は行わない。
+            if (btLhs.kind == btRhs.kind) {
+                return btLhs;
+            }
+
+            // そうでない場合，両方のオペランドが符号付き整数型をもつ，又は両方のオペランドが符号無し整数型をもつならば，
+            // 整数変換順位の低い方の型を，高い方の型に変換する。
+            if ((btLhs.IsSignedIntegerType() && btRhs.IsSignedIntegerType()) || (btLhs.IsUnsignedIntegerType() && btRhs.IsUnsignedIntegerType())) {
+                if (btLhs.IntegerConversionRank() < btRhs.IntegerConversionRank()) {
+                    lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                    return btRhs;
+                } else {
+                    rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                    return btLhs;
+                }
+            }
+
+            // そうでない場合，符号無し整数型をもつオペランドが，他方のオペランドの整数変換順位より高い又は等しい順位をもつならば，
+            // 符号付き整数型をもつオペランドを，符号無し整数型をもつオペランドの型に変換する。
+            if (btLhs.IsUnsignedIntegerType() && btLhs.IntegerConversionRank() >= btRhs.IntegerConversionRank()) {
+                rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                return btLhs;
+            } else if (btRhs.IsUnsignedIntegerType() && btRhs.IntegerConversionRank() >= btLhs.IntegerConversionRank()) {
+                lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                return btRhs;
+            }
+
+            // そうでない場合，符号付き整数型をもつオペランドの型が，符号無し整数型をもつオペランドの型のすべての値を表現できるならば，
+            // 符号無し整数型をもつオペランドを，符号付き整数型をもつオペランドの型に変換する。
+            if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.Sizeof() > btRhs.Sizeof()) {
+                rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                return btLhs;
+            } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.Sizeof() > btLhs.Sizeof()) {
+                lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                return btRhs;
+            }
+
+            // 
         }
     }
+
+
 
     public abstract class AST {
         public static int ConstantEval(AST.Expression expr) {
@@ -840,7 +1644,7 @@ namespace AnsiCParser {
             }
             if (expr is AST.Expression.EnumerationConstant) {
                 var e = expr as AST.Expression.EnumerationConstant;
-                return e.Ret.Item3;
+                return e.Ret.Value;
             }
             if (expr is AST.Expression.EqualityExpression) {
                 var e = expr as AST.Expression.EqualityExpression;
@@ -1012,6 +1816,9 @@ namespace AnsiCParser {
         }
 
         public abstract class Expression : AST {
+
+            public CType Type { get; set; }
+
             public class CommaExpression : Expression {
                 public List<AST.Expression> expressions { get; } = new List<AST.Expression>();
             }
@@ -1449,11 +2256,11 @@ namespace AnsiCParser {
             }
 
             public class EnumerationConstant : Expression {
-                public Tuple<string, CType, int> Ret {
+                public CType.TaggedType.EnumType.MemberInfo Ret {
                     get;
                 }
 
-                public EnumerationConstant(Tuple<string, CType, int> ret) {
+                public EnumerationConstant(CType.TaggedType.EnumType.MemberInfo ret) {
                     Ret = ret;
                 }
             }
@@ -1495,6 +2302,22 @@ namespace AnsiCParser {
                     this.statements = statements;
                 }
             }
+
+
+            public class IntegerPromotionExpression : Expression {
+                public CType.BasicType Ty {
+                    get;
+                }
+                public Expression Expr {
+                    get;
+                }
+
+                public IntegerPromotionExpression(CType.BasicType ty, Expression expr) {
+                    Ty = ty;
+                    Expr = expr;
+                }
+            }
+
         }
 
         public abstract class Statement : AST {
@@ -1880,7 +2703,7 @@ namespace AnsiCParser {
                 return false;
             }
 
-            public virtual Tuple<string, CType, int> ToEnumValue() {
+            public virtual CType.TaggedType.EnumType.MemberInfo ToEnumValue() {
                 throw new Exception("");
             }
 
@@ -1904,8 +2727,8 @@ namespace AnsiCParser {
                 public override bool IsEnumValue() {
                     return true;
                 }
-                public override Tuple<string, CType, int> ToEnumValue() {
-                    return Tuple.Create(ident, (CType)ctype, ctype.enumerator_list.FindIndex(x => x.Item1 == ident));
+                public override CType.TaggedType.EnumType.MemberInfo ToEnumValue() {
+                    return ctype.enumerator_list.Find(x => x.Name == ident);
                 }
                 public CType.TaggedType.EnumType ctype {
                     get;
@@ -2480,10 +3303,10 @@ namespace AnsiCParser {
             if (!(v is IdentifierValue.EnumValue)) {
                 return false;
             }
-            return (v as IdentifierValue.EnumValue).ctype.enumerator_list.First(x => x.Item1 == ident.raw) != null;
+            return (v as IdentifierValue.EnumValue).ctype.enumerator_list.First(x => x.Name == ident.raw) != null;
         }
 
-        private Tuple<string, CType, int> ENUMERATION_CONSTANT() {
+        private CType.TaggedType.EnumType.MemberInfo ENUMERATION_CONSTANT() {
             var ident = IDENTIFIER(false);
             IdentifierValue v;
             if (ident_scope.TryGetValue(ident, out v) == false) {
@@ -2493,8 +3316,8 @@ namespace AnsiCParser {
                 throw new Exception();
             }
             var ev = (v as IdentifierValue.EnumValue);
-            var el = ev.ctype.enumerator_list.First(x => x.Item1 == ident);
-            return Tuple.Create(el.Item1, (CType)ev.ctype, el.Item2);
+            var el = ev.ctype.enumerator_list.First(x => x.Name == ident);
+            return el;
         }
 
         private bool is_CHARACTER_CONSTANT() {
@@ -2583,7 +3406,7 @@ namespace AnsiCParser {
             while (is_external_declaration(null, TypeSpecifier.None)) {
                 ret.declarations.AddRange(external_declaration());
             }
-            is_eof();
+            eof();
             return ret;
         }
 
@@ -2610,7 +3433,11 @@ namespace AnsiCParser {
             } else if (baseType == null) {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
-            baseType = new CType.TypeQualifierType(baseType, typeQualifier);
+            if (baseType.IsQualifiedType()) {
+                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
+            } else {
+                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
+            }
 
             var ret = new List<AST.Declaration>();
 
@@ -2635,7 +3462,7 @@ namespace AnsiCParser {
                                 throw new Exception();
                             }
                             // 関数宣言に初期値は指定できない
-                            if (ctype.IsFunction()) {
+                            if (ctype.IsFunctionType()) {
                                 throw new Exception("");
                             }
                             Read('=');
@@ -2645,7 +3472,7 @@ namespace AnsiCParser {
                             if (storageClass == StorageClass.Typedef) {
                                 AST.Declaration.TypeDeclaration tdecl;
                                 if (typedef_scope.TryGetValue(ident, out tdecl)) {
-                                    if (CType.EqualType(tdecl.Ctype, ctype) == false) {
+                                    if (CType.Equals(tdecl.Ctype, ctype) == false) {
                                         throw new Exception("再定義型の不一致");
                                     }
                                 } else {
@@ -2653,7 +3480,7 @@ namespace AnsiCParser {
                                     decl = tdecl;
                                     typedef_scope.Add(ident, tdecl);
                                 }
-                            } else if (ctype.IsFunction()) {
+                            } else if (ctype.IsFunctionType()) {
                                 decl = new AST.Declaration.FunctionDeclaration(ident, ctype, storageClass);
                                 ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
                             } else {
@@ -2669,7 +3496,7 @@ namespace AnsiCParser {
                             continue;
                         }
                         break;
-                    } else if (ctype.IsFunction()) {
+                    } else if (ctype.IsFunctionType()) {
                         // 関数定義
 
                         // K&Rの引数型宣言があるか調べる。
@@ -2677,7 +3504,7 @@ namespace AnsiCParser {
 
                         // 判定は適当。修正予定
                         // ctypeがK&R型の宣言ならここでctypeの引数部分とargumentsを照合してマージする。
-                        if (ctype.IsFunction()) {
+                        if (ctype.IsFunctionType()) {
                             var ctype_fun = ctype as CType.FunctionType;
                             if (ctype_fun.Arguments == null) {
                                 if (argmuents != null) {
@@ -2685,8 +3512,8 @@ namespace AnsiCParser {
                                 } else {
                                     // ANSIの引数指定なし関数
                                 }
-                            } else if (ctype_fun.Arguments.Any(x => x.Item2.IsImplicit())) {
-                                if (!ctype_fun.Arguments.All(x => x.Item2.IsImplicit())) {
+                            } else if (ctype_fun.Arguments.Any(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
+                                if (!ctype_fun.Arguments.All(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
                                 }
 
                                 if (!argmuents.All(x => x is AST.Declaration.VariableDeclaration)) {
@@ -2695,10 +3522,10 @@ namespace AnsiCParser {
 
                                 var dic = argmuents.Cast<AST.Declaration.VariableDeclaration>().ToDictionary(x => x.Ident, x => x);
                                 var mapped = ctype_fun.Arguments.Select(x => {
-                                    if (dic.ContainsKey(x.Item1)) {
-                                        return Tuple.Create(x.Item1, dic[x.Item1].Ctype);
+                                    if (dic.ContainsKey(x.Name)) {
+                                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype);
                                     } else {
-                                        return Tuple.Create(x.Item1, (CType)new CType.BasicType(TypeSpecifier.None));
+                                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, (CType)new CType.BasicType(TypeSpecifier.None));
                                     }
                                 }).ToList();
                                 ctype_fun.Arguments.Clear();
@@ -2773,8 +3600,13 @@ namespace AnsiCParser {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
             sc = storageClass;
-            return new CType.TypeQualifierType(baseType, typeQualifier);
 
+            if (baseType.IsQualifiedType()) {
+                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
+            } else {
+                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
+            }
+            return baseType;
         }
 
         private bool is_declaration_specifier(CType ctype, TypeSpecifier typeSpecifier) {
@@ -2808,7 +3640,7 @@ namespace AnsiCParser {
                     throw new Exception();
                 }
                 if (ctype != null) {
-                    if (CType.EqualType(ctype, value.Ctype) == false) {
+                    if (CType.Equals(ctype, value.Ctype) == false) {
                         throw new Exception("");
                     }
                 }
@@ -2948,7 +3780,7 @@ namespace AnsiCParser {
                 if (Peek('{')) {
                     CType.TaggedType.StructUnionType stype = null;
                     if (tag_scope.TryGetValue(ident, out ctype) == false) {
-                        stype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, false);
+                        stype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union, ident, false);
                         tag_scope.Add(ident, ctype);
                     } else if (!(ctype is CType.TaggedType.StructUnionType)) {
                         throw new Exception("別のタグ型として定義済み");
@@ -2964,14 +3796,14 @@ namespace AnsiCParser {
                     ctype = stype;
                 } else {
                     if (tag_scope.TryGetValue(ident, out ctype) == false) {
-                        ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, false);
+                        ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union, ident, false);
                         tag_scope.Add(ident, ctype);
                     }
                 }
                 return ctype;
             } else {
                 var ident = $"${struct_or_union}_{anony++}";
-                var ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT, ident, true);
+                var ctype = new CType.TaggedType.StructUnionType(struct_or_union == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union, ident, true);
                 // ctype を tag に 登録
                 tag_scope.Add(ident, ctype);
                 Read('{');
@@ -3016,7 +3848,7 @@ namespace AnsiCParser {
                     throw new Exception();
                 }
 
-                if (ctype.IsFunction()) {
+                if (ctype.IsFunctionType()) {
                     // 変数じゃない
                     throw new Exception("");
                 }
@@ -3027,7 +3859,7 @@ namespace AnsiCParser {
                 var tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
                 decl = tdecl;
                 typedef_scope.Add(ident, tdecl);
-            } else if (ctype.IsFunction()) {
+            } else if (ctype.IsFunctionType()) {
                 decl = new AST.Declaration.FunctionDeclaration(ident, ctype, storage_class);
                 ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
             } else {
@@ -3098,7 +3930,12 @@ namespace AnsiCParser {
             } else if (baseType == null) {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
-            return new CType.TypeQualifierType(baseType, typeQualifier);
+            if (baseType.IsQualifiedType()) {
+                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
+            } else {
+                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
+            }
+            return baseType;
         }
 
 
@@ -3124,7 +3961,7 @@ namespace AnsiCParser {
                 Read(':');
                 expr = constant_expression();
             }
-            return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, 0, expr == null ? 0 :AST.ConstantEval(expr));
+            return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : AST.ConstantEval(expr));
 
         }
         private CType enum_specifier() {
@@ -3151,19 +3988,19 @@ namespace AnsiCParser {
             }
         }
         private void enumerator_list(CType.TaggedType.EnumType ctype) {
-            var ret = new List<Tuple<string, int>>();
+            var ret = new List<CType.TaggedType.EnumType.MemberInfo>();
             ctype.enumerator_list = ret;
             var e = enumerator(ctype, 0);
-            ident_scope.Add(e.Item1, new IdentifierValue.EnumValue(ctype, e.Item1));
+            ident_scope.Add(e.Name, new IdentifierValue.EnumValue(ctype, e.Name));
             ret.Add(e);
             while (Peek(',')) {
-                var i = e.Item2 + 1;
+                var i = e.Value + 1;
                 Read(',');
                 if (is_enumerator() == false) {
                     break;
                 }
                 e = enumerator(ctype, i);
-                ident_scope.Add(e.Item1, new IdentifierValue.EnumValue(ctype, e.Item1));
+                ident_scope.Add(e.Name, new IdentifierValue.EnumValue(ctype, e.Name));
                 ret.Add(e);
             }
         }
@@ -3172,14 +4009,14 @@ namespace AnsiCParser {
             return is_IDENTIFIER(false);
         }
 
-        private Tuple<string, int> enumerator(CType ctype, int i) {
+        private CType.TaggedType.EnumType.MemberInfo enumerator(CType.TaggedType.EnumType ctype, int i) {
             var ident = IDENTIFIER(false);
             if (Peek('=')) {
                 Read('=');
                 var expr = constant_expression();
                 i = AST.ConstantEval(expr);
             }
-            return Tuple.Create(ident, i);
+            return new CType.TaggedType.EnumType.MemberInfo(ctype, ident, i);
         }
         private bool is_declarator() {
             return is_pointer() || is_direct_declarator();
@@ -3227,7 +4064,7 @@ namespace AnsiCParser {
                     more_direct_declarator(stack, index);
                 } else if (is_identifier_list()) {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => Tuple.Create(x, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
                     Read(')');
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                     more_direct_declarator(stack, index);
@@ -3265,8 +4102,8 @@ namespace AnsiCParser {
         private bool is_parameter_type_list() {
             return is_parameter_declaration();
         }
-        private List<Tuple<string, CType>> parameter_type_list(ref bool vargs) {
-            var items = new List<Tuple<string, CType>>();
+        private List<CType.FunctionType.ArgumentInfo> parameter_type_list(ref bool vargs) {
+            var items = new List<CType.FunctionType.ArgumentInfo>();
             items.Add(parameter_declaration());
             while (Peek(',')) {
                 Read(',');
@@ -3283,7 +4120,7 @@ namespace AnsiCParser {
         public bool is_parameter_declaration() {
             return is_declaration_specifier(null, TypeSpecifier.None);
         }
-        private Tuple<string, CType> parameter_declaration() {
+        private CType.FunctionType.ArgumentInfo parameter_declaration() {
             StorageClass storageClass;
             CType baseType = declaration_specifiers(out storageClass);
 
@@ -3292,9 +4129,9 @@ namespace AnsiCParser {
                 List<CType> stack = new List<CType>() { new CType.StubType() };
                 declarator_or_abstract_declarator(ref ident, stack, 0);
                 var ctype = CType.Resolve(baseType, stack);
-                return Tuple.Create(ident, ctype);
+                return new CType.FunctionType.ArgumentInfo(ident, storageClass, ctype);
             } else {
-                return Tuple.Create((string)null, baseType);
+                return new CType.FunctionType.ArgumentInfo((string)null, storageClass, baseType);
             }
 
         }
@@ -3365,7 +4202,7 @@ namespace AnsiCParser {
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => Tuple.Create(x, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                 }
                 Read(')');
