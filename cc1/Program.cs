@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -13,10 +12,63 @@ namespace AnsiCParser {
     class Program {
         static void Main(string[] args) {
             foreach (var arg in args) {
-                var grammer = new Grammer();
-                string input = System.IO.File.ReadAllText(arg);
-                grammer.Parse(input);
+                RaiseError<Exception>(@"
+typedef char BUF[256];
+BUF hoge(BUF buf) { /* エラー: hoge は配列を返す関数として宣言されています */
+return buf;
+}
+");
+
+                RaiseError<Exception>(@"
+float f(float);
+
+int main(void)
+{
+float x;
+f(x);
+}
+
+float f(x)
+float x;    /* 警告: promoted argument ‘x’ doesn’t match prototype [-Wpedantic] */
+{ return x;}
+
+");
+
+                Success(@"
+int count();
+
+int main(void) {
+    int n = count(""hello"");
+    return n;
+}
+
+int count(str)
+char* str;
+{
+    char* p = str;
+    while (*p != '\0') {
+        p++;
+    }
+    return p - str;
+}
+            ");
+
+                //System.IO.File.ReadAllText(arg);
             }
+        }
+
+        public static void Success(string input) {
+            var grammer = new Grammer();
+            grammer.Parse(input);
+        }
+        public static void RaiseError<T>(string input) where T : Exception {
+            try {
+                var grammer = new Grammer();
+                grammer.Parse(input);
+            } catch (T) {
+                return;
+            }
+            throw new Exception($"例外{typeof(T).Name}が発生すべきだが発生しなかった");
         }
     }
 
@@ -341,59 +393,107 @@ namespace AnsiCParser {
             /// <returns></returns>
             public override int Sizeof() {
                 switch (kind) {
-                    case Kind.KAndRImplicitInt: return 4;
-                    case Kind.Void: throw new Exception();
-                    case Kind.Char: return 1;
-                    case Kind.SignedChar: return 1;
-                    case Kind.UnsignedChar: return 1;
-                    case Kind.SignedShortInt: return 2;
-                    case Kind.UnsignedShortInt: return 2;
-                    case Kind.SignedInt: return 4;
-                    case Kind.UnsignedInt: return 4;
-                    case Kind.SignedLongInt: return 4;
-                    case Kind.UnsignedLongInt: return 4;
-                    case Kind.SignedLongLongInt: return 4;
-                    case Kind.UnsignedLongLongInt: return 4;
-                    case Kind.Float: return 4;
-                    case Kind.Double: return 8;
-                    case Kind.LongDouble: return 12;
-                    case Kind._Bool: return 1;
-                    case Kind.Float_Complex: return 4 * 2;
-                    case Kind.Double_Complex: return 8 * 2;
-                    case Kind.LongDouble_Complex: return 12 * 2;
-                    case Kind.Float_Imaginary: return 4;
-                    case Kind.Double_Imaginary: return 8;
-                    case Kind.LongDouble_Imaginary: return 12;
-                    default: throw new Exception();
+                    case Kind.KAndRImplicitInt:
+                        return 4;
+                    case Kind.Void:
+                        throw new Exception();
+                    case Kind.Char:
+                        return 1;
+                    case Kind.SignedChar:
+                        return 1;
+                    case Kind.UnsignedChar:
+                        return 1;
+                    case Kind.SignedShortInt:
+                        return 2;
+                    case Kind.UnsignedShortInt:
+                        return 2;
+                    case Kind.SignedInt:
+                        return 4;
+                    case Kind.UnsignedInt:
+                        return 4;
+                    case Kind.SignedLongInt:
+                        return 4;
+                    case Kind.UnsignedLongInt:
+                        return 4;
+                    case Kind.SignedLongLongInt:
+                        return 4;
+                    case Kind.UnsignedLongLongInt:
+                        return 4;
+                    case Kind.Float:
+                        return 4;
+                    case Kind.Double:
+                        return 8;
+                    case Kind.LongDouble:
+                        return 12;
+                    case Kind._Bool:
+                        return 1;
+                    case Kind.Float_Complex:
+                        return 4 * 2;
+                    case Kind.Double_Complex:
+                        return 8 * 2;
+                    case Kind.LongDouble_Complex:
+                        return 12 * 2;
+                    case Kind.Float_Imaginary:
+                        return 4;
+                    case Kind.Double_Imaginary:
+                        return 8;
+                    case Kind.LongDouble_Imaginary:
+                        return 12;
+                    default:
+                        throw new Exception();
                 }
             }
 
             public override string ToString() {
                 switch (kind) {
-                    case Kind.KAndRImplicitInt: return "int";
-                    case Kind.Void: return "void";
-                    case Kind.Char: return "char";
-                    case Kind.SignedChar: return "signed char";
-                    case Kind.UnsignedChar: return "unsigned char";
-                    case Kind.SignedShortInt: return "signed short int";
-                    case Kind.UnsignedShortInt: return "unsigned short int";
-                    case Kind.SignedInt: return "signed int";
-                    case Kind.UnsignedInt: return "unsigned int";
-                    case Kind.SignedLongInt: return "signed long int";
-                    case Kind.UnsignedLongInt: return "unsigned long int";
-                    case Kind.SignedLongLongInt: return "signed long long int";
-                    case Kind.UnsignedLongLongInt: return "unsigned long long int";
-                    case Kind.Float: return "float";
-                    case Kind.Double: return "double";
-                    case Kind.LongDouble: return "long double";
-                    case Kind._Bool: return "_Bool";
-                    case Kind.Float_Complex: return "float _Complex";
-                    case Kind.Double_Complex: return "double _Complex";
-                    case Kind.LongDouble_Complex: return "long double _Complex";
-                    case Kind.Float_Imaginary: return "float _Imaginary";
-                    case Kind.Double_Imaginary: return "double _Imaginary";
-                    case Kind.LongDouble_Imaginary: return "long double _Imaginary";
-                    default: throw new Exception();
+                    case Kind.KAndRImplicitInt:
+                        return "int";
+                    case Kind.Void:
+                        return "void";
+                    case Kind.Char:
+                        return "char";
+                    case Kind.SignedChar:
+                        return "signed char";
+                    case Kind.UnsignedChar:
+                        return "unsigned char";
+                    case Kind.SignedShortInt:
+                        return "signed short int";
+                    case Kind.UnsignedShortInt:
+                        return "unsigned short int";
+                    case Kind.SignedInt:
+                        return "signed int";
+                    case Kind.UnsignedInt:
+                        return "unsigned int";
+                    case Kind.SignedLongInt:
+                        return "signed long int";
+                    case Kind.UnsignedLongInt:
+                        return "unsigned long int";
+                    case Kind.SignedLongLongInt:
+                        return "signed long long int";
+                    case Kind.UnsignedLongLongInt:
+                        return "unsigned long long int";
+                    case Kind.Float:
+                        return "float";
+                    case Kind.Double:
+                        return "double";
+                    case Kind.LongDouble:
+                        return "long double";
+                    case Kind._Bool:
+                        return "_Bool";
+                    case Kind.Float_Complex:
+                        return "float _Complex";
+                    case Kind.Double_Complex:
+                        return "double _Complex";
+                    case Kind.LongDouble_Complex:
+                        return "long double _Complex";
+                    case Kind.Float_Imaginary:
+                        return "float _Imaginary";
+                    case Kind.Double_Imaginary:
+                        return "double _Imaginary";
+                    case Kind.LongDouble_Imaginary:
+                        return "long double _Imaginary";
+                    default:
+                        throw new Exception();
                 }
             }
 
@@ -523,6 +623,14 @@ namespace AnsiCParser {
             /// </summary>
             public class EnumType : TaggedType {
 
+                /// <summary>
+                /// 列挙型で宣言されている列挙定数
+                /// </summary>
+                /// <remarks>
+                /// 6.4.4.3 列挙定数 
+                /// 意味規則  
+                ///   列挙定数として宣言された識別子は，型 int をもつ。
+                /// </remarks>
                 public class MemberInfo {
                     public string Name {
                         get;
@@ -589,19 +697,41 @@ namespace AnsiCParser {
         /// </summary>
         public class FunctionType : CType {
 
+            /// K&R書式で関数を定義した場合、仮引数の宣言で宣言した型に規定の実引数拡張を適用した結果が外から見える仮引数の型になる。
+            /// 関数本体中では仮引数の型は宣言した型そのものが使われる。
+            /// 例: int foo(f) float f { ... } の場合、int foo(double _t) { float f = (float)_t; ... } と読み替えられる。
             public class ArgumentInfo {
-                public string Name { get; }
-                public StorageClass Sc { get; }
-                public CType cType { get; }
-                public ArgumentInfo(string name, StorageClass sc, CType ctype) {
+                public string Name {
+                    get;
+                }
+                public StorageClass Sc {
+                    get;
+                }
+
+                // 関数型として外から見える引数型
+                public CType cType {
+                    get;
+                }
+
+                // 実際に宣言された型(nullの場合はK&R形式で宣言されていない)
+                public CType realType {
+                    get;
+                }
+
+
+                public ArgumentInfo(string name, StorageClass sc, CType ctype, CType rType) {
                     Name = name;
                     Sc = sc;
                     cType = ctype;
+                    realType = rType;
                 }
             }
 
             /// <summary>
-            /// 引数型
+            /// 引数の情報
+            /// nullの場合、int foo(); のように識別子並びが空であることを示す。
+            /// 空リストの場合、int foo(void); のように唯一のvoidであることを示す。
+            /// 一つ以上の要素を持つリストの場合、int foo(int, double); のように引数を持つことを示す。また、引数リストにvoid型が含まれない。
             /// </summary>
             public List<ArgumentInfo> Arguments {
                 get;
@@ -622,6 +752,23 @@ namespace AnsiCParser {
             }
 
             public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType) {
+                // 6.7.5.3 関数宣言子（関数原型を含む）
+                // 制約 
+                // 関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。(返却値の型が確定するFixupメソッド中で行う)
+                // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
+                // 関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。(これは関数定義/宣言中で行う。)
+                // 関数定義の一部である関数宣言子の仮引数型並びにある仮引数は，型調整後に不完全型をもってはならない。(これは関数定義/宣言中で行う。)
+                // 
+
+                // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
+                if (arguments != null) {
+                    foreach (var arg in arguments) {
+                        if (arg.Sc != StorageClass.None && arg.Sc != StorageClass.Register) {
+                            throw new Exception("仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
+                        }
+                    }
+                }
+
                 this.Arguments = arguments;
                 this.ResultType = resultType;
                 this.HasVariadic = hasVariadic;
@@ -633,6 +780,11 @@ namespace AnsiCParser {
                 } else {
                     ResultType.Fixup(ty);
                 }
+                // 関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。
+                if (ResultType.IsFunctionType() || ResultType.IsArrayType()) {
+                    throw new Exception("関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。");
+                }
+
             }
 
             public override int Sizeof() {
@@ -792,7 +944,7 @@ namespace AnsiCParser {
         /// <param name="t1"></param>
         /// <param name="t2"></param>
         /// <returns></returns>
-        public static bool Equals(CType t1, CType t2) {
+        public static bool IsEqual(CType t1, CType t2) {
             for (; ; ) {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
@@ -804,6 +956,14 @@ namespace AnsiCParser {
                     if (t2 is CType.TypedefedType) {
                         t2 = (t2 as CType.TypedefedType).cType;
                     }
+                    continue;
+                }
+                if ((t1 as CType.TypeQualifierType)?.type_qualifier == TypeQualifier.None) {
+                    t1 = (t1 as CType.TypeQualifierType).cType;
+                    continue;
+                }
+                if ((t2 as CType.TypeQualifierType)?.type_qualifier == TypeQualifier.None) {
+                    t2 = (t2 as CType.TypeQualifierType).cType;
                     continue;
                 }
                 if (t1.GetType() != t2.GetType()) {
@@ -837,7 +997,7 @@ namespace AnsiCParser {
                     if ((t1 as CType.FunctionType).HasVariadic != (t2 as CType.FunctionType).HasVariadic) {
                         return false;
                     }
-                    if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => Equals(x.cType, y.cType)).All(x => x) == false) {
+                    if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => IsEqual(x.cType, y.cType)).All(x => x) == false) {
                         return false;
                     }
                     t1 = (t1 as CType.FunctionType).ResultType;
@@ -860,7 +1020,7 @@ namespace AnsiCParser {
                     if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Count != (t2 as CType.TaggedType.StructUnionType).struct_declarations.Count) {
                         return false;
                     }
-                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => Equals(x.Type, y.Type)).All(x => x) == false) {
+                    if ((t1 as CType.TaggedType.StructUnionType).struct_declarations.Zip((t2 as CType.TaggedType.StructUnionType).struct_declarations, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                         return false;
                     }
                     return true;
@@ -897,6 +1057,16 @@ namespace AnsiCParser {
                 break;
             }
             return self;
+        }
+
+        /// <summary>
+        /// void型ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        public static bool IsVoidType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            return (unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Void;
         }
 
 
@@ -1005,7 +1175,7 @@ namespace AnsiCParser {
                 }
                 return sut.struct_declarations.Any(x => x.Type.IsIncompleteType());
             }
-            return true;
+            return false;
         }
 
         /// <summary>
@@ -1259,6 +1429,23 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        /// 配列型（array type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="elementType">配列型の場合、要素型が入る</param>
+        /// <returns></returns>
+        public static bool IsArrayType(this CType self, out CType elementType) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.ArrayType) {
+                elementType = (unwrappedSelf as CType.ArrayType).cType;
+                return true;
+            } else {
+                elementType = null;
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 構造体型（structure type）ならば真
         /// </summary>
         /// <returns></returns>
@@ -1283,6 +1470,23 @@ namespace AnsiCParser {
         public static bool IsPointerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             return unwrappedSelf is CType.PointerType;
+        }
+
+        /// <summary>
+        /// ポインタ型（pointer type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="referencedType">ポインタ型の場合、被参照型が入る</param>
+        /// <returns></returns>
+        public static bool IsPointerType(this CType self, out CType referencedType) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.PointerType) {
+                referencedType = (unwrappedSelf as CType.PointerType).cType;
+                return true;
+            } else {
+                referencedType = null;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1448,10 +1652,10 @@ namespace AnsiCParser {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                     if ((expr.Type.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.UnsignedInt) {
                         // unsigned int でないと表現できない
-                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
                     } else {
                         // signed int で表現できる
-                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
                     }
                 } else {
                     // 拡張は不要
@@ -1463,18 +1667,18 @@ namespace AnsiCParser {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
                     case CType.BasicType.Kind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
-                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
                     case CType.BasicType.Kind.SignedInt:
                         // 無条件でint型に変換できる
-                        return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
                     case CType.BasicType.Kind.UnsignedInt:
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                         if (bitfield.Value == 4 * 8) {
                             // unsigned int でないと表現できない
-                            return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
                         } else {
                             // signed int で表現できる
-                            return new AST.Expression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
                         }
                     default:
                         throw new Exception("ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
@@ -1483,8 +1687,49 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        ///  規定の実引数拡張（default argument promotion）
+        /// </summary>
+        /// <param name="self"></param>
+        public static CType DefaultArgumentPromotion(this CType self) {
+            // 整数変換の順位が int 型及び unsigned int 型より低い整数型?
+            if (IsIntegerType(self)) {
+                if (IntegerConversionRank(self) < -5) {
+                    // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                    if ((self.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.UnsignedInt) {
+                        // unsigned int に拡張
+                        return new CType.BasicType(CType.BasicType.Kind.UnsignedInt);
+                    } else {
+                        // signed int に拡張
+                        return new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                    }
+                } else {
+                    // 拡張は不要
+                    return self;
+                }
+            } else if (IsRealFloatingType(self)) {
+                if ((self.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.Float) {
+                    // double に拡張
+                    return new CType.BasicType(CType.BasicType.Kind.Double);
+                } else {
+                    // 拡張は不要
+                    return self;
+                }
+            } else {
+                // 拡張は不要
+                return self;
+            }
+        }
+
+        /// <summary>
         /// 通常の算術型変換（usual arithmetic conversion）
         /// </summary>
+        /// <remarks>
+        /// 6.3.1.8 通常の算術型変換
+        /// 算術型のオペランドをもつ多くの演算子は，同じ方法でオペランドの型変換を行い，結果の型を決める。型変換は，オペランドと結果の共通の実数型（common real type）を決めるために行う。
+        /// 与えられたオペランドに対し，それぞれのオペランドは，型領域を変えることなく，共通の実数型を対応する実数型とする型に変換する。
+        /// この規格で明示的に異なる規定を行わない限り，結果の対応する実数型も，この共通の実数型とし，その型領域は，オペランドの型領域が一致していればその型領域とし，一致していなければ複素数型とする。
+        /// これを通常の算術型変換（usual arithmetic conversion）と呼ぶ
+        /// </remarks>
         public static CType UsualArithmeticConversion(ref AST.Expression lhs, ref AST.Expression rhs) {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
@@ -1500,35 +1745,37 @@ namespace AnsiCParser {
             }
 
             // まず，一方のオペランドの対応する実数型が long double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が long double となるように型変換する。
+            // そうでない場合，一方のオペランドの対応する実数型が double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が double となるように型変換する。
+            // そうでない場合，一方のオペランドの対応する実数型が float ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が float となるように型変換する。
+            // 例：
+            //  - 一方が long double で 他方が double なら double を long double にする。
+            //  - 一方が long double で 他方が float _Complex なら float _Complex を long double _Complex にする。（結果の型は long double _Complex 型になる）
+            //  - 一方が long double _Complex で 他方が float なら float を long double にする。（結果の型は long double _Complex 型になる）
+            var realConversionPairTable = new[] {
+                Tuple.Create(CType.BasicType.Kind.LongDouble,CType.BasicType.Kind.LongDouble_Complex),
+                Tuple.Create(CType.BasicType.Kind.Double,CType.BasicType.Kind.Double_Complex),
+                Tuple.Create(CType.BasicType.Kind.Float,CType.BasicType.Kind.Float_Complex)
+            };
 
-            if (btLhs.GetCorrespondingRealType().kind == CType.BasicType.Kind.LongDouble) {
-                if (btRhs.IsComplexType()) {
-                    var retTy = new CType.BasicType(CType.BasicType.Kind.LongDouble_Complex);
-                    rhs = new AST.Expression.CastExpression(retTy, rhs);
-                    return retTy;
-                } else {
-                    rhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble), rhs);
-                    return btLhs;
-                }
-            } else if (btRhs.GetCorrespondingRealType().kind == CType.BasicType.Kind.LongDouble) {
-                if (btLhs.IsComplexType()) {
-                    lhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble_Complex), lhs);
-                    return btRhs;
-                }
-                else {
-                    lhs = new AST.Expression.CastExpression(new CType.BasicType(CType.BasicType.Kind.LongDouble), lhs);
-                    return btRhs;
-                }
-            }
-
-            foreach (var target in realTargets) {
-                if (btLhs.GetCorrespondingRealType().kind == target.Item1) {
-                    rhs = new AST.Expression.CastExpression(new CType.BasicType(btLhs.IsComplexType() ? target.Item2 : target.Item1), rhs);
-                    return btLhs;
-                }
-                if (btRhs.GetCorrespondingRealType().kind == target.Item1) {
-                    lhs = new AST.Expression.CastExpression(new CType.BasicType(btLhs.IsComplexType() ? target.Item2 : target.Item1), lhs);
-                    return btRhs;
+            foreach (var realConversionPair in realConversionPairTable) {
+                if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().kind == realConversionPair.Item1) {
+                    if (btRhs.IsComplexType()) {
+                        var retTy = new CType.BasicType(realConversionPair.Item2);
+                        rhs = new AST.Expression.PostfixExpression.CastExpression(retTy, rhs);
+                        return retTy;
+                    } else {
+                        rhs = new AST.Expression.PostfixExpression.CastExpression(new CType.BasicType(realConversionPair.Item1), rhs);
+                        return btLhs;
+                    }
+                } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().kind == realConversionPair.Item1) {
+                    if (btLhs.IsComplexType()) {
+                        var retTy = new CType.BasicType(realConversionPair.Item2);
+                        lhs = new AST.Expression.PostfixExpression.CastExpression(retTy, lhs);
+                        return retTy;
+                    } else {
+                        lhs = new AST.Expression.PostfixExpression.CastExpression(new CType.BasicType(realConversionPair.Item1), lhs);
+                        return btRhs;
+                    }
                 }
             }
 
@@ -1554,44 +1801,72 @@ namespace AnsiCParser {
             // 整数変換順位の低い方の型を，高い方の型に変換する。
             if ((btLhs.IsSignedIntegerType() && btRhs.IsSignedIntegerType()) || (btLhs.IsUnsignedIntegerType() && btRhs.IsUnsignedIntegerType())) {
                 if (btLhs.IntegerConversionRank() < btRhs.IntegerConversionRank()) {
-                    lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                    lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
                     return btRhs;
                 } else {
-                    rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                    rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
                     return btLhs;
                 }
             }
 
+            // ここに到達した時点で、一方が符号無し、一方が符号付きであることが保障される
+
             // そうでない場合，符号無し整数型をもつオペランドが，他方のオペランドの整数変換順位より高い又は等しい順位をもつならば，
             // 符号付き整数型をもつオペランドを，符号無し整数型をもつオペランドの型に変換する。
             if (btLhs.IsUnsignedIntegerType() && btLhs.IntegerConversionRank() >= btRhs.IntegerConversionRank()) {
-                rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsUnsignedIntegerType() && btRhs.IntegerConversionRank() >= btLhs.IntegerConversionRank()) {
-                lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
                 return btRhs;
             }
+
+            // ここに到達した時点で、符号有りオペランドのほうが符号無しオペランドよりも大きい整数変換順位を持つことが保障される
+            // 整数変換順位の大きさと型の表現サイズの大きさは環境によっては一致しない
+            // 例：int が 2byte (signed int = signed short) 、char が 16bit以上など
 
             // そうでない場合，符号付き整数型をもつオペランドの型が，符号無し整数型をもつオペランドの型のすべての値を表現できるならば，
             // 符号無し整数型をもつオペランドを，符号付き整数型をもつオペランドの型に変換する。
             if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.Sizeof() > btRhs.Sizeof()) {
-                rhs = new AST.Expression.CastExpression(btLhs, rhs);
+                rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.Sizeof() > btLhs.Sizeof()) {
-                lhs = new AST.Expression.CastExpression(btRhs, lhs);
+                lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
                 return btRhs;
             }
 
-            // 
+            // そうでない場合，両方のオペランドを，符号付き整数型をもつオペランドの型に対応する符号無し整数型に変換する。
+            CType.BasicType.Kind tySignedKind = ((btLhs.IsSignedIntegerType()) ? btLhs : btRhs).kind;
+            CType.BasicType.Kind tyUnsignedKind;
+            switch (tySignedKind) {
+                case CType.BasicType.Kind.SignedInt:
+                    tyUnsignedKind = CType.BasicType.Kind.UnsignedInt;
+                    break;
+                case CType.BasicType.Kind.SignedLongInt:
+                    tyUnsignedKind = CType.BasicType.Kind.UnsignedLongInt;
+                    break;
+                case CType.BasicType.Kind.SignedLongLongInt:
+                    tyUnsignedKind = CType.BasicType.Kind.UnsignedLongLongInt;
+                    break;
+                default:
+                    throw new Exception("整数拡張が正しく行われていない？");
+            }
+
+            var tyUnsigned = new CType.BasicType(tyUnsignedKind);
+            lhs = new AST.Expression.PostfixExpression.CastExpression(tyUnsigned, lhs);
+            rhs = new AST.Expression.PostfixExpression.CastExpression(tyUnsigned, rhs);
+            return tyUnsigned;
+
         }
     }
 
-
-
+    /// <summary>
+    /// 構文木
+    /// </summary>
     public abstract class AST {
         public static int ConstantEval(AST.Expression expr) {
-            if (expr is AST.Expression.AdditiveExpression) {
-                var e = expr as AST.Expression.AdditiveExpression;
+            if (expr is AST.Expression.PostfixExpression.AdditiveExpression) {
+                var e = expr as AST.Expression.PostfixExpression.AdditiveExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
                 switch (e.Op) {
@@ -1603,8 +1878,8 @@ namespace AnsiCParser {
                         throw new Exception();
                 }
             }
-            if (expr is AST.Expression.AndExpression) {
-                var e = expr as AST.Expression.AndExpression;
+            if (expr is AST.Expression.PostfixExpression.AndExpression) {
+                var e = expr as AST.Expression.PostfixExpression.AndExpression;
                 var lhs = ConstantEval(e.Lhs);
                 if (lhs != 0) {
                     return ConstantEval(e.Rhs) == 0 ? 0 : 1;
@@ -1612,29 +1887,29 @@ namespace AnsiCParser {
                     return 0;
                 }
             }
-            if (expr is AST.Expression.ArrayIndexExpression) {
-                var e = expr as AST.Expression.ArrayIndexExpression;
+            if (expr is AST.Expression.PostfixExpression.ArraySubscriptingExpression) {
+                var e = expr as AST.Expression.PostfixExpression.ArraySubscriptingExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.AssignmentExpression) {
-                var e = expr as AST.Expression.AssignmentExpression;
+            if (expr is AST.Expression.PostfixExpression.AssignmentExpression) {
+                var e = expr as AST.Expression.PostfixExpression.AssignmentExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.CastExpression) {
-                var e = expr as AST.Expression.CastExpression;
+            if (expr is AST.Expression.PostfixExpression.CastExpression) {
+                var e = expr as AST.Expression.PostfixExpression.CastExpression;
                 // キャストは未実装
                 return ConstantEval(e.Expr);
             }
-            if (expr is AST.Expression.CharacterConstant) {
-                var e = expr as AST.Expression.CharacterConstant;
+            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant;
                 return (int)e.Str[1];
             }
-            if (expr is AST.Expression.CommaExpression) {
-                var e = expr as AST.Expression.CommaExpression;
+            if (expr is AST.Expression.PostfixExpression.CommaExpression) {
+                var e = expr as AST.Expression.PostfixExpression.CommaExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.ConditionalExpression) {
-                var e = expr as AST.Expression.ConditionalExpression;
+            if (expr is AST.Expression.PostfixExpression.ConditionalExpression) {
+                var e = expr as AST.Expression.PostfixExpression.ConditionalExpression;
                 var cond = ConstantEval(e.Cond);
                 if (cond != 0) {
                     return ConstantEval(e.ThenExpr);
@@ -1642,12 +1917,12 @@ namespace AnsiCParser {
                     return ConstantEval(e.ElseExpr);
                 }
             }
-            if (expr is AST.Expression.EnumerationConstant) {
-                var e = expr as AST.Expression.EnumerationConstant;
+            if (expr is AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant;
                 return e.Ret.Value;
             }
-            if (expr is AST.Expression.EqualityExpression) {
-                var e = expr as AST.Expression.EqualityExpression;
+            if (expr is AST.Expression.PostfixExpression.EqualityExpression) {
+                var e = expr as AST.Expression.PostfixExpression.EqualityExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
                 switch (e.Op) {
@@ -1665,21 +1940,21 @@ namespace AnsiCParser {
                 var rhs = ConstantEval(e.Rhs);
                 return lhs ^ rhs;
             }
-            if (expr is AST.Expression.FloatingConstant) {
-                var e = expr as AST.Expression.FloatingConstant;
+            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant;
                 // 未実装
                 throw new Exception();
             }
-            if (expr is AST.Expression.FunctionCallExpression) {
-                var e = expr as AST.Expression.FunctionCallExpression;
+            if (expr is AST.Expression.PostfixExpression.FunctionCallExpression) {
+                var e = expr as AST.Expression.PostfixExpression.FunctionCallExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.FunctionExpression) {
-                var e = expr as AST.Expression.FunctionExpression;
+            if (expr is AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
+                var e = expr as AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.IdentifierExpression) {
-                var e = expr as AST.Expression.IdentifierExpression;
+            if (expr is AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
+                var e = expr as AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
                 throw new Exception();
             }
             if (expr is AST.Expression.InclusiveOrExpression) {
@@ -1688,8 +1963,8 @@ namespace AnsiCParser {
                 var rhs = ConstantEval(e.Rhs);
                 return lhs | rhs;
             }
-            if (expr is AST.Expression.IntegerConstant) {
-                var e = expr as AST.Expression.IntegerConstant;
+            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant;
                 return (int)e.Value;
             }
             if (expr is AST.Expression.LogicalAndExpression) {
@@ -1710,12 +1985,12 @@ namespace AnsiCParser {
                     return 1;
                 }
             }
-            if (expr is AST.Expression.MemberDirectAccess) {
-                var e = expr as AST.Expression.MemberDirectAccess;
+            if (expr is AST.Expression.PostfixExpression.MemberDirectAccess) {
+                var e = expr as AST.Expression.PostfixExpression.MemberDirectAccess;
                 throw new Exception();
             }
-            if (expr is AST.Expression.MemberIndirectAccess) {
-                var e = expr as AST.Expression.MemberIndirectAccess;
+            if (expr is AST.Expression.PostfixExpression.MemberIndirectAccess) {
+                var e = expr as AST.Expression.PostfixExpression.MemberIndirectAccess;
                 throw new Exception();
             }
             if (expr is AST.Expression.MultiplicitiveExpression) {
@@ -1772,8 +2047,8 @@ namespace AnsiCParser {
                 var e = expr as AST.Expression.SizeofTypeExpression;
                 return e.Ty.Sizeof();
             }
-            if (expr is AST.Expression.StringExpression) {
-                var e = expr as AST.Expression.StringExpression;
+            if (expr is AST.Expression.PrimaryExpression.StringExpression) {
+                var e = expr as AST.Expression.PrimaryExpression.StringExpression;
                 throw new Exception();
             }
             if (expr is AST.Expression.UnaryAddressExpression) {
@@ -1796,8 +2071,8 @@ namespace AnsiCParser {
                 var e = expr as AST.Expression.UnaryPlusExpression;
                 return ConstantEval(e.Expr);
             }
-            if (expr is AST.Expression.UnaryPostfixExpression) {
-                var e = expr as AST.Expression.UnaryPostfixExpression;
+            if (expr is AST.Expression.PostfixExpression.UnaryPostfixExpression) {
+                var e = expr as AST.Expression.PostfixExpression.UnaryPostfixExpression;
                 throw new Exception();
             }
             if (expr is AST.Expression.UnaryPrefixExpression) {
@@ -1808,20 +2083,549 @@ namespace AnsiCParser {
                 var e = expr as AST.Expression.UnaryReferenceExpression;
                 throw new Exception();
             }
-            if (expr is AST.Expression.VariableExpression) {
-                var e = expr as AST.Expression.VariableExpression;
+            if (expr is AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
+                var e = expr as AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
                 throw new Exception();
+            }
+            if (expr is AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                var e = expr as AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression;
+                return ConstantEval(e.expression);
             }
             throw new Exception();
         }
 
+        /// <summary>
+        /// 6.5 式 
+        ///   - 式（expression）は，演算子及びオペランドの列とする。式は，値の計算を指定するか，オブジェクト若しくは関数を指し示すか，副作用を引き起こすか，又はそれらの組合せを行う。
+        ///   - 直前の副作用完了点から次の副作用完了点までの間に，式の評価によって一つのオブジェクトに格納された値を変更する回数は，高々 1 回でなければならない。
+        ///     さらに，変更前の値の読取りは，格納される値を決定するためだけに行われなければならない。
+        ///   - （関数呼出しの()，&&，||，?:及びコンマ演算子に対して）後で規定する場合を除いて，部分式の評価順序及び副作用が生じる順序は未規定とする。
+        ///   - 幾つかの演算子［総称してビット単位の演算子（bitwise operator）と呼ぶ単項演算子~並びに 2 項演算子<<，>>，&，^及び|］は，整数型のオペランドを必要とする。
+        ///     これらの演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつ。
+        ///   - 式の評価中に例外条件（exceptional condition）が発生した場合（すなわち，結果が数学的に定義できないか，又は結果の型で表現可能な値の範囲にない場合），その動作は未定義とする。
+        ///   - 格納された値にアクセスするときのオブジェクトの有効型（effective type）は，（もしあれば）そのオブジェクトの宣言された型とする。
+        ///     宣言された型をもたないオブジェクトへ，文字型以外の型をもつ左辺値を通じて値を格納した場合，左辺値の型をそのアクセス及び格納された値を変更しないそれ以降のアクセスでのオブジェクトの有効型とする。
+        ///     宣言された型をもたないオブジェクトに，memcpy 関数若しくは memmove関数を用いて値をコピーするか，又は文字型の配列として値をコピーした場合，
+        ///     そのアクセス及び値を変更しないそれ以降のアクセスでのオブジェクトの有効型は，値のコピー元となったオブジェクトの有効型があれば，その型とする。
+        ///     宣言された型をもたないオブジェクトに対するその他のすべてのアクセスでは，そのアクセスでの左辺値の型を有効型とする。
+        ///   - オブジェクトに格納された値に対するアクセスは，次のうちのいずれか一つの型をもつ左辺値によらなければならない
+        ///     - オブジェクトの有効型と適合する型
+        ///     - オブジェクトの有効型と適合する型の修飾版
+        ///     - オブジェクトの有効型に対応する符号付き型又は符号無し型
+        ///     - オブジェクトの有効型の修飾版に対応する符号付き型又は符号無し型
+        ///     - メンバの中に上に列挙した型の一つを含む集成体型又は共用体型（再帰的に包含されている部分集成体又は含まれる共用体のメンバを含む。）
+        ///     - 文字型
+        ///   - 浮動小数点型の式は短縮（contract）してもよい。すなわち，ハードウェアによる不可分な操作として評価して，ソースコードの記述及び式の評価方法どおりなら生じるはずの丸め誤差を省いてもよい
+        ///     <math.h>の FP_CONTRACT プラグマは，式の短縮を禁止する方法を提供する。FP_CONTRACT プラグマがない場合，式が短縮されるかどうか，及びそれをどのように短縮するかは処理系定義とする。
+        /// </summary>
         public abstract class Expression : AST {
 
-            public CType Type { get; set; }
+            /// <summary>
+            /// 式の結果の型
+            /// </summary>
+            public abstract CType Type {
+                get;
+            }
+
+            /// <summary>
+            /// 式の結果が左辺値と成りうるか
+            /// </summary>
+            public virtual bool IsLValue() {
+                return false;
+            }
+
+            /// <summary>
+            /// 6.5.1 一次式
+            /// </summary>
+            public abstract class PrimaryExpression : Expression {
+
+                /// <summary>
+                /// 識別子式
+                /// </summary>
+                /// <remarks>
+                /// 識別子がオブジェクト（この場合，識別子は左辺値となる。），又は関数（この場合，関数指示子となる。）を指し示すと宣言されている場合，識別子は一次式とする。
+                /// 宣言されていない識別子は構文規則違反である。（脚注：C89以降では宣言されていない識別子は構文規則違反であるとなっているが、K&Rでは未定義識別子が許されちゃってるので文脈から変数/関数を判断する必要がある。）
+                /// </remarks>
+                public abstract class IdentifierExpression : PrimaryExpression {
+
+                    public string Ident {
+                        get;
+                    }
+                    protected IdentifierExpression(string ident) {
+                        Ident = ident;
+                    }
+
+
+                    /// <summary>
+                    /// 未定義識別子式
+                    /// </summary>
+                    public class UndefinedIdentifierExpression : IdentifierExpression {
+
+                        public override CType Type {
+                            get {
+                                throw new NotImplementedException();
+                            }
+                        }
+
+                        public UndefinedIdentifierExpression(string ident) : base(ident) {
+                        }
+
+                        public override bool IsLValue() {
+                            throw new NotImplementedException();
+                        }
+
+                    }
+
+                    public class VariableExpression : IdentifierExpression {
+                        public Declaration.VariableDeclaration variableDeclaration {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return variableDeclaration.Ctype;
+                            }
+                        }
+                        public override bool IsLValue() {
+                            // 6.5.1 一次式
+                            // 識別子がオブジェクト（この場合，識別子は左辺値となる。）
+                            return true;
+                        }
+
+                        public VariableExpression(string ident, Declaration.VariableDeclaration variableDeclaration) : base(ident) {
+                            this.variableDeclaration = variableDeclaration;
+                        }
+                    }
+
+                    public class FunctionExpression : IdentifierExpression {
+                        public Declaration.FunctionDeclaration functionDeclaration {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return functionDeclaration.Ty;
+                            }
+                        }
+
+                        public FunctionExpression(string ident, Declaration.FunctionDeclaration functionDeclaration) : base(ident) {
+                            this.functionDeclaration = functionDeclaration;
+                        }
+                    }
+
+                    /// <summary>
+                    /// 列挙定数式
+                    /// </summary>
+                    public class EnumerationConstant : IdentifierExpression {
+                        public CType.TaggedType.EnumType.MemberInfo Ret {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                            }
+                        }
+
+                        public EnumerationConstant(CType.TaggedType.EnumType.MemberInfo ret) : base(ret.Name) {
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// 定数式
+                /// </summary>
+                /// <remarks>
+                /// 定数は，一次式とする。その型は，その形式と値によって決まる（6.4.4 で規定する。）
+                /// </remarks>
+                public abstract class ConstantExpression : Expression {
+                    /// <summary>
+                    /// 整数定数式
+                    /// </summary>
+                    public class IntegerConstant : ConstantExpression {
+
+                        public string Str {
+                            get;
+                        }
+                        public long Value {
+                            get;
+                        }
+                        private CType _type {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return _type;
+                            }
+                        }
+
+                        public IntegerConstant(string str, long value, CType.BasicType.Kind kind) {
+                            this.Str = str;
+                            this.Value = value;
+                            this._type = new CType.BasicType(kind);
+                        }
+                    }
+
+                    /// <summary>
+                    /// 文字定数式
+                    /// </summary>
+                    public class CharacterConstant : ConstantExpression {
+                        public string Str {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return new CType.BasicType(CType.BasicType.Kind.Char);
+                            }
+                        }
+
+
+                        public CharacterConstant(string str) {
+                            Str = str;
+                        }
+
+                    }
+
+                    /// <summary>
+                    /// 浮動小数点定数式
+                    /// </summary>
+                    public class FloatingConstant : ConstantExpression {
+                        private CType.BasicType.Kind _type {
+                            get;
+                        }
+
+                        public string Str {
+                            get;
+                        }
+
+                        public double Value {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return new CType.BasicType(_type);
+                            }
+                        }
+
+                        public FloatingConstant(string str, double value, CType.BasicType.Kind kind) {
+                            Str = str;
+                            Value = value;
+                            this._type = kind;
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// 文字列リテラル式
+                /// </summary>
+                /// <remarks>
+                /// 文字列リテラルは，一次式とする。それは，6.4.5 の規則で決まる型をもつ左辺値とする。
+                /// </remarks>
+                public class StringExpression : PrimaryExpression {
+                    public List<string> Strings {
+                        get;
+                    }
+                    public override CType Type {
+                        get {
+                            return new CType.BasicType.ArrayType(String.Concat(Strings).Length, new CType.BasicType(CType.BasicType.Kind.Char));
+                        }
+                    }
+                    public override bool IsLValue() {
+                        // 6.5.1 一次式
+                        // 文字列リテラルは，一次式とする。それは，6.4.5 の規則で決まる型をもつ左辺値とする。
+                        return true;
+                    }
+
+                    public StringExpression(List<string> strings) {
+                        Strings = strings;
+                        // Todo: WideChar未対応
+                    }
+                }
+
+                /// <summary>
+                /// 括弧で囲まれた式
+                /// </summary>
+                /// <remarks>
+                /// 括弧で囲まれた式は，一次式とする。その型及び値は，括弧の中の式のそれらと同じとする。
+                /// 括弧の中の式が左辺値，関数指示子又はボイド式である場合，それは，それぞれ左辺値，関数指示子又はボイド式とする。
+                /// </remarks>
+                public class EnclosedInParenthesesExpression : PrimaryExpression {
+                    public AST.Expression expression {
+                        get;
+                    }
+                    public override CType Type {
+                        get {
+                            return expression.Type;
+                        }
+                    }
+                    public override bool IsLValue() {
+                        // 6.5.1 一次式
+                        // 括弧の中の式が左辺値である場合，それは，左辺値とする
+                        return expression.IsLValue();
+                    }
+
+                    public EnclosedInParenthesesExpression(AST.Expression expression) {
+                        this.expression = expression;
+                    }
+                }
+            }
+
+            /// <summary>
+            /// 6.5.2 後置演算子式
+            /// </summary>
+            public abstract class PostfixExpression : Expression {
+                /// <summary>
+                /// 配列の添字付け
+                /// </summary>
+                /// <remarks>
+                /// 式の一方は，型“オブジェクト型T型へのポインタ”をもたなければならない。
+                /// もう一方の式は，整数型をもたなければならない。
+                /// 結果は，型“T型”をもつ。
+                /// 
+                /// 脚注：有名な話だが「式の一方」とあるように、他の言語と違って配列式の要素を入れ替えても意味は変わらない。すなわち、x[1] と 1[x]は同じ意味。
+                /// </remarks>
+                public class ArraySubscriptingExpression : PostfixExpression {
+                    /// <summary>
+                    /// 型“オブジェクト型T型へのポインタ”（もしくは配列）の式
+                    /// </summary>
+                    public Expression Target {
+                        get;
+                    }
+                    /// <summary>
+                    /// 添え字式（整数側）の式
+                    /// </summary>
+                    public Expression Index {
+                        get;
+                    }
+                    /// <summary>
+                    /// 構文上での左辺側
+                    /// </summary>
+                    public Expression Lhs {
+                        get;
+                    }
+                    /// <summary>
+                    /// 構文上での右辺側
+                    /// </summary>
+                    public Expression Rhs {
+                        get;
+                    }
+
+                    private CType _referencedType {
+                        get;
+                    }
+
+                    public override CType Type {
+                        get {
+                            return _referencedType;
+                        }
+                    }
+
+                    /// <summary>
+                    /// 6.5.2.1
+                    /// 配列の添字付け式
+                    /// </summary>
+                    /// <param name="lhs"></param>
+                    /// <param name="rhs"></param>
+                    public ArraySubscriptingExpression(Expression lhs, Expression rhs) {
+                        // 6.3 型変換 
+                        {
+                            // 6.3.2.1 左辺値，配列及び関数指示子、
+                            //
+                            // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
+                            // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
+                            // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
+                            CType elementType;
+                            if (lhs.Type.IsArrayType(out elementType)) {
+                                lhs = new AST.Expression.CastExpression(new CType.PointerType(elementType), lhs);
+                            } else if (rhs.Type.IsArrayType(out elementType)) {
+                                rhs = new AST.Expression.CastExpression(new CType.PointerType(elementType), rhs);
+                            }
+                        }
+                        {
+                            // 6.3.1.1 論理型，文字型及び整数型
+                            // int型又は unsigned int 型を使用してよい式の中ではどこでも，次に示すものを使用することができる。
+                            // - 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式
+                            // - _Bool 型，int 型，signed int 型，又は unsigned int 型のビットフィールド
+                            // これらのものの元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。
+                            // そうでない場合，unsigned int 型に変換する。これらの処理を，整数拡張（integer promotion）と呼ぶ
+                            if (lhs.Type.IsIntegerType()) {
+                                lhs = Specification.IntegerPromotion(lhs);
+                            } else if (rhs.Type.IsIntegerType()) {
+                                rhs = Specification.IntegerPromotion(rhs);
+                            }
+                        }
+
+
+                        // 制約
+                        //   式の一方は，型“オブジェクト型T型へのポインタ”をもたなければならない。
+                        //   もう一方の式は，整数型をもたなければならない。
+                        CType referencedType;
+                        if ((lhs.Type.IsPointerType(out referencedType) && referencedType.IsObjectType()) && (rhs.Type.IsIntegerType())) {
+                            _referencedType = referencedType;
+                            Target = lhs;
+                            Index = rhs;
+                        } else if ((rhs.Type.IsPointerType(out referencedType) && referencedType.IsObjectType()) && (lhs.Type.IsIntegerType())) {
+                            _referencedType = referencedType;
+                            Target = rhs;
+                            Index = lhs;
+                        } else {
+
+                            throw new Exception("式の一方は，型“オブジェクト型へのポインタ”をもたなければならず、もう一方の式は，整数型をもたなければならない。");
+                        }
+                        Lhs = lhs;
+                        Rhs = rhs;
+                    }
+                }
+
+                /// <summary>
+                /// 6.5.2.2
+                /// 関数呼出し式
+                /// </summary>
+                public class FunctionCallExpression : PostfixExpression {
+                    public Expression Expr {
+                        get;
+                    }
+                    public List<Expression> Args {
+                        get;
+                    }
+                    private CType _resultType {
+                        get;
+                    }
+
+                    public override CType Type {
+                        get {
+                            return _resultType;
+                        }
+                    }
+
+                    public FunctionCallExpression(Expression expr, List<Expression> args) {
+                        // 6.3 型変換 
+                        {
+                            // 6.3.2.1 左辺値，配列及び関数指示子、
+                            //
+                            // 関数指示子（function designator）は，関数型をもつ式とする。
+                            // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                            if (expr.Type.IsFunctionType()) {
+                                expr = new AST.Expression.PostfixExpression.CastExpression(new CType.PointerType(expr.Type.Unwrap()), expr);
+                            }
+                        }
+
+                        // 制約
+                        // 呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない。
+                        CType referencedType;
+                        CType.FunctionType functionType;
+                        if (expr.Type.IsPointerType(out referencedType) && referencedType.IsFunctionType()) {
+                            functionType = (referencedType as CType.FunctionType);
+                            if (functionType.ResultType.IsVoidType() || (functionType.ResultType.IsObjectType() && !functionType.ResultType.IsArrayType())) {
+                                goto Valid;
+                            }
+                        }
+                        throw new Exception("呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
+                        Valid:
+                        if (functionType.Arguments != null) {
+                            // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
+                            if (functionType.HasVariadic) { // 可変長引数を持つ
+                                if (functionType.Arguments.Count > args.Count) {
+                                    throw new Exception("実引数の個数が，仮引数の個数よりも少ない。");
+                                }
+                            } else {
+                                if (functionType.Arguments.Count != args.Count) {
+                                    throw new Exception("実引数の個数が，仮引数の個数と一致しない。");
+                                }
+                            }
+                            // ToDo: 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
+
+                        } else {
+
+                        }
+                        // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない
+                        _resultType = functionType.ResultType;
+                        Expr = expr;
+                        Args = args;
+                    }
+                }
+
+                public class MemberDirectAccess : PostfixExpression {
+                    public Expression Expr {
+                        get;
+                    }
+                    public string Ident {
+                        get;
+                    }
+                    private CType _memberType {
+                        get;
+                    }
+
+                    public override CType Type {
+                        get {
+                            return _memberType;
+                        }
+                    }
+
+                    public MemberDirectAccess(Expression expr, string ident) {
+                        Expr = expr;
+                        Ident = ident;
+                    }
+                }
+
+                public class MemberIndirectAccess : PostfixExpression {
+                    public Expression Expr {
+                        get;
+                    }
+                    public string Ident {
+                        get;
+                    }
+                    private CType _memberType {
+                        get;
+                    }
+
+                    public override CType Type {
+                        get {
+                            return _memberType;
+                        }
+                    }
+
+                    public MemberIndirectAccess(Expression expr, string ident) {
+                        Expr = expr;
+                        Ident = ident;
+                    }
+                }
+
+                public class UnaryPostfixExpression : PostfixExpression {
+                    public string Op {
+                        get;
+                    }
+
+                    public Expression Expr {
+                        get;
+                    }
+
+                    private CType _resultType {
+                        get;
+                    }
+
+                    public override CType Type {
+                        get {
+                            return _resultType;
+                        }
+                    }
+
+                    public UnaryPostfixExpression(string op, Expression expr) {
+                        Op = op;
+                        Expr = expr;
+                    }
+
+                }
+
+                // Todo: C99の複合リテラル式はここに入る
+            }
 
             public class CommaExpression : Expression {
                 public List<AST.Expression> expressions { get; } = new List<AST.Expression>();
+                public override CType Type {
+                    get {
+                        return expressions.Last().Type;
+                    }
+                }
             }
+
 
             public class AssignmentExpression : Expression {
                 public string Op {
@@ -1833,7 +2637,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
                 public AssignmentExpression(string op, Expression lhs, Expression rhs) {
                     Op = op;
                     Lhs = lhs;
@@ -1852,6 +2663,14 @@ namespace AnsiCParser {
                 public Expression ElseExpr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public ConditionalExpression(Expression cond, Expression thenExpr, Expression elseExpr) {
                     Cond = cond;
@@ -1866,6 +2685,14 @@ namespace AnsiCParser {
                 }
                 public Expression Rhs {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public LogicalOrExpression(Expression lhs, Expression rhs) {
@@ -1882,6 +2709,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public LogicalAndExpression(Expression lhs, Expression rhs) {
                     Lhs = lhs;
@@ -1895,6 +2730,14 @@ namespace AnsiCParser {
                 }
                 public Expression Rhs {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public InclusiveOrExpression(Expression lhs, Expression rhs) {
@@ -1910,6 +2753,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public ExclusiveOrExpression(Expression lhs, Expression rhs) {
                     Lhs = lhs;
@@ -1924,6 +2775,14 @@ namespace AnsiCParser {
                 }
                 public Expression Rhs {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public AndExpression(Expression lhs, Expression rhs) {
@@ -1941,6 +2800,14 @@ namespace AnsiCParser {
                 }
                 public Expression Rhs {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public EqualityExpression(string op, Expression lhs, Expression rhs) {
@@ -1960,6 +2827,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public RelationalExpression(string op, Expression lhs, Expression rhs) {
                     Op = op;
@@ -1977,6 +2852,14 @@ namespace AnsiCParser {
                 }
                 public Expression Rhs {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public ShiftExpression(string op, Expression lhs, Expression rhs) {
@@ -1996,6 +2879,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public AdditiveExpression(string op, Expression lhs, Expression rhs) {
                     Op = op;
@@ -2014,6 +2905,14 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public MultiplicitiveExpression(string op, Expression lhs, Expression rhs) {
                     Op = op;
@@ -2029,6 +2928,11 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                public override CType Type {
+                    get {
+                        return Ty;
+                    }
+                }
 
                 public CastExpression(CType ty, Expression expr) {
                     Ty = ty;
@@ -2043,6 +2947,14 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public UnaryPrefixExpression(string op, Expression expr) {
                     Op = op;
@@ -2054,6 +2966,14 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public UnaryAddressExpression(Expression expr) {
                     Expr = expr;
@@ -2063,6 +2983,14 @@ namespace AnsiCParser {
             public class UnaryReferenceExpression : Expression {
                 public Expression Expr {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public UnaryReferenceExpression(Expression expr) {
@@ -2074,6 +3002,14 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public UnaryPlusExpression(Expression expr) {
                     Expr = expr;
@@ -2083,6 +3019,14 @@ namespace AnsiCParser {
             public class UnaryMinusExpression : Expression {
                 public Expression Expr {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public UnaryMinusExpression(Expression expr) {
@@ -2094,6 +3038,14 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public UnaryNegateExpression(Expression expr) {
                     Expr = expr;
@@ -2103,6 +3055,14 @@ namespace AnsiCParser {
             public class UnaryNotExpression : Expression {
                 public Expression Expr {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public UnaryNotExpression(Expression expr) {
@@ -2114,6 +3074,14 @@ namespace AnsiCParser {
                 public CType Ty {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public SizeofTypeExpression(CType ty) {
                     Ty = ty;
@@ -2124,178 +3092,34 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
 
                 public SizeofExpression(Expression expr) {
                     Expr = expr;
                 }
             }
 
-            public class ArrayIndexExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                public Expression Index {
-                    get;
-                }
 
-                public ArrayIndexExpression(Expression expr, Expression index) {
-                    Expr = expr;
-                    Index = index;
-                }
-            }
 
-            public class FunctionCallExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                public List<Expression> Args {
-                    get;
-                }
-
-                public FunctionCallExpression(Expression expr, List<Expression> args) {
-                    Expr = expr;
-                    Args = args;
-                }
-            }
-
-            public class MemberDirectAccess : Expression {
-                public Expression Expr {
-                    get;
-                }
-                public string Ident {
-                    get;
-                }
-
-                public MemberDirectAccess(Expression expr, string ident) {
-                    Expr = expr;
-                    Ident = ident;
-                }
-            }
-
-            public class MemberIndirectAccess : Expression {
-                public Expression Expr {
-                    get;
-                }
-                public string Ident {
-                    get;
-                }
-
-                public MemberIndirectAccess(Expression expr, string ident) {
-                    Expr = expr;
-                    Ident = ident;
-                }
-            }
-
-            public class UnaryPostfixExpression : Expression {
-                public string Op {
-                    get;
-                }
-                public Expression Expr {
-                    get;
-                }
-
-                public UnaryPostfixExpression(string op, Expression expr) {
-                    Op = op;
-                    Expr = expr;
-                }
-            }
-
-            public class IdentifierExpression : Expression {
-                public string Ident {
-                    get;
-                }
-
-                public IdentifierExpression(string ident) {
-                    Ident = ident;
-                }
-            }
-
-            public class StringExpression : Expression {
-                public List<string> Strings {
-                    get;
-                }
-
-                public StringExpression(List<string> strings) {
-                    Strings = strings;
-                }
-            }
-
-            public class IntegerConstant : Expression {
-
-                public string Str {
-                    get;
-                }
-                public long Value {
-                    get;
-                }
-
-                public IntegerConstant(string str, long value) {
-                    this.Str = str;
-                    this.Value = value;
-                }
-            }
-
-            public class CharacterConstant : Expression {
-                public string Str {
-                    get;
-                }
-
-                public CharacterConstant(string str) {
-                    Str = str;
-                }
-            }
-
-            public class FloatingConstant : Expression {
-                public string Str {
-                    get;
-                }
-
-                public FloatingConstant(string str) {
-                    Str = str;
-                }
-            }
-
-            public class EnumerationConstant : Expression {
-                public CType.TaggedType.EnumType.MemberInfo Ret {
-                    get;
-                }
-
-                public EnumerationConstant(CType.TaggedType.EnumType.MemberInfo ret) {
-                    Ret = ret;
-                }
-            }
-
-            internal class VariableExpression : Expression {
-                public string ident {
-                    get;
-                }
-                public Declaration.VariableDeclaration variableDeclaration {
-                    get;
-                }
-
-                public VariableExpression(string ident, Declaration.VariableDeclaration variableDeclaration) {
-                    this.ident = ident;
-                    this.variableDeclaration = variableDeclaration;
-                }
-            }
-
-            internal class FunctionExpression : Expression {
-                public Declaration.FunctionDeclaration functionDeclaration {
-                    get;
-                }
-                public string ident {
-                    get;
-                }
-
-                public FunctionExpression(string ident, Declaration.FunctionDeclaration functionDeclaration) {
-                    this.ident = ident;
-                    this.functionDeclaration = functionDeclaration;
-                }
-            }
 
             internal class GccStatementExpression : Expression {
                 public Statement statements {
                     get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
                 }
 
                 public GccStatementExpression(Statement statements) {
@@ -2310,6 +3134,11 @@ namespace AnsiCParser {
                 }
                 public Expression Expr {
                     get;
+                }
+                public override CType Type {
+                    get {
+                        return Ty;
+                    }
                 }
 
                 public IntegerPromotionExpression(CType.BasicType ty, Expression expr) {
@@ -2545,14 +3374,7 @@ namespace AnsiCParser {
                     get;
                 }
                 public Statement Body {
-                    get;
-                }
-
-                public FunctionDeclaration(string ident, CType ty, StorageClass storage_class, Statement body) {
-                    Ident = ident;
-                    Ty = ty;
-                    StorageClass = storage_class;
-                    Body = body;
+                    get; set;
                 }
 
                 public FunctionDeclaration(string ident, CType ty, StorageClass storage_class) {
@@ -3023,13 +3845,13 @@ namespace AnsiCParser {
         private static string L { get; } = $@"[a-zA-Z_]";
         private static string H { get; } = $@"[a-fA-F0-9]";
         private static string E { get; } = $@"[Ee][+-]?{D}+";
-        private static string FS { get; } = $@"(f|F|l|L)";
+        private static string FS { get; } = $@"(f|F|l|L)?";
         private static string IS { get; } = $@"(u|U|l|L)*";
         private static Regex RegexPreprocessingNumber { get; } = new Regex($@"^(\.?\d([eEpP][\+\-]|\.|({L}|{D}|_))*)$");
-        private static Regex RegexFlating { get; } = new Regex($@"^({D}+{E}|{D}*\.{D}+({E})?|{D}+\.{D}*({E})?){FS}?$");
-        private static Regex RegexHeximal { get; } = new Regex($@"^0[xX]({H}+)({IS})?$");
-        private static Regex RegexDecimal { get; } = new Regex($@"^({D}+){IS}?$");
-        private static Regex RegexOctal { get; } = new Regex($@"^0({D}+){IS}?$");
+        private static Regex RegexFlating { get; } = new Regex($@"^(?<Body>{D}+{E}|{D}*\.{D}+({E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$");
+        private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$");
+        private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$");
+        private static Regex RegexOctal { get; } = new Regex($@"^0(?<Body>{D}+)(?<Suffix>{IS})$");
         private static Regex RegexChar { get; } = new Regex($@"^L?'(\.|[^\'])+'$");
         private static Regex RegexStringLiteral { get; } = new Regex($@"^L?""(\.|[^\""])*""$");
 
@@ -3094,6 +3916,27 @@ namespace AnsiCParser {
                         IncPos(2);
                     } else if (scanch("*/")) {
                         IncPos(2);
+                        terminated = true;
+                        break;
+                    } else {
+                        IncPos(1);
+                    }
+                }
+                if (terminated == false) {
+                    _tokens.Add(new Token(Token.TokenKind.EOF, _inputPos, 0, ""));
+                    return false;
+                }
+                goto rescan;
+            }
+            if (scanch("//")) {
+                int start = _inputPos;
+                IncPos(2);
+
+                bool terminated = false;
+                while (_inputPos < _inputText.Length) {
+                    if (scanch("\\")) {
+                        IncPos(2);
+                    } else if (scanch("\n")) {
                         terminated = true;
                         break;
                     } else {
@@ -3336,52 +4179,217 @@ namespace AnsiCParser {
         private bool is_FLOATING_CONSTANT() {
             return current_token().kind == Token.TokenKind.FLOAT_CONSTANT;
         }
-        private string FLOATING_CONSTANT() {
+        private AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant FLOATING_CONSTANT() {
             if (is_FLOATING_CONSTANT() == false) {
                 throw new Exception();
             }
-            var ret = current_token().raw;
+            var raw = current_token().raw;
+            var m = RegexHeximal.Match(raw);
+            if (m.Success == false) {
+                throw new Exception();
+            }
+            var value = Convert.ToDouble(m.Groups["Body"].Value);
+            CType.BasicType.Kind type;
+            switch (String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x))) {
+                case "F":
+                    type = CType.BasicType.Kind.Float;
+                    break;
+                case "L":
+                    type = CType.BasicType.Kind.LongDouble;
+                    break;
+                case "":
+                    type = CType.BasicType.Kind.Double;
+                    break;
+                default:
+                    throw new Exception();
+            }
             next_token();
-            return ret;
+            return new AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant(raw, value, type);
         }
 
         private bool is_INTEGER_CONSTANT() {
             return current_token().kind == Token.TokenKind.HEXIMAL_CONSTANT | current_token().kind == Token.TokenKind.OCTAL_CONSTANT | current_token().kind == Token.TokenKind.DECIAML_CONSTANT;
         }
-        private Tuple<string, long> INTEGER_CONSTANT() {
+        private AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant INTEGER_CONSTANT() {
             if (is_INTEGER_CONSTANT() == false) {
                 throw new Exception();
             }
-            long value = 0;
+            string raw = current_token().raw;
+            string body;
+            string suffix;
+            int radix;
+            CType.BasicType.Kind[] candidates;
+
             switch (current_token().kind) {
                 case Token.TokenKind.HEXIMAL_CONSTANT: {
-                        var m = RegexHeximal.Match(current_token().raw);
+                        var m = RegexHeximal.Match(raw);
                         if (m.Success == false) {
                             throw new Exception();
                         }
-                        value = Convert.ToInt64(m.Groups[1].Value, 16);
-                        // m.Groups[2].Valueのサフィックスに応じていろいろする
+                        body = m.Groups["Body"].Value;
+                        suffix = String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x));
+                        radix = 16;
+                        switch (suffix) {
+                            case "LLU":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "LL":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "UL":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "L":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "U":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "":
+                                candidates = new[] { CType.BasicType.Kind.SignedInt, CType.BasicType.Kind.UnsignedInt, CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            default:
+                                throw new Exception();
+                        }
+
                         break;
                     }
-                case Token.TokenKind.OCTAL_CONSTANT:
-                    value = Convert.ToInt64(current_token().raw, 8);
-                    break;
-                case Token.TokenKind.DECIAML_CONSTANT: {
-                        var m = RegexDecimal.Match(current_token().raw);
+                case Token.TokenKind.OCTAL_CONSTANT: {
+                        var m = RegexOctal.Match(raw);
                         if (m.Success == false) {
                             throw new Exception();
                         }
-                        value = Convert.ToInt64(m.Groups[1].Value, 10);
-                        // m.Groups[2].Valueのサフィックスに応じていろいろする
+                        body = m.Groups["Body"].Value;
+                        suffix = String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x));
+                        radix = 8;
+                        switch (suffix) {
+                            case "LLU":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "LL":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "UL":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "L":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "U":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "":
+                                candidates = new[] { CType.BasicType.Kind.SignedInt, CType.BasicType.Kind.UnsignedInt, CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.SignedLongLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            default:
+                                throw new Exception();
+                        }
+                        break;
+                    }
+                case Token.TokenKind.DECIAML_CONSTANT: {
+                        var m = RegexDecimal.Match(raw);
+                        if (m.Success == false) {
+                            throw new Exception();
+                        }
+                        body = m.Groups["Body"].Value;
+                        suffix = String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x));
+                        radix = 10;
+                        switch (suffix) {
+                            case "LLU":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "LL":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongLongInt };
+                                break;
+                            case "UL":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "L":
+                                candidates = new[] { CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.SignedLongLongInt };
+                                break;
+                            case "U":
+                                candidates = new[] { CType.BasicType.Kind.UnsignedInt, CType.BasicType.Kind.UnsignedLongInt, CType.BasicType.Kind.UnsignedLongLongInt };
+                                break;
+                            case "":
+                                candidates = new[] { CType.BasicType.Kind.SignedInt, CType.BasicType.Kind.SignedLongInt, CType.BasicType.Kind.SignedLongLongInt };
+                                break;
+                            default:
+                                throw new Exception();
+                        }
                         break;
                     }
                 default:
                     throw new Exception();
 
             }
-            var ret = current_token().raw;
+
+            var originalSigned = Convert.ToInt64(body, radix);
+            var originalUnsigned = Convert.ToUInt64(body, radix);
+            Int64 value = 0;
+
+            CType.BasicType.Kind selectedType = 0;
+            System.Diagnostics.Debug.Assert(candidates.Length > 0);
+            foreach (var candidate in candidates) {
+                switch (candidate) {
+                    case CType.BasicType.Kind.SignedInt: {
+                            var v = Convert.ToInt32(body, radix);
+                            if (v == originalSigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    case CType.BasicType.Kind.UnsignedInt: {
+                            var v = Convert.ToUInt32(body, radix);
+                            if (v == originalUnsigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    case CType.BasicType.Kind.SignedLongInt: {
+                            var v = Convert.ToInt32(body, radix);
+                            if (v == originalSigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    case CType.BasicType.Kind.UnsignedLongInt: {
+                            var v = Convert.ToUInt32(body, radix);
+                            if (v == originalUnsigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    case CType.BasicType.Kind.SignedLongLongInt: {
+                            var v = Convert.ToInt64(body, radix);
+                            if (v == originalSigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    case CType.BasicType.Kind.UnsignedLongLongInt: {
+                            var v = Convert.ToUInt64(body, radix);
+                            if (v == originalUnsigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    default:
+                        throw new Exception();
+                }
+                selectedType = candidate;
+                break;
+            }
+
             next_token();
-            return Tuple.Create(ret, value);
+
+            return new AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant(raw, value, selectedType);
+
         }
 
         private bool is_STRING() {
@@ -3441,38 +4449,68 @@ namespace AnsiCParser {
 
             var ret = new List<AST.Declaration>();
 
+
             if (!is_declarator()) {
                 Read(';');
                 return ret;
             } else {
-
                 for (; ; ) {
                     string ident = "";
                     List<CType> stack = new List<CType>() { new CType.StubType() };
                     declarator(ref ident, stack, 0);
                     var ctype = CType.Resolve(baseType, stack);
                     if (Peek('=', ',', ';')) {
+                        // 関数定義以外である
+
                         if (functionSpecifier != FunctionSpecifier.None) {
-                            throw new Exception("inlineは関数定義でのみ使える。");
+                            throw new Exception("inlineは関数定義に対してのみ使える。");
                         }
+                        if (storageClass == StorageClass.Auto || storageClass == StorageClass.Register) {
+                            throw new Exception("inlineは関数定義に対してのみ使える。");
+                        }
+
+
+
                         AST.Declaration decl = null;
                         if (Peek('=')) {
-                            if (storageClass == StorageClass.Typedef || storageClass == StorageClass.Extern) {
-                                // 初期化できない記憶クラス指定子
-                                throw new Exception();
+                            // 初期化式を伴うので、初期化付きの変数宣言
+
+                            if (storageClass == StorageClass.Typedef || storageClass == StorageClass.Auto || storageClass == StorageClass.Register) {
+                                throw new Exception("変数宣言には指定できない記憶クラス指定子が指定されている。");
                             }
-                            // 関数宣言に初期値は指定できない
+
                             if (ctype.IsFunctionType()) {
-                                throw new Exception("");
+                                throw new Exception("関数宣言に初期値を指定している");
                             }
+
                             Read('=');
                             var init = initializer();
                             decl = new AST.Declaration.VariableDeclaration(ident, ctype, storageClass, init);
                         } else {
+                            // 初期化式を伴わないため、関数宣言、変数宣言、Typedef宣言のどれか
+
+                            if (storageClass == StorageClass.Auto || storageClass == StorageClass.Register) {
+                                throw new Exception("ファイル有効範囲での関数宣言、変数宣言、Typedef宣言で指定できない記憶クラス指定子が指定されている。");
+                            }
+
+
+                            if (ctype.IsFunctionType()) {
+                                // 6.7.5.3 関数宣言子（関数原型を含む）
+                                // 関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。
+                                // 脚注　関数宣言でK&Rの関数定義のように int f(a,b,c); と書くことはダメということ。int f(); ならOK
+                                if ((ctype as CType.FunctionType).Arguments != null) {
+                                    // K&R の記法で宣言を記述した場合、cTypeがnull
+                                    // ANSIの記法で宣言を記述した場合、cTypeは非null
+                                    if ((ctype as CType.FunctionType).Arguments.Any(x => x.cType == null)) {
+                                        throw new Exception("関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。");
+                                    }
+                                }
+                            }
+
                             if (storageClass == StorageClass.Typedef) {
                                 AST.Declaration.TypeDeclaration tdecl;
                                 if (typedef_scope.TryGetValue(ident, out tdecl)) {
-                                    if (CType.Equals(tdecl.Ctype, ctype) == false) {
+                                    if (CType.IsEqual(tdecl.Ctype, ctype) == false) {
                                         throw new Exception("再定義型の不一致");
                                     }
                                 } else {
@@ -3481,9 +4519,31 @@ namespace AnsiCParser {
                                     typedef_scope.Add(ident, tdecl);
                                 }
                             } else if (ctype.IsFunctionType()) {
+                                // 関数宣言
+                                IdentifierValue iv;
+                                if (ident_scope.TryGetValue(ident, out iv)) {
+                                    if (iv.IsFunction() == false) {
+                                        throw new Exception("関数型以外で宣言済み");
+                                    }
+                                    if (CType.IsEqual(iv.ToFunction().Ty, ctype) == false) {
+                                        throw new Exception("再定義型の不一致");
+                                    }
+                                    // Todo: 型の合成
+                                }
                                 decl = new AST.Declaration.FunctionDeclaration(ident, ctype, storageClass);
                                 ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
                             } else {
+                                // 変数宣言
+                                IdentifierValue iv;
+                                if (ident_scope.TryGetValue(ident, out iv)) {
+                                    if (iv.IsVariable() == false) {
+                                        throw new Exception("変数型以外で宣言済み");
+                                    }
+                                    if (CType.IsEqual(iv.ToVariable().Ctype, ctype) == false) {
+                                        throw new Exception("再定義型の不一致");
+                                    }
+                                    // Todo: 型の合成
+                                }
                                 decl = new AST.Declaration.VariableDeclaration(ident, ctype, storageClass, null);
                                 ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
                             }
@@ -3499,45 +4559,74 @@ namespace AnsiCParser {
                     } else if (ctype.IsFunctionType()) {
                         // 関数定義
 
-                        // K&Rの引数型宣言があるか調べる。
+                        // K&Rにおける宣言並びがあるか調べる。
                         var argmuents = is_declaration() ? declaration() : null;
 
-                        // 判定は適当。修正予定
-                        // ctypeがK&R型の宣言ならここでctypeの引数部分とargumentsを照合してマージする。
-                        if (ctype.IsFunctionType()) {
-                            var ctype_fun = ctype as CType.FunctionType;
-                            if (ctype_fun.Arguments == null) {
-                                if (argmuents != null) {
-                                    throw new Exception("K&Rの空の引数リストに対して引数宣言がある");
-                                } else {
-                                    // ANSIの引数指定なし関数
-                                }
-                            } else if (ctype_fun.Arguments.Any(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
-                                if (!ctype_fun.Arguments.All(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
-                                }
-
-                                if (!argmuents.All(x => x is AST.Declaration.VariableDeclaration)) {
-                                    throw new Exception("宣言部に引数宣言以外が混ざってない？");
-                                }
-
-                                var dic = argmuents.Cast<AST.Declaration.VariableDeclaration>().ToDictionary(x => x.Ident, x => x);
-                                var mapped = ctype_fun.Arguments.Select(x => {
-                                    if (dic.ContainsKey(x.Name)) {
-                                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype);
-                                    } else {
-                                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, (CType)new CType.BasicType(TypeSpecifier.None));
-                                    }
-                                }).ToList();
-                                ctype_fun.Arguments.Clear();
-                                ctype_fun.Arguments.AddRange(mapped);
-                            }
+                        // 宣言並びと仮引数宣言の両方があるのは違反
+                        if (argmuents?.Any(x => !(x is AST.Declaration.VariableDeclaration)) == true) {
+                            throw new Exception("宣言並び中に仮引数宣言以外がある");
                         }
 
-                        var stmts = compound_statement();
+                        var ctype_fun = ctype as CType.FunctionType;
 
-                        var funcdecl = new AST.Declaration.FunctionDeclaration(ident, ctype, storageClass, stmts);
-                        ret.Add(funcdecl);
+                        if (ctype_fun.Arguments == null) {
+                            // 識別子並び・仮引数型並びなし
+                            if (argmuents != null) {
+                                throw new Exception("K&R形式の関数定義だが、識別子並びが空なのに、宣言並びがある");
+                            } else {
+                                // 引数指定なし関数
+                            }
+                        } else if (ctype_fun.Arguments.Any(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
+
+                            // K&R形式の識別子並びが存在するので K&R 形式として処理
+                            if (ctype_fun.Arguments.Any(x => (x.cType as CType.BasicType)?.kind != CType.BasicType.Kind.KAndRImplicitInt)) {
+                                throw new Exception("関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
+                            }
+
+                            // 識別子並びに宣言並びの型情報を規定の実引数拡張を伴って反映させる。
+                            var dic = argmuents.Cast<AST.Declaration.VariableDeclaration>().ToDictionary(x => x.Ident, x => x);
+                            var mapped = ctype_fun.Arguments.Select(x => {
+                                if (dic.ContainsKey(x.Name)) {
+                                    return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype.DefaultArgumentPromotion(), dic[x.Name].Ctype);
+                                } else {
+                                    var type = (CType)new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                                    return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, type.DefaultArgumentPromotion(), type);
+                                }
+                            }).ToList();
+
+
+
+                            ctype_fun.Arguments.Clear();
+                            ctype_fun.Arguments.AddRange(mapped);
+
+                            // ToDo: スコープを一つ作り、実引数拡張後の引数変数から実引数拡張前の型で指定された引数変数へのコピーを入れる。
+
+                        } else {
+                            // ANSI形式の仮引数型並びのみなので何もしない
+                        }
+
+                        // 関数が定義済みの場合は、再定義のチェックを行う
+                        IdentifierValue iv;
+                        if (ident_scope.TryGetValue(ident, out iv)) {
+                            if (iv.IsFunction() == false) {
+                                throw new Exception("関数型以外で宣言済み");
+                            }
+                            if (CType.IsEqual(iv.ToFunction().Ty, ctype_fun) == false) {
+                                throw new Exception("再定義型の不一致");
+                            }
+                            if (iv.ToFunction().Body != null) {
+                                throw new Exception("関数はすでに本体を持っている。");
+                            }
+
+                        }
+                        var funcdecl = new AST.Declaration.FunctionDeclaration(ident, ctype, storageClass);
                         ident_scope.Add(ident, new IdentifierValue.Declaration(funcdecl));
+
+                        funcdecl.Body = compound_statement();
+
+
+
+                        ret.Add(funcdecl);
                         return ret;
                     } else {
                         throw new Exception("");
@@ -3640,7 +4729,7 @@ namespace AnsiCParser {
                     throw new Exception();
                 }
                 if (ctype != null) {
-                    if (CType.Equals(ctype, value.Ctype) == false) {
+                    if (CType.IsEqual(ctype, value.Ctype) == false) {
                         throw new Exception("");
                     }
                 }
@@ -4064,7 +5153,7 @@ namespace AnsiCParser {
                     more_direct_declarator(stack, index);
                 } else if (is_identifier_list()) {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None), null)).ToList();
                     Read(')');
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                     more_direct_declarator(stack, index);
@@ -4129,9 +5218,9 @@ namespace AnsiCParser {
                 List<CType> stack = new List<CType>() { new CType.StubType() };
                 declarator_or_abstract_declarator(ref ident, stack, 0);
                 var ctype = CType.Resolve(baseType, stack);
-                return new CType.FunctionType.ArgumentInfo(ident, storageClass, ctype);
+                return new CType.FunctionType.ArgumentInfo(ident, storageClass, ctype, null);
             } else {
-                return new CType.FunctionType.ArgumentInfo((string)null, storageClass, baseType);
+                return new CType.FunctionType.ArgumentInfo((string)null, storageClass, baseType, null);
             }
 
         }
@@ -4202,7 +5291,7 @@ namespace AnsiCParser {
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None), null)).ToList();
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                 }
                 Read(')');
@@ -4808,7 +5897,7 @@ namespace AnsiCParser {
                 Read('[');
                 var index = expression();
                 Read(']');
-                return more_postfix_expression(new AST.Expression.ArrayIndexExpression(expr, index));
+                return more_postfix_expression(new AST.Expression.PostfixExpression.ArraySubscriptingExpression(expr, index));
             }
             if (Peek('(')) {
                 Read('(');
@@ -4819,22 +5908,22 @@ namespace AnsiCParser {
                     args = new List<AST.Expression>();
                 }
                 Read(')');
-                return more_postfix_expression(new AST.Expression.FunctionCallExpression(expr, args));
+                return more_postfix_expression(new AST.Expression.PostfixExpression.FunctionCallExpression(expr, args));
             }
             if (Peek('.')) {
                 Read('.');
                 var ident = IDENTIFIER(false);
-                return more_postfix_expression(new AST.Expression.MemberDirectAccess(expr, ident));
+                return more_postfix_expression(new AST.Expression.PostfixExpression.MemberDirectAccess(expr, ident));
             }
             if (Peek(Token.TokenKind.PTR_OP)) {
                 Read(Token.TokenKind.PTR_OP);
                 var ident = IDENTIFIER(false);
-                return more_postfix_expression(new AST.Expression.MemberIndirectAccess(expr, ident));
+                return more_postfix_expression(new AST.Expression.PostfixExpression.MemberIndirectAccess(expr, ident));
             }
             if (Peek(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
                 var op = current_token().raw;
                 next_token();
-                return more_postfix_expression(new AST.Expression.UnaryPostfixExpression(op, expr));
+                return more_postfix_expression(new AST.Expression.PostfixExpression.UnaryPostfixExpression(op, expr));
             }
             return expr;
         }
@@ -4844,17 +5933,17 @@ namespace AnsiCParser {
                 IdentifierValue value;
                 if (ident_scope.TryGetValue(ident, out value) == false) {
                     //throw new Exception("未宣言");
-                    return new AST.Expression.IdentifierExpression(ident);
+                    return new AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression(ident);
                 }
                 if (value.IsVariable()) {
-                    return new AST.Expression.VariableExpression(ident, value.ToVariable());
+                    return new AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression(ident, value.ToVariable());
                 }
                 if (value.IsEnumValue()) {
                     var ev = value.ToEnumValue();
-                    return new AST.Expression.EnumerationConstant(ev);
+                    return new AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(ev);
                 }
                 if (value.IsFunction()) {
-                    return new AST.Expression.FunctionExpression(ident, value.ToFunction());
+                    return new AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(ident, value.ToFunction());
                 }
                 throw new Exception("");
             }
@@ -4866,7 +5955,7 @@ namespace AnsiCParser {
                 while (is_STRING()) {
                     strings.Add(STRING());
                 }
-                return new AST.Expression.StringExpression(strings);
+                return new AST.Expression.PrimaryExpression.StringExpression(strings);
             }
             if (Peek('(')) {
                 Read('(');
@@ -4876,7 +5965,7 @@ namespace AnsiCParser {
                     Read(')');
                     return new AST.Expression.GccStatementExpression(statements);
                 } else {
-                    var expr = expression();
+                    var expr = new AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression(expression());
                     Read(')');
                     return expr;
                 }
@@ -4903,20 +5992,18 @@ namespace AnsiCParser {
 
         private AST.Expression constant() {
             if (is_INTEGER_CONSTANT()) {
-                var ret = INTEGER_CONSTANT();
-                return new AST.Expression.IntegerConstant(ret.Item1, ret.Item2);
+                return INTEGER_CONSTANT();
             }
             if (is_CHARACTER_CONSTANT()) {
                 var ret = CHARACTER_CONSTANT();
-                return new AST.Expression.CharacterConstant(ret);
+                return new AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant(ret);
             }
             if (is_FLOATING_CONSTANT()) {
-                var ret = FLOATING_CONSTANT();
-                return new AST.Expression.FloatingConstant(ret);
+                return FLOATING_CONSTANT();
             }
             if (is_ENUMERATION_CONSTANT()) {
                 var ret = ENUMERATION_CONSTANT();
-                return new AST.Expression.EnumerationConstant(ret);
+                return new AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(ret);
             }
             throw new Exception();
         }
