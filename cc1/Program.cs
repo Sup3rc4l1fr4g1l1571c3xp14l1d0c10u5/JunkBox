@@ -11,7 +11,9 @@ using System.Text.RegularExpressions;
 namespace AnsiCParser {
     class Program {
         static void Main(string[] args) {
-            new TestCase.FunctionCallCase().Run();
+            new TestCase.EmptyStruct().Run();
+            new TestCase.NoNameStructIsNotUsed().Run();
+
             new Grammer(System.IO.File.ReadAllText(args[0])).Parse();
             TestCase.RunTest();
         }
@@ -30,7 +32,7 @@ namespace AnsiCParser {
             public override void Run() {
                 try {
                     new Grammer(source()).Parse();
-                } catch (T) {
+                } catch (T ex) {
                     return;
                 }
                 throw new Exception($"例外{typeof(T).Name}が発生すべきだが発生しなかった");
@@ -43,6 +45,13 @@ namespace AnsiCParser {
             (new KandRStyleCase()).Run();
             (new HelloWorldCase()).Run();
             (new FunctionCallCase()).Run();
+            (new TestCase.QuickSortCase()).Run();
+            (new TestCase.LValueAndAddressOpCase1()).Run();
+            (new TestCase.LValueAndAddressOpCase2()).Run();
+            (new TestCase.LValueAndAddressOpCase3()).Run();
+            (new TestCase.RedefineTypedefInSameScope()).Run();
+            (new TestCase.RedefineTypedefInNestedScope()).Run();
+            new TestCase.TypedefInStruct().Run();
         }
 
         /// <summary>
@@ -107,6 +116,9 @@ char* str;
 ";
         }
 
+        /// <summary>
+        /// お約束のhello, world(文字配列型から文字型へのポインタ型への暗黙の型変換の例)
+        /// </summary>
         public class HelloWorldCase : SuccessCase {
             protected override string source() => @"
 extern int printf(const char *, ...);
@@ -118,6 +130,10 @@ int main(void) {
 
 ";
         }
+
+        /// <summary>
+        /// 暗黙の型変換の例
+        /// </summary>
         public class FunctionCallCase : SuccessCase {
             protected override string source() => @"
 static  unsigned short
@@ -136,14 +152,151 @@ int main(void) {
     return __bswap_32(0x12345UL);
 }
 ";
-            
+
         }
+
+        /// <summary>
+        /// Wikipediaのクイックソート
+        /// </summary>
+        public class QuickSortCase : SuccessCase {
+            protected override string source() => @"
+typedef int value_type; /* ソートするキーの型 */
+
+/* x, y, z の中間値を返す */
+value_type med3(value_type x, value_type y, value_type z) {
+    if (x < y) {
+        if (y < z) return y; else if (z < x) return x; else return z;
+    } else {
+        if (z < y) return y; else if (x < z) return x; else return z;
+    }
+}
+
+/* クイックソート
+ * a     : ソートする配列
+ * left  : ソートするデータの開始位置
+ * right : ソートするデータの終了位置
+ */
+void quicksort(value_type a[], int left, int right) {
+    if (left < right) {
+        int i = left, j = right;
+        value_type tmp, pivot = med3(a[i], a[i + (j - i) / 2], a[j]); /* (i+j)/2 ではオーバーフローしてしまう */
+        while (1) { /* a[] を pivot 以上と以下の集まりに分割する */
+            while (a[i] < pivot) i++; /* a[i] >= pivot となる位置を検索 */
+            while (pivot < a[j]) j--; /* a[j] <= pivot となる位置を検索 */
+            if (i >= j) break;
+            tmp = a[i]; a[i] = a[j]; a[j] = tmp; /* a[i], a[j] を交換 */
+            i++; j--;
+        }
+        quicksort(a, left, i - 1);  /* 分割した左を再帰的にソート */
+        quicksort(a, j + 1, right); /* 分割した右を再帰的にソート */
+    }
+}";
+
+        }
+
+        /// <summary>
+        /// 左辺値と単項&演算子の例
+        /// </summary>
+        public class LValueAndAddressOpCase1 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+int foo() {
+    &""a"";
+}
+";
+        }
+        public class LValueAndAddressOpCase2 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+int foo() {
+    &1;
+}
+";
+        }
+        public class LValueAndAddressOpCase3 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+int foo() {
+    &a;
+}
+";
+        }
+        /// <summary>
+        /// typedef の再定義
+        /// </summary>
+        public class RedefineTypedefInSameScope : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+typedef int SINT;
+typedef int SINT;   // NG(redefine)
+
+int main(void) {
+SINT x = 1.0;
+return (int)x;
+}
+";
+        }
+        /// <summary>
+        /// typedef の入れ子定義
+        /// </summary>
+        public class RedefineTypedefInNestedScope : SuccessCase {
+            protected override string source() => @"
+typedef int SINT;
+
+typedef struct {
+    typedef int SINT ;
+};
+
+int main(void) {
+typedef double SINT;    // OK(override)
+SINT x = 1.0;
+return (int)x;
+}
+
+";
+        }
+
+        /// <summary>
+        /// struct中で typedef
+        /// </summary>
+        public class TypedefInStruct : RaiseError<SyntaxErrorException> {
+            protected override string source() => @"
+struct Z {
+    typedef int SINT ;  // NG
+    SINT x;
+};
+
+
+";
+        }
+
+        /// <summary>
+        /// メンバが空の構造体
+        /// </summary>
+        public class EmptyStruct : RaiseError<SyntaxErrorException> {
+            protected override string source() => @"
+struct foo {};
+";
+        }
+
+        /// <summary>
+        /// タグ型の宣言、変数宣言のどちらももならない（意味を持たない）構造体の宣言。
+        /// </summary>
+        public class NoNameStructIsNotUsed : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+struct { int x; };
+";
+        }
+
+
     }
 
     public abstract class CompilerException : Exception {
-        public Location Start { get; }
-        public Location End { get; }
-        public string message { get; }
+        public Location Start {
+            get;
+        }
+        public Location End {
+            get;
+        }
+        public string message {
+            get;
+        }
 
         public CompilerException(Location start, Location end, string message) {
             this.Start = start;
@@ -343,22 +496,30 @@ int main(void) {
         /// <summary>
         /// 論理ソースファイルパス
         /// </summary>
-        public string FilePath { get; }
+        public string FilePath {
+            get;
+        }
 
         /// <summary>
         /// 論理ソースファイル上の行番号
         /// </summary>
-        public int Line { get; }
+        public int Line {
+            get;
+        }
 
         /// <summary>
         /// 論理ソースファイル上の桁番号
         /// </summary>
-        public int Column { get; }
+        public int Column {
+            get;
+        }
 
         /// <summary>
         /// 物理ソースファイル上の位置
         /// </summary>
-        public int Position { get; }
+        public int Position {
+            get;
+        }
 
         public static Location Empty { get; } = new Location("", 1, 1, 0);
 
@@ -375,7 +536,7 @@ int main(void) {
     }
 
     /// <summary>
-    /// 型情報の表現
+    /// 型情報
     /// </summary>
     public abstract class CType {
 
@@ -414,6 +575,8 @@ int main(void) {
         /// 基本型
         /// </summary>
         /// <remarks>
+        /// 6.7.2 型指定子
+        /// 制約 
         /// それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。型指定子の並びは，次に示すもののいずれか一つでなければならない.
         /// - void
         /// - char
@@ -537,7 +700,7 @@ int main(void) {
                     case TypeSpecifier.Long | TypeSpecifier.Double | TypeSpecifier._Imaginary:
                         return Kind.LongDouble_Imaginary;
                     default:
-                        throw new Exception();
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型指定子の並びが制約を満たしていません。");
                 }
             }
 
@@ -560,7 +723,7 @@ int main(void) {
                     case Kind.KAndRImplicitInt:
                         return 4;
                     case Kind.Void:
-                        throw new Exception();
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
                     case Kind.Char:
                         return 1;
                     case Kind.SignedChar:
@@ -604,7 +767,7 @@ int main(void) {
                     case Kind.LongDouble_Imaginary:
                         return 12;
                     default:
-                        throw new Exception();
+                        throw new InternalErrorException(Location.Empty, Location.Empty, "型のサイズを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
                 }
             }
 
@@ -681,6 +844,9 @@ int main(void) {
                 this.IsAnonymous = isAnonymous;
             }
 
+            /// <summary>
+            /// 構造体・共用体型
+            /// </summary>
             public class StructUnionType : TaggedType {
                 public enum StructOrUnion {
                     Struct,
@@ -708,21 +874,14 @@ int main(void) {
                             //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
                             //   - 値が 0 の場合，その宣言に宣言子があってはならない。
                             // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
-                            switch ((type.Unwrap() as CType.BasicType)?.kind) {
-                                case BasicType.Kind._Bool:
-                                case BasicType.Kind.SignedInt:
-                                case BasicType.Kind.UnsignedInt:
-                                    break;
-                                default:
-                                    throw new SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                            if (!type.Unwrap().IsBasicType(BasicType.Kind._Bool, BasicType.Kind.SignedInt, BasicType.Kind.UnsignedInt)) {
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                             }
                             if (bitSize.Value < 0) {
                                 throw new SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの幅の値は，0 以上でなければならない。");
-                            }
-                            else if (bitSize.Value > type.Sizeof() * 8) {
+                            } else if (bitSize.Value > type.Sizeof() * 8) {
                                 throw new SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
-                            }
-                            else if (bitSize.Value == 0) {
+                            } else if (bitSize.Value == 0) {
                                 // 値が 0 の場合，その宣言に宣言子があってはならない。
                                 // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
                                 // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
@@ -855,7 +1014,7 @@ int main(void) {
         /// </summary>
         public class StubType : CType {
             public override int Sizeof() {
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "スタブ型のサイズを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
             }
             public override string ToString() {
                 return "$";
@@ -915,17 +1074,17 @@ int main(void) {
                         // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
                         foreach (var arg in value) {
                             if (arg.Sc != StorageClass.None && arg.Sc != StorageClass.Register) {
-                                throw new Exception("仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
                             }
                         }
                         // 意味規則
                         // 並びの中の唯一の項目が void 型で名前のない仮引数であるという特別な場合，関数が仮引数をもたないことを指定する。
                         if (value.Any(x => x.cType.IsVoidType())) {
                             if (value.Length != 1) {
-                                throw new Exception("仮引数宣言並びがvoid 型を含むが唯一ではない。");
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並びがvoid 型を含むが唯一ではない。");
                             }
                             if (value.First().Name != null) {
-                                throw new Exception("仮引数宣言並び中のvoid型が名前を持っている。");
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並び中のvoid型が名前を持っている。");
                             }
                             // 空で置き換える。
                             value = new ArgumentInfo[0];
@@ -960,7 +1119,7 @@ int main(void) {
                 // 関数定義の一部である関数宣言子の仮引数型並びにある仮引数は，型調整後に不完全型をもってはならない。(これは関数定義/宣言中で行う。)
                 // 
 
-                this.Arguments = arguments.ToArray();
+                this.Arguments = arguments?.ToArray();
                 this.ResultType = resultType;
                 this.HasVariadic = hasVariadic;
             }
@@ -979,7 +1138,7 @@ int main(void) {
             }
 
             public override int Sizeof() {
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "関数型のサイズは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
             }
 
             public override string ToString() {
@@ -1182,21 +1341,23 @@ int main(void) {
                     continue;
                 }
                 if (t1 is CType.FunctionType && t2 is CType.FunctionType) {
-                    if ((t1 as CType.FunctionType).Arguments.Length != (t2 as CType.FunctionType).Arguments.Length) {
+                    if ((t1 as CType.FunctionType).Arguments?.Length != (t2 as CType.FunctionType).Arguments?.Length) {
                         return false;
                     }
                     if ((t1 as CType.FunctionType).HasVariadic != (t2 as CType.FunctionType).HasVariadic) {
                         return false;
                     }
-                    if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => IsEqual(x.cType, y.cType)).All(x => x) == false) {
-                        return false;
+                    if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments != null) {
+                        if ((t1 as CType.FunctionType).Arguments.Zip((t2 as CType.FunctionType).Arguments, (x, y) => IsEqual(x.cType, y.cType)).All(x => x) == false) {
+                            return false;
+                        }
                     }
                     t1 = (t1 as CType.FunctionType).ResultType;
                     t2 = (t2 as CType.FunctionType).ResultType;
                     continue;
                 }
                 if (t1 is CType.StubType && t2 is CType.StubType) {
-                    throw new Exception();
+                    throw new InternalErrorException(Location.Empty, Location.Empty, "スタブ型同士の比較はできません。（本処理系の実装の誤りが原因です。）");
                 }
                 if (t1 is CType.TaggedType.StructUnionType && t2 is CType.TaggedType.StructUnionType) {
                     if ((t1 as CType.TaggedType.StructUnionType).Kind != (t2 as CType.TaggedType.StructUnionType).Kind) {
@@ -1222,21 +1383,125 @@ int main(void) {
                     }
                     return true;
                 }
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "型の比較方法が定義されていません。（本処理系の実装の誤りが原因です。）");
             }
         }
-    }
 
-    /// <summary>
-    /// 規格書の用語に対応した定義の実装
-    /// </summary>
-    public static class Specification {
+        public static BasicType CreateVoid() {
+            return new CType.BasicType(CType.BasicType.Kind.Void);
+        }
+        public static BasicType CreateChar() {
+            return new CType.BasicType(CType.BasicType.Kind.Char);
+        }
+        public static BasicType CreateUnsignedChar() {
+            return new CType.BasicType(CType.BasicType.Kind.UnsignedChar);
+        }
+        public static BasicType CreateUnsignedShortInt() {
+            return new CType.BasicType(CType.BasicType.Kind.UnsignedShortInt);
+        }
+        public static BasicType CreateUnsignedInt() {
+            return new CType.BasicType(CType.BasicType.Kind.UnsignedInt);
+        }
+        public static BasicType CreateSignedInt() {
+            return new CType.BasicType(CType.BasicType.Kind.SignedInt);
+        }
+        public static BasicType CreateFloat() {
+            return new CType.BasicType(CType.BasicType.Kind.Float);
+        }
+        public static BasicType CreateDouble() {
+            return new CType.BasicType(CType.BasicType.Kind.Double);
+        }
+        public static BasicType CreateLongDouble() {
+            return new CType.BasicType(CType.BasicType.Kind.LongDouble);
+        }
+        public static ArrayType CreateArray(int length, CType type) {
+            return new CType.ArrayType(length, type);
+        }
+        public static PointerType CreatePointer(CType type) {
+            return new CType.PointerType(type);
+        }
+
+        // 処理系定義の特殊型
+
+        public static BasicType CreateSizeT() {
+            return new CType.BasicType(CType.BasicType.Kind.UnsignedLongInt);
+        }
+        public static BasicType CreatePtrDiffT() {
+            return new CType.BasicType(CType.BasicType.Kind.SignedLongInt);
+        }
+
+        /// <summary>
+        /// 型修飾を得る
+        /// </summary>
+        /// <returns></returns>
+        public TypeQualifier GetQualifiedType() {
+            if (this is CType.TypeQualifierType) {
+                return (this as CType.TypeQualifierType).type_qualifier;
+            }
+            return TypeQualifier.None;
+        }
+
+        /// <summary>
+        /// 型修飾を追加する
+        /// </summary>
+        /// <returns></returns>
+        public CType WrapTypeQualifier(TypeQualifier typeQualifier) {
+            if (typeQualifier != TypeQualifier.None) {
+                return new CType.TypeQualifierType(this.UnwrapTypeQualifier(), this.GetQualifiedType() | typeQualifier);
+            } else {
+                return this;
+            }
+        }
+
+        /// <summary>
+        /// 型修飾を除去する
+        /// </summary>
+        /// <returns></returns>
+        public CType UnwrapTypeQualifier() {
+            var self = this;
+            while (self is CType.TypeQualifierType) {
+                self = (self as CType.TypeQualifierType).cType;
+            }
+            return self;
+        }
+        /// <summary>
+        /// void型ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        public bool IsVoidType() {
+            var unwrappedSelf = this.Unwrap();
+            return (unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Void;
+        }
+
+        /// <summary>
+        /// Bool型ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+        public bool IsBoolType() {
+            var unwrappedSelf = this.Unwrap();
+            return (unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind._Bool;
+        }
+
+        /// <summary>
+        /// 指定した種別の基本型なら真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="kind"></param>
+        /// <returns></returns>
+        public bool IsBasicType(params CType.BasicType.Kind[] kind) {
+            var unwrappedSelf = this.Unwrap();
+            return (unwrappedSelf is CType.BasicType) && kind.Contains((unwrappedSelf as CType.BasicType).kind);
+        }
+
         /// <summary>
         /// 型別名と型修飾を無視した型を得る。
         /// </summary>
         /// <param name="self"></param>
         /// <returns></returns>
-        public static CType Unwrap(this CType self) {
+        public CType Unwrap() {
+            var self = this;
             for (; ; ) {
                 if (self is CType.TypedefedType) {
                     self = (self as CType.TypedefedType).cType;
@@ -1249,16 +1514,12 @@ int main(void) {
             }
             return self;
         }
+    }
 
-        /// <summary>
-        /// void型ならば真
-        /// </summary>
-        /// <param name="self"></param>
-        /// <returns></returns>
-        public static bool IsVoidType(this CType self) {
-            var unwrappedSelf = self.Unwrap();
-            return (unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Void;
-        }
+    /// <summary>
+    /// 規格書の用語に対応した定義の実装
+    /// </summary>
+    public static class Specification {
 
         // 6.2.5 型
         // - オブジェクト型（object type）: オブジェクトを完全に規定する型（脚注：不完全型 (incomplete type) と関数型 (function type) 以外の サイズが確定している型）
@@ -1528,19 +1789,18 @@ int main(void) {
                 var bt = unwrappedSelf as CType.BasicType;
                 switch (bt.kind) {
                     case CType.BasicType.Kind.Float_Complex:
-                        return new CType.BasicType(CType.BasicType.Kind.Float);
+                        return CType.CreateFloat();
                     case CType.BasicType.Kind.Double_Complex:
-                        return new CType.BasicType(CType.BasicType.Kind.Double);
+                        return CType.CreateDouble();
                     case CType.BasicType.Kind.LongDouble_Complex:
-                        return new CType.BasicType(CType.BasicType.Kind.LongDouble);
+                        return CType.CreateLongDouble();
                     default:
-                        throw new Exception();
+                        throw new InternalErrorException(Location.Empty, Location.Empty, "対応する実数型を持たない_Complex型です。（本実装に誤りがあるようです。）");
                 }
             } else {
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "実数型以外から「対応する実数型」を得ようとしました。（本実装に誤りがあるようです。）");
             }
         }
-
 
         /// <summary>
         /// 基本型（basic type）ならば真
@@ -1550,7 +1810,6 @@ int main(void) {
             var unwrappedSelf = self.Unwrap();
             return unwrappedSelf.IsSignedIntegerType() || unwrappedSelf.IsUnsignedIntegerType() || unwrappedSelf.IsFloatingType() || ((unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind.Char);
         }
-
 
         /// <summary>
         /// 文字型（character type）ならば真
@@ -1607,7 +1866,6 @@ int main(void) {
             var unwrappedSelf = self.Unwrap();
             return unwrappedSelf.IsIntegerType() || unwrappedSelf.IsFloatingType();
         }
-
 
         /// <summary>
         /// 配列型（array type）ならば真
@@ -1728,7 +1986,6 @@ int main(void) {
                 ;
         }
 
-
         /// <summary>
         /// 派生宣言子型（derived declarator type）ならば真
         /// </summary>
@@ -1755,35 +2012,6 @@ int main(void) {
         /// <returns></returns>
         public static bool IsQualifiedType(this CType self) {
             return self is CType.TypeQualifierType;
-        }
-
-        /// <summary>
-        /// 修飾型を外す。
-        /// </summary>
-        /// <param name="self"></param>
-        /// <returns></returns>
-        public static CType UnwrapQualifiedType(this CType self) {
-            while (self is CType.TypeQualifierType) {
-                self = (self as CType.TypeQualifierType).cType;
-            }
-            return self;
-        }
-
-        /// <summary>
-        /// 修飾型を得る
-        /// </summary>
-        /// <param name="self"></param>
-        /// <returns></returns>
-        public static TypeQualifier  GetQualifiedType(this CType self) {
-            if (self is CType.TypeQualifierType) {
-                return (self as CType.TypeQualifierType).type_qualifier;
-            }
-            return TypeQualifier.None;
-        }
-        
-        public static bool IsBoolType(this CType self) {
-            var unwrappedSelf = self.Unwrap();
-            return (unwrappedSelf as CType.BasicType)?.kind == CType.BasicType.Kind._Bool;
         }
 
         // 6.3 型変換
@@ -1869,12 +2097,12 @@ int main(void) {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
                 if (IntegerConversionRank(expr.Type) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if ((expr.Type.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.UnsignedInt) {
+                    if (expr.Type.Unwrap().IsBasicType(CType.BasicType.Kind.UnsignedInt)) {
                         // unsigned int でないと表現できない
-                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateUnsignedInt(), expr);
                     } else {
                         // signed int で表現できる
-                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateSignedInt(), expr);
                     }
                 } else {
                     // 拡張は不要
@@ -1886,21 +2114,21 @@ int main(void) {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
                     case CType.BasicType.Kind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
-                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateSignedInt(), expr);
                     case CType.BasicType.Kind.SignedInt:
                         // 無条件でint型に変換できる
-                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                        return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateSignedInt(), expr);
                     case CType.BasicType.Kind.UnsignedInt:
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                         if (bitfield.Value == 4 * 8) {
                             // unsigned int でないと表現できない
-                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.UnsignedInt), expr);
+                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateUnsignedInt(), expr);
                         } else {
                             // signed int で表現できる
-                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(new CType.BasicType(CType.BasicType.Kind.SignedInt), expr);
+                            return new AST.Expression.PostfixExpression.IntegerPromotionExpression(CType.CreateSignedInt(), expr);
                         }
                     default:
-                        throw new Exception("ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                 }
             }
         }
@@ -1921,21 +2149,21 @@ int main(void) {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型?
                 if (IntegerConversionRank(self) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if ((self.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.UnsignedInt) {
+                    if (self.Unwrap().IsBasicType(CType.BasicType.Kind.UnsignedInt)) {
                         // unsigned int に拡張
-                        return new CType.BasicType(CType.BasicType.Kind.UnsignedInt);
+                        return CType.CreateUnsignedInt();
                     } else {
                         // signed int に拡張
-                        return new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                        return CType.CreateSignedInt();
                     }
                 } else {
                     // 拡張は不要
                     return self;
                 }
             } else if (IsRealFloatingType(self)) {
-                if ((self.Unwrap() as CType.BasicType)?.kind == CType.BasicType.Kind.Float) {
+                if (self.Unwrap().IsBasicType(CType.BasicType.Kind.Float)) {
                     // double に拡張
-                    return new CType.BasicType(CType.BasicType.Kind.Double);
+                    return CType.CreateDouble();
                 } else {
                     // 拡張は不要
                     return self;
@@ -1964,7 +2192,7 @@ int main(void) {
             var btRhs = tyRhs as CType.BasicType;
 
             if (btLhs == null || btRhs == null) {
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
             }
             if (btLhs.kind == btRhs.kind) {
                 return btLhs;
@@ -2016,7 +2244,7 @@ int main(void) {
             btRhs = tyRhs as CType.BasicType;
 
             if (btLhs == null || btRhs == null) {
-                throw new Exception();
+                throw new InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型が基本型以外になっています。（本実装の誤りが原因だと思われます。）");
             }
             // 両方のオペランドが同じ型をもつ場合，更なる型変換は行わない。
             if (btLhs.kind == btRhs.kind) {
@@ -2075,7 +2303,7 @@ int main(void) {
                     tyUnsignedKind = CType.BasicType.Kind.UnsignedLongLongInt;
                     break;
                 default:
-                    throw new Exception("整数拡張が正しく行われていない？");
+                    throw new InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型がsigned int/signed long int/ signed long long int 型以外になっています。（本実装の誤りが原因だと思われます。）");
             }
 
             var tyUnsigned = new CType.BasicType(tyUnsignedKind);
@@ -2105,7 +2333,7 @@ int main(void) {
             // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
             // （ボイド式は， 副作用のために評価する。 ）
             if (expr.Type.IsVoidType()) {
-                throw new Exception("void型は使えない");
+                throw new SpecificationErrorException(Location.Empty, Location.Empty, "void型の式の値を型変換しようとしました。");
             }
             // 6.3.1 算術オペランド
             // 6.3.1.1 論理型，文字型及び整数型
@@ -2125,7 +2353,7 @@ int main(void) {
                     // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-                    return new AST.Expression.PostfixExpression.CastExpression(new CType.PointerType(elementType), expr);
+                    return new AST.Expression.PostfixExpression.CastExpression(CType.CreatePointer(elementType), expr);
                 }
             }
 
@@ -2144,13 +2372,28 @@ int main(void) {
             // 左辺値が不完全型をもち，配列型以外の型をもつ場合，その動作は未定義とする。
             //
             if (expr.Type.IsIncompleteType() && !expr.Type.IsArrayType()) {
-                throw new Exception("未定義の動作");
+                throw new SpecificationErrorException(Location.Empty, Location.Empty, "左辺値が不完全型をもち，配列型以外の型をもつため、型変換結果は未定義の動作となります。");
             }
             if (expr.Type.IsQualifiedType()) {
                 return new AST.Expression.PostfixExpression.CastExpression((expr.Type as CType.TypeQualifierType).cType, expr);
             } else {
                 return expr;
             }
+        }
+
+        /// <summary>
+        /// 6.3 型変換(暗黙の型変換(implicit conversion))
+        /// </summary>
+        public static AST.Expression ImplicitConversion(AST.Expression expr) {
+            return TypeConvert(expr);
+        }
+
+        /// <summary>
+        /// 6.3 型変換(明示的な型変換(explicit conversion))
+        /// </summary>
+        /// <returns></returns>
+        public static AST.Expression ExplicitConversion(AST.Expression expr) {
+            return TypeConvert(expr);
         }
 
         /// <summary>
@@ -2161,9 +2404,8 @@ int main(void) {
         public static CType GetBasePointerType(this CType self) {
             var unwraped = self.Unwrap();
             if (!unwraped.IsPointerType()) {
-                throw new Exception("ポインタ型以外から派生元型を得ようとした");
-            }
-            else {
+                throw new InternalErrorException(Location.Empty, Location.Empty, "ポインタ型以外から派生元型を得ようとしました。（本実装の誤りが原因だと思われます。）");
+            } else {
                 return (unwraped as CType.PointerType).cType;
             }
         }
@@ -2183,8 +2425,8 @@ int main(void) {
                     expr = (expr as AST.Expression.UnaryPrefixExpression.CastExpression).Expr;
                 }
             }
-            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant) {
-                return (expr as AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant).Value == 0;
+            if (expr is AST.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                return (expr as AST.Expression.PrimaryExpression.Constant.IntegerConstant).Value == 0;
             } else {
                 return false;
             }
@@ -2194,21 +2436,52 @@ int main(void) {
     }
 
     /// <summary>
-    /// 構文木
+    /// 評価器
     /// </summary>
-    public abstract class AST {
+    public static class Evaluator {
+
+        /// <summary>
+        /// 定数式の評価
+        /// </summary>
+        /// <param name="expr"></param>
+        /// <returns></returns>
         public static int ConstantEval(AST.Expression expr) {
+            // 6.6 定数式
+            // 補足説明  
+            // 定数式は，実行時ではなく翻訳時に評価することができる。したがって，定数を使用してよいところならばどこでも使用してよい。
+            //
+            // 制約
+            // - 定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。
+            //   ただし，定数式が評価されない部分式(sizeof演算子のオペランド等)に含まれている場合を除く。
+            // - 定数式を評価した結果は，その型で表現可能な値の範囲内にある定数でなければならない。
+            // 
+
+            // ToDo: 初期化子中の定数式の扱いを実装
+
             if (expr is AST.Expression.PostfixExpression.AdditiveExpression) {
+                // 意味規則
+                // 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する(実装注釈: AdditiveExpressionクラスのコンストラクタ内で適用済み)
+                // 2項+演算子の結果は，両オペランドの和とする。
+                // 2項-演算子の結果は，第 1 オペランドから第 2 オペランドを引いた結果の差とする。
+                // これらの演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
+                // 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
+                // ポインタオペランドが配列オブジェクトの要素を指し，配列が十分に大きい場合，その結果は，その配列の要素を指し，演算結果の要素と元の配列要素の添字の差は，整数式の値に等しい。
+                // すなわち，式 P が配列オブジェクトの i 番目の要素を指している場合，式(P)+N（N+(P)と等しい）及び(P)-N（N は値nをもつと仮定する。）は，それらが存在するのであれば，それぞれ配列オブジェクトのi+n番目及びi−n番目の要素を指す。
+                // さらに，式 P が配列オブジェクトの最後の要素を指す場合，式(P)+1 はその配列オブジェクトの最後の要素を一つ越えたところを指し，式 Q が配列オブジェクトの最後の要素を一つ越えたところを指す場合，式(Q)-1 はその配列オブジェクトの最後の要素を指す。
+                // ポインタオペランド及びその結果の両方が同じ配列オブジェクトの要素，又は配列オブジェクトの最後の要素を一つ越えたところを指している場合，演算によって，オーバフローを生じてはならない。
+                // それ以外の場合，動作は未定義とする。
+                // 結果が配列オブジェクトの最後の要素を一つ越えたところを指す場合，評価される単項*演算子のオペランドとしてはならない。
+
                 var e = expr as AST.Expression.PostfixExpression.AdditiveExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
                 switch (e.Op) {
-                    case Expression.AdditiveExpression.OperatorKind.Add:
+                    case AST.Expression.AdditiveExpression.OperatorKind.Add:
                         return lhs + rhs;
-                    case Expression.AdditiveExpression.OperatorKind.Sub:
+                    case AST.Expression.AdditiveExpression.OperatorKind.Sub:
                         return lhs - rhs;
                     default:
-                        throw new Exception();
+                        throw new InternalErrorException(Location.Empty, Location.Empty, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                 }
             }
             if (expr is AST.Expression.PostfixExpression.AndExpression) {
@@ -2222,24 +2495,113 @@ int main(void) {
             }
             if (expr is AST.Expression.PostfixExpression.ArraySubscriptingExpression) {
                 var e = expr as AST.Expression.PostfixExpression.ArraySubscriptingExpression;
-                throw new Exception();
+                throw new Exception("");
             }
             if (expr is AST.Expression.PostfixExpression.AssignmentExpression) {
                 var e = expr as AST.Expression.PostfixExpression.AssignmentExpression;
-                throw new Exception();
+                throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
             }
             if (expr is AST.Expression.PostfixExpression.CastExpression) {
                 var e = expr as AST.Expression.PostfixExpression.CastExpression;
-                // キャストは未実装
+                // 6.3.1.2 論理型  
+                // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
+                if (e.Ty.IsBoolType()) {
+                    if (e.Expr.Type.IsScalarType()) {
+                        return ConstantEval(e.Expr) == 0 ? 0 : 1;
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "スカラ値以外を_Bool 型に変換しようとした。");
+                    }
+                }
+
+                // 6.3.1.3 符号付き整数型及び符号無し整数型  
+                // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
+                // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
+                // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
+                if (e.Ty.IsIntegerType() && e.Expr.Type.IsIntegerType()) {
+                    var value = ConstantEval(e.Expr);
+                    var target = (e.Ty is CType.BasicType) ? (e.Ty as CType.BasicType).kind : CType.BasicType.Kind.SignedInt;
+                    switch (target) {
+                        case CType.BasicType.Kind.Char:
+                        case CType.BasicType.Kind.SignedChar:
+                            return unchecked((int)(SByte)value);
+                        case CType.BasicType.Kind.UnsignedChar:
+                            return unchecked((int)(Byte)value);
+                        case CType.BasicType.Kind.SignedShortInt:
+                            return unchecked((int)(Int16)value);
+                        case CType.BasicType.Kind.UnsignedShortInt:
+                            return unchecked((int)(UInt16)value);
+                        case CType.BasicType.Kind.SignedInt:
+                        case CType.BasicType.Kind.SignedLongInt:
+                            return unchecked((int)(Int32)value);
+                        case CType.BasicType.Kind.UnsignedInt:
+                        case CType.BasicType.Kind.UnsignedLongInt:
+                            return unchecked((int)(UInt32)value);
+                        case CType.BasicType.Kind.SignedLongLongInt:
+                            return unchecked((int)(Int64)value);
+                        case CType.BasicType.Kind.UnsignedLongLongInt:
+                            return unchecked((int)(UInt64)value);
+                        default:
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "整数値の変換先の型が不正です。");
+                    }
+                }
+
+                // 6.3.1.4実浮動小数点型及び整数型  
+                // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
+                // 整数部の値が整数型で表現できない場合，その動作は未定義とする。
+                // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
+                // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                //
+                // 6.3.1.5 実浮動小数点型  
+                // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。 
+                // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
+                // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                // 
+                // 6.3.1.6 複素数型  
+                // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
+                // 
+                // 6.3.1.7 実数型及び複素数型
+                // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
+                // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する。
+                //
+                // 6.3.2.2 void ボイド式（void expression）
+                // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
+                // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。
+                // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。（ボイド式は， 副作用のために評価する。 ）
+                // 
+                // 6.3.2.3 ポインタ
+                // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
+                // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
+                // 任意の型修飾子qに対して非q修飾型へのポインタは，その型のq修飾版へのポインタに型変換してもよい。
+                // 元のポインタと変換されたポインタに格納された値は，比較して等しくなければならない。
+                // 値0をもつ整数定数式又はその定数式を型void *にキャストした式を，空ポインタ定数（null pointerconstant）と呼ぶ。
+                // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
+                // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
+                // 二つの空ポインタは比較して等しくなければならない。
+                // 整数は任意のポインタ型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない(56)。
+                // 任意のポインタ型は整数型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とする。
+                // 結果が整数型で表現できなければ，その動作は未定義とする。
+                // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
+                // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
+                // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
+                // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
+                // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
+                // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
+                // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
+                // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
+                // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
                 return ConstantEval(e.Expr);
             }
-            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant) {
-                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant;
+            if (expr is AST.Expression.PrimaryExpression.Constant.CharacterConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.Constant.CharacterConstant;
                 return (int)e.Str[1];
             }
             if (expr is AST.Expression.PostfixExpression.CommaExpression) {
                 var e = expr as AST.Expression.PostfixExpression.CommaExpression;
-                throw new Exception();
+                throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
             }
             if (expr is AST.Expression.PostfixExpression.ConditionalExpression) {
                 var e = expr as AST.Expression.PostfixExpression.ConditionalExpression;
@@ -2273,14 +2635,14 @@ int main(void) {
                 var rhs = ConstantEval(e.Rhs);
                 return lhs ^ rhs;
             }
-            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant) {
-                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant;
+            if (expr is AST.Expression.PrimaryExpression.Constant.FloatingConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.Constant.FloatingConstant;
                 // 未実装
                 throw new Exception();
             }
             if (expr is AST.Expression.PostfixExpression.FunctionCallExpression) {
                 var e = expr as AST.Expression.PostfixExpression.FunctionCallExpression;
-                throw new Exception();
+                throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
             }
             if (expr is AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
                 var e = expr as AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
@@ -2296,8 +2658,8 @@ int main(void) {
                 var rhs = ConstantEval(e.Rhs);
                 return lhs | rhs;
             }
-            if (expr is AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant) {
-                var e = expr as AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant;
+            if (expr is AST.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                var e = expr as AST.Expression.PrimaryExpression.Constant.IntegerConstant;
                 return (int)e.Value;
             }
             if (expr is AST.Expression.LogicalAndExpression) {
@@ -2329,13 +2691,13 @@ int main(void) {
             if (expr is AST.Expression.MultiplicitiveExpression) {
                 var e = expr as AST.Expression.MultiplicitiveExpression;
                 var lhs = ConstantEval(e.Lhs);
-                var rhs = ConstantEval(e.Rhs);  
+                var rhs = ConstantEval(e.Rhs);
                 switch (e.Op) {
-                    case Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                    case AST.Expression.MultiplicitiveExpression.OperatorKind.Mul:
                         return lhs * rhs;
-                    case Expression.MultiplicitiveExpression.OperatorKind.Div:
+                    case AST.Expression.MultiplicitiveExpression.OperatorKind.Div:
                         return lhs / rhs;
-                    case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                    case AST.Expression.MultiplicitiveExpression.OperatorKind.Mod:
                         return lhs % rhs;
                     default:
                         throw new Exception();
@@ -2373,8 +2735,7 @@ int main(void) {
             }
             if (expr is AST.Expression.SizeofExpression) {
                 var e = expr as AST.Expression.SizeofExpression;
-                // 未実装につきintサイズ固定
-                return 4;
+                return e.Type.Sizeof();
             }
             if (expr is AST.Expression.SizeofTypeExpression) {
                 var e = expr as AST.Expression.SizeofTypeExpression;
@@ -2406,10 +2767,16 @@ int main(void) {
             }
             if (expr is AST.Expression.PostfixExpression.UnaryPostfixExpression) {
                 var e = expr as AST.Expression.PostfixExpression.UnaryPostfixExpression;
+                if (e.Op == "++" || e.Op == "--") {
+                    throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
+                }
                 throw new Exception();
             }
             if (expr is AST.Expression.UnaryPrefixExpression) {
                 var e = expr as AST.Expression.UnaryPrefixExpression;
+                if (e.Op == AST.Expression.UnaryPrefixExpression.OperatorKind.Inc || e.Op == AST.Expression.UnaryPrefixExpression.OperatorKind.Dec) {
+                    throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
+                }
                 throw new Exception();
             }
             if (expr is AST.Expression.UnaryReferenceExpression) {
@@ -2427,6 +2794,12 @@ int main(void) {
             }
             throw new Exception();
         }
+    }
+
+    /// <summary>
+    /// 構文木
+    /// </summary>
+    public abstract class AST {
 
         /// <summary>
         /// 6.5 式 
@@ -2505,7 +2878,7 @@ int main(void) {
                         }
 
                         public override bool IsLValue() {
-                            throw new NotImplementedException();
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "左辺値が必要な場所に未定義の識別子が登場しています。");
                         }
 
                     }
@@ -2554,7 +2927,7 @@ int main(void) {
                         }
                         public override CType Type {
                             get {
-                                return new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                                return CType.CreateSignedInt();
                             }
                         }
 
@@ -2565,16 +2938,16 @@ int main(void) {
                 }
 
                 /// <summary>
-                /// 定数式
+                /// 定数
                 /// </summary>
                 /// <remarks>
                 /// 定数は，一次式とする。その型は，その形式と値によって決まる（6.4.4 で規定する。）
                 /// </remarks>
-                public abstract class ConstantExpression : Expression {
+                public abstract class Constant : Expression {
                     /// <summary>
                     /// 整数定数式
                     /// </summary>
-                    public class IntegerConstant : ConstantExpression {
+                    public class IntegerConstant : Constant {
 
                         public string Str {
                             get;
@@ -2601,13 +2974,13 @@ int main(void) {
                     /// <summary>
                     /// 文字定数式
                     /// </summary>
-                    public class CharacterConstant : ConstantExpression {
+                    public class CharacterConstant : Constant {
                         public string Str {
                             get;
                         }
                         public override CType Type {
                             get {
-                                return new CType.BasicType(CType.BasicType.Kind.Char);
+                                return CType.CreateChar();
                             }
                         }
 
@@ -2621,7 +2994,7 @@ int main(void) {
                     /// <summary>
                     /// 浮動小数点定数式
                     /// </summary>
-                    public class FloatingConstant : ConstantExpression {
+                    public class FloatingConstant : Constant {
                         private CType.BasicType.Kind _type {
                             get;
                         }
@@ -2659,13 +3032,13 @@ int main(void) {
                     }
                     public override CType Type {
                         get {
-                            return new CType.BasicType.ArrayType(String.Concat(Strings).Length, new CType.BasicType(CType.BasicType.Kind.Char));
+                            return CType.CreateArray(String.Concat(Strings).Length, CType.CreateChar());
                         }
                     }
                     public override bool IsLValue() {
-                        // 6.5.1 一次式
-                        // 文字列リテラルは，一次式とする。それは，6.4.5 の規則で決まる型をもつ左辺値とする。
-                        return true;
+                        // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                        // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
+                        return false;
                     }
 
                     public StringExpression(List<string> strings) {
@@ -2709,13 +3082,6 @@ int main(void) {
                 /// <summary>
                 /// 6.5.2.1 配列の添字付け
                 /// </summary>
-                /// <remarks>
-                /// 式の一方は，型“オブジェクト型T型へのポインタ”をもたなければならない。
-                /// もう一方の式は，整数型をもたなければならない。
-                /// 結果は，型“T型”をもつ。
-                /// 
-                /// 脚注：有名な話だが「式の一方」とあるように、他の言語と違って配列式の要素を入れ替えても意味は変わらない。すなわち、x[1] と 1[x]は同じ意味。
-                /// </remarks>
                 public class ArraySubscriptingExpression : PostfixExpression {
                     /// <summary>
                     /// 型“オブジェクト型T型へのポインタ”（もしくは配列）の式
@@ -2751,25 +3117,23 @@ int main(void) {
                             return _referencedType;
                         }
                     }
+                    public override bool IsLValue() {
+                        return Target.IsLValue();
+                    }
 
                     public ArraySubscriptingExpression(Expression lhs, Expression rhs) {
                         // 6.3 型変換
-                        if (lhs.Type.IsIntegerType()) {
-                            lhs = Specification.IntegerPromotion(lhs);
-                        } else if (lhs.Type.IsArrayType()) {
-                            lhs = Specification.TypeConvert(lhs);
-                        }
-
-                        if (rhs.Type.IsIntegerType()) {
-                            rhs = Specification.IntegerPromotion(rhs);
-                        } else if (lhs.Type.IsArrayType()) {
-                            rhs = Specification.TypeConvert(rhs);
-                        }
-
+                        lhs = Specification.ImplicitConversion(lhs);
+                        rhs = Specification.ImplicitConversion(rhs);
 
                         // 制約
                         //   式の一方は，型“オブジェクト型T型へのポインタ”をもたなければならない。
                         //   もう一方の式は，整数型をもたなければならない。
+                        //   結果は，型“T型”をもつ。
+                        // 
+                        // 脚注 
+                        //   C言語の特徴として有名な話だが「式の一方」とあるように、他の言語と違って配列式の要素を入れ替えても意味は変わらない。すなわち、x[1] と 1[x]は同じ意味。
+
                         CType referencedType;
                         if ((lhs.Type.IsPointerType(out referencedType) && referencedType.IsObjectType()) && (rhs.Type.IsIntegerType())) {
                             _referencedType = referencedType;
@@ -2781,7 +3145,7 @@ int main(void) {
                             Index = lhs;
                         } else {
 
-                            throw new Exception("式の一方は，型“オブジェクト型へのポインタ”をもたなければならず、もう一方の式は，整数型をもたなければならない。");
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "式の一方は，型“オブジェクト型へのポインタ”をもたなければならず、もう一方の式は，整数型をもたなければならない。");
                         }
                         Lhs = lhs;
                         Rhs = rhs;
@@ -2789,7 +3153,7 @@ int main(void) {
                 }
 
                 /// <summary>
-                /// 6.5.2.2  式
+                /// 6.5.2.2  関数呼出し
                 /// </summary>
                 public class FunctionCallExpression : PostfixExpression {
                     public Expression Expr {
@@ -2857,7 +3221,7 @@ int main(void) {
 
                         if (!CType.IsEqual(lType, rhs.Type)) {
                             //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new Expression.CastExpression(lType,rhs);
+                            rhs = new Expression.CastExpression(lType, rhs);
                         }
 
 
@@ -2893,7 +3257,7 @@ int main(void) {
                             // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
                             for (var i = 0; i < functionType.Arguments.Length; i++) {
                                 var targ = functionType.Arguments[i];
-                                var lhs = targ.cType.UnwrapQualifiedType();
+                                var lhs = targ.cType.UnwrapTypeQualifier();
                                 var rhs = args[i];
                                 CheckAssignment(lhs, rhs);
                             }
@@ -2935,10 +3299,10 @@ int main(void) {
                     public MemberDirectAccess(Expression expr, string ident) {
                         // 制約  
                         // .演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならず，2 番目のオペランドは，その型のメンバの名前でなければならない
-                        if (!expr.Type.IsStructureType()) {
+                        if (!expr.Type.IsStructureType() && !expr.Type.IsUnionType()) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならない。");
                         }
-                        var sType = expr.Type as CType.TaggedType.StructUnionType;
+                        var sType = expr.Type.Unwrap() as CType.TaggedType.StructUnionType;
                         var memberInfo = sType.struct_declarations.FirstOrDefault(x => x.Ident == ident);
                         if (memberInfo == null) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
@@ -2954,13 +3318,16 @@ int main(void) {
 
                         var qual = expr.Type.GetQualifiedType();
                         if (qual != TypeQualifier.None) {
-                            _memberType = new CType.TypeQualifierType(memberInfo.Type.UnwrapQualifiedType(), qual);
+                            _memberType = memberInfo.Type.WrapTypeQualifier(qual);
                         } else {
-                            _memberType = memberInfo.Type.UnwrapQualifiedType();
+                            _memberType = memberInfo.Type.UnwrapTypeQualifier();
                         }
                     }
                 }
 
+                /// <summary>
+                /// 6.5.2.3 構造体及び共用体のメンバ(->演算子)
+                /// </summary>
                 public class MemberIndirectAccess : PostfixExpression {
                     public Expression Expr {
                         get;
@@ -2972,6 +3339,10 @@ int main(void) {
                         get;
                     }
 
+                    public override bool IsLValue() {
+                        return ((Expr.Type.GetQualifiedType() & TypeQualifier.Const) != TypeQualifier.Const) && Expr.IsLValue();
+                    }
+
                     public override CType Type {
                         get {
                             return _memberType;
@@ -2981,11 +3352,11 @@ int main(void) {
                     public MemberIndirectAccess(Expression expr, string ident) {
                         // 制約  
                         // ->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならず，2 番目のオペランドは，指される型のメンバの名前でなければならない
-                        if (!(expr.Type.IsPointerType() && expr.Type.GetBasePointerType().IsStructureType())) {
+                        if (!(expr.Type.IsPointerType() && (expr.Type.GetBasePointerType().IsStructureType() || expr.Type.GetBasePointerType().IsUnionType()))) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, "演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならない。");
                         }
-                        var sType = expr.Type.GetBasePointerType() as CType.TaggedType.StructUnionType;
-                        var memberInfo = sType.struct_declarations.FirstOrDefault(x => x.Ident == ident);
+                        var sType = expr.Type.GetBasePointerType().Unwrap() as CType.TaggedType.StructUnionType;
+                        var memberInfo = sType.struct_declarations?.FirstOrDefault(x => x.Ident == ident);
                         if (memberInfo == null) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, "->演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
                         }
@@ -2999,11 +3370,7 @@ int main(void) {
                         Ident = ident;
 
                         var qual = expr.Type.GetQualifiedType();
-                        if (qual != TypeQualifier.None) {
-                            _memberType = new CType.TypeQualifierType(memberInfo.Type.UnwrapQualifiedType(), qual);
-                        } else {
-                            _memberType = memberInfo.Type.UnwrapQualifiedType();
-                        }
+                        _memberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
                     }
                 }
 
@@ -3019,13 +3386,9 @@ int main(void) {
                         get;
                     }
 
-                    private CType _resultType {
-                        get;
-                    }
-
                     public override CType Type {
                         get {
-                            return _resultType;
+                            return Expr.Type;
                         }
                     }
 
@@ -3055,21 +3418,956 @@ int main(void) {
             }
 
             /// <summary>
-            /// 6.5.17 コンマ演算子
+            /// 6.5.3.1 前置増分及び前置減分演算子
             /// </summary>
-            public class CommaExpression : Expression {
-                public List<AST.Expression> expressions { get; } = new List<AST.Expression>();
+            public class UnaryPrefixExpression : Expression {
+                public enum OperatorKind {
+                    None, Inc, Dec
+                }
+                public OperatorKind Op {
+                    get;
+                }
+                public Expression Expr {
+                    get;
+                }
                 public override CType Type {
                     get {
-                        return expressions.Last().Type;
+                        return Expr.Type;
                     }
                 }
-                public CommaExpression() {
+
+                public UnaryPrefixExpression(OperatorKind op, Expression expr) {
+                    // 制約 
+                    // 前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならず，
+                    // 変更可能な左辺値でなければならない。    
+                    if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならない。");
+                    }
+                    // ToDo: 変更可能な左辺値でなければならない。    
+
+                    // 意味規則
+                    // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
+                    // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
+                    Op = op;
+                    Expr = new Expression.CastExpression(expr.Type, Specification.ImplicitConversion(expr));
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.2 アドレス及び間接演算子(アドレス演算子)
+            /// </summary>
+            public class UnaryAddressExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public UnaryAddressExpression(Expression expr) {
+                    // 制約  
+                    // 単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。
+                    // 左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。
+                    if (
+                           (expr is AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) // オペランドは，関数指示子
+                        || (expr is AST.Expression.PostfixExpression.ArraySubscriptingExpression) // オペランドは，[]演算子(ToDo:の結果にすること)
+                        || (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) // オペランドは，単項*演算子(ToDo:の結果にすること)
+                        ) {
+                        // ok
+                    } else if (
+                           expr.IsLValue()  // オペランドは，左辺値
+                                            // ToDo: ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
+                        ) {
+
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。");
+                    }
+
+
+                    // 意味規則  
+                    // 単項 &演算子は，そのオペランドのアドレスを返す。
+                    // オペランドが型“∼型”をもっている場合，結果は，型“∼型へのポインタ”をもつ。
+                    // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
+                    // ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
+                    // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，&演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
+                    // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる。
+
+                    if (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) {
+                        // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
+                        // ToDo: ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
+                        expr = (expr as AST.Expression.PostfixExpression.UnaryReferenceExpression).Expr;
+                    } else if (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) {
+                        // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，
+                        // &演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
+                        var aexpr = (expr as AST.Expression.PostfixExpression.ArraySubscriptingExpression);
+                        expr =
+                            new AST.Expression.AdditiveExpression(
+                                AdditiveExpression.OperatorKind.Add,
+                                new AST.Expression.PostfixExpression.CastExpression(CType.CreatePointer(aexpr.Lhs.Type), aexpr),
+                                Specification.ImplicitConversion(aexpr.Rhs)
+                            );
+                    } else {
+                        // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
+                    }
+                    Expr = expr;
+                    _resultType = CType.CreatePointer(expr.Type);
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.2 アドレス及び間接演算子(間接演算子)
+            /// </summary>
+            public class UnaryReferenceExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public override bool IsLValue() {
+                    return Expr.IsLValue();
+                }
+                public UnaryReferenceExpression(Expression expr) {
+                    // 制約
+                    // 単項*演算子のオペランドは，ポインタ型をもたなければならない。
+                    if (!expr.Type.IsPointerType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "ポインタ型の式以外に単項参照演算子を適用しようとした。（左辺値型とか配列型とか色々見なければいけない部分は未実装。）");
+                    }
+
+                    // 意味規則
+                    // 単項*演算子は，間接参照を表す。
+                    // オペランドが関数を指している場合，その結果は関数指示子とする。
+                    // オペランドがオブジェクトを指している場合，その結果はそのオブジェクトを指し示す左辺値とする。
+                    // オペランドが型“∼型へのポインタ”をもつ場合，その結果は型“∼型”をもつ。
+                    // 正しくない値がポインタに代入されている場合，単項*演算子の動作は，未定義とする
+                    Expr = expr;
+                    _resultType = expr.Type.GetBasePointerType();
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.3 単項算術演算子(単項+演算子)
+            /// </summary>
+            public class UnaryPlusExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Expr.Type;
+                    }
+                }
+
+                public UnaryPlusExpression(Expression expr) {
+                    // 制約 
+                    // 単項+演算子のオペランドは，算術型をもたなければならない。
+                    if (!expr.Type.IsArithmeticType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "単項+演算子のオペランドは，算術型をもたなければならない。");
+                    }
+
                     // 意味規則 
-                    // コンマ演算子は，左オペランドをボイド式として評価する。
-                    // その評価の直後を副作用完了点とする。
-                    // 次に右オペランドを評価する。
-                    // コンマ演算子の結果は，右オペランドの型及び値をもつ
+                    // 単項 +演算子の結果は，その（拡張された）オペランドの値とする。オペランドに対して整数拡張を行い，その結果は，拡張された型をもつ。
+                    Expr = Specification.IntegerPromotion(expr);
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.3 単項算術演算子(単項-演算子)
+            /// </summary>
+            public class UnaryMinusExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Expr.Type;
+                    }
+                }
+
+                public UnaryMinusExpression(Expression expr) {
+                    // 制約 
+                    // 単項-演算子のオペランドは，算術型をもたなければならない。
+                    if (!expr.Type.IsArithmeticType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "単項-演算子のオペランドは，算術型をもたなければならない。");
+                    }
+
+                    // 意味規則 
+                    // 単項-演算子の結果は，その（拡張された）オペランドの符号を反転した値とする。オペランドに対して整数拡張を行い，その結果は，拡張された型をもつ。
+                    Expr = Specification.IntegerPromotion(expr);
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.3 単項算術演算子(~演算子)
+            /// </summary>
+            public class UnaryNegateExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Expr.Type;
+                    }
+                }
+
+                public UnaryNegateExpression(Expression expr) {
+                    // 制約 
+                    // ~演算子のオペランドは，整数型をもたなければならない。
+                    if (!expr.Type.IsIntegerType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "~演算子のオペランドは，整数型をもたなければならない。");
+                    }
+
+                    // 意味規則 
+                    // ~演算子の結果は，その（拡張された）オペランドのビット単位の補数とする（すなわち，結果の各ビットは，拡張されたオペランドの対応するビットがセットされていない場合，そしてその場合に限り，セットされる。）。
+                    // オペランドに対して整数拡張を行い，その結果は，拡張された型をもつ。拡張された型が符号無し整数型である場合，~E はその型で表現可能な最大値から E を減算した値と等価とする。
+                    Expr = Specification.IntegerPromotion(expr);
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.3 単項算術演算子(論理否定演算子!)
+            /// </summary>
+            public class UnaryNotExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSignedInt();
+                    }
+                }
+
+                public UnaryNotExpression(Expression expr) {
+                    // 制約
+                    // !演算子のオペランドは，スカラ型をもたなければならない。
+                    if (!expr.Type.IsScalarType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "!演算子のオペランドは，スカラ型をもたなければならない。");
+                    }
+
+                    // 意味規則 
+                    // 論理否定演算子!の結果は，そのオペランドの値が 0 と比較して等しくない場合 0 とし，等しい場合 1 とする。
+                    // 結果の型は，int とする。式!E は，(0 == E)と等価とする。
+                    Expr = expr;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.4 sizeof演算子(型を対象)
+            /// </summary>
+            public class SizeofTypeExpression : Expression {
+                public CType Ty {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSizeT();
+                    }
+                }
+
+                public SizeofTypeExpression(CType ty) {
+                    // 制約
+                    // sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。
+                    if (ty.IsIncompleteType() || ty.IsFunctionType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
+                    }
+                    Ty = ty;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.3.4 sizeof演算子(式を対象)
+            /// </summary>
+            public class SizeofExpression : Expression {
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSizeT();
+                    }
+                }
+
+                public SizeofExpression(Expression expr) {
+                    if (expr.Type.IsIncompleteType() || expr.Type.IsFunctionType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
+                    }
+                    // ToDo: ビットフィールドメンバを示す式のチェック
+                    Expr = expr;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.4 キャスト演算子(キャスト式)
+            /// </summary>
+            public class CastExpression : Expression {
+                // 制約 
+                // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
+                //
+                // 6.3.1.2 論理型  
+                // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
+                //
+                // 6.3.1.3 符号付き整数型及び符号無し整数型  
+                // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
+                // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
+                // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
+                //
+                // 6.3.1.4実浮動小数点型及び整数型  
+                // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
+                // 整数部の値が整数型で表現できない場合，その動作は未定義とする。
+                // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
+                // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                //
+                // 6.3.1.5 実浮動小数点型  
+                // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。 
+                // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
+                // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                // 
+                // 6.3.1.6 複素数型  
+                // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
+                // 
+                // 6.3.1.7 実数型及び複素数型
+                // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
+                // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する。
+                //
+                // 6.3.2.2 void ボイド式（void expression）
+                // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
+                // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。
+                // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。（ボイド式は， 副作用のために評価する。 ）
+                // 
+                // 6.3.2.3 ポインタ
+                // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
+                // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
+                // 任意の型修飾子qに対して非q修飾型へのポインタは，その型のq修飾版へのポインタに型変換してもよい。
+                // 元のポインタと変換されたポインタに格納された値は，比較して等しくなければならない。
+                // 値0をもつ整数定数式又はその定数式を型void *にキャストした式を，空ポインタ定数（null pointerconstant）と呼ぶ。
+                // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
+                // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
+                // 二つの空ポインタは比較して等しくなければならない。
+                // 整数は任意のポインタ型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない(56)。
+                // 任意のポインタ型は整数型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とする。
+                // 結果が整数型で表現できなければ，その動作は未定義とする。
+                // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
+                // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
+                // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
+                // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
+                // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
+                // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
+                // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
+                // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
+                // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
+                // 
+                public CType Ty {
+                    get;
+                }
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Ty;
+                    }
+                }
+
+                public override bool IsLValue() {
+                    return Expr.IsLValue();
+                }
+
+                public CastExpression(CType ty, Expression expr) {
+                    // 制約 
+                    // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
+                    if (!(ty.IsScalarType() || ty.IsVoidType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。");
+                    }
+                    Ty = ty;
+                    Expr = expr;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.5 乗除演算子(乗除式)
+            /// </summary>
+            public class MultiplicitiveExpression : Expression {
+                public enum OperatorKind {
+                    None, Mul, Div, Mod
+                }
+                public OperatorKind Op {
+                    get;
+                }
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public MultiplicitiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
+                    // 制約 
+                    // 各オペランドは，算術型をもたなければならない。
+                    // %演算子のオペランドは，整数型をもたなければならない
+                    if (op == OperatorKind.Mod) {
+                        if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "%演算子のオペランドは，整数型をもたなければならない。");
+                        }
+                    } else {
+                        if (!(lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType())) {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，算術型をもたなければならない。");
+                        }
+                    }
+                    // 意味規則  
+                    // 通常の算術型変換をオペランドに適用する。
+                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+
+                    Op = op;
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.6 加減演算子(加減式)
+            /// </summary>
+            public class AdditiveExpression : Expression {
+                public enum OperatorKind {
+                    None, Add, Sub
+                }
+                public OperatorKind Op {
+                    get;
+                }
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public AdditiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
+                    // 制約  
+                    // 加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。
+                    // 減算の場合，次のいずれかの条件を満たさなければならない
+                    // - 両オペランドが算術型をもつ。 
+                    // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
+                    // - 左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型である。（減分は 1 の減算に等しい。）
+                    // 意味規則  
+                    // 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
+                    // 2項 + 演算子の結果は，両オペランドの和とする。
+                    // 2項 - 演算子の結果は，第 1 オペランドから第 2 オペランドを引いた結果の差とする。
+                    // これらの演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
+                    // 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
+                    // 二つのポインタを減算する場合，その両方のポインタは同じ配列オブジェクトの要素か，その配列オブジェクトの最後の要素を一つ越えたところを指していなければならない。
+                    // その結果は，二つの配列要素の添字の差とする。
+                    // 結果の大きさは処理系定義とし，その型（符号付き整数型）は，ヘッダ<stddef.h>で定義される ptrdiff_t とする。
+                    if (op == OperatorKind.Add) {
+                        if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                            // 両オペランドが算術型をもつ
+                            // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
+                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                        } else if (
+                            (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) ||
+                            (lhs.Type.IsIntegerType() && rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsObjectType())
+                            ) {
+                            // 一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型。
+                            // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
+                            _resultType = lhs.Type.IsPointerType() ? lhs.Type : rhs.Type;
+                        } else {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
+                        }
+
+                    } else {
+                        if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                            // 両オペランドが算術型をもつ
+                            // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
+                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                        } else if (
+                            lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.IsEqual(lhs.Type.GetBasePointerType(), lhs.Type.GetBasePointerType())
+                            ) {
+                            // 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタ。
+                            // 意味規則 二つのポインタを減算する場合(中略)，その型（符号付き整数型）は，ヘッダ<stddef.h>で定義される ptrdiff_t とする。
+                            _resultType = CType.CreatePtrDiffT();
+                        } else if (
+                            lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()
+                            ) {
+                            // 左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型である。（減分は 1 の減算に等しい。）
+                            // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
+                            _resultType = lhs.Type;
+                        } else {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
+                        }
+                    }
+                    Op = op;
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.7 ビット単位のシフト演算子(シフト式)
+            /// </summary>
+            public class ShiftExpression : Expression {
+                public string Op {
+                    get;
+                }
+
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Lhs.Type;
+                    }
+                }
+
+                public ShiftExpression(string op, Expression lhs, Expression rhs) {
+                    // 制約  
+                    // 各オペランドは，整数型をもたなければならない。
+                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    // 意味規則 
+                    // 整数拡張を各オペランドに適用する。
+                    // 結果の型は，左オペランドを拡張した後の型とする。
+                    // 右オペランドの値が負であるか，又は拡張した左オペランドの幅以上の場合，その動作は，未定義とする。
+                    lhs = Specification.IntegerPromotion(lhs);
+                    rhs = Specification.IntegerPromotion(rhs);
+                    Op = op;
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.8 関係演算子(関係式)
+            /// </summary>
+            public class RelationalExpression : Expression {
+                public string Op {
+                    get;
+                }
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSignedInt();
+                    }
+                }
+
+                public RelationalExpression(string op, Expression lhs, Expression rhs) {
+                    // 制約  
+                    // 次のいずれかの条件を満たさなければならない。 
+                    // - 両オペランドが実数型をもつ。 
+                    // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
+                    // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
+
+                    if (lhs.Type.IsRealType() && rhs.Type.IsRealType()) {
+                        // 両オペランドが実数型をもつ。 
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.GetBasePointerType().IsObjectType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                        // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsIncompleteType() && rhs.Type.GetBasePointerType().IsIncompleteType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                        // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "関係演算子は両オペランドが実数型をもつ、もしくは、両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタでなければならない。");
+                    }
+                    // 意味規則  
+                    // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
+                    // 関係演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
+                    // <（小さい），>（大きい），<=（以下）及び>=（以上）の各演算子は，指定された関係が真の場合は 1を，偽の場合は 0 を返す。その結果は，型 int をもつ。
+
+                    if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                        // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
+                        Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                    }
+                    Op = op;
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.9 等価演算子(等価式)
+            /// </summary>
+            public class EqualityExpression : Expression {
+                public string Op {
+                    get;
+                }
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSignedInt();
+                    }
+                }
+
+                public EqualityExpression(string op, Expression lhs, Expression rhs) {
+                    // 制約
+                    // 次のいずれかの条件を満たさなければならない。
+                    // - 両オペランドは算術型をもつ。
+                    // - 両オペランドとも適合する型の修飾版又は非修飾版へのポインタである。
+                    // - 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
+                    // - 一方のオペランドがポインタで他方が空ポインタ定数である。
+
+                    if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                        // 両オペランドは算術型をもつ。
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                        // 両オペランドとも適合する型の修飾版又は非修飾版へのポインタである。
+                    } else if (
+                        (lhs.Type.IsPointerType() && (lhs.Type.GetBasePointerType().IsObjectType() || lhs.Type.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
+                        (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsVoidType()))
+                    ) {
+                        // 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
+                    } else if (
+                        (lhs.Type.IsPointerType() && rhs.IsNullPointerConstant()) ||
+                        (rhs.Type.IsPointerType() && lhs.IsNullPointerConstant())
+                    ) {
+                        // 一方のオペランドがポインタで他方が空ポインタ定数である。
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
+                    }
+
+                    // 意味規則
+                    // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
+                    // 関係演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
+                    // 二つのポインタを比較する場合，その結果は指されているオブジェクトのアドレス空間内の相対位置に依存する。
+                    // オブジェクト型又は不完全型への二つのポインタがいずれも同じオブジェクトを指しているか，いずれも同じ配列オブジェクトの最後の要素を一つ越えたところを指している場合，それらは比較して等しいとする。指されている両オブジェクトが同一の集成体オブジェクトのメンバの場合，後方で宣言された構造体のメンバへのポインタは，その構造体中で前方に宣言されたメンバへのポインタと比較すると大きく，大きな添字の値をもつ配列の要素へのポインタは，より小さな添字の値をもつ同じ配列の要素へのポインタと比較すると大きいとする。
+                    // 同じ共用体オブジェクトのメンバへのポインタは，すべて等しいとする。
+                    // 式 P が配列オブジェクトの要素を指しており，式 Q が同じ配列オブジェクトの最後の要素を指している場合，ポインタ式 Q+1 は，P と比較してより大きいとする。
+                    // その他のすべての場合，動作は未定義とする。
+                    // <（小さい），>（大きい），<=（以下）及び>=（以上）の各演算子は，指定された関係が真の場合は 1を，偽の場合は 0 を返す。その結果は，型 int をもつ。
+
+                    Op = op;
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            ///  6.5.10 ビット単位の AND 演算子(AND式)
+            /// </summary>
+            public class AndExpression : Expression {
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public AndExpression(Expression lhs, Expression rhs) {
+                    // 制約
+                    // 各オペランドの型は，整数型でなければならない。
+                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    }
+
+                    // 意味規則  
+                    // オペランドに対して通常の算術型変換を適用する。
+                    // 2項&演算子の結果は，オペランドのビット単位の論理積とする（すなわち，型変換されたオペランドの対応するビットが両者ともセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
+                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.11 ビット単位の排他 OR 演算子(排他OR式)
+            /// </summary>
+            public class ExclusiveOrExpression : Expression {
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public ExclusiveOrExpression(Expression lhs, Expression rhs) {
+                    // 制約
+                    // 各オペランドの型は，整数型でなければならない。
+                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    }
+
+                    // 意味規則
+                    // オペランドに対して通常の算術型変換を適用する。
+                    // ^演算子の結果は，オペランドのビット単位の排他的論理和とする（すなわち，型変換されたオペランドの対応するビットのいずれか一方だけがセットされている場合，そしてその場合に限り，結果のそのビットをセットする。） 。
+                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+
+            }
+
+            /// <summary>
+            /// 6.5.12 ビット単位の OR 演算子(OR式)
+            /// </summary>
+            public class InclusiveOrExpression : Expression {
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public InclusiveOrExpression(Expression lhs, Expression rhs) {
+                    // 制約
+                    // 各オペランドの型は，整数型でなければならない。
+                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    }
+
+                    // 意味規則
+                    // オペランドに対して通常の算術型変換を適用する。
+                    // |演算子の結果は，オペランドのビット単位の論理和とする（すなわち，型変換されたオペランドの対応するビットの少なくとも一方がセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
+                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.13 論理 AND 演算子(論理AND式)
+            /// </summary>
+            public class LogicalAndExpression : Expression {
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSignedInt();
+                    }
+                }
+
+                public LogicalAndExpression(Expression lhs, Expression rhs) {
+                    // 制約
+                    // 各オペランドの型は，スカラ型でなければならない。
+                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
+                    }
+
+                    // 意味規則
+                    // &&演算子の結果の値は，両オペランドの値が 0 と比較してともに等しくない場合は 1，それ以外の場合は 0 とする。
+                    // 結果の型は，int とする。
+                    // ビット単位の 2 項&演算子と異なり，&&演算子は左から右への評価を保証する。
+                    // 第 1 オペランドの評価の直後を副作用完了点とする。
+                    // 第 1 オペランドの値が 0 と比較して等しい場合，第 2 オペランドは評価しない。
+
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+            }
+
+            /// <summary>
+            /// 6.5.14 論理 OR 演算子(論理OR式)
+            /// </summary>
+            public class LogicalOrExpression : Expression {
+                public Expression Lhs {
+                    get;
+                }
+                public Expression Rhs {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return CType.CreateSignedInt();
+                    }
+                }
+
+                public LogicalOrExpression(Expression lhs, Expression rhs) {
+                    // 制約
+                    // 各オペランドの型は，スカラ型でなければならない。
+                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
+                    }
+
+                    // 意味規則
+                    // ||演算子の結果の値は，両オペランドを 0 と比較していずれか一方でも等しくない場合は 1，それ以外の場合は 0 とする。
+                    // 結果の型は int とする。
+                    // ビット単位の|演算子と異なり，||演算子は左から右への評価を保証する。
+                    // 第 1 オペランドの評価の直後を副作用完了点とする。
+                    // 第 1 オペランドの値が 0 と比較して等しくない場合，第 2 オペランドは評価しない
+
+                    Lhs = lhs;
+                    Rhs = rhs;
+                }
+
+            }
+
+            /// <summary>
+            /// 6.5.15 条件演算子
+            /// </summary>
+            public class ConditionalExpression : Expression {
+                public Expression Cond {
+                    get;
+                }
+                public Expression ThenExpr {
+                    get;
+                }
+                public Expression ElseExpr {
+                    get;
+                }
+                private CType _resultType {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return _resultType;
+                    }
+                }
+
+                public ConditionalExpression(Expression cond, Expression thenExpr, Expression elseExpr) {
+
+                    // 暗黙の型変換を適用
+                    thenExpr = Specification.TypeConvert(thenExpr);
+                    elseExpr = Specification.TypeConvert(elseExpr);
+
+                    // 制約
+                    // 第 1 オペランドの型は，スカラ型でなければならない。
+                    // 第 2 及び第 3 オペランドの型は，次のいずれかの条件を満たさなければならない。
+                    // - 両オペランドの型が算術型である。
+                    // - 両オペランドの型が同じ構造体型又は共用体型である。
+                    // - 両オペランドの型が void 型である。
+                    // - 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
+                    // - 一方のオペランドがポインタであり，かつ他方が空ポインタ定数である。
+                    // - 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
+
+                    // 第 1 オペランドの型は，スカラ型でなければならない。
+                    if (!cond.Type.IsScalarType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 1 オペランドの型は，スカラ型でなければならない。");
+                    }
+
+                    // 意味規則
+                    // 第 1 オペランドを評価し，その評価の直後を副作用完了点とする。
+                    // 第 1 オペランドが 0 と比較して等しくない場合だけ，第 2 オペランドを評価する。
+                    // 第 1 オペランドが 0 と比較して等しい場合だけ，第 3 オペランドを評価する。
+                    // 第 2 又は第 3 オペランド（いずれか評価したほう）の値を結果とする。
+                    // 結果の型は 6.5.15 の規定に従って型変換する。
+                    // 条件演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は，未定義とする。
+                    // 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
+                    // 両オペランドの型がともに構造体型又は共用体型ならば，結果の型はその型とする。
+                    // 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
+                    // 第 2 及び第 3 オペランドがともにポインタである場合，又は，一方が空ポインタ定数かつ他方がポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
+                    // さらに，両オペランドが適合する型へのポインタ又は適合する型の異なる修飾版へのポインタである場合，結果の型は適切に修飾された合成型へのポインタとする。
+                    // 一方のオペランドが空ポインタ定数である場合，結果の型は他方のオペランドの型とする。
+                    // これら以外の場合（一方のオペランドが void 又は void の修飾版へのポインタである場合），結果の型は，適切に修飾された void 型へのポインタとする。
+
+                    // 第 2 及び第 3 オペランドの型は，次のいずれかの条件を満たさなければならない。
+                    if (thenExpr.Type.IsArithmeticType() && elseExpr.Type.IsArithmeticType()) {
+                        // 制約 両オペランドの型が算術型である。
+                        // 意味規則 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
+                        _resultType = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
+                    } else if (thenExpr.Type.IsStructureType() && elseExpr.Type.IsStructureType() && CType.IsEqual(thenExpr.Type, elseExpr.Type)) {
+                        // - 両オペランドの型が同じ構造体型又は共用体型である。
+                    } else if (thenExpr.Type.IsVoidType() && elseExpr.Type.IsVoidType()) {
+                        // 制約 両オペランドの型が void 型である。
+                        // 意味規則 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
+                        _resultType = CType.CreateVoid();
+                    } else if (thenExpr.Type.IsPointerType() && elseExpr.Type.IsPointerType() && CType.IsEqual(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType())) {
+                        // 制約 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
+                        // 意味規則 第 2 及び第 3 オペランドがともにポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
+                        // さらに，両オペランドが適合する型へのポインタ又は適合する型の異なる修飾版へのポインタである場合，結果の型は適切に修飾された合成型へのポインタとする。
+
+                        // ToDo: 合成型を作る
+
+                        var baseType = thenExpr.Type.GetBasePointerType().Unwrap();
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        baseType = baseType.WrapTypeQualifier(tq);
+                        _resultType = CType.CreatePointer(baseType);
+                    } else if (
+                        (thenExpr.Type.IsPointerType() && elseExpr.IsNullPointerConstant()) ||
+                        (elseExpr.Type.IsPointerType() && thenExpr.IsNullPointerConstant())
+                    ) {
+                        // 制約 一方のオペランドがポインタであり，かつ他方が空ポインタ定数である。
+                        // 意味規則 第 2 及び第 3 オペランドが，一方が空ポインタ定数かつ他方がポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
+                        var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        baseType = baseType.WrapTypeQualifier(tq);
+                        _resultType = CType.CreatePointer(baseType);
+                    } else if (
+                        (thenExpr.Type.IsPointerType() && (thenExpr.Type.GetBasePointerType().IsObjectType() || thenExpr.Type.GetBasePointerType().IsIncompleteType()) && (elseExpr.Type.IsPointerType() && elseExpr.Type.GetBasePointerType().IsVoidType())) ||
+                        (elseExpr.Type.IsPointerType() && (elseExpr.Type.GetBasePointerType().IsObjectType() || elseExpr.Type.GetBasePointerType().IsIncompleteType()) && (thenExpr.Type.IsPointerType() && thenExpr.Type.GetBasePointerType().IsVoidType()))
+                    ) {
+                        // 制約 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
+                        // 意味規則 これら以外の場合（一方のオペランドが void 又は void の修飾版へのポインタである場合），結果の型は，適切に修飾された void 型へのポインタとする。
+                        CType baseType = CType.CreatePointer(CType.CreateVoid());
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        baseType = baseType.WrapTypeQualifier(tq);
+                        _resultType = CType.CreatePointer(baseType);
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
+                    }
+
+
+
+                    Cond = cond;
+                    ThenExpr = thenExpr;
+                    ElseExpr = elseExpr;
                 }
             }
 
@@ -3155,8 +4453,8 @@ int main(void) {
                         // さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。
                         // そうでない場合，動作は未定義とする。
                         if (!CType.IsEqual(lhs.Type, rhs.Type)) {
-                            // さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。");
+                            //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
+                            rhs = new Expression.CastExpression(lhs.Type, rhs);
                         }
 
                         Op = op;
@@ -3164,7 +4462,7 @@ int main(void) {
                         Rhs = rhs;
                         // 代入式の型は，左オペランドの型とする。
                         // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        _resultType = lhs.Type.UnwrapQualifiedType();
+                        _resultType = lhs.Type.UnwrapTypeQualifier();
                     }
                 }
 
@@ -3186,7 +4484,7 @@ int main(void) {
                         // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
                         // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
                         switch (op) {
-                            case "+=": 
+                            case "+=":
                             case "-=": {
                                     if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
                                         // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
@@ -3197,8 +4495,8 @@ int main(void) {
                                     }
                                     break;
                                 }
-                            case "*=": 
-                            case "/=": 
+                            case "*=":
+                            case "/=":
                             case "%=": {
                                     // 制約(複合代入)
                                     // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
@@ -3278,952 +4576,35 @@ int main(void) {
                         Rhs = rhs;
                         // 代入式の型は，左オペランドの型とする。
                         // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        _resultType = lhs.Type.UnwrapQualifiedType();
+                        _resultType = lhs.Type.UnwrapTypeQualifier();
                     }
 
                 }
             }
 
             /// <summary>
-            /// 6.5.15 条件演算子
+            /// 6.5.17 コンマ演算子
             /// </summary>
-            public class ConditionalExpression : Expression {
-                public Expression Cond {
-                    get;
-                }
-                public Expression ThenExpr {
-                    get;
-                }
-                public Expression ElseExpr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
+            public class CommaExpression : Expression {
+                public List<AST.Expression> expressions { get; } = new List<AST.Expression>();
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return expressions.Last().Type;
                     }
                 }
-
-                public ConditionalExpression(Expression cond, Expression thenExpr, Expression elseExpr) {
-
-                    // 制約
-                    // 第 1 オペランドの型は，スカラ型でなければならない。
-                    // 第 2 及び第 3 オペランドの型は，次のいずれかの条件を満たさなければならない。
-                    // - 両オペランドの型が算術型である。
-                    // - 両オペランドの型が同じ構造体型又は共用体型である。
-                    // - 両オペランドの型が void 型である。
-                    // - 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
-                    // - 一方のオペランドがポインタであり，かつ他方が空ポインタ定数である。
-                    // - 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
-
-                    // 第 1 オペランドの型は，スカラ型でなければならない。
-                    if (!cond.Type.IsScalarType()) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 1 オペランドの型は，スカラ型でなければならない。");
-                    }
-
-                    // 意味規則
-                    // 第 1 オペランドを評価し，その評価の直後を副作用完了点とする。
-                    // 第 1 オペランドが 0 と比較して等しくない場合だけ，第 2 オペランドを評価する。
-                    // 第 1 オペランドが 0 と比較して等しい場合だけ，第 3 オペランドを評価する。
-                    // 第 2 又は第 3 オペランド（いずれか評価したほう）の値を結果とする。
-                    // 結果の型は 6.5.15 の規定に従って型変換する。
-                    // 条件演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は，未定義とする。
-                    // 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
-                    // 両オペランドの型がともに構造体型又は共用体型ならば，結果の型はその型とする。
-                    // 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
-                    // 第 2 及び第 3 オペランドがともにポインタである場合，又は，一方が空ポインタ定数かつ他方がポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
-                    // さらに，両オペランドが適合する型へのポインタ又は適合する型の異なる修飾版へのポインタである場合，結果の型は適切に修飾された合成型へのポインタとする。
-                    // 一方のオペランドが空ポインタ定数である場合，結果の型は他方のオペランドの型とする。
-                    // これら以外の場合（一方のオペランドが void 又は void の修飾版へのポインタである場合），結果の型は，適切に修飾された void 型へのポインタとする。
-
-                    // 第 2 及び第 3 オペランドの型は，次のいずれかの条件を満たさなければならない。
-                    if (thenExpr.Type.IsArithmeticType() && elseExpr.Type.IsArithmeticType()) {
-                        // 制約 両オペランドの型が算術型である。
-                        // 意味規則 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
-                        _resultType = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
-                    } else if (thenExpr.Type.IsStructureType() && elseExpr.Type.IsStructureType() && CType.IsEqual(thenExpr.Type, elseExpr.Type)) {
-                        // - 両オペランドの型が同じ構造体型又は共用体型である。
-                    } else if (thenExpr.Type.IsVoidType() && elseExpr.Type.IsVoidType()) {
-                        // 制約 両オペランドの型が void 型である。
-                        // 意味規則 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
-                        _resultType = new CType.BasicType(CType.BasicType.Kind.Void);
-                    } else if (thenExpr.Type.IsPointerType() && elseExpr.Type.IsPointerType() && CType.IsEqual(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType())) {
-                        // 制約 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
-                        // 意味規則 第 2 及び第 3 オペランドがともにポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
-                        // さらに，両オペランドが適合する型へのポインタ又は適合する型の異なる修飾版へのポインタである場合，結果の型は適切に修飾された合成型へのポインタとする。
-                       
-                        // ToDo: 合成型を作る
-
-                        var baseType = thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = TypeQualifier.None;
-                        if (thenExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (thenExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (elseExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (elseExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (tq != TypeQualifier.None) {
-                            baseType = new CType.TypeQualifierType(baseType, tq);
-                        }
-                        _resultType = new CType.PointerType(baseType);
-                    } else if (
-                        (thenExpr.Type.IsPointerType() && elseExpr.IsNullPointerConstant()) ||
-                        (elseExpr.Type.IsPointerType() && thenExpr.IsNullPointerConstant())
-                    ) {
-                        // 制約 一方のオペランドがポインタであり，かつ他方が空ポインタ定数である。
-                        // 意味規則 第 2 及び第 3 オペランドが，一方が空ポインタ定数かつ他方がポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
-                        var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = TypeQualifier.None;
-                        if (thenExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (thenExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (elseExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (elseExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (tq != TypeQualifier.None) {
-                            baseType = new CType.TypeQualifierType(baseType, tq);
-                        }
-                        _resultType = new CType.PointerType(baseType);
-                    } else if (
-                        (thenExpr.Type.IsPointerType() && (thenExpr.Type.GetBasePointerType().IsObjectType() || thenExpr.Type.GetBasePointerType().IsIncompleteType()) && (elseExpr.Type.IsPointerType() && elseExpr.Type.GetBasePointerType().IsVoidType())) ||
-                        (elseExpr.Type.IsPointerType() && (elseExpr.Type.GetBasePointerType().IsObjectType() || elseExpr.Type.GetBasePointerType().IsIncompleteType()) && (thenExpr.Type.IsPointerType() && thenExpr.Type.GetBasePointerType().IsVoidType()))
-                    ) {
-                        // 制約 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
-                        // 意味規則 これら以外の場合（一方のオペランドが void 又は void の修飾版へのポインタである場合），結果の型は，適切に修飾された void 型へのポインタとする。
-                        CType baseType = new CType.PointerType(new CType.BasicType(CType.BasicType.Kind.Void));
-                        TypeQualifier tq = TypeQualifier.None;
-                        if (thenExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (thenExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (elseExpr.Type.GetBasePointerType().IsQualifiedType()) {
-                            tq |= (elseExpr.Type.GetBasePointerType() as CType.TypeQualifierType).type_qualifier;
-                        }
-                        if (tq != TypeQualifier.None) {
-                            baseType = new CType.TypeQualifierType(baseType, tq);
-                        }
-                        _resultType = new CType.PointerType(baseType);
-                    } else {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
-                    }
-
-
-
-                    Cond = cond;
-                    ThenExpr = thenExpr;
-                    ElseExpr = elseExpr;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.14 論理 OR 演算子(論理OR式)
-            /// </summary>
-            public class LogicalOrExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public LogicalOrExpression(Expression lhs, Expression rhs) {
-                    // 制約
-                    // 各オペランドの型は，スカラ型でなければならない。
-                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
-                    }
-
-                    // 意味規則
-                    // ||演算子の結果の値は，両オペランドを 0 と比較していずれか一方でも等しくない場合は 1，それ以外の場合は 0 とする。
-                    // 結果の型は int とする。
-                    // ビット単位の|演算子と異なり，||演算子は左から右への評価を保証する。
-                    // 第 1 オペランドの評価の直後を副作用完了点とする。
-                    // 第 1 オペランドの値が 0 と比較して等しくない場合，第 2 オペランドは評価しない
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-
-            }
-
-            /// <summary>
-            /// 6.5.13 論理 AND 演算子(論理AND式)
-            /// </summary>
-            public class LogicalAndExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return new CType.BasicType(CType.BasicType.Kind.SignedInt);
-                    }
-                }
-
-                public LogicalAndExpression(Expression lhs, Expression rhs) {
-                    // 制約
-                    // 各オペランドの型は，スカラ型でなければならない。
-                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
-                    }
-
-                    // 意味規則
-                    // &&演算子の結果の値は，両オペランドの値が 0 と比較してともに等しくない場合は 1，それ以外の場合は 0 とする。
-                    // 結果の型は，int とする。
-                    // ビット単位の 2 項&演算子と異なり，&&演算子は左から右への評価を保証する。
-                    // 第 1 オペランドの評価の直後を副作用完了点とする。
-                    // 第 1 オペランドの値が 0 と比較して等しい場合，第 2 オペランドは評価しない。
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.12 ビット単位の OR 演算子(OR式)
-            /// </summary>
-            public class InclusiveOrExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public InclusiveOrExpression(Expression lhs, Expression rhs) {
-                    // 制約
-                    // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
-                    }
-
-                    // 意味規則
-                    // オペランドに対して通常の算術型変換を適用する。
-                    // |演算子の結果は，オペランドのビット単位の論理和とする（すなわち，型変換されたオペランドの対応するビットの少なくとも一方がセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.11 ビット単位の排他 OR 演算子(排他OR式)
-            /// </summary>
-            public class ExclusiveOrExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public ExclusiveOrExpression(Expression lhs, Expression rhs) {
-                    // 制約
-                    // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
-                    }
-
-                    // 意味規則
-                    // オペランドに対して通常の算術型変換を適用する。
-                    // ^演算子の結果は，オペランドのビット単位の排他的論理和とする（すなわち，型変換されたオペランドの対応するビットのいずれか一方だけがセットされている場合，そしてその場合に限り，結果のそのビットをセットする。） 。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-
-            }
-
-            /// <summary>
-            ///  6.5.10 ビット単位の AND 演算子(AND式)
-            /// </summary>
-            public class AndExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public AndExpression(Expression lhs, Expression rhs) {
-                    // 制約
-                    // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
-                    }
-
-                    // 意味規則  
-                    // オペランドに対して通常の算術型変換を適用する。
-                    // 2項&演算子の結果は，オペランドのビット単位の論理積とする（すなわち，型変換されたオペランドの対応するビットが両者ともセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.9 等価演算子(等価式)
-            /// </summary>
-            public class EqualityExpression : Expression {
-                public string Op {
-                    get;
-                }
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return new CType.BasicType(CType.BasicType.Kind.SignedInt);
-                    }
-                }
-
-                public EqualityExpression(string op, Expression lhs, Expression rhs) {
-                    // 制約
-                    // 次のいずれかの条件を満たさなければならない。
-                    // - 両オペランドは算術型をもつ。
-                    // - 両オペランドとも適合する型の修飾版又は非修飾版へのポインタである。
-                    // - 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
-                    // - 一方のオペランドがポインタで他方が空ポインタ定数である。
-
-                    if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                        // 両オペランドは算術型をもつ。
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
-                        // 両オペランドとも適合する型の修飾版又は非修飾版へのポインタである。
-                    } else if (
-                        (lhs.Type.IsPointerType() && (lhs.Type.GetBasePointerType().IsObjectType() || lhs.Type.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
-                        (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsVoidType()))
-                    ) {
-                        // 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
-                    } else if (
-                        (lhs.Type.IsPointerType() && rhs.IsNullPointerConstant())||
-                        (rhs.Type.IsPointerType() && lhs.IsNullPointerConstant())    
-                    ) {
-                     // 一方のオペランドがポインタで他方が空ポインタ定数である。
-                   } else {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
-                    }
-
-                    // 意味規則
-                    // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
-                    // 関係演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
-                    // 二つのポインタを比較する場合，その結果は指されているオブジェクトのアドレス空間内の相対位置に依存する。
-                    // オブジェクト型又は不完全型への二つのポインタがいずれも同じオブジェクトを指しているか，いずれも同じ配列オブジェクトの最後の要素を一つ越えたところを指している場合，それらは比較して等しいとする。指されている両オブジェクトが同一の集成体オブジェクトのメンバの場合，後方で宣言された構造体のメンバへのポインタは，その構造体中で前方に宣言されたメンバへのポインタと比較すると大きく，大きな添字の値をもつ配列の要素へのポインタは，より小さな添字の値をもつ同じ配列の要素へのポインタと比較すると大きいとする。
-                    // 同じ共用体オブジェクトのメンバへのポインタは，すべて等しいとする。
-                    // 式 P が配列オブジェクトの要素を指しており，式 Q が同じ配列オブジェクトの最後の要素を指している場合，ポインタ式 Q+1 は，P と比較してより大きいとする。
-                    // その他のすべての場合，動作は未定義とする。
-                    // <（小さい），>（大きい），<=（以下）及び>=（以上）の各演算子は，指定された関係が真の場合は 1を，偽の場合は 0 を返す。その結果は，型 int をもつ。
-
-                    Op = op;
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.8 関係演算子(関係式)
-            /// </summary>
-            public class RelationalExpression : Expression {
-                public string Op {
-                    get;
-                }
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return new CType.BasicType(CType.BasicType.Kind.SignedInt);
-                    }
-                }
-
-                public RelationalExpression(string op, Expression lhs, Expression rhs) {
-                    // 制約  
-                    // 次のいずれかの条件を満たさなければならない。 
-                    // - 両オペランドが実数型をもつ。 
-                    // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
-                    // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
-
-                    if (lhs.Type.IsRealType() && rhs.Type.IsRealType()) {
-                        // 両オペランドが実数型をもつ。 
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.GetBasePointerType().IsObjectType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
-                        // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsIncompleteType() && rhs.Type.GetBasePointerType().IsIncompleteType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
-                        // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
-                    } else {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "関係演算子は両オペランドが実数型をもつ、もしくは、両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタでなければならない。");
-                    }
-                    // 意味規則  
-                    // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
-                    // 関係演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
-                    // <（小さい），>（大きい），<=（以下）及び>=（以上）の各演算子は，指定された関係が真の場合は 1を，偽の場合は 0 を返す。その結果は，型 int をもつ。
-
-                    if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                        // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
-                        Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-                    }
-                    Op = op;
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.7 ビット単位のシフト演算子(シフト式)
-            /// </summary>
-            public class ShiftExpression : Expression {
-                public string Op {
-                    get;
-                }
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return Lhs.Type;
-                    }
-                }
-
-                public ShiftExpression(string op, Expression lhs, Expression rhs) {
-                    // 制約  
-                    // 各オペランドは，整数型をもたなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
-                    }
+                public CommaExpression() {
                     // 意味規則 
-                    // 整数拡張を各オペランドに適用する。
-                    // 結果の型は，左オペランドを拡張した後の型とする。
-                    // 右オペランドの値が負であるか，又は拡張した左オペランドの幅以上の場合，その動作は，未定義とする。
-                    lhs = Specification.IntegerPromotion(lhs);
-                    rhs = Specification.IntegerPromotion(rhs);
-                    Op = op;
-                    Lhs = lhs;
-                    Rhs = rhs;
+                    // コンマ演算子は，左オペランドをボイド式として評価する。
+                    // その評価の直後を副作用完了点とする。
+                    // 次に右オペランドを評価する。
+                    // コンマ演算子の結果は，右オペランドの型及び値をもつ
                 }
             }
+
 
             /// <summary>
-            /// 6.5.6 加減演算子(加減式)
+            /// X.X.X GCC拡張：式中に文
             /// </summary>
-            public class AdditiveExpression : Expression {
-                public enum OperatorKind {
-                    None, Add, Sub
-                }
-                public OperatorKind Op {
-                    get;
-                }
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public AdditiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
-                    // 制約  
-                    // 加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。
-                    // 減算の場合，次のいずれかの条件を満たさなければならない
-                    // - 両オペランドが算術型をもつ。 
-                    // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
-                    // - 左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型である。（減分は 1 の減算に等しい。）
-                    // 意味規則  
-                    // 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                    // 2項 + 演算子の結果は，両オペランドの和とする。
-                    // 2項 - 演算子の結果は，第 1 オペランドから第 2 オペランドを引いた結果の差とする。
-                    // これらの演算子に関しては，配列の要素でないオブジェクトへのポインタは，要素型としてそのオブジェクトの型をもつ長さ 1 の配列の最初の要素へのポインタと同じ動作をする。
-                    // 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
-                    // 二つのポインタを減算する場合，その両方のポインタは同じ配列オブジェクトの要素か，その配列オブジェクトの最後の要素を一つ越えたところを指していなければならない。
-                    // その結果は，二つの配列要素の添字の差とする。
-                    // 結果の大きさは処理系定義とし，その型（符号付き整数型）は，ヘッダ<stddef.h>で定義される ptrdiff_t とする。
-                    if (op == OperatorKind.Add) {
-                        if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                            // 両オペランドが算術型をもつ
-                            // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-                        } else if (
-                            (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) ||
-                            (lhs.Type.IsIntegerType() && rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsObjectType())
-                            ) {
-                            // 一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型。
-                            // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
-                            _resultType = lhs.Type.IsPointerType() ? lhs.Type : rhs.Type;
-                        } else {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
-                        }
-
-                    } else {
-                        if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                            // 両オペランドが算術型をもつ
-                            // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-                        } else if (
-                            lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.IsEqual(lhs.Type.GetBasePointerType(), lhs.Type.GetBasePointerType())
-                            ) {
-                            // 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタ。
-                            // 意味規則 二つのポインタを減算する場合(中略)，その型（符号付き整数型）は，ヘッダ<stddef.h>で定義される ptrdiff_t とする。
-                            _resultType = new CType.BasicType(CType.BasicType.Kind.SignedInt);
-                        } else if (
-                            lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()
-                            ) {
-                            // 左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型である。（減分は 1 の減算に等しい。）
-                            // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
-                            _resultType = lhs.Type;
-                        } else {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
-                        }
-                    }
-                    Op = op;
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.5 乗除演算子(乗除式)
-            /// </summary>
-            public class MultiplicitiveExpression : Expression {
-                public enum OperatorKind {
-                    None, Mul, Div, Mod
-                }
-                public OperatorKind Op {
-                    get;
-                }
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public MultiplicitiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
-                    // 制約 
-                    // 各オペランドは，算術型をもたなければならない。
-                    // %演算子のオペランドは，整数型をもたなければならない
-                    if (op == OperatorKind.Mod) {
-                        if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "%演算子のオペランドは，整数型をもたなければならない。");
-                        }
-                    } else {
-                        if (!(lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType())) {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，算術型をもたなければならない。");
-                        }
-                    }
-                    // 意味規則  
-                    // 通常の算術型変換をオペランドに適用する。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Op = op;
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.4 キャスト演算子(キャスト式)
-            /// 制約 
-            /// 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-            /// </summary>
-            public class CastExpression : Expression {
-                // 6.3.1.2 論理型  
-                // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
-                //
-                // 6.3.1.3 符号付き整数型及び符号無し整数型  
-                // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
-                // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
-                // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
-                //
-                // 6.3.1.4実浮動小数点型及び整数型  
-                // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
-                // 整数部の値が整数型で表現できない場合，その動作は未定義とする。
-                // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
-                // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
-                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                //
-                // 6.3.1.5 実浮動小数点型  
-                // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。 
-                // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
-                // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
-                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                // 
-                // 6.3.1.6 複素数型  
-                // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
-                // 
-                // 6.3.1.7 実数型及び複素数型
-                // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
-                // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する。
-                //
-                // 6.3.2.2 void ボイド式（void expression）
-                // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
-                // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。//
-                // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
-                // （ボイド式は， 副作用のために評価する。 ）
-                // 
-                // 6.3.2.3 ポインタ
-                // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
-                // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
-                // 任意の型修飾子qに対して非q修飾型へのポインタは，その型のq修飾版へのポインタに型変換してもよい。
-                // 元のポインタと変換されたポインタに格納された値は，比較して等しくなければならない。
-                // 値0をもつ整数定数式又はその定数式を型void *にキャストした式を，空ポインタ定数（null pointerconstant）と呼ぶ。
-                // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
-                // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
-                // 二つの空ポインタは比較して等しくなければならない。
-                // 整数は任意のポインタ型に型変換できる。
-                // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない(56)。
-                // 任意のポインタ型は整数型に型変換できる。
-                // これまでに規定されている場合を除き，結果は処理系定義とする。
-                // 結果が整数型で表現できなければ，その動作は未定義とする。
-                // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
-                // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
-                // その結果のポインタが，被参照型に関して正しく境界調整されていなければ(57)，その動作は未定義とする。
-                // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
-                // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
-                // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
-                // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
-                // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
-                // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
-                // 
-                public CType Ty {
-                    get;
-                }
-                public Expression Expr {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return Ty;
-                    }
-                }
-
-                public CastExpression(CType ty, Expression expr) {
-                    if (!(ty.IsScalarType() || ty.IsVoidType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。");
-                    }
-                    Ty = ty;
-                    Expr = expr;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.3.1 前置増分及び前置減分演算子
-            /// </summary>
-            public class UnaryPrefixExpression : Expression {
-                public enum OperatorKind {
-                    None, Inc, Dec
-                }
-                public OperatorKind Op {
-                    get;
-                }
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryPrefixExpression(OperatorKind op, Expression expr) {
-                    // 制約 
-                    // 前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならず，
-                    // 変更可能な左辺値でなければならない。    
-                    if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならない。");
-                    }
-                    // ToDo: 変更可能な左辺値でなければならない。    
-
-                    // 意味規則
-                    // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
-                    // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
-                    Op = op;
-                    Expr = new Expression.CastExpression(expr.Type, Specification.TypeConvert(expr));
-                }
-            }
-
-            /// <summary>
-            /// 6.5.3.2 アドレス及び間接演算子(アドレス演算子)
-            /// </summary>
-            public class UnaryAddressExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryAddressExpression(Expression expr) {
-                    // 制約  
-                    // 単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。
-                    // 左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。
-                    if (
-                           (expr is AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) // オペランドは，関数指示子
-                        || (expr is AST.Expression.PostfixExpression.ArraySubscriptingExpression) // オペランドは，[]演算子(ToDo:の結果にすること)
-                        || (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) // オペランドは，単項*演算子(ToDo:の結果にすること)
-                        ) {
-                        // ok
-                    } else if(
-                           expr.IsLValue()  // オペランドは，左辺値
-                           // ToDo: ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
-                        ) {
-
-                    } else {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。");
-                    }
-
-                    // 意味規則  
-                    // 単項 &演算子は，そのオペランドのアドレスを返す。
-                    // オペランドが型“∼型”をもっている場合，結果は，型“∼型へのポインタ”をもつ。
-                    // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
-                    // ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
-                    // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，&演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
-                    // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる。
-
-                    if (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) {
-                        // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
-                        // ToDo: ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
-                        expr = (expr as AST.Expression.PostfixExpression.UnaryReferenceExpression).Expr;
-                    } else if (expr is AST.Expression.PostfixExpression.UnaryReferenceExpression) {
-                        // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，
-                        // &演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
-                        var aexpr = (expr as AST.Expression.PostfixExpression.ArraySubscriptingExpression);
-                        expr = 
-                            new AST.Expression.AdditiveExpression(
-                                AdditiveExpression.OperatorKind.Add,
-                                new AST.Expression.PostfixExpression.CastExpression(new CType.PointerType(aexpr.Lhs.Type), aexpr),
-                                Specification.TypeConvert(aexpr.Rhs)
-                            );
-                    } else {
-                        // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
-                    }
-                    Expr = expr;
-                    _resultType = new CType.PointerType(expr.Type);
-                }
-            }
-
-            /// <summary>
-            /// 6.5.3.2 アドレス及び間接演算子(間接演算子)
-            /// </summary>
-            public class UnaryReferenceExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryReferenceExpression(Expression expr) {
-                    // 制約
-                    // 単項*演算子のオペランドは，ポインタ型をもたなければならない。
-                    if (!expr.Type.IsPointerType()) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "ポインタ型の式以外に単項参照演算子を適用しようとした。（左辺値型とか配列型とか色々見なければいけない部分は未実装。）");
-                    }
-
-                    // 意味規則
-                    // 単項*演算子は，間接参照を表す。
-                    // オペランドが関数を指している場合，その結果は関数指示子とする。
-                    // オペランドがオブジェクトを指している場合，その結果はそのオブジェクトを指し示す左辺値とする。
-                    // オペランドが型“∼型へのポインタ”をもつ場合，その結果は型“∼型”をもつ。
-                    // 正しくない値がポインタに代入されている場合，単項*演算子の動作は，未定義とする
-                    Expr = expr;
-                    _resultType = expr.Type.GetBasePointerType();
-                }
-            }
-
-            /// <summary>
-            /// 6.5.3.4 sizeof演算子
-            /// </summary>
-            public class SizeofTypeExpression : Expression {
-                public CType Ty {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return Ty;
-                    }
-                }
-
-                public SizeofTypeExpression(CType ty) {
-                    // 制約
-                    // sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。
-                    if (ty.IsIncompleteType() || ty.IsFunctionType()) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
-                    }
-                    Ty = ty;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.3.4 sizeof演算子
-            /// </summary>
-            public class SizeofExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return Expr.Type;
-                    }
-                }
-
-                public SizeofExpression(Expression expr) {
-                    if (expr.Type.IsIncompleteType() || expr.Type.IsFunctionType()) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
-                    }
-                    // ToDo: ビットフィールドメンバを示す式のチェック
-                    Expr = expr;
-                }
-            }
-
-            public class UnaryPlusExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryPlusExpression(Expression expr) {
-                    Expr = expr;
-                }
-            }
-
-            public class UnaryMinusExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryMinusExpression(Expression expr) {
-                    Expr = expr;
-                }
-            }
-
-            public class UnaryNegateExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryNegateExpression(Expression expr) {
-                    Expr = expr;
-                }
-            }
-
-            public class UnaryNotExpression : Expression {
-                public Expression Expr {
-                    get;
-                }
-                private CType _resultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return _resultType;
-                    }
-                }
-
-                public UnaryNotExpression(Expression expr) {
-                    Expr = expr;
-                }
-            }
-
-
-
-
-
-
             internal class GccStatementExpression : Expression {
                 public Statement statements {
                     get;
@@ -4242,7 +4623,9 @@ int main(void) {
                 }
             }
 
-
+            /// <summary>
+            /// 6.3.1.1 整数拡張（AST生成時に挿入）
+            /// </summary>
             public class IntegerPromotionExpression : Expression {
                 public CType.BasicType Ty {
                     get;
@@ -4526,9 +4909,9 @@ int main(void) {
             }
 
             public class ArgumentDeclaration : VariableDeclaration {
-                
-                public ArgumentDeclaration(string ident, CType ctype, StorageClass storage_class) 
-                    : base(ident, ctype,storage_class, null) {}
+
+                public ArgumentDeclaration(string ident, CType ctype, StorageClass storage_class)
+                    : base(ident, ctype, storage_class, null) { }
             }
 
             public class TypeDeclaration : Declaration {
@@ -4552,7 +4935,7 @@ int main(void) {
     }
 
     /// <summary>
-    /// スコープ
+    /// 名前空間
     /// </summary>
     /// <typeparam name="TValue"></typeparam>
     public class Scope<TValue> {
@@ -4596,6 +4979,21 @@ int main(void) {
                     return true;
                 }
                 it = it.Parent;
+            }
+            value = default(TValue);
+            return false;
+        }
+        public bool TryGetValue(string v, out TValue value, out bool isCurrent) {
+            var it = this;
+            isCurrent = true;
+            while (it != null) {
+                var val = it.entries.FindLast(x => x.Item1 == v);
+                if (val != null) {
+                    value = val.Item2;
+                    return true;
+                }
+                it = it.Parent;
+                isCurrent = false;
             }
             value = default(TValue);
             return false;
@@ -4850,6 +5248,9 @@ int main(void) {
         private static Regex RegexChar { get; } = new Regex($@"^L?'(\.|[^\'])+'$");
         private static Regex RegexStringLiteral { get; } = new Regex($@"^L?""(\.|[^\""])*""$");
 
+        /// <summary>
+        /// 字句解析器
+        /// </summary>
         private class Lexer {
 
             /// <summary>
@@ -5147,12 +5548,7 @@ int main(void) {
                     if (reserve_words.TryGetValue(str, out reserveWordId)) {
                         _tokens.Add(new Token(reserveWordId, start, end, str));
                     } else {
-                        //AST.Declaration.TypeDeclaration val;
-                        //if (typedef_scope.TryGetValue(str, out val)) {
-                        //    _tokens.Add(new Token(Token.TokenKind.TYPE_NAME, start, len, str));
-                        //} else {
                         _tokens.Add(new Token(Token.TokenKind.IDENTIFIER, start, end, str));
-                        //}
                     }
                     return true;
                 } else if ((scanch(0) == '.' && IsDigit(scanch(1))) || IsDigit(scanch(0))) {
@@ -5285,14 +5681,16 @@ int main(void) {
         }
 
 
-        private Lexer lexer { get; }
+        private Lexer lexer {
+            get;
+        }
 
 
         public Grammer(string s) {
             lexer = new Lexer(s, "<built-in>");
 
             // GCCの組み込み型の設定
-            typedef_scope.Add("__builtin_va_list", new AST.Declaration.TypeDeclaration("__builtin_va_list", new CType.PointerType(new CType.BasicType(TypeSpecifier.Void))));
+            typedef_scope.Add("__builtin_va_list", new AST.Declaration.TypeDeclaration("__builtin_va_list", CType.CreatePointer(new CType.BasicType(TypeSpecifier.Void))));
 
         }
 
@@ -5356,12 +5754,12 @@ int main(void) {
         private bool is_FLOATING_CONSTANT() {
             return lexer.current_token().Kind == Token.TokenKind.FLOAT_CONSTANT;
         }
-        private AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant FLOATING_CONSTANT() {
+        private AST.Expression.PrimaryExpression.Constant.FloatingConstant FLOATING_CONSTANT() {
             if (is_FLOATING_CONSTANT() == false) {
                 throw new Exception();
             }
             var raw = lexer.current_token().Raw;
-            var m = RegexHeximal.Match(raw);
+            var m = RegexFlating.Match(raw);
             if (m.Success == false) {
                 throw new Exception();
             }
@@ -5381,13 +5779,13 @@ int main(void) {
                     throw new Exception();
             }
             lexer.next_token();
-            return new AST.Expression.PrimaryExpression.ConstantExpression.FloatingConstant(raw, value, type);
+            return new AST.Expression.PrimaryExpression.Constant.FloatingConstant(raw, value, type);
         }
 
         private bool is_INTEGER_CONSTANT() {
             return lexer.current_token().Kind == Token.TokenKind.HEXIMAL_CONSTANT | lexer.current_token().Kind == Token.TokenKind.OCTAL_CONSTANT | lexer.current_token().Kind == Token.TokenKind.DECIAML_CONSTANT;
         }
-        private AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant INTEGER_CONSTANT() {
+        private AST.Expression.PrimaryExpression.Constant.IntegerConstant INTEGER_CONSTANT() {
             if (is_INTEGER_CONSTANT() == false) {
                 throw new Exception();
             }
@@ -5565,7 +5963,7 @@ int main(void) {
 
             lexer.next_token();
 
-            return new AST.Expression.PrimaryExpression.ConstantExpression.IntegerConstant(raw, value, selectedType);
+            return new AST.Expression.PrimaryExpression.Constant.IntegerConstant(raw, value, selectedType);
 
         }
 
@@ -5629,18 +6027,20 @@ int main(void) {
             } else if (baseType == null) {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
-            if (baseType.IsQualifiedType()) {
-                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
-            } else {
-                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
-            }
+            baseType = baseType.WrapTypeQualifier(typeQualifier);
 
             var ret = new List<AST.Declaration>();
 
 
             if (!is_declarator()) {
-                lexer.Read(';');
-                return ret;
+                if (!baseType.IsStructureType() && !baseType.IsEnumeratedType()) {
+                    throw new SpecificationErrorException(Location.Empty, Location.Empty, "空の宣言は使用できません。");
+                } else if (baseType.IsStructureType() && (baseType.Unwrap() as CType.TaggedType.StructUnionType).IsAnonymous) {
+                    throw new SpecificationErrorException(Location.Empty, Location.Empty, "無名構造体/共用体が宣言されていますが、そのインスタンスを定義していません。");
+                } else {
+                    lexer.Read(';');
+                    return ret;
+                }
             } else {
                 for (; ; ) {
                     string ident = "";
@@ -5735,7 +6135,7 @@ int main(void) {
                     if (dic.ContainsKey(x.Name)) {
                         return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype.DefaultArgumentPromotion(), dic[x.Name].Ctype);
                     } else {
-                        var type = (CType)new CType.BasicType(CType.BasicType.Kind.SignedInt);
+                        var type = (CType)CType.CreateSignedInt();
                         return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, type.DefaultArgumentPromotion(), type);
                     }
                 }).ToList();
@@ -5767,20 +6167,24 @@ int main(void) {
             // 環境に名前を追加
             ident_scope.Add(ident, new IdentifierValue.Declaration(funcdecl));
 
-            // 関数スコープを積む
+            // 各スコープを積む
+            tag_scope = tag_scope.Extend();
+            typedef_scope = typedef_scope.Extend();
             ident_scope = ident_scope.Extend();
 
             if (ctype.Arguments != null) {
                 foreach (var arg in ctype.Arguments) {
-                    ident_scope.Add(arg.Name, new IdentifierValue.Declaration(new AST.Declaration.ArgumentDeclaration(arg.Name, arg.cType, arg.Sc )));
+                    ident_scope.Add(arg.Name, new IdentifierValue.Declaration(new AST.Declaration.ArgumentDeclaration(arg.Name, arg.cType, arg.Sc)));
                 }
             }
 
             // 関数本体（複文）を解析
             funcdecl.Body = compound_statement();
 
-            // 関数スコープから出る
+            //各スコープから出る
             ident_scope = ident_scope.Parent;
+            typedef_scope = typedef_scope.Parent;
+            tag_scope = tag_scope.Parent;
 
             return funcdecl;
         }
@@ -5842,9 +6246,10 @@ int main(void) {
                 if (storageClass == StorageClass.Typedef) {
                     // typedef 宣言
                     AST.Declaration.TypeDeclaration tdecl;
-                    if (typedef_scope.TryGetValue(ident, out tdecl)) {
-                        if (CType.IsEqual(tdecl.Ctype, ctype) == false) {
-                            throw new Exception("再定義型の不一致");
+                    bool current;
+                    if (typedef_scope.TryGetValue(ident, out tdecl, out current)) {
+                        if (current == true) {
+                            //throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "型が再定義された。（型の再定義はC11以降の機能。）");
                         }
                     }
                     tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
@@ -5958,11 +6363,7 @@ int main(void) {
             }
             sc = storageClass;
 
-            if (baseType.IsQualifiedType()) {
-                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
-            } else {
-                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
-            }
+            baseType = baseType.WrapTypeQualifier(typeQualifier);
             return baseType;
         }
 
@@ -6062,10 +6463,10 @@ int main(void) {
                 IdentifierValue iv;
                 if (ident_scope.TryGetValue(ident, out iv)) {
                     if (iv.IsVariable() == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"{ident}は既に変数以外として宣言されています。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は既に変数以外として宣言されています。");
                     }
                     if (CType.IsEqual(iv.ToVariable().Ctype, ctype) == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"既に宣言されている変数{ident}と型が一致しないため再宣言できません。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"既に宣言されている変数{ident}と型が一致しないため再宣言できません。");
                     }
                     if (iv.ToVariable().Init != null) {
                         throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"変数{ident}は既に初期化子を伴って宣言されている。");
@@ -6082,22 +6483,24 @@ int main(void) {
 
                 // 再宣言の確認
                 AST.Declaration.TypeDeclaration tdecl;
-                if (typedef_scope.TryGetValue(ident, out tdecl)) {
-                    throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"{ident} は既に型宣言名として宣言されています。");
-                } else {
-                    tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
-                    decl = tdecl;
-                    typedef_scope.Add(ident, tdecl);
+                bool isCurrent;
+                if (typedef_scope.TryGetValue(ident, out tdecl, out isCurrent)) {
+                    if (isCurrent) {
+                        throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"{ident} は既に型宣言名として宣言されています。");
+                    }
                 }
+                tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
+                decl = tdecl;
+                typedef_scope.Add(ident, tdecl);
             } else if (ctype.IsFunctionType()) {
                 // 再宣言の確認
                 IdentifierValue iv;
                 if (ident_scope.TryGetValue(ident, out iv)) {
                     if (iv.IsFunction() == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"{ident}は既に関数以外として宣言されています。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は既に関数以外として宣言されています。");
                     }
                     if (CType.IsEqual(iv.ToFunction().Ty, ctype) == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
                     }
                     if (storage_class != StorageClass.Static && storage_class == StorageClass.None && storage_class != StorageClass.Extern) {
                         throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"関数宣言に指定することができない記憶クラス指定子 {(storage_class == StorageClass.Register ? "register" : storage_class == StorageClass.Typedef ? "typedef" : storage_class.ToString())} が指定されている。");
@@ -6129,10 +6532,10 @@ int main(void) {
                 IdentifierValue iv;
                 if (ident_scope.TryGetValue(ident, out iv)) {
                     if (iv.IsVariable() == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"{ident}は既に変数以外として宣言されています。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は既に変数以外として宣言されています。");
                     }
                     if (CType.IsEqual(iv.ToVariable().Ctype, ctype) == false) {
-                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End,  $"既に宣言されている変数{ident}と型が一致しないため再宣言できません。");
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"既に宣言されている変数{ident}と型が一致しないため再宣言できません。");
                     }
                     decl = iv.ToVariable();
                 } else {
@@ -6257,7 +6660,7 @@ int main(void) {
                 if (lexer.Peek('{')) {
                     // 識別子を伴う完全型の宣言
                     CType.TaggedType ctype;
-                    CType.TaggedType.StructUnionType stype ;
+                    CType.TaggedType.StructUnionType stype;
                     if (tag_scope.TryGetValue(ident, out ctype) == false) {
                         // タグ名前表に無い場合は新しく追加する。
                         stype = new CType.TaggedType.StructUnionType(type == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union, ident, false);
@@ -6363,6 +6766,13 @@ int main(void) {
             TypeQualifier typeQualifier = TypeQualifier.None;
 
             // 型指定子もしくは型修飾子を読み取る。
+            if (is_specifier_qualifier(null, TypeSpecifier.None) == false) {
+                if (is_storage_class_specifier()) {
+                    // 記憶クラス指定子（文法上は無くてよい。エラーメッセージ表示のために用意。）
+                    throw new SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"記憶クラス指定子 { lexer.current_token().ToString() } は使えません。");
+                }
+                throw new SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, "型指定子もしくは型修飾子以外の要素がある。");
+            }
             specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
             while (is_specifier_qualifier(baseType, typeSpecifier)) {
                 specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
@@ -6377,7 +6787,7 @@ int main(void) {
                     // （歴史的な話：K&R では typedef は 別名(alias)扱いだったため、typedef int INT; unsingned INT x; は妥当だった）
                     throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "型指定子・型修飾子並び中で構造体共用体指定子、列挙型指定子、型定義名のいずれかと、それら以外の型指定子が組み合わせられている。");
                 }
-            } else  {
+            } else {
                 // 型指定子部に構造体共用体指定子、列挙型指定子、型定義名が出現しない場合
                 if (typeSpecifier == TypeSpecifier.None) {
                     // 6.7.2 それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。
@@ -6391,11 +6801,7 @@ int main(void) {
             }
 
             // 型修飾子を適用
-            if (baseType.IsQualifiedType()) {
-                (baseType as CType.TypeQualifierType).type_qualifier |= typeQualifier;
-            } else {
-                baseType = new CType.TypeQualifierType(baseType, typeQualifier);
-            }
+            baseType = baseType.WrapTypeQualifier(typeQualifier);
 
             return baseType;
         }
@@ -6493,15 +6899,15 @@ int main(void) {
                     expr = constant_expression();
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : AST.ConstantEval(expr));
+                return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
             } else if (lexer.Peek(':')) {
                 // ビットフィールド部分(must)
                 lexer.Read(':');
                 AST.Expression expr = constant_expression();
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : AST.ConstantEval(expr));
+                return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
             } else {
-                throw new SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。");
+                throw new SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
         }
 
@@ -6596,7 +7002,7 @@ int main(void) {
             if (lexer.Peek('=')) {
                 lexer.Read('=');
                 var expr = constant_expression();
-                i = AST.ConstantEval(expr);
+                i = Evaluator.ConstantEval(expr);
             }
             return new CType.TaggedType.EnumType.MemberInfo(ctype, ident, i);
         }
@@ -6724,10 +7130,10 @@ int main(void) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
-                    len = AST.ConstantEval(expr);
+                    len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = new CType.ArrayType(len, stack[index]);
+                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_declarator(stack, index);
             } else if (lexer.Peek('(')) {
                 // 6.7.5.3 関数宣言子（関数原型を含む）
@@ -6876,10 +7282,10 @@ int main(void) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
-                    len = AST.ConstantEval(expr);
+                    len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = new CType.ArrayType(len, stack[index]);
+                stack[index] = CType.CreateArray(len, stack[index]);
                 more_dd_or_dad(stack, index);
             } else {
                 throw new Exception();
@@ -6917,10 +7323,10 @@ int main(void) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
-                    len = AST.ConstantEval(expr);
+                    len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = new CType.ArrayType(len, stack[index]);
+                stack[index] = CType.CreateArray(len, stack[index]);
                 more_dd_or_dad(stack, index);
             } else {
                 // _epsilon_
@@ -6965,12 +7371,12 @@ int main(void) {
         /// <param name="index"></param>
         private void pointer(List<CType> stack, int index) {
             lexer.Read('*');
-            stack[index] = new CType.PointerType(stack[index]);
+            stack[index] = CType.CreatePointer(stack[index]);
             TypeQualifier typeQualifier = TypeQualifier.None;
             while (is_type_qualifier()) {
                 typeQualifier = typeQualifier.Marge(type_qualifier());
             }
-            stack[index] = new CType.TypeQualifierType(stack[index], typeQualifier);
+            stack[index] = stack[index].WrapTypeQualifier(typeQualifier);
 
             if (is_pointer()) {
                 pointer(stack, index);
@@ -7055,10 +7461,10 @@ int main(void) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
-                    len = AST.ConstantEval(expr);
+                    len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = new CType.ArrayType(len, stack[index]);
+                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_abstract_declarator(stack, index);
             }
         }
@@ -7074,10 +7480,10 @@ int main(void) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
-                    len = AST.ConstantEval(expr);
+                    len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = new CType.ArrayType(len, stack[index]);
+                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_abstract_declarator(stack, index);
             } else if (lexer.Peek('(')) {
                 lexer.Read('(');
@@ -7211,6 +7617,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Statement compound_statement() {
             tag_scope = tag_scope.Extend();
+            typedef_scope = typedef_scope.Extend();
             ident_scope = ident_scope.Extend();
             lexer.Read('{');
             var decls = new List<AST.Declaration>();
@@ -7227,6 +7634,7 @@ int main(void) {
             lexer.Read('}');
             var stmt = new AST.Statement.CompoundStatement(decls, stmts, tag_scope, ident_scope);
             ident_scope = ident_scope.Parent;
+            typedef_scope = typedef_scope.Parent;
             tag_scope = tag_scope.Parent;
             return stmt;
 
@@ -7499,7 +7907,7 @@ int main(void) {
             // 文字定数
             if (is_CHARACTER_CONSTANT()) {
                 var ret = CHARACTER_CONSTANT();
-                return new AST.Expression.PrimaryExpression.ConstantExpression.CharacterConstant(ret);
+                return new AST.Expression.PrimaryExpression.Constant.CharacterConstant(ret);
             }
 
             // 浮動小数定数
@@ -7917,8 +8325,16 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Expression constant_expression() {
+            // 補足説明  
             // 定数式は，実行時ではなく翻訳時に評価することができる。したがって，定数を使用してよいところならばどこでも使用してよい。
-            // 実際に評価を行い、結果型についてもチェックが必要
+            //
+            // 制約
+            // - 定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。
+            //   ただし，定数式が評価されない部分式(sizeof演算子のオペランド等)に含まれている場合を除く。
+            // - 定数式を評価した結果は，その型で表現可能な値の範囲内にある定数でなければならない。
+            // 
+
+            // ToDo: 初期化子中の定数式の扱いを実装
             return conditional_expression();
 
         }
