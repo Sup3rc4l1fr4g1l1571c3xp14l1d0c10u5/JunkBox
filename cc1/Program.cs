@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -11,10 +12,22 @@ using System.Text.RegularExpressions;
 namespace AnsiCParser {
     class Program {
         static void Main(string[] args) {
-            new TestCase.EmptyStruct().Run();
-            new TestCase.NoNameStructIsNotUsed().Run();
+            new Grammer(@"
+void f();
 
-            new Grammer(System.IO.File.ReadAllText(args[0])).Parse();
+void foo(void) { 
+  float x = 3.14f; 
+  f(x); 
+  f(x,x); 
+}
+
+void f (double x) { 
+  (int)x;
+}
+").Parse();
+            //new TestCase.ConstantExprIsNullpointerCase().Run();
+            new TestCase.ConstantExprIsNotNullpointerCase().Run();
+            //new Grammer(System.IO.File.ReadAllText(args[0])).Parse();
             TestCase.RunTest();
         }
     }
@@ -49,9 +62,11 @@ namespace AnsiCParser {
             (new TestCase.LValueAndAddressOpCase1()).Run();
             (new TestCase.LValueAndAddressOpCase2()).Run();
             (new TestCase.LValueAndAddressOpCase3()).Run();
-            (new TestCase.RedefineTypedefInSameScope()).Run();
-            (new TestCase.RedefineTypedefInNestedScope()).Run();
-            new TestCase.TypedefInStruct().Run();
+            (new TestCase.RedefineTypedefInSameScopeCase()).Run();
+            (new TestCase.RedefineTypedefInNestedScopeCase()).Run();
+            new TestCase.TypedefInStructCase().Run();
+            new TestCase.EmptyStructCase().Run();
+            new TestCase.NoNameStructIsNotUsedCase().Run();
         }
 
         /// <summary>
@@ -95,7 +110,7 @@ float x;
         /// <summary>
         /// K&R形式の関数定義・宣言の例
         /// </summary>
-        public class KandRStyleCase : RaiseError<SyntaxErrorException> {
+        public class KandRStyleCase : SuccessCase {
             protected override string source() => @"
 int count();
 
@@ -124,7 +139,7 @@ char* str;
 extern int printf(const char *, ...);
 
 int main(void) {
-    printf((int*)""hello, world"");
+    printf(""hello, world"");
     return 0;
 }
 
@@ -221,7 +236,7 @@ int foo() {
         /// <summary>
         /// typedef の再定義
         /// </summary>
-        public class RedefineTypedefInSameScope : RaiseError<SpecificationErrorException> {
+        public class RedefineTypedefInSameScopeCase : RaiseError<SpecificationErrorException> {
             protected override string source() => @"
 typedef int SINT;
 typedef int SINT;   // NG(redefine)
@@ -235,13 +250,9 @@ return (int)x;
         /// <summary>
         /// typedef の入れ子定義
         /// </summary>
-        public class RedefineTypedefInNestedScope : SuccessCase {
+        public class RedefineTypedefInNestedScopeCase : SuccessCase {
             protected override string source() => @"
 typedef int SINT;
-
-typedef struct {
-    typedef int SINT ;
-};
 
 int main(void) {
 typedef double SINT;    // OK(override)
@@ -255,7 +266,7 @@ return (int)x;
         /// <summary>
         /// struct中で typedef
         /// </summary>
-        public class TypedefInStruct : RaiseError<SyntaxErrorException> {
+        public class TypedefInStructCase : RaiseError<SyntaxErrorException> {
             protected override string source() => @"
 struct Z {
     typedef int SINT ;  // NG
@@ -269,7 +280,7 @@ struct Z {
         /// <summary>
         /// メンバが空の構造体
         /// </summary>
-        public class EmptyStruct : RaiseError<SyntaxErrorException> {
+        public class EmptyStructCase : RaiseError<SyntaxErrorException> {
             protected override string source() => @"
 struct foo {};
 ";
@@ -278,13 +289,44 @@ struct foo {};
         /// <summary>
         /// タグ型の宣言、変数宣言のどちらももならない（意味を持たない）構造体の宣言。
         /// </summary>
-        public class NoNameStructIsNotUsed : RaiseError<SpecificationErrorException> {
+        public class NoNameStructIsNotUsedCase : RaiseError<SpecificationErrorException> {
             protected override string source() => @"
 struct { int x; };
 ";
         }
 
 
+        /// <summary>
+        /// 定数式のヌルポインタ扱い
+        /// </summary>
+        public class ConstantExprIsNullpointerCase : SuccessCase {
+            protected override string source() => @"
+const char *str = (2*4/8-1);
+
+int main(void) {
+	if (str == 0) {
+		return 1;
+	}
+	return 0;
+}
+";
+        }
+
+        /// <summary>
+        /// 定数式のヌルポインタ扱い
+        /// </summary>
+        public class ConstantExprIsNotNullpointerCase : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+const char *str = (2*4/8);
+
+int main(void) {
+	if (str == 0) {
+		return 1;
+	}
+	return 0;
+}
+";
+        }
     }
 
     public abstract class CompilerException : Exception {
@@ -1042,17 +1084,20 @@ struct { int x; };
                     get;
                 }
 
-                // 実際に宣言された型(nullの場合はK&R形式で宣言されていない)
-                public CType realType {
-                    get;
-                }
-
-
-                public ArgumentInfo(string name, StorageClass sc, CType ctype, CType rType) {
+                public ArgumentInfo(string name, StorageClass sc, CType ctype) {
                     Name = name;
                     Sc = sc;
+                    // 6.7.5.3 関数宣言子（関数原型を含む）
+                    // 制約
+                    // 仮引数を“∼型の配列”とする宣言は，“∼型への修飾されたポインタ”に型調整する。
+                    // そのときの型修飾子は，配列型派生の[及び]の間で指定したものとする。
+                    // 配列型派生の[及び]の間にキーワード static がある場合，その関数の呼出しの際に対応する実引数の値は，大きさを指定する式で指定される数以上の要素をもつ配列の先頭要素を指していなければならない。
+                    CType elementType;
+                    if (ctype.IsArrayType(out elementType)) {
+                        //ToDo: 及び。の間の型修飾子、static について実装
+                        ctype = CType.CreatePointer(elementType);
+                    }
                     cType = ctype;
-                    realType = rType;
                 }
             }
 
@@ -1194,7 +1239,7 @@ struct { int x; };
             /// 配列長(-1は指定無し)
             /// </summary>
             public int Length {
-                get;
+                get; set;
             }
 
             public CType cType {
@@ -2215,19 +2260,19 @@ struct { int x; };
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
                         var retTy = new CType.BasicType(realConversionPair.Item2);
-                        rhs = new AST.Expression.PostfixExpression.CastExpression(retTy, rhs);
+                        rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(retTy, rhs);
                         return retTy;
                     } else {
-                        rhs = new AST.Expression.PostfixExpression.CastExpression(new CType.BasicType(realConversionPair.Item1), rhs);
+                        rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(new CType.BasicType(realConversionPair.Item1), rhs);
                         return btLhs;
                     }
                 } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().kind == realConversionPair.Item1) {
                     if (btLhs.IsComplexType()) {
                         var retTy = new CType.BasicType(realConversionPair.Item2);
-                        lhs = new AST.Expression.PostfixExpression.CastExpression(retTy, lhs);
+                        lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(retTy, lhs);
                         return retTy;
                     } else {
-                        lhs = new AST.Expression.PostfixExpression.CastExpression(new CType.BasicType(realConversionPair.Item1), lhs);
+                        lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(new CType.BasicType(realConversionPair.Item1), lhs);
                         return btRhs;
                     }
                 }
@@ -2255,10 +2300,10 @@ struct { int x; };
             // 整数変換順位の低い方の型を，高い方の型に変換する。
             if ((btLhs.IsSignedIntegerType() && btRhs.IsSignedIntegerType()) || (btLhs.IsUnsignedIntegerType() && btRhs.IsUnsignedIntegerType())) {
                 if (btLhs.IntegerConversionRank() < btRhs.IntegerConversionRank()) {
-                    lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
+                    lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btRhs, lhs);
                     return btRhs;
                 } else {
-                    rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
+                    rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btLhs, rhs);
                     return btLhs;
                 }
             }
@@ -2268,10 +2313,10 @@ struct { int x; };
             // そうでない場合，符号無し整数型をもつオペランドが，他方のオペランドの整数変換順位より高い又は等しい順位をもつならば，
             // 符号付き整数型をもつオペランドを，符号無し整数型をもつオペランドの型に変換する。
             if (btLhs.IsUnsignedIntegerType() && btLhs.IntegerConversionRank() >= btRhs.IntegerConversionRank()) {
-                rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
+                rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsUnsignedIntegerType() && btRhs.IntegerConversionRank() >= btLhs.IntegerConversionRank()) {
-                lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
+                lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btRhs, lhs);
                 return btRhs;
             }
 
@@ -2282,10 +2327,10 @@ struct { int x; };
             // そうでない場合，符号付き整数型をもつオペランドの型が，符号無し整数型をもつオペランドの型のすべての値を表現できるならば，
             // 符号無し整数型をもつオペランドを，符号付き整数型をもつオペランドの型に変換する。
             if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.Sizeof() > btRhs.Sizeof()) {
-                rhs = new AST.Expression.PostfixExpression.CastExpression(btLhs, rhs);
+                rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.Sizeof() > btLhs.Sizeof()) {
-                lhs = new AST.Expression.PostfixExpression.CastExpression(btRhs, lhs);
+                lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(btRhs, lhs);
                 return btRhs;
             }
 
@@ -2307,8 +2352,8 @@ struct { int x; };
             }
 
             var tyUnsigned = new CType.BasicType(tyUnsignedKind);
-            lhs = new AST.Expression.PostfixExpression.CastExpression(tyUnsigned, lhs);
-            rhs = new AST.Expression.PostfixExpression.CastExpression(tyUnsigned, rhs);
+            lhs = new AST.Expression.PostfixExpression.TypeConversionExpression(tyUnsigned, lhs);
+            rhs = new AST.Expression.PostfixExpression.TypeConversionExpression(tyUnsigned, rhs);
             return tyUnsigned;
 
         }
@@ -2353,7 +2398,7 @@ struct { int x; };
                     // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-                    return new AST.Expression.PostfixExpression.CastExpression(CType.CreatePointer(elementType), expr);
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(elementType), expr);
                 }
             }
 
@@ -2375,7 +2420,7 @@ struct { int x; };
                 throw new SpecificationErrorException(Location.Empty, Location.Empty, "左辺値が不完全型をもち，配列型以外の型をもつため、型変換結果は未定義の動作となります。");
             }
             if (expr.Type.IsQualifiedType()) {
-                return new AST.Expression.PostfixExpression.CastExpression((expr.Type as CType.TypeQualifierType).cType, expr);
+                return new AST.Expression.PostfixExpression.TypeConversionExpression((expr.Type as CType.TypeQualifierType).cType, expr);
             } else {
                 return expr;
             }
@@ -2421,13 +2466,23 @@ struct { int x; };
         public static bool IsNullPointerConstant(this AST.Expression expr) {
 
             if (expr.Type.IsPointerType() && expr.Type.GetBasePointerType().IsVoidType()) {
-                while (expr is AST.Expression.UnaryPrefixExpression.CastExpression) {
-                    expr = (expr as AST.Expression.UnaryPrefixExpression.CastExpression).Expr;
+                for (; ; ) {
+                    if (expr is AST.Expression.UnaryPrefixExpression.TypeConversionExpression) {
+                        expr = (expr as AST.Expression.UnaryPrefixExpression.TypeConversionExpression).Expr;
+                        continue;
+                    }
+                    if (expr is AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                        expr = (expr as AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression).expression;
+                        continue;
+                    }
+                    break;
                 }
             }
-            if (expr is AST.Expression.PrimaryExpression.Constant.IntegerConstant) {
-                return (expr as AST.Expression.PrimaryExpression.Constant.IntegerConstant).Value == 0;
-            } else {
+
+            // 整数定数式又はその定数式とあるので定数演算を試みる
+            try {
+                return Evaluator.ConstantEval(expr) == 0;
+            } catch {
                 return false;
             }
 
@@ -2501,11 +2556,11 @@ struct { int x; };
                 var e = expr as AST.Expression.PostfixExpression.AssignmentExpression;
                 throw new SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
             }
-            if (expr is AST.Expression.PostfixExpression.CastExpression) {
-                var e = expr as AST.Expression.PostfixExpression.CastExpression;
+            if (expr is AST.Expression.PostfixExpression.TypeConversionExpression) {
+                var e = expr as AST.Expression.PostfixExpression.TypeConversionExpression;
                 // 6.3.1.2 論理型  
                 // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
-                if (e.Ty.IsBoolType()) {
+                if (e.Type.IsBoolType()) {
                     if (e.Expr.Type.IsScalarType()) {
                         return ConstantEval(e.Expr) == 0 ? 0 : 1;
                     } else {
@@ -2517,9 +2572,9 @@ struct { int x; };
                 // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
                 // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
                 // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
-                if (e.Ty.IsIntegerType() && e.Expr.Type.IsIntegerType()) {
+                if (e.Type.IsIntegerType() && e.Expr.Type.IsIntegerType()) {
                     var value = ConstantEval(e.Expr);
-                    var target = (e.Ty is CType.BasicType) ? (e.Ty as CType.BasicType).kind : CType.BasicType.Kind.SignedInt;
+                    var target = (e.Type is CType.BasicType) ? (e.Type as CType.BasicType).kind : CType.BasicType.Kind.SignedInt;
                     switch (target) {
                         case CType.BasicType.Kind.Char:
                         case CType.BasicType.Kind.SignedChar:
@@ -2883,6 +2938,9 @@ struct { int x; };
 
                     }
 
+                    /// <summary>
+                    /// 変数識別子式
+                    /// </summary>
                     public class VariableExpression : IdentifierExpression {
                         public Declaration.VariableDeclaration variableDeclaration {
                             get;
@@ -2903,6 +2961,9 @@ struct { int x; };
                         }
                     }
 
+                    /// <summary>
+                    /// 関数識別子式
+                    /// </summary>
                     public class FunctionExpression : IdentifierExpression {
                         public Declaration.FunctionDeclaration functionDeclaration {
                             get;
@@ -3173,6 +3234,8 @@ struct { int x; };
                     }
 
                     private void CheckAssignment(CType lType, Expression rhs) {
+                        rhs = Specification.ImplicitConversion(rhs);
+
                         // 制約 (単純代入)
                         // 次のいずれかの条件が成立しなければならない。
                         // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
@@ -3221,7 +3284,7 @@ struct { int x; };
 
                         if (!CType.IsEqual(lType, rhs.Type)) {
                             //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new Expression.CastExpression(lType, rhs);
+                            rhs = new Expression.TypeConversionExpression(lType, rhs);
                         }
 
 
@@ -3242,7 +3305,7 @@ struct { int x; };
                             }
                         }
                         throw new Exception("呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
-                        Valid:
+                    Valid:
                         if (functionType.Arguments != null) {
                             // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
                             if (functionType.HasVariadic) { // 可変長引数を持つ
@@ -3264,6 +3327,7 @@ struct { int x; };
 
                         } else {
                             // 呼び出される関数を表す式が，関数原型を含まない型をもつ場合，各実引数に対して既定の実引数拡張を行う。
+                            args = args.Select(x => (AST.Expression)new AST.Expression.TypeConversionExpression(Specification.DefaultArgumentPromotion(x.Type), x)).ToList();
                         }
                         // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない
                         _resultType = functionType.ResultType;
@@ -3392,6 +3456,10 @@ struct { int x; };
                         }
                     }
 
+                    public override bool IsLValue() {
+                        return Expr.IsLValue();
+                    }
+
                     public UnaryPostfixExpression(string op, Expression expr) {
                         // 制約  
                         // 後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならず，
@@ -3408,7 +3476,7 @@ struct { int x; };
                         // 制約，型，並びにポインタに対する型変換及び 演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                         // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                         Op = op;
-                        Expr = new Expression.CastExpression(expr.Type, Specification.TypeConvert(expr));
+                        Expr = new Expression.TypeConversionExpression(expr.Type, Specification.TypeConvert(expr));
 
                     }
 
@@ -3436,6 +3504,10 @@ struct { int x; };
                     }
                 }
 
+                public override bool IsLValue() {
+                    return Expr.IsLValue();
+                }
+
                 public UnaryPrefixExpression(OperatorKind op, Expression expr) {
                     // 制約 
                     // 前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならず，
@@ -3449,7 +3521,7 @@ struct { int x; };
                     // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                     // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                     Op = op;
-                    Expr = new Expression.CastExpression(expr.Type, Specification.ImplicitConversion(expr));
+                    Expr = new Expression.TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr));
                 }
             }
 
@@ -3508,7 +3580,7 @@ struct { int x; };
                         expr =
                             new AST.Expression.AdditiveExpression(
                                 AdditiveExpression.OperatorKind.Add,
-                                new AST.Expression.PostfixExpression.CastExpression(CType.CreatePointer(aexpr.Lhs.Type), aexpr),
+                                new AST.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(aexpr.Lhs.Type), aexpr),
                                 Specification.ImplicitConversion(aexpr.Rhs)
                             );
                     } else {
@@ -3539,6 +3611,9 @@ struct { int x; };
                     return Expr.IsLValue();
                 }
                 public UnaryReferenceExpression(Expression expr) {
+                    // 暗黙の型変換
+                    expr = Specification.ImplicitConversion(expr);
+
                     // 制約
                     // 単項*演算子のオペランドは，ポインタ型をもたなければならない。
                     if (!expr.Type.IsPointerType()) {
@@ -3710,93 +3785,24 @@ struct { int x; };
             /// <summary>
             /// 6.5.4 キャスト演算子(キャスト式)
             /// </summary>
-            public class CastExpression : Expression {
+            public class CastExpression : TypeConversionExpression {
                 // 制約 
                 // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-                //
-                // 6.3.1.2 論理型  
-                // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
-                //
-                // 6.3.1.3 符号付き整数型及び符号無し整数型  
-                // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
-                // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
-                // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
-                //
-                // 6.3.1.4実浮動小数点型及び整数型  
-                // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
-                // 整数部の値が整数型で表現できない場合，その動作は未定義とする。
-                // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
-                // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
-                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                //
-                // 6.3.1.5 実浮動小数点型  
-                // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。 
-                // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
-                // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
-                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                // 
-                // 6.3.1.6 複素数型  
-                // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
-                // 
-                // 6.3.1.7 実数型及び複素数型
-                // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
-                // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する。
-                //
-                // 6.3.2.2 void ボイド式（void expression）
-                // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
-                // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。
-                // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。（ボイド式は， 副作用のために評価する。 ）
-                // 
-                // 6.3.2.3 ポインタ
-                // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
-                // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
-                // 任意の型修飾子qに対して非q修飾型へのポインタは，その型のq修飾版へのポインタに型変換してもよい。
-                // 元のポインタと変換されたポインタに格納された値は，比較して等しくなければならない。
-                // 値0をもつ整数定数式又はその定数式を型void *にキャストした式を，空ポインタ定数（null pointerconstant）と呼ぶ。
-                // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
-                // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
-                // 二つの空ポインタは比較して等しくなければならない。
-                // 整数は任意のポインタ型に型変換できる。
-                // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない(56)。
-                // 任意のポインタ型は整数型に型変換できる。
-                // これまでに規定されている場合を除き，結果は処理系定義とする。
-                // 結果が整数型で表現できなければ，その動作は未定義とする。
-                // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
-                // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
-                // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
-                // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
-                // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
-                // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
-                // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
-                // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
-                // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
-                // 
-                public CType Ty {
-                    get;
-                }
-                public Expression Expr {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return Ty;
-                    }
-                }
 
-                public override bool IsLValue() {
-                    return Expr.IsLValue();
-                }
-
-                public CastExpression(CType ty, Expression expr) {
+                public CastExpression(CType ty, Expression expr) : base(ty, expr) {
                     // 制約 
                     // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-                    if (!(ty.IsScalarType() || ty.IsVoidType())) {
-                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。");
+                    if (!ty.IsVoidType()) {
+                        if (!ty.IsScalarType()) {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                        }
+                        if (!expr.Type.IsScalarType()) {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
+                        }
                     }
-                    Ty = ty;
-                    Expr = expr;
                 }
             }
+
 
             /// <summary>
             /// 6.5.5 乗除演算子(乗除式)
@@ -3872,6 +3878,10 @@ struct { int x; };
                 }
 
                 public AdditiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
+
+                    lhs = Specification.ImplicitConversion(lhs);
+                    rhs = Specification.ImplicitConversion(rhs);
+
                     // 制約  
                     // 加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。
                     // 減算の場合，次のいずれかの条件を満たさなければならない
@@ -3996,9 +4006,9 @@ struct { int x; };
 
                     if (lhs.Type.IsRealType() && rhs.Type.IsRealType()) {
                         // 両オペランドが実数型をもつ。 
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.GetBasePointerType().IsObjectType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.GetBasePointerType().IsObjectType() && CType.IsEqual(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
                         // - 両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタである。
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsIncompleteType() && rhs.Type.GetBasePointerType().IsIncompleteType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsIncompleteType() && rhs.Type.GetBasePointerType().IsIncompleteType() && CType.IsEqual(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
                         // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
                     } else {
                         throw new SpecificationErrorException(Location.Empty, Location.Empty, "関係演算子は両オペランドが実数型をもつ、もしくは、両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタでなければならない。");
@@ -4047,7 +4057,7 @@ struct { int x; };
 
                     if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                         // 両オペランドは算術型をもつ。
-                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.Equals(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
+                    } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && CType.IsEqual(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
                         // 両オペランドとも適合する型の修飾版又は非修飾版へのポインタである。
                     } else if (
                         (lhs.Type.IsPointerType() && (lhs.Type.GetBasePointerType().IsObjectType() || lhs.Type.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
@@ -4400,6 +4410,8 @@ struct { int x; };
                 /// </summary>
                 public class SimpleAssignmentExpression : AssignmentExpression {
                     public SimpleAssignmentExpression(string op, Expression lhs, Expression rhs) {
+                        rhs = Specification.ImplicitConversion(rhs);
+
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
@@ -4454,7 +4466,7 @@ struct { int x; };
                         // そうでない場合，動作は未定義とする。
                         if (!CType.IsEqual(lhs.Type, rhs.Type)) {
                             //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new Expression.CastExpression(lhs.Type, rhs);
+                            rhs = new Expression.TypeConversionExpression(lhs.Type, rhs);
                         }
 
                         Op = op;
@@ -4605,7 +4617,7 @@ struct { int x; };
             /// <summary>
             /// X.X.X GCC拡張：式中に文
             /// </summary>
-            internal class GccStatementExpression : Expression {
+            public class GccStatementExpression : Expression {
                 public Statement statements {
                     get;
                 }
@@ -4624,10 +4636,93 @@ struct { int x; };
             }
 
             /// <summary>
+            /// 6.3 型変換（キャスト式ではなく、強制的に型を変更する）
+            /// </summary>
+            public class TypeConversionExpression : Expression {
+                // 6.3.1.2 論理型  
+                // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
+                //
+                // 6.3.1.3 符号付き整数型及び符号無し整数型  
+                // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
+                // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
+                // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
+                //
+                // 6.3.1.4実浮動小数点型及び整数型  
+                // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
+                // 整数部の値が整数型で表現できない場合，その動作は未定義とする。
+                // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
+                // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                //
+                // 6.3.1.5 実浮動小数点型  
+                // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。 
+                // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
+                // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                // 
+                // 6.3.1.6 複素数型  
+                // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
+                // 
+                // 6.3.1.7 実数型及び複素数型
+                // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
+                // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する。
+                //
+                // 6.3.2.2 void ボイド式（void expression）
+                // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
+                // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。
+                // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。（ボイド式は， 副作用のために評価する。 ）
+                // 
+                // 6.3.2.3 ポインタ
+                // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
+                // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
+                // 任意の型修飾子qに対して非q修飾型へのポインタは，その型のq修飾版へのポインタに型変換してもよい。
+                // 元のポインタと変換されたポインタに格納された値は，比較して等しくなければならない。
+                // 値0をもつ整数定数式又はその定数式を型void *にキャストした式を，空ポインタ定数（null pointerconstant）と呼ぶ。
+                // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
+                // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
+                // 二つの空ポインタは比較して等しくなければならない。
+                // 整数は任意のポインタ型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない(56)。
+                // 任意のポインタ型は整数型に型変換できる。
+                // これまでに規定されている場合を除き，結果は処理系定義とする。
+                // 結果が整数型で表現できなければ，その動作は未定義とする。
+                // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
+                // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
+                // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
+                // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
+                // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
+                // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
+                // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
+                // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
+                // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
+                // 
+                private CType Ty {
+                    get;
+                }
+                public Expression Expr {
+                    get;
+                }
+                public override CType Type {
+                    get {
+                        return Ty;
+                    }
+                }
+
+                public override bool IsLValue() {
+                    return Expr.IsLValue();
+                }
+
+                public TypeConversionExpression(CType ty, Expression expr) {
+                    Ty = ty;
+                    Expr = expr;
+                }
+            }
+
+            /// <summary>
             /// 6.3.1.1 整数拡張（AST生成時に挿入）
             /// </summary>
             public class IntegerPromotionExpression : Expression {
-                public CType.BasicType Ty {
+                private CType.BasicType Ty {
                     get;
                 }
                 public Expression Expr {
@@ -4837,12 +4932,12 @@ struct { int x; };
         }
 
         public abstract class Initializer : AST {
-            public class CompilxInitializer : Initializer {
+            public class ComplexInitializer : Initializer {
                 public List<Initializer> Ret {
                     get;
                 }
 
-                public CompilxInitializer(List<Initializer> ret) {
+                public ComplexInitializer(List<Initializer> ret) {
                     Ret = ret;
                 }
             }
@@ -4858,7 +4953,7 @@ struct { int x; };
             }
         }
 
-        public abstract class Declaration {
+        public abstract class Declaration : AST {
 
             public class FunctionDeclaration : Declaration {
 
@@ -4900,7 +4995,71 @@ struct { int x; };
                     get; set;
                 }
 
+                private void CheckType(CType ctype, Initializer init) {
+                    if (init is Initializer.SimpleInitializer) {
+                        var dummydecl = new AST.Declaration.VariableDeclaration("<dummy>", ctype, StorageClass.None, null);
+                        var dummyvarref = new AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", dummydecl);
+                        var e = new AST.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyvarref, (init as Initializer.SimpleInitializer).AssignmentExpression);
+                        //if (!(CType.IsEqual(ctype, (init as Initializer.SimpleInitializer).AssignmentExpression.Type))) {
+                        //    throw new SpecificationErrorException(Location.Empty, Location.Empty, "初期化式の型が変数と不一致。");
+                        //}
+                    } else if (init is Initializer.ComplexInitializer) {
+                        if (ctype.IsArrayType()) {
+                            var aType = ctype.Unwrap() as CType.ArrayType;
+                            var initializers = (init as Initializer.ComplexInitializer).Ret;
+                            if (aType.Length != -1 && aType.Length < initializers.Count) {
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "初期化式要素数が配列型を超えている。");
+                            }
+                            foreach (var i in initializers) {
+                                CheckType(aType.cType, i);
+                            }
+                        } else if (ctype.IsStructureType()) {
+                            var sType = ctype.Unwrap() as CType.TaggedType.StructUnionType;
+                            var initializers = (init as Initializer.ComplexInitializer).Ret;
+                            if (sType.struct_declarations == null) {
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "不完全型を初期化している。");
+                            }
+                            if (sType.struct_declarations.Count < initializers.Count) {
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "初期化式要素数が構造体要素数を超えている。");
+                            }
+                            for (var i = 0; i < initializers.Count; i++) {
+                                CheckType(sType.struct_declarations[i].Type, initializers[i]);
+                            }
+                        } else if (ctype.IsUnionType()) {
+                            // 最初の要素だけ適合すればいい
+                            var sType = ctype.Unwrap() as CType.TaggedType.StructUnionType;
+                            var initializers = (init as Initializer.ComplexInitializer).Ret;
+                            if (sType.struct_declarations == null) {
+                                throw new SpecificationErrorException(Location.Empty, Location.Empty, "不完全型を初期化している。");
+                            }
+                            CheckType(sType.struct_declarations[0].Type, init);
+                        } else {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "複合初期化式を複合型/配列型以外に適用した");
+                        }
+                    } else {
+                        throw new InternalErrorException(Location.Empty, Location.Empty, "複合初期化でも単純初期化でもない式が初期化部にある。（おそらく処理系の誤り）");
+                    }
+                }
+
                 public VariableDeclaration(string ident, CType ctype, StorageClass storage_class, Initializer init) {
+                    if (init != null) {
+                        // 配列型を配列式で初期化する場合、サイズを設定する
+                        if (ctype.IsArrayType() && (ctype.Unwrap() as CType.ArrayType).Length == -1) {
+                            if (init is Initializer.SimpleInitializer) {
+                                // const char str[] = "hello, world"; を想定したケース
+                                var assignExpr = (init as Initializer.SimpleInitializer).AssignmentExpression;
+                                if (assignExpr.Type.IsArrayType()) {
+                                    (ctype.Unwrap() as CType.ArrayType).Length = (assignExpr.Type.Unwrap() as CType.ArrayType).Length;
+                                }
+                            } else if (init is Initializer.ComplexInitializer) {
+                                var assignExprs = (init as Initializer.ComplexInitializer).Ret;
+                                (ctype.Unwrap() as CType.ArrayType).Length = assignExprs.Count;
+                            }
+                        }
+                        // ToDo: 型チェックと合成型の生成
+                        CheckType(ctype, init);
+                    }
+
                     Ident = ident;
                     Ctype = ctype;
                     StorageClass = storage_class;
@@ -5079,22 +5238,22 @@ struct { int x; };
         /// <summary>
         /// 名前空間(ステートメント ラベル)
         /// </summary>
-        private Scope<AST.Statement.GenericLabeledStatement> label_scope = Scope<AST.Statement.GenericLabeledStatement>.Empty;
+        private Scope<AST.Statement.GenericLabeledStatement> label_scope = Scope<AST.Statement.GenericLabeledStatement>.Empty.Extend();
 
         /// <summary>
         /// 名前空間(構造体、共用体、列挙体のタグ名)
         /// </summary>
-        private Scope<CType.TaggedType> tag_scope = Scope<CType.TaggedType>.Empty;
+        private Scope<CType.TaggedType> tag_scope = Scope<CType.TaggedType>.Empty.Extend();
 
         /// <summary>
         /// 名前空間(通常の識別子（変数、関数、引数、列挙定数)
         /// </summary>
-        private Scope<IdentifierValue> ident_scope = Scope<IdentifierValue>.Empty;
+        private Scope<IdentifierValue> ident_scope = Scope<IdentifierValue>.Empty.Extend();
 
         /// <summary>
         /// 名前空間(Typedef名)
         /// </summary>
-        private Scope<AST.Declaration.TypeDeclaration> typedef_scope = Scope<AST.Declaration.TypeDeclaration>.Empty;
+        private Scope<AST.Declaration.TypeDeclaration> typedef_scope = Scope<AST.Declaration.TypeDeclaration>.Empty.Extend();
 
         // 構造体または共用体のメンバーについてはそれぞれの宣言オブジェクトに付与される
 
@@ -5697,6 +5856,7 @@ struct { int x; };
 
         public void Parse() {
             var ret = translation_unit();
+            Console.WriteLine(ret.Accept(new ASTDumpVisitor(), null).ToString());
         }
 
 
@@ -6109,34 +6269,61 @@ struct { int x; };
                 }
             }
 
-
             if (ctype.Arguments == null) {
                 // 識別子並び・仮引数型並びなし
                 if (argmuents != null) {
                     throw new Exception("K&R形式の関数定義だが、識別子並びが空なのに、宣言並びがある");
                 } else {
-                    // 引数指定なし関数
+                    // ANSIにおける引数をとらない関数(void)
+                    // 警告を出すこと。
+                    ctype.Arguments = new CType.FunctionType.ArgumentInfo[0];
                 }
             } else if (ctype.Arguments.Any(x => (x.cType as CType.BasicType)?.kind == CType.BasicType.Kind.KAndRImplicitInt)) {
 
-                // K&R形式の識別子並びが存在するので K&R 形式として処理
+                // ANSI形式の仮引数並びとの共存は不可能
                 if (ctype.Arguments.Any(x => (x.cType as CType.BasicType)?.kind != CType.BasicType.Kind.KAndRImplicitInt)) {
                     throw new Exception("関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
                 }
 
-                // 次のような例の場合の扱いについて規格書を読んでもはっきりと解らなかった
-                // float f(float);
-                // void foo(void) { float x = 3.14f;  
+
+                // 標準化前のK＆R初版においては、引数には規定の実引数拡張が適用され、char, short型はintに、float型は double型に拡張される。つまり、引数として渡せる整数型はint/小数型はdoubleのみ。
+                //  -> int f(x,y,z) char x; float y; short* z; {...} は int f(int x, double y, short *z) { ... } になる(short*はポインタ型なので拡張されない)
+                //
+                // gccは非標準拡張として関数プロトタイプ宣言の後に同じ型のK&R型の関数定義が登場すると、プロトタイプ宣言を使ってK&Rの関数定義を書き換える。（"info gcc" -> "C Extension" -> "Function Prototypes"）
+                //  -> int f(char, float, short*); が事前にあると int f(x,y,z) char x; float y; short* z; {...} は int f(char x, float y, short* z) { ... } になる。（プロトタイプが無い場合は従来通り？）
+                // 
+                // これらより、
+                // K&R形式の仮引数定義の場合、規定の実引数拡張前後で型が食い違う引数宣言はエラーにする。
+
+                // 紛らわしい例の場合
+                // int f();
+                // void foo(void) { f(3.14f); }
+                // int f (x) floar x; { ... }
+                //
+                // int f(); 引数の情報がない関数のプロトタイプなので、実引数には規定の実引数拡張が適用され、引数として渡せる整数型はint/小数型はdoubleのみ。
+                // f(3.14f); は引数の情報がない関数のプロトタイプなので引数の型・数はチェックせず、既定の実引数拡張により引数はdouble型に変換される。（規定の実引数拡張で型が変化するなら警告を出したほうがいいよね）
+                // int f(x) float x; {...} は 規定の実引数拡張により inf f(x) double x; {... }相当となる。（ので警告出したほうがいいよね）
+                // なので、全体でみると型の整合性はとれている。
+
                 // 関数原型を含まない型で関数を定義し，かつ拡張後の実引数の型が，拡張後の仮引数の型と適合しない場合，その動作は未定義とする。
+                // 上の例でf(1) とすると、呼び出し側は引数をint型で渡すのに、受け取り側はdoubleで受け取るためバグの温床になる。
+                // 自動検査するには型推論するしかない
+
 
                 // K&R形式の識別子並びに宣言並びの型情報を規定の実引数拡張を伴って反映させる。
+                // 宣言並びを名前引きできる辞書に変換
                 var dic = argmuents.Cast<AST.Declaration.VariableDeclaration>().ToDictionary(x => x.Ident, x => x);
+                // 型宣言側の仮引数
                 var mapped = ctype.Arguments.Select(x => {
                     if (dic.ContainsKey(x.Name)) {
-                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype.DefaultArgumentPromotion(), dic[x.Name].Ctype);
+                        var dapType = dic[x.Name].Ctype.DefaultArgumentPromotion();
+                        if (CType.IsEqual(dapType, dic[x.Name].Ctype) == false) {
+                            throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は規定の実引数拡張で型が変化します。");
+                        }
+                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, dic[x.Name].Ctype.DefaultArgumentPromotion());
                     } else {
                         var type = (CType)CType.CreateSignedInt();
-                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, type.DefaultArgumentPromotion(), type);
+                        return new CType.FunctionType.ArgumentInfo(x.Name, x.Sc, type.DefaultArgumentPromotion());
                     }
                 }).ToList();
 
@@ -6154,8 +6341,13 @@ struct { int x; };
                 if (iv.IsFunction() == false) {
                     throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は既に関数型以外で宣言済み");
                 }
-                if (CType.IsEqual(iv.ToFunction().Ty, ctype) == false) {
-                    throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, "再定義型の不一致");
+                if ((iv.ToFunction().Ty as CType.FunctionType).Arguments != null) {
+                    if (CType.IsEqual(iv.ToFunction().Ty, ctype) == false) {
+                        throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, "再定義型の不一致");
+                    }
+                } else {
+                    // 仮引数が省略されているため、引数の数や型はチェックしない
+                    Console.WriteLine($"仮引数が省略されて宣言された関数 {ident} の実態を宣言しています。");
                 }
                 if (iv.ToFunction().Body != null) {
                     throw new Exception("関数はすでに本体を持っている。");
@@ -6222,6 +6414,8 @@ struct { int x; };
                 lexer.Read('=');
                 var init = initializer();
                 decl = new AST.Declaration.VariableDeclaration(ident, ctype, storageClass, init);
+                // 環境に初期値付き変数を追加
+                ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
             } else {
                 // 初期化式を伴わないため、関数宣言、変数宣言、Typedef宣言のどれか
 
@@ -6249,7 +6443,7 @@ struct { int x; };
                     bool current;
                     if (typedef_scope.TryGetValue(ident, out tdecl, out current)) {
                         if (current == true) {
-                            //throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "型が再定義された。（型の再定義はC11以降の機能。）");
+                            throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "型が再定義された。（型の再定義はC11以降の機能。）");
                         }
                     }
                     tdecl = new AST.Declaration.TypeDeclaration(ident, ctype);
@@ -6461,7 +6655,8 @@ struct { int x; };
 
                 // 再宣言の確認
                 IdentifierValue iv;
-                if (ident_scope.TryGetValue(ident, out iv)) {
+                bool isCurrent;
+                if (ident_scope.TryGetValue(ident, out iv, out isCurrent) && isCurrent == true) {
                     if (iv.IsVariable() == false) {
                         throw new TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}は既に変数以外として宣言されています。");
                     }
@@ -6474,6 +6669,9 @@ struct { int x; };
                     iv.ToVariable().Init = init;
                     decl = iv.ToVariable();
                 } else {
+                    if (iv != null) {
+                        // 警告！名前を隠した！
+                    }
                     decl = new AST.Declaration.VariableDeclaration(ident, ctype, storage_class, init);
                     // 識別子スコープに変数宣言を追加
                     ident_scope.Add(ident, new IdentifierValue.Declaration(decl));
@@ -7133,8 +7331,8 @@ struct { int x; };
                     len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_declarator(stack, index);
+                stack[index] = CType.CreateArray(len, stack[index]);
             } else if (lexer.Peek('(')) {
                 // 6.7.5.3 関数宣言子（関数原型を含む）
                 lexer.Read('(');
@@ -7145,7 +7343,7 @@ struct { int x; };
                     more_direct_declarator(stack, index);
                 } else if (is_identifier_list()) {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None), null)).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
                     lexer.Read(')');
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                     more_direct_declarator(stack, index);
@@ -7212,9 +7410,9 @@ struct { int x; };
                 List<CType> stack = new List<CType>() { new CType.StubType() };
                 declarator_or_abstract_declarator(ref ident, stack, 0);
                 var ctype = CType.Resolve(baseType, stack);
-                return new CType.FunctionType.ArgumentInfo(ident, storageClass, ctype, null);
+                return new CType.FunctionType.ArgumentInfo(ident, storageClass, ctype);
             } else {
-                return new CType.FunctionType.ArgumentInfo((string)null, storageClass, baseType, null);
+                return new CType.FunctionType.ArgumentInfo((string)null, storageClass, baseType);
             }
 
         }
@@ -7285,8 +7483,8 @@ struct { int x; };
                     len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = CType.CreateArray(len, stack[index]);
                 more_dd_or_dad(stack, index);
+                stack[index] = CType.CreateArray(len, stack[index]);
             } else {
                 throw new Exception();
             }
@@ -7313,7 +7511,7 @@ struct { int x; };
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None), null)).ToList();
+                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClass.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                 }
                 lexer.Read(')');
@@ -7326,8 +7524,8 @@ struct { int x; };
                     len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = CType.CreateArray(len, stack[index]);
                 more_dd_or_dad(stack, index);
+                stack[index] = CType.CreateArray(len, stack[index]);
             } else {
                 // _epsilon_
             }
@@ -7464,8 +7662,8 @@ struct { int x; };
                     len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_abstract_declarator(stack, index);
+                stack[index] = CType.CreateArray(len, stack[index]);
             }
         }
 
@@ -7483,8 +7681,8 @@ struct { int x; };
                     len = Evaluator.ConstantEval(expr);
                 }
                 lexer.Read(']');
-                stack[index] = CType.CreateArray(len, stack[index]);
                 more_direct_abstract_declarator(stack, index);
+                stack[index] = CType.CreateArray(len, stack[index]);
             } else if (lexer.Peek('(')) {
                 lexer.Read('(');
                 if (lexer.Peek(')') == false) {
@@ -7522,7 +7720,7 @@ struct { int x; };
                     ret = initializer_list();
                 }
                 lexer.Read('}');
-                return new AST.Initializer.CompilxInitializer(ret);
+                return new AST.Initializer.ComplexInitializer(ret);
             } else {
                 return new AST.Initializer.SimpleInitializer(assignment_expression());
             }
@@ -8068,6 +8266,10 @@ struct { int x; };
                         var expr = unary_expression();
                         return new AST.Expression.SizeofExpression(expr);
                     }
+                } else {
+                    // 括弧がないので式
+                    var expr = unary_expression();
+                    return new AST.Expression.SizeofExpression(expr);
                 }
             }
             return postfix_expression();
@@ -8203,7 +8405,7 @@ struct { int x; };
             while (lexer.Peek('&')) {
                 lexer.Read('&');
                 var rhs = equality_expression();
-                return lhs = new AST.Expression.AndExpression(lhs, rhs);
+                lhs = new AST.Expression.AndExpression(lhs, rhs);
             }
             return lhs;
         }
@@ -8217,7 +8419,7 @@ struct { int x; };
             while (lexer.Peek('^')) {
                 lexer.Read('^');
                 var rhs = and_expression();
-                return lhs = new AST.Expression.ExclusiveOrExpression(lhs, rhs);
+                lhs = new AST.Expression.ExclusiveOrExpression(lhs, rhs);
             }
             return lhs;
         }
@@ -8287,9 +8489,9 @@ struct { int x; };
         /// <returns></returns>
         private AST.Expression assignment_expression() {
             var lhs = conditional_expression();
-            while (is_assignment_operator()) {
+            if (is_assignment_operator()) {
                 var op = assignment_operator();
-                var rhs = conditional_expression();
+                var rhs = assignment_expression();
                 if (op == "=") {
                     lhs = new AST.Expression.AssignmentExpression.SimpleAssignmentExpression(op, lhs, rhs);
                 } else {
@@ -8340,5 +8542,810 @@ struct { int x; };
         }
 
     }
+
+    public static class CTypeVisitor {
+        public interface IVisitor<TResult, TArg> {
+            TResult OnArrayType(CType.ArrayType self, TArg value);
+            TResult OnBasicType(CType.BasicType self, TArg value);
+            TResult OnFunctionType(CType.FunctionType self, TArg value);
+            TResult OnPointerType(CType.PointerType self, TArg value);
+            TResult OnStubType(CType.StubType self, TArg value);
+            TResult OnEnumType(CType.TaggedType.EnumType self, TArg value);
+            TResult OnStructUnionType(CType.TaggedType.StructUnionType self, TArg value);
+            TResult OnTypedefedType(CType.TypedefedType self, TArg value);
+            TResult OnTypeQualifierType(CType.TypeQualifierType self, TArg value);
+        }
+
+        private static TResult Accept<TResult, TArg>(dynamic ctype, IVisitor<TResult, TArg> visitor, TArg value, bool dummy) {
+            return Accept<TResult, TArg>(ctype, visitor, value);
+        }
+
+        public static TResult Accept<TResult, TArg>(this CType ctype, IVisitor<TResult, TArg> visitor, TArg value) {
+            return Accept<TResult, TArg>(ctype, visitor, value, true);
+        }
+
+        public static TResult Accept<TResult, TArg>(this CType.ArrayType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnArrayType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.BasicType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnBasicType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.FunctionType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnFunctionType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.PointerType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnPointerType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.StubType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnStubType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.TaggedType.EnumType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnEnumType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.TaggedType.StructUnionType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnStructUnionType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.TypedefedType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnTypedefedType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.TypeQualifierType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnTypeQualifierType(self, value); }
+    }
+
+    public static class ASTVisitor {
+        public interface IVisitor<TResult, TArg> {
+            TResult OnArgumentDeclaration(AST.Declaration.ArgumentDeclaration self, TArg value);
+            TResult OnFunctionDeclaration(AST.Declaration.FunctionDeclaration self, TArg value);
+            TResult OnTypeDeclaration(AST.Declaration.TypeDeclaration self, TArg value);
+            TResult OnVariableDeclaration(AST.Declaration.VariableDeclaration self, TArg value);
+            TResult OnAdditiveExpression(AST.Expression.AdditiveExpression self, TArg value);
+            TResult OnAndExpression(AST.Expression.AndExpression self, TArg value);
+            TResult OnCompoundAssignmentExpression(AST.Expression.AssignmentExpression.CompoundAssignmentExpression self, TArg value);
+            TResult OnSimpleAssignmentExpression(AST.Expression.AssignmentExpression.SimpleAssignmentExpression self, TArg value);
+            TResult OnCastExpression(AST.Expression.CastExpression self, TArg value);
+            TResult OnCommaExpression(AST.Expression.CommaExpression self, TArg value);
+            TResult OnConditionalExpression(AST.Expression.ConditionalExpression self, TArg value);
+            TResult OnEqualityExpression(AST.Expression.EqualityExpression self, TArg value);
+            TResult OnExclusiveOrExpression(AST.Expression.ExclusiveOrExpression self, TArg value);
+            TResult OnGccStatementExpression(AST.Expression.GccStatementExpression self, TArg value);
+            TResult OnInclusiveOrExpression(AST.Expression.InclusiveOrExpression self, TArg value);
+            TResult OnIntegerPromotionExpression(AST.Expression.IntegerPromotionExpression self, TArg value);
+            TResult OnLogicalAndExpression(AST.Expression.LogicalAndExpression self, TArg value);
+            TResult OnLogicalOrExpression(AST.Expression.LogicalOrExpression self, TArg value);
+            TResult OnMultiplicitiveExpression(AST.Expression.MultiplicitiveExpression self, TArg value);
+            TResult OnArraySubscriptingExpression(AST.Expression.PostfixExpression.ArraySubscriptingExpression self, TArg value);
+            TResult OnFunctionCallExpression(AST.Expression.PostfixExpression.FunctionCallExpression self, TArg value);
+            TResult OnMemberDirectAccess(AST.Expression.PostfixExpression.MemberDirectAccess self, TArg value);
+            TResult OnMemberIndirectAccess(AST.Expression.PostfixExpression.MemberIndirectAccess self, TArg value);
+            TResult OnUnaryPostfixExpression(AST.Expression.PostfixExpression.UnaryPostfixExpression self, TArg value);
+            TResult OnCharacterConstant(AST.Expression.PrimaryExpression.Constant.CharacterConstant self, TArg value);
+            TResult OnFloatingConstant(AST.Expression.PrimaryExpression.Constant.FloatingConstant self, TArg value);
+            TResult OnIntegerConstant(AST.Expression.PrimaryExpression.Constant.IntegerConstant self, TArg value);
+            TResult OnEnclosedInParenthesesExpression(AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, TArg value);
+            TResult OnEnumerationConstant(AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, TArg value);
+            TResult OnFunctionExpression(AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, TArg value);
+            TResult OnUndefinedIdentifierExpression(AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, TArg value);
+            TResult OnVariableExpression(AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, TArg value);
+            TResult OnStringExpression(AST.Expression.PrimaryExpression.StringExpression self, TArg value);
+            TResult OnRelationalExpression(AST.Expression.RelationalExpression self, TArg value);
+            TResult OnShiftExpression(AST.Expression.ShiftExpression self, TArg value);
+            TResult OnSizeofExpression(AST.Expression.SizeofExpression self, TArg value);
+            TResult OnSizeofTypeExpression(AST.Expression.SizeofTypeExpression self, TArg value);
+            TResult OnTypeConversionExpression(AST.Expression.TypeConversionExpression self, TArg value);
+            TResult OnUnaryAddressExpression(AST.Expression.UnaryAddressExpression self, TArg value);
+            TResult OnUnaryMinusExpression(AST.Expression.UnaryMinusExpression self, TArg value);
+            TResult OnUnaryNegateExpression(AST.Expression.UnaryNegateExpression self, TArg value);
+            TResult OnUnaryNotExpression(AST.Expression.UnaryNotExpression self, TArg value);
+            TResult OnUnaryPlusExpression(AST.Expression.UnaryPlusExpression self, TArg value);
+            TResult OnUnaryPrefixExpression(AST.Expression.UnaryPrefixExpression self, TArg value);
+            TResult OnUnaryReferenceExpression(AST.Expression.UnaryReferenceExpression self, TArg value);
+            TResult OnComplexInitializer(AST.Initializer.ComplexInitializer self, TArg value);
+            TResult OnSimpleInitializer(AST.Initializer.SimpleInitializer self, TArg value);
+            TResult OnBreakStatement(AST.Statement.BreakStatement self, TArg value);
+            TResult OnCaseStatement(AST.Statement.CaseStatement self, TArg value);
+            TResult OnCompoundStatement(AST.Statement.CompoundStatement self, TArg value);
+            TResult OnContinueStatement(AST.Statement.ContinueStatement self, TArg value);
+            TResult OnDefaultStatement(AST.Statement.DefaultStatement self, TArg value);
+            TResult OnDoWhileStatement(AST.Statement.DoWhileStatement self, TArg value);
+            TResult OnEmptyStatement(AST.Statement.EmptyStatement self, TArg value);
+            TResult OnExpressionStatement(AST.Statement.ExpressionStatement self, TArg value);
+            TResult OnForStatement(AST.Statement.ForStatement self, TArg value);
+            TResult OnGenericLabeledStatement(AST.Statement.GenericLabeledStatement self, TArg value);
+            TResult OnGotoStatement(AST.Statement.GotoStatement self, TArg value);
+            TResult OnIfStatement(AST.Statement.IfStatement self, TArg value);
+            TResult OnReturnStatement(AST.Statement.ReturnStatement self, TArg value);
+            TResult OnSwitchStatement(AST.Statement.SwitchStatement self, TArg value);
+            TResult OnWhileStatement(AST.Statement.WhileStatement self, TArg value);
+            TResult OnTranslationUnit(AST.TranslationUnit self, TArg value);
+
+
+        }
+
+        private static TResult Accept<TResult, TArg>(dynamic ast, IVisitor<TResult, TArg> visitor, TArg value, bool dummy) {
+            return Accept<TResult, TArg>(ast, visitor, value);
+        }
+
+        public static TResult Accept<TResult, TArg>(this AST ast, IVisitor<TResult, TArg> visitor, TArg value) {
+            return Accept<TResult, TArg>(ast, visitor, value, true);
+        }
+
+        public static TResult Accept<TResult, TArg>(this AST.Declaration.ArgumentDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnArgumentDeclaration(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Declaration.FunctionDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnFunctionDeclaration(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Declaration.TypeDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTypeDeclaration(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Declaration.VariableDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnVariableDeclaration(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.AdditiveExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnAdditiveExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.AndExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnAndExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.AssignmentExpression.CompoundAssignmentExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCompoundAssignmentExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.AssignmentExpression.SimpleAssignmentExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSimpleAssignmentExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.CastExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCastExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.CommaExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCommaExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.ConditionalExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnConditionalExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.EqualityExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnEqualityExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.ExclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnExclusiveOrExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.GccStatementExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnGccStatementExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.InclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnInclusiveOrExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.IntegerPromotionExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnIntegerPromotionExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.LogicalAndExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnLogicalAndExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.LogicalOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnLogicalOrExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.MultiplicitiveExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnMultiplicitiveExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PostfixExpression.ArraySubscriptingExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnArraySubscriptingExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PostfixExpression.FunctionCallExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnFunctionCallExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PostfixExpression.MemberDirectAccess self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnMemberDirectAccess(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PostfixExpression.MemberIndirectAccess self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnMemberIndirectAccess(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PostfixExpression.UnaryPostfixExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryPostfixExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.Constant.CharacterConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCharacterConstant(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.Constant.FloatingConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnFloatingConstant(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.Constant.IntegerConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnIntegerConstant(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnEnclosedInParenthesesExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnEnumerationConstant(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnFunctionExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUndefinedIdentifierExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnVariableExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.PrimaryExpression.StringExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnStringExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.RelationalExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnRelationalExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.ShiftExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnShiftExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.SizeofExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSizeofExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.SizeofTypeExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSizeofTypeExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.TypeConversionExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTypeConversionExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryAddressExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryAddressExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryMinusExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryMinusExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryNegateExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryNegateExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryNotExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryNotExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryPlusExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryPlusExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryPrefixExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryPrefixExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Expression.UnaryReferenceExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnUnaryReferenceExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Initializer.ComplexInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnComplexInitializer(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Initializer.SimpleInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSimpleInitializer(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.BreakStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnBreakStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.CaseStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCaseStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.CompoundStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCompoundStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.ContinueStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnContinueStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.DefaultStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnDefaultStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.DoWhileStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnDoWhileStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.EmptyStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnEmptyStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.ExpressionStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnExpressionStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.ForStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnForStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.GenericLabeledStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnGenericLabeledStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.GotoStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnGotoStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.IfStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnIfStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.ReturnStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnReturnStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.SwitchStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSwitchStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.Statement.WhileStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnWhileStatement(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this AST.TranslationUnit self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTranslationUnit(self, value);
+        }
+    }
+
+    public abstract class Cell {
+
+        public class NilCell : Cell {
+            public override string ToString() {
+                return "()";
+            }
+        }
+        public class ConsCell : Cell {
+            public Cell Car {
+                get;
+            }
+            public Cell Cdr {
+                get;
+            }
+            public ConsCell(Cell car = null, Cell cdr = null) {
+                Car = car ?? Cell.Nil;
+                Cdr = cdr ?? Cell.Nil;
+            }
+            public override string ToString() {
+                List<string> cars = new List<string>();
+                var self = this;
+                while (self != null && self != Cell.Nil) {
+                    cars.Add(self.Car.ToString());
+                    self = self.Cdr as ConsCell;
+                }
+                return "(" + string.Join(" ", cars) + ")";
+            }
+        }
+        public class ValueCell : Cell {
+            public string Value {
+                get;
+            }
+            public ValueCell(string value) {
+                Value = value;
+            }
+            public override string ToString() {
+                return Value;
+            }
+        }
+        public static Cell Nil { get; } = new NilCell();
+
+        public static Cell Create(params object[] args) {
+            var chain = Cell.Nil;
+            foreach (var arg in args.Reverse()) {
+                if (arg is String) {
+                    chain = new ConsCell(new ValueCell(arg as string), chain);
+                } else if (arg is Cell) {
+                    chain = new ConsCell(arg as Cell, chain);
+                } else {
+                    throw new Exception();
+                }
+            }
+            return chain;
+        }
+    }
+
+    public class CTypeDumpVisitor : CTypeVisitor.IVisitor<Cell, Cell> {
+        public Cell OnArrayType(CType.ArrayType self, Cell value) {
+            return Cell.Create("array",self.Length.ToString(), self.cType.Accept(this, null));
+        }
+
+        public Cell OnBasicType(CType.BasicType self, Cell value) {
+            switch (self.kind) {
+                case CType.BasicType.Kind.KAndRImplicitInt:
+                    return Cell.Create("int");
+                case CType.BasicType.Kind.Void:
+                    return Cell.Create("void");
+                case CType.BasicType.Kind.Char:
+                    return Cell.Create("char");
+                case CType.BasicType.Kind.SignedChar:
+                    return Cell.Create("signed char");
+                case CType.BasicType.Kind.UnsignedChar:
+                    return Cell.Create("unsigned char");
+                case CType.BasicType.Kind.SignedShortInt:
+                    return Cell.Create("signed short int");
+                case CType.BasicType.Kind.UnsignedShortInt:
+                    return Cell.Create("unsigned short int");
+                case CType.BasicType.Kind.SignedInt:
+                    return Cell.Create("signed int");
+                case CType.BasicType.Kind.UnsignedInt:
+                    return Cell.Create("unsigned int");
+                case CType.BasicType.Kind.SignedLongInt:
+                    return Cell.Create("signed long int");
+                case CType.BasicType.Kind.UnsignedLongInt:
+                    return Cell.Create("unsigned long int");
+                case CType.BasicType.Kind.SignedLongLongInt:
+                    return Cell.Create("signed long long int");
+                case CType.BasicType.Kind.UnsignedLongLongInt:
+                    return Cell.Create("unsigned long long int");
+                case CType.BasicType.Kind.Float:
+                    return Cell.Create("float");
+                case CType.BasicType.Kind.Double:
+                    return Cell.Create("double");
+                case CType.BasicType.Kind.LongDouble:
+                    return Cell.Create("long double");
+                case CType.BasicType.Kind._Bool:
+                    return Cell.Create("_Bool");
+                case CType.BasicType.Kind.Float_Complex:
+                    return Cell.Create("float _Complex");
+                case CType.BasicType.Kind.Double_Complex:
+                    return Cell.Create("double _Complex");
+                case CType.BasicType.Kind.LongDouble_Complex:
+                    return Cell.Create("long double _Complex");
+                case CType.BasicType.Kind.Float_Imaginary:
+                    return Cell.Create("float _Imaginary");
+                case CType.BasicType.Kind.Double_Imaginary:
+                    return Cell.Create("double _Imaginary");
+                case CType.BasicType.Kind.LongDouble_Imaginary:
+                    return Cell.Create("long double _Imaginary");
+                default:
+                    throw new Exception();
+
+            }
+        }
+
+        public Cell OnEnumType(CType.TaggedType.EnumType self, Cell value) {
+            return Cell.Create("enum", self.TagName, Cell.Create(self.enumerator_list.Select(x => Cell.Create(x.Name, x.Value.ToString())).ToArray()));
+        }
+
+        public Cell OnFunctionType(CType.FunctionType self, Cell value) {
+            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Name, x.Sc.ToString(),x.cType.Accept(this, null))).ToArray()):Cell.Nil);
+        }
+
+        public Cell OnPointerType(CType.PointerType self, Cell value) {
+            return Cell.Create("pointer", self.cType.Accept(this, null));
+        }
+
+        public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
+            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, Cell.Create(self.struct_declarations.Select(x => Cell.Create(x.Ident,  x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()));
+        }
+
+        public Cell OnStubType(CType.StubType self, Cell value) {                        
+            return Cell.Create("$");
+        }
+
+        public Cell OnTypedefedType(CType.TypedefedType self, Cell value) {
+            return Cell.Create("typedef", self.Ident, self.cType.Accept(this, null));
+        }
+
+        public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {
+            List<string> qual = new List<string>();
+            if ((self.type_qualifier & TypeQualifier.None) == TypeQualifier.Const) { qual.Add("none"); }
+            if ((self.type_qualifier & TypeQualifier.Const) == TypeQualifier.Const) { qual.Add("const"); }
+            if ((self.type_qualifier & TypeQualifier.Restrict) == TypeQualifier.Const) { qual.Add("restrict"); }
+            if ((self.type_qualifier & TypeQualifier.Volatile) == TypeQualifier.Const) { qual.Add("volatile"); }
+            if ((self.type_qualifier & TypeQualifier.Near) == TypeQualifier.Const) { qual.Add("near"); }
+            if ((self.type_qualifier & TypeQualifier.Far) == TypeQualifier.Const) { qual.Add("far"); }
+            if ((self.type_qualifier & TypeQualifier.Invalid) == TypeQualifier.Const) { qual.Add("invalid"); }
+            return Cell.Create("type-qual", Cell.Create(qual.ToArray()), self.cType.Accept(this, null));
+        }
+    }
+
+
+    public class ASTDumpVisitor : ASTVisitor.IVisitor<Cell, Cell> {
+
+        public Cell OnAdditiveExpression(AST.Expression.AdditiveExpression self, Cell value) {
+            return Cell.Create((self.Op == AST.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"), self.Type.Accept<Cell,Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnAndExpression(AST.Expression.AndExpression self, Cell value) {
+            return Cell.Create("and-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnArgumentDeclaration(AST.Declaration.ArgumentDeclaration self, Cell value) {
+            return Cell.Create("argument-declaration", self.Ctype.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnArraySubscriptingExpression(AST.Expression.PostfixExpression.ArraySubscriptingExpression self, Cell value) {
+            return Cell.Create("array-subscript-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Target.Accept<Cell, Cell>(this, value), self.Index.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnBreakStatement(AST.Statement.BreakStatement self, Cell value) {
+            return Cell.Create("break-stmt");
+        }
+
+        public Cell OnCaseStatement(AST.Statement.CaseStatement self, Cell value) {
+            return Cell.Create("case-stmt", self.Expr.Accept<Cell, Cell>(this, value), self.Stmt.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnCastExpression(AST.Expression.CastExpression self, Cell value) {
+            return Cell.Create("cast-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnCharacterConstant(AST.Expression.PrimaryExpression.Constant.CharacterConstant self, Cell value) {
+            return Cell.Create("char-const", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Str);
+        }
+
+        public Cell OnCommaExpression(AST.Expression.CommaExpression self, Cell value) {
+            return Cell.Create("comma-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), Cell.Create(self.expressions.Select(x => x.Accept<Cell, Cell>(this, value)).ToArray()));
+        }
+
+        public Cell OnComplexInitializer(AST.Initializer.ComplexInitializer self, Cell value) {
+            return Cell.Create("complex-init", Cell.Create(self.Ret.Select(x => x.Accept<Cell, Cell>(this, value)).ToArray()));
+        }
+
+        public Cell OnCompoundAssignmentExpression(AST.Expression.AssignmentExpression.CompoundAssignmentExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case "+=":
+                    ops = "add-assign-expr";
+                    break;
+                case "-=":
+                    ops = "sub-assign-expr";
+                    break;
+                case "*=":
+                    ops = "mul-assign-expr";
+                    break;
+                case "/=":
+                    ops = "div-assign-expr";
+                    break;
+                case "%=":
+                    ops = "mod-assign-expr";
+                    break;
+                case "&=":
+                    ops = "and-assign-expr";
+                    break;
+                case "|=":
+                    ops = "or-assign-expr";
+                    break;
+                case "^=":
+                    ops = "xor-assign-expr";
+                    break;
+                case "<<=":
+                    ops = "shl-assign-expr";
+                    break;
+                case ">>=":
+                    ops = "shr-assign-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnCompoundStatement(AST.Statement.CompoundStatement self, Cell value) {
+            return Cell.Create("compound-stmt", Cell.Create(self.Decls.Select(x => x.Accept<Cell, Cell>(this, value)).Concat(self.Stmts.Select(x => x.Accept<Cell, Cell>(this, value))).ToArray()));
+        }
+
+        public Cell OnConditionalExpression(AST.Expression.ConditionalExpression self, Cell value) {
+            return Cell.Create("cond-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Cond.Accept<Cell, Cell>(this, value), self.ThenExpr.Accept<Cell, Cell>(this, value), self.ElseExpr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnContinueStatement(AST.Statement.ContinueStatement self, Cell value) {
+            return Cell.Create("continue-stmt");
+        }
+
+        public Cell OnDefaultStatement(AST.Statement.DefaultStatement self, Cell value) {
+            return Cell.Create("default-stmt");
+        }
+
+        public Cell OnDoWhileStatement(AST.Statement.DoWhileStatement self, Cell value) {
+            return Cell.Create("do-stmt", self.Stmt.Accept<Cell, Cell>(this, value), self.Cond.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnEmptyStatement(AST.Statement.EmptyStatement self, Cell value) {
+            return Cell.Create("empty-stmt");
+        }
+
+        public Cell OnEnclosedInParenthesesExpression(AST.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Cell value) {
+            return Cell.Create("enclosed-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.expression.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnEnumerationConstant(AST.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Cell value) {
+            return Cell.Create("enum-const", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident, self.Ret.Value.ToString());
+        }
+
+        public Cell OnEqualityExpression(AST.Expression.EqualityExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case "==":
+                    ops = "equal-expr";
+                    break;
+                case "!=":
+                    ops = "noteq-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnExclusiveOrExpression(AST.Expression.ExclusiveOrExpression self, Cell value) {
+            return Cell.Create("xor-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnExpressionStatement(AST.Statement.ExpressionStatement self, Cell value) {
+            return Cell.Create("expr-stmt", self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnFloatingConstant(AST.Expression.PrimaryExpression.Constant.FloatingConstant self, Cell value) {
+            return Cell.Create("float-const", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Str, self.Value.ToString());
+        }
+
+        public Cell OnForStatement(AST.Statement.ForStatement self, Cell value) {
+            return Cell.Create("for-stmt", self.Init?.Accept<Cell, Cell>(this, value) ?? Cell.Nil, self.Cond?.Accept<Cell, Cell>(this, value) ?? Cell.Nil, self.Update?.Accept<Cell, Cell>(this, value) ?? Cell.Nil, self.Stmt?.Accept<Cell, Cell>(this, value) ?? Cell.Nil);
+        }
+
+        public Cell OnFunctionCallExpression(AST.Expression.PostfixExpression.FunctionCallExpression self, Cell value) {
+            return Cell.Create("call-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value), Cell.Create(self.Args.Select(x => x.Accept<Cell, Cell>(this, value)).ToArray()));
+        }
+
+        public Cell OnFunctionDeclaration(AST.Declaration.FunctionDeclaration self, Cell value) {
+            return Cell.Create("func-decl", self.Ty.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.FunctionSpecifier.ToString(), self.Body?.Accept<Cell, Cell>(this, value) ?? Cell.Nil);
+        }
+
+        public Cell OnFunctionExpression(AST.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Cell value) {
+            return Cell.Create("func-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident);
+        }
+
+        public Cell OnGccStatementExpression(AST.Expression.GccStatementExpression self, Cell value) {
+            return Cell.Create("gcc-stmt-expr");
+        }
+
+        public Cell OnGenericLabeledStatement(AST.Statement.GenericLabeledStatement self, Cell value) {
+            return Cell.Create("label-stmt", self.Ident, self.Stmt.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnGotoStatement(AST.Statement.GotoStatement self, Cell value) {
+            return Cell.Create("goto-stmt", self.Label);
+        }
+
+        public Cell OnIfStatement(AST.Statement.IfStatement self, Cell value) {
+            return Cell.Create("if-stmt", self.Cond.Accept<Cell, Cell>(this, value), self.ThenStmt?.Accept<Cell, Cell>(this, value) ?? Cell.Nil, self.ElseStmt?.Accept<Cell, Cell>(this, value) ?? Cell.Nil);
+        }
+
+        public Cell OnInclusiveOrExpression(AST.Expression.InclusiveOrExpression self, Cell value) {
+            return Cell.Create("or-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnIntegerConstant(AST.Expression.PrimaryExpression.Constant.IntegerConstant self, Cell value) {
+            return Cell.Create("int-const", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Str, self.Value.ToString());
+        }
+
+        public Cell OnIntegerPromotionExpression(AST.Expression.IntegerPromotionExpression self, Cell value) {
+            return Cell.Create("intpromot-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnLogicalAndExpression(AST.Expression.LogicalAndExpression self, Cell value) {
+            return Cell.Create("logic-and-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnLogicalOrExpression(AST.Expression.LogicalOrExpression self, Cell value) {
+            return Cell.Create("logic-or-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnMemberDirectAccess(AST.Expression.PostfixExpression.MemberDirectAccess self, Cell value) {
+            return Cell.Create("member-direct-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value), self.Ident);
+        }
+
+        public Cell OnMemberIndirectAccess(AST.Expression.PostfixExpression.MemberIndirectAccess self, Cell value) {
+            return Cell.Create("member-indirect-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value), self.Ident);
+        }
+
+        public Cell OnMultiplicitiveExpression(AST.Expression.MultiplicitiveExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case AST.Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                    ops = "mul-expr";
+                    break;
+                case AST.Expression.MultiplicitiveExpression.OperatorKind.Div:
+                    ops = "div-expr";
+                    break;
+                case AST.Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                    ops = "mod-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnRelationalExpression(AST.Expression.RelationalExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case ">":
+                    ops = "less-expr";
+                    break;
+                case ">=":
+                    ops = "lesseq-expr";
+                    break;
+                case "<":
+                    ops = "great-expr";
+                    break;
+                case "<=":
+                    ops = "greateq-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnReturnStatement(AST.Statement.ReturnStatement self, Cell value) {
+            return Cell.Create("ret-stmt", self.Expr?.Accept<Cell, Cell>(this, value) ?? Cell.Nil);
+        }
+
+        public Cell OnShiftExpression(AST.Expression.ShiftExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case ">>":
+                    ops = "shr-expr";
+                    break;
+                case "<<":
+                    ops = "shl-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnSimpleAssignmentExpression(AST.Expression.AssignmentExpression.SimpleAssignmentExpression self, Cell value) {
+            return Cell.Create("assign-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnSimpleInitializer(AST.Initializer.SimpleInitializer self, Cell value) {
+            return Cell.Create("simple-init", self.AssignmentExpression.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnSizeofExpression(AST.Expression.SizeofExpression self, Cell value) {
+            return Cell.Create("sizeof-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnSizeofTypeExpression(AST.Expression.SizeofTypeExpression self, Cell value) {
+            return Cell.Create("sizeof-type-init", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null));
+        }
+
+        public Cell OnStringExpression(AST.Expression.PrimaryExpression.StringExpression self, Cell value) {
+            return Cell.Create("string-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), Cell.Create(self.Strings.ToArray()));
+        }
+
+        public Cell OnSwitchStatement(AST.Statement.SwitchStatement self, Cell value) {
+            return Cell.Create("switch-expr", self.Cond.Accept<Cell, Cell>(this, value), self.Stmt.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnTranslationUnit(AST.TranslationUnit self, Cell value) {
+            return Cell.Create("translation-unit", Cell.Create(self.declarations.Select(x => x.Accept<Cell, Cell>(this, value)).ToArray()));
+        }
+
+        public Cell OnTypeConversionExpression(AST.Expression.TypeConversionExpression self, Cell value) {
+            return Cell.Create("type-conv", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnTypeDeclaration(AST.Declaration.TypeDeclaration self, Cell value) {
+            return Cell.Create("type-decl", self.Ctype.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident);
+        }
+
+        public Cell OnUnaryAddressExpression(AST.Expression.UnaryAddressExpression self, Cell value) {
+            return Cell.Create("addr-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryMinusExpression(AST.Expression.UnaryMinusExpression self, Cell value) {
+            return Cell.Create("unary-minus-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryNegateExpression(AST.Expression.UnaryNegateExpression self, Cell value) {
+            return Cell.Create("unary-neg-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryNotExpression(AST.Expression.UnaryNotExpression self, Cell value) {
+            return Cell.Create("unary-not-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryPlusExpression(AST.Expression.UnaryPlusExpression self, Cell value) {
+            return Cell.Create("unary-plus-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryPostfixExpression(AST.Expression.PostfixExpression.UnaryPostfixExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case "++":
+                    ops = "post-inc-expr";
+                    break;
+                case "--":
+                    ops = "post-inc-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryPrefixExpression(AST.Expression.UnaryPrefixExpression self, Cell value) {
+            var ops = "";
+            switch (self.Op) {
+                case AST.Expression.UnaryPrefixExpression.OperatorKind.Inc:
+                    ops = "pre-inc-expr";
+                    break;
+                case AST.Expression.UnaryPrefixExpression.OperatorKind.Dec:
+                    ops = "pre-inc-expr";
+                    break;
+            }
+            return Cell.Create(ops, self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUnaryReferenceExpression(AST.Expression.UnaryReferenceExpression self, Cell value) {
+            return Cell.Create("ref-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Expr.Accept<Cell, Cell>(this, value));
+        }
+
+        public Cell OnUndefinedIdentifierExpression(AST.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Cell value) {
+            return Cell.Create("undef-ident-expr", self.Ident.ToString());
+        }
+
+        public Cell OnVariableDeclaration(AST.Declaration.VariableDeclaration self, Cell value) {
+            return Cell.Create("var-decl", self.Ctype.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init?.Accept<Cell, Cell>(this, value) ?? Cell.Nil);
+        }
+
+        public Cell OnVariableExpression(AST.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Cell value) {
+            return Cell.Create("var-expr", self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Ident);
+        }
+
+        public Cell OnWhileStatement(AST.Statement.WhileStatement self, Cell value) {
+            return Cell.Create("while-stmt", self.Cond.Accept<Cell, Cell>(this, value), self.Stmt.Accept<Cell, Cell>(this, value));
+        }
+    }
+
 }
 
