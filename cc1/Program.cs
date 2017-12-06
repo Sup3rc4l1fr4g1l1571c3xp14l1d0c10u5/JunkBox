@@ -12,21 +12,9 @@ using System.Text.RegularExpressions;
 namespace AnsiCParser {
     class Program {
         static void Main(string[] args) {
-            new Grammer(@"
-void f();
-
-void foo(void) { 
-  float x = 3.14f; 
-  f(x); 
-  f(x,x); 
-}
-
-void f (double x) { 
-  (int)x;
-}
-").Parse();
+            new Grammer(@"").Parse();
             //new TestCase.ConstantExprIsNullpointerCase().Run();
-            new TestCase.ConstantExprIsNotNullpointerCase().Run();
+            new TestCase.QuickSortCase().Run();
             //new Grammer(System.IO.File.ReadAllText(args[0])).Parse();
             TestCase.RunTest();
         }
@@ -53,20 +41,27 @@ void f (double x) {
         }
 
         public static void RunTest() {
-            (new FunctionReturnArrayCase()).Run();
-            (new MixedFunctionCase()).Run();
-            (new KandRStyleCase()).Run();
-            (new HelloWorldCase()).Run();
-            (new FunctionCallCase()).Run();
-            (new TestCase.QuickSortCase()).Run();
-            (new TestCase.LValueAndAddressOpCase1()).Run();
-            (new TestCase.LValueAndAddressOpCase2()).Run();
-            (new TestCase.LValueAndAddressOpCase3()).Run();
-            (new TestCase.RedefineTypedefInSameScopeCase()).Run();
-            (new TestCase.RedefineTypedefInNestedScopeCase()).Run();
-            new TestCase.TypedefInStructCase().Run();
-            new TestCase.EmptyStructCase().Run();
-            new TestCase.NoNameStructIsNotUsedCase().Run();
+            new FunctionReturnArrayCase().Run();
+            new DefaultArgumentPromotionCase1().Run();
+            new MixedFunctionCase().Run();
+            new KandRStyleCase().Run();
+            new HelloWorldCase().Run();
+            new FunctionCallCase().Run();
+            new QuickSortCase().Run();
+            new LValueAndAddressOpCase1().Run();
+            new LValueAndAddressOpCase2().Run();
+            new LValueAndAddressOpCase3().Run();
+            new RedefineTypedefInSameScopeCase().Run();
+            new RedefineTypedefInNestedScopeCase().Run();
+            new TypedefInStructCase().Run();
+            new EmptyStructCase().Run();
+            new NoNameStructIsNotUsedCase().Run();
+            new ConstantExprIsNullpointerCase().Run();
+            new ConstantExprIsNotNullpointerCase().Run();
+            new ValidAssignCase().Run();
+            new InvalidAssignCase1().Run();
+            new InvalidAssignCase2().Run();
+            new InvalidAssignCase3().Run();
         }
 
         /// <summary>
@@ -83,11 +78,29 @@ BUF hoge(BUF buf) { /* エラー: hoge は配列を返す関数として宣言�
         }
 
         /// <summary>
+        /// 既定の実引数拡張のケース(1)
+        /// </summary>
+        public class DefaultArgumentPromotionCase1 : SuccessCase {
+            protected override string source() => @"
+void f();
+
+void foo(void) { 
+  float x = 3.14f; 
+  f(x);     // 既定の実引数拡張で float -> double になる
+}
+
+void f (double x) { 
+  (int)x;
+}
+";
+        }
+
+        /// <summary>
         /// ANSI形式の関数宣言とK&R形式の関数定義が併用されていて、既定の実引数拡張によって引数型の一致が怪しくなるケース
         /// </summary>
         /// <remarks>
         /// gcc    : -Wpedantic 時にのみ警告 promoted argument ‘x’ doesn’t match prototype が出力される。
-        /// clang  : 未調査
+        /// clang  :  warning: promoted type 'double' of K&R function parameter is not compatible with the parameter type 'float' declared in a previous prototype [-Wknr-promoted-parameter]
         /// splint : 宣言 float f(float); に対応する関数がないという警告。
         /// </remarks>
         public class MixedFunctionCase : RaiseError<TypeMissmatchError> {
@@ -106,7 +119,6 @@ float x;
 
 ";
         }
-
         /// <summary>
         /// K&R形式の関数定義・宣言の例
         /// </summary>
@@ -301,7 +313,7 @@ struct { int x; };
         /// </summary>
         public class ConstantExprIsNullpointerCase : SuccessCase {
             protected override string source() => @"
-const char *str = (2*4/8-1);
+const char *str = (2*4/8-1);    // clang: warning: expression which evaluates to zero treated as a null pointer constant of type 'const char *' [-Wnon-literal-null-conversion]
 
 int main(void) {
 	if (str == 0) {
@@ -313,11 +325,11 @@ int main(void) {
         }
 
         /// <summary>
-        /// 定数式のヌルポインタ扱い
+        /// 定数式のポインタ扱い
         /// </summary>
-        public class ConstantExprIsNotNullpointerCase : RaiseError<SpecificationErrorException> {
+        public class ConstantExprIsNotNullpointerCase : SuccessCase {
             protected override string source() => @"
-const char *str = (2*4/8);
+const char *str = (2*4/8);  // warning: incompatible integer to pointer conversion initializing 'const char *' with an expression of type 'int' [-Wint-conversion]
 
 int main(void) {
 	if (str == 0) {
@@ -326,6 +338,180 @@ int main(void) {
 	return 0;
 }
 ";
+        }
+
+        /// <summary>
+        /// 暗黙の型変換を伴う妥当な代入式
+        /// </summary>
+        public class ValidAssignCase : SuccessCase {
+            protected override string source() => @"
+void foo(void) { 
+    unsigned char  u8  = 0;
+    signed   char  s8  = 0;
+    unsigned short u16 = 0;
+    signed   short s16 = 0;
+    unsigned long  u32 = 0;
+    signed   long  s32 = 0;
+    float          f   = 0;
+    double         d   = 0;
+    long double    ld  = 0;
+
+    unsigned int   *p  = 0;
+    double         *q  = 0;
+    void           *v  = 0;
+
+    s8  = s8;   // signed char -> signed char    : ビットパターンを維持
+    s16 = s8;   // signed char -> signed short   : 符号拡張
+    s32 = s8;   // signed char -> signed long    : 符号拡張
+    u8  = s8;   // signed char -> unsigned char  : ビットパターンを維持、上位ビットは符号ビットとしての機能を失う。
+    u16 = s8;   // signed char -> unsigned short : short への符号拡張、short から unsigned short への変換。
+    u32 = s8;   // signed char -> unsigned long  : long への符号拡張、long から unsigned long への変換。
+    f   = s8;   // signed char -> float          : long への符号拡張、long から float への変換。
+    d   = s8;   // signed char -> double         : long への符号拡張、long から double への変換。
+    ld  = s8;   // signed char -> long double    : long への符号拡張、long から long double への変換。
+
+    s8  = s16;   // signed short -> signed char    : 下位バイトを維持。上位バイトは消失
+    s16 = s16;   // signed short -> signed short   : ビットパターンを維持
+    s32 = s16;   // signed short -> signed long    : 符号拡張
+    u8  = s16;   // signed short -> unsigned char  : 下位バイトを維持。上位バイトは消失
+    u16 = s16;   // signed short -> unsigned short : ビットパターンを維持、上位ビットは符号ビットとしての機能を失う。
+    u32 = s16;   // signed short -> unsigned long  : long への符号拡張、long から unsigned long への変換。
+    f   = s16;   // signed short -> float          : long への符号拡張、long から float への変換。
+    d   = s16;   // signed short -> double         : long への符号拡張、long から double への変換。
+    ld  = s16;   // signed short -> long double    : long への符号拡張、long から long double への変換。
+
+    s8  = s32;   // signed long -> signed char    : 下位バイトを維持。上位バイトは消失
+    s16 = s32;   // signed long -> signed short   : 下位ワードを維持。上位ワードは消失
+    s32 = s32;   // signed long -> signed long    : ビットパターンを維持
+    u8  = s32;   // signed long -> unsigned char  : 下位バイトを維持。上位バイトは消失
+    u16 = s32;   // signed long -> unsigned short : 下位ワードを維持。上位ワードは消失
+    u32 = s32;   // signed long -> unsigned long  : ビット パターンを維持、上位ビットは符号ビットとしての機能を失う。
+    f   = s32;   // signed long -> float          : float として表される。 long を正確に表すことができない場合、精度が低下する場合がある。
+    d   = s32;   // signed long -> double         : double として表される。 long を double として正確に表すことができない場合、精度が低下する場合がある。
+    ld  = s32;   // signed long -> long double    : long double として表される。 long を long double として正確に表すことができない場合、精度が低下する場合がある。
+
+    s8  = u8;   // unsigned char -> signed char    : ビットパターンを維持、上位ビットが符号ビットになる。
+    s16 = u8;   // unsigned char -> signed short   : ゼロ拡張。
+    s32 = u8;   // unsigned char -> signed long    : ゼロ拡張。
+    u8  = u8;   // unsigned char -> unsigned char  : ビットパターンを維持。
+    u16 = u8;   // unsigned char -> unsigned short : ゼロ拡張。
+    u32 = u8;   // unsigned char -> unsigned long  : ゼロ拡張。
+    f   = u8;   // unsigned char -> float          : long への符号拡張、long から float への変換。
+    d   = u8;   // unsigned char -> double         : long への符号拡張、long から double への変換。
+    ld  = u8;   // unsigned char -> long double    : long への符号拡張、long から long double への変換。
+
+    s8  = u16;   // unsigned short -> signed char    : 下位バイトを維持。上位バイトは消失
+    s16 = u16;   // unsigned short -> signed short   : ビット パターンを維持、上位ビットが符号ビットになる。
+    s32 = u16;   // unsigned short -> signed long    : ゼロ拡張。
+    u8  = u16;   // unsigned short -> unsigned char  : 下位バイトを維持。上位バイトは消失
+    u16 = u16;   // unsigned short -> unsigned short : ビットパターンを維持。
+    u32 = u16;   // unsigned short -> unsigned long  : ゼロ拡張。
+    f   = u16;   // unsigned short -> float          : long への変換、long から float への変換。
+    d   = u16;   // unsigned short -> double         : long への変換、long から double への変換。
+    ld  = u16;   // unsigned short -> long double    : long への変換、long から long double への変換。
+
+    s8  = u32;   // unsigned long -> signed char    : 下位バイトを維持。上位バイトは消失
+    s16 = u32;   // unsigned long -> signed short   : 下位ワードを維持。上位ワードは消失
+    s32 = u32;   // unsigned long -> signed long    : ビット パターンを維持、上位ビットが符号ビットになる。
+    u8  = u32;   // unsigned long -> unsigned char  : 下位バイトを維持。上位バイトは消失
+    u16 = u32;   // unsigned long -> unsigned short : 下位ワードを維持。上位ワードは消失
+    u32 = u32;   // unsigned long -> unsigned long  : ビットパターンを維持
+    f   = u32;   // unsigned long -> float          : long への変換、long から float への変換。
+    d   = u32;   // unsigned long -> double         : long への変換、long から double への変換。
+    ld  = u32;   // unsigned long -> long double    : long への変換、long から long double への変換。
+
+    s8  = f;   // float -> signed char    : long への変換、long から char への変換
+    s16 = f;   // float -> signed short   : long への変換、long から short への変換
+    s32 = f;   // float -> signed long    : 小数点で切り捨てます。 結果が long で表すには大きすぎる場合、結果は未定義になります。
+    u8  = f;   // float -> unsigned char  : long への変換、long から unsigned char への変換
+    u16 = f;   // float -> unsigned short : long への変換、long から unsigned short への変換
+    u32 = f;   // float -> unsigned long  : long への変換、long から unsigned long への変換
+    f   = f;   // float -> float          : ビットパターンを維持
+    d   = f;   // float -> double         : 内部表現を変更します
+    ld  = f;   // float -> long double    : 内部表現を変更します
+
+    s8  = d;   // double -> signed char    : long への変換、long から char への変換
+    s16 = d;   // double -> signed short   : long への変換、long から short への変換
+    s32 = d;   // double -> signed long    : 小数点で切り捨てます。 結果が long で表すには大きすぎる場合、結果は未定義になります。
+    u8  = d;   // double -> unsigned char  : long への変換、long から unsigned char への変換
+    u16 = d;   // double -> unsigned short : long への変換、long から unsigned short への変換
+    u32 = d;   // double -> unsigned long  : long への変換、long から unsigned long への変換
+    f   = d;   // double -> float          : 内部表現を変更します
+    d   = d;   // double -> double         : ビットパターンを維持
+    ld  = d;   // double -> long double    : 内部表現を変更します
+
+    s8  = ld;   // long double -> signed char    : long への変換、long から char への変換
+    s16 = ld;   // long double -> signed short   : long への変換、long から short への変換
+    s32 = ld;   // long double -> signed long    : 小数点で切り捨てます。 結果が long で表すには大きすぎる場合、結果は未定義になります。
+    u8  = ld;   // long double -> unsigned char  : long への変換、long から unsigned char への変換
+    u16 = ld;   // long double -> unsigned short : long への変換、long から unsigned short への変換
+    u32 = ld;   // long double -> unsigned long  : long への変換、long から unsigned long への変換
+    f   = ld;   // long double -> float          : 内部表現を変更します
+    d   = ld;   // long double -> double         : 内部表現を変更します
+    ld  = ld;   // long double -> long double    : ビットパターンを維持
+
+    // ポインター型との間の変換
+    // ある型の値へのポインターは、別の型へのポインターに変換できます。 ただし、結果は、各型のストレージのアラインメント要件とサイズの違いにより、未定義になることがあります。
+    p = q;  // gcc -std=c89 => 警告: assignment from incompatible pointer type
+
+    // void へのポインターは、情報の制限や損失なしに任意の型へのポインターとの間で変換できます。 
+    p = v;  // gcc -Wall -Wextra -std=c89 -pedantic test.c => 警告なし
+
+    // ポインター値は、整数値に変換することもできます。 変換パスは、次の規則に従い、ポインターのサイズと整数型のサイズによって決まります。
+    // sizeof(void *) == sizeof(uint) の場合
+
+    // ポインターのサイズが整数型のサイズ以上である場合、変換で符号なしの値と同様の動作をします。
+    s8  = p; // この場合は unsigned long -> signed char  と同様の動作なので 下位バイトを維持。上位バイトは消失 ）
+    s16 = p; // この場合は unsigned long -> signed short と同様の動作なので 下位ワードを維持。上位ワードは消失 ）
+    s32 = p; // この場合は unsigned long -> signed long  と同様の動作なので ビット パターンを維持、上位ビットが符号ビットになる。 ）
+    u8  = p; // この場合は unsigned long -> unsigned char  と同様の動作なので 下位バイトを維持。上位バイトは消失 ）
+    u16 = p; // この場合は unsigned long -> unsigned short と同様の動作なので 下位ワードを維持。上位ワードは消失 ）
+    u32 = p; // この場合は unsigned long -> unsigned long  と同様の動作なので ビットパターンを維持 ）
+}";
+        }
+
+        /// <summary>
+        /// 妥当ではない代入式(1)
+        /// </summary>
+        public class InvalidAssignCase1 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+void foo(void) { 
+    float          f   = 0;
+    unsigned int   *p  = 0;
+
+    // ポインターは、浮動小数点型に変換できない
+    f  = p; // gcc =>  error: incompatible types when assigning to type ‘float’ from type ‘float *’
+}";
+        }
+
+        /// <summary>
+        /// 妥当ではない代入式
+        /// </summary>
+        public class InvalidAssignCase2 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+void foo(void) { 
+    double         d   = 0;
+    unsigned int   *p  = 0;
+
+    // ポインターは、浮動小数点型に変換できない
+    d  = p; // gcc =>  error: incompatible types when assigning to type ‘double’ from type ‘float *’
+
+}";
+        }
+
+        /// <summary>
+        /// 妥当ではない代入式
+        /// </summary>
+        public class InvalidAssignCase3 : RaiseError<SpecificationErrorException> {
+            protected override string source() => @"
+void foo(void) { 
+    long double    ld  = 0;
+    unsigned int   *p  = 0;
+
+    // ポインターは、浮動小数点型に変換できない
+    ld = p; // gcc =>  error: incompatible types when assigning to type ‘long double’ from type ‘float *’
+
+}";
         }
     }
 
@@ -1334,7 +1520,7 @@ int main(void) {
         }
 
         /// <summary>
-        /// 型が同一であるかどうかを比較する
+        /// 型が同一であるかどうかを比較する(適合ではない。)
         /// </summary>
         /// <param name="t1"></param>
         /// <param name="t2"></param>
@@ -1479,7 +1665,7 @@ int main(void) {
         /// 型修飾を得る
         /// </summary>
         /// <returns></returns>
-        public TypeQualifier GetQualifiedType() {
+        public TypeQualifier GetTypeQualifier() {
             if (this is CType.TypeQualifierType) {
                 return (this as CType.TypeQualifierType).type_qualifier;
             }
@@ -1492,7 +1678,7 @@ int main(void) {
         /// <returns></returns>
         public CType WrapTypeQualifier(TypeQualifier typeQualifier) {
             if (typeQualifier != TypeQualifier.None) {
-                return new CType.TypeQualifierType(this.UnwrapTypeQualifier(), this.GetQualifiedType() | typeQualifier);
+                return new CType.TypeQualifierType(this.UnwrapTypeQualifier(), this.GetTypeQualifier() | typeQualifier);
             } else {
                 return this;
             }
@@ -1635,6 +1821,16 @@ int main(void) {
         public static bool IsFunctionType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             return unwrappedSelf is CType.FunctionType;
+        }
+        public static bool IsFunctionType(this CType self, out CType.FunctionType funcSelf) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.FunctionType) {
+                funcSelf = unwrappedSelf as CType.FunctionType;
+                return true;
+            } else {
+                funcSelf = null;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1946,6 +2142,16 @@ int main(void) {
             var unwrappedSelf = self.Unwrap();
             return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct;
         }
+        public static bool IsStructureType(this CType self, out CType.TaggedType.StructUnionType suType) {
+            var unwrappedSelf = self.Unwrap();
+            if ((unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct) {
+                suType = unwrappedSelf as CType.TaggedType.StructUnionType;
+                return true;
+            } else {
+                suType = null;
+                return false;
+            }
+        }
 
         /// <summary>
         /// 共用体型（union type）ならば真
@@ -1954,6 +2160,16 @@ int main(void) {
         public static bool IsUnionType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Union;
+        }
+        public static bool IsUnionType(this CType self, out CType.TaggedType.StructUnionType suType) {
+            var unwrappedSelf = self.Unwrap();
+            if ((unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Union) {
+                suType = unwrappedSelf as CType.TaggedType.StructUnionType;
+                return true;
+            } else {
+                suType = null;
+                return false;
+            }
         }
 
         /// <summary>
@@ -2370,30 +2586,139 @@ int main(void) {
         /// 各演算子における型変換については，必要に応じて 6.5 に補足する。
         /// 適合する型へのオペランドの値の型変換は，値又は表現の変更を引き起こさない
         /// </remarks>
-        public static AST.Expression TypeConvert(AST.Expression expr) {
+        public static AST.Expression TypeConvert(CType targetType, AST.Expression expr) {
 
-            // 6.3.2.2 void ボイド式（void expression）
-            // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
-            // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。//
-            // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
-            // （ボイド式は， 副作用のために評価する。 ）
-            if (expr.Type.IsVoidType()) {
-                throw new SpecificationErrorException(Location.Empty, Location.Empty, "void型の式の値を型変換しようとしました。");
-            }
             // 6.3.1 算術オペランド
+
             // 6.3.1.1 論理型，文字型及び整数型
-            if (expr.Type.IsIntegerType()) {
-                // int型又は unsigned int 型を使用してよい式の中ではどこでも，次に示すものを使用することができる。
-                // - 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式
-                // - _Bool 型，int 型，signed int 型，又は unsigned int 型のビットフィールドこれらのものの元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。
-                //   そうでない場合，unsigned int 型に変換する。
-                //   これらの処理を，整数拡張（integer promotion）と呼ぶ
-                return IntegerPromotion(expr);
+            // 6.3.1.3 符号付き整数型及び符号無し整数型 
+            // 6.3.1.4 実浮動小数点型及び整数型 
+            if (targetType != null) {
+                if (targetType.IsIntegerType() && !targetType.IsBoolType()) {
+                    if (targetType.Unwrap().IsBasicType(CType.BasicType.Kind.SignedInt | CType.BasicType.Kind.UnsignedInt)) {
+                        // 6.3.1.1 論理型，文字型及び整数型
+                        // int型又は unsigned int 型を使用してよい式の中ではどこでも，次に示すものを使用することができる。
+                        if (expr.Type.IntegerConversionRank() < -5) {
+                            // - 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式
+                        } else if (expr.Type.IsBoolType() || expr.Type.Unwrap().IsBasicType(CType.BasicType.Kind.SignedInt | CType.BasicType.Kind.UnsignedInt) /*ToDo: bitfield*/) {
+                            // - _Bool 型，int 型，signed int 型，又は unsigned int 型のビットフィールド
+                        } else {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "int型又は unsigned int 型を使用してよい式の中で使えないものが指定された。");
+                        }
+                        // これらのものの元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。
+                        // そうでない場合，unsigned int 型に変換する。
+                        // これらの処理を，整数拡張（integer promotion）と呼ぶ
+                        // 整数拡張は，符号を含めてその値を変えない。“単なる”char 型を符号付きとして扱うか否かは，処理系定義とする（6.2.5 参照）
+                        return IntegerPromotion(expr);
+
+                    } else if (expr.Type.IsRealFloatingType()) {
+                        // 6.3.1.4 実浮動小数点型及び整数型 
+                        // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
+                        // 整数部の値が整数型で表現できない場合， その動作は未定義とする
+                        return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                    } else if (expr.Type.IsArithmeticType()) {
+                        // 6.3.1.1 論理型，文字型及び整数型
+                        // これら以外の型が整数拡張によって変わることはない。
+
+                        // 6.3.1.3 符号付き整数型及び符号無し整数型 
+                        // 整数型の値を_Bool 型以外の他の整数型に変換する場合，その値が新しい型で表現可能なとき，値は変化しない。
+                        return expr;
+                    }
+                }
+            } else {
+                if (expr.Type.IsRealFloatingType()) {
+                    return (expr);
+                } else if (expr.Type.IsIntegerType()) {
+                    return IntegerPromotion(expr);
+                }
             }
 
-            {
+            // 6.3.1.2 論理型 
+            if (targetType != null) {
+                if (targetType.IsBoolType()) {
+                    // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
+                    if (expr.Type.IsScalarType()) {
+                        return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                    } else if (expr.Type.IsBoolType()) {
+                        return expr;
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "スカラ値以外は_Bool 型に変換できません。");
+                    }
+                }
+            }
+
+            // 6.3.1.4 実浮動小数点型及び整数型
+            if (targetType != null) {
+                if (targetType.IsRealFloatingType() && expr.Type.IsIntegerType()) {
+                    // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
+                    // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                    // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+            }
+
+            // 6.3.1.5 実浮動小数点型
+            if (targetType != null) {
+                if (targetType.IsRealFloatingType() && expr.Type.IsRealFloatingType()) {
+                    // float を double 若しくは long double に拡張する場合，又は double を long double に拡張する場合，その値は変化しない。
+                    // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，
+                    // 変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
+                    // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
+                    // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+            }
+
+            // 6.3.1.6 複素数型 
+            if (targetType != null) {
+                if (targetType.IsComplexType() && expr.Type.IsComplexType()) {
+                    // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
+                    if ((targetType.Unwrap() as CType.BasicType).kind == (expr.Type.Unwrap() as CType.BasicType).kind) {
+                        return expr;
+                    } else {
+                        return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                    }
+                }
+            }
+
+            // 6.3.1.7 実数型及び複素数型 
+            if (targetType != null) {
+                if (targetType.IsComplexType() && expr.Type.IsRealType()) {
+                    // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                } else if (expr.Type.IsComplexType() && targetType.IsRealType()) {
+                    // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+            }
+
+            // 6.3.2 他のオペランド
+
+            // 6.3.2.1 左辺値，配列及び関数指示子
+            if (targetType != null) {
+                if (targetType.IsPointerType()) {
+                    CType elementType;
+                    if (expr.Type.IsFunctionType()) {
+                        // 関数指示子（function designator）は，関数型をもつ式とする。
+                        // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
+                        // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                        return TypeConvert(targetType, new AST.Expression.PostfixExpression.UnaryAddressExpression(expr));
+                    } else if (expr.Type.IsArrayType(out elementType)) {
+                        // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
+                        // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                        // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
+                        // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
+                        return TypeConvert(targetType, new AST.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(elementType), expr));
+                    }
+                }
+            } else {
                 CType elementType;
-                if (expr.Type.IsArrayType(out elementType)) {
+                if (expr.Type.IsFunctionType()) {
+                    // 関数指示子（function designator）は，関数型をもつ式とする。
+                    // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
+                    // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                    return new AST.Expression.PostfixExpression.UnaryAddressExpression(expr);
+                } else if (expr.Type.IsArrayType(out elementType)) {
                     // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
                     // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
@@ -2402,43 +2727,108 @@ int main(void) {
                 }
             }
 
-            if (expr.Type.IsFunctionType()) {
-                // 関数指示子（function designator）は，関数型をもつ式とする。
-                // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
-                // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
-                return new AST.Expression.PostfixExpression.UnaryAddressExpression(expr);
+            // 6.3.2.2 void ボイド式（void expression）
+            if (targetType != null) {
+                if (expr.Type.IsVoidType()) {
+                    // （型 void をもつ式）の（存在しない）値は，いかなる方法で も使ってはならない。
+                    // ボイド式には，暗黙の型変換も明示的な型変換（void への型変換を除く。 ）も適用してはならない。
+                    // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
+                    // （ボイド式は， 副作用のために評価する。 ）
+                    if (targetType.IsVoidType()) {
+                        return expr;
+                    } else {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "void型の式の値をvoid型以外へ型変換しようとしました。");
+                    }
+                } else if (targetType.IsVoidType()) {
+                    // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
             }
 
+            // 6.3.2.3 ポインタ
+            if (targetType != null) {
+                CType exprPointedType;
+                CType targetPointedType;
+                if (targetType.IsPointerType() && ((expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsVoidType()) || (expr.IsNullPointerConstant()))) {
+                    // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
+                    // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
 
-            // 左辺値が sizeof 演算子，単項&演算子，++演算子若しくは--演算子のオペランド，又は，演算子若しくは代入演算子の左側のオペランドである場合を除いて，
-            // 配列型以外の左辺値は，指し示されたオブジェクトが格納する値に変換する（そして，それはもはや左辺値ではない。）。
-            // 左辺値が修飾型をもつ場合，その値は左辺値の型の非修飾版をもつ。
-            // そうでない場合，その値は左辺値の型をもつ。
-            // 左辺値が不完全型をもち，配列型以外の型をもつ場合，その動作は未定義とする。
-            //
-            if (expr.Type.IsIncompleteType() && !expr.Type.IsArrayType()) {
-                throw new SpecificationErrorException(Location.Empty, Location.Empty, "左辺値が不完全型をもち，配列型以外の型をもつため、型変換結果は未定義の動作となります。");
-            }
-            if (expr.Type.IsQualifiedType()) {
-                return new AST.Expression.PostfixExpression.TypeConversionExpression((expr.Type as CType.TypeQualifierType).cType, expr);
+                    // 値0をもつ整数定数式又はその定数式を型void* にキャストした式を，空ポインタ定数（null pointer constant） と呼ぶ。
+                    // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
+                    // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
+
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+                if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsQualifiedType()
+                    && expr.Type.IsPointerType(out exprPointedType) && !exprPointedType.IsQualifiedType()
+                    && CType.IsEqual(targetPointedType.Unwrap(), exprPointedType.Unwrap())) {
+                    // 任意の型修飾子 q に対して非 q 修飾型へのポインタは，その型の q 修飾版へのポインタに型変換してもよい。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+                if (targetType.IsPointerType() && expr.IsNullPointerConstant()) {
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+                if (targetType.IsPointerType() && expr.Type.IsIntegerType()) {
+                    // 整数は任意のポインタ型に型変換できる。
+                    // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない。
+                    // 結果が整数型で表現できなければ，その動作は未定義とする。
+                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+
+                if (targetType.IsIntegerType() && expr.Type.IsPointerType()) {
+                    // 任意のポインタ型は整数型に型変換できる。
+                    // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
+                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+
+                if (targetType.IsPointerType(out targetPointedType) && (targetPointedType.IsObjectType() || targetPointedType.IsIncompleteType())
+                    && expr.Type.IsPointerType(out exprPointedType) && (exprPointedType.IsObjectType() || exprPointedType.IsIncompleteType())) {
+                    // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
+                    // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
+                    // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+
+                if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsCharacterType()
+                    && expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsObjectType()) {
+                    // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
+                    // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+
+                if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsFunctionType()
+                    && expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsFunctionType()) {
+                    // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
+                    // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
+                    // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
+                    return new AST.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
+                }
+
             } else {
-                return expr;
+                if (expr.Type.IsPointerType()) {
+                    return expr;
+                }
             }
+
+            throw new SpecificationErrorException(Location.Empty, Location.Empty, "型変換できない組み合わせを型変換しようとした");
+
         }
 
         /// <summary>
         /// 6.3 型変換(暗黙の型変換(implicit conversion))
         /// </summary>
-        public static AST.Expression ImplicitConversion(AST.Expression expr) {
-            return TypeConvert(expr);
+        public static AST.Expression ImplicitConversion(CType targetType, AST.Expression expr) {
+            return TypeConvert(targetType, expr);
         }
 
         /// <summary>
         /// 6.3 型変換(明示的な型変換(explicit conversion))
         /// </summary>
         /// <returns></returns>
-        public static AST.Expression ExplicitConversion(AST.Expression expr) {
-            return TypeConvert(expr);
+        public static AST.Expression ExplicitConversion(CType targetType, AST.Expression expr) {
+            return TypeConvert(targetType, expr);
         }
 
         /// <summary>
@@ -3184,8 +3574,6 @@ int main(void) {
 
                     public ArraySubscriptingExpression(Expression lhs, Expression rhs) {
                         // 6.3 型変換
-                        lhs = Specification.ImplicitConversion(lhs);
-                        rhs = Specification.ImplicitConversion(rhs);
 
                         // 制約
                         //   式の一方は，型“オブジェクト型T型へのポインタ”をもたなければならない。
@@ -3196,12 +3584,18 @@ int main(void) {
                         //   C言語の特徴として有名な話だが「式の一方」とあるように、他の言語と違って配列式の要素を入れ替えても意味は変わらない。すなわち、x[1] と 1[x]は同じ意味。
 
                         CType referencedType;
-                        if ((lhs.Type.IsPointerType(out referencedType) && referencedType.IsObjectType()) && (rhs.Type.IsIntegerType())) {
+                        if (((lhs.Type.IsPointerType(out referencedType) || lhs.Type.IsArrayType(out referencedType)) && referencedType.IsObjectType())
+                            && (rhs.Type.IsIntegerType())) {
                             _referencedType = referencedType;
+                            lhs = Specification.ImplicitConversion(CType.CreatePointer(_referencedType), lhs);
+                            rhs = Specification.ImplicitConversion(CType.CreateSignedInt(), rhs);
                             Target = lhs;
                             Index = rhs;
-                        } else if ((rhs.Type.IsPointerType(out referencedType) && referencedType.IsObjectType()) && (lhs.Type.IsIntegerType())) {
+                        } else if (((rhs.Type.IsPointerType(out referencedType) || rhs.Type.IsArrayType(out referencedType)) && referencedType.IsObjectType())
+                            && (lhs.Type.IsIntegerType())) {
                             _referencedType = referencedType;
+                            lhs = Specification.ImplicitConversion(CType.CreateSignedInt(), lhs);
+                            rhs = Specification.ImplicitConversion(CType.CreatePointer(_referencedType), rhs);
                             Target = rhs;
                             Index = lhs;
                         } else {
@@ -3233,8 +3627,14 @@ int main(void) {
                         }
                     }
 
+                    /// <summary>
+                    /// 実引数を仮引数に代入できるか判定
+                    /// </summary>
+                    /// <param name="lType"></param>
+                    /// <param name="rhs"></param>
                     private void CheckAssignment(CType lType, Expression rhs) {
-                        rhs = Specification.ImplicitConversion(rhs);
+                        // 実引数に対して仮引数型への型変換を適用
+                        rhs = Specification.TypeConvert(lType, rhs);
 
                         // 制約 (単純代入)
                         // 次のいずれかの条件が成立しなければならない。
@@ -3250,12 +3650,12 @@ int main(void) {
                             // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
                         } else if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
                             // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        } else if (CType.IsEqual(lType, rhs.Type) && ((lType.GetQualifiedType() & rhs.Type.GetQualifiedType()) == rhs.Type.GetQualifiedType())) {
+                        } else if (CType.IsEqual(lType, rhs.Type) && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
                             // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
                         } else if ((
                                 (lType.IsPointerType() && (lType.GetBasePointerType().IsObjectType() || lType.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
                                 (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lType.IsPointerType() && lType.GetBasePointerType().IsVoidType()))
-                            ) && ((lType.GetQualifiedType() & rhs.Type.GetQualifiedType()) == rhs.Type.GetQualifiedType())) {
+                            ) && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
                             // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
                             // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
                         } else if (lType.IsPointerType() && rhs.IsNullPointerConstant()) {
@@ -3292,20 +3692,19 @@ int main(void) {
 
                     public FunctionCallExpression(Expression expr, List<Expression> args) {
                         // 6.3 型変換 
-                        expr = Specification.TypeConvert(expr);
+                        expr = Specification.TypeConvert(null, expr);
 
                         // 制約
                         // 呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない。
                         CType referencedType;
                         CType.FunctionType functionType;
-                        if (expr.Type.IsPointerType(out referencedType) && referencedType.IsFunctionType()) {
-                            functionType = (referencedType as CType.FunctionType);
+                        if (expr.Type.IsPointerType(out referencedType) && referencedType.IsFunctionType(out functionType)) {
                             if (functionType.ResultType.IsVoidType() || (functionType.ResultType.IsObjectType() && !functionType.ResultType.IsArrayType())) {
                                 goto Valid;
                             }
                         }
                         throw new Exception("呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
-                    Valid:
+                        Valid:
                         if (functionType.Arguments != null) {
                             // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
                             if (functionType.HasVariadic) { // 可変長引数を持つ
@@ -3363,10 +3762,10 @@ int main(void) {
                     public MemberDirectAccess(Expression expr, string ident) {
                         // 制約  
                         // .演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならず，2 番目のオペランドは，その型のメンバの名前でなければならない
-                        if (!expr.Type.IsStructureType() && !expr.Type.IsUnionType()) {
+                        CType.TaggedType.StructUnionType sType;
+                        if (!expr.Type.IsStructureType(out sType) && !expr.Type.IsUnionType(out sType)) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならない。");
                         }
-                        var sType = expr.Type.Unwrap() as CType.TaggedType.StructUnionType;
                         var memberInfo = sType.struct_declarations.FirstOrDefault(x => x.Ident == ident);
                         if (memberInfo == null) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
@@ -3380,7 +3779,7 @@ int main(void) {
                         Expr = expr;
                         Ident = ident;
 
-                        var qual = expr.Type.GetQualifiedType();
+                        var qual = expr.Type.GetTypeQualifier();
                         if (qual != TypeQualifier.None) {
                             _memberType = memberInfo.Type.WrapTypeQualifier(qual);
                         } else {
@@ -3404,7 +3803,7 @@ int main(void) {
                     }
 
                     public override bool IsLValue() {
-                        return ((Expr.Type.GetQualifiedType() & TypeQualifier.Const) != TypeQualifier.Const) && Expr.IsLValue();
+                        return ((Expr.Type.GetTypeQualifier() & TypeQualifier.Const) != TypeQualifier.Const) && Expr.IsLValue();
                     }
 
                     public override CType Type {
@@ -3416,11 +3815,14 @@ int main(void) {
                     public MemberIndirectAccess(Expression expr, string ident) {
                         // 制約  
                         // ->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならず，2 番目のオペランドは，指される型のメンバの名前でなければならない
-                        if (!(expr.Type.IsPointerType() && (expr.Type.GetBasePointerType().IsStructureType() || expr.Type.GetBasePointerType().IsUnionType()))) {
+                        CType.TaggedType.StructUnionType sType;
+                        if (!(expr.Type.IsPointerType() && (expr.Type.GetBasePointerType().IsStructureType(out sType) || expr.Type.GetBasePointerType().IsUnionType(out sType)))) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, "演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならない。");
                         }
-                        var sType = expr.Type.GetBasePointerType().Unwrap() as CType.TaggedType.StructUnionType;
-                        var memberInfo = sType.struct_declarations?.FirstOrDefault(x => x.Ident == ident);
+                        if (sType.struct_declarations == null) {
+                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "構造体/共用体が不完全型です。");
+                        }
+                        var memberInfo = sType.struct_declarations.FirstOrDefault(x => x.Ident == ident);
                         if (memberInfo == null) {
                             throw new SpecificationErrorException(Location.Empty, Location.Empty, "->演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
                         }
@@ -3433,7 +3835,7 @@ int main(void) {
                         Expr = expr;
                         Ident = ident;
 
-                        var qual = expr.Type.GetQualifiedType();
+                        var qual = expr.Type.GetTypeQualifier();
                         _memberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
                     }
                 }
@@ -3476,7 +3878,7 @@ int main(void) {
                         // 制約，型，並びにポインタに対する型変換及び 演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                         // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                         Op = op;
-                        Expr = new Expression.TypeConversionExpression(expr.Type, Specification.TypeConvert(expr));
+                        Expr = new Expression.TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
 
                     }
 
@@ -3521,7 +3923,7 @@ int main(void) {
                     // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                     // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                     Op = op;
-                    Expr = new Expression.TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr));
+                    Expr = new Expression.TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
                 }
             }
 
@@ -3580,8 +3982,8 @@ int main(void) {
                         expr =
                             new AST.Expression.AdditiveExpression(
                                 AdditiveExpression.OperatorKind.Add,
-                                new AST.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(aexpr.Lhs.Type), aexpr),
-                                Specification.ImplicitConversion(aexpr.Rhs)
+                                new AST.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(aexpr.Target.Type), aexpr),
+                                Specification.ImplicitConversion(CType.CreateSignedInt(), aexpr.Index)
                             );
                     } else {
                         // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
@@ -3612,7 +4014,7 @@ int main(void) {
                 }
                 public UnaryReferenceExpression(Expression expr) {
                     // 暗黙の型変換
-                    expr = Specification.ImplicitConversion(expr);
+                    expr = Specification.ImplicitConversion(null, expr);
 
                     // 制約
                     // 単項*演算子のオペランドは，ポインタ型をもたなければならない。
@@ -3788,18 +4190,22 @@ int main(void) {
             public class CastExpression : TypeConversionExpression {
                 // 制約 
                 // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-
                 public CastExpression(CType ty, Expression expr) : base(ty, expr) {
                     // 制約 
                     // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-                    if (!ty.IsVoidType()) {
-                        if (!ty.IsScalarType()) {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
-                        }
-                        if (!expr.Type.IsScalarType()) {
-                            throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
-                        }
+                    if (ty.IsVoidType()) {
+                        // void型を指定しているのでOK
+                        return;
                     }
+
+                    if (!ty.IsScalarType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                    }
+
+                    if (!expr.Type.IsScalarType()) {
+                        throw new SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
+                    }
+
                 }
             }
 
@@ -3879,8 +4285,8 @@ int main(void) {
 
                 public AdditiveExpression(OperatorKind op, Expression lhs, Expression rhs) {
 
-                    lhs = Specification.ImplicitConversion(lhs);
-                    rhs = Specification.ImplicitConversion(rhs);
+                    lhs = Specification.ImplicitConversion(null, lhs);
+                    rhs = Specification.ImplicitConversion(null, rhs);
 
                     // 制約  
                     // 加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。
@@ -4294,8 +4700,8 @@ int main(void) {
                 public ConditionalExpression(Expression cond, Expression thenExpr, Expression elseExpr) {
 
                     // 暗黙の型変換を適用
-                    thenExpr = Specification.TypeConvert(thenExpr);
-                    elseExpr = Specification.TypeConvert(elseExpr);
+                    thenExpr = Specification.TypeConvert(null, thenExpr);
+                    elseExpr = Specification.TypeConvert(null, elseExpr);
 
                     // 制約
                     // 第 1 オペランドの型は，スカラ型でなければならない。
@@ -4346,7 +4752,7 @@ int main(void) {
                         // ToDo: 合成型を作る
 
                         var baseType = thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);
                         _resultType = CType.CreatePointer(baseType);
                     } else if (
@@ -4356,7 +4762,7 @@ int main(void) {
                         // 制約 一方のオペランドがポインタであり，かつ他方が空ポインタ定数である。
                         // 意味規則 第 2 及び第 3 オペランドが，一方が空ポインタ定数かつ他方がポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
                         var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);
                         _resultType = CType.CreatePointer(baseType);
                     } else if (
@@ -4366,7 +4772,7 @@ int main(void) {
                         // 制約 一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである。
                         // 意味規則 これら以外の場合（一方のオペランドが void 又は void の修飾版へのポインタである場合），結果の型は，適切に修飾された void 型へのポインタとする。
                         CType baseType = CType.CreatePointer(CType.CreateVoid());
-                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetQualifiedType() | elseExpr.Type.GetBasePointerType().GetQualifiedType();
+                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);
                         _resultType = CType.CreatePointer(baseType);
                     } else {
@@ -4410,7 +4816,7 @@ int main(void) {
                 /// </summary>
                 public class SimpleAssignmentExpression : AssignmentExpression {
                     public SimpleAssignmentExpression(string op, Expression lhs, Expression rhs) {
-                        rhs = Specification.ImplicitConversion(rhs);
+                        rhs = Specification.ImplicitConversion(lhs.Type, rhs);
 
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
@@ -4433,12 +4839,12 @@ int main(void) {
                             // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
                         } else if (lhs.Type.IsStructureType() && CType.IsEqual(lhs.Type.Unwrap(), rhs.Type.Unwrap())) {
                             // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        } else if (CType.IsEqual(lhs.Type, rhs.Type) && ((lhs.Type.GetQualifiedType() & rhs.Type.GetQualifiedType()) == rhs.Type.GetQualifiedType())) {
+                        } else if (CType.IsEqual(lhs.Type, rhs.Type) && ((lhs.Type.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
                             // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
                         } else if ((
                                 (lhs.Type.IsPointerType() && (lhs.Type.GetBasePointerType().IsObjectType() || lhs.Type.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
                                 (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsVoidType()))
-                            ) && ((lhs.Type.GetQualifiedType() & rhs.Type.GetQualifiedType()) == rhs.Type.GetQualifiedType())) {
+                            ) && ((lhs.Type.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
                             // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
                             // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
                         } else if (lhs.Type.IsPointerType() && rhs.IsNullPointerConstant()) {
@@ -5817,6 +6223,22 @@ int main(void) {
             public bool Peek(params char[] s) {
                 return Peek(s.Select(x => (Token.TokenKind)x).ToArray());
             }
+            public bool ReadIf(params Token.TokenKind[] s) {
+                if (Peek(s)) {
+                    Read(s);
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            public bool ReadIf(params char[] s) {
+                if (Peek(s)) {
+                    Read(s);
+                    return true;
+                } else {
+                    return false;
+                }
+            }
 
             public bool is_nexttoken(params Token.TokenKind[] s) {
                 if (_tokens.Count <= current + 1) {
@@ -5856,7 +6278,7 @@ int main(void) {
 
         public void Parse() {
             var ret = translation_unit();
-            Console.WriteLine(ret.Accept(new ASTDumpVisitor(), null).ToString());
+            Console.WriteLine(Cell.PP(ret.Accept(new ASTDumpVisitor(), null)));
         }
 
 
@@ -6215,8 +6637,7 @@ int main(void) {
                         ret.Add(decl);
 
 
-                        if (lexer.Peek(',')) {
-                            lexer.Read(',');
+                        if (lexer.ReadIf(',')) {
                             continue;
                         }
                         break;
@@ -6400,7 +6821,7 @@ int main(void) {
             }
 
 
-            if (lexer.Peek('=')) {
+            if (lexer.ReadIf('=')) {
                 // 初期化式を伴うので、初期化付きの変数宣言
 
                 if (storageClass == StorageClass.Typedef || storageClass == StorageClass.Auto || storageClass == StorageClass.Register) {
@@ -6411,7 +6832,6 @@ int main(void) {
                     throw new Exception("関数宣言に初期値を指定している");
                 }
 
-                lexer.Read('=');
                 var init = initializer();
                 decl = new AST.Declaration.VariableDeclaration(ident, ctype, storageClass, init);
                 // 環境に初期値付き変数を追加
@@ -6423,17 +6843,15 @@ int main(void) {
                     throw new Exception("ファイル有効範囲での関数宣言、変数宣言、Typedef宣言で指定できない記憶クラス指定子が指定されている。");
                 }
 
-
-                if (ctype.IsFunctionType()) {
+                CType.FunctionType ft;
+                if (ctype.IsFunctionType(out ft) && ft.Arguments != null) {
                     // 6.7.5.3 関数宣言子（関数原型を含む）
                     // 関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。
                     // 脚注　関数宣言でK&Rの関数定義のように int f(a,b,c); と書くことはダメということ。int f(); ならOK
-                    if ((ctype as CType.FunctionType).Arguments != null) {
-                        // K&R の記法で宣言を記述した場合、引数のcTypeはnull
-                        // ANSIの記法で宣言を記述した場合、引数のcTypeは非null
-                        if ((ctype as CType.FunctionType).Arguments.Any(x => x.cType == null)) {
-                            throw new Exception("関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。");
-                        }
+                    // K&R の記法で宣言を記述した場合、引数のcTypeはnull
+                    // ANSIの記法で宣言を記述した場合、引数のcTypeは非null
+                    if (ft.Arguments.Any(x => x.cType == null)) {
+                        throw new Exception("関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。");
                     }
                 }
 
@@ -6506,8 +6924,7 @@ int main(void) {
                 // 一つ以上の初期化宣言子
                 decls = new List<AST.Declaration>();
                 decls.Add(init_declarator(baseType, storageClass));
-                while (lexer.Peek(',')) {
-                    lexer.Read(',');
+                while (lexer.ReadIf(',')) {
                     decls.Add(init_declarator(baseType, storageClass));
                 }
             }
@@ -6640,7 +7057,7 @@ int main(void) {
             ctype = CType.Resolve(ctype, stack);
 
             AST.Declaration decl;
-            if (lexer.Peek('=')) {
+            if (lexer.ReadIf('=')) {
                 // 初期化子を伴う関数宣言
 
                 if (storage_class == StorageClass.Typedef) {
@@ -6650,7 +7067,6 @@ int main(void) {
                 if (ctype.IsFunctionType()) {
                     throw new SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "関数型を持つ宣言子に対して初期化子を設定しています。");
                 }
-                lexer.Read('=');
                 var init = initializer();
 
                 // 再宣言の確認
@@ -6855,7 +7271,7 @@ int main(void) {
                 var ident = IDENTIFIER(true);
 
                 // 波括弧の有無で分割
-                if (lexer.Peek('{')) {
+                if (lexer.ReadIf('{')) {
                     // 識別子を伴う完全型の宣言
                     CType.TaggedType ctype;
                     CType.TaggedType.StructUnionType stype;
@@ -6874,7 +7290,6 @@ int main(void) {
                         stype = (ctype as CType.TaggedType.StructUnionType);
                     }
                     // メンバ宣言並びを解析する
-                    lexer.Read('{');
                     stype.struct_declarations = struct_declarations();
                     lexer.Read('}');
                     return stype;
@@ -7068,8 +7483,7 @@ int main(void) {
         private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declarator_list(CType ctype) {
             var ret = new List<CType.TaggedType.StructUnionType.MemberInfo>();
             ret.Add(struct_declarator(ctype));
-            while (lexer.Peek(',')) {
-                lexer.Read(',');
+            while (lexer.ReadIf(',')) {
                 ret.Add(struct_declarator(ctype));
             }
             return ret;
@@ -7092,15 +7506,13 @@ int main(void) {
 
                 // ビットフィールド部分(opt)
                 AST.Expression expr = null;
-                if (lexer.Peek(':')) {
-                    lexer.Read(':');
+                if (lexer.ReadIf(':')) {
                     expr = constant_expression();
                 }
 
                 return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
-            } else if (lexer.Peek(':')) {
+            } else if (lexer.ReadIf(':')) {
                 // ビットフィールド部分(must)
-                lexer.Read(':');
                 AST.Expression expr = constant_expression();
 
                 return new CType.TaggedType.StructUnionType.MemberInfo(ident, ctype, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
@@ -7136,12 +7548,11 @@ int main(void) {
                 } else {
 
                 }
-                if (lexer.Peek('{')) {
+                if (lexer.ReadIf('{')) {
                     if ((etype as CType.TaggedType.EnumType).enumerator_list != null) {
                         throw new Exception($"列挙型 {ident} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
-                        lexer.Read('{');
                         (etype as CType.TaggedType.EnumType).enumerator_list = enumerator_list(etype as CType.TaggedType.EnumType);
                         lexer.Read('}');
                     }
@@ -7168,9 +7579,8 @@ int main(void) {
             var e = enumerator(ctype, 0);
             ident_scope.Add(e.Name, new IdentifierValue.EnumValue(ctype, e.Name));
             ret.Add(e);
-            while (lexer.Peek(',')) {
+            while (lexer.ReadIf(',')) {
                 var i = e.Value + 1;
-                lexer.Read(',');
                 if (is_enumerator() == false) {
                     break;
                 }
@@ -7197,8 +7607,7 @@ int main(void) {
         /// <returns></returns>
         private CType.TaggedType.EnumType.MemberInfo enumerator(CType.TaggedType.EnumType ctype, int i) {
             var ident = IDENTIFIER(false);
-            if (lexer.Peek('=')) {
-                lexer.Read('=');
+            if (lexer.ReadIf('=')) {
                 var expr = constant_expression();
                 i = Evaluator.ConstantEval(expr);
             }
@@ -7302,8 +7711,7 @@ int main(void) {
         /// <param name="stack"></param>
         /// <param name="index"></param>
         private void direct_declarator(ref string ident, List<CType> stack, int index) {
-            if (lexer.Peek('(')) {
-                lexer.Read('(');
+            if (lexer.ReadIf('(')) {
                 stack.Add(new CType.StubType());
                 declarator(ref ident, stack, index + 1);
                 lexer.Read(')');
@@ -7321,10 +7729,9 @@ int main(void) {
         /// <param name="stack"></param>
         /// <param name="index"></param>
         private void more_direct_declarator(List<CType> stack, int index) {
-            if (lexer.Peek('[')) {
+            if (lexer.ReadIf('[')) {
                 // 6.7.5.2 配列宣言子
                 // ToDo: AnsiC範囲のみ対応
-                lexer.Read('[');
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
@@ -7333,12 +7740,10 @@ int main(void) {
                 lexer.Read(']');
                 more_direct_declarator(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
-            } else if (lexer.Peek('(')) {
+            } else if (lexer.ReadIf('(')) {
                 // 6.7.5.3 関数宣言子（関数原型を含む）
-                lexer.Read('(');
-                if (lexer.Peek(')')) {
+                if (lexer.ReadIf(')')) {
                     // k&r or ANSI empty parameter list
-                    lexer.Read(')');
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
                     more_direct_declarator(stack, index);
                 } else if (is_identifier_list()) {
@@ -7376,10 +7781,8 @@ int main(void) {
         private List<CType.FunctionType.ArgumentInfo> parameter_type_list(ref bool vargs) {
             var items = new List<CType.FunctionType.ArgumentInfo>();
             items.Add(parameter_declaration());
-            while (lexer.Peek(',')) {
-                lexer.Read(',');
-                if (lexer.Peek(Token.TokenKind.ELLIPSIS)) {
-                    lexer.Read(Token.TokenKind.ELLIPSIS);
+            while (lexer.ReadIf(',')) {
+                if (lexer.ReadIf(Token.TokenKind.ELLIPSIS)) {
                     vargs = true;
                     break;
                 } else {
@@ -7460,8 +7863,7 @@ int main(void) {
             if (is_IDENTIFIER(true)) {
                 ident = IDENTIFIER(true);
                 more_dd_or_dad(stack, index);
-            } else if (lexer.Peek('(')) {
-                lexer.Read('(');
+            } else if (lexer.ReadIf('(')) {
                 if (lexer.Peek(')')) {
                     // function?
                 } else if (is_parameter_type_list()) {
@@ -7475,8 +7877,7 @@ int main(void) {
                 }
                 lexer.Read(')');
                 more_dd_or_dad(stack, index);
-            } else if (lexer.Peek('[')) {
-                lexer.Read('[');
+            } else if (lexer.ReadIf('[')) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
@@ -7498,8 +7899,7 @@ int main(void) {
         /// <param name="stack"></param>
         /// <param name="index"></param>
         private void more_dd_or_dad(List<CType> stack, int index) {
-            if (lexer.Peek('(')) {
-                lexer.Read('(');
+            if (lexer.ReadIf('(')) {
                 if (lexer.Peek(')')) {
                     // function?
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
@@ -7516,8 +7916,7 @@ int main(void) {
                 }
                 lexer.Read(')');
                 more_dd_or_dad(stack, index);
-            } else if (lexer.Peek('[')) {
-                lexer.Read('[');
+            } else if (lexer.ReadIf('[')) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
@@ -7546,8 +7945,7 @@ int main(void) {
         private List<string> identifier_list() {
             var items = new List<string>();
             items.Add(IDENTIFIER(false));
-            while (lexer.Peek(',')) {
-                lexer.Read(',');
+            while (lexer.ReadIf(',')) {
                 items.Add(IDENTIFIER(false));
             }
             return items;
@@ -7640,8 +8038,7 @@ int main(void) {
         /// <param name="stack"></param>
         /// <param name="index"></param>
         private void direct_abstract_declarator(List<CType> stack, int index) {
-            if (lexer.Peek('(')) {
-                lexer.Read('(');
+            if (lexer.ReadIf('(')) {
                 if (is_abstract_declarator()) {
                     stack.Add(new CType.StubType());
                     abstract_declarator(stack, index + 1);
@@ -7673,8 +8070,7 @@ int main(void) {
         /// <param name="stack"></param>
         /// <param name="index"></param>
         private void more_direct_abstract_declarator(List<CType> stack, int index) {
-            if (lexer.Peek('[')) {
-                lexer.Read('[');
+            if (lexer.ReadIf('[')) {
                 int len = -1;
                 if (lexer.Peek(']') == false) {
                     var expr = constant_expression();
@@ -7683,8 +8079,7 @@ int main(void) {
                 lexer.Read(']');
                 more_direct_abstract_declarator(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
-            } else if (lexer.Peek('(')) {
-                lexer.Read('(');
+            } else if (lexer.ReadIf('(')) {
                 if (lexer.Peek(')') == false) {
                     bool vargs = false;
                     var items = parameter_type_list(ref vargs);
@@ -7713,8 +8108,7 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Initializer initializer() {
-            if (lexer.Peek('{')) {
-                lexer.Read('{');
+            if (lexer.ReadIf('{')) {
                 List<AST.Initializer> ret = null;
                 if (lexer.Peek('}') == false) {
                     ret = initializer_list();
@@ -7733,8 +8127,7 @@ int main(void) {
         private List<AST.Initializer> initializer_list() {
             var ret = new List<AST.Initializer>();
             ret.Add(initializer());
-            while (lexer.Peek(',')) {
-                lexer.Read(',');
+            while (lexer.ReadIf(',')) {
                 if (lexer.Peek('}')) {
                     break;
                 }
@@ -7790,14 +8183,12 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Statement labeled_statement() {
-            if (lexer.Peek(Token.TokenKind.CASE)) {
-                lexer.Read(Token.TokenKind.CASE);
+            if (lexer.ReadIf(Token.TokenKind.CASE)) {
                 var expr = constant_expression();
                 lexer.Read(':');
                 var stmt = statement();
                 return new AST.Statement.CaseStatement(expr, stmt);
-            } else if (lexer.Peek(Token.TokenKind.DEFAULT)) {
-                lexer.Read(Token.TokenKind.DEFAULT);
+            } else if (lexer.ReadIf(Token.TokenKind.DEFAULT)) {
                 lexer.Read(':');
                 var stmt = statement();
                 return new AST.Statement.DefaultStatement(stmt);
@@ -7859,21 +8250,18 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Statement selection_statement() {
-            if (lexer.Peek(Token.TokenKind.IF)) {
-                lexer.Read(Token.TokenKind.IF);
+            if (lexer.ReadIf(Token.TokenKind.IF)) {
                 lexer.Read('(');
                 var cond = expression();
                 lexer.Read(')');
                 var then_stmt = statement();
                 AST.Statement else_stmt = null;
-                if (lexer.Peek(Token.TokenKind.ELSE)) {
-                    lexer.Read(Token.TokenKind.ELSE);
+                if (lexer.ReadIf(Token.TokenKind.ELSE)) {
                     else_stmt = statement();
                 }
                 return new AST.Statement.IfStatement(cond, then_stmt, else_stmt);
             }
-            if (lexer.Peek(Token.TokenKind.SWITCH)) {
-                lexer.Read(Token.TokenKind.SWITCH);
+            if (lexer.ReadIf(Token.TokenKind.SWITCH)) {
                 lexer.Read('(');
                 var cond = expression();
                 lexer.Read(')');
@@ -7891,8 +8279,7 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Statement iteration_statement() {
-            if (lexer.Peek(Token.TokenKind.WHILE)) {
-                lexer.Read(Token.TokenKind.WHILE);
+            if (lexer.ReadIf(Token.TokenKind.WHILE)) {
                 lexer.Read('(');
                 var cond = expression();
                 lexer.Read(')');
@@ -7904,8 +8291,7 @@ int main(void) {
                 continue_scope.Pop();
                 return ss;
             }
-            if (lexer.Peek(Token.TokenKind.DO)) {
-                lexer.Read(Token.TokenKind.DO);
+            if (lexer.ReadIf(Token.TokenKind.DO)) {
                 var ss = new AST.Statement.DoWhileStatement();
                 break_scope.Push(ss);
                 continue_scope.Push(ss);
@@ -7919,8 +8305,7 @@ int main(void) {
                 lexer.Read(';');
                 return ss;
             }
-            if (lexer.Peek(Token.TokenKind.FOR)) {
-                lexer.Read(Token.TokenKind.FOR);
+            if (lexer.ReadIf(Token.TokenKind.FOR)) {
                 lexer.Read('(');
 
                 var init = lexer.Peek(';') ? (AST.Expression)null : expression();
@@ -7945,24 +8330,20 @@ int main(void) {
         /// </summary>
         /// <returns></returns>
         private AST.Statement jump_statement() {
-            if (lexer.Peek(Token.TokenKind.GOTO)) {
-                lexer.Read(Token.TokenKind.GOTO);
+            if (lexer.ReadIf(Token.TokenKind.GOTO)) {
                 var label = IDENTIFIER(true);
                 lexer.Read(';');
                 return new AST.Statement.GotoStatement(label);
             }
-            if (lexer.Peek(Token.TokenKind.CONTINUE)) {
-                lexer.Read(Token.TokenKind.CONTINUE);
+            if (lexer.ReadIf(Token.TokenKind.CONTINUE)) {
                 lexer.Read(';');
                 return new AST.Statement.ContinueStatement(continue_scope.Peek());
             }
-            if (lexer.Peek(Token.TokenKind.BREAK)) {
-                lexer.Read(Token.TokenKind.BREAK);
+            if (lexer.ReadIf(Token.TokenKind.BREAK)) {
                 lexer.Read(';');
                 return new AST.Statement.BreakStatement(break_scope.Peek());
             }
-            if (lexer.Peek(Token.TokenKind.RETURN)) {
-                lexer.Read(Token.TokenKind.RETURN);
+            if (lexer.ReadIf(Token.TokenKind.RETURN)) {
                 var expr = lexer.Peek(';') ? null : expression();
                 //現在の関数の戻り値と型チェック
                 lexer.Read(';');
@@ -7979,9 +8360,7 @@ int main(void) {
             Console.Error.WriteLine("GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
 
             lexer.Read(Token.TokenKind.__ASM__);
-            if (lexer.Peek(Token.TokenKind.__VOLATILE__)) {
-                lexer.Read(Token.TokenKind.__VOLATILE__);
-            }
+            lexer.ReadIf(Token.TokenKind.__VOLATILE__);
             lexer.Read('(');
             Stack<char> parens = new Stack<char>();
             parens.Push('(');
@@ -8017,8 +8396,7 @@ int main(void) {
             if (lexer.Peek(',')) {
                 var ce = new AST.Expression.CommaExpression();
                 ce.expressions.Add(e);
-                while (lexer.Peek(',')) {
-                    lexer.Read(',');
+                while (lexer.ReadIf(',')) {
                     e = assignment_expression();
                     ce.expressions.Add(e);
                 }
@@ -8062,8 +8440,7 @@ int main(void) {
                 }
                 return new AST.Expression.PrimaryExpression.StringExpression(strings);
             }
-            if (lexer.Peek('(')) {
-                lexer.Read('(');
+            if (lexer.ReadIf('(')) {
                 if (lexer.Peek('{')) {
                     // gcc statement expression
                     var statements = compound_statement();
@@ -8138,16 +8515,14 @@ int main(void) {
         /// <param name="expr"></param>
         /// <returns></returns>
         private AST.Expression more_postfix_expression(AST.Expression expr) {
-            if (lexer.Peek('[')) {
+            if (lexer.ReadIf('[')) {
                 // 6.5.2.1 配列の添字付け
-                lexer.Read('[');
                 var index = expression();
                 lexer.Read(']');
                 return more_postfix_expression(new AST.Expression.PostfixExpression.ArraySubscriptingExpression(expr, index));
             }
-            if (lexer.Peek('(')) {
+            if (lexer.ReadIf('(')) {
                 // 6.5.2.2 関数呼出し
-                lexer.Read('(');
                 List<AST.Expression> args = null;
                 if (lexer.Peek(')') == false) {
                     args = argument_expression_list();
@@ -8162,15 +8537,13 @@ int main(void) {
                 }
                 return more_postfix_expression(new AST.Expression.PostfixExpression.FunctionCallExpression(expr, args));
             }
-            if (lexer.Peek('.')) {
+            if (lexer.ReadIf('.')) {
                 // 6.5.2.3 構造体及び共用体のメンバ
-                lexer.Read('.');
                 var ident = IDENTIFIER(false);
                 return more_postfix_expression(new AST.Expression.PostfixExpression.MemberDirectAccess(expr, ident));
             }
-            if (lexer.Peek(Token.TokenKind.PTR_OP)) {
+            if (lexer.ReadIf(Token.TokenKind.PTR_OP)) {
                 // 6.5.2.3 構造体及び共用体のメンバ
-                lexer.Read(Token.TokenKind.PTR_OP);
                 var ident = IDENTIFIER(false);
                 return more_postfix_expression(new AST.Expression.PostfixExpression.MemberIndirectAccess(expr, ident));
             }
@@ -8192,8 +8565,7 @@ int main(void) {
         private List<AST.Expression> argument_expression_list() {
             var ret = new List<AST.Expression>();
             ret.Add(assignment_expression());
-            while (lexer.Peek(',')) {
-                lexer.Read(',');
+            while (lexer.ReadIf(',')) {
                 ret.Add(assignment_expression());
             }
             return ret;
@@ -8221,38 +8593,31 @@ int main(void) {
                 var expr = unary_expression();
                 return new AST.Expression.UnaryPrefixExpression(op, expr);
             }
-            if (lexer.Peek('&')) {
-                lexer.next_token();
+            if (lexer.ReadIf('&')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryAddressExpression(expr);
             }
-            if (lexer.Peek('*')) {
-                lexer.next_token();
+            if (lexer.ReadIf('*')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryReferenceExpression(expr);
             }
-            if (lexer.Peek('+')) {
-                lexer.next_token();
+            if (lexer.ReadIf('+')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryPlusExpression(expr);
             }
-            if (lexer.Peek('-')) {
-                lexer.next_token();
+            if (lexer.ReadIf('-')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryMinusExpression(expr);
             }
-            if (lexer.Peek('~')) {
-                lexer.next_token();
+            if (lexer.ReadIf('~')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryNegateExpression(expr);
             }
-            if (lexer.Peek('!')) {
-                lexer.next_token();
+            if (lexer.ReadIf('!')) {
                 var expr = cast_expression();
                 return new AST.Expression.UnaryNotExpression(expr);
             }
-            if (lexer.Peek(Token.TokenKind.SIZEOF)) {
-                lexer.next_token();
+            if (lexer.ReadIf(Token.TokenKind.SIZEOF)) {
                 if (lexer.Peek('(')) {
                     // どっちにも'('が出ることが出来るのでさらに先読みする（LL(2))
                     var saveCurrent = lexer.Save();
@@ -8402,8 +8767,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression and_expression() {
             var lhs = equality_expression();
-            while (lexer.Peek('&')) {
-                lexer.Read('&');
+            while (lexer.ReadIf('&')) {
                 var rhs = equality_expression();
                 lhs = new AST.Expression.AndExpression(lhs, rhs);
             }
@@ -8416,8 +8780,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression exclusive_OR_expression() {
             var lhs = and_expression();
-            while (lexer.Peek('^')) {
-                lexer.Read('^');
+            while (lexer.ReadIf('^')) {
                 var rhs = and_expression();
                 lhs = new AST.Expression.ExclusiveOrExpression(lhs, rhs);
             }
@@ -8430,8 +8793,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression inclusive_OR_expression() {
             var lhs = exclusive_OR_expression();
-            while (lexer.Peek('|')) {
-                lexer.Read('|');
+            while (lexer.ReadIf('|')) {
                 var rhs = exclusive_OR_expression();
                 lhs = new AST.Expression.InclusiveOrExpression(lhs, rhs);
             }
@@ -8444,8 +8806,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression logical_AND_expression() {
             var lhs = inclusive_OR_expression();
-            while (lexer.Peek(Token.TokenKind.AND_OP)) {
-                lexer.Read(Token.TokenKind.AND_OP);
+            while (lexer.ReadIf(Token.TokenKind.AND_OP)) {
                 var rhs = inclusive_OR_expression();
                 lhs = new AST.Expression.LogicalAndExpression(lhs, rhs);
             }
@@ -8458,8 +8819,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression logical_OR_expression() {
             var lhs = logical_AND_expression();
-            while (lexer.Peek(Token.TokenKind.OR_OP)) {
-                lexer.Read(Token.TokenKind.OR_OP);
+            while (lexer.ReadIf(Token.TokenKind.OR_OP)) {
                 var rhs = logical_AND_expression();
                 lhs = new AST.Expression.LogicalOrExpression(lhs, rhs);
             }
@@ -8472,8 +8832,7 @@ int main(void) {
         /// <returns></returns>
         private AST.Expression conditional_expression() {
             var cond = logical_OR_expression();
-            if (lexer.Peek('?')) {
-                lexer.Read('?');
+            if (lexer.ReadIf('?')) {
                 var then_expr = expression();
                 lexer.Read(':');
                 var else_expr = conditional_expression();
@@ -8564,15 +8923,33 @@ int main(void) {
             return Accept<TResult, TArg>(ctype, visitor, value, true);
         }
 
-        public static TResult Accept<TResult, TArg>(this CType.ArrayType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnArrayType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.BasicType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnBasicType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.FunctionType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnFunctionType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.PointerType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnPointerType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.StubType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnStubType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.TaggedType.EnumType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnEnumType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.TaggedType.StructUnionType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnStructUnionType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.TypedefedType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnTypedefedType(self, value); }
-        public static TResult Accept<TResult, TArg>(this CType.TypeQualifierType self, IVisitor<TResult, TArg> visitor, TArg value) { return visitor.OnTypeQualifierType(self, value); }
+        public static TResult Accept<TResult, TArg>(this CType.ArrayType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnArrayType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.BasicType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnBasicType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.FunctionType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnFunctionType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.PointerType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnPointerType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.StubType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnStubType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.TaggedType.EnumType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnEnumType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.TaggedType.StructUnionType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnStructUnionType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.TypedefedType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTypedefedType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.TypeQualifierType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTypeQualifierType(self, value);
+        }
     }
 
     public static class ASTVisitor {
@@ -8845,11 +9222,6 @@ int main(void) {
 
     public abstract class Cell {
 
-        public class NilCell : Cell {
-            public override string ToString() {
-                return "()";
-            }
-        }
         public class ConsCell : Cell {
             public Cell Car {
                 get;
@@ -8882,7 +9254,7 @@ int main(void) {
                 return Value;
             }
         }
-        public static Cell Nil { get; } = new NilCell();
+        public static Cell Nil { get; } = new ConsCell();
 
         public static Cell Create(params object[] args) {
             var chain = Cell.Nil;
@@ -8897,11 +9269,90 @@ int main(void) {
             }
             return chain;
         }
+
+
+        //(define (pretty-print-sexp s)
+        public static string PP(Cell cell) {
+            StringBuilder sb = new StringBuilder();
+
+            //  (define (do-indent level)
+            //    (dotimes (_ level) (write-char #?space)))
+            Action<int> do_indent = (lebel) => sb.Append(String.Concat(Enumerable.Repeat("  ", lebel)));
+
+            //  (define (pp-parenl)
+            //    (write-char #?())
+            Action pp_parenl = () => sb.Append("(");
+
+            //  (define (pp-parenr)
+            //    (write-char #?)))
+            Action pp_parenr = () => sb.Append(")");
+
+            //  (define (pp-atom e prefix)
+            //    (when prefix (write-char #?space))
+            //    (write e))
+            Action<Cell, bool> pp_atom = (e, prefix) => sb.Append(prefix ? " " : "").Append((e as ValueCell)?.Value ?? "");
+
+            //  (define (pp-list s level prefix)
+            //    (and prefix (do-indent level))
+            //    (pp-parenl)
+            //    (let loop ((s s)
+            //               (prefix #f))
+            //      (if (null? s)
+            //          (pp-parenr)
+            //          (let1 e (car s)
+            //            (if (list? e)
+            //                (begin (and prefix (newline))
+            //                       (pp-list e (+ level 1) prefix))
+            //                (pp-atom e prefix))
+            //            (loop (cdr s) #t)))))
+            Action<Cell, int, bool> pp_list = null;
+            pp_list = (s, lebel, prefix) => {
+                if (prefix) { do_indent(lebel); }
+                pp_parenl();
+                prefix = false;
+                for (; ; ) {
+                    if (s == Cell.Nil) {
+                        pp_parenr();
+                        break;
+                    } else if (s is ConsCell) {
+                        var e = (s as ConsCell).Car;
+                        if (e is ConsCell) {
+                            if (prefix) {
+                                sb.AppendLine();
+                            }
+                            pp_list(e as ConsCell, lebel + 1, prefix);
+                        } else {
+                            pp_atom(e, prefix);
+                        }
+                        s = (s as ConsCell).Cdr;
+                        prefix = true;
+                        continue;
+                    } else {
+                        throw new Exception();
+                    }
+                }
+            };
+
+            //  (if (list? s)
+            //      (pp-list s 0 #f)
+            //      (write s))
+            if (cell is ConsCell) {
+                pp_list(cell, 0, false);
+            } else if (cell is ValueCell) {
+                sb.Append((cell as ValueCell)?.Value ?? "");
+            } else {
+                throw new Exception();
+            }
+            //  (newline))
+            sb.AppendLine();
+
+            return sb.ToString();
+        }
     }
 
     public class CTypeDumpVisitor : CTypeVisitor.IVisitor<Cell, Cell> {
         public Cell OnArrayType(CType.ArrayType self, Cell value) {
-            return Cell.Create("array",self.Length.ToString(), self.cType.Accept(this, null));
+            return Cell.Create("array", self.Length.ToString(), self.cType.Accept(this, null));
         }
 
         public Cell OnBasicType(CType.BasicType self, Cell value) {
@@ -8963,7 +9414,7 @@ int main(void) {
         }
 
         public Cell OnFunctionType(CType.FunctionType self, Cell value) {
-            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Name, x.Sc.ToString(),x.cType.Accept(this, null))).ToArray()):Cell.Nil);
+            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null ? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Name, x.Sc.ToString(), x.cType.Accept(this, null))).ToArray()) : Cell.Nil);
         }
 
         public Cell OnPointerType(CType.PointerType self, Cell value) {
@@ -8971,10 +9422,10 @@ int main(void) {
         }
 
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
-            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, Cell.Create(self.struct_declarations.Select(x => Cell.Create(x.Ident,  x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()));
+            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, Cell.Create(self.struct_declarations.Select(x => Cell.Create(x.Ident, x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()));
         }
 
-        public Cell OnStubType(CType.StubType self, Cell value) {                        
+        public Cell OnStubType(CType.StubType self, Cell value) {
             return Cell.Create("$");
         }
 
@@ -8984,13 +9435,27 @@ int main(void) {
 
         public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {
             List<string> qual = new List<string>();
-            if ((self.type_qualifier & TypeQualifier.None) == TypeQualifier.Const) { qual.Add("none"); }
-            if ((self.type_qualifier & TypeQualifier.Const) == TypeQualifier.Const) { qual.Add("const"); }
-            if ((self.type_qualifier & TypeQualifier.Restrict) == TypeQualifier.Const) { qual.Add("restrict"); }
-            if ((self.type_qualifier & TypeQualifier.Volatile) == TypeQualifier.Const) { qual.Add("volatile"); }
-            if ((self.type_qualifier & TypeQualifier.Near) == TypeQualifier.Const) { qual.Add("near"); }
-            if ((self.type_qualifier & TypeQualifier.Far) == TypeQualifier.Const) { qual.Add("far"); }
-            if ((self.type_qualifier & TypeQualifier.Invalid) == TypeQualifier.Const) { qual.Add("invalid"); }
+            if ((self.type_qualifier & TypeQualifier.None) == TypeQualifier.Const) {
+                qual.Add("none");
+            }
+            if ((self.type_qualifier & TypeQualifier.Const) == TypeQualifier.Const) {
+                qual.Add("const");
+            }
+            if ((self.type_qualifier & TypeQualifier.Restrict) == TypeQualifier.Const) {
+                qual.Add("restrict");
+            }
+            if ((self.type_qualifier & TypeQualifier.Volatile) == TypeQualifier.Const) {
+                qual.Add("volatile");
+            }
+            if ((self.type_qualifier & TypeQualifier.Near) == TypeQualifier.Const) {
+                qual.Add("near");
+            }
+            if ((self.type_qualifier & TypeQualifier.Far) == TypeQualifier.Const) {
+                qual.Add("far");
+            }
+            if ((self.type_qualifier & TypeQualifier.Invalid) == TypeQualifier.Const) {
+                qual.Add("invalid");
+            }
             return Cell.Create("type-qual", Cell.Create(qual.ToArray()), self.cType.Accept(this, null));
         }
     }
@@ -8999,7 +9464,7 @@ int main(void) {
     public class ASTDumpVisitor : ASTVisitor.IVisitor<Cell, Cell> {
 
         public Cell OnAdditiveExpression(AST.Expression.AdditiveExpression self, Cell value) {
-            return Cell.Create((self.Op == AST.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"), self.Type.Accept<Cell,Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
+            return Cell.Create((self.Op == AST.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"), self.Type.Accept<Cell, Cell>(new CTypeDumpVisitor(), null), self.Lhs.Accept<Cell, Cell>(this, value), self.Rhs.Accept<Cell, Cell>(this, value));
         }
 
         public Cell OnAndExpression(AST.Expression.AndExpression self, Cell value) {
