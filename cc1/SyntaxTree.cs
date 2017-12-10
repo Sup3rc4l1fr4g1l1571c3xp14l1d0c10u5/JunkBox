@@ -14,7 +14,7 @@ namespace AnsiCParser {
         ///   - 直前の副作用完了点から次の副作用完了点までの間に，式の評価によって一つのオブジェクトに格納された値を変更する回数は，高々 1 回でなければならない。
         ///     さらに，変更前の値の読取りは，格納される値を決定するためだけに行われなければならない。
         ///   - （関数呼出しの()，&&，||，?:及びコンマ演算子に対して）後で規定する場合を除いて，部分式の評価順序及び副作用が生じる順序は未規定とする。
-        ///   - 幾つかの演算子［総称してビット単位の演算子（bitwise operator）と呼ぶ単項演算子~並びに 2 項演算子<<，>>，&，^及び|］は，整数型のオペランドを必要とする。
+        ///   - 幾つかの演算子［総称してビット単位の演算子（bitwise operator）と呼ぶ単項演算子~並びに 2 項演算子 <<，>>，&，^及び|］は，整数型のオペランドを必要とする。
         ///     これらの演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつ。
         ///   - 式の評価中に例外条件（exceptional condition）が発生した場合（すなわち，結果が数学的に定義できないか，又は結果の型で表現可能な値の範囲にない場合），その動作は未定義とする。
         ///   - 格納された値にアクセスするときのオブジェクトの有効型（effective type）は，（もしあれば）そのオブジェクトの宣言された型とする。
@@ -65,10 +65,10 @@ namespace AnsiCParser {
                     public string Ident {
                         get;
                     }
+
                     protected IdentifierExpression(string ident) {
                         Ident = ident;
                     }
-
 
                     /// <summary>
                     /// 未定義識別子式
@@ -94,12 +94,12 @@ namespace AnsiCParser {
                     /// 変数識別子式
                     /// </summary>
                     public class VariableExpression : IdentifierExpression {
-                        public Declaration.VariableDeclaration variableDeclaration {
+                        public Declaration.VariableDeclaration Decl {
                             get;
                         }
                         public override CType Type {
                             get {
-                                return variableDeclaration.Type;
+                                return Decl.Type;
                             }
                         }
                         public override bool IsLValue() {
@@ -108,8 +108,31 @@ namespace AnsiCParser {
                             return true;
                         }
 
-                        public VariableExpression(string ident, Declaration.VariableDeclaration variableDeclaration) : base(ident) {
-                            this.variableDeclaration = variableDeclaration;
+                        public VariableExpression(string ident, Declaration.VariableDeclaration decl) : base(ident) {
+                            Decl = decl;
+                        }
+                    }
+
+                    /// <summary>
+                    /// 引数識別子式
+                    /// </summary>
+                    public class ArgumentExpression : IdentifierExpression {
+                        public Declaration.ArgumentDeclaration Decl {
+                            get;
+                        }
+                        public override CType Type {
+                            get {
+                                return Decl.Type;
+                            }
+                        }
+                        public override bool IsLValue() {
+                            // 6.5.1 一次式
+                            // 識別子がオブジェクト（この場合，識別子は左辺値となる。）
+                            return true;
+                        }
+
+                        public ArgumentExpression(string ident, Declaration.ArgumentDeclaration decl) : base(ident) {
+                            Decl = decl;
                         }
                     }
 
@@ -117,17 +140,17 @@ namespace AnsiCParser {
                     /// 関数識別子式
                     /// </summary>
                     public class FunctionExpression : IdentifierExpression {
-                        public Declaration.FunctionDeclaration functionDeclaration {
+                        public Declaration.FunctionDeclaration Decl {
                             get;
                         }
                         public override CType Type {
                             get {
-                                return functionDeclaration.Ty;
+                                return Decl.Type;
                             }
                         }
 
-                        public FunctionExpression(string ident, Declaration.FunctionDeclaration functionDeclaration) : base(ident) {
-                            this.functionDeclaration = functionDeclaration;
+                        public FunctionExpression(string ident, Declaration.FunctionDeclaration decl) : base(ident) {
+                            Decl = decl;
                         }
                     }
 
@@ -135,7 +158,7 @@ namespace AnsiCParser {
                     /// 列挙定数式
                     /// </summary>
                     public class EnumerationConstant : IdentifierExpression {
-                        public CType.TaggedType.EnumType.MemberInfo Ret {
+                        public CType.TaggedType.EnumType.MemberInfo Info {
                             get;
                         }
                         public override CType Type {
@@ -144,8 +167,8 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public EnumerationConstant(CType.TaggedType.EnumType.MemberInfo ret) : base(ret.Ident) {
-                            Ret = ret;
+                        public EnumerationConstant(CType.TaggedType.EnumType.MemberInfo info) : base(info.Ident) {
+                            Info = info;
                         }
                     }
                 }
@@ -168,19 +191,19 @@ namespace AnsiCParser {
                         public long Value {
                             get;
                         }
-                        private CType _type {
+                        private CType ConstantType {
                             get;
                         }
                         public override CType Type {
                             get {
-                                return _type;
+                                return ConstantType;
                             }
                         }
 
                         public IntegerConstant(string str, long value, CType.BasicType.TypeKind kind) {
-                            this.Str = str;
-                            this.Value = value;
-                            this._type = new CType.BasicType(kind);
+                            Str = str;
+                            Value = value;
+                            ConstantType = new CType.BasicType(kind);
                         }
                     }
 
@@ -192,15 +215,19 @@ namespace AnsiCParser {
                             get;
                         }
 
+                        private CType ConstantType {
+                            get;
+                        }
+
                         public override CType Type {
                             get {
-                                return CType.CreateChar();
+                                return ConstantType;
                             }
                         }
 
-
                         public CharacterConstant(string str) {
                             Str = str;
+                            ConstantType = CType.CreateChar();
                         }
 
                     }
@@ -209,9 +236,6 @@ namespace AnsiCParser {
                     /// 浮動小数点定数式
                     /// </summary>
                     public class FloatingConstant : Constant {
-                        private CType.BasicType.TypeKind _type {
-                            get;
-                        }
 
                         public string Str {
                             get;
@@ -220,16 +244,22 @@ namespace AnsiCParser {
                         public double Value {
                             get;
                         }
+
+                        private CType ConstantType {
+                            get;
+                        }
+
                         public override CType Type {
                             get {
-                                return new CType.BasicType(_type);
+                                return ConstantType;
                             }
                         }
 
                         public FloatingConstant(string str, double value, CType.BasicType.TypeKind kind) {
+                            // Todo: WideChar未対応
                             Str = str;
                             Value = value;
-                            this._type = kind;
+                            ConstantType = new CType.BasicType(kind);
                         }
                     }
                 }
@@ -244,11 +274,17 @@ namespace AnsiCParser {
                     public List<string> Strings {
                         get;
                     }
+
+                    private CType ConstantType {
+                        get;
+                    }
+
                     public override CType Type {
                         get {
-                            return CType.CreateArray(String.Concat(Strings).Length, CType.CreateChar());
+                            return ConstantType;
                         }
                     }
+
                     public override bool IsLValue() {
                         // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
                         // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
@@ -256,8 +292,9 @@ namespace AnsiCParser {
                     }
 
                     public StringExpression(List<string> strings) {
-                        Strings = strings;
                         // Todo: WideChar未対応
+                        Strings = strings;
+                        ConstantType = CType.CreateArray(String.Concat(Strings).Length, CType.CreateChar());
                     }
                 }
 
@@ -269,22 +306,22 @@ namespace AnsiCParser {
                 /// 括弧の中の式が左辺値，関数指示子又はボイド式である場合，それは，それぞれ左辺値，関数指示子又はボイド式とする。
                 /// </remarks>
                 public class EnclosedInParenthesesExpression : PrimaryExpression {
-                    public SyntaxTree.Expression expression {
+                    public Expression ParenthesesExpression {
                         get;
                     }
                     public override CType Type {
                         get {
-                            return expression.Type;
+                            return ParenthesesExpression.Type;
                         }
                     }
                     public override bool IsLValue() {
                         // 6.5.1 一次式
                         // 括弧の中の式が左辺値である場合，それは，左辺値とする
-                        return expression.IsLValue();
+                        return ParenthesesExpression.IsLValue();
                     }
 
-                    public EnclosedInParenthesesExpression(SyntaxTree.Expression expression) {
-                        this.expression = expression;
+                    public EnclosedInParenthesesExpression(Expression parenthesesExpression) {
+                        ParenthesesExpression = parenthesesExpression;
                     }
                 }
             }
@@ -322,13 +359,13 @@ namespace AnsiCParser {
                         get;
                     }
 
-                    private CType _referencedType {
+                    private CType ReferencedType {
                         get;
                     }
 
                     public override CType Type {
                         get {
-                            return _referencedType;
+                            return ReferencedType;
                         }
                     }
                     public override bool IsLValue() {
@@ -349,16 +386,16 @@ namespace AnsiCParser {
                         CType referencedType;
                         if (((lhs.Type.IsPointerType(out referencedType) || lhs.Type.IsArrayType(out referencedType)) && referencedType.IsObjectType())
                             && (rhs.Type.IsIntegerType())) {
-                            _referencedType = referencedType;
-                            lhs = Specification.ImplicitConversion(CType.CreatePointer(_referencedType), lhs);
+                            ReferencedType = referencedType;
+                            lhs = Specification.ImplicitConversion(CType.CreatePointer(ReferencedType), lhs);
                             rhs = Specification.ImplicitConversion(CType.CreateSignedInt(), rhs);
                             Target = lhs;
                             Index = rhs;
                         } else if (((rhs.Type.IsPointerType(out referencedType) || rhs.Type.IsArrayType(out referencedType)) && referencedType.IsObjectType())
                                    && (lhs.Type.IsIntegerType())) {
-                            _referencedType = referencedType;
+                            ReferencedType = referencedType;
                             lhs = Specification.ImplicitConversion(CType.CreateSignedInt(), lhs);
-                            rhs = Specification.ImplicitConversion(CType.CreatePointer(_referencedType), rhs);
+                            rhs = Specification.ImplicitConversion(CType.CreatePointer(ReferencedType), rhs);
                             Target = rhs;
                             Index = lhs;
                         } else {
@@ -380,13 +417,13 @@ namespace AnsiCParser {
                     public List<Expression> Args {
                         get;
                     }
-                    private CType _resultType {
+                    private CType ResultType {
                         get;
                     }
 
                     public override CType Type {
                         get {
-                            return _resultType;
+                            return ResultType;
                         }
                     }
 
@@ -456,7 +493,7 @@ namespace AnsiCParser {
 
                         if (!CType.IsEqual(lType, rhs.Type)) {
                             //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new Expression.TypeConversionExpression(lType, rhs);
+                            rhs = new TypeConversionExpression(lType, rhs);
                         }
 
 
@@ -498,10 +535,10 @@ namespace AnsiCParser {
 
                         } else {
                             // 呼び出される関数を表す式が，関数原型を含まない型をもつ場合，各実引数に対して既定の実引数拡張を行う。
-                            args = args.Select(x => (SyntaxTree.Expression)new SyntaxTree.Expression.TypeConversionExpression(Specification.DefaultArgumentPromotion(x.Type), x)).ToList();
+                            args = args.Select(x => (Expression)new TypeConversionExpression(x.Type.DefaultArgumentPromotion(), x)).ToList();
                         }
                         // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない
-                        _resultType = functionType.ResultType;
+                        ResultType = functionType.ResultType;
                         Expr = expr;
                         Args = args;
                     }
@@ -517,7 +554,7 @@ namespace AnsiCParser {
                     public string Ident {
                         get;
                     }
-                    private CType _memberType {
+                    private CType MemberType {
                         get;
                     }
 
@@ -527,7 +564,7 @@ namespace AnsiCParser {
 
                     public override CType Type {
                         get {
-                            return _memberType;
+                            return MemberType;
                         }
                     }
 
@@ -553,9 +590,9 @@ namespace AnsiCParser {
 
                         var qual = expr.Type.GetTypeQualifier();
                         if (qual != TypeQualifier.None) {
-                            _memberType = memberInfo.Type.WrapTypeQualifier(qual);
+                            MemberType = memberInfo.Type.WrapTypeQualifier(qual);
                         } else {
-                            _memberType = memberInfo.Type.UnwrapTypeQualifier();
+                            MemberType = memberInfo.Type.UnwrapTypeQualifier();
                         }
                     }
                 }
@@ -570,7 +607,7 @@ namespace AnsiCParser {
                     public string Ident {
                         get;
                     }
-                    private CType _memberType {
+                    private CType MemberType {
                         get;
                     }
 
@@ -580,7 +617,7 @@ namespace AnsiCParser {
 
                     public override CType Type {
                         get {
-                            return _memberType;
+                            return MemberType;
                         }
                     }
 
@@ -608,7 +645,7 @@ namespace AnsiCParser {
                         Ident = ident;
 
                         var qual = expr.Type.GetTypeQualifier();
-                        _memberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
+                        MemberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
                     }
                 }
 
@@ -653,7 +690,7 @@ namespace AnsiCParser {
                         // 制約，型，並びにポインタに対する型変換及び 演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                         // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                         Op = op;
-                        Expr = new Expression.TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
+                        Expr = new TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
 
                     }
 
@@ -698,7 +735,7 @@ namespace AnsiCParser {
                     // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                     // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                     Op = op;
-                    Expr = new Expression.TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
+                    Expr = new TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
                 }
             }
 
@@ -709,12 +746,12 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -723,9 +760,9 @@ namespace AnsiCParser {
                     // 単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。
                     // 左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。
                     if (
-                        (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) // オペランドは，関数指示子
-                        || (expr is SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression) // オペランドは，[]演算子(ToDo:の結果にすること)
-                        || (expr is SyntaxTree.Expression.PostfixExpression.UnaryReferenceExpression) // オペランドは，単項*演算子(ToDo:の結果にすること)
+                        (expr is PrimaryExpression.IdentifierExpression.FunctionExpression) // オペランドは，関数指示子
+                        || (expr is PostfixExpression.ArraySubscriptingExpression) // オペランドは，[]演算子(ToDo:の結果にすること)
+                        || (expr is UnaryReferenceExpression) // オペランドは，単項*演算子(ToDo:の結果にすること)
                     ) {
                         // ok
                     } else if (
@@ -746,25 +783,25 @@ namespace AnsiCParser {
                     // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，&演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
                     // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる。
 
-                    if (expr is SyntaxTree.Expression.PostfixExpression.UnaryReferenceExpression) {
+                    if (expr is UnaryReferenceExpression) {
                         // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
                         // ToDo: ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
-                        expr = (expr as SyntaxTree.Expression.PostfixExpression.UnaryReferenceExpression).Expr;
-                    } else if (expr is SyntaxTree.Expression.PostfixExpression.UnaryReferenceExpression) {
+                        expr = ((UnaryReferenceExpression) expr).Expr;
+                    } else if (expr is PostfixExpression.ArraySubscriptingExpression) {
                         // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，
                         // &演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
-                        var aexpr = (expr as SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression);
+                        var aexpr = (PostfixExpression.ArraySubscriptingExpression) expr;
                         expr =
-                            new SyntaxTree.Expression.AdditiveExpression(
+                            new AdditiveExpression(
                                 AdditiveExpression.OperatorKind.Add,
-                                new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(aexpr.Target.Type), aexpr),
+                                new TypeConversionExpression(CType.CreatePointer(aexpr.Target.Type), aexpr),
                                 Specification.ImplicitConversion(CType.CreateSignedInt(), aexpr.Index)
                             );
                     } else {
                         // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
                     }
                     Expr = expr;
-                    _resultType = CType.CreatePointer(expr.Type);
+                    ResultType = CType.CreatePointer(expr.Type);
                 }
             }
 
@@ -775,12 +812,12 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -804,7 +841,7 @@ namespace AnsiCParser {
                     // オペランドが型“∼型へのポインタ”をもつ場合，その結果は型“∼型”をもつ。
                     // 正しくない値がポインタに代入されている場合，単項*演算子の動作は，未定義とする
                     Expr = expr;
-                    _resultType = expr.Type.GetBasePointerType();
+                    ResultType = expr.Type.GetBasePointerType();
                 }
             }
 
@@ -1004,12 +1041,12 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1028,7 +1065,7 @@ namespace AnsiCParser {
                     }
                     // 意味規則  
                     // 通常の算術型変換をオペランドに適用する。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
 
                     Op = op;
                     Lhs = lhs;
@@ -1052,12 +1089,12 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1082,7 +1119,7 @@ namespace AnsiCParser {
                         if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                             // 両オペランドが算術型をもつ
                             // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                            ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
                         } else {
                             // ポインタ型への暗黙的型変換を試みる
                             var lhsPtr = Specification.ToPointerTypeExpr(lhs);
@@ -1092,11 +1129,11 @@ namespace AnsiCParser {
                             if (lhsPtr != null && lhsPtr.Type.IsPointerType() && lhsPtr.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
                                 lhs = lhsPtr;
                                 // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
-                                _resultType = lhs.Type;
+                                ResultType = lhs.Type;
                             } else if (rhsPtr != null && lhs.Type.IsIntegerType() && rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsObjectType()) {
                                 rhs = rhsPtr;
                                 // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
-                                _resultType = rhs.Type;
+                                ResultType = rhs.Type;
                             } else {
                                 throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
                             }
@@ -1106,7 +1143,7 @@ namespace AnsiCParser {
                         if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                             // 両オペランドが算術型をもつ
                             // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                            _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                            ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
                         } else {
                             // ポインタ型への暗黙的型変換を試みる
                             var lhsPtr = Specification.ToPointerTypeExpr(lhs);
@@ -1122,14 +1159,14 @@ namespace AnsiCParser {
                                 lhs = lhsPtr;
                                 rhs = rhsPtr;
 
-                                _resultType = CType.CreatePtrDiffT();
+                                ResultType = CType.CreatePtrDiffT();
                             } else if (
                                 lhsPtr != null && lhsPtr.Type.IsPointerType() && lhsPtr.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()
                             ) {
                                 // 左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型である。（減分は 1 の減算に等しい。）
                                 // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                                 lhs = lhsPtr;
-                                _resultType = lhs.Type;
+                                ResultType = lhs.Type;
                             } else {
                                 throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
                             }
@@ -1325,12 +1362,12 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1344,7 +1381,7 @@ namespace AnsiCParser {
                     // 意味規則  
                     // オペランドに対して通常の算術型変換を適用する。
                     // 2項&演算子の結果は，オペランドのビット単位の論理積とする（すなわち，型変換されたオペランドの対応するビットが両者ともセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
 
                     Lhs = lhs;
                     Rhs = rhs;
@@ -1361,12 +1398,12 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1380,7 +1417,7 @@ namespace AnsiCParser {
                     // 意味規則
                     // オペランドに対して通常の算術型変換を適用する。
                     // ^演算子の結果は，オペランドのビット単位の排他的論理和とする（すなわち，型変換されたオペランドの対応するビットのいずれか一方だけがセットされている場合，そしてその場合に限り，結果のそのビットをセットする。） 。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
 
                     Lhs = lhs;
                     Rhs = rhs;
@@ -1398,12 +1435,12 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1417,7 +1454,7 @@ namespace AnsiCParser {
                     // 意味規則
                     // オペランドに対して通常の算術型変換を適用する。
                     // |演算子の結果は，オペランドのビット単位の論理和とする（すなわち，型変換されたオペランドの対応するビットの少なくとも一方がセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    _resultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
 
                     Lhs = lhs;
                     Rhs = rhs;
@@ -1508,12 +1545,12 @@ namespace AnsiCParser {
                 public Expression ElseExpr {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
@@ -1557,13 +1594,13 @@ namespace AnsiCParser {
                     if (thenExpr.Type.IsArithmeticType() && elseExpr.Type.IsArithmeticType()) {
                         // 制約 両オペランドの型が算術型である。
                         // 意味規則 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
-                        _resultType = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
+                        ResultType = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
                     } else if (thenExpr.Type.IsStructureType() && elseExpr.Type.IsStructureType() && CType.IsEqual(thenExpr.Type, elseExpr.Type)) {
                         // - 両オペランドの型が同じ構造体型又は共用体型である。
                     } else if (thenExpr.Type.IsVoidType() && elseExpr.Type.IsVoidType()) {
                         // 制約 両オペランドの型が void 型である。
                         // 意味規則 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
-                        _resultType = CType.CreateVoid();
+                        ResultType = CType.CreateVoid();
                     } else {
                         // ポインタ型への暗黙的型変換を試みる
                         var thenExprPtr = Specification.ToPointerTypeExpr(thenExpr);
@@ -1584,7 +1621,7 @@ namespace AnsiCParser {
                             var baseType = thenExpr.Type.GetBasePointerType().Unwrap();
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
-                            _resultType = CType.CreatePointer(baseType);
+                            ResultType = CType.CreatePointer(baseType);
                         } else if (
                             (thenExprPtr != null && thenExprPtr.Type.IsPointerType() && elseExpr.IsNullPointerConstant()) ||
                             (elseExprPtr != null && elseExprPtr.Type.IsPointerType() && thenExpr.IsNullPointerConstant())
@@ -1600,7 +1637,7 @@ namespace AnsiCParser {
                             var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
-                            _resultType = CType.CreatePointer(baseType);
+                            ResultType = CType.CreatePointer(baseType);
                         } else if (
                             (thenExprPtr != null && elseExprPtr != null) &&
                             (
@@ -1616,7 +1653,7 @@ namespace AnsiCParser {
                             CType baseType = CType.CreatePointer(CType.CreateVoid());
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
-                            _resultType = CType.CreatePointer(baseType);
+                            ResultType = CType.CreatePointer(baseType);
                         } else {
                             throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
                         }
@@ -1643,15 +1680,13 @@ namespace AnsiCParser {
                 public Expression Rhs {
                     get; protected set;
                 }
-                protected CType _resultType {
+                protected CType ResultType {
                     get; set;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
-                }
-                protected AssignmentExpression() {
                 }
 
                 /// <summary>
@@ -1730,7 +1765,7 @@ namespace AnsiCParser {
                         // そうでない場合，動作は未定義とする。
                         if (!CType.IsEqual(lhs.Type, rhs.Type)) {
                             //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new Expression.TypeConversionExpression(lhs.Type, rhs);
+                            rhs = new TypeConversionExpression(lhs.Type, rhs);
                         }
 
                         Op = op;
@@ -1738,7 +1773,7 @@ namespace AnsiCParser {
                         Rhs = rhs;
                         // 代入式の型は，左オペランドの型とする。
                         // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        _resultType = lhs.Type.UnwrapTypeQualifier();
+                        ResultType = lhs.Type.UnwrapTypeQualifier();
                     }
                 }
 
@@ -1852,7 +1887,7 @@ namespace AnsiCParser {
                         Rhs = rhs;
                         // 代入式の型は，左オペランドの型とする。
                         // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        _resultType = lhs.Type.UnwrapTypeQualifier();
+                        ResultType = lhs.Type.UnwrapTypeQualifier();
                     }
 
                 }
@@ -1862,10 +1897,10 @@ namespace AnsiCParser {
             /// 6.5.17 コンマ演算子
             /// </summary>
             public class CommaExpression : Expression {
-                public List<SyntaxTree.Expression> expressions { get; } = new List<SyntaxTree.Expression>();
+                public List<Expression> Expressions { get; } = new List<Expression>();
                 public override CType Type {
                     get {
-                        return expressions.Last().Type;
+                        return Expressions.Last().Type;
                     }
                 }
                 public CommaExpression() {
@@ -1882,20 +1917,21 @@ namespace AnsiCParser {
             /// X.X.X GCC拡張：式中に文
             /// </summary>
             public class GccStatementExpression : Expression {
-                public Statement statements {
+                public Statement Statements {
                     get;
                 }
-                private CType _resultType {
+                private CType ResultType {
                     get;
                 }
                 public override CType Type {
                     get {
-                        return _resultType;
+                        return ResultType;
                     }
                 }
 
-                public GccStatementExpression(Statement statements) {
-                    this.statements = statements;
+                public GccStatementExpression(Statement statements, CType resultType) {
+                    Statements = statements;
+                    ResultType = resultType;
                 }
             }
 
@@ -2008,12 +2044,22 @@ namespace AnsiCParser {
 
         public abstract class Statement : SyntaxTree {
             public class GotoStatement : Statement {
+                /// <summary>
+                /// 参照ラベル名
+                /// </summary>
                 public string Label {
                     get;
+                }
+                /// <summary>
+                /// 参照先のラベル付き文(ラベル名前表で挿入する)
+                /// </summary>
+                public GenericLabeledStatement Target {
+                    get; set;
                 }
 
                 public GotoStatement(string label) {
                     Label = label;
+                    Target = null;
                 }
             }
 
@@ -2288,7 +2334,7 @@ namespace AnsiCParser {
                 public string Ident {
                     get;
                 }
-                public CType Ty {
+                public CType Type {
                     get;
                 }
                 public StorageClassSpecifier StorageClass {
@@ -2300,12 +2346,12 @@ namespace AnsiCParser {
                 public FunctionSpecifier FunctionSpecifier {
                     get;
                 }
-                public FunctionDeclaration(string ident, CType type, StorageClassSpecifier storage_class, FunctionSpecifier function_specifier) {
+                public FunctionDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
                     Ident = ident;
-                    Ty = type;
-                    StorageClass = storage_class;
+                    Type = type;
+                    StorageClass = storageClass;
                     Body = null;
-                    FunctionSpecifier = function_specifier;
+                    FunctionSpecifier = functionSpecifier;
                 }
             }
 
@@ -2355,7 +2401,7 @@ namespace AnsiCParser {
         }
 
         public class TranslationUnit : SyntaxTree {
-            public List<SyntaxTree.Declaration> declarations { get; } = new List<Declaration>();
+            public List<Declaration> Declarations { get; } = new List<Declaration>();
         }
     }
 }

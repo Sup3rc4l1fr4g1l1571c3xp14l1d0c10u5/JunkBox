@@ -1128,7 +1128,7 @@ namespace AnsiCParser {
                         continue;
                     }
                     if (expr is SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
-                        expr = (expr as SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression).expression;
+                        expr = (expr as SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression).ParenthesesExpression;
                         continue;
                     }
                     break;

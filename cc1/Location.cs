@@ -1,33 +1,33 @@
 
 namespace AnsiCParser {
     /// <summary>
-    /// �\�[�X�R�[�h���̈ʒu���
+    /// ソースコード中の位置情報
     /// </summary>
     public class Location {
 
         /// <summary>
-        /// �_���\�[�X�t�@�C���p�X
+        /// 論理ソースファイルパス
         /// </summary>
         public string FilePath {
             get;
         }
 
         /// <summary>
-        /// �_���\�[�X�t�@�C����̍s�ԍ�
+        /// 論理ソースファイル上の行番号
         /// </summary>
         public int Line {
             get;
         }
 
         /// <summary>
-        /// �_���\�[�X�t�@�C����̌��ԍ�
+        /// 論理ソースファイル上の桁番号
         /// </summary>
         public int Column {
             get;
         }
 
         /// <summary>
-        /// �����\�[�X�t�@�C����̈ʒu
+        /// 物理ソースファイル上の位置
         /// </summary>
         public int Position {
             get;

@@ -5,10 +5,47 @@ namespace AnsiCParser {
     class Program {
 
         static void Main(string[] args) {
-            new Parser(@"
+            //args = System.IO.Directory.GetFiles(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\test\examples","*.c");
+            if (args.Length == 0) {
+                var ret = new Parser(@"
+double x = 1.0;
+int main(void) {
+	int x = 2;
+	{
+		extern double x;
+		x = 3.0;
+	}
+	return 0;
+}
+
 ").Parse();
-            TestCase.RunTest();
-            new Parser(System.IO.File.ReadAllText(args[0])).Parse();
+
+                Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
+
+                TestCase.RunTest();
+            } else {
+                var defaultStdout = Console.Out;
+                var defaultStderr = Console.Error;
+                foreach (var arg in args) {
+                    if (System.IO.File.Exists(arg) == false) {
+                        Console.WriteLine($"ファイル{arg}が見つかりません。");
+                        continue;
+                    }
+                    using (var tw = new System.IO.StreamWriter(arg + ".log")) {
+                        Console.SetOut(tw);
+                        Console.SetError(tw);
+                        try {
+                            new Parser(System.IO.File.ReadAllText(arg)).Parse();
+                        } catch (Exception e) {
+                            Console.WriteLine($"例外: {e.GetType().Name}");
+                            Console.WriteLine($"メッセージ: {e.Message}");
+                            Console.WriteLine($"スタックトレース: {e.StackTrace}");
+                        }
+                        Console.SetOut(defaultStdout);
+                        Console.SetError(defaultStderr);
+                    }
+                }
+            }
         }
     }
 

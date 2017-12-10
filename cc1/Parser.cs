@@ -4,155 +4,99 @@ using System.Linq;
 
 namespace AnsiCParser {
     /// <summary>
-    /// ƒp[ƒT
+    /// ãƒ‘ãƒ¼ã‚µ
     /// </summary>
     public class Parser {
-        /// <summary>
-        /// –¼‘O‹óŠÔ(ƒXƒe[ƒgƒƒ“ƒg ƒ‰ƒxƒ‹)
-        /// </summary>
-        private Scope<SyntaxTree.Statement.GenericLabeledStatement> label_scope = Scope<SyntaxTree.Statement.GenericLabeledStatement>.Empty.Extend();
 
         /// <summary>
-        /// –¼‘O‹óŠÔ(\‘¢‘ÌA‹¤—p‘ÌA—ñ‹“‘Ì‚Ìƒ^ƒO–¼)
+        /// åå‰ç©ºé–“(ã‚¹ãƒ†ãƒ¼ãƒˆãƒ¡ãƒ³ãƒˆ ãƒ©ãƒ™ãƒ«)
+        /// </summary>
+        private Scope<LabelScopeValue> _labelScope = Scope<LabelScopeValue>.Empty.Extend();
+
+        /// <summary>
+        /// åå‰ç©ºé–“(æ§‹é€ ä½“ã€å…±ç”¨ä½“ã€åˆ—æŒ™ä½“ã®ã‚¿ã‚°å)
         /// </summary>
         private Scope<CType.TaggedType> _tagScope = Scope<CType.TaggedType>.Empty.Extend();
 
         /// <summary>
-        /// –¼‘O‹óŠÔ(’Êí‚Ì¯•Êqi•Ï”AŠÖ”Aˆø”A—ñ‹“’è”)
+        /// åå‰ç©ºé–“(é€šå¸¸ã®è­˜åˆ¥å­ï¼ˆå¤‰æ•°ã€é–¢æ•°ã€å¼•æ•°ã€åˆ—æŒ™å®šæ•°)
         /// </summary>
         private Scope<IdentifierScopeValue> _identScope = Scope<IdentifierScopeValue>.Empty.Extend();
 
         /// <summary>
-        /// –¼‘O‹óŠÔ(Typedef–¼)
+        /// åå‰ç©ºé–“(Typedefå)
         /// </summary>
         private Scope<SyntaxTree.Declaration.TypeDeclaration> _typedefScope = Scope<SyntaxTree.Declaration.TypeDeclaration>.Empty.Extend();
 
-        // \‘¢‘Ì‚Ü‚½‚Í‹¤—p‘Ì‚Ìƒƒ“ƒo[‚É‚Â‚¢‚Ä‚Í‚»‚ê‚¼‚ê‚ÌéŒ¾ƒIƒuƒWƒFƒNƒg‚É•t—^‚³‚ê‚é
+        
+
+        // æ§‹é€ ä½“ã¾ãŸã¯å…±ç”¨ä½“ã®ãƒ¡ãƒ³ãƒãƒ¼ã«ã¤ã„ã¦ã¯ãã‚Œãã‚Œã®å®£è¨€ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«ä»˜ä¸ã•ã‚Œã‚‹
 
         /// <summary>
-        /// break–½—ß‚É‚Â‚¢‚Ä‚ÌƒXƒR[ƒv
+        /// breakå‘½ä»¤ã«ã¤ã„ã¦ã®ã‚¹ã‚³ãƒ¼ãƒ—
         /// </summary>
         private readonly Stack<SyntaxTree.Statement> _breakScope = new Stack<SyntaxTree.Statement>();
 
         /// <summary>
-        /// continue–½—ß‚É‚Â‚¢‚Ä‚ÌƒXƒR[ƒv
+        /// continueå‘½ä»¤ã«ã¤ã„ã¦ã®ã‚¹ã‚³ãƒ¼ãƒ—
         /// </summary>
         private readonly Stack<SyntaxTree.Statement> _continueScope = new Stack<SyntaxTree.Statement>();
 
-        //
-        // lex spec
-        //
-
-
-        private Lexer lexer {
-            get;
-        }
-
+        /// <summary>
+        /// å­—å¥è§£æå™¨
+        /// </summary>
+        private readonly Lexer _lexer;
 
         public Parser(string s) {
-            lexer = new Lexer(s, "<built-in>");
+            _lexer = new Lexer(s, "<built-in>");
 
-            // GCC‚Ì‘g‚İ‚İŒ^‚Ìİ’è
-            _typedefScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration("__builtin_va_list", CType.CreatePointer(new CType.BasicType(TypeSpecifier.Void))));
+            // GCCã®çµ„ã¿è¾¼ã¿å‹ã®è¨­å®š
+            _typedefScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration("__builtin_va_list", CType.CreatePointer(new CType.BasicType(AnsiCParser.TypeSpecifier.Void))));
 
         }
 
-
-        public void Parse() {
-            var ret = translation_unit();
-            Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
+        /// <summary>
+        /// æ§‹æ–‡è§£æã¨æ„å‘³è§£æã‚’è¡Œã„ã€æ§‹æ–‡æœ¨ã‚’è¿”ã™
+        /// </summary>
+        /// <returns></returns>
+        public SyntaxTree Parse() {
+            return TranslationUnit();
         }
 
 
         private void EoF() {
-            if (!lexer.is_eof()) {
+            if (!_lexer.is_eof()) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãƒ•ã‚¡ã‚¤ãƒ«ãŒæ­£ã—ãçµ‚ç«¯ã—ã¦ã„ã¾ã›ã‚“ã€‚");
+            }
+        }
+
+        #region 6.4.4 å®šæ•°
+
+        /// <summary>
+        /// 6.4.4.1 æ•´æ•°å®šæ•°ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
+        /// </summary>
+        /// <returns></returns>
+        private bool IsIntegerConstant() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.HEXIMAL_CONSTANT 
+                 | _lexer.CurrentToken().Kind == Token.TokenKind.OCTAL_CONSTANT 
+                 | _lexer.CurrentToken().Kind == Token.TokenKind.DECIAML_CONSTANT;
+        }
+
+        /// <summary>
+        /// 6.4.4.1 æ•´æ•°å®šæ•°
+        /// </summary>
+        /// <returns></returns>
+        private SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant IntegerConstant() {
+            if (IsIntegerConstant() == false) {
                 throw new Exception();
             }
-        }
-
-
-
-
-        private bool is_ENUMERATION_CONSTANT() {
-            if (!is_IDENTIFIER(false)) {
-                return false;
-            }
-            var ident = lexer.current_token();
-            IdentifierScopeValue v;
-            if (_identScope.TryGetValue(ident.Raw, out v) == false) {
-                return false;
-            }
-            return (v as IdentifierScopeValue.EnumValue)?.ParentType.Members.First(x => x.Ident == ident.Raw) != null;
-        }
-
-        private CType.TaggedType.EnumType.MemberInfo ENUMERATION_CONSTANT() {
-            var ident = IDENTIFIER(false);
-            IdentifierScopeValue v;
-            if (_identScope.TryGetValue(ident, out v) == false) {
-                throw new Exception();
-            }
-            if (!(v is IdentifierScopeValue.EnumValue)) {
-                throw new Exception();
-            }
-            var el = ((IdentifierScopeValue.EnumValue)v).ParentType.Members.First(x => x.Ident == ident);
-            return el;
-        }
-
-        private bool is_CHARACTER_CONSTANT() {
-            return lexer.current_token().Kind == Token.TokenKind.STRING_CONSTANT;
-        }
-
-        private string CHARACTER_CONSTANT() {
-            if (is_CHARACTER_CONSTANT() == false) {
-                throw new Exception();
-            }
-            var ret = lexer.current_token().Raw;
-            lexer.next_token();
-            return ret;
-        }
-
-        private bool is_FLOATING_CONSTANT() {
-            return lexer.current_token().Kind == Token.TokenKind.FLOAT_CONSTANT;
-        }
-        private SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant FLOATING_CONSTANT() {
-            if (is_FLOATING_CONSTANT() == false) {
-                throw new Exception();
-            }
-            var raw = lexer.current_token().Raw;
-            var m = Lexer.ParseFloat(raw);
-            var value = Convert.ToDouble(m.Item1);
-            CType.BasicType.TypeKind type;
-            switch (m.Item2) {
-                case "F":
-                    type = CType.BasicType.TypeKind.Float;
-                    break;
-                case "L":
-                    type = CType.BasicType.TypeKind.LongDouble;
-                    break;
-                case "":
-                    type = CType.BasicType.TypeKind.Double;
-                    break;
-                default:
-                    throw new Exception();
-            }
-            lexer.next_token();
-            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(raw, value, type);
-        }
-
-        private bool is_INTEGER_CONSTANT() {
-            return lexer.current_token().Kind == Token.TokenKind.HEXIMAL_CONSTANT | lexer.current_token().Kind == Token.TokenKind.OCTAL_CONSTANT | lexer.current_token().Kind == Token.TokenKind.DECIAML_CONSTANT;
-        }
-        private SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant INTEGER_CONSTANT() {
-            if (is_INTEGER_CONSTANT() == false) {
-                throw new Exception();
-            }
-            string raw = lexer.current_token().Raw;
+            string raw = _lexer.CurrentToken().Raw;
             string body;
             string suffix;
             int radix;
             CType.BasicType.TypeKind[] candidates;
 
-            switch (lexer.current_token().Kind) {
+            switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.HEXIMAL_CONSTANT: {
                         var m = Lexer.ParseHeximal(raw);
                         body = m.Item1;
@@ -309,62 +253,158 @@ namespace AnsiCParser {
                 break;
             }
 
-            lexer.next_token();
+            _lexer.NextToken();
 
             return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(raw, value, selectedType);
-
         }
 
-        private bool is_STRING() {
-            return lexer.current_token().Kind == Token.TokenKind.STRING_LITERAL;
+        /// <summary>
+        /// 6.4.4.2 æµ®å‹•å°æ•°ç‚¹å®šæ•°ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
+        /// </summary>
+        /// <returns></returns>
+        private bool IsFloatingConstant() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.FLOAT_CONSTANT;
         }
-        private string STRING() {
-            if (is_STRING() == false) {
+
+        /// <summary>
+        /// 6.4.4.2 æµ®å‹•å°æ•°ç‚¹å®šæ•°
+        /// </summary>
+        /// <returns></returns>
+        private SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant FloatingConstant() {
+            if (IsFloatingConstant() == false) {
                 throw new Exception();
             }
-            var ret = lexer.current_token().Raw;
-            lexer.next_token();
+            var raw = _lexer.CurrentToken().Raw;
+            var m = Lexer.ParseFloat(raw);
+            var value = Convert.ToDouble(m.Item1);
+            CType.BasicType.TypeKind type;
+            switch (m.Item2) {
+                case "F":
+                    type = CType.BasicType.TypeKind.Float;
+                    break;
+                case "L":
+                    type = CType.BasicType.TypeKind.LongDouble;
+                    break;
+                case "":
+                    type = CType.BasicType.TypeKind.Double;
+                    break;
+                default:
+                    throw new Exception();
+            }
+            _lexer.NextToken();
+            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(raw, value, type);
+        }
+
+        /// <summary>
+        /// 6.4.4.3 åˆ—æŒ™å®šæ•°ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
+        /// </summary>
+        /// <returns></returns>
+        private bool IsEnumerationConstant() {
+            if (!IsIdentifier(false)) {
+                return false;
+            }
+            var ident = _lexer.CurrentToken();
+            IdentifierScopeValue.EnumValue value;
+            if (_identScope.TryGetValue(ident.Raw, out value) == false) {
+                return false;
+            }
+            return value.ParentType.Members.First(x => x.Ident == ident.Raw) != null;
+        }
+
+        /// <summary>
+        /// 6.4.4.3 åˆ—æŒ™å®šæ•°
+        /// </summary>
+        /// <returns></returns>
+        private CType.TaggedType.EnumType.MemberInfo EnumerationConstant() {
+            var ident = Identifier(false);
+            IdentifierScopeValue.EnumValue value;
+            if (_identScope.TryGetValue(ident, out value) == false) {
+                throw new Exception();
+            }
+            var el = value.ParentType.Members.First(x => x.Ident == ident);
+            return el;
+        }
+
+        /// <summary>
+        /// 6.4.4.4 æ–‡å­—å®šæ•°ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
+        /// </summary>
+        /// <returns></returns>
+        private bool IsCharacterConstant() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.STRING_CONSTANT;
+        }
+
+        /// <summary>
+        /// 6.4.4.4 æ–‡å­—å®šæ•°
+        /// </summary>
+        /// <returns></returns>
+        private string CharacterConstant() {
+            if (IsCharacterConstant() == false) {
+                throw new Exception();
+            }
+            var ret = _lexer.CurrentToken().Raw;
+            _lexer.NextToken();
             return ret;
         }
 
-        //
-        // Grammers
-        //
-
-
         /// <summary>
-        /// 6.9 ŠO•”’è‹`(–|–ó’PˆÊ)
+        /// 6.4.5 æ–‡å­—åˆ—ãƒªãƒ†ãƒ©ãƒ«ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
         /// </summary>
         /// <returns></returns>
-        public SyntaxTree.TranslationUnit translation_unit() {
+        private bool IsStringLiteral() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.STRING_LITERAL;
+        }
+
+        /// <summary>
+        /// 6.4.5 æ–‡å­—åˆ—ãƒªãƒ†ãƒ©ãƒ«
+        /// </summary>
+        /// <returns></returns>
+        private string StringLiteral() {
+            if (IsStringLiteral() == false) {
+                throw new Exception();
+            }
+            var ret = _lexer.CurrentToken().Raw;
+            _lexer.NextToken();
+            return ret;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 6.9 å¤–éƒ¨å®šç¾©(ç¿»è¨³å˜ä½)
+        /// </summary>
+        /// <returns></returns>
+        public SyntaxTree.TranslationUnit TranslationUnit() {
             var ret = new SyntaxTree.TranslationUnit();
-            while (is_external_declaration(null, TypeSpecifier.None)) {
-                ret.declarations.AddRange(external_declaration());
+            while (IsExternalDeclaration(null, AnsiCParser.TypeSpecifier.None)) {
+                ret.Declarations.AddRange(ExternalDeclaration());
             }
             EoF();
             return ret;
         }
 
         /// <summary>
-        /// 6.9 ŠO•”’è‹`(ŠO•”éŒ¾‚Æ‚È‚è‚¦‚é‚©H)
+        /// 6.9 å¤–éƒ¨å®šç¾©(å¤–éƒ¨å®£è¨€ã¨ãªã‚Šãˆã‚‹ã‹ï¼Ÿ)
         /// </summary>
         /// <returns></returns>
-        private bool is_external_declaration(CType baseType, TypeSpecifier typeSpecifier) {
-            return (is_declaration_specifier(baseType, typeSpecifier) || lexer.Peek(';') || is_declarator());
+        private bool IsExternalDeclaration(CType baseType, TypeSpecifier typeSpecifier) {
+            return IsDeclarationSpecifier(baseType, typeSpecifier) 
+                 || _lexer.PeekToken(';') 
+                 || IsDeclarator();
         }
 
         /// <summary>
-        /// 6.9 ŠO•”’è‹`(ŠO•”éŒ¾)
+        /// 6.9 å¤–éƒ¨å®šç¾©(å¤–éƒ¨å®£è¨€)
         /// </summary>
         /// <returns></returns>
-        private List<SyntaxTree.Declaration> external_declaration() {
+        private List<SyntaxTree.Declaration> ExternalDeclaration() {
             CType baseType = null;
-            StorageClassSpecifier storageClass = StorageClassSpecifier.None;
+            StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
+            FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+#if false
             TypeSpecifier typeSpecifier = TypeSpecifier.None;
             TypeQualifier typeQualifier = TypeQualifier.None;
-            FunctionSpecifier functionSpecifier = FunctionSpecifier.None;
-            while (is_declaration_specifier(baseType, typeSpecifier)) {
-                declaration_specifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
+            while (IsDeclarationSpecifier(baseType, typeSpecifier)) {
+                DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
             }
             if (typeSpecifier != TypeSpecifier.None) {
                 if (baseType != null) {
@@ -376,190 +416,221 @@ namespace AnsiCParser {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
             baseType = baseType.WrapTypeQualifier(typeQualifier);
-
+#else
+            ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier,*/ ref functionSpecifier, ReadDeclarationSpecifierPartFlag.ExternalDeclaration);
+#endif
             var ret = new List<SyntaxTree.Declaration>();
-
-
-            if (!is_declarator()) {
+            if (!IsDeclarator()) {
                 if (!baseType.IsStructureType() && !baseType.IsEnumeratedType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "‹ó‚ÌéŒ¾‚Íg—p‚Å‚«‚Ü‚¹‚ñB");
-                } else if (baseType.IsStructureType() && (baseType.Unwrap() as CType.TaggedType.StructUnionType).IsAnonymous) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "–³–¼\‘¢‘Ì/‹¤—p‘Ì‚ªéŒ¾‚³‚ê‚Ä‚¢‚Ü‚·‚ªA‚»‚ÌƒCƒ“ƒXƒ^ƒ“ƒX‚ğ’è‹`‚µ‚Ä‚¢‚Ü‚¹‚ñB");
-                } else {
-                    lexer.Read(';');
-                    return ret;
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ç©ºã®å®£è¨€ã¯ä½¿ç”¨ã§ãã¾ã›ã‚“ã€‚");
                 }
+                if (baseType.IsStructureType() && (baseType.Unwrap() as CType.TaggedType.StructUnionType).IsAnonymous) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ç„¡åæ§‹é€ ä½“/å…±ç”¨ä½“ãŒå®£è¨€ã•ã‚Œã¦ã„ã¾ã™ãŒã€ãã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’å®šç¾©ã—ã¦ã„ã¾ã›ã‚“ã€‚");
+                }
+                _lexer.ReadToken(';');
+                return ret;
             } else {
                 for (; ; ) {
                     string ident = "";
-                    List<CType> stack = new List<CType>() { new CType.StubType() };
-                    declarator(ref ident, stack, 0);
+                    var stack = new List<CType>() { new CType.StubType() };
+                    Declarator(ref ident, stack, 0);
                     var type = CType.Resolve(baseType, stack);
-                    if (lexer.Peek('=', ',', ';')) {
-                        // éŒ¾
-
-                        SyntaxTree.Declaration decl = func_or_var_or_typedef_declaration(ident, type, storageClass, functionSpecifier);
+                    if (_lexer.PeekToken('=', ',', ';')) {
+                        // é–¢æ•°/å¤‰æ•°/å‹ã®å®£è¨€
+                        SyntaxTree.Declaration decl = FunctionOrVariableOrTypedefDeclaration(ident, type, storageClass, functionSpecifier);
 
                         ret.Add(decl);
-
-
-                        if (lexer.ReadIf(',')) {
+                        if (_lexer.ReadTokenIf(',')) {
                             continue;
                         }
-                        break;
+                        _lexer.ReadToken(';');
                     } else if (type.IsFunctionType()) {
-                        ret.Add(function_definition(ident, type.Unwrap() as CType.FunctionType, storageClass, functionSpecifier));
-                        return ret;
+                        if (type.UnwrapTypeQualifier() is CType.TypedefedType) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å®šç¾©ã§å®£è¨€ã™ã‚‹è­˜åˆ¥å­ï¼ˆãã®é–¢æ•°ã®åå‰ï¼‰ã®å‹ãŒé–¢æ•°å‹ã§ã‚ã‚‹ã“ã¨ã¯ï¼Œãã®é–¢æ•°å®šç¾©ã®å®£è¨€å­ã®éƒ¨åˆ†ã§æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
+                        }
+                        ret.Add(FunctionDefinition(ident, type.Unwrap() as CType.FunctionType, storageClass, functionSpecifier));
                     } else {
-                        throw new Exception("");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "æ–‡æ³•ã‚¨ãƒ©ãƒ¼ã§ã™ã€‚");
                     }
+                    break;
 
                 }
-                lexer.Read(';');
                 return ret;
             }
 
         }
 
         /// <summary>
-        /// 6.9.1@ŠÖ”’è‹`
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="type"></param>
         /// <param name="storageClass"></param>
         /// <returns></returns>
         /// <remarks>
-        /// §–ñ
-        /// - ŠÖ”’è‹`‚ÅéŒ¾‚·‚é¯•Êqi‚»‚ÌŠÖ”‚Ì–¼‘Oj‚ÌŒ^‚ªŠÖ”Œ^‚Å‚ ‚é‚±‚Æ‚ÍC‚»‚ÌŠÖ”’è‹`‚ÌéŒ¾q ‚Ì•”•ª‚Åw’è‚µ‚È‚¯‚ê‚Î‚È‚ç‚È‚¢
-        /// - ŠÖ”‚Ì•Ô‹p’l‚ÌŒ^‚ÍC”z—ñŒ^ˆÈŠO‚ÌƒIƒuƒWƒFƒNƒgŒ^–”‚Í void Œ^‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-        /// - éŒ¾w’èq—ñ‚Ì’†‚É‹L‰¯ˆæƒNƒ‰ƒXw’èq‚ª‚ ‚éê‡C‚»‚ê‚Í extern –”‚Í static ‚Ì‚¢‚¸‚ê‚©‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-        /// - éŒ¾q‚ª‰¼ˆø”Œ^•À‚Ñ‚ğŠÜ‚Şê‡C‚»‚ê‚¼‚ê‚Ì‰¼ˆø”‚ÌéŒ¾‚Í¯•Êq‚ğŠÜ‚Ü‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-        ///   ‚½‚¾‚µC‰¼ˆø”Œ^•À‚Ñ‚ª void Œ^‚Ì‰¼ˆø”ˆê‚Â‚¾‚¯‚©‚ç¬‚é“Á•Ê‚Èê‡‚ğœ‚­B‚±‚Ìê‡‚ÍC¯•Êq‚ª‚ ‚Á‚Ä‚Í‚È‚ç‚¸CX‚ÉéŒ¾q‚ÌŒã‚ë‚ÉéŒ¾•À‚Ñ‚ª‘±‚¢‚Ä‚Í‚È‚ç‚È‚¢B
+        /// åˆ¶ç´„
+        /// - é–¢æ•°å®šç¾©ã§å®£è¨€ã™ã‚‹è­˜åˆ¥å­ï¼ˆãã®é–¢æ•°ã®åå‰ï¼‰ã®å‹ãŒé–¢æ•°å‹ã§ã‚ã‚‹ã“ã¨ã¯ï¼Œãã®é–¢æ•°å®šç¾©ã®å®£è¨€å­ ã®éƒ¨åˆ†ã§æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„
+        /// - é–¢æ•°ã®è¿”å´å€¤ã®å‹ã¯ï¼Œé…åˆ—å‹ä»¥å¤–ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆå‹åˆã¯ void å‹ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+        /// - å®£è¨€æŒ‡å®šå­åˆ—ã®ä¸­ã«è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­ãŒã‚ã‚‹å ´åˆï¼Œãã‚Œã¯ extern åˆã¯ static ã®ã„ãšã‚Œã‹ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+        /// - å®£è¨€å­ãŒä»®å¼•æ•°å‹ä¸¦ã³ã‚’å«ã‚€å ´åˆï¼Œãã‚Œãã‚Œã®ä»®å¼•æ•°ã®å®£è¨€ã¯è­˜åˆ¥å­ã‚’å«ã¾ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+        ///   ãŸã ã—ï¼Œä»®å¼•æ•°å‹ä¸¦ã³ãŒ void å‹ã®ä»®å¼•æ•°ä¸€ã¤ã ã‘ã‹ã‚‰æˆã‚‹ç‰¹åˆ¥ãªå ´åˆã‚’é™¤ãã€‚ã“ã®å ´åˆã¯ï¼Œè­˜åˆ¥å­ãŒã‚ã£ã¦ã¯ãªã‚‰ãšï¼Œæ›´ã«å®£è¨€å­ã®å¾Œã‚ã«å®£è¨€ä¸¦ã³ãŒç¶šã„ã¦ã¯ãªã‚‰ãªã„ã€‚
         /// </remarks>
-        private SyntaxTree.Declaration function_definition(string ident, CType.FunctionType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
+        private SyntaxTree.Declaration FunctionDefinition(string ident, CType.FunctionType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
 
-            // K&R‚É‚¨‚¯‚ééŒ¾•À‚Ñ‚ª‚ ‚éê‡‚Í“Ç‚İæ‚éB
-            var argmuents = is_declaration() ? declaration() : null;
-
-            // éŒ¾•À‚Ñ‚ª‚ ‚éê‡‚Í‰¼ˆø”éŒ¾‚ğŒŸØ
-            if (argmuents != null) {
-                foreach (var arg in argmuents) {
-                    if (!(arg is SyntaxTree.Declaration.VariableDeclaration)) {
-                        throw new Exception("ŒÃ‚¢ƒXƒ^ƒCƒ‹‚ÌŠÖ”éŒ¾‚É‚¨‚¯‚ééŒ¾•À‚Ñ’†‚É‰¼ˆø”éŒ¾ˆÈŠO‚ª‚ ‚é");
-                    }
-                    if ((arg as SyntaxTree.Declaration.VariableDeclaration).Init != null) {
-                        throw new Exception("ŒÃ‚¢ƒXƒ^ƒCƒ‹‚ÌŠÖ”éŒ¾‚É‚¨‚¯‚é‰¼ˆø”éŒ¾‚ª‰Šú‰»®‚ğ‚Á‚Ä‚¢‚éB");
-                    }
-                    if ((arg as SyntaxTree.Declaration.VariableDeclaration).StorageClass != StorageClassSpecifier.Register && (arg as SyntaxTree.Declaration.VariableDeclaration).StorageClass != StorageClassSpecifier.None) {
-                        throw new Exception("ŒÃ‚¢ƒXƒ^ƒCƒ‹‚ÌŠÖ”éŒ¾‚É‚¨‚¯‚é‰¼ˆø”éŒ¾‚ªAregister ˆÈŠO‚Ì‹L‰¯ƒNƒ‰ƒXw’èq‚ğ”º‚Á‚Ä‚¢‚éB");
-                    }
-                }
+            // K&Rã«ãŠã‘ã‚‹å®£è¨€ä¸¦ã³ãŒã‚ã‚‹å ´åˆã¯èª­ã¿å–ã‚‹ã€‚
+            List<Tuple<string, CType, StorageClassSpecifier>> argmuents = null;
+            if (IsOldStyleFunctionArgumentDeclaration()) {
+                argmuents = OldStypeFunctionArgumentDeclarations();
             }
 
-            if (type.Arguments == null) {
-                // ¯•Êq•À‚ÑE‰¼ˆø”Œ^•À‚Ñ‚È‚µ
-                if (argmuents != null) {
-                    throw new Exception("K&RŒ`®‚ÌŠÖ”’è‹`‚¾‚ªA¯•Êq•À‚Ñ‚ª‹ó‚È‚Ì‚ÉAéŒ¾•À‚Ñ‚ª‚ ‚é");
-                } else {
-                    // ANSI‚É‚¨‚¯‚éˆø”‚ğ‚Æ‚ç‚È‚¢ŠÖ”(void)
-                    // Œx‚ğo‚·‚±‚ÆB
-                    type.Arguments = new CType.FunctionType.ArgumentInfo[0];
-                }
-            } else if (type.Arguments.Any(x => (x.Type as CType.BasicType)?.Kind == CType.BasicType.TypeKind.KAndRImplicitInt)) {
+            if (type.Arguments == null && argmuents != null) {
+                // è­˜åˆ¥å­ä¸¦ã³: ãªã—
+                // å®£è¨€ä¸¦ã³: ã‚ã‚Š
+                // -> ä»®å¼•æ•°ç”¨ã®å®£è¨€ä¸¦ã³ãŒã‚ã‚‹ã®ã«ã€è­˜åˆ¥å­ä¸¦ã³ãŒãªã„
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "è­˜åˆ¥å­ä¸¦ã³ãŒç©ºãªã®ã«ã€å®£è¨€ä¸¦ã³ãŒã‚ã‚‹ã€‚");
+            } else if (type.Arguments == null && argmuents == null) {
+                // è­˜åˆ¥å­ä¸¦ã³: ãªã—
+                // ä»®å¼•æ•°å‹ä¸¦ã³: ãªã—
+                // -> ANSIå½¢å¼ã§å¼•æ•°ç„¡ã—ã®é–¢æ•°å®šç¾©ï¼ˆé–¢æ•°å®£è¨€æ™‚ã¨ã¯æ„å‘³ãŒé•ã†ï¼‰
+                // ToDo:è­¦å‘Šã‚’å‡ºã™ã“ã¨ã€‚
+                type.Arguments = new CType.FunctionType.ArgumentInfo[0];
+            } else if (type.Arguments != null && argmuents != null) {
+                // è­˜åˆ¥å­ä¸¦ã³ã‚ã‚Šã€ä»®å¼•æ•°ä¸¦ã³ã‚ã‚Šã€‚
 
-                // ANSIŒ`®‚Ì‰¼ˆø”•À‚Ñ‚Æ‚Ì‹¤‘¶‚Í•s‰Â”\
+                // è­˜åˆ¥å­ä¸¦ã³ãŒANSIå½¢å¼ã®ä»®å¼•æ•°ä¸¦ã³ã‹ã©ã†ã‹èª¿ã¹ã‚‹
+                // è­˜åˆ¥å­ä¸¦ã³ã®å ´åˆã€type.Argumentsã®å…¨ã¦ã®å‹ãŒCType.BasicType(KAndRImplicitInt)ã«ãªã‚‹ã®ã§
+                // ä¸€ã¤ã§ã‚‚ãã†ã§ã¯ãªã„å ´åˆã‚’è¦‹ã¤ã‘ã‚Œã°ã„ã„
                 if (type.Arguments.Any(x => (x.Type as CType.BasicType)?.Kind != CType.BasicType.TypeKind.KAndRImplicitInt)) {
-                    throw new Exception("ŠÖ”’è‹`’†‚ÅK&RŒ`®‚Ì¯•Êq•À‚Ñ‚ÆANSIŒ`®‚Ì‰¼ˆø”Œ^•À‚Ñ‚ª¬İ‚µ‚Ä‚¢‚é");
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å®šç¾©ä¸­ã§K&Rå½¢å¼ã®è­˜åˆ¥å­ä¸¦ã³ã¨ANSIå½¢å¼ã®ä»®å¼•æ•°å‹ä¸¦ã³ãŒæ··åœ¨ã—ã¦ã„ã‚‹");
                 }
 
+                // è­˜åˆ¥å­ä¸¦ã³ã®ä¸­ã«ç„¡ã„ã‚‚ã®ãŒå®£è¨€ä¸¦ã³ã«ã‚ã‚‹ã‹èª¿ã¹ã‚‹
+                if (argmuents.Select(x => x.Item1).Except(type.Arguments.Select(x => x.Ident)).Any()) {
+                    // è­˜åˆ¥å­ä¸¦ã³ä¸­ã®è¦ç´ ä»¥å¤–ãŒå®£è¨€ä¸¦ã³ã«ã‚ã‚‹ã€‚
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "è­˜åˆ¥å­ä¸¦ã³ä¸­ã®è¦ç´ ä»¥å¤–ãŒå®£è¨€ä¸¦ã³ã«ã‚ã‚‹ã€‚");
+                }
 
-                // •W€‰»‘O‚ÌK•R‰”Å‚É‚¨‚¢‚Ä‚ÍAˆø”‚É‚Í‹K’è‚ÌÀˆø”Šg’£‚ª“K—p‚³‚êAchar, shortŒ^‚Íint‚ÉAfloatŒ^‚Í doubleŒ^‚ÉŠg’£‚³‚ê‚éB‚Â‚Ü‚èAˆø”‚Æ‚µ‚Ä“n‚¹‚é®”Œ^‚Íint/¬”Œ^‚Ídouble‚Ì‚İB
-                //  -> int f(x,y,z) char x; float y; short* z; {...} ‚Í int f(int x, double y, short *z) { ... } ‚É‚È‚é(short*‚Íƒ|ƒCƒ“ƒ^Œ^‚È‚Ì‚ÅŠg’£‚³‚ê‚È‚¢)
+                // æ¨™æº–åŒ–å‰ã®Kï¼†Råˆç‰ˆã«ãŠã„ã¦ã¯ã€å¼•æ•°ã«ã¯è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µãŒé©ç”¨ã•ã‚Œã€char, shortå‹ã¯intã«ã€floatå‹ã¯ doubleå‹ã«æ‹¡å¼µã•ã‚Œã‚‹ã€‚ã¤ã¾ã‚Šã€å¼•æ•°ã¨ã—ã¦æ¸¡ã›ã‚‹æ•´æ•°å‹ã¯int/å°æ•°å‹ã¯doubleã®ã¿ã€‚
+                //  -> int f(x,y,z) char x; float y; short* z; {...} ã¯ int f(int x, double y, short *z) { ... } ã«ãªã‚‹(short*ã¯ãƒã‚¤ãƒ³ã‚¿å‹ãªã®ã§æ‹¡å¼µã•ã‚Œãªã„)
                 //
-                // gcc‚Í”ñ•W€Šg’£‚Æ‚µ‚ÄŠÖ”ƒvƒƒgƒ^ƒCƒvéŒ¾‚ÌŒã‚É“¯‚¶Œ^‚ÌK&RŒ^‚ÌŠÖ”’è‹`‚ª“oê‚·‚é‚ÆAƒvƒƒgƒ^ƒCƒvéŒ¾‚ğg‚Á‚ÄK&R‚ÌŠÖ”’è‹`‚ğ‘‚«Š·‚¦‚éBi"info gcc" -> "C Extension" -> "Function Prototypes"j
-                //  -> int f(char, float, short*); ‚ª–‘O‚É‚ ‚é‚Æ int f(x,y,z) char x; float y; short* z; {...} ‚Í int f(char x, float y, short* z) { ... } ‚É‚È‚éBiƒvƒƒgƒ^ƒCƒv‚ª–³‚¢ê‡‚Í]—ˆ’Ê‚èHj
+                // gccã¯éæ¨™æº–æ‹¡å¼µã¨ã—ã¦é–¢æ•°ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—å®£è¨€ã®å¾Œã«åŒã˜å‹ã®K&Rå‹ã®é–¢æ•°å®šç¾©ãŒç™»å ´ã™ã‚‹ã¨ã€ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—å®£è¨€ã‚’ä½¿ã£ã¦K&Rã®é–¢æ•°å®šç¾©ã‚’æ›¸ãæ›ãˆã‚‹ã€‚ï¼ˆ"info gcc" -> "C Extension" -> "Function Prototypes"ï¼‰
+                //  -> int f(char, float, short*); ãŒäº‹å‰ã«ã‚ã‚‹ã¨ int f(x,y,z) char x; float y; short* z; {...} ã¯ int f(char x, float y, short* z) { ... } ã«ãªã‚‹ã€‚ï¼ˆãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—ãŒç„¡ã„å ´åˆã¯å¾“æ¥é€šã‚Šï¼Ÿï¼‰
                 // 
-                // ‚±‚ê‚ç‚æ‚èA
-                // K&RŒ`®‚Ì‰¼ˆø”’è‹`‚Ìê‡A‹K’è‚ÌÀˆø”Šg’£‘OŒã‚ÅŒ^‚ªH‚¢ˆá‚¤ˆø”éŒ¾‚ÍƒGƒ‰[‚É‚·‚éB
+                // ã“ã‚Œã‚‰ã‚ˆã‚Šã€
+                // K&Rå½¢å¼ã®ä»®å¼•æ•°å®šç¾©ã®å ´åˆã€è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µå‰å¾Œã§å‹ãŒé£Ÿã„é•ã†å¼•æ•°å®£è¨€ã¯ã‚¨ãƒ©ãƒ¼ã«ã™ã‚‹ã€‚
 
-                // •´‚ç‚í‚µ‚¢—á‚Ìê‡
+                // ç´›ã‚‰ã‚ã—ã„ä¾‹ã®å ´åˆ
                 // int f();
                 // void foo(void) { f(3.14f); }
                 // int f (x) floar x; { ... }
                 //
-                // int f(); ˆø”‚Ìî•ñ‚ª‚È‚¢ŠÖ”‚Ìƒvƒƒgƒ^ƒCƒv‚È‚Ì‚ÅAÀˆø”‚É‚Í‹K’è‚ÌÀˆø”Šg’£‚ª“K—p‚³‚êAˆø”‚Æ‚µ‚Ä“n‚¹‚é®”Œ^‚Íint/¬”Œ^‚Ídouble‚Ì‚İB
-                // f(3.14f); ‚Íˆø”‚Ìî•ñ‚ª‚È‚¢ŠÖ”‚Ìƒvƒƒgƒ^ƒCƒv‚È‚Ì‚Åˆø”‚ÌŒ^E”‚Íƒ`ƒFƒbƒN‚¹‚¸AŠù’è‚ÌÀˆø”Šg’£‚É‚æ‚èˆø”‚ÍdoubleŒ^‚É•ÏŠ·‚³‚ê‚éBi‹K’è‚ÌÀˆø”Šg’£‚ÅŒ^‚ª•Ï‰»‚·‚é‚È‚çŒx‚ğo‚µ‚½‚Ù‚¤‚ª‚¢‚¢‚æ‚Ëj
-                // int f(x) float x; {...} ‚Í ‹K’è‚ÌÀˆø”Šg’£‚É‚æ‚è inf f(x) double x; {... }‘Š“–‚Æ‚È‚éBi‚Ì‚ÅŒxo‚µ‚½‚Ù‚¤‚ª‚¢‚¢‚æ‚Ëj
-                // ‚È‚Ì‚ÅA‘S‘Ì‚Å‚İ‚é‚ÆŒ^‚Ì®‡«‚Í‚Æ‚ê‚Ä‚¢‚éB
+                // int f(); å¼•æ•°ã®æƒ…å ±ãŒãªã„é–¢æ•°ã®ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—ãªã®ã§ã€å®Ÿå¼•æ•°ã«ã¯è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µãŒé©ç”¨ã•ã‚Œã€å¼•æ•°ã¨ã—ã¦æ¸¡ã›ã‚‹æ•´æ•°å‹ã¯int/å°æ•°å‹ã¯doubleã®ã¿ã€‚
+                // f(3.14f); ã¯å¼•æ•°ã®æƒ…å ±ãŒãªã„é–¢æ•°ã®ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—ãªã®ã§å¼•æ•°ã®å‹ãƒ»æ•°ã¯ãƒã‚§ãƒƒã‚¯ã›ãšã€æ—¢å®šã®å®Ÿå¼•æ•°æ‹¡å¼µã«ã‚ˆã‚Šå¼•æ•°ã¯doubleå‹ã«å¤‰æ›ã•ã‚Œã‚‹ã€‚ï¼ˆè¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µã§å‹ãŒå¤‰åŒ–ã™ã‚‹ãªã‚‰è­¦å‘Šã‚’å‡ºã—ãŸã»ã†ãŒã„ã„ã‚ˆã­ï¼‰
+                // int f(x) float x; {...} ã¯ è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µã«ã‚ˆã‚Š inf f(x) double x; {... }ç›¸å½“ã¨ãªã‚‹ã€‚ï¼ˆã®ã§è­¦å‘Šå‡ºã—ãŸã»ã†ãŒã„ã„ã‚ˆã­ï¼‰
+                // ãªã®ã§ã€å…¨ä½“ã§ã¿ã‚‹ã¨å‹ã®æ•´åˆæ€§ã¯ã¨ã‚Œã¦ã„ã‚‹ã€‚
 
-                // ŠÖ”Œ´Œ^‚ğŠÜ‚Ü‚È‚¢Œ^‚ÅŠÖ”‚ğ’è‹`‚µC‚©‚ÂŠg’£Œã‚ÌÀˆø”‚ÌŒ^‚ªCŠg’£Œã‚Ì‰¼ˆø”‚ÌŒ^‚Æ“K‡‚µ‚È‚¢ê‡C‚»‚Ì“®ì‚Í–¢’è‹`‚Æ‚·‚éB
-                // ã‚Ì—á‚Åf(1) ‚Æ‚·‚é‚ÆAŒÄ‚Ño‚µ‘¤‚Íˆø”‚ğintŒ^‚Å“n‚·‚Ì‚ÉAó‚¯æ‚è‘¤‚Ídouble‚Åó‚¯æ‚é‚½‚ßƒoƒO‚Ì‰·°‚É‚È‚éB
-                // ©“®ŒŸ¸‚·‚é‚É‚ÍŒ^„˜_‚·‚é‚µ‚©‚È‚¢
+                // é–¢æ•°åŸå‹ã‚’å«ã¾ãªã„å‹ã§é–¢æ•°ã‚’å®šç¾©ã—ï¼Œã‹ã¤æ‹¡å¼µå¾Œã®å®Ÿå¼•æ•°ã®å‹ãŒï¼Œæ‹¡å¼µå¾Œã®ä»®å¼•æ•°ã®å‹ã¨é©åˆã—ãªã„å ´åˆï¼Œãã®å‹•ä½œã¯æœªå®šç¾©ã¨ã™ã‚‹ã€‚
+                // ä¸Šã®ä¾‹ã§f(1) ã¨ã™ã‚‹ã¨ã€å‘¼ã³å‡ºã—å´ã¯å¼•æ•°ã‚’intå‹ã§æ¸¡ã™ã®ã«ã€å—ã‘å–ã‚Šå´ã¯doubleã§å—ã‘å–ã‚‹ãŸã‚ãƒã‚°ã®æ¸©åºŠã«ãªã‚‹ã€‚
+                // è‡ªå‹•æ¤œæŸ»ã™ã‚‹ã«ã¯å‹æ¨è«–ã™ã‚‹ã—ã‹ãªã„
 
 
-                // K&RŒ`®‚Ì¯•Êq•À‚Ñ‚ÉéŒ¾•À‚Ñ‚ÌŒ^î•ñ‚ğ‹K’è‚ÌÀˆø”Šg’£‚ğ”º‚Á‚Ä”½‰f‚³‚¹‚éB
-                // éŒ¾•À‚Ñ‚ğ–¼‘Oˆø‚«‚Å‚«‚é«‘‚É•ÏŠ·
-                var dic = argmuents.Cast<SyntaxTree.Declaration.VariableDeclaration>().ToDictionary(x => x.Ident, x => x);
-                // Œ^éŒ¾‘¤‚Ì‰¼ˆø”
+                // K&Rå½¢å¼ã®è­˜åˆ¥å­ä¸¦ã³ã«å®£è¨€ä¸¦ã³ã®å‹æƒ…å ±ã‚’è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µã‚’ä¼´ã£ã¦åæ˜ ã•ã›ã‚‹ã€‚
+                // å®£è¨€ä¸¦ã³ã‚’åå‰å¼•ãã§ãã‚‹è¾æ›¸ã«å¤‰æ›
+                var dic = argmuents.ToDictionary(x => x.Item1, x => x);
+
+                // å‹å®£è¨€å´ã®ä»®å¼•æ•°
                 var mapped = type.Arguments.Select(x => {
                     if (dic.ContainsKey(x.Ident)) {
-                        var dapType = dic[x.Ident].Type.DefaultArgumentPromotion();
-                        if (CType.IsEqual(dapType, dic[x.Ident].Type) == false) {
-                            throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}‚Í‹K’è‚ÌÀˆø”Šg’£‚ÅŒ^‚ª•Ï‰»‚µ‚Ü‚·B");
+                        var dapType = dic[x.Ident].Item2.DefaultArgumentPromotion();
+                        if (CType.IsEqual(dapType, dic[x.Ident].Item2) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯è¦å®šã®å®Ÿå¼•æ•°æ‹¡å¼µã§å‹ãŒå¤‰åŒ–ã—ã¾ã™ã€‚");
                         }
-                        return new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, dic[x.Ident].Type.DefaultArgumentPromotion());
+                        return new CType.FunctionType.ArgumentInfo(x.Ident, dic[x.Ident].Item3, dic[x.Ident].Item2.DefaultArgumentPromotion());
                     } else {
-                        return new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, CType.CreateSignedInt().DefaultArgumentPromotion());
+                        return new CType.FunctionType.ArgumentInfo(x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion());
                     }
                 }).ToList();
 
-
-
                 type.Arguments = mapped.ToArray();
 
+            } else if (type.Arguments != null && argmuents == null) {
+                // ANSIå½¢å¼ã®ä»®å¼•æ•°å‹ä¸¦ã³ã®ã¿ãªã®ã§ä½•ã‚‚ã—ãªã„
             } else {
-                // ANSIŒ`®‚Ì‰¼ˆø”Œ^•À‚Ñ‚Ì‚İ‚È‚Ì‚Å‰½‚à‚µ‚È‚¢
+                throw new Exception("ã‚ã‚Šãˆãªã„");
             }
 
-            // ŠÖ”‚ª’è‹`Ï‚İ‚Ìê‡‚ÍAÄ’è‹`‚Ìƒ`ƒFƒbƒN‚ğs‚¤
-            IdentifierScopeValue iv;
-            if (_identScope.TryGetValue(ident, out iv)) {
-                if (iv.IsFunction() == false) {
-                    throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}‚ÍŠù‚ÉŠÖ”Œ^ˆÈŠO‚ÅéŒ¾Ï‚İ");
+            // 6.9.1 é–¢æ•°å®šç¾©
+            // å‹å®šç¾©åã¨ã—ã¦å®£è¨€ã•ã‚ŒãŸè­˜åˆ¥å­ã‚’ä»®å¼•æ•°ã¨ã—ã¦å†å®£è¨€ã—ã¦ã¯ãªã‚‰ãªã„ã€‚
+            if (type.Arguments != null) {
+                foreach (var arg in type.Arguments) {
+                    if (_typedefScope.ContainsKey(arg.Ident)) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å‹å®šç¾©åã¨ã—ã¦å®£è¨€ã•ã‚ŒãŸè­˜åˆ¥å­{arg.Ident}ã‚’ä»®å¼•æ•°ã¨ã—ã¦å†å®£è¨€ã—ã¦ã¯ãªã‚‰ãªã„ã€‚");
+                    }
                 }
-                if ((iv.ToFunction().Ty as CType.FunctionType).Arguments != null) {
-                    if (CType.IsEqual(iv.ToFunction().Ty, type) == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, "Ä’è‹`Œ^‚Ì•sˆê’v");
+            }
+
+
+            // é–¢æ•°ãŒå®šç¾©æ¸ˆã¿ã®å ´åˆã¯ã€å†å®šç¾©ã®ãƒã‚§ãƒƒã‚¯ã‚’è¡Œã†
+            IdentifierScopeValue value;
+            if (_identScope.TryGetValue(ident, out value)) {
+                if (value.IsFunction() == false) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«é–¢æ•°å‹ä»¥å¤–ã§å®£è¨€æ¸ˆã¿");
+                }
+                CType.FunctionType functionType;
+                if (value.ToFunction().Type.IsFunctionType(out functionType) == false) {
+                    throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å®šç¾©ã®å‹ãŒé–¢æ•°å‹ã‚’å«ã¾ãªã„ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã“ã¨ãŒåŸå› ã§ã™ã€‚ï¼‰");
+                }
+                if (functionType.Arguments != null) {
+                    if (CType.IsEqual(functionType, type) == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å†å®šç¾©å‹ã®ä¸ä¸€è‡´");
                     }
                 } else {
-                    // ‰¼ˆø”‚ªÈ—ª‚³‚ê‚Ä‚¢‚é‚½‚ßAˆø”‚Ì”‚âŒ^‚Íƒ`ƒFƒbƒN‚µ‚È‚¢
-                    Console.WriteLine($"‰¼ˆø”‚ªÈ—ª‚³‚ê‚ÄéŒ¾‚³‚ê‚½ŠÖ” {ident} ‚ÌÀ‘Ô‚ğéŒ¾‚µ‚Ä‚¢‚Ü‚·B");
+                    // ä»®å¼•æ•°ãŒçœç•¥ã•ã‚Œã¦ã„ã‚‹ãŸã‚ã€å¼•æ•°ã®æ•°ã‚„å‹ã¯ãƒã‚§ãƒƒã‚¯ã—ãªã„
+                    Console.WriteLine($"ä»®å¼•æ•°ãŒçœç•¥ã•ã‚Œã¦å®£è¨€ã•ã‚ŒãŸé–¢æ•° {ident} ã®å®Ÿä½“ã‚’å®£è¨€ã—ã¦ã„ã¾ã™ã€‚");
                 }
-                if (iv.ToFunction().Body != null) {
-                    throw new Exception("ŠÖ”‚Í‚·‚Å‚É–{‘Ì‚ğ‚Á‚Ä‚¢‚éB");
+                if (value.ToFunction().Body != null) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ã™ã§ã«æœ¬ä½“ã‚’æŒã£ã¦ã„ã‚‹é–¢æ•°ã‚’å†å®šç¾©ã—ã¦ã„ã¾ã™ã€‚");
                 }
 
             }
+
+            // é–¢æ•°å®šç¾©ã‚’ç”Ÿæˆã™ã‚‹
             var funcdecl = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
 
-            // ŠÂ‹«‚É–¼‘O‚ğ’Ç‰Á
+            // ç’°å¢ƒã«åå‰ã‚’è¿½åŠ 
             _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcdecl));
 
-            // ŠeƒXƒR[ƒv‚ğÏ‚Ş
+            // å„ã‚¹ã‚³ãƒ¼ãƒ—ã‚’ç©ã‚€
             _tagScope = _tagScope.Extend();
             _typedefScope = _typedefScope.Extend();
             _identScope = _identScope.Extend();
+            _labelScope = _labelScope.Extend();
 
+            // å¼•æ•°ã‚’ç©ã‚€
             if (type.Arguments != null) {
                 foreach (var arg in type.Arguments) {
                     _identScope.Add(arg.Ident, new IdentifierScopeValue.Declaration(new SyntaxTree.Declaration.ArgumentDeclaration(arg.Ident, arg.Type, arg.StorageClass)));
                 }
             }
 
-            // ŠÖ”–{‘Ìi•¡•¶j‚ğ‰ğÍ
-            funcdecl.Body = compound_statement();
+            // é–¢æ•°æœ¬ä½“ï¼ˆè¤‡æ–‡ï¼‰ã‚’è§£æ
+            // å¼•æ•°å¤‰æ•°ã‚’è¤‡æ–‡ã‚¹ã‚³ãƒ¼ãƒ—ã«å…¥ã‚Œã‚‹ãŸã‚ã«ã€é–¢æ•°å´ã§ã‚¹ã‚³ãƒ¼ãƒ—ã‚’ä½œã‚Šã€è¤‡æ–‡å´ã§ã‚¹ã‚³ãƒ¼ãƒ—ã‚’ä½œæˆã—ãªã„ã‚ˆã†ã«ã™ã‚‹ã€‚
+            funcdecl.Body = CompoundStatement(skipCreateNewScope: true);
 
-            //ŠeƒXƒR[ƒv‚©‚ço‚é
+            // æœªå®šç¾©ãƒ©ãƒ™ãƒ«ã¨æœªä½¿ç”¨ãƒ©ãƒ™ãƒ«ã‚’èª¿æŸ»
+            foreach (var scopeValue in _labelScope.GetEnumertor()) {
+                if (scopeValue.Item2.Declaration == null && scopeValue.Item2.Reference.Any()) {
+                    // æœªå®šç¾©ã®ãƒ©ãƒ™ãƒ«ãŒä½¿ã‚ã‚Œã¦ã„ã‚‹ã€‚
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "æœªå®šç¾©ã®ãƒ©ãƒ™ãƒ«ãŒä½¿ç”¨ã•ã‚Œã¦ã„ã¾ã™ã€‚");
+                }
+                if (scopeValue.Item2.Declaration != null && !scopeValue.Item2.Reference.Any()) {
+                    // æœªå®šç¾©ã®ãƒ©ãƒ™ãƒ«ãŒä½¿ã‚ã‚Œã¦ã„ã‚‹ã€‚
+                    Console.Error.WriteLine("ãƒ©ãƒ™ãƒ«ã¯å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ãŒã©ã“ã‹ã‚‰ã‚‚å‚ç…§ã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚");
+                }
+            }
+
+            //å„ã‚¹ã‚³ãƒ¼ãƒ—ã‹ã‚‰å‡ºã‚‹
+            _labelScope = _labelScope.Parent;
             _identScope = _identScope.Parent;
             _typedefScope = _typedefScope.Parent;
             _tagScope = _tagScope.Parent;
@@ -568,168 +639,116 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.9.2@ŠO•”ƒIƒuƒWƒFƒNƒg’è‹`A‚à‚µ‚­‚ÍAéŒ¾
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©(K&Rã®å®£è¨€ä¸¦ã³)
         /// </summary>
-        /// <param name="ident"></param>
-        /// <param name="type"></param>
-        /// <param name="storageClass"></param>
-        /// <param name="functionSpecifier"></param>
         /// <returns></returns>
-        private SyntaxTree.Declaration func_or_var_or_typedef_declaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
-            SyntaxTree.Declaration decl;
-
-            if (functionSpecifier != FunctionSpecifier.None) {
-                throw new Exception("inline‚ÍŠÖ”’è‹`‚É‘Î‚µ‚Ä‚Ì‚İg‚¦‚éB");
-            }
-            if (storageClass == StorageClassSpecifier.Auto || storageClass == StorageClassSpecifier.Register) {
-                throw new Exception("éŒ¾‚É‘Î‚µ‚Ä—˜—p‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq‚ªw’è‚³‚ê‚Ä‚¢‚éB");
-            }
-
-
-            if (lexer.ReadIf('=')) {
-                // ‰Šú‰»®‚ğ”º‚¤‚Ì‚ÅA‰Šú‰»•t‚«‚Ì•Ï”éŒ¾
-
-                if (storageClass == StorageClassSpecifier.Typedef || storageClass == StorageClassSpecifier.Auto || storageClass == StorageClassSpecifier.Register) {
-                    throw new Exception("•Ï”éŒ¾‚É‚Íw’è‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq‚ªw’è‚³‚ê‚Ä‚¢‚éB");
+        private List<Tuple<string, CType, StorageClassSpecifier>> OldStypeFunctionArgumentDeclarations() {
+            if (IsOldStyleFunctionArgumentDeclaration()) {
+                var decls = new List<Tuple<string, CType, StorageClassSpecifier>>();
+                while (IsOldStyleFunctionArgumentDeclaration()) {
+                    decls = OldStyleFunctionArgumentDeclaration(decls);
                 }
-
-                if (type.IsFunctionType()) {
-                    throw new Exception("ŠÖ”éŒ¾‚É‰Šú’l‚ğw’è‚µ‚Ä‚¢‚é");
-                }
-                if (ident == "tktk") {
-
-                }
-                var init = initializer(type);
-                decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, init);
-                // ŠÂ‹«‚É‰Šú’l•t‚«•Ï”‚ğ’Ç‰Á
-                _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                return decls;
             } else {
-                // ‰Šú‰»®‚ğ”º‚í‚È‚¢‚½‚ßAŠÖ”éŒ¾A•Ï”éŒ¾ATypedeféŒ¾‚Ì‚Ç‚ê‚©
-
-                if (storageClass == StorageClassSpecifier.Auto || storageClass == StorageClassSpecifier.Register) {
-                    throw new Exception("ƒtƒ@ƒCƒ‹—LŒø”ÍˆÍ‚Å‚ÌŠÖ”éŒ¾A•Ï”éŒ¾ATypedeféŒ¾‚Åw’è‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq‚ªw’è‚³‚ê‚Ä‚¢‚éB");
-                }
-
-                CType.FunctionType ft;
-                if (type.IsFunctionType(out ft) && ft.Arguments != null) {
-                    // 6.7.5.3 ŠÖ”éŒ¾qiŠÖ”Œ´Œ^‚ğŠÜ‚Şj
-                    // ŠÖ”’è‹`‚Ìˆê•”‚Å‚È‚¢ŠÖ”éŒ¾q‚É‚¨‚¯‚é¯•Êq•À‚Ñ‚ÍC‹ó‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-                    // ‹r’@ŠÖ”éŒ¾‚ÅK&R‚ÌŠÖ”’è‹`‚Ì‚æ‚¤‚É int f(a,b,c); ‚Æ‘‚­‚±‚Æ‚Íƒ_ƒ‚Æ‚¢‚¤‚±‚ÆBint f(); ‚È‚çOK
-                    // K&R ‚Ì‹L–@‚ÅéŒ¾‚ğ‹Lq‚µ‚½ê‡Aˆø”‚ÌType‚Ínull
-                    // ANSI‚Ì‹L–@‚ÅéŒ¾‚ğ‹Lq‚µ‚½ê‡Aˆø”‚ÌType‚Í”ñnull
-                    if (ft.Arguments.Any(x => x.Type == null)) {
-                        throw new Exception("ŠÖ”’è‹`‚Ìˆê•”‚Å‚È‚¢ŠÖ”éŒ¾q‚É‚¨‚¯‚é¯•Êq•À‚Ñ‚ÍC‹ó‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
-                    }
-                }
-
-                if (storageClass == StorageClassSpecifier.Typedef) {
-                    // typedef éŒ¾
-                    SyntaxTree.Declaration.TypeDeclaration tdecl;
-                    bool current;
-                    if (_typedefScope.TryGetValue(ident, out tdecl, out current)) {
-                        if (current == true) {
-                            throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^‚ªÄ’è‹`‚³‚ê‚½BiŒ^‚ÌÄ’è‹`‚ÍC11ˆÈ~‚Ì‹@”\Bj");
-                        }
-                    }
-                    tdecl = new SyntaxTree.Declaration.TypeDeclaration(ident, type);
-                    decl = tdecl;
-                    _typedefScope.Add(ident, tdecl);
-                } else if (type.IsFunctionType()) {
-                    // ŠÖ”éŒ¾
-                    IdentifierScopeValue iv;
-                    if (_identScope.TryGetValue(ident, out iv)) {
-                        if (iv.IsFunction() == false) {
-                            throw new Exception("ŠÖ”Œ^ˆÈŠO‚ÅéŒ¾Ï‚İ");
-                        }
-                        if (CType.IsEqual(iv.ToFunction().Ty, type) == false) {
-                            throw new Exception("Ä’è‹`Œ^‚Ì•sˆê’v");
-                        }
-                        // Todo: Œ^‚Ì‡¬
-                    }
-                    decl = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
-                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
-                } else {
-                    // •Ï”éŒ¾
-                    IdentifierScopeValue iv;
-                    if (_identScope.TryGetValue(ident, out iv)) {
-                        if (iv.IsVariable() == false) {
-                            throw new Exception("•Ï”Œ^ˆÈŠO‚ÅéŒ¾Ï‚İ");
-                        }
-                        if (CType.IsEqual(iv.ToVariable().Type, type) == false) {
-                            throw new Exception("Ä’è‹`Œ^‚Ì•sˆê’v");
-                        }
-                        // Todo: Œ^‚Ì‡¬
-                    }
-                    decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
-                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
-                }
+                return null;
             }
-            return decl;
         }
 
         /// <summary>
-        /// 6.7 éŒ¾‚Æ‚È‚è‚¤‚é‚©H
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©(K&Rã®å®£è¨€è¦ç´ ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_declaration() {
-            return is_declaration_specifiers(null, TypeSpecifier.None);
+        private bool IsOldStyleFunctionArgumentDeclaration() {
+            return IsDeclarationSpecifiers(null, AnsiCParser.TypeSpecifier.None);
         }
 
         /// <summary>
-        /// 6.7 éŒ¾(éŒ¾)
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©(K&Rã®å®£è¨€è¦ç´ )
         /// </summary>
         /// <returns></returns>
-        private List<SyntaxTree.Declaration> declaration() {
+        private List<Tuple<string, CType, StorageClassSpecifier>> OldStyleFunctionArgumentDeclaration(List<Tuple<string, CType, StorageClassSpecifier>> decls) {
 
-            // éŒ¾w’èq—ñ 
+            // å®£è¨€æŒ‡å®šå­åˆ— 
             StorageClassSpecifier storageClass;
-            CType baseType = declaration_specifiers(out storageClass);
-
-            // ‰Šú‰»éŒ¾q•À‚Ñ
-            List<SyntaxTree.Declaration> decls = null;
-            if (!lexer.Peek(';')) {
-                // ˆê‚ÂˆÈã‚Ì‰Šú‰»éŒ¾q
-                decls = new List<SyntaxTree.Declaration>();
-                decls.Add(init_declarator(baseType, storageClass));
-                while (lexer.ReadIf(',')) {
-                    decls.Add(init_declarator(baseType, storageClass));
-                }
+            CType baseType = OldStyleFunctionArgumentDeclarationSpecifiers(out storageClass);
+            if (!(storageClass == AnsiCParser.StorageClassSpecifier.Register || storageClass == AnsiCParser.StorageClassSpecifier.None)) {
+                // 6.9.1 
+                // åˆ¶ç´„ å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯ï¼Œregister ä»¥å¤–ã®è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­åŠã³åˆæœŸåŒ–ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯ï¼Œregister ä»¥å¤–ã®è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚");
             }
-            lexer.Read(';');
+            // åˆæœŸåŒ–å®£è¨€å­ä¸¦ã³
+            if (!_lexer.PeekToken(';')) {
+                // ä¸€ã¤ä»¥ä¸Šã®åˆæœŸåŒ–å®£è¨€å­ãŒã‚ã‚‹ï¼Ÿ
+                do {
+                    var declaration = OldStyleFunctionArgumentInitDeclarator(baseType, storageClass);
+                    // å†å®šç¾©ï¼ˆé‡è¤‡å®šç¾©ï¼‰ã®ãƒã‚§ãƒƒã‚¯
+                    if (decls.Any(x => x.Item1 == declaration.Item1)) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å®£è¨€ä¸¦ã³ä¸­ã§è­˜åˆ¥å­{declaration.Item1}ãŒå†å®šç¾©ã•ã‚Œã¾ã—ãŸã€‚");
+                    }
+                    decls.Add(declaration);
+                } while (_lexer.ReadTokenIf(','));
+            }
+            _lexer.ReadToken(';');
             return decls;
         }
 
         /// <summary>
-        /// 6.7 éŒ¾(éŒ¾w’èq—ñ‚É‚È‚è‚¤‚é‚©)
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©(K&Rã®åˆæœŸåŒ–å®£è¨€å­)
         /// </summary>
-        /// <param name="sc"></param>
+        /// <param name="type"></param>
+        /// <param name="storageClass"></param>
         /// <returns></returns>
-        private bool is_declaration_specifiers(CType type, TypeSpecifier typeSpecifier) {
-            return is_declaration_specifier(type, typeSpecifier);
+        private Tuple<string,CType, StorageClassSpecifier> OldStyleFunctionArgumentInitDeclarator(CType type, StorageClassSpecifier storageClass) {
+            // å®£è¨€å­
+            string ident = "";
+            List<CType> stack = new List<CType>() { new CType.StubType() };
+            Declarator(ref ident, stack, 0);
+            type = CType.Resolve(type, stack);
+
+            if (_lexer.ReadTokenIf('=')) {
+                // åˆæœŸåŒ–å­ã‚’ä¼´ã†å®£è¨€
+                // å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯åˆæœŸåŒ–ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„
+
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯åˆæœŸåŒ–ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚");
+
+                //// ã‚¨ãƒ©ãƒ¼å›å¾©ã®ãŸã‚ã«åˆæœŸåŒ–å¼ã‚’èª­ã¿é£›ã°ã™ã€‚
+                //var init = initializer(type);
+                //// å†å®£è¨€ã®ç¢ºèªã¯å‘¼ã³å‡ºã—å´ã§è¡Œã†ã“ã¨ã¨ã™ã‚‹ã€‚
+
+                return Tuple.Create(ident, type, storageClass);
+            } else if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                // 6.9.1 
+                // åˆ¶ç´„ å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯ï¼Œregister ä»¥å¤–ã®è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­åŠã³åˆæœŸåŒ–ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å®£è¨€ä¸¦ã³ã®ä¸­ã®å®£è¨€ã¯ï¼Œregister ä»¥å¤–ã®è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚");
+            } else if (type.IsFunctionType()) {
+                // ä»®å¼•æ•°ã‚’â€œï½å‹ã‚’è¿”å´ã™ã‚‹é–¢æ•°â€ã¨ã™ã‚‹å®£è¨€ã¯ï¼Œ6.3.2.1 ã®è¦å®šã«å¾“ã„ï¼Œâ€œï½å‹ã‚’è¿”å´ã™ã‚‹é–¢æ•°ã¸ã®ãƒã‚¤ãƒ³ã‚¿â€ã«å‹èª¿æ•´ã™ã‚‹ã€‚
+                Console.Error.WriteLine("ä»®å¼•æ•°ã«â€œï½å‹ã‚’è¿”å´ã™ã‚‹é–¢æ•°â€ã¨ã™ã‚‹å®£è¨€ãŒã‚ã‚Šã¾ã™ãŒï¼Œ6.3.2.1 ã®è¦å®šã«å¾“ã„ï¼Œâ€œï½å‹ã‚’è¿”å´ã™ã‚‹é–¢æ•°ã¸ã®ãƒã‚¤ãƒ³ã‚¿â€ã«å‹èª¿æ•´ã—ã¾ã™ã€‚");
+                return Tuple.Create(ident, (CType)CType.CreatePointer(type), storageClass);
+            } else {
+                return Tuple.Create(ident, type, storageClass);
+            }
         }
 
         /// <summary>
-        /// 6.7 éŒ¾(éŒ¾w’èq—ñ)
+        /// 6.9.1ã€€é–¢æ•°å®šç¾©(å¤ã„å½¢å¼ã®é–¢æ•°å®šç¾©ã«ãŠã‘ã‚‹å®£è¨€æŒ‡å®šå­åˆ—)
         /// </summary>
         /// <param name="sc"></param>
         /// <returns></returns>
-        private CType declaration_specifiers(out StorageClassSpecifier sc) {
+        private CType OldStyleFunctionArgumentDeclarationSpecifiers(out StorageClassSpecifier sc) {
             CType baseType = null;
-            StorageClassSpecifier storageClass = StorageClassSpecifier.None;
+            StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
+            FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+#if false
             TypeSpecifier typeSpecifier = TypeSpecifier.None;
             TypeQualifier typeQualifier = TypeQualifier.None;
-            FunctionSpecifier functionSpecifier = FunctionSpecifier.None;
+            DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
 
-            declaration_specifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
-
-            while (is_declaration_specifier(baseType, typeSpecifier)) {
-                declaration_specifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
+            while (IsDeclarationSpecifier(baseType, typeSpecifier)) {
+                DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
             }
-
             if (functionSpecifier != FunctionSpecifier.None) {
-                throw new Exception("inline‚ÍŠÖ”’è‹`‚Å‚Ì‚İg‚¦‚éB");
+                throw new Exception("inlineã¯é–¢æ•°å®šç¾©ã§ã®ã¿ä½¿ãˆã‚‹ã€‚");
             }
-
             if (typeSpecifier != TypeSpecifier.None) {
                 if (baseType != null) {
                     throw new Exception("");
@@ -739,54 +758,289 @@ namespace AnsiCParser {
             } else if (baseType == null) {
                 baseType = new CType.BasicType(TypeSpecifier.None);
             }
-            sc = storageClass;
-
             baseType = baseType.WrapTypeQualifier(typeQualifier);
+#else
+            if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ /å‹æŒ‡å®šå­/å‹ä¿®é£¾å­ãŒä¸€ã¤ä»¥ä¸ŠæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å¿…è¦ãŒã‚ã‚‹ã€‚");
+            }
+            System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
+#endif
+
+            sc = storageClass;
             return baseType;
         }
 
         /// <summary>
-        /// 6.7 éŒ¾(éŒ¾w’èq—v‘f‚É‚È‚è‚¤‚é‚©)
+        /// 6.9.2ã€€å¤–éƒ¨ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆå®šç¾©ã€ã‚‚ã—ãã¯ã€å®£è¨€ 
+        /// </summary>
+        /// <param name="ident"></param>
+        /// <param name="type"></param>
+        /// <param name="storageClass"></param>
+        /// <param name="functionSpecifier"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// é–¢æ•°å®£è¨€ã€å¤‰æ•°å®£è¨€ã€ã‚‚ã—ãã¯å‹å®šç¾©ã®ã„ãšã‚Œã‹ã®ã‚±ãƒ¼ã‚¹ã‚’è§£æã™ã‚‹ã€‚é–¢æ•°å®šç¾©ã¯å«ã¾ã‚Œãªã„
+        /// </remarks>
+        private SyntaxTree.Declaration FunctionOrVariableOrTypedefDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
+            if (functionSpecifier != AnsiCParser.FunctionSpecifier.None) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "inlineã¯é–¢æ•°å®šç¾©ã«å¯¾ã—ã¦ã®ã¿ä½¿ãˆã‚‹ã€‚");
+            }
+            if (storageClass == AnsiCParser.StorageClassSpecifier.Auto || storageClass == AnsiCParser.StorageClassSpecifier.Register) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å®£è¨€ã«å¯¾ã—ã¦åˆ©ç”¨ã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+            }
+
+
+            if (_lexer.ReadTokenIf('=')) {
+                // åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€
+
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef 
+                 || storageClass == AnsiCParser.StorageClassSpecifier.Auto 
+                 || storageClass == AnsiCParser.StorageClassSpecifier.Register) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€ã«ã¯æŒ‡å®šã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+
+                if (type.IsFunctionType()) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å‹ã‚’æŒã¤å®£è¨€å­ã«å¯¾ã—ã¦åˆæœŸåŒ–å­ã‚’è¨­å®šã—ã¦ã„ã¾ã™ã€‚");
+                }
+                var initializer = Initializer(type);
+
+                // å†å®£è¨€ã®ç¢ºèª
+
+                IdentifierScopeValue iv;
+                bool isCurrent;
+                if (_identScope.TryGetValue(ident, out iv, out isCurrent) && isCurrent == true) {
+                    // å®£è¨€ã•ã‚Œã¦ã„ã‚‹ã®ã§è©³ç´°ã‚’ç¢ºèª
+                    // ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã®å¤‰æ•°å®£è¨€ã¯åˆæœŸåŒ–å­ã‚’æŒã¤å®Œå…¨ãªå®£è¨€ã¨æŒãŸãªã„ä¸å®Œå…¨ãªå®£è¨€ã«åˆ†ã‹ã‚Œã‚‹ã€‚
+                    // ä¸å®Œå…¨ãªå®£è¨€ã«ã¤ã„ã¦ã¯è¨˜æ†¶ã‚¹ã‚³ãƒ¼ãƒ—ãŒä¸€è‡´ã™ã‚‹é™ã‚Šä½•åº¦è¡Œã£ã¦ã‚‚å•é¡Œãªã„ã€‚
+                    if (iv.IsVariable() == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«å¤‰æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
+                    }
+                    if (CType.IsEqual(iv.ToVariable().Type, type) == false) {
+                        // å‹ãŒä¸ä¸€è‡´
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ—¢ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹å¤‰æ•°{ident}ã¨å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
+                    }
+                    if (iv.ToVariable().Init != null) {
+                        // åˆæœŸåŒ–å­ã‚’ã™ã§ã«æŒã£ã¦ã„ã‚‹
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å¤‰æ•°{ident}ã¯æ—¢ã«åˆæœŸåŒ–å­ã‚’ä¼´ã£ã¦å®£è¨€ã•ã‚Œã¦ã„ã‚‹ã€‚");
+                    }
+                    iv.ToVariable().Init = initializer;
+                    var varDecl = iv.ToVariable();
+                    return varDecl;
+                } else {
+                    if (iv != null) {
+                        // è­¦å‘Šï¼åå‰ã‚’éš ã—ãŸï¼
+                    }
+                    var varDecl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, initializer);
+                    // è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«å¤‰æ•°å®£è¨€ã‚’è¿½åŠ 
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(varDecl));
+                    return varDecl;
+                }
+
+            } else {
+                // åˆæœŸåŒ–å¼ã‚’ä¼´ã‚ãªã„ãŸã‚ã€é–¢æ•°å®£è¨€ã€å¤‰æ•°å®£è¨€ã€Typedefå®£è¨€ã®ã©ã‚Œã‹
+
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Auto || 
+                    storageClass == AnsiCParser.StorageClassSpecifier.Register) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãƒ•ã‚¡ã‚¤ãƒ«æœ‰åŠ¹ç¯„å›²ã§ã®é–¢æ•°å®£è¨€ã€å¤‰æ•°å®£è¨€ã€Typedefå®£è¨€ã§æŒ‡å®šã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+
+                CType.FunctionType ft;
+                if (type.IsFunctionType(out ft) && ft.Arguments != null) {
+                    // 6.7.5.3 é–¢æ•°å®£è¨€å­ï¼ˆé–¢æ•°åŸå‹ã‚’å«ã‚€ï¼‰
+                    // é–¢æ•°å®šç¾©ã®ä¸€éƒ¨ã§ãªã„é–¢æ•°å®£è¨€å­ã«ãŠã‘ã‚‹è­˜åˆ¥å­ä¸¦ã³ã¯ï¼Œç©ºã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+                    // è„šæ³¨ã€€é–¢æ•°å®£è¨€ã§K&Rã®é–¢æ•°å®šç¾©ã®ã‚ˆã†ã« int f(a,b,c); ã¨æ›¸ãã“ã¨ã¯ãƒ€ãƒ¡ã¨ã„ã†ã“ã¨ã€‚int f(); ãªã‚‰OK
+                    // K&R ã®è¨˜æ³•ã§å®£è¨€ã‚’è¨˜è¿°ã—ãŸå ´åˆã€å¼•æ•°ã®Typeã¯null
+                    // ANSIã®è¨˜æ³•ã§å®£è¨€ã‚’è¨˜è¿°ã—ãŸå ´åˆã€å¼•æ•°ã®Typeã¯énull
+                    if (ft.Arguments.Any(x => x.Type == null)) {
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å®šç¾©ã®ä¸€éƒ¨ã§ãªã„é–¢æ•°å®£è¨€å­ã«ãŠã‘ã‚‹è­˜åˆ¥å­ä¸¦ã³ã¯ï¼Œç©ºã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
+                    }
+                }
+
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                    // typedef å®£è¨€
+                    SyntaxTree.Declaration.TypeDeclaration tdecl;
+                    bool current;
+                    if (_typedefScope.TryGetValue(ident, out tdecl, out current)) {
+                        if (current == true) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹ãŒå†å®šç¾©ã•ã‚ŒãŸã€‚ï¼ˆå‹ã®å†å®šç¾©ã¯C11ä»¥é™ã®æ©Ÿèƒ½ã€‚ï¼‰");
+                        }
+                    }
+                    var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(ident, type);
+                    _typedefScope.Add(ident, typeDecl);
+                    return typeDecl;
+                } else if (type.IsFunctionType()) {
+                    // é–¢æ•°å®£è¨€
+                    IdentifierScopeValue value;
+                    if (_identScope.TryGetValue(ident, out value)) {
+                        if (value.IsFunction() == false) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«é–¢æ•°å‹ä»¥å¤–ã§å®£è¨€æ¸ˆã¿");
+                        }
+                        CType.FunctionType functionType;
+                        if (value.ToFunction().Type.IsFunctionType(out functionType) == false) {
+                            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å®šç¾©ã®å‹ãŒé–¢æ•°å‹ã‚’å«ã¾ãªã„ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã“ã¨ãŒåŸå› ã§ã™ã€‚ï¼‰");
+                        }
+                        // Todo: å‹ã®åˆæˆ
+                        // ãŸã¨ãˆã°ã€extern int foo(); ã¨ int foo() {} ã¯åˆæˆã—ãªã„ã¨æ„å‘³ãŒé•ã†
+                        if (CType.IsEqual(value.ToFunction().Type, type) == false) {
+                            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å†å®šç¾©å‹ã®ä¸ä¸€è‡´");
+                        }
+                    }
+                    var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc));
+
+                    return funcDelc;
+                } else {
+                    // å¤‰æ•°å®£è¨€
+                    IdentifierScopeValue iv;
+                    if (_identScope.TryGetValue(ident, out iv)) {
+                        if (iv.IsVariable() == false) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å¤‰æ•°å‹ä»¥å¤–ã§å®£è¨€æ¸ˆã¿");
+                        }
+                        // Todo: å‹ã®åˆæˆ
+                        if (CType.IsEqual(iv.ToVariable().Type, type) == false) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å†å®šç¾©å‹ã®ä¸ä¸€è‡´");
+                        }
+                    }
+                    var varDecl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(varDecl));
+
+                    return varDecl;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 6.7 å®£è¨€ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
+        /// </summary>
+        /// <returns></returns>
+        private bool IsDeclaration() {
+            return IsDeclarationSpecifiers(null, AnsiCParser.TypeSpecifier.None);
+        }
+
+        /// <summary>
+        /// 6.7 å®£è¨€(å®£è¨€)
+        /// </summary>
+        /// <returns></returns>
+        /// <remarks>
+        /// ã“ã‚Œã¯è¤‡æ–‡ä¸­ã«ç™»å ´ã™ã‚‹å®£è¨€ã®è§£æãªã®ã§ã€ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã¨ã—ã¦è§£æã™ã‚‹
+        /// </remarks>
+        private List<SyntaxTree.Declaration> Declaration() {
+
+            // å®£è¨€æŒ‡å®šå­åˆ— 
+            StorageClassSpecifier storageClass;
+            CType baseType = DeclarationSpecifiers(out storageClass);
+
+            // åˆæœŸåŒ–å®£è¨€å­ä¸¦ã³
+            List<SyntaxTree.Declaration> decls = null;
+            if (!_lexer.PeekToken(';')) {
+                // ä¸€ã¤ä»¥ä¸Šã®åˆæœŸåŒ–å®£è¨€å­
+                decls = new List<SyntaxTree.Declaration>();
+                do {
+                    var declaration = InitDeclarator(baseType, storageClass);
+                    decls.Add(declaration);
+                } while (_lexer.ReadTokenIf(','));
+            }
+            _lexer.ReadToken(';');
+            return decls;
+        }
+
+        /// <summary>
+        /// 6.7 å®£è¨€(å®£è¨€æŒ‡å®šå­åˆ—ã«ãªã‚Šã†ã‚‹ã‹)
+        /// </summary>
+        /// <param name="sc"></param>
+        /// <returns></returns>
+        private bool IsDeclarationSpecifiers(CType type, TypeSpecifier typeSpecifier) {
+            return IsDeclarationSpecifier(type, typeSpecifier);
+        }
+
+        /// <summary>
+        /// 6.7 å®£è¨€(å®£è¨€æŒ‡å®šå­åˆ—)
+        /// </summary>
+        /// <param name="sc"></param>
+        /// <returns></returns>
+        private CType DeclarationSpecifiers(out StorageClassSpecifier sc) {
+            CType baseType = null;
+            StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
+            FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+#if false
+            TypeSpecifier typeSpecifier = TypeSpecifier.None;
+            TypeQualifier typeQualifier = TypeQualifier.None;
+            DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
+
+            while (IsDeclarationSpecifier(baseType, typeSpecifier)) {
+                DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
+            }
+            if (functionSpecifier != FunctionSpecifier.None) {
+                throw new Exception("inlineã¯é–¢æ•°å®šç¾©ã§ã®ã¿ä½¿ãˆã‚‹ã€‚");
+            }
+            if (typeSpecifier != TypeSpecifier.None) {
+                if (baseType != null) {
+                    throw new Exception("");
+                } else {
+                    baseType = new CType.BasicType(typeSpecifier);
+                }
+            } else if (baseType == null) {
+                baseType = new CType.BasicType(TypeSpecifier.None);
+            }
+            baseType = baseType.WrapTypeQualifier(typeQualifier);
+#else
+            if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ /å‹æŒ‡å®šå­/å‹ä¿®é£¾å­ãŒä¸€ã¤ä»¥ä¸ŠæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å¿…è¦ãŒã‚ã‚‹ã€‚");
+            }
+            System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
+#endif
+
+            sc = storageClass;
+            return baseType;
+        }
+
+        /// <summary>
+        /// 6.7 å®£è¨€(å®£è¨€æŒ‡å®šå­è¦ç´ ã«ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <param name="type"></param>
         /// <param name="typeSpecifier"></param>
         /// <returns></returns>
-        private bool is_declaration_specifier(CType type, TypeSpecifier typeSpecifier) {
-            return (is_storage_class_specifier() ||
-                (is_type_specifier() && type == null) ||
-                (is_struct_or_union_specifier() && type == null) ||
-                (is_enum_specifier() && type == null) ||
-                (is_TYPEDEF_NAME() && type == null && typeSpecifier == TypeSpecifier.None) ||
-                is_type_qualifier() ||
-                is_function_specifier());
+        private bool IsDeclarationSpecifier(CType type, TypeSpecifier typeSpecifier) {
+            return (IsStorageClassSpecifier() ||
+                (IsTypeSpecifier() && type == null) ||
+                (IsStructOrUnionSpecifier() && type == null) ||
+                (IsEnumSpecifier() && type == null) ||
+                (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) ||
+                IsTypeQualifier() ||
+                IsFunctionSpecifier());
         }
 
         /// <summary>
-        /// 6.7 éŒ¾(éŒ¾w’èq—v‘f)
+        /// 6.7 å®£è¨€(å®£è¨€æŒ‡å®šå­è¦ç´ )
         /// </summary>
         /// <param name="type"></param>
         /// <param name="storageClass"></param>
         /// <param name="typeSpecifier"></param>
         /// <param name="typeQualifier"></param>
         /// <param name="functionSpecifier"></param>
-        private void declaration_specifier(ref CType type, ref StorageClassSpecifier storageClass, ref TypeSpecifier typeSpecifier, ref TypeQualifier typeQualifier, ref FunctionSpecifier functionSpecifier) {
-            if (is_storage_class_specifier()) {
-                storageClass = storageClass.Marge(storage_class_specifier());
-            } else if (is_type_specifier()) {
-                typeSpecifier = typeSpecifier.Marge(type_specifier());
-            } else if (is_struct_or_union_specifier()) {
+        private void DeclarationSpecifier(ref CType type, ref StorageClassSpecifier storageClass, ref TypeSpecifier typeSpecifier, ref TypeQualifier typeQualifier, ref FunctionSpecifier functionSpecifier) {
+            if (IsStorageClassSpecifier()) {
+                // è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­
+                storageClass = storageClass.Marge(StorageClassSpecifier());
+            } else if (IsTypeSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆäºˆç´„èªï¼‰
+                typeSpecifier = typeSpecifier.Marge(TypeSpecifier());
+            } else if (IsStructOrUnionSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆæ§‹é€ ä½“æŒ‡å®šå­ã‚‚ã—ãã¯å…±ç”¨ä½“æŒ‡å®šå­ï¼‰
                 if (type != null) {
                     throw new Exception("");
                 }
-                type = struct_or_union_specifier();
-            } else if (is_enum_specifier()) {
+                type = StructOrUnionSpecifier();
+            } else if (IsEnumSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å‹æŒ‡å®šå­ï¼‰
                 if (type != null) {
                     throw new Exception("");
                 }
-                type = enum_specifier();
-            } else if (is_TYPEDEF_NAME()) {
+                type = EnumSpecifier();
+            } else if (IsTypedefName()) {
+                // å‹æŒ‡å®šå­ï¼ˆå‹å®šç¾©åï¼‰
                 SyntaxTree.Declaration.TypeDeclaration value;
-                if (_typedefScope.TryGetValue(lexer.current_token().Raw, out value) == false) {
+                if (_typedefScope.TryGetValue(_lexer.CurrentToken().Raw, out value) == false) {
                     throw new Exception();
                 }
                 if (type != null) {
@@ -794,537 +1048,681 @@ namespace AnsiCParser {
                         throw new Exception("");
                     }
                 }
-                type = new CType.TypedefedType(lexer.current_token().Raw, value.Type);
-                lexer.next_token();
-            } else if (is_type_qualifier()) {
-                typeQualifier.Marge(type_qualifier());
-            } else if (is_function_specifier()) {
-                functionSpecifier.Marge(function_specifier());
+                type = new CType.TypedefedType(_lexer.CurrentToken().Raw, value.Type);
+                _lexer.NextToken();
+            } else if (IsTypeQualifier()) {
+                // å‹ä¿®é£¾å­
+                typeQualifier.Marge(TypeQualifier());
+            } else if (IsFunctionSpecifier()) {
+                // é–¢æ•°ä¿®é£¾å­
+                functionSpecifier.Marge(FunctionSpecifier());
             } else {
                 throw new Exception("");
             }
         }
 
         /// <summary>
-        /// 6.7 éŒ¾ (‰Šú‰»éŒ¾q‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7 å®£è¨€ (åˆæœŸåŒ–å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_init_declarator() {
-            return is_declarator();
+        private bool IsInitDeclarator() {
+            return IsDeclarator();
         }
 
         /// <summary>
-        /// 6.7 éŒ¾ (‰Šú‰»éŒ¾q)
+        /// 6.7 å®£è¨€ (åˆæœŸåŒ–å®£è¨€å­)
         /// </summary>
         /// <param name="type"></param>
         /// <param name="storageClass"></param>
         /// <returns></returns>
-        private SyntaxTree.Declaration init_declarator(CType type, StorageClassSpecifier storageClass) {
-            // éŒ¾q
+        /// <remarks>
+        /// ã“ã‚Œã¯è¤‡æ–‡ä¸­ã«ç™»å ´ã™ã‚‹å®£è¨€ã«ä»˜éšã™ã‚‹åˆæœŸåŒ–å®£è¨€å­ãªã®ã§ã€ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã¨ã—ã¦è§£æã™ã‚‹
+        /// </remarks>
+        private SyntaxTree.Declaration InitDeclarator(CType type, StorageClassSpecifier storageClass) {
+            // å®£è¨€å­
             string ident = "";
             List<CType> stack = new List<CType>() { new CType.StubType() };
-            declarator(ref ident, stack, 0);
+            Declarator(ref ident, stack, 0);
             type = CType.Resolve(type, stack);
 
             SyntaxTree.Declaration decl;
-            if (lexer.ReadIf('=')) {
-                // ‰Šú‰»q‚ğ”º‚¤ŠÖ”éŒ¾
-
-                if (storageClass == StorageClassSpecifier.Typedef) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "‰Šú‰»q‚ğ”º‚¤•Ï”éŒ¾‚Éw’è‚·‚é‚±‚Æ‚ª‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq typedef ‚ªw’è‚³‚ê‚Ä‚¢‚éB");
+            if (_lexer.ReadTokenIf('=')) {
+                // åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€
+#if false
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€ã«æŒ‡å®šã™ã‚‹ã“ã¨ãŒã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ typedef ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
                 }
 
                 if (type.IsFunctionType()) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "ŠÖ”Œ^‚ğ‚ÂéŒ¾q‚É‘Î‚µ‚Ä‰Šú‰»q‚ğİ’è‚µ‚Ä‚¢‚Ü‚·B");
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å‹ã‚’æŒã¤å®£è¨€å­ã«å¯¾ã—ã¦åˆæœŸåŒ–å­ã‚’è¨­å®šã—ã¦ã„ã¾ã™ã€‚");
                 }
-                if (ident == "tktk") {
+                var initializer = Initializer(type);
 
-                }
-                var init = initializer(type);
-
-                // ÄéŒ¾‚ÌŠm”F
+                // å†å®£è¨€ã®ç¢ºèª
                 IdentifierScopeValue iv;
                 bool isCurrent;
                 if (_identScope.TryGetValue(ident, out iv, out isCurrent) && isCurrent == true) {
+                    // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã§ã¯æœ‰ç„¡ã‚’è¨€ã‚ã•ãšå†å®šç¾©ã¯ç¦æ­¢
                     if (iv.IsVariable() == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}‚ÍŠù‚É•Ï”ˆÈŠO‚Æ‚µ‚ÄéŒ¾‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«å¤‰æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     }
                     if (CType.IsEqual(iv.ToVariable().Type, type) == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"Šù‚ÉéŒ¾‚³‚ê‚Ä‚¢‚é•Ï”{ident}‚ÆŒ^‚ªˆê’v‚µ‚È‚¢‚½‚ßÄéŒ¾‚Å‚«‚Ü‚¹‚ñB");
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ—¢ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹å¤‰æ•°{ident}ã¨å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
                     }
                     if (iv.ToVariable().Init != null) {
-                        throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"•Ï”{ident}‚ÍŠù‚É‰Šú‰»q‚ğ”º‚Á‚ÄéŒ¾‚³‚ê‚Ä‚¢‚éB");
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å¤‰æ•°{ident}ã¯æ—¢ã«åˆæœŸåŒ–å­ã‚’ä¼´ã£ã¦å®£è¨€ã•ã‚Œã¦ã„ã‚‹ã€‚");
                     }
-                    iv.ToVariable().Init = init;
+                    iv.ToVariable().Init = initializer;
                     decl = iv.ToVariable();
                 } else {
                     if (iv != null) {
-                        // ŒxI–¼‘O‚ğ‰B‚µ‚½I
+                        // è­¦å‘Šï¼åå‰ã‚’éš ã—ãŸï¼
                     }
-                    decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, init);
-                    // ¯•ÊqƒXƒR[ƒv‚É•Ï”éŒ¾‚ğ’Ç‰Á
+                    decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, initializer);
+                    // è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«å¤‰æ•°å®£è¨€ã‚’è¿½åŠ 
                     _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
                 }
-            } else if (storageClass == StorageClassSpecifier.Typedef) {
-                // Œ^éŒ¾–¼
+#else
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€ã«æŒ‡å®šã™ã‚‹ã“ã¨ãŒã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ typedef ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Extern) {
+                    // ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã¨é•ã„ã€ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã§ã¯ extern è¨˜æ†¶ã‚¯ãƒ©ã‚¹ã«å¯¾ã™ã‚‹åˆæœŸå€¤è¨­å®šã¯ã§ããªã„
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€ã«æŒ‡å®šã™ã‚‹ã“ã¨ãŒã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ extern ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+                if (type.IsFunctionType()) {
+                    // é–¢æ•°å‹ã¯å¤‰æ•°ã®ã‚ˆã†ã«åˆæœŸåŒ–ã§ããªã„ã€‚ãªãœãªã‚‰ã€ãã‚Œã¯é–¢æ•°å®£è¨€ã ã‹ã‚‰ã€‚
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "é–¢æ•°å‹ã‚’æŒã¤å®£è¨€å­ã«å¯¾ã—ã¦åˆæœŸåŒ–å­ã‚’è¨­å®šã—ã¦ã„ã¾ã™ã€‚");
+                }
+                var initializer = Initializer(type);
 
-                // ÄéŒ¾‚ÌŠm”F
+                // ã™ã§ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹ã‹ç¢ºèª
+                IdentifierScopeValue iv;
+                bool current;
+                if (_identScope.TryGetValue(ident, out iv, out current)) {
+                    if (current) {
+                        // åˆæœŸåŒ–å­ã‚’æŒã¤ã®ã§åŒä¸€ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§ã®å†å®šç¾©ã¯ç¦æ­¢
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $" {ident} ã¯åŒã˜ã‚¹ã‚³ãƒ¼ãƒ—å†…ã§å®£è¨€æ¸ˆã¿ã§ã™ã€‚");
+                    }
+                    else {
+                        // å¤–ã®ã‚¹ã‚³ãƒ¼ãƒ—ã®å®£è¨€ã‚’éš ã™ã“ã¨ã«ãªã‚‹ã‘ã©æ–°ãŸã«å¤‰æ•°å®£è¨€ã‚’ä½œæˆ
+                    }
+                }
+                else {
+                    // æœªå®šç¾©ãªã®ã§æ–°ãŸã«å¤‰æ•°å®£è¨€ã‚’ä½œæˆ
+                }
+                decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, initializer);
+                _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+#endif
+                return decl;
+            } else if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                // å‹å®£è¨€å
+                // åŒä¸€ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§ãªã‘ã‚Œã°å†å®£è¨€å¯èƒ½
+
+                // å†å®£è¨€ã®ç¢ºèª
                 SyntaxTree.Declaration.TypeDeclaration tdecl;
                 bool isCurrent;
                 if (_typedefScope.TryGetValue(ident, out tdecl, out isCurrent)) {
                     if (isCurrent) {
-                        throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"{ident} ‚ÍŠù‚ÉŒ^éŒ¾–¼‚Æ‚µ‚ÄéŒ¾‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident} ã¯æ—¢ã«å‹å®£è¨€åã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     }
                 }
+
                 tdecl = new SyntaxTree.Declaration.TypeDeclaration(ident, type);
                 decl = tdecl;
                 _typedefScope.Add(ident, tdecl);
+                return decl;
             } else if (type.IsFunctionType()) {
-                // ÄéŒ¾‚ÌŠm”F
+                // é–¢æ•°ã®å®£è¨€
+                // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§ã¯é–¢æ•°å®£è¨€ã®ã¿å¯èƒ½ã€‚
+
+                // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§ã¯é–¢æ•°å®£è¨€ã«ã¯ extern ä»¥å¤–ã®è¨˜æ†¶ã‚¯ãƒ©ã‚¹ã‚’æŒ‡å®šã—ã¦ã¯ã„ã‘ãªã„
+                if (storageClass != AnsiCParser.StorageClassSpecifier.None
+                 && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§ã®é–¢æ•°å®£è¨€ã«æŒ‡å®šã™ã‚‹ã“ã¨ãŒã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ extern ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+
+                // ã™ã§ã«åå‰ã®è¦ç´ ãŒå®£è¨€ã•ã‚Œã¦ã„ã‚‹ã‹ç¢ºèª
                 IdentifierScopeValue iv;
+
                 if (_identScope.TryGetValue(ident, out iv)) {
+                    // ã™ã§ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹ã€‚
+                    // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—å†…ã«ãŠã„ã¦ã€é–¢æ•°ã¯ã‚¹ã‚³ãƒ¼ãƒ—ãŒé•ã£ã¦ã‚‚åŒååŒå‹ä»¥å¤–ã¯é‡è¤‡å®šç¾©ã¯ã§ããªã„ã€‚
+                    /* ä»¥ä¸‹ã¯å¦¥å½“
+                     * int main(void) {
+                     *     int hoge(void);
+                     *     int hoge(void);
+                     *     extern int hoge(void);
+                     *     extern int hoge(void);
+                     * 	return 4;
+                     * }
+                     */
+
+                    // åå‰è¡¨ã®è¦ç´ ã¨ã®ç…§ã‚‰ã—åˆã‚ã›
+
+                    // åŒåè¦ç´ ãŒé–¢æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€æ¸ˆã¿
                     if (iv.IsFunction() == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}‚ÍŠù‚ÉŠÖ”ˆÈŠO‚Æ‚µ‚ÄéŒ¾‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«é–¢æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     }
-                    if (CType.IsEqual(iv.ToFunction().Ty, type) == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"Šù‚ÉéŒ¾‚³‚ê‚Ä‚¢‚éŠÖ”{ident}‚ÆŒ^‚ªˆê’v‚µ‚È‚¢‚½‚ßÄéŒ¾‚Å‚«‚Ü‚¹‚ñB");
+
+                    // è¨˜æ†¶ã‚¯ãƒ©ã‚¹ä¸æ•´åˆ
+                    if (   iv.ToFunction().StorageClass != AnsiCParser.StorageClassSpecifier.None 
+                        && iv.ToFunction().StorageClass != AnsiCParser.StorageClassSpecifier.Extern 
+                        && storageClass != AnsiCParser.StorageClassSpecifier.None 
+                        && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                        // é©åˆã—ãªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ã®çµ„ã¿åˆã‚ã›
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"é–¢æ•°{ident}ã¨è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
                     }
-                    if (storageClass != StorageClassSpecifier.Static && storageClass == StorageClassSpecifier.None && storageClass != StorageClassSpecifier.Extern) {
-                        throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"ŠÖ”éŒ¾‚Éw’è‚·‚é‚±‚Æ‚ª‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq {(storageClass == StorageClassSpecifier.Register ? "register" : storageClass == StorageClassSpecifier.Typedef ? "typedef" : storageClass.ToString())} ‚ªw’è‚³‚ê‚Ä‚¢‚éB");
+
+                    // å‹ä¸æ•´åˆ
+                    if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ—¢ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹é–¢æ•°{ident}ã¨å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
                     }
-                    if (storageClass == StorageClassSpecifier.Static && iv.ToFunction().StorageClass == StorageClassSpecifier.Static) {
-                        // ‚¨Œİ‚¢‚ª static ‚È‚Ì‚ÅÄéŒ¾‰Â”\
-                    } else if ((storageClass == StorageClassSpecifier.Extern || storageClass == StorageClassSpecifier.None) &&
-                               (iv.ToFunction().StorageClass == StorageClassSpecifier.Extern || iv.ToFunction().StorageClass == StorageClassSpecifier.None)) {
-                        // ‚¨Œİ‚¢‚ª extern ‚à‚µ‚­‚Í w’è‚È‚µ ‚È‚Ì‚ÅÄéŒ¾‰Â”\
-                    } else {
-                        throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, $"Šù‚ÉéŒ¾‚³‚ê‚Ä‚¢‚éŠÖ”{ident}‚Æ‹L‰¯w’èƒNƒ‰ƒX‚ªˆê’v‚µ‚È‚¢‚½‚ßÄéŒ¾‚Å‚«‚Ü‚¹‚ñB");
-                    }
-                    decl = iv.ToFunction();
-                } else {
-                    decl = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, FunctionSpecifier.None);
-                    // ¯•ÊqƒXƒR[ƒv‚ÉŠÖ”éŒ¾‚ğ’Ç‰Á
+
+                    // é‡è¤‡å®šç¾©ã—ã¦ã‚‚ã‚ˆã„ã¨åˆ¤æ–­ã§ããŸã®ã§è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«é–¢æ•°å®£è¨€ã‚’è¿½åŠ 
+                    decl = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None);
                     _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+
+                    return decl;
+                } else {
+                    // æœªå®£è¨€ã ã£ãŸã®ã§è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«é–¢æ•°å®£è¨€ã‚’è¿½åŠ 
+                    decl = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                    return decl;
                 }
             } else {
-                if (storageClass == StorageClassSpecifier.Typedef) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "‰Šú‰»q‚ğ”º‚¤•Ï”éŒ¾‚Éw’è‚·‚é‚±‚Æ‚ª‚Å‚«‚È‚¢‹L‰¯ƒNƒ‰ƒXw’èq typedef ‚ªw’è‚³‚ê‚Ä‚¢‚éB");
+                // å¤‰æ•°å®£è¨€
+
+                if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
+                    // æ¥ãªã„ã¯ãš
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "åˆæœŸåŒ–å­ã‚’ä¼´ã†å¤‰æ•°å®£è¨€ã«æŒ‡å®šã™ã‚‹ã“ã¨ãŒã§ããªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ typedef ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã€‚ï¼ˆç™ºç”Ÿã—ãªã„ã¯ãšï¼‰");
                 }
 
-                if (type.IsFunctionType()) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "ŠÖ”Œ^‚ğ‚ÂéŒ¾q‚É‘Î‚µ‚Ä‰Šú‰»q‚ğİ’è‚µ‚Ä‚¢‚Ü‚·B");
-                }
-
-                // ÄéŒ¾‚ÌŠm”F
+                // ã™ã§ã«åŒåã®è¦ç´ ãŒå®£è¨€ã•ã‚Œã¦ã„ã‚‹ã‹ç¢ºèª
                 IdentifierScopeValue iv;
-                if (_identScope.TryGetValue(ident, out iv)) {
-                    if (iv.IsVariable() == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"{ident}‚ÍŠù‚É•Ï”ˆÈŠO‚Æ‚µ‚ÄéŒ¾‚³‚ê‚Ä‚¢‚Ü‚·B");
+                bool current;
+                if (_identScope.TryGetValue(ident, out iv, out current)) {
+                    // åŒåè¦ç´ ãŒå®£è¨€ã•ã‚Œã¦ã„ã‚‹ã€‚
+
+                    // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã«ãŠã„ã¦ã€åŒä¸€ã‚¹ã‚³ãƒ¼ãƒ—ä¸­ã§å†å®šç¾©ã§ãã‚‹å¤‰æ•°å®£è¨€ã¯externåŒå£«ä»¥å¤–ç¦æ­¢
+
+                    if (current) {
+                        // åŒä¸€ã‚¹ã‚³ãƒ¼ãƒ—å†…ã§ã®å†å®£è¨€
+                        if (iv.IsVariable() == false) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«å¤‰æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
+                        }
+                        if (iv.ToVariable().StorageClass == AnsiCParser.StorageClassSpecifier.Extern
+                            && storageClass == AnsiCParser.StorageClassSpecifier.Extern) {
+                            // å‰ã®å®£è¨€ãŒ extern å®£è¨€ãªã®ã§å†å®šç¾©å¯èƒ½
+                            // è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«é–¢æ•°å®£è¨€ã‚’è¿½åŠ 
+                            decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                            _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                            return decl;
+                        }
+                        else {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ—¢ã«å¤‰æ•°ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã‚‹ {ident} ãŒå†å®£è¨€ã•ã‚Œã¾ã—ãŸã€‚");
+                        }
                     }
-                    if (CType.IsEqual(iv.ToVariable().Type, type) == false) {
-                        throw new CompilerException.TypeMissmatchError(lexer.current_token().Start, lexer.current_token().End, $"Šù‚ÉéŒ¾‚³‚ê‚Ä‚¢‚é•Ï”{ident}‚ÆŒ^‚ªˆê’v‚µ‚È‚¢‚½‚ßÄéŒ¾‚Å‚«‚Ü‚¹‚ñB");
+                    else {
+                        // åŒä¸€ã‚¹ã‚³ãƒ¼ãƒ—ä»¥å¤–ã§ã®å†å®£è¨€
+                        if (storageClass == AnsiCParser.StorageClassSpecifier.Extern) {
+                            // ãƒ­ãƒ¼ã‚«ãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã§ã®externå®£è¨€ã¯ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã‚’å‚ç…§ã™ã‚‹ã®ã§ã€
+                            // ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã§ç™»éŒ²ã•ã‚Œã¦ã„ã‚‹ã‹ç¢ºèª
+                            IdentifierScopeValue iv2;
+                            if (_identScope.GetGlobalScope().TryGetValue(ident, out iv2)) {
+                                // ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã§åŒåã®è¦ç´ ãŒå®£è¨€ã•ã‚Œã¦ã„ã‚‹ã®ã§è©³ç´°ã‚’ç¢ºèª
+
+                                // å¤‰æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã‚‹
+                                if (iv2.IsVariable() == false) {
+                                    throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}ã¯æ—¢ã«å¤‰æ•°ä»¥å¤–ã¨ã—ã¦å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
+                                }
+
+                                // è¨˜æ†¶ã‚¯ãƒ©ã‚¹ä¸æ•´åˆ
+                                if (iv2.ToVariable().StorageClass != AnsiCParser.StorageClassSpecifier.None
+                                    && iv.ToVariable().StorageClass != AnsiCParser.StorageClassSpecifier.Extern
+                                    && storageClass != AnsiCParser.StorageClassSpecifier.None
+                                    && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                                    // é©åˆã—ãªã„è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ã®çµ„ã¿åˆã‚ã›
+                                    throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"é–¢æ•°{ident}ã¨è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
+                                }
+
+                                // å‹ä¸æ•´åˆ
+                                if (CType.IsEqual(iv2.ToVariable().Type.Unwrap(), type.Unwrap()) == false) {
+                                    throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ—¢ã«å®£è¨€ã•ã‚Œã¦ã„ã‚‹é–¢æ•°{ident}ã¨å‹ãŒä¸€è‡´ã—ãªã„ãŸã‚å†å®£è¨€ã§ãã¾ã›ã‚“ã€‚");
+                                }
+
+                                // å•é¡Œãªã„
+                                decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                                _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                                return decl;
+                            } else {
+                                // ç™»éŒ²ã•ã‚Œã¦ã„ãªã„ã®ã§ç™»éŒ²
+                                decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                                _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                                return decl;
+                            }
+                        }
+                        else {
+                            // å‰ã®å®šç¾©ã‚’éš ã—ãŸå¤‰æ•°å®£è¨€ã‚’ä½œæˆã—è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«è¿½åŠ 
+                            decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                            _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                            return decl;
+                        }
                     }
-                    decl = iv.ToVariable();
                 } else {
-                    decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
-                    // ¯•ÊqƒXƒR[ƒv‚É•Ï”éŒ¾‚ğ’Ç‰Á
-                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                    if (storageClass == AnsiCParser.StorageClassSpecifier.Extern) {
+                        // ã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¹ã‚³ãƒ¼ãƒ—ã«ãªã„ã®ã§å®£è¨€ã‚’ä½œæˆã—è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«è¿½åŠ 
+                        decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                        _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                        return decl;
+                    } else {
+                        // æœªå®šç¾©ãªã®ã§æ–°ãŸã«å¤‰æ•°å®£è¨€ã‚’ä½œæˆã—è­˜åˆ¥å­ã‚¹ã‚³ãƒ¼ãƒ—ã«è¿½åŠ 
+                        decl = new SyntaxTree.Declaration.VariableDeclaration(ident, type, storageClass, null);
+                        _identScope.Add(ident, new IdentifierScopeValue.Declaration(decl));
+                        return decl;
+                    }
                 }
             }
-            return decl;
         }
 
         /// <summary>
-        /// 6.7.1 ‹L‰¯ˆæƒNƒ‰ƒXw’èq‚É‚È‚è‚¤‚é‚©
+        /// 6.7.1 è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­ã«ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_storage_class_specifier() {
-            return lexer.Peek(Token.TokenKind.AUTO, Token.TokenKind.REGISTER, Token.TokenKind.STATIC, Token.TokenKind.EXTERN, Token.TokenKind.TYPEDEF);
+        private bool IsStorageClassSpecifier() {
+            return _lexer.PeekToken(Token.TokenKind.AUTO, Token.TokenKind.REGISTER, Token.TokenKind.STATIC, Token.TokenKind.EXTERN, Token.TokenKind.TYPEDEF);
         }
 
         /// <summary>
-        /// 6.7.1 ‹L‰¯ˆæƒNƒ‰ƒXw’èq
+        /// 6.7.1 è¨˜æ†¶åŸŸã‚¯ãƒ©ã‚¹æŒ‡å®šå­
         /// </summary>
         /// <returns></returns>
-        private StorageClassSpecifier storage_class_specifier() {
-            switch (lexer.current_token().Kind) {
+        private StorageClassSpecifier StorageClassSpecifier() {
+            switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.AUTO:
-                    lexer.next_token();
-                    return StorageClassSpecifier.Auto;
+                    _lexer.NextToken();
+                    return AnsiCParser.StorageClassSpecifier.Auto;
                 case Token.TokenKind.REGISTER:
-                    lexer.next_token();
-                    return StorageClassSpecifier.Register;
+                    _lexer.NextToken();
+                    return AnsiCParser.StorageClassSpecifier.Register;
                 case Token.TokenKind.STATIC:
-                    lexer.next_token();
-                    return StorageClassSpecifier.Static;
+                    _lexer.NextToken();
+                    return AnsiCParser.StorageClassSpecifier.Static;
                 case Token.TokenKind.EXTERN:
-                    lexer.next_token();
-                    return StorageClassSpecifier.Extern;
+                    _lexer.NextToken();
+                    return AnsiCParser.StorageClassSpecifier.Extern;
                 case Token.TokenKind.TYPEDEF:
-                    lexer.next_token();
-                    return StorageClassSpecifier.Typedef;
+                    _lexer.NextToken();
+                    return AnsiCParser.StorageClassSpecifier.Typedef;
                 default:
                     throw new Exception();
             }
         }
 
         /// <summary>
-        /// 6.7.2 Œ^w’èq‚É‚È‚è‚¤‚é‚©
+        /// 6.7.2 å‹æŒ‡å®šå­ã«ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_type_specifier() {
-            return lexer.Peek(Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED);
+        private bool IsTypeSpecifier() {
+            return _lexer.PeekToken(Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED);
         }
 
         /// <summary>
-        /// “½–¼Œ^‚ÉŠ„‚è“–‚Ä‚é–¼‘O‚ğ¶¬‚·‚é‚½‚ß‚ÌƒJƒEƒ“ƒ^[
+        /// åŒ¿åå‹ã«å‰²ã‚Šå½“ã¦ã‚‹åå‰ã‚’ç”Ÿæˆã™ã‚‹ãŸã‚ã®ã‚«ã‚¦ãƒ³ã‚¿ãƒ¼
         /// </summary>
         private int anony = 0;
 
         /// <summary>
-        /// 6.7.2 Œ^w’èq
+        /// 6.7.2 å‹æŒ‡å®šå­
         /// </summary>
         /// <returns></returns>
-        private TypeSpecifier type_specifier() {
-            switch (lexer.current_token().Kind) {
+        private TypeSpecifier TypeSpecifier() {
+            switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.VOID:
-                    lexer.next_token();
-                    return TypeSpecifier.Void;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Void;
                 case Token.TokenKind.CHAR:
-                    lexer.next_token();
-                    return TypeSpecifier.Char;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Char;
                 case Token.TokenKind.INT:
-                    lexer.next_token();
-                    return TypeSpecifier.Int;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Int;
                 case Token.TokenKind.FLOAT:
-                    lexer.next_token();
-                    return TypeSpecifier.Float;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Float;
                 case Token.TokenKind.DOUBLE:
-                    lexer.next_token();
-                    return TypeSpecifier.Double;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Double;
                 case Token.TokenKind.SHORT:
-                    lexer.next_token();
-                    return TypeSpecifier.Short;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Short;
                 case Token.TokenKind.LONG:
-                    lexer.next_token();
-                    return TypeSpecifier.Long;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Long;
                 case Token.TokenKind.SIGNED:
-                    lexer.next_token();
-                    return TypeSpecifier.Signed;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Signed;
                 case Token.TokenKind.UNSIGNED:
-                    lexer.next_token();
-                    return TypeSpecifier.Unsigned;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier.Unsigned;
                 default:
                     throw new Exception();
             }
         }
 
         /// <summary>
-        /// 6.7.2.1 \‘¢‘Ìw’èq‹y‚Ñ‹¤—p‘Ìw’èq‚É‚È‚è‚¤‚é‚©
+        /// 6.7.2.1 æ§‹é€ ä½“æŒ‡å®šå­åŠã³å…±ç”¨ä½“æŒ‡å®šå­ã«ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_struct_or_union_specifier() {
-            return lexer.Peek(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
+        private bool IsStructOrUnionSpecifier() {
+            return _lexer.PeekToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
         }
 
         /// <summary>
-        /// 6.7.2.1 \‘¢‘Ìw’èq‹y‚Ñ‹¤—p‘Ìw’èqi\‘¢‘Ì‹¤—p‘Ìw’èqj
+        /// 6.7.2.1 æ§‹é€ ä½“æŒ‡å®šå­åŠã³å…±ç”¨ä½“æŒ‡å®šå­ï¼ˆæ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ï¼‰
         /// </summary>
         /// <returns></returns>
-        private CType struct_or_union_specifier() {
-            var kind = lexer.current_token().Kind == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union;
+        private CType StructOrUnionSpecifier() {
+            // æ§‹é€ ä½“/å…±ç”¨ä½“
+            var kind = _lexer.ReadToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION).Kind == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union;
 
-            // \‘¢‘Ì‹¤—p‘Ì
-            lexer.Read(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
+            // è­˜åˆ¥å­ã®æœ‰ç„¡ã§åˆ†å²
+            if (IsIdentifier(true)) {
 
-            // ¯•Êq‚Ì—L–³‚Å•ªŠò
-            if (is_IDENTIFIER(true)) {
+                var ident = Identifier(true);
 
-                var ident = IDENTIFIER(true);
-
-                // ”gŠ‡ŒÊ‚Ì—L–³‚Å•ªŠ„
-                if (lexer.ReadIf('{')) {
-                    // ¯•Êq‚ğ”º‚¤Š®‘SŒ^‚ÌéŒ¾
+                // æ³¢æ‹¬å¼§ã®æœ‰ç„¡ã§åˆ†å‰²
+                if (_lexer.ReadTokenIf('{')) {
+                    // è­˜åˆ¥å­ã‚’ä¼´ã†å®Œå…¨å‹ã®å®£è¨€
                     CType.TaggedType tagType;
                     CType.TaggedType.StructUnionType structUnionType;
                     if (_tagScope.TryGetValue(ident, out tagType) == false) {
-                        // ƒ^ƒO–¼‘O•\‚É–³‚¢ê‡‚ÍV‚µ‚­’Ç‰Á‚·‚éB
+                        // ã‚¿ã‚°åå‰è¡¨ã«ç„¡ã„å ´åˆã¯æ–°ã—ãè¿½åŠ ã™ã‚‹ã€‚
                         structUnionType = new CType.TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, structUnionType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new Exception($"\‘¢‘Ì/‹¤—p‘Ì {ident} ‚ÍŠù‚É—ñ‹“Œ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new Exception($"æ§‹é€ ä½“/å…±ç”¨ä½“ {ident} ã¯æ—¢ã«åˆ—æŒ™å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new Exception($"\‘¢‘Ì/‹¤—p‘Ì {ident} ‚ÍŠù‚É’è‹`‚³‚ê‚Ä‚¢‚Ü‚·‚ªA\‘¢‘Ì/‹¤—p‘Ì‚Ìí•Ê‚ªˆê’v‚µ‚Ü‚¹‚ñB");
+                        throw new Exception($"æ§‹é€ ä½“/å…±ç”¨ä½“ {ident} ã¯æ—¢ã«å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ãŒã€æ§‹é€ ä½“/å…±ç”¨ä½“ã®ç¨®åˆ¥ãŒä¸€è‡´ã—ã¾ã›ã‚“ã€‚");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Members != null) {
-                        throw new Exception($"\‘¢‘Ì/‹¤—p‘Ì {ident} ‚ÍŠù‚ÉŠ®‘SŒ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new Exception($"æ§‹é€ ä½“/å…±ç”¨ä½“ {ident} ã¯æ—¢ã«å®Œå…¨å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     } else {
-                        // •sŠ®‘SŒ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚é‚Ì‚ÅŠ®‘SŒ^‚É‚·‚é‚½‚ß‚É‘‚«Š·‚¦‘ÎÛ‚Æ‚·‚é
+                        // ä¸å®Œå…¨å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã‚‹ã®ã§å®Œå…¨å‹ã«ã™ã‚‹ãŸã‚ã«æ›¸ãæ›ãˆå¯¾è±¡ã¨ã™ã‚‹
                         structUnionType = (tagType as CType.TaggedType.StructUnionType);
                     }
-                    // ƒƒ“ƒoéŒ¾•À‚Ñ‚ğ‰ğÍ‚·‚é
-                    structUnionType.Members = struct_declarations();
-                    lexer.Read('}');
+                    // ãƒ¡ãƒ³ãƒå®£è¨€ä¸¦ã³ã‚’è§£æã™ã‚‹
+                    structUnionType.Members = StructDeclarations();
+                    _lexer.ReadToken('}');
                     return structUnionType;
                 } else {
-                    // •sŠ®‘SŒ^‚ÌéŒ¾
+                    // ä¸å®Œå…¨å‹ã®å®£è¨€
                     CType.TaggedType tagType;
                     if (_tagScope.TryGetValue(ident, out tagType) == false) {
-                        // ƒ^ƒO–¼‘O•\‚É–³‚¢ê‡‚ÍV‚µ‚­’Ç‰Á‚·‚éB
+                        // ã‚¿ã‚°åå‰è¡¨ã«ç„¡ã„å ´åˆã¯æ–°ã—ãè¿½åŠ ã™ã‚‹ã€‚
                         tagType = new CType.TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, tagType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new Exception($"\‘¢‘Ì/‹¤—p‘Ì {ident} ‚ÍŠù‚É—ñ‹“Œ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new Exception($"æ§‹é€ ä½“/å…±ç”¨ä½“ {ident} ã¯æ—¢ã«åˆ—æŒ™å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new Exception($"\‘¢‘Ì/‹¤—p‘Ì {ident} ‚ÍŠù‚É’è‹`‚³‚ê‚Ä‚¢‚Ü‚·‚ªA\‘¢‘Ì/‹¤—p‘Ì‚Ìí•Ê‚ªˆê’v‚µ‚Ü‚¹‚ñB");
+                        throw new Exception($"æ§‹é€ ä½“/å…±ç”¨ä½“ {ident} ã¯æ—¢ã«å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ãŒã€æ§‹é€ ä½“/å…±ç”¨ä½“ã®ç¨®åˆ¥ãŒä¸€è‡´ã—ã¾ã›ã‚“ã€‚");
                     } else {
-                        // Šù‚É’è‹`‚³‚ê‚Ä‚¢‚é‚à‚Ì‚ªŠ®‘SŒ^E•sŠ®‘SŒ^–â‚í‚¸‰½‚à‚µ‚È‚¢B
+                        // æ—¢ã«å®šç¾©ã•ã‚Œã¦ã„ã‚‹ã‚‚ã®ãŒå®Œå…¨å‹ãƒ»ä¸å®Œå…¨å‹å•ã‚ãšä½•ã‚‚ã—ãªã„ã€‚
                     }
                     return tagType;
                 }
             } else {
-                // ¯•Êq‚ğ”º‚í‚È‚¢“½–¼‚ÌŠ®‘SŒ^‚ÌéŒ¾
+                // è­˜åˆ¥å­ã‚’ä¼´ã‚ãªã„åŒ¿åã®å®Œå…¨å‹ã®å®£è¨€
 
-                // –¼‘O‚ğ¶¬
+                // åå‰ã‚’ç”Ÿæˆ
                 var ident = $"${kind}_{anony++}";
 
-                // Œ^î•ñ‚ğ¶¬‚·‚é
+                // å‹æƒ…å ±ã‚’ç”Ÿæˆã™ã‚‹
                 var structUnionType = new CType.TaggedType.StructUnionType(kind, ident, true);
 
-                // ƒ^ƒO–¼‘O•\‚É’Ç‰Á‚·‚é
+                // ã‚¿ã‚°åå‰è¡¨ã«è¿½åŠ ã™ã‚‹
                 _tagScope.Add(ident, structUnionType);
 
-                // ƒƒ“ƒoéŒ¾•À‚Ñ‚ğ‰ğÍ‚·‚é
-                lexer.Read('{');
-                structUnionType.Members = struct_declarations();
-                lexer.Read('}');
+                // ãƒ¡ãƒ³ãƒå®£è¨€ä¸¦ã³ã‚’è§£æã™ã‚‹
+                _lexer.ReadToken('{');
+                structUnionType.Members = StructDeclarations();
+                _lexer.ReadToken('}');
                 return structUnionType;
             }
         }
 
         /// <summary>
-        /// 6.7.2.1 \‘¢‘Ìw’èq‹y‚Ñ‹¤—p‘Ìw’èq(ƒƒ“ƒoéŒ¾•À‚Ñ)
+        /// 6.7.2.1 æ§‹é€ ä½“æŒ‡å®šå­åŠã³å…±ç”¨ä½“æŒ‡å®šå­(ãƒ¡ãƒ³ãƒå®£è¨€ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declarations() {
+        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
             var items = new List<CType.TaggedType.StructUnionType.MemberInfo>();
-            items.AddRange(struct_declaration());
-            while (is_struct_declaration()) {
-                items.AddRange(struct_declaration());
+            items.AddRange(StructDeclaration());
+            while (IsStructDeclaration()) {
+                items.AddRange(StructDeclaration());
             }
             return items;
         }
 
         /// <summary>
-        /// 6.7.2.1 \‘¢‘Ìw’èq‹y‚Ñ‹¤—p‘Ìw’èq(ƒƒ“ƒoéŒ¾)‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.2.1 æ§‹é€ ä½“æŒ‡å®šå­åŠã³å…±ç”¨ä½“æŒ‡å®šå­(ãƒ¡ãƒ³ãƒå®£è¨€)ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_struct_declaration() {
-            return is_specifier_qualifiers();
+        private bool IsStructDeclaration() {
+            return IsSpecifierQualifiers();
         }
 
         /// <summary>
-        /// 6.7.2.1 \‘¢‘Ìw’èq‹y‚Ñ‹¤—p‘Ìw’èq(ƒƒ“ƒoéŒ¾)
+        /// 6.7.2.1 æ§‹é€ ä½“æŒ‡å®šå­åŠã³å…±ç”¨ä½“æŒ‡å®šå­(ãƒ¡ãƒ³ãƒå®£è¨€)
         /// </summary>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declaration() {
-            CType baseType = specifier_qualifiers();
-            var ret = struct_declarator_list(baseType);
-            lexer.Read(';');
+        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclaration() {
+            CType baseType = SpecifierQualifiers();
+            var ret = StructDeclaratorList(baseType);
+            _lexer.ReadToken(';');
             return ret;
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚Ñ‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_specifier_qualifiers() {
-            return is_specifier_qualifier(null, TypeSpecifier.None);
+        private bool IsSpecifierQualifiers() {
+            return IsSpecifierQualifier(null, AnsiCParser.TypeSpecifier.None);
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚Ñ
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³
         /// </summary>
         /// <returns></returns>
-        private CType specifier_qualifiers() {
+        private CType SpecifierQualifiers() {
             CType baseType = null;
+#if false
             TypeSpecifier typeSpecifier = TypeSpecifier.None;
             TypeQualifier typeQualifier = TypeQualifier.None;
-
-            // Œ^w’èq‚à‚µ‚­‚ÍŒ^Cüq‚ğ“Ç‚İæ‚éB
-            if (is_specifier_qualifier(null, TypeSpecifier.None) == false) {
-                if (is_storage_class_specifier()) {
-                    // ‹L‰¯ƒNƒ‰ƒXw’èqi•¶–@ã‚Í–³‚­‚Ä‚æ‚¢BƒGƒ‰[ƒƒbƒZ[ƒW•\¦‚Ì‚½‚ß‚É—pˆÓBj
-                    throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"‹L‰¯ƒNƒ‰ƒXw’èq { lexer.current_token().ToString() } ‚Íg‚¦‚Ü‚¹‚ñB");
+            // å‹æŒ‡å®šå­ã‚‚ã—ãã¯å‹ä¿®é£¾å­ã‚’èª­ã¿å–ã‚‹ã€‚
+            if (IsSpecifierQualifier(null, TypeSpecifier.None) == false) {
+                if (IsStorageClassSpecifier()) {
+                    // è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ï¼ˆæ–‡æ³•ä¸Šã¯ç„¡ãã¦ã‚ˆã„ã€‚ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸è¡¨ç¤ºã®ãŸã‚ã«ç”¨æ„ã€‚ï¼‰
+                    throw new CompilerException.SyntaxErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, $"è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ { lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
                 }
-                throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^w’èq‚à‚µ‚­‚ÍŒ^CüqˆÈŠO‚Ì—v‘f‚ª‚ ‚éB");
+                throw new CompilerException.SyntaxErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "å‹æŒ‡å®šå­ã‚‚ã—ãã¯å‹ä¿®é£¾å­ä»¥å¤–ã®è¦ç´ ãŒã‚ã‚‹ã€‚");
             }
-            specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
-            while (is_specifier_qualifier(baseType, typeSpecifier)) {
-                specifier_qualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
+            SpecifierQualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
+            while (IsSpecifierQualifier(baseType, typeSpecifier)) {
+                SpecifierQualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
             }
-
             if (baseType != null) {
-                // Œ^w’èq•”‚É\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ªoŒ»‚·‚éê‡
+                // å‹æŒ‡å®šå­éƒ¨ã«æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒå‡ºç¾ã™ã‚‹å ´åˆ
                 if (typeSpecifier != TypeSpecifier.None) {
-                    // 6.7.2 Œ^w’èquŒ^w’èq‚Ì•À‚Ñ‚ÍCŸ‚É¦‚·‚à‚Ì‚Ì‚¢‚¸‚ê‚©ˆê‚Â‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢Bv’†‚Å\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚Í‚»‚ê’P‘Ì‚Ì‚İ‚Åg‚¤‚±‚Æ‚ª‹K’è‚³‚ê‚Ä‚¢‚é‚½‚ßA
-                    // \‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚Ì‚¢‚¸‚ê‚©‚Æ‚»‚ê‚çˆÈŠO‚ÌŒ^w’èq‚ª‘g‚İ‡‚í‚¹‚ç‚ê‚Ä‚¢‚éê‡‚ÍƒGƒ‰[‚Æ‚·‚éB
-                    // ‚È‚¨A\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ª•¡”‰ñ—˜—p‚³‚ê‚Ä‚¢‚éê‡‚Í specifier_qualifier “à‚ÅƒGƒ‰[‚Æ‚È‚éB
-                    // i—ğj“I‚È˜bFK&R ‚Å‚Í typedef ‚Í •Ê–¼(alias)ˆµ‚¢‚¾‚Á‚½‚½‚ßAtypedef int INT; unsingned INT x; ‚Í‘Ã“–‚¾‚Á‚½j
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^w’èqEŒ^Cüq•À‚Ñ’†‚Å\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚Ì‚¢‚¸‚ê‚©‚ÆA‚»‚ê‚çˆÈŠO‚ÌŒ^w’èq‚ª‘g‚İ‡‚í‚¹‚ç‚ê‚Ä‚¢‚éB");
+                    // 6.7.2 å‹æŒ‡å®šå­ã€Œå‹æŒ‡å®šå­ã®ä¸¦ã³ã¯ï¼Œæ¬¡ã«ç¤ºã™ã‚‚ã®ã®ã„ãšã‚Œã‹ä¸€ã¤ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ã€ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã¯ãã‚Œå˜ä½“ã®ã¿ã§ä½¿ã†ã“ã¨ãŒè¦å®šã•ã‚Œã¦ã„ã‚‹ãŸã‚ã€
+                    // æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã®ã„ãšã‚Œã‹ã¨ãã‚Œã‚‰ä»¥å¤–ã®å‹æŒ‡å®šå­ãŒçµ„ã¿åˆã‚ã›ã‚‰ã‚Œã¦ã„ã‚‹å ´åˆã¯ã‚¨ãƒ©ãƒ¼ã¨ã™ã‚‹ã€‚
+                    // ãªãŠã€æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒè¤‡æ•°å›åˆ©ç”¨ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ SpecifierQualifier å†…ã§ã‚¨ãƒ©ãƒ¼ã¨ãªã‚‹ã€‚
+                    // ï¼ˆæ­´å²çš„ãªè©±ï¼šK&R ã§ã¯ typedef ã¯ åˆ¥å(alias)æ‰±ã„ã ã£ãŸãŸã‚ã€typedef int INT; unsingned INT x; ã¯å¦¥å½“ã ã£ãŸï¼‰
+                    throw new CompilerException.SpecificationErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "å‹æŒ‡å®šå­ãƒ»å‹ä¿®é£¾å­ä¸¦ã³ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã®ã„ãšã‚Œã‹ã¨ã€ãã‚Œã‚‰ä»¥å¤–ã®å‹æŒ‡å®šå­ãŒçµ„ã¿åˆã‚ã›ã‚‰ã‚Œã¦ã„ã‚‹ã€‚");
                 }
             } else {
-                // Œ^w’èq•”‚É\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ªoŒ»‚µ‚È‚¢ê‡
+                // å‹æŒ‡å®šå­éƒ¨ã«æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒå‡ºç¾ã—ãªã„å ´åˆ
                 if (typeSpecifier == TypeSpecifier.None) {
-                    // 6.7.2 ‚»‚ê‚¼‚ê‚ÌéŒ¾‚ÌéŒ¾w’èq—ñ‚Ì’†‚ÅC–”‚Í‚»‚ê‚¼‚ê‚Ì\‘¢‘ÌéŒ¾‹y‚ÑŒ^–¼‚ÌŒ^w’èqŒ^Cüq•À‚Ñ‚Ì’†‚ÅC­‚È‚­‚Æ‚àˆê‚Â‚ÌŒ^w’èq‚ğw’è‚µ‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-                    // ‚Æ‚ ‚é‚½‚ßAéŒ¾w’èq‚ğˆê‚Â‚àw’è‚µ‚È‚¢‚±‚Æ‚Í‹–‚³‚ê‚È‚¢B
-                    // i—ğj“I‚È˜bFK&R ‚Å‚Í éŒ¾w’èq‚ğÈ—ª‚·‚é‚Æ int ˆµ‚¢j
-                    // ToDo: C90‚ÍŒİŠ·«‚ÌŠÏ“_‚©‚çK&R“®ì‚àc‚³‚ê‚Ä‚¢‚é‚Ì‚Å‘I‘ğ‚Å‚«‚é‚æ‚¤‚É‚·‚é
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "‚»‚ê‚¼‚ê‚ÌéŒ¾‚ÌéŒ¾w’èq—ñ‚Ì’†‚ÅC–”‚Í‚»‚ê‚¼‚ê‚Ì\‘¢‘ÌéŒ¾‹y‚ÑŒ^–¼‚ÌŒ^w’èqŒ^Cüq•À‚Ñ‚Ì’†‚ÅC­‚È‚­‚Æ‚àˆê‚Â‚ÌŒ^w’èq‚ğw’è‚µ‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    // 6.7.2 ãã‚Œãã‚Œã®å®£è¨€ã®å®£è¨€æŒ‡å®šå­åˆ—ã®ä¸­ã§ï¼Œåˆã¯ãã‚Œãã‚Œã®æ§‹é€ ä½“å®£è¨€åŠã³å‹åã®å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ã®ä¸­ã§ï¼Œå°‘ãªãã¨ã‚‚ä¸€ã¤ã®å‹æŒ‡å®šå­ã‚’æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+                    // ã¨ã‚ã‚‹ãŸã‚ã€å®£è¨€æŒ‡å®šå­ã‚’ä¸€ã¤ã‚‚æŒ‡å®šã—ãªã„ã“ã¨ã¯è¨±ã•ã‚Œãªã„ã€‚
+                    // ï¼ˆæ­´å²çš„ãªè©±ï¼šK&R ã§ã¯ å®£è¨€æŒ‡å®šå­ã‚’çœç•¥ã™ã‚‹ã¨ int æ‰±ã„ï¼‰
+                    // ToDo: C90ã¯äº’æ›æ€§ã®è¦³ç‚¹ã‹ã‚‰K&Rå‹•ä½œã‚‚æ®‹ã•ã‚Œã¦ã„ã‚‹ã®ã§é¸æŠã§ãã‚‹ã‚ˆã†ã«ã™ã‚‹
+                    throw new CompilerException.SpecificationErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "ãã‚Œãã‚Œã®å®£è¨€ã®å®£è¨€æŒ‡å®šå­åˆ—ã®ä¸­ã§ï¼Œåˆã¯ãã‚Œãã‚Œã®æ§‹é€ ä½“å®£è¨€åŠã³å‹åã®å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ã®ä¸­ã§ï¼Œå°‘ãªãã¨ã‚‚ä¸€ã¤ã®å‹æŒ‡å®šå­ã‚’æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 } else {
                     baseType = new CType.BasicType(typeSpecifier);
                 }
             }
 
-            // Œ^Cüq‚ğ“K—p
+            // å‹ä¿®é£¾å­ã‚’é©ç”¨
             baseType = baseType.WrapTypeQualifier(typeQualifier);
+#else
+            StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
+            FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+            if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.SpecifierQualifiers) < 1) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹æŒ‡å®šå­/å‹ä¿®é£¾å­ãŒä¸€ã¤ä»¥ä¸ŠæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å¿…è¦ãŒã‚ã‚‹ã€‚");
+            }
+            System.Diagnostics.Debug.Assert(storageClass == AnsiCParser.StorageClassSpecifier.None);
+            System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
+#endif
+
 
             return baseType;
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚ÑiŒ^w’èq‚à‚µ‚­‚ÍŒ^Cüq‚Æ‚È‚è‚¤‚é‚©Hj
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ï¼ˆå‹æŒ‡å®šå­ã‚‚ã—ãã¯å‹ä¿®é£¾å­ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿï¼‰
         /// </summary>
         /// <param name="type"></param>
         /// <param name="typeSpecifier"></param>
         /// <returns></returns>
-        private bool is_specifier_qualifier(CType type, TypeSpecifier typeSpecifier) {
+        private bool IsSpecifierQualifier(CType type, TypeSpecifier typeSpecifier) {
             return (
-                (is_type_specifier() && type == null) ||
-                (is_struct_or_union_specifier() && type == null) ||
-                (is_enum_specifier() && type == null) ||
-                (is_TYPEDEF_NAME() && type == null && typeSpecifier == TypeSpecifier.None) ||
-                is_type_qualifier());
+                (IsTypeSpecifier() && type == null) ||
+                (IsStructOrUnionSpecifier() && type == null) ||
+                (IsEnumSpecifier() && type == null) ||
+                (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) ||
+                IsTypeQualifier());
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚ÑiŒ^w’èq‚à‚µ‚­‚ÍŒ^Cüqj
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ï¼ˆå‹æŒ‡å®šå­ã‚‚ã—ãã¯å‹ä¿®é£¾å­ï¼‰
         /// </summary>
         /// <param name="type"></param>
         /// <param name="typeSpecifier"></param>
         /// <returns></returns>
-        private void specifier_qualifier(ref CType type, ref TypeSpecifier typeSpecifier, ref TypeQualifier typeQualifier) {
-            if (is_type_specifier()) {
-                // Œ^w’èqi—\–ñŒêj
-                typeSpecifier = typeSpecifier.Marge(type_specifier());
-            } else if (is_struct_or_union_specifier()) {
-                // Œ^w’èqi\‘¢‘Ìw’èq‚à‚µ‚­‚Í‹¤—p‘Ìw’èqj
+        private void SpecifierQualifier(ref CType type, ref TypeSpecifier typeSpecifier, ref TypeQualifier typeQualifier) {
+            if (IsTypeSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆäºˆç´„èªï¼‰
+                typeSpecifier = typeSpecifier.Marge(TypeSpecifier());
+            } else if (IsStructOrUnionSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆæ§‹é€ ä½“æŒ‡å®šå­ã‚‚ã—ãã¯å…±ç”¨ä½“æŒ‡å®šå­ï¼‰
                 if (type != null) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^w’èqEŒ^Cüq•À‚Ñ’†‚Å\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ª‚Q‚ÂˆÈãg—p‚³‚ê‚Ä‚¢‚éB");
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹æŒ‡å®šå­ãƒ»å‹ä¿®é£¾å­ä¸¦ã³ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒï¼’ã¤ä»¥ä¸Šä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã€‚");
                 }
-                type = struct_or_union_specifier();
-            } else if (is_enum_specifier()) {
-                // Œ^w’èqi—ñ‹“Œ^w’èqj
+                type = StructOrUnionSpecifier();
+            } else if (IsEnumSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å‹æŒ‡å®šå­ï¼‰
                 if (type != null) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^w’èqEŒ^Cüq•À‚Ñ’†‚Å\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ª‚Q‚ÂˆÈãg—p‚³‚ê‚Ä‚¢‚éB");
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹æŒ‡å®šå­ãƒ»å‹ä¿®é£¾å­ä¸¦ã³ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒï¼’ã¤ä»¥ä¸Šä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã€‚");
                 }
-                type = enum_specifier();
-            } else if (is_TYPEDEF_NAME()) {
-                // Œ^w’èqiŒ^’è‹`–¼j
+                type = EnumSpecifier();
+            } else if (IsTypedefName()) {
+                // å‹æŒ‡å®šå­ï¼ˆå‹å®šç¾©åï¼‰
                 SyntaxTree.Declaration.TypeDeclaration value;
-                if (_typedefScope.TryGetValue(lexer.current_token().Raw, out value) == false) {
-                    throw new CompilerException.UndefinedIdentifierErrorException(lexer.current_token().Start, lexer.current_token().End, $"Œ^–¼ {lexer.current_token().Raw} ‚Í’è‹`‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB");
+                if (_typedefScope.TryGetValue(_lexer.CurrentToken().Raw, out value) == false) {
+                    throw new CompilerException.UndefinedIdentifierErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å‹å {_lexer.CurrentToken().Raw} ã¯å®šç¾©ã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚");
                 }
                 if (type != null) {
-                    throw new CompilerException.SpecificationErrorException(lexer.current_token().Start, lexer.current_token().End, "Œ^w’èqEŒ^Cüq•À‚Ñ’†‚Å\‘¢‘Ì‹¤—p‘Ìw’èqA—ñ‹“Œ^w’èqAŒ^’è‹`–¼‚ª‚Q‚ÂˆÈãg—p‚³‚ê‚Ä‚¢‚éB");
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹æŒ‡å®šå­ãƒ»å‹ä¿®é£¾å­ä¸¦ã³ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒï¼’ã¤ä»¥ä¸Šä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã€‚");
                 }
-                type = new CType.TypedefedType(lexer.current_token().Raw, value.Type);
-                lexer.next_token();
-            } else if (is_type_qualifier()) {
-                // Œ^Cüq
-                typeQualifier.Marge(type_qualifier());
+                type = new CType.TypedefedType(_lexer.CurrentToken().Raw, value.Type);
+                _lexer.NextToken();
+            } else if (IsTypeQualifier()) {
+                // å‹ä¿®é£¾å­
+                typeQualifier.Marge(TypeQualifier());
             } else {
-                throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, $"Œ^w’èqŒ^Cüq‚Í Œ^w’èq‚Ì—\–ñŒê, \‘¢‘Ìw’èq‚à‚µ‚­‚Í‹¤—p‘Ìw’èq, —ñ‹“Œ^w’èq, Œ^’è‹`–¼ Œ^Cüq‚Ì‰½‚ê‚©‚Å‚·‚ªA { lexer.current_token().ToString() } ‚Í‚»‚Ì‚¢‚¸‚ê‚Å‚à‚ ‚è‚Ü‚¹‚ñBi–{ˆ—Œn‚ÌÀ‘•‚ÉŒë‚è‚ª‚ ‚é‚Æv‚¢‚Ü‚·Bj");
+                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å‹æŒ‡å®šå­å‹ä¿®é£¾å­ã¯ å‹æŒ‡å®šå­ã®äºˆç´„èª, æ§‹é€ ä½“æŒ‡å®šå­ã‚‚ã—ãã¯å…±ç”¨ä½“æŒ‡å®šå­, åˆ—æŒ™å‹æŒ‡å®šå­, å‹å®šç¾©å å‹ä¿®é£¾å­ã®ä½•ã‚Œã‹ã§ã™ãŒã€ { _lexer.CurrentToken().ToString() } ã¯ãã®ã„ãšã‚Œã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã¨æ€ã„ã¾ã™ã€‚ï¼‰");
             }
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚Ñiƒƒ“ƒoéŒ¾q•À‚Ñj
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ï¼ˆãƒ¡ãƒ³ãƒå®£è¨€å­ä¸¦ã³ï¼‰
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> struct_declarator_list(CType type) {
+        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclaratorList(CType type) {
             var ret = new List<CType.TaggedType.StructUnionType.MemberInfo>();
-            ret.Add(struct_declarator(type));
-            while (lexer.ReadIf(',')) {
-                ret.Add(struct_declarator(type));
+            ret.Add(StructDeclarator(type));
+            while (_lexer.ReadTokenIf(',')) {
+                ret.Add(StructDeclarator(type));
             }
             return ret;
         }
 
         /// <summary>
-        /// 6.7.2.1 Œ^w’èqŒ^Cüq•À‚Ñiƒƒ“ƒoéŒ¾qj
+        /// 6.7.2.1 å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ï¼ˆãƒ¡ãƒ³ãƒå®£è¨€å­ï¼‰
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private CType.TaggedType.StructUnionType.MemberInfo struct_declarator(CType type) {
+        private CType.TaggedType.StructUnionType.MemberInfo StructDeclarator(CType type) {
             string ident = null;
-            if (is_declarator()) {
-                // éŒ¾q
+            if (IsDeclarator()) {
+                // å®£è¨€å­
                 List<CType> stack = new List<CType>() { new CType.StubType() };
-                declarator(ref ident, stack, 0);
+                Declarator(ref ident, stack, 0);
                 type = CType.Resolve(type, stack);
 
-                // ƒrƒbƒgƒtƒB[ƒ‹ƒh•”•ª(opt)
+                // ãƒ“ãƒƒãƒˆãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰éƒ¨åˆ†(opt)
                 SyntaxTree.Expression expr = null;
-                if (lexer.ReadIf(':')) {
-                    expr = constant_expression();
+                if (_lexer.ReadTokenIf(':')) {
+                    expr = ConstantExpression();
                 }
 
                 return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
-            } else if (lexer.ReadIf(':')) {
-                // ƒrƒbƒgƒtƒB[ƒ‹ƒh•”•ª(must)
-                SyntaxTree.Expression expr = constant_expression();
+            } else if (_lexer.ReadTokenIf(':')) {
+                // ãƒ“ãƒƒãƒˆãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰éƒ¨åˆ†(must)
+                SyntaxTree.Expression expr = ConstantExpression();
 
                 return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
             } else {
-                throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"\‘¢‘Ì/‹¤—p‘Ì‚Ìƒƒ“ƒoéŒ¾q‚Å‚ÍAéŒ¾q‚ÆƒrƒbƒgƒtƒB[ƒ‹ƒh•”‚Ì—¼•û‚ğÈ—ª‚·‚é‚±‚Æ‚Í‚Å‚«‚Ü‚¹‚ñB–³–¼\‘¢‘Ì/‹¤—p‘Ì‚ğg—p‚Å‚«‚é‚Ì‚Í‹KŠiã‚ÍC11‚©‚ç‚Å‚·B(C11 6.7.2.1‚Å‹K’è)B");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"æ§‹é€ ä½“/å…±ç”¨ä½“ã®ãƒ¡ãƒ³ãƒå®£è¨€å­ã§ã¯ã€å®£è¨€å­ã¨ãƒ“ãƒƒãƒˆãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰éƒ¨ã®ä¸¡æ–¹ã‚’çœç•¥ã™ã‚‹ã“ã¨ã¯ã§ãã¾ã›ã‚“ã€‚ç„¡åæ§‹é€ ä½“/å…±ç”¨ä½“ã‚’ä½¿ç”¨ã§ãã‚‹ã®ã¯è¦æ ¼ä¸Šã¯C11ã‹ã‚‰ã§ã™ã€‚(C11 6.7.2.1ã§è¦å®š)ã€‚");
             }
         }
 
         /// <summary>
-        /// 6.7.2.2 —ñ‹“Œ^w’èq‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.2.2 åˆ—æŒ™å‹æŒ‡å®šå­ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_enum_specifier() {
-            return lexer.Peek(Token.TokenKind.ENUM);
+        private bool IsEnumSpecifier() {
+            return _lexer.PeekToken(Token.TokenKind.ENUM);
         }
 
         /// <summary>
-        /// 6.7.2.2 —ñ‹“Œ^w’èq
+        /// 6.7.2.2 åˆ—æŒ™å‹æŒ‡å®šå­
         /// </summary>
         /// <returns></returns>
-        private CType enum_specifier() {
-            lexer.Read(Token.TokenKind.ENUM);
+        private CType EnumSpecifier() {
+            _lexer.ReadToken(Token.TokenKind.ENUM);
 
-            if (is_IDENTIFIER(true)) {
-                var ident = IDENTIFIER(true);
+            if (IsIdentifier(true)) {
+                var ident = Identifier(true);
                 CType.TaggedType etype;
                 if (_tagScope.TryGetValue(ident, out etype) == false) {
-                    // ƒ^ƒO–¼‘O•\‚É–³‚¢ê‡‚ÍV‚µ‚­’Ç‰Á‚·‚éB
+                    // ã‚¿ã‚°åå‰è¡¨ã«ç„¡ã„å ´åˆã¯æ–°ã—ãè¿½åŠ ã™ã‚‹ã€‚
                     etype = new CType.TaggedType.EnumType(ident, false);
                     _tagScope.Add(ident, etype);
                 } else if (!(etype is CType.TaggedType.EnumType)) {
-                    throw new Exception($"—ñ‹“Œ^ {ident} ‚ÍŠù‚É\‘¢‘Ì/‹¤—p‘Ì‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚Ü‚·B");
+                    throw new Exception($"åˆ—æŒ™å‹ {ident} ã¯æ—¢ã«æ§‹é€ ä½“/å…±ç”¨ä½“ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                 } else {
 
                 }
-                if (lexer.ReadIf('{')) {
+                if (_lexer.ReadTokenIf('{')) {
                     if ((etype as CType.TaggedType.EnumType).Members != null) {
-                        throw new Exception($"—ñ‹“Œ^ {ident} ‚ÍŠù‚ÉŠ®‘SŒ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚Ü‚·B");
+                        throw new Exception($"åˆ—æŒ™å‹ {ident} ã¯æ—¢ã«å®Œå…¨å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     } else {
-                        // •sŠ®‘SŒ^‚Æ‚µ‚Ä’è‹`‚³‚ê‚Ä‚¢‚é‚Ì‚ÅŠ®‘SŒ^‚É‚·‚é‚½‚ß‚É‘‚«Š·‚¦‘ÎÛ‚Æ‚·‚é
-                        (etype as CType.TaggedType.EnumType).Members = enumerator_list(etype as CType.TaggedType.EnumType);
-                        lexer.Read('}');
+                        // ä¸å®Œå…¨å‹ã¨ã—ã¦å®šç¾©ã•ã‚Œã¦ã„ã‚‹ã®ã§å®Œå…¨å‹ã«ã™ã‚‹ãŸã‚ã«æ›¸ãæ›ãˆå¯¾è±¡ã¨ã™ã‚‹
+                        (etype as CType.TaggedType.EnumType).Members = EnumeratorList(etype as CType.TaggedType.EnumType);
+                        _lexer.ReadToken('}');
                     }
                 }
                 return etype;
@@ -1332,29 +1730,29 @@ namespace AnsiCParser {
                 var ident = $"$enum_{anony++}";
                 var etype = new CType.TaggedType.EnumType(ident, true);
                 _tagScope.Add(ident, etype);
-                lexer.Read('{');
-                enumerator_list(etype);
-                lexer.Read('}');
+                _lexer.ReadToken('{');
+                EnumeratorList(etype);
+                _lexer.ReadToken('}');
                 return etype;
             }
         }
 
         /// <summary>
-        /// 6.7.2.2 —ñ‹“Œ^w’èqi—ñ‹“q•À‚Ñj
+        /// 6.7.2.2 åˆ—æŒ™å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å­ä¸¦ã³ï¼‰
         /// </summary>
         /// <param name="enumType"></param>
-        private List<CType.TaggedType.EnumType.MemberInfo> enumerator_list(CType.TaggedType.EnumType enumType) {
+        private List<CType.TaggedType.EnumType.MemberInfo> EnumeratorList(CType.TaggedType.EnumType enumType) {
             var ret = new List<CType.TaggedType.EnumType.MemberInfo>();
             enumType.Members = ret;
-            var e = enumerator(enumType, 0);
+            var e = Enumerator(enumType, 0);
             _identScope.Add(e.Ident, new IdentifierScopeValue.EnumValue(enumType, e.Ident));
             ret.Add(e);
-            while (lexer.ReadIf(',')) {
+            while (_lexer.ReadTokenIf(',')) {
                 var i = e.Value + 1;
-                if (is_enumerator() == false) {
+                if (IsEnumerator() == false) {
                     break;
                 }
-                e = enumerator(enumType, i);
+                e = Enumerator(enumType, i);
                 _identScope.Add(e.Ident, new IdentifierScopeValue.EnumValue(enumType, e.Ident));
                 ret.Add(e);
             }
@@ -1362,173 +1760,177 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.7.2.2 —ñ‹“Œ^w’èqi—ñ‹“q‚Æ‚È‚è‚¤‚é‚©j
+        /// 6.7.2.2 åˆ—æŒ™å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å­ã¨ãªã‚Šã†ã‚‹ã‹ï¼‰
         /// </summary>
         /// <returns></returns>
-        private bool is_enumerator() {
-            return is_IDENTIFIER(false);
+        private bool IsEnumerator() {
+            return IsIdentifier(false);
         }
 
         /// <summary>
-        /// 6.7.2.2 —ñ‹“Œ^w’èqi—ñ‹“qj
+        /// 6.7.2.2 åˆ—æŒ™å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å­ï¼‰
         /// </summary>
         /// <param name="enumType"></param>
         /// <param name="i"></param>
         /// <returns></returns>
-        private CType.TaggedType.EnumType.MemberInfo enumerator(CType.TaggedType.EnumType enumType, int i) {
-            var ident = IDENTIFIER(false);
-            if (lexer.ReadIf('=')) {
-                var expr = constant_expression();
+        private CType.TaggedType.EnumType.MemberInfo Enumerator(CType.TaggedType.EnumType enumType, int i) {
+            var ident = Identifier(false);
+            if (_lexer.ReadTokenIf('=')) {
+                var expr = ConstantExpression();
                 i = Evaluator.ConstantEval(expr);
             }
             return new CType.TaggedType.EnumType.MemberInfo(enumType, ident, i);
         }
 
         /// <summary>
-        /// 6.7.3 Œ^Cüq‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.3 å‹ä¿®é£¾å­ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_type_qualifier() {
-            return lexer.Peek(Token.TokenKind.CONST, Token.TokenKind.VOLATILE, Token.TokenKind.RESTRICT, Token.TokenKind.NEAR, Token.TokenKind.FAR);
+        private bool IsTypeQualifier() {
+            return _lexer.PeekToken(Token.TokenKind.CONST, Token.TokenKind.VOLATILE, Token.TokenKind.RESTRICT, Token.TokenKind.NEAR, Token.TokenKind.FAR);
         }
 
         /// <summary>
-        /// 6.7.3 Œ^Cüq
+        /// 6.7.3 å‹ä¿®é£¾å­
         /// </summary>
         /// <returns></returns>
-        private TypeQualifier type_qualifier() {
-            switch (lexer.current_token().Kind) {
+        private TypeQualifier TypeQualifier() {
+            switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.CONST:
-                    lexer.next_token();
-                    return TypeQualifier.Const;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeQualifier.Const;
                 case Token.TokenKind.VOLATILE:
-                    lexer.next_token();
-                    return TypeQualifier.Volatile;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeQualifier.Volatile;
                 case Token.TokenKind.RESTRICT:
-                    lexer.next_token();
-                    return TypeQualifier.Restrict;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeQualifier.Restrict;
                 case Token.TokenKind.NEAR:
-                    lexer.next_token();
-                    return TypeQualifier.Near;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeQualifier.Near;
                 case Token.TokenKind.FAR:
-                    lexer.next_token();
-                    return TypeQualifier.Far;
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeQualifier.Far;
                 default:
                     throw new Exception();
             }
         }
 
         /// <summary>
-        /// 6.7.4 ŠÖ”w’èq‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.4 é–¢æ•°æŒ‡å®šå­ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_function_specifier() {
-            return lexer.Peek(Token.TokenKind.INLINE);
+        private bool IsFunctionSpecifier() {
+            return _lexer.PeekToken(Token.TokenKind.INLINE);
         }
 
         /// <summary>
-        /// 6.7.4 ŠÖ”w’èq
+        /// 6.7.4 é–¢æ•°æŒ‡å®šå­
         /// </summary>
         /// <returns></returns>
-        private FunctionSpecifier function_specifier() {
-            switch (lexer.current_token().Kind) {
+        private FunctionSpecifier FunctionSpecifier() {
+            switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.INLINE:
-                    lexer.next_token();
-                    return FunctionSpecifier.Inline;
+                    _lexer.NextToken();
+                    return AnsiCParser.FunctionSpecifier.Inline;
                 default:
                     throw new Exception();
             }
         }
 
-        private bool is_TYPEDEF_NAME() {
-            //return lexer.current_token().Kind == Token.TokenKind.TYPE_NAME;
-            return lexer.current_token().Kind == Token.TokenKind.IDENTIFIER && _typedefScope.ContainsKey(lexer.current_token().Raw);
-        }
-
         /// <summary>
-        /// 6.7.5 éŒ¾q‚Æ‚È‚è‚¤‚é‚©
+        /// å‹åã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_declarator() {
-            return is_pointer() || is_direct_declarator();
+        private bool IsTypedefName() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER 
+                && _typedefScope.ContainsKey(_lexer.CurrentToken().Raw);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q
+        /// 6.7.5 å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹
+        /// </summary>
+        /// <returns></returns>
+        private bool IsDeclarator() {
+            return IsPointer() || IsDirectDeclarator();
+        }
+
+        /// <summary>
+        /// 6.7.5 å®£è¨€å­
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void declarator(ref string ident, List<CType> stack, int index) {
-            if (is_pointer()) {
-                pointer(stack, index);
+        private void Declarator(ref string ident, List<CType> stack, int index) {
+            if (IsPointer()) {
+                Pointer(stack, index);
             }
-            direct_declarator(ref ident, stack, index);
+            DirectDeclarator(ref ident, stack, index);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_direct_declarator() {
-            return lexer.Peek('(') || is_IDENTIFIER(true);
+        private bool IsDirectDeclarator() {
+            return _lexer.PeekToken('(') || IsIdentifier(true);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚Ì‘O”¼•”•ª)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã®å‰åŠéƒ¨åˆ†)
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void direct_declarator(ref string ident, List<CType> stack, int index) {
-            if (lexer.ReadIf('(')) {
+        private void DirectDeclarator(ref string ident, List<CType> stack, int index) {
+            if (_lexer.ReadTokenIf('(')) {
                 stack.Add(new CType.StubType());
-                declarator(ref ident, stack, index + 1);
-                lexer.Read(')');
+                Declarator(ref ident, stack, index + 1);
+                _lexer.ReadToken(')');
             } else {
-                ident = lexer.current_token().Raw;
-                lexer.next_token();
+                ident = _lexer.CurrentToken().Raw;
+                _lexer.NextToken();
             }
-            more_direct_declarator(stack, index);
+            MoreDirectDeclarator(stack, index);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚ÌŒã”¼•”•ª)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã®å¾ŒåŠéƒ¨åˆ†)
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void more_direct_declarator(List<CType> stack, int index) {
-            if (lexer.ReadIf('[')) {
-                // 6.7.5.2 ”z—ñéŒ¾q
-                // ToDo: AnsiC”ÍˆÍ‚Ì‚İ‘Î‰
+        private void MoreDirectDeclarator(List<CType> stack, int index) {
+            if (_lexer.ReadTokenIf('[')) {
+                // 6.7.5.2 é…åˆ—å®£è¨€å­
+                // ToDo: AnsiCç¯„å›²ã®ã¿å¯¾å¿œ
                 int len = -1;
-                if (lexer.Peek(']') == false) {
-                    var expr = constant_expression();
+                if (_lexer.PeekToken(']') == false) {
+                    var expr = ConstantExpression();
                     len = Evaluator.ConstantEval(expr);
                 }
-                lexer.Read(']');
-                more_direct_declarator(stack, index);
+                _lexer.ReadToken(']');
+                MoreDirectDeclarator(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
-            } else if (lexer.ReadIf('(')) {
-                // 6.7.5.3 ŠÖ”éŒ¾qiŠÖ”Œ´Œ^‚ğŠÜ‚Şj
-                if (lexer.ReadIf(')')) {
+            } else if (_lexer.ReadTokenIf('(')) {
+                // 6.7.5.3 é–¢æ•°å®£è¨€å­ï¼ˆé–¢æ•°åŸå‹ã‚’å«ã‚€ï¼‰
+                if (_lexer.ReadTokenIf(')')) {
                     // k&r or ANSI empty parameter list
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
-                    more_direct_declarator(stack, index);
+                    MoreDirectDeclarator(stack, index);
                 } else if (is_identifier_list()) {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClassSpecifier.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
-                    lexer.Read(')');
+                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x, AnsiCParser.StorageClassSpecifier.None, (CType)new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    _lexer.ReadToken(')');
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
-                    more_direct_declarator(stack, index);
+                    MoreDirectDeclarator(stack, index);
                 } else {
                     // ANSI parameter list
                     bool vargs = false;
-                    var args = parameter_type_list(ref vargs);
-                    lexer.Read(')');
+                    var args = ParameterTypeList(ref vargs);
+                    _lexer.ReadToken(')');
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
-                    more_direct_declarator(stack, index);
+                    MoreDirectDeclarator(stack, index);
 
                 }
             } else {
@@ -1537,51 +1939,51 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(‰¼ˆø”Œ^•À‚Ñ‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(ä»®å¼•æ•°å‹ä¸¦ã³ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_parameter_type_list() {
-            return is_parameter_declaration();
+        private bool IsParameterTypeList() {
+            return IsParameterDeclaration();
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(‰¼ˆø”Œ^•À‚Ñ)
+        /// 6.7.5 å®£è¨€å­(ä»®å¼•æ•°å‹ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private List<CType.FunctionType.ArgumentInfo> parameter_type_list(ref bool vargs) {
+        private List<CType.FunctionType.ArgumentInfo> ParameterTypeList(ref bool vargs) {
             var items = new List<CType.FunctionType.ArgumentInfo>();
-            items.Add(parameter_declaration());
-            while (lexer.ReadIf(',')) {
-                if (lexer.ReadIf(Token.TokenKind.ELLIPSIS)) {
+            items.Add(ParameterDeclaration());
+            while (_lexer.ReadTokenIf(',')) {
+                if (_lexer.ReadTokenIf(Token.TokenKind.ELLIPSIS)) {
                     vargs = true;
                     break;
                 } else {
-                    items.Add(parameter_declaration());
+                    items.Add(ParameterDeclaration());
                 }
             }
             return items;
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(‰¼ˆø”•À‚Ñ‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(ä»®å¼•æ•°ä¸¦ã³ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        public bool is_parameter_declaration() {
-            return is_declaration_specifier(null, TypeSpecifier.None);
+        public bool IsParameterDeclaration() {
+            return IsDeclarationSpecifier(null, AnsiCParser.TypeSpecifier.None);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(‰¼ˆø”•À‚Ñ)
+        /// 6.7.5 å®£è¨€å­(ä»®å¼•æ•°ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private CType.FunctionType.ArgumentInfo parameter_declaration() {
+        private CType.FunctionType.ArgumentInfo ParameterDeclaration() {
             StorageClassSpecifier storageClass;
-            CType baseType = declaration_specifiers(out storageClass);
+            CType baseType = DeclarationSpecifiers(out storageClass);
 
-            if (is_declarator_or_abstract_declarator()) {
+            if (IsDeclaratorOrAbstractDeclarator()) {
                 string ident = "";
                 List<CType> stack = new List<CType>() { new CType.StubType() };
-                declarator_or_abstract_declarator(ref ident, stack, 0);
+                DeclaratorOrAbstractDeclarator(ref ident, stack, 0);
                 var type = CType.Resolve(baseType, stack);
                 return new CType.FunctionType.ArgumentInfo(ident, storageClass, type);
             } else {
@@ -1591,70 +1993,70 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(éŒ¾q‚à‚µ‚­‚Í’ŠÛéŒ¾q‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(å®£è¨€å­ã‚‚ã—ãã¯æŠ½è±¡å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_declarator_or_abstract_declarator() {
-            return is_pointer() || is_direct_declarator_or_direct_abstract_declarator();
+        private bool IsDeclaratorOrAbstractDeclarator() {
+            return IsPointer() || IsDirectDeclaratorOrDirectAbstractDeclarator();
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(éŒ¾q‚à‚µ‚­‚Í’ŠÛéŒ¾q)
+        /// 6.7.5 å®£è¨€å­(å®£è¨€å­ã‚‚ã—ãã¯æŠ½è±¡å®£è¨€å­)
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void declarator_or_abstract_declarator(ref string ident, List<CType> stack, int index) {
-            if (is_pointer()) {
-                pointer(stack, index);
-                if (is_direct_declarator_or_direct_abstract_declarator()) {
-                    direct_declarator_or_direct_abstract_declarator(ref ident, stack, index);
+        private void DeclaratorOrAbstractDeclarator(ref string ident, List<CType> stack, int index) {
+            if (IsPointer()) {
+                Pointer(stack, index);
+                if (IsDirectDeclaratorOrDirectAbstractDeclarator()) {
+                    DirectDeclaratorOrDirectAbstractDeclarator(ref ident, stack, index);
                 }
             } else {
-                direct_declarator_or_direct_abstract_declarator(ref ident, stack, index);
+                DirectDeclaratorOrDirectAbstractDeclarator(ref ident, stack, index);
             }
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚à‚µ‚­‚Í’¼Ú’ŠÛéŒ¾q‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã‚‚ã—ãã¯ç›´æ¥æŠ½è±¡å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_direct_declarator_or_direct_abstract_declarator() {
-            return is_IDENTIFIER(true) || lexer.Peek('(', '[');
+        private bool IsDirectDeclaratorOrDirectAbstractDeclarator() {
+            return IsIdentifier(true) || _lexer.PeekToken('(', '[');
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚à‚µ‚­‚Í’¼Ú’ŠÛéŒ¾q‚Ì‘O”¼)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã‚‚ã—ãã¯ç›´æ¥æŠ½è±¡å®£è¨€å­ã®å‰åŠ)
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void direct_declarator_or_direct_abstract_declarator(ref string ident, List<CType> stack, int index) {
-            if (is_IDENTIFIER(true)) {
-                ident = IDENTIFIER(true);
-                more_dd_or_dad(stack, index);
-            } else if (lexer.ReadIf('(')) {
-                if (lexer.Peek(')')) {
+        private void DirectDeclaratorOrDirectAbstractDeclarator(ref string ident, List<CType> stack, int index) {
+            if (IsIdentifier(true)) {
+                ident = Identifier(true);
+                MoreDdOrDad(stack, index);
+            } else if (_lexer.ReadTokenIf('(')) {
+                if (_lexer.PeekToken(')')) {
                     // function?
-                } else if (is_parameter_type_list()) {
+                } else if (IsParameterTypeList()) {
                     // function 
                     // ANSI parameter list
                     bool vargs = false;
-                    var args = parameter_type_list(ref vargs);
+                    var args = ParameterTypeList(ref vargs);
                 } else {
                     stack.Add(new CType.StubType());
-                    declarator_or_abstract_declarator(ref ident, stack, index + 1);
+                    DeclaratorOrAbstractDeclarator(ref ident, stack, index + 1);
                 }
-                lexer.Read(')');
-                more_dd_or_dad(stack, index);
-            } else if (lexer.ReadIf('[')) {
+                _lexer.ReadToken(')');
+                MoreDdOrDad(stack, index);
+            } else if (_lexer.ReadTokenIf('[')) {
                 int len = -1;
-                if (lexer.Peek(']') == false) {
-                    var expr = constant_expression();
+                if (_lexer.PeekToken(']') == false) {
+                    var expr = ConstantExpression();
                     len = Evaluator.ConstantEval(expr);
                 }
-                lexer.Read(']');
-                more_dd_or_dad(stack, index);
+                _lexer.ReadToken(']');
+                MoreDdOrDad(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
             } else {
                 throw new Exception();
@@ -1663,37 +2065,37 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(’¼ÚéŒ¾q‚à‚µ‚­‚Í’¼Ú’ŠÛéŒ¾q‚ÌŒã”¼)
+        /// 6.7.5 å®£è¨€å­(ç›´æ¥å®£è¨€å­ã‚‚ã—ãã¯ç›´æ¥æŠ½è±¡å®£è¨€å­ã®å¾ŒåŠ)
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void more_dd_or_dad(List<CType> stack, int index) {
-            if (lexer.ReadIf('(')) {
-                if (lexer.Peek(')')) {
+        private void MoreDdOrDad(List<CType> stack, int index) {
+            if (_lexer.ReadTokenIf('(')) {
+                if (_lexer.PeekToken(')')) {
                     // function?
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
-                } else if (is_parameter_type_list()) {
+                } else if (IsParameterTypeList()) {
                     // function 
                     // ANSI parameter list
                     bool vargs = false;
-                    var args = parameter_type_list(ref vargs);
+                    var args = ParameterTypeList(ref vargs);
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // K&R parameter name list
-                    var args = identifier_list().Select(x => new CType.FunctionType.ArgumentInfo(x, StorageClassSpecifier.None, (CType)new CType.BasicType(TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x, AnsiCParser.StorageClassSpecifier.None, (CType)new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                 }
-                lexer.Read(')');
-                more_dd_or_dad(stack, index);
-            } else if (lexer.ReadIf('[')) {
+                _lexer.ReadToken(')');
+                MoreDdOrDad(stack, index);
+            } else if (_lexer.ReadTokenIf('[')) {
                 int len = -1;
-                if (lexer.Peek(']') == false) {
-                    var expr = constant_expression();
+                if (_lexer.PeekToken(']') == false) {
+                    var expr = ConstantExpression();
                     len = Evaluator.ConstantEval(expr);
                 }
-                lexer.Read(']');
-                more_dd_or_dad(stack, index);
+                _lexer.ReadToken(']');
+                MoreDdOrDad(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
             } else {
                 // _epsilon_
@@ -1701,203 +2103,205 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(¯•Êq•À‚Ñ‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.7.5 å®£è¨€å­(è­˜åˆ¥å­ä¸¦ã³ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
         private bool is_identifier_list() {
-            return is_IDENTIFIER(false);
+            return IsIdentifier(false);
         }
 
         /// <summary>
-        /// 6.7.5 éŒ¾q(¯•Êq•À‚Ñ)
+        /// 6.7.5 å®£è¨€å­(è­˜åˆ¥å­ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private List<string> identifier_list() {
+        private List<string> IdentifierList() {
             var items = new List<string>();
-            items.Add(IDENTIFIER(false));
-            while (lexer.ReadIf(',')) {
-                items.Add(IDENTIFIER(false));
+            items.Add(Identifier(false));
+            while (_lexer.ReadTokenIf(',')) {
+                items.Add(Identifier(false));
             }
             return items;
         }
 
         /// <summary>
-        /// 6.7.5.1 ƒ|ƒCƒ“ƒ^éŒ¾q‚Æ‚È‚è‚¤‚é‚©
+        /// 6.7.5.1 ãƒã‚¤ãƒ³ã‚¿å®£è¨€å­ã¨ãªã‚Šã†ã‚‹ã‹
         /// </summary>
         /// <returns></returns>
-        private bool is_pointer() {
-            return lexer.Peek('*');
+        private bool IsPointer() {
+            return _lexer.PeekToken('*');
         }
 
         /// <summary>
-        /// 6.7.5.1 ƒ|ƒCƒ“ƒ^éŒ¾q
+        /// 6.7.5.1 ãƒã‚¤ãƒ³ã‚¿å®£è¨€å­
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void pointer(List<CType> stack, int index) {
-            lexer.Read('*');
+        private void Pointer(List<CType> stack, int index) {
+            _lexer.ReadToken('*');
             stack[index] = CType.CreatePointer(stack[index]);
-            TypeQualifier typeQualifier = TypeQualifier.None;
-            while (is_type_qualifier()) {
-                typeQualifier = typeQualifier.Marge(type_qualifier());
+            TypeQualifier typeQualifier = AnsiCParser.TypeQualifier.None;
+            while (IsTypeQualifier()) {
+                typeQualifier = typeQualifier.Marge(TypeQualifier());
             }
             stack[index] = stack[index].WrapTypeQualifier(typeQualifier);
 
-            if (is_pointer()) {
-                pointer(stack, index);
+            if (IsPointer()) {
+                Pointer(stack, index);
             }
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(Œ^–¼)‚Æ‚È‚è‚¤‚é‚©H
+        /// 6.7.6 å‹å(å‹å)ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
         /// </summary>
         /// <returns></returns>
-        private bool is_type_name() {
-            return is_specifier_qualifiers();
+        private bool IsTypeName() {
+            return IsSpecifierQualifiers();
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(Œ^–¼)
+        /// 6.7.6 å‹å(å‹å)
         /// </summary>
         /// <returns></returns>
-        private CType type_name() {
-            CType baseType = specifier_qualifiers();
-            if (is_abstract_declarator()) {
+        private CType TypeName() {
+            CType baseType = SpecifierQualifiers();
+            if (IsAbstractDeclarator()) {
                 List<CType> stack = new List<CType>() { new CType.StubType() };
-                abstract_declarator(stack, 0);
+                AbstractDeclarator(stack, 0);
                 baseType = CType.Resolve(baseType, stack);
             }
             return baseType;
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(’ŠÛéŒ¾q)‚Æ‚È‚è‚¤‚é‚©H
+        /// 6.7.6 å‹å(æŠ½è±¡å®£è¨€å­)ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
         /// </summary>
         /// <returns></returns>
-        private bool is_abstract_declarator() {
-            return (is_pointer() || is_direct_abstract_declarator());
+        private bool IsAbstractDeclarator() {
+            return (IsPointer() || IsDirectAbstractDeclarator());
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(’ŠÛéŒ¾q)
+        /// 6.7.6 å‹å(æŠ½è±¡å®£è¨€å­)
         /// </summary>
         /// <returns></returns>
-        private void abstract_declarator(List<CType> stack, int index) {
-            if (is_pointer()) {
-                pointer(stack, index);
-                if (is_direct_abstract_declarator()) {
-                    direct_abstract_declarator(stack, index);
+        private void AbstractDeclarator(List<CType> stack, int index) {
+            if (IsPointer()) {
+                Pointer(stack, index);
+                if (IsDirectAbstractDeclarator()) {
+                    DirectAbstractDeclarator(stack, index);
                 }
             } else {
-                direct_abstract_declarator(stack, index);
+                DirectAbstractDeclarator(stack, index);
             }
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(’¼Ú’ŠÛéŒ¾q‚ğ\¬‚·‚é‘O”¼‚Ì—v‘f)‚Æ‚È‚è‚¤‚é‚©H
+        /// 6.7.6 å‹å(ç›´æ¥æŠ½è±¡å®£è¨€å­ã‚’æ§‹æˆã™ã‚‹å‰åŠã®è¦ç´ )ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿ
         /// </summary>
         /// <returns></returns>
-        private bool is_direct_abstract_declarator() {
-            return lexer.Peek('(', '[');
+        private bool IsDirectAbstractDeclarator() {
+            return _lexer.PeekToken('(', '[');
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(’¼Ú’ŠÛéŒ¾q‚ğ\¬‚·‚é‘O”¼‚Ì—v‘f)
+        /// 6.7.6 å‹å(ç›´æ¥æŠ½è±¡å®£è¨€å­ã‚’æ§‹æˆã™ã‚‹å‰åŠã®è¦ç´ )
         /// </summary>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void direct_abstract_declarator(List<CType> stack, int index) {
-            if (lexer.ReadIf('(')) {
-                if (is_abstract_declarator()) {
+        private void DirectAbstractDeclarator(List<CType> stack, int index) {
+            if (_lexer.ReadTokenIf('(')) {
+                if (IsAbstractDeclarator()) {
                     stack.Add(new CType.StubType());
-                    abstract_declarator(stack, index + 1);
-                } else if (lexer.Peek(')') == false) {
+                    AbstractDeclarator(stack, index + 1);
+                } else if (_lexer.PeekToken(')') == false) {
                     // ansi args
                     bool vargs = false;
-                    var items = parameter_type_list(ref vargs);
+                    var items = ParameterTypeList(ref vargs);
                 } else {
                     // k&r or ansi
                 }
-                lexer.Read(')');
-                more_direct_abstract_declarator(stack, index);
+                _lexer.ReadToken(')');
+                MoreDirectAbstractDeclarator(stack, index);
             } else {
-                lexer.Read('[');
+                _lexer.ReadToken('[');
                 int len = -1;
-                if (lexer.Peek(']') == false) {
-                    var expr = constant_expression();
+                if (_lexer.PeekToken(']') == false) {
+                    var expr = ConstantExpression();
                     len = Evaluator.ConstantEval(expr);
                 }
-                lexer.Read(']');
-                more_direct_abstract_declarator(stack, index);
+                _lexer.ReadToken(']');
+                MoreDirectAbstractDeclarator(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
             }
         }
 
         /// <summary>
-        /// 6.7.6 Œ^–¼(’¼Ú’ŠÛéŒ¾q‚ğ\¬‚·‚éŒã”¼‚Ì—v‘f)
+        /// 6.7.6 å‹å(ç›´æ¥æŠ½è±¡å®£è¨€å­ã‚’æ§‹æˆã™ã‚‹å¾ŒåŠã®è¦ç´ )
         /// </summary>
         /// <param name="stack"></param>
         /// <param name="index"></param>
-        private void more_direct_abstract_declarator(List<CType> stack, int index) {
-            if (lexer.ReadIf('[')) {
+        private void MoreDirectAbstractDeclarator(List<CType> stack, int index) {
+            if (_lexer.ReadTokenIf('[')) {
                 int len = -1;
-                if (lexer.Peek(']') == false) {
-                    var expr = constant_expression();
+                if (_lexer.PeekToken(']') == false) {
+                    var expr = ConstantExpression();
                     len = Evaluator.ConstantEval(expr);
                 }
-                lexer.Read(']');
-                more_direct_abstract_declarator(stack, index);
+                _lexer.ReadToken(']');
+                MoreDirectAbstractDeclarator(stack, index);
                 stack[index] = CType.CreateArray(len, stack[index]);
-            } else if (lexer.ReadIf('(')) {
-                if (lexer.Peek(')') == false) {
+            } else if (_lexer.ReadTokenIf('(')) {
+                if (_lexer.PeekToken(')') == false) {
                     bool vargs = false;
-                    var items = parameter_type_list(ref vargs);
+                    var items = ParameterTypeList(ref vargs);
                     stack[index] = new CType.FunctionType(items, vargs, stack[index]);
                 } else {
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
                 }
-                lexer.Read(')');
-                more_direct_abstract_declarator(stack, index);
+                _lexer.ReadToken(')');
+                MoreDirectAbstractDeclarator(stack, index);
             } else {
                 // _epsilon_
             }
         }
 
         /// <summary>
-        /// 6.7.7 Œ^’è‹`(Œ^’è‹`–¼)
+        /// 6.7.7 å‹å®šç¾©(å‹å®šç¾©å)
         /// </summary>
         /// <param name="v"></param>
         /// <returns></returns>
-        private bool is_typedefed_type(string v) {
+        private bool IsTypedefedType(string v) {
             return _typedefScope.ContainsKey(v);
         }
 
+#region 6.7.8 åˆæœŸåŒ–(åˆæœŸåŒ–å¼ã®å‹æ¤œæŸ»)
+
         private void CheckInitializerExpression(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType()) {
-                // ”z—ñŒ^‚Ìê‡
+                // é…åˆ—å‹ã®å ´åˆ
                 var arrayType = type.Unwrap() as CType.ArrayType;
                 CheckInitializerArray(arrayType, ast);
                 return;
             } else if (type.IsStructureType()) {
-                // \‘¢‘ÌŒ^‚Ìê‡
+                // æ§‹é€ ä½“å‹ã®å ´åˆ
                 var arrayType = type.Unwrap() as CType.TaggedType.StructUnionType;
                 CheckInitializerStruct(arrayType, ast);
                 return;
             } else if (type.IsUnionType()) {
-                // ‹¤—p‘ÌŒ^‚Ìê‡
+                // å…±ç”¨ä½“å‹ã®å ´åˆ
                 var arrayType = type.Unwrap() as CType.TaggedType.StructUnionType;
                 CheckInitializerUnion(arrayType, ast);
                 return;
             } else {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "W¬‘ÌŒ^–”‚Í‹¤—p‘ÌŒ^‚ğ‚à‚ÂƒIƒuƒWƒFƒNƒg‚É‘Î‚·‚é‰Šú‰»q‚ÍC—v‘f–”‚Í–¼‘O•t‚«ƒƒ“ƒo‚É‘Î‚·‚é‰Šú‰»q•À‚Ñ‚ğ”gŠ‡ŒÊ‚ÅˆÍ‚ñ‚¾‚à‚Ì‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "é›†æˆä½“å‹åˆã¯å…±ç”¨ä½“å‹ã‚’ã‚‚ã¤ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ã¯ï¼Œè¦ç´ åˆã¯åå‰ä»˜ããƒ¡ãƒ³ãƒã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ä¸¦ã³ã‚’æ³¢æ‹¬å¼§ã§å›²ã‚“ã ã‚‚ã®ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 }
-                // ‘ã“ü®‚ğ¶¬‚µ‚ÄŒŸØ
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, StorageClassSpecifier.None, null));
+                // ä»£å…¥å¼ã‚’ç”Ÿæˆã—ã¦æ¤œè¨¼
+                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
                 var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // —áŠO‚ª‹N‚«‚È‚¢‚È‚ç‘ã“ü‚Å‚«‚é
+                // ä¾‹å¤–ãŒèµ·ããªã„ãªã‚‰ä»£å…¥ã§ãã‚‹
             }
         }
 
@@ -1905,20 +2309,20 @@ namespace AnsiCParser {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "W¬‘ÌŒ^–”‚Í‹¤—p‘ÌŒ^‚ğ‚à‚ÂƒIƒuƒWƒFƒNƒg‚É‘Î‚·‚é‰Šú‰»q‚ÍC—v‘f–”‚Í–¼‘O•t‚«ƒƒ“ƒo‚É‘Î‚·‚é‰Šú‰»q•À‚Ñ‚ğ”gŠ‡ŒÊ‚ÅˆÍ‚ñ‚¾‚à‚Ì‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "é›†æˆä½“å‹åˆã¯å…±ç”¨ä½“å‹ã‚’ã‚‚ã¤ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ã¯ï¼Œè¦ç´ åˆã¯åå‰ä»˜ããƒ¡ãƒ³ãƒã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ä¸¦ã³ã‚’æ³¢æ‹¬å¼§ã§å›²ã‚“ã ã‚‚ã®ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 }
-                // ‘ã“ü®‚ğ¶¬‚µ‚ÄŒŸØ
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, StorageClassSpecifier.None, null));
+                // ä»£å…¥å¼ã‚’ç”Ÿæˆã—ã¦æ¤œè¨¼
+                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
                 var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // —áŠO‚ª‹N‚«‚È‚¢‚È‚ç‘ã“ü‚Å‚«‚é
+                // ä¾‹å¤–ãŒèµ·ããªã„ãªã‚‰ä»£å…¥ã§ãã‚‹
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Length == -1) {
                     type.Length = inits.Count;
                 } else if (type.Length < inits.Count) {
-                    throw new Exception("—v‘f”‚ªˆá‚¤");
+                    throw new Exception("è¦ç´ æ•°ãŒé•ã†");
                 }
-                // —v‘f”•ª‰ñ‚·
+                // è¦ç´ æ•°åˆ†å›ã™
                 for (var i = 0; type.Length == -1 || i < inits.Count; i++) {
                     CheckInitializerExpression(type.BaseType, inits[i]);
                 }
@@ -1928,19 +2332,19 @@ namespace AnsiCParser {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "W¬‘ÌŒ^–”‚Í‹¤—p‘ÌŒ^‚ğ‚à‚ÂƒIƒuƒWƒFƒNƒg‚É‘Î‚·‚é‰Šú‰»q‚ÍC—v‘f–”‚Í–¼‘O•t‚«ƒƒ“ƒo‚É‘Î‚·‚é‰Šú‰»q•À‚Ñ‚ğ”gŠ‡ŒÊ‚ÅˆÍ‚ñ‚¾‚à‚Ì‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "é›†æˆä½“å‹åˆã¯å…±ç”¨ä½“å‹ã‚’ã‚‚ã¤ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ã¯ï¼Œè¦ç´ åˆã¯åå‰ä»˜ããƒ¡ãƒ³ãƒã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ä¸¦ã³ã‚’æ³¢æ‹¬å¼§ã§å›²ã‚“ã ã‚‚ã®ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 }
-                // ‘ã“ü®‚ğ¶¬‚µ‚ÄŒŸØ
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, StorageClassSpecifier.None, null));
+                // ä»£å…¥å¼ã‚’ç”Ÿæˆã—ã¦æ¤œè¨¼
+                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
                 var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // —áŠO‚ª‹N‚«‚È‚¢‚È‚ç‘ã“ü‚Å‚«‚é
+                // ä¾‹å¤–ãŒèµ·ããªã„ãªã‚‰ä»£å…¥ã§ãã‚‹
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Members.Count < inits.Count) {
-                    throw new Exception("—v‘f”‚ªˆá‚¤");
+                    throw new Exception("è¦ç´ æ•°ãŒé•ã†");
                 }
-                // —v‘f”•ª‰ñ‚·
-                // Todo: ƒrƒbƒgƒtƒB[ƒ‹ƒh
+                // è¦ç´ æ•°åˆ†å›ã™
+                // Todo: ãƒ“ãƒƒãƒˆãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰
                 for (var i = 0; i < inits.Count; i++) {
                     CheckInitializerExpression(type.Members[i].Type, inits[i]);
                 }
@@ -1952,15 +2356,15 @@ namespace AnsiCParser {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "W¬‘ÌŒ^–”‚Í‹¤—p‘ÌŒ^‚ğ‚à‚ÂƒIƒuƒWƒFƒNƒg‚É‘Î‚·‚é‰Šú‰»q‚ÍC—v‘f–”‚Í–¼‘O•t‚«ƒƒ“ƒo‚É‘Î‚·‚é‰Šú‰»q•À‚Ñ‚ğ”gŠ‡ŒÊ‚ÅˆÍ‚ñ‚¾‚à‚Ì‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "é›†æˆä½“å‹åˆã¯å…±ç”¨ä½“å‹ã‚’ã‚‚ã¤ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ã¯ï¼Œè¦ç´ åˆã¯åå‰ä»˜ããƒ¡ãƒ³ãƒã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ä¸¦ã³ã‚’æ³¢æ‹¬å¼§ã§å›²ã‚“ã ã‚‚ã®ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 }
-                // ‘ã“ü®‚ğ¶¬‚µ‚ÄŒŸØ
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, StorageClassSpecifier.None, null));
+                // ä»£å…¥å¼ã‚’ç”Ÿæˆã—ã¦æ¤œè¨¼
+                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
                 var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // —áŠO‚ª‹N‚«‚È‚¢‚È‚ç‘ã“ü‚Å‚«‚é
+                // ä¾‹å¤–ãŒèµ·ããªã„ãªã‚‰ä»£å…¥ã§ãã‚‹
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
-                // Å‰‚Ì—v‘f‚Æ‚Ì‚İƒ`ƒFƒbƒN
+                // æœ€åˆã®è¦ç´ ã¨ã®ã¿ãƒã‚§ãƒƒã‚¯
                 CheckInitializerExpression(type.Members[0].Type, ast);
             } else {
                 throw new Exception("");
@@ -1968,21 +2372,21 @@ namespace AnsiCParser {
         }
         private void CheckInitializerList(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType()) {
-                // ”z—ñŒ^‚Ìê‡
+                // é…åˆ—å‹ã®å ´åˆ
                 var arrayType = type.Unwrap() as CType.ArrayType;
 
                 if (arrayType.BaseType.IsCharacterType()) {
-                    // ‰Šú‰»æ‚ÌŒ^‚ª•¶š”z—ñ‚Ìê‡
+                    // åˆæœŸåŒ–å…ˆã®å‹ãŒæ–‡å­—é…åˆ—ã®å ´åˆ
 
                     if (ast is SyntaxTree.Initializer.SimpleInitializer && (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
-                        // •¶š—ñ®‚Å‰Šú‰»
+                        // æ–‡å­—åˆ—å¼ã§åˆæœŸåŒ–
                         var strExpr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
                         if (arrayType.Length == -1) {
                             arrayType.Length = string.Concat(strExpr.Strings).Length + 1;
                         }
                         return;
                     } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
-                        // ”gŠ‡ŒÊ‚ÅŠ‡‚ç‚ê‚½•¶š—ñ‚Å‰Šú‰»
+                        // æ³¢æ‹¬å¼§ã§æ‹¬ã‚‰ã‚ŒãŸæ–‡å­—åˆ—ã§åˆæœŸåŒ–
                         if ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret?.Count == 1
                             && ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret[0] as SyntaxTree.Initializer.SimpleInitializer)?.AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
                             var strExpr = ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret[0] as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
@@ -1996,12 +2400,12 @@ namespace AnsiCParser {
                 CheckInitializerArray(arrayType, ast);
                 return;
             } else if (type.IsStructureType()) {
-                // \‘¢‘ÌŒ^‚Ìê‡
+                // æ§‹é€ ä½“å‹ã®å ´åˆ
                 var suType = type.Unwrap() as CType.TaggedType.StructUnionType;
                 CheckInitializerStruct(suType, ast);
                 return;
             } else if (type.IsUnionType()) {
-                // ‹¤—p‘ÌŒ^‚Ìê‡
+                // å…±ç”¨ä½“å‹ã®å ´åˆ
                 var suType = type.Unwrap() as CType.TaggedType.StructUnionType;
                 CheckInitializerUnion(suType, ast);
                 return;
@@ -2016,316 +2420,352 @@ namespace AnsiCParser {
             } else {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "W¬‘ÌŒ^–”‚Í‹¤—p‘ÌŒ^‚ğ‚à‚ÂƒIƒuƒWƒFƒNƒg‚É‘Î‚·‚é‰Šú‰»q‚ÍC—v‘f–”‚Í–¼‘O•t‚«ƒƒ“ƒo‚É‘Î‚·‚é‰Šú‰»q•À‚Ñ‚ğ”gŠ‡ŒÊ‚ÅˆÍ‚ñ‚¾‚à‚Ì‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B");
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "é›†æˆä½“å‹åˆã¯å…±ç”¨ä½“å‹ã‚’ã‚‚ã¤ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ã¯ï¼Œè¦ç´ åˆã¯åå‰ä»˜ããƒ¡ãƒ³ãƒã«å¯¾ã™ã‚‹åˆæœŸåŒ–å­ä¸¦ã³ã‚’æ³¢æ‹¬å¼§ã§å›²ã‚“ã ã‚‚ã®ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
                 }
-                // ‘ã“ü®‚ğ¶¬‚µ‚ÄŒŸØ
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, StorageClassSpecifier.None, null));
+                // ä»£å…¥å¼ã‚’ç”Ÿæˆã—ã¦æ¤œè¨¼
+                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
                 var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // —áŠO‚ª‹N‚«‚È‚¢‚È‚ç‘ã“ü‚Å‚«‚é
+                // ä¾‹å¤–ãŒèµ·ããªã„ãªã‚‰ä»£å…¥ã§ãã‚‹
             }
         }
 
+#endregion
+
         /// <summary>
-        /// 6.7.8 ‰Šú‰»(‰Šú‰»q)
+        /// 6.7.8 åˆæœŸåŒ–
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Initializer initializer(CType type) {
-            var init = initializer_();
+        private SyntaxTree.Initializer Initializer(CType type) {
+            var init = InitializerItem();
             CheckInitializer(type, init);
             return init;
         }
-        private SyntaxTree.Initializer initializer_() {
-            if (lexer.ReadIf('{')) {
+
+        /// <summary>
+        /// 6.7.8 åˆæœŸåŒ–(åˆæœŸåŒ–å­)
+        /// </summary>
+        /// <returns></returns>
+        private SyntaxTree.Initializer InitializerItem() {
+            if (_lexer.ReadTokenIf('{')) {
                 List<SyntaxTree.Initializer> ret = null;
-                if (lexer.Peek('}') == false) {
-                    ret = initializer_list();
+                if (_lexer.PeekToken('}') == false) {
+                    ret = InitializerList();
                 }
-                lexer.Read('}');
+                _lexer.ReadToken('}');
                 return new SyntaxTree.Initializer.ComplexInitializer(ret);
             } else {
-                return new SyntaxTree.Initializer.SimpleInitializer(assignment_expression());
+                return new SyntaxTree.Initializer.SimpleInitializer(AssignmentExpression());
             }
         }
 
         /// <summary>
-        /// 6.7.8 ‰Šú‰»(‰Šú‰»q•À‚Ñ)
+        /// 6.7.8 åˆæœŸåŒ–(åˆæœŸåŒ–å­ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private List<SyntaxTree.Initializer> initializer_list() {
+        private List<SyntaxTree.Initializer> InitializerList() {
             var ret = new List<SyntaxTree.Initializer>();
-            ret.Add(initializer_());
-            while (lexer.ReadIf(',')) {
-                if (lexer.Peek('}')) {
+            ret.Add(InitializerItem());
+            while (_lexer.ReadTokenIf(',')) {
+                if (_lexer.PeekToken('}')) {
                     break;
                 }
-                ret.Add(initializer_());
+                ret.Add(InitializerItem());
             }
             return ret;
         }
 
-        private bool is_IDENTIFIER(bool include_type_name) {
-            // return lexer.current_token().Kind == Token.TokenKind.IDENTIFIER || (include_type_name && lexer.current_token().Kind == Token.TokenKind.TYPE_NAME);
-            if (include_type_name) {
-                return lexer.current_token().Kind == Token.TokenKind.IDENTIFIER;
+        
+        private bool IsIdentifier(bool includeTypeName) {
+            if (includeTypeName) {
+                return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER;
             } else {
-                return lexer.current_token().Kind == Token.TokenKind.IDENTIFIER && !_typedefScope.ContainsKey(lexer.current_token().Raw);
+                return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER && !_typedefScope.ContainsKey(_lexer.CurrentToken().Raw);
 
             }
         }
 
-        private string IDENTIFIER(bool include_type_name) {
-            if (is_IDENTIFIER(include_type_name) == false) {
+        private string Identifier(bool includeTypeName) {
+            if (IsIdentifier(includeTypeName) == false) {
                 throw new Exception();
             }
-            var ret = lexer.current_token().Raw;
-            lexer.next_token();
+            var ret = _lexer.CurrentToken().Raw;
+            _lexer.NextToken();
             return ret;
         }
 
         /// <summary>
-        /// 6.8 •¶‹y‚ÑƒuƒƒbƒN
+        /// 6.8 æ–‡åŠã³ãƒ–ãƒ­ãƒƒã‚¯
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement statement() {
-            if ((is_IDENTIFIER(true) && lexer.is_nexttoken(':')) || lexer.Peek(Token.TokenKind.CASE, Token.TokenKind.DEFAULT)) {
-                return labeled_statement();
-            } else if (lexer.Peek('{')) {
-                return compound_statement();
-            } else if (lexer.Peek(Token.TokenKind.IF, Token.TokenKind.SWITCH)) {
-                return selection_statement();
-            } else if (lexer.Peek(Token.TokenKind.WHILE, Token.TokenKind.DO, Token.TokenKind.FOR)) {
-                return iteration_statement();
-            } else if (lexer.Peek(Token.TokenKind.GOTO, Token.TokenKind.CONTINUE, Token.TokenKind.BREAK, Token.TokenKind.RETURN)) {
-                return jump_statement();
-            } else if (lexer.Peek(Token.TokenKind.__ASM__)) {
-                return gnu_asm_statement();
+        private SyntaxTree.Statement Statement() {
+            if ((IsIdentifier(true) && _lexer.PeekNextToken(':')) || _lexer.PeekToken(Token.TokenKind.CASE, Token.TokenKind.DEFAULT)) {
+                return LabeledStatement();
+            } else if (_lexer.PeekToken('{')) {
+                return CompoundStatement();
+            } else if (_lexer.PeekToken(Token.TokenKind.IF, Token.TokenKind.SWITCH)) {
+                return SelectionStatement();
+            } else if (_lexer.PeekToken(Token.TokenKind.WHILE, Token.TokenKind.DO, Token.TokenKind.FOR)) {
+                return IterationStatement();
+            } else if (_lexer.PeekToken(Token.TokenKind.GOTO, Token.TokenKind.CONTINUE, Token.TokenKind.BREAK, Token.TokenKind.RETURN)) {
+                return JumpStatement();
+            } else if (_lexer.PeekToken(Token.TokenKind.__ASM__)) {
+                return GnuAsmStatement();
             } else {
-                return expression_statement();
+                return ExpressionStatement();
             }
 
         }
 
         /// <summary>
-        /// 6.8.1 ƒ‰ƒxƒ‹•t‚«•¶
+        /// 6.8.1 ãƒ©ãƒ™ãƒ«ä»˜ãæ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement labeled_statement() {
-            if (lexer.ReadIf(Token.TokenKind.CASE)) {
-                var expr = constant_expression();
-                lexer.Read(':');
-                var stmt = statement();
+        private SyntaxTree.Statement LabeledStatement() {
+            if (_lexer.ReadTokenIf(Token.TokenKind.CASE)) {
+                var expr = ConstantExpression();
+                _lexer.ReadToken(':');
+                var stmt = Statement();
                 return new SyntaxTree.Statement.CaseStatement(expr, stmt);
-            } else if (lexer.ReadIf(Token.TokenKind.DEFAULT)) {
-                lexer.Read(':');
-                var stmt = statement();
+            } else if (_lexer.ReadTokenIf(Token.TokenKind.DEFAULT)) {
+                _lexer.ReadToken(':');
+                var stmt = Statement();
                 return new SyntaxTree.Statement.DefaultStatement(stmt);
             } else {
-                var ident = IDENTIFIER(true);
-                lexer.Read(':');
-                var stmt = statement();
-                return new SyntaxTree.Statement.GenericLabeledStatement(ident, stmt);
+                var ident = Identifier(true);
+                _lexer.ReadToken(':');
+                var stmt = Statement();
+                LabelScopeValue value;
+                if (_labelScope.TryGetValue(ident, out value) == false) {
+                    // ãƒ©ãƒ™ãƒ«ã®å‰æ–¹å‚ç…§ãªã®ã§ä»®ç™»éŒ²ã™ã‚‹ã€‚
+                    value = new LabelScopeValue();
+                    _labelScope.Add(ident, value);
+                } else if (value.Declaration != null) {
+                    // æ—¢ã«å®£è¨€æ¸ˆã¿ãªã®ã§ã‚¨ãƒ©ãƒ¼
+                    throw new CompilerException. SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ãƒ©ãƒ™ãƒ«{ident}ã¯ã™ã§ã«å®£è¨€ã•ã‚Œã¦ã„ã¾ã™ã€‚");
+                }
+                var labelStmt = new SyntaxTree.Statement.GenericLabeledStatement(ident, stmt);
+                value.SetDeclaration(labelStmt);
+                return labelStmt;
             }
         }
 
         /// <summary>
-        /// 6.8.2 •¡‡•¶
+        /// 6.8.2 è¤‡åˆæ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement compound_statement() {
-            _tagScope = _tagScope.Extend();
-            _typedefScope = _typedefScope.Extend();
-            _identScope = _identScope.Extend();
-            lexer.Read('{');
+        private SyntaxTree.Statement.CompoundStatement CompoundStatement(bool skipCreateNewScope = false) {
+            if (skipCreateNewScope == false) {
+                _tagScope = _tagScope.Extend();
+                _typedefScope = _typedefScope.Extend();
+                _identScope = _identScope.Extend();
+            }
+            _lexer.ReadToken('{');
             var decls = new List<SyntaxTree.Declaration>();
-            while (is_declaration()) {
-                var d = declaration();
+            while (IsDeclaration()) {
+                var d = Declaration();
                 if (d != null) {
                     decls.AddRange(d);
                 }
             }
             var stmts = new List<SyntaxTree.Statement>();
-            while (lexer.Peek('}') == false) {
-                stmts.Add(statement());
+            while (_lexer.PeekToken('}') == false) {
+                stmts.Add(Statement());
             }
-            lexer.Read('}');
+            _lexer.ReadToken('}');
             var stmt = new SyntaxTree.Statement.CompoundStatement(decls, stmts, _tagScope, _identScope);
-            _identScope = _identScope.Parent;
-            _typedefScope = _typedefScope.Parent;
-            _tagScope = _tagScope.Parent;
+            if (skipCreateNewScope == false) {
+                _identScope = _identScope.Parent;
+                _typedefScope = _typedefScope.Parent;
+                _tagScope = _tagScope.Parent;
+            }
             return stmt;
 
         }
 
         /// <summary>
-        /// 6.8.3 ®•¶‹y‚Ñ‹ó•¶
+        /// 6.8.3 å¼æ–‡åŠã³ç©ºæ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement expression_statement() {
+        private SyntaxTree.Statement ExpressionStatement() {
             SyntaxTree.Statement ret;
-            if (!lexer.Peek(';')) {
-                var expr = expression();
+            if (!_lexer.PeekToken(';')) {
+                var expr = Expression();
                 ret = new SyntaxTree.Statement.ExpressionStatement(expr);
             } else {
                 ret = new SyntaxTree.Statement.EmptyStatement();
             }
-            lexer.Read(';');
+            _lexer.ReadToken(';');
             return ret;
         }
 
         /// <summary>
-        /// 6.8.4 ‘I‘ğ•¶
+        /// 6.8.4 é¸æŠæ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement selection_statement() {
-            if (lexer.ReadIf(Token.TokenKind.IF)) {
-                lexer.Read('(');
-                var cond = expression();
-                lexer.Read(')');
-                var then_stmt = statement();
-                SyntaxTree.Statement else_stmt = null;
-                if (lexer.ReadIf(Token.TokenKind.ELSE)) {
-                    else_stmt = statement();
+        private SyntaxTree.Statement SelectionStatement() {
+            if (_lexer.ReadTokenIf(Token.TokenKind.IF)) {
+                _lexer.ReadToken('(');
+                var cond = Expression();
+                _lexer.ReadToken(')');
+                var thenStmt = Statement();
+                SyntaxTree.Statement elseStmt = null;
+                if (_lexer.ReadTokenIf(Token.TokenKind.ELSE)) {
+                    elseStmt = Statement();
                 }
-                return new SyntaxTree.Statement.IfStatement(cond, then_stmt, else_stmt);
+                return new SyntaxTree.Statement.IfStatement(cond, thenStmt, elseStmt);
             }
-            if (lexer.ReadIf(Token.TokenKind.SWITCH)) {
-                lexer.Read('(');
-                var cond = expression();
-                lexer.Read(')');
+            if (_lexer.ReadTokenIf(Token.TokenKind.SWITCH)) {
+                _lexer.ReadToken('(');
+                var cond = Expression();
+                _lexer.ReadToken(')');
                 var ss = new SyntaxTree.Statement.SwitchStatement(cond);
                 _breakScope.Push(ss);
-                ss.Stmt = statement();
+                ss.Stmt = Statement();
                 _breakScope.Pop();
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, $"‘I‘ğ•¶‚Í if, switch ‚Ì‰½‚ê‚©‚Ån‚Ü‚è‚Ü‚·‚ªA { lexer.current_token().ToString() } ‚Í‚»‚Ì‚¢‚¸‚ê‚Å‚à‚ ‚è‚Ü‚¹‚ñBi–{ˆ—Œn‚ÌÀ‘•‚ÉŒë‚è‚ª‚ ‚é‚Æv‚¢‚Ü‚·Bj");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"é¸æŠæ–‡ã¯ if, switch ã®ä½•ã‚Œã‹ã§å§‹ã¾ã‚Šã¾ã™ãŒã€ { _lexer.CurrentToken().ToString() } ã¯ãã®ã„ãšã‚Œã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã¨æ€ã„ã¾ã™ã€‚ï¼‰");
         }
 
         /// <summary>
-        /// 6.8.5 ŒJ•Ô‚µ•¶
+        /// 6.8.5 ç¹°è¿”ã—æ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement iteration_statement() {
-            if (lexer.ReadIf(Token.TokenKind.WHILE)) {
-                lexer.Read('(');
-                var cond = expression();
-                lexer.Read(')');
+        private SyntaxTree.Statement IterationStatement() {
+            if (_lexer.ReadTokenIf(Token.TokenKind.WHILE)) {
+                _lexer.ReadToken('(');
+                var cond = Expression();
+                _lexer.ReadToken(')');
                 var ss = new SyntaxTree.Statement.WhileStatement(cond);
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
-                ss.Stmt = statement();
+                ss.Stmt = Statement();
                 _breakScope.Pop();
                 _continueScope.Pop();
                 return ss;
             }
-            if (lexer.ReadIf(Token.TokenKind.DO)) {
+            if (_lexer.ReadTokenIf(Token.TokenKind.DO)) {
                 var ss = new SyntaxTree.Statement.DoWhileStatement();
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
-                ss.Stmt = statement();
+                ss.Stmt = Statement();
                 _breakScope.Pop();
                 _continueScope.Pop();
-                lexer.Read(Token.TokenKind.WHILE);
-                lexer.Read('(');
-                ss.Cond = expression();
-                lexer.Read(')');
-                lexer.Read(';');
+                _lexer.ReadToken(Token.TokenKind.WHILE);
+                _lexer.ReadToken('(');
+                ss.Cond = Expression();
+                _lexer.ReadToken(')');
+                _lexer.ReadToken(';');
                 return ss;
             }
-            if (lexer.ReadIf(Token.TokenKind.FOR)) {
-                lexer.Read('(');
+            if (_lexer.ReadTokenIf(Token.TokenKind.FOR)) {
+                _lexer.ReadToken('(');
 
-                var init = lexer.Peek(';') ? (SyntaxTree.Expression)null : expression();
-                lexer.Read(';');
-                var cond = lexer.Peek(';') ? (SyntaxTree.Expression)null : expression();
-                lexer.Read(';');
-                var update = lexer.Peek(')') ? (SyntaxTree.Expression)null : expression();
-                lexer.Read(')');
+                var init = _lexer.PeekToken(';') ? (SyntaxTree.Expression)null : Expression();
+                _lexer.ReadToken(';');
+                var cond = _lexer.PeekToken(';') ? (SyntaxTree.Expression)null : Expression();
+                _lexer.ReadToken(';');
+                var update = _lexer.PeekToken(')') ? (SyntaxTree.Expression)null : Expression();
+                _lexer.ReadToken(')');
                 var ss = new SyntaxTree.Statement.ForStatement(init, cond, update);
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
-                ss.Stmt = statement();
+                ss.Stmt = Statement();
                 _breakScope.Pop();
                 _continueScope.Pop();
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, $"ŒJ•Ô‚µ•¶‚Í while, do, for ‚Ì‰½‚ê‚©‚Ån‚Ü‚è‚Ü‚·‚ªA { lexer.current_token().ToString() } ‚Í‚»‚Ì‚¢‚¸‚ê‚Å‚à‚ ‚è‚Ü‚¹‚ñBi–{ˆ—Œn‚ÌÀ‘•‚ÉŒë‚è‚ª‚ ‚é‚Æv‚¢‚Ü‚·Bj");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ç¹°è¿”ã—æ–‡ã¯ while, do, for ã®ä½•ã‚Œã‹ã§å§‹ã¾ã‚Šã¾ã™ãŒã€ { _lexer.CurrentToken().ToString() } ã¯ãã®ã„ãšã‚Œã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã¨æ€ã„ã¾ã™ã€‚ï¼‰");
         }
 
         /// <summary>
-        ///  6.8.6 •ªŠò•¶
+        ///  6.8.6 åˆ†å²æ–‡
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement jump_statement() {
-            if (lexer.ReadIf(Token.TokenKind.GOTO)) {
-                var label = IDENTIFIER(true);
-                lexer.Read(';');
-                return new SyntaxTree.Statement.GotoStatement(label);
+        private SyntaxTree.Statement JumpStatement() {
+            if (_lexer.ReadTokenIf(Token.TokenKind.GOTO)) {
+                var label = Identifier(true);
+                _lexer.ReadToken(';');
+                LabelScopeValue value;
+                if (_labelScope.TryGetValue(label, out value) == false) {
+                    // ãƒ©ãƒ™ãƒ«ã®å‰æ–¹å‚ç…§ãªã®ã§ä»®ç™»éŒ²ã™ã‚‹ã€‚
+                    value = new LabelScopeValue();
+                    _labelScope.Add(label, value);
+                }
+                var gotoStmt = new SyntaxTree.Statement.GotoStatement(label);
+                value.AddReference(gotoStmt);
+                return gotoStmt;
             }
-            if (lexer.ReadIf(Token.TokenKind.CONTINUE)) {
-                lexer.Read(';');
+            if (_lexer.ReadTokenIf(Token.TokenKind.CONTINUE)) {
+                _lexer.ReadToken(';');
+                if (_continueScope.Any() == false || _continueScope.Peek() == null) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãƒ«ãƒ¼ãƒ—æ–‡ã®å¤–ã§ continue æ–‡ãŒä½¿ã‚ã‚Œã¦ã„ã¾ã™ã€‚");
+                }
                 return new SyntaxTree.Statement.ContinueStatement(_continueScope.Peek());
             }
-            if (lexer.ReadIf(Token.TokenKind.BREAK)) {
-                lexer.Read(';');
+            if (_lexer.ReadTokenIf(Token.TokenKind.BREAK)) {
+                _lexer.ReadToken(';');
+                if (_breakScope.Any() == false || _breakScope.Peek() == null) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãƒ«ãƒ¼ãƒ—æ–‡/switchæ–‡ã®å¤–ã§ break æ–‡ãŒä½¿ã‚ã‚Œã¦ã„ã¾ã™ã€‚");
+                }
                 return new SyntaxTree.Statement.BreakStatement(_breakScope.Peek());
             }
-            if (lexer.ReadIf(Token.TokenKind.RETURN)) {
-                var expr = lexer.Peek(';') ? null : expression();
-                //Œ»İ‚ÌŠÖ”‚Ì–ß‚è’l‚ÆŒ^ƒ`ƒFƒbƒN
-                lexer.Read(';');
+            if (_lexer.ReadTokenIf(Token.TokenKind.RETURN)) {
+                var expr = _lexer.PeekToken(';') ? null : Expression();
+                //ç¾åœ¨ã®é–¢æ•°ã®æˆ»ã‚Šå€¤ã¨å‹ãƒã‚§ãƒƒã‚¯
+                _lexer.ReadToken(';');
                 return new SyntaxTree.Statement.ReturnStatement(expr);
             }
-            throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, $"•ªŠò•¶‚Í goto, continue, break, return ‚Ì‰½‚ê‚©‚Ån‚Ü‚è‚Ü‚·‚ªA { lexer.current_token().ToString() } ‚Í‚»‚Ì‚¢‚¸‚ê‚Å‚à‚ ‚è‚Ü‚¹‚ñBi–{ˆ—Œn‚ÌÀ‘•‚ÉŒë‚è‚ª‚ ‚é‚Æv‚¢‚Ü‚·Bj");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"åˆ†å²æ–‡ã¯ goto, continue, break, return ã®ä½•ã‚Œã‹ã§å§‹ã¾ã‚Šã¾ã™ãŒã€ { _lexer.CurrentToken().ToString() } ã¯ãã®ã„ãšã‚Œã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã¨æ€ã„ã¾ã™ã€‚ï¼‰");
         }
 
         /// <summary>
-        /// X.X.X GCCŠg’£ƒCƒ“ƒ‰ƒCƒ“ƒAƒZƒ“ƒuƒ‰
+        /// X.X.X GCCæ‹¡å¼µã‚¤ãƒ³ãƒ©ã‚¤ãƒ³ã‚¢ã‚»ãƒ³ãƒ–ãƒ©
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Statement gnu_asm_statement() {
-            Console.Error.WriteLine("GCCŠg’£ƒCƒ“ƒ‰ƒCƒ“ƒAƒZƒ“ƒuƒ‰\•¶‚É‚Í‘Î‰‚µ‚Ä‚¢‚Ü‚¹‚ñB‚´‚Á‚­‚è‚Æ“Ç‚İ”ò‚Î‚µ‚Ü‚·B");
+        private SyntaxTree.Statement GnuAsmStatement() {
+            Console.Error.WriteLine("GCCæ‹¡å¼µã‚¤ãƒ³ãƒ©ã‚¤ãƒ³ã‚¢ã‚»ãƒ³ãƒ–ãƒ©æ§‹æ–‡ã«ã¯å¯¾å¿œã—ã¦ã„ã¾ã›ã‚“ã€‚ã–ã£ãã‚Šã¨èª­ã¿é£›ã°ã—ã¾ã™ã€‚");
 
-            lexer.Read(Token.TokenKind.__ASM__);
-            lexer.ReadIf(Token.TokenKind.__VOLATILE__);
-            lexer.Read('(');
+            _lexer.ReadToken(Token.TokenKind.__ASM__);
+            _lexer.ReadTokenIf(Token.TokenKind.__VOLATILE__);
+            _lexer.ReadToken('(');
             Stack<char> parens = new Stack<char>();
             parens.Push('(');
             while (parens.Any()) {
-                if (lexer.Peek('(', '[')) {
-                    parens.Push((char)lexer.current_token().Kind);
-                } else if (lexer.Peek(')')) {
+                if (_lexer.PeekToken('(', '[')) {
+                    parens.Push((char)_lexer.CurrentToken().Kind);
+                } else if (_lexer.PeekToken(')')) {
                     if (parens.Peek() == '(') {
                         parens.Pop();
                     } else {
-                        throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"GCCŠg’£ƒCƒ“ƒ‰ƒCƒ“ƒAƒZƒ“ƒuƒ‰\•¶’†‚Å ŠÛŠ‡ŒÊ•Â‚¶ ) ‚ªg—p‚³‚ê‚Ä‚¢‚Ü‚·‚ªA‘Î‰‚·‚éŠÛŠ‡ŒÊŠJ‚« ( ‚ª‚ ‚è‚Ü‚¹‚ñB");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"GCCæ‹¡å¼µã‚¤ãƒ³ãƒ©ã‚¤ãƒ³ã‚¢ã‚»ãƒ³ãƒ–ãƒ©æ§‹æ–‡ä¸­ã§ ä¸¸æ‹¬å¼§é–‰ã˜ ) ãŒä½¿ç”¨ã•ã‚Œã¦ã„ã¾ã™ãŒã€å¯¾å¿œã™ã‚‹ä¸¸æ‹¬å¼§é–‹ã ( ãŒã‚ã‚Šã¾ã›ã‚“ã€‚");
                     }
-                } else if (lexer.Peek(']')) {
+                } else if (_lexer.PeekToken(']')) {
                     if (parens.Peek() == '[') {
                         parens.Pop();
                     } else {
-                        throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"GCCŠg’£ƒCƒ“ƒ‰ƒCƒ“ƒAƒZƒ“ƒuƒ‰\•¶’†‚Å ŠpŠ‡ŒÊ•Â‚¶ ] ‚ªg—p‚³‚ê‚Ä‚¢‚Ü‚·‚ªA‘Î‰‚·‚éŠpŠ‡ŒÊŠJ‚« [ ‚ª‚ ‚è‚Ü‚¹‚ñB");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"GCCæ‹¡å¼µã‚¤ãƒ³ãƒ©ã‚¤ãƒ³ã‚¢ã‚»ãƒ³ãƒ–ãƒ©æ§‹æ–‡ä¸­ã§ è§’æ‹¬å¼§é–‰ã˜ ] ãŒä½¿ç”¨ã•ã‚Œã¦ã„ã¾ã™ãŒã€å¯¾å¿œã™ã‚‹è§’æ‹¬å¼§é–‹ã [ ãŒã‚ã‚Šã¾ã›ã‚“ã€‚");
                     }
                 }
-                lexer.next_token();
+                _lexer.NextToken();
             }
-            lexer.Read(';');
+            _lexer.ReadToken(';');
             return new SyntaxTree.Statement.EmptyStatement();
             ;
         }
 
         /// <summary>
-        /// 6.5 ®
+        /// 6.5 å¼
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression expression() {
-            var e = assignment_expression();
-            if (lexer.Peek(',')) {
+        private SyntaxTree.Expression Expression() {
+            var e = AssignmentExpression();
+            if (_lexer.PeekToken(',')) {
                 var ce = new SyntaxTree.Expression.CommaExpression();
-                ce.expressions.Add(e);
-                while (lexer.ReadIf(',')) {
-                    e = assignment_expression();
-                    ce.expressions.Add(e);
+                ce.Expressions.Add(e);
+                while (_lexer.ReadTokenIf(',')) {
+                    e = AssignmentExpression();
+                    ce.Expressions.Add(e);
                 }
                 return ce;
             } else {
@@ -2334,19 +2774,22 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 6.5.1 ˆêŸ®
+        /// 6.5.1 ä¸€æ¬¡å¼
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression primary_expression() {
-            if (is_IDENTIFIER(false)) {
-                var ident = IDENTIFIER(false);
+        private SyntaxTree.Expression PrimaryExpression() {
+            if (IsIdentifier(false)) {
+                var ident = Identifier(false);
                 IdentifierScopeValue value;
                 if (_identScope.TryGetValue(ident, out value) == false) {
-                    Console.Error.WriteLine($"–¢’è‹`‚Ì¯•Êq{ident}‚ªˆêŸ®‚Æ‚µ‚Ä—˜—p‚³‚ê‚Ä‚¢‚Ü‚·B");
+                    Console.Error.WriteLine($"æœªå®šç¾©ã®è­˜åˆ¥å­{ident}ãŒä¸€æ¬¡å¼ã¨ã—ã¦åˆ©ç”¨ã•ã‚Œã¦ã„ã¾ã™ã€‚");
                     return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression(ident);
                 }
                 if (value.IsVariable()) {
                     return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression(ident, value.ToVariable());
+                }
+                if (value.IsArgument()) {
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression(ident, value.ToArgument());
                 }
                 if (value.IsEnumValue()) {
                     var ev = value.ToEnumValue();
@@ -2355,129 +2798,129 @@ namespace AnsiCParser {
                 if (value.IsFunction()) {
                     return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(ident, value.ToFunction());
                 }
-                throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, $"ˆêŸ®‚Æ‚µ‚Äg‚¦‚é’è‹`Ï‚İ¯•Êq‚Í•Ï”A—ñ‹“’è”AŠÖ”‚Ì‰½‚ê‚©‚Å‚·‚ªA { lexer.current_token().ToString() } ‚Í‚»‚Ì‚¢‚¸‚ê‚Å‚à‚ ‚è‚Ü‚¹‚ñBi–{ˆ—Œn‚ÌÀ‘•‚ÉŒë‚è‚ª‚ ‚é‚Æv‚¢‚Ü‚·Bj");
+                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ä¸€æ¬¡å¼ã¨ã—ã¦ä½¿ãˆã‚‹å®šç¾©æ¸ˆã¿è­˜åˆ¥å­ã¯å¤‰æ•°ã€åˆ—æŒ™å®šæ•°ã€é–¢æ•°ã®ä½•ã‚Œã‹ã§ã™ãŒã€ { _lexer.CurrentToken().ToString() } ã¯ãã®ã„ãšã‚Œã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚ï¼ˆæœ¬å‡¦ç†ç³»ã®å®Ÿè£…ã«èª¤ã‚ŠãŒã‚ã‚‹ã¨æ€ã„ã¾ã™ã€‚ï¼‰");
             }
-            if (is_constant()) {
-                return constant();
+            if (IsConstant()) {
+                return Constant();
             }
-            if (is_STRING()) {
+            if (IsStringLiteral()) {
                 List<string> strings = new List<string>();
-                while (is_STRING()) {
-                    strings.Add(STRING());
+                while (IsStringLiteral()) {
+                    strings.Add(StringLiteral());
                 }
                 return new SyntaxTree.Expression.PrimaryExpression.StringExpression(strings);
             }
-            if (lexer.ReadIf('(')) {
-                if (lexer.Peek('{')) {
+            if (_lexer.ReadTokenIf('(')) {
+                if (_lexer.PeekToken('{')) {
                     // gcc statement expression
-                    var statements = compound_statement();
-                    lexer.Read(')');
-                    return new SyntaxTree.Expression.GccStatementExpression(statements);
+                    var statements = CompoundStatement();
+                    _lexer.ReadToken(')');
+                    return new SyntaxTree.Expression.GccStatementExpression(statements,null);// todo: implement type
                 } else {
-                    var expr = new SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression(expression());
-                    lexer.Read(')');
+                    var expr = new SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression(Expression());
+                    _lexer.ReadToken(')');
                     return expr;
                 }
             }
-            throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"ˆêŸ®‚Æ‚È‚é—v‘f‚ª‚ ‚é‚×‚«êŠ‚É { lexer.current_token().ToString() } ‚ª‚ ‚è‚Ü‚·B");
+            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ä¸€æ¬¡å¼ã¨ãªã‚‹è¦ç´ ãŒã‚ã‚‹ã¹ãå ´æ‰€ã« { _lexer.CurrentToken().ToString() } ãŒã‚ã‚Šã¾ã™ã€‚");
         }
 
         /// <summary>
-        /// 6.5.1 ˆêŸ®(’è”‚Æ‚È‚è‚¤‚é‚©)
+        /// 6.5.1 ä¸€æ¬¡å¼(å®šæ•°ã¨ãªã‚Šã†ã‚‹ã‹)
         /// </summary>
         /// <returns></returns>
-        private bool is_constant() {
-            return is_INTEGER_CONSTANT() ||
-                   is_CHARACTER_CONSTANT() ||
-                   is_FLOATING_CONSTANT() ||
-                   is_ENUMERATION_CONSTANT();
+        private bool IsConstant() {
+            return IsIntegerConstant() ||
+                   IsCharacterConstant() ||
+                   IsFloatingConstant() ||
+                   IsEnumerationConstant();
         }
 
         /// <summary>
-        /// 6.5.1 ˆêŸ®(’è”)
+        /// 6.5.1 ä¸€æ¬¡å¼(å®šæ•°)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression constant() {
-            // 6.5.1 ˆêŸ®
-            // ’è”‚ÍCˆêŸ®‚Æ‚·‚éB‚»‚ÌŒ^‚ÍC‚»‚ÌŒ`®‚Æ’l‚É‚æ‚Á‚ÄŒˆ‚Ü‚éi6.4.4 ‚Å‹K’è‚·‚éBjB
+        private SyntaxTree.Expression Constant() {
+            // 6.5.1 ä¸€æ¬¡å¼
+            // å®šæ•°ã¯ï¼Œä¸€æ¬¡å¼ã¨ã™ã‚‹ã€‚ãã®å‹ã¯ï¼Œãã®å½¢å¼ã¨å€¤ã«ã‚ˆã£ã¦æ±ºã¾ã‚‹ï¼ˆ6.4.4 ã§è¦å®šã™ã‚‹ã€‚ï¼‰ã€‚
 
-            // ®”’è”
-            if (is_INTEGER_CONSTANT()) {
-                return INTEGER_CONSTANT();
+            // æ•´æ•°å®šæ•°
+            if (IsIntegerConstant()) {
+                return IntegerConstant();
             }
 
-            // •¶š’è”
-            if (is_CHARACTER_CONSTANT()) {
-                var ret = CHARACTER_CONSTANT();
+            // æ–‡å­—å®šæ•°
+            if (IsCharacterConstant()) {
+                var ret = CharacterConstant();
                 return new SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant(ret);
             }
 
-            // •‚“®¬”’è”
-            if (is_FLOATING_CONSTANT()) {
-                return FLOATING_CONSTANT();
+            // æµ®å‹•å°æ•°å®šæ•°
+            if (IsFloatingConstant()) {
+                return FloatingConstant();
             }
 
-            // —ñ‹“’è”
-            if (is_ENUMERATION_CONSTANT()) {
-                var ret = ENUMERATION_CONSTANT();
+            // åˆ—æŒ™å®šæ•°
+            if (IsEnumerationConstant()) {
+                var ret = EnumerationConstant();
                 return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(ret);
             }
 
-            throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"’è”‚ª‚ ‚é‚×‚«êŠ‚É { lexer.current_token().ToString() } ‚ª‚ ‚è‚Ü‚·B");
+            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"å®šæ•°ãŒã‚ã‚‹ã¹ãå ´æ‰€ã« { _lexer.CurrentToken().ToString() } ãŒã‚ã‚Šã¾ã™ã€‚");
         }
 
         /// <summary>
-        /// 6.5.2 Œã’u‰‰Zq(Œã’u®‚Ì‘O”¼)
+        /// 6.5.2 å¾Œç½®æ¼”ç®—å­(å¾Œç½®å¼ã®å‰åŠ)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression postfix_expression() {
-            var expr = primary_expression();
-            return more_postfix_expression(expr);
+        private SyntaxTree.Expression PostfixExpression() {
+            var expr = PrimaryExpression();
+            return MorePostfixExpression(expr);
 
         }
 
         /// <summary>
-        /// 6.5.2 Œã’u‰‰Zq(Œã’u®‚ÌŒã”¼)
+        /// 6.5.2 å¾Œç½®æ¼”ç®—å­(å¾Œç½®å¼ã®å¾ŒåŠ)
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        private SyntaxTree.Expression more_postfix_expression(SyntaxTree.Expression expr) {
-            if (lexer.ReadIf('[')) {
-                // 6.5.2.1 ”z—ñ‚Ì“Yš•t‚¯
-                var index = expression();
-                lexer.Read(']');
-                return more_postfix_expression(new SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression(expr, index));
+        private SyntaxTree.Expression MorePostfixExpression(SyntaxTree.Expression expr) {
+            if (_lexer.ReadTokenIf('[')) {
+                // 6.5.2.1 é…åˆ—ã®æ·»å­—ä»˜ã‘
+                var index = Expression();
+                _lexer.ReadToken(']');
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression(expr, index));
             }
-            if (lexer.ReadIf('(')) {
-                // 6.5.2.2 ŠÖ”ŒÄo‚µ
+            if (_lexer.ReadTokenIf('(')) {
+                // 6.5.2.2 é–¢æ•°å‘¼å‡ºã—
                 List<SyntaxTree.Expression> args = null;
-                if (lexer.Peek(')') == false) {
-                    args = argument_expression_list();
+                if (_lexer.PeekToken(')') == false) {
+                    args = ArgumentExpressionList();
                 } else {
                     args = new List<SyntaxTree.Expression>();
                 }
-                lexer.Read(')');
-                // –¢’è‹`‚Ì¯•Êq‚Ì’¼Œã‚ÉŠÖ”ŒÄ‚Ño‚µ—p‚ÌŒã’u‰‰Zq '(' ‚ª‚ ‚éê‡A
-                // K&R‚¨‚æ‚ÑC89/90‚Å‚ÍˆÃ–Ù“IŠÖ”éŒ¾ extern int ¯•Êq(); ‚ªŒ»İ‚ÌéŒ¾ƒuƒƒbƒN‚Ìæ“ª‚Å’è‹`‚³‚ê‚Ä‚¢‚é‚Æ‰¼’è‚µ‚Ä–|–ó‚·‚é
+                _lexer.ReadToken(')');
+                // æœªå®šç¾©ã®è­˜åˆ¥å­ã®ç›´å¾Œã«é–¢æ•°å‘¼ã³å‡ºã—ç”¨ã®å¾Œç½®æ¼”ç®—å­ '(' ãŒã‚ã‚‹å ´åˆã€
+                // K&RãŠã‚ˆã³C89/90ã§ã¯æš—é»™çš„é–¢æ•°å®£è¨€ extern int è­˜åˆ¥å­(); ãŒç¾åœ¨ã®å®£è¨€ãƒ–ãƒ­ãƒƒã‚¯ã®å…ˆé ­ã§å®šç¾©ã•ã‚Œã¦ã„ã‚‹ã¨ä»®å®šã—ã¦ç¿»è¨³ã™ã‚‹
                 if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
 
                 }
-                return more_postfix_expression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(expr, args));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(expr, args));
             }
-            if (lexer.ReadIf('.')) {
-                // 6.5.2.3 \‘¢‘Ì‹y‚Ñ‹¤—p‘Ì‚Ìƒƒ“ƒo
-                var ident = IDENTIFIER(false);
-                return more_postfix_expression(new SyntaxTree.Expression.PostfixExpression.MemberDirectAccess(expr, ident));
+            if (_lexer.ReadTokenIf('.')) {
+                // 6.5.2.3 æ§‹é€ ä½“åŠã³å…±ç”¨ä½“ã®ãƒ¡ãƒ³ãƒ
+                var ident = Identifier(false);
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberDirectAccess(expr, ident));
             }
-            if (lexer.ReadIf(Token.TokenKind.PTR_OP)) {
-                // 6.5.2.3 \‘¢‘Ì‹y‚Ñ‹¤—p‘Ì‚Ìƒƒ“ƒo
-                var ident = IDENTIFIER(false);
-                return more_postfix_expression(new SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess(expr, ident));
+            if (_lexer.ReadTokenIf(Token.TokenKind.PTR_OP)) {
+                // 6.5.2.3 æ§‹é€ ä½“åŠã³å…±ç”¨ä½“ã®ãƒ¡ãƒ³ãƒ
+                var ident = Identifier(false);
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess(expr, ident));
             }
-            if (lexer.Peek(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
-                // 6.5.2.4 Œã’u‘•ª‹y‚ÑŒã’uŒ¸•ª‰‰Zq
+            if (_lexer.PeekToken(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
+                // 6.5.2.4 å¾Œç½®å¢—åˆ†åŠã³å¾Œç½®æ¸›åˆ†æ¼”ç®—å­
                 var op = SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.None;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case Token.TokenKind.INC_OP:
                         op = SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc;
                         break;
@@ -2485,38 +2928,39 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, "‚½‚Ô‚ñÀ‘•ƒ~ƒX‚Å‚·B");
+                        throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãŸã¶ã‚“å®Ÿè£…ãƒŸã‚¹ã§ã™ã€‚");
                 }
-                lexer.next_token();
-                return more_postfix_expression(new SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression(op, expr));
+                _lexer.NextToken();
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression(op, expr));
             }
-            // 6.5.2.5 •¡‡ƒŠƒeƒ‰ƒ‹
-            // Todo: –¢À‘•
+            // 6.5.2.5 è¤‡åˆãƒªãƒ†ãƒ©ãƒ«
+            {
+                // Todo: å®Ÿè£…
+            }
             return expr;
         }
 
         /// <summary>
-        /// 6.5.2 Œã’u‰‰Zq(Àˆø”•À‚Ñ)
+        /// 6.5.2 å¾Œç½®æ¼”ç®—å­(å®Ÿå¼•æ•°ä¸¦ã³)
         /// </summary>
         /// <returns></returns>
-        private List<SyntaxTree.Expression> argument_expression_list() {
+        private List<SyntaxTree.Expression> ArgumentExpressionList() {
             var ret = new List<SyntaxTree.Expression>();
-            ret.Add(assignment_expression());
-            while (lexer.ReadIf(',')) {
-                ret.Add(assignment_expression());
+            ret.Add(AssignmentExpression());
+            while (_lexer.ReadTokenIf(',')) {
+                ret.Add(AssignmentExpression());
             }
             return ret;
         }
 
-
         /// <summary>
-        /// 6.5.3 ’P€‰‰Zq(’P€®)
+        /// 6.5.3 å˜é …æ¼”ç®—å­(å˜é …å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression unary_expression() {
-            if (lexer.Peek(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
+        private SyntaxTree.Expression UnaryExpression() {
+            if (_lexer.PeekToken(Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
                 var op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.None;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case Token.TokenKind.INC_OP:
                         op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc;
                         break;
@@ -2524,91 +2968,91 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(lexer.current_token().Start, lexer.current_token().End, "‚½‚Ô‚ñÀ‘•ƒ~ƒX‚Å‚·B");
+                        throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãŸã¶ã‚“å®Ÿè£…ãƒŸã‚¹ã§ã™ã€‚");
                 }
-                lexer.next_token();
-                var expr = unary_expression();
+                _lexer.NextToken();
+                var expr = UnaryExpression();
                 return new SyntaxTree.Expression.UnaryPrefixExpression(op, expr);
             }
-            if (lexer.ReadIf('&')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('&')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryAddressExpression(expr);
             }
-            if (lexer.ReadIf('*')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('*')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryReferenceExpression(expr);
             }
-            if (lexer.ReadIf('+')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('+')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryPlusExpression(expr);
             }
-            if (lexer.ReadIf('-')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('-')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryMinusExpression(expr);
             }
-            if (lexer.ReadIf('~')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('~')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryNegateExpression(expr);
             }
-            if (lexer.ReadIf('!')) {
-                var expr = cast_expression();
+            if (_lexer.ReadTokenIf('!')) {
+                var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryNotExpression(expr);
             }
-            if (lexer.ReadIf(Token.TokenKind.SIZEOF)) {
-                if (lexer.Peek('(')) {
-                    // ‚Ç‚Á‚¿‚É‚à'('‚ªo‚é‚±‚Æ‚ªo—ˆ‚é‚Ì‚Å‚³‚ç‚Éæ“Ç‚İ‚·‚éiLL(2))
-                    var saveCurrent = lexer.Save();
-                    lexer.Read('(');
-                    if (is_type_name()) {
-                        var type = type_name();
-                        lexer.Read(')');
+            if (_lexer.ReadTokenIf(Token.TokenKind.SIZEOF)) {
+                if (_lexer.PeekToken('(')) {
+                    // ã©ã£ã¡ã«ã‚‚'('ãŒå‡ºã‚‹ã“ã¨ãŒå‡ºæ¥ã‚‹ã®ã§ã•ã‚‰ã«å…ˆèª­ã¿ã™ã‚‹ï¼ˆLL(2))
+                    var saveCurrent = _lexer.Save();
+                    _lexer.ReadToken('(');
+                    if (IsTypeName()) {
+                        var type = TypeName();
+                        _lexer.ReadToken(')');
                         return new SyntaxTree.Expression.SizeofTypeExpression(type);
                     } else {
-                        lexer.Restore(saveCurrent);
-                        var expr = unary_expression();
+                        _lexer.Restore(saveCurrent);
+                        var expr = UnaryExpression();
                         return new SyntaxTree.Expression.SizeofExpression(expr);
                     }
                 } else {
-                    // Š‡ŒÊ‚ª‚È‚¢‚Ì‚Å®
-                    var expr = unary_expression();
+                    // æ‹¬å¼§ãŒãªã„ã®ã§å¼
+                    var expr = UnaryExpression();
                     return new SyntaxTree.Expression.SizeofExpression(expr);
                 }
             }
-            return postfix_expression();
+            return PostfixExpression();
         }
 
         /// <summary>
-        /// 6.5.4 ƒLƒƒƒXƒg‰‰Zq(ƒLƒƒƒXƒg®)
+        /// 6.5.4 ã‚­ãƒ£ã‚¹ãƒˆæ¼”ç®—å­(ã‚­ãƒ£ã‚¹ãƒˆå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression cast_expression() {
-            if (lexer.Peek('(')) {
-                // ‚Ç‚¿‚ç‚É‚à'('‚ÌoŒ»‚ª‹–‚³‚ê‚é‚½‚ß‚³‚ç‚Éæ“Ç‚İ‚ğs‚¤B
-                var saveCurrent = lexer.Save();
-                lexer.Read('(');
-                if (is_type_name()) {
-                    var type = type_name();
-                    lexer.Read(')');
-                    var expr = cast_expression();
+        private SyntaxTree.Expression CastExpression() {
+            if (_lexer.PeekToken('(')) {
+                // ã©ã¡ã‚‰ã«ã‚‚'('ã®å‡ºç¾ãŒè¨±ã•ã‚Œã‚‹ãŸã‚ã•ã‚‰ã«å…ˆèª­ã¿ã‚’è¡Œã†ã€‚
+                var saveCurrent = _lexer.Save();
+                _lexer.ReadToken('(');
+                if (IsTypeName()) {
+                    var type = TypeName();
+                    _lexer.ReadToken(')');
+                    var expr = CastExpression();
                     return new SyntaxTree.Expression.CastExpression(type, expr);
                 } else {
-                    lexer.Restore(saveCurrent);
-                    return unary_expression();
+                    _lexer.Restore(saveCurrent);
+                    return UnaryExpression();
                 }
             } else {
-                return unary_expression();
+                return UnaryExpression();
             }
         }
 
         /// <summary>
-        /// 6.5.5 æœ‰‰Zq(æœ®)
+        /// 6.5.5 ä¹—é™¤æ¼”ç®—å­(ä¹—é™¤å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression multiplicitive_expression() {
-            var lhs = cast_expression();
-            while (lexer.Peek('*', '/', '%')) {
+        private SyntaxTree.Expression MultiplicitiveExpression() {
+            var lhs = CastExpression();
+            while (_lexer.PeekToken('*', '/', '%')) {
                 SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind op;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case (Token.TokenKind)'*':
                         op = SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul;
                         break;
@@ -2621,22 +3065,22 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "");
                 }
-                lexer.next_token();
-                var rhs = cast_expression();
+                _lexer.NextToken();
+                var rhs = CastExpression();
                 lhs = new SyntaxTree.Expression.MultiplicitiveExpression(op, lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.6 ‰ÁŒ¸‰‰Zq(‰ÁŒ¸®)
+        /// 6.5.6 åŠ æ¸›æ¼”ç®—å­(åŠ æ¸›å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression additive_expression() {
-            var lhs = multiplicitive_expression();
-            while (lexer.Peek('+', '-')) {
+        private SyntaxTree.Expression AdditiveExpression() {
+            var lhs = MultiplicitiveExpression();
+            while (_lexer.PeekToken('+', '-')) {
                 SyntaxTree.Expression.AdditiveExpression.OperatorKind op;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case (Token.TokenKind)'+':
                         op = SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add;
                         break;
@@ -2646,22 +3090,22 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "");
                 }
-                lexer.next_token();
-                var rhs = multiplicitive_expression();
+                _lexer.NextToken();
+                var rhs = MultiplicitiveExpression();
                 lhs = new SyntaxTree.Expression.AdditiveExpression(op, lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.7 ƒrƒbƒg’PˆÊ‚ÌƒVƒtƒg‰‰Zq(ƒVƒtƒg®)
+        /// 6.5.7 ãƒ“ãƒƒãƒˆå˜ä½ã®ã‚·ãƒ•ãƒˆæ¼”ç®—å­(ã‚·ãƒ•ãƒˆå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression shift_expression() {
-            var lhs = additive_expression();
-            while (lexer.Peek(Token.TokenKind.LEFT_OP, Token.TokenKind.RIGHT_OP)) {
+        private SyntaxTree.Expression ShiftExpression() {
+            var lhs = AdditiveExpression();
+            while (_lexer.PeekToken(Token.TokenKind.LEFT_OP, Token.TokenKind.RIGHT_OP)) {
                 var op = SyntaxTree.Expression.ShiftExpression.OperatorKind.None;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case Token.TokenKind.LEFT_OP:
                         op = SyntaxTree.Expression.ShiftExpression.OperatorKind.Left;
                         break;
@@ -2672,22 +3116,22 @@ namespace AnsiCParser {
                         throw new Exception();
                 }
 
-                lexer.next_token();
-                var rhs = additive_expression();
+                _lexer.NextToken();
+                var rhs = AdditiveExpression();
                 lhs = new SyntaxTree.Expression.ShiftExpression(op, lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.8 ŠÖŒW‰‰Zq(ŠÖŒW®)
+        /// 6.5.8 é–¢ä¿‚æ¼”ç®—å­(é–¢ä¿‚å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression relational_expression() {
-            var lhs = shift_expression();
-            while (lexer.Peek((Token.TokenKind)'<', (Token.TokenKind)'>', Token.TokenKind.LE_OP, Token.TokenKind.GE_OP)) {
+        private SyntaxTree.Expression RelationalExpression() {
+            var lhs = ShiftExpression();
+            while (_lexer.PeekToken((Token.TokenKind)'<', (Token.TokenKind)'>', Token.TokenKind.LE_OP, Token.TokenKind.GE_OP)) {
                 var op = SyntaxTree.Expression.RelationalExpression.OperatorKind.None;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case (Token.TokenKind)'<':
                         op = SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan;
                         break;
@@ -2703,22 +3147,22 @@ namespace AnsiCParser {
                     default:
                         throw new Exception();
                 }
-                lexer.next_token();
-                var rhs = shift_expression();
+                _lexer.NextToken();
+                var rhs = ShiftExpression();
                 lhs = new SyntaxTree.Expression.RelationalExpression(op, lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.9 “™‰¿‰‰Zq(“™‰¿®)
+        /// 6.5.9 ç­‰ä¾¡æ¼”ç®—å­(ç­‰ä¾¡å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression equality_expression() {
-            var lhs = relational_expression();
-            while (lexer.Peek(Token.TokenKind.EQ_OP, Token.TokenKind.NE_OP)) {
+        private SyntaxTree.Expression EqualityExpression() {
+            var lhs = RelationalExpression();
+            while (_lexer.PeekToken(Token.TokenKind.EQ_OP, Token.TokenKind.NE_OP)) {
                 var op = SyntaxTree.Expression.EqualityExpression.OperatorKind.None;
-                switch (lexer.current_token().Kind) {
+                switch (_lexer.CurrentToken().Kind) {
                     case Token.TokenKind.EQ_OP:
                         op = SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal;
                         break;
@@ -2728,103 +3172,103 @@ namespace AnsiCParser {
                     default:
                         throw new Exception();
                 }
-                lexer.next_token();
-                var rhs = relational_expression();
+                _lexer.NextToken();
+                var rhs = RelationalExpression();
                 lhs = new SyntaxTree.Expression.EqualityExpression(op, lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.10 ƒrƒbƒg’PˆÊ‚Ì AND ‰‰Zq(AND®)
+        /// 6.5.10 ãƒ“ãƒƒãƒˆå˜ä½ã® AND æ¼”ç®—å­(ANDå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression and_expression() {
-            var lhs = equality_expression();
-            while (lexer.ReadIf('&')) {
-                var rhs = equality_expression();
+        private SyntaxTree.Expression AndExpression() {
+            var lhs = EqualityExpression();
+            while (_lexer.ReadTokenIf('&')) {
+                var rhs = EqualityExpression();
                 lhs = new SyntaxTree.Expression.AndExpression(lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.11 ƒrƒbƒg’PˆÊ‚Ì”r‘¼ OR ‰‰Zq(”r‘¼OR®)
+        /// 6.5.11 ãƒ“ãƒƒãƒˆå˜ä½ã®æ’ä»– OR æ¼”ç®—å­(æ’ä»–ORå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression exclusive_OR_expression() {
-            var lhs = and_expression();
-            while (lexer.ReadIf('^')) {
-                var rhs = and_expression();
+        private SyntaxTree.Expression ExclusiveOrExpression() {
+            var lhs = AndExpression();
+            while (_lexer.ReadTokenIf('^')) {
+                var rhs = AndExpression();
                 lhs = new SyntaxTree.Expression.ExclusiveOrExpression(lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.12 ƒrƒbƒg’PˆÊ‚Ì OR ‰‰Zq(OR®)
+        /// 6.5.12 ãƒ“ãƒƒãƒˆå˜ä½ã® OR æ¼”ç®—å­(ORå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression inclusive_OR_expression() {
-            var lhs = exclusive_OR_expression();
-            while (lexer.ReadIf('|')) {
-                var rhs = exclusive_OR_expression();
+        private SyntaxTree.Expression InclusiveOrExpression() {
+            var lhs = ExclusiveOrExpression();
+            while (_lexer.ReadTokenIf('|')) {
+                var rhs = ExclusiveOrExpression();
                 lhs = new SyntaxTree.Expression.InclusiveOrExpression(lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.13 ˜_— AND ‰‰Zq(˜_—AND®)
+        /// 6.5.13 è«–ç† AND æ¼”ç®—å­(è«–ç†ANDå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression logical_AND_expression() {
-            var lhs = inclusive_OR_expression();
-            while (lexer.ReadIf(Token.TokenKind.AND_OP)) {
-                var rhs = inclusive_OR_expression();
+        private SyntaxTree.Expression LogicalAndExpression() {
+            var lhs = InclusiveOrExpression();
+            while (_lexer.ReadTokenIf(Token.TokenKind.AND_OP)) {
+                var rhs = InclusiveOrExpression();
                 lhs = new SyntaxTree.Expression.LogicalAndExpression(lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.14 ˜_— OR ‰‰Zq(˜_—OR®)
+        /// 6.5.14 è«–ç† OR æ¼”ç®—å­(è«–ç†ORå¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression logical_OR_expression() {
-            var lhs = logical_AND_expression();
-            while (lexer.ReadIf(Token.TokenKind.OR_OP)) {
-                var rhs = logical_AND_expression();
+        private SyntaxTree.Expression LogicalOrExpression() {
+            var lhs = LogicalAndExpression();
+            while (_lexer.ReadTokenIf(Token.TokenKind.OR_OP)) {
+                var rhs = LogicalAndExpression();
                 lhs = new SyntaxTree.Expression.LogicalOrExpression(lhs, rhs);
             }
             return lhs;
         }
 
         /// <summary>
-        /// 6.5.15 ğŒ‰‰Zq(ğŒ®)
+        /// 6.5.15 æ¡ä»¶æ¼”ç®—å­(æ¡ä»¶å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression conditional_expression() {
-            var cond = logical_OR_expression();
-            if (lexer.ReadIf('?')) {
-                var then_expr = expression();
-                lexer.Read(':');
-                var else_expr = conditional_expression();
-                return new SyntaxTree.Expression.ConditionalExpression(cond, then_expr, else_expr);
+        private SyntaxTree.Expression ConditionalExpression() {
+            var condExpr = LogicalOrExpression();
+            if (_lexer.ReadTokenIf('?')) {
+                var thenExpr = Expression();
+                _lexer.ReadToken(':');
+                var elseExpr = ConditionalExpression();
+                return new SyntaxTree.Expression.ConditionalExpression(condExpr, thenExpr, elseExpr);
             } else {
-                return cond;
+                return condExpr;
             }
         }
 
         /// <summary>
-        /// 6.5.16 ‘ã“ü‰‰Zq(‘ã“ü®)
+        /// 6.5.16 ä»£å…¥æ¼”ç®—å­(ä»£å…¥å¼)
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression assignment_expression() {
-            var lhs = conditional_expression();
-            if (is_assignment_operator()) {
-                var op = assignment_operator();
-                var rhs = assignment_expression();
+        private SyntaxTree.Expression AssignmentExpression() {
+            var lhs = ConditionalExpression();
+            if (IsAssignmentOperator()) {
+                var op = AssignmentOperator();
+                var rhs = AssignmentExpression();
                 if (op == "=") {
                     lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(op, lhs, rhs);
                 } else {
@@ -2835,43 +3279,229 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        ///6.5.16 ‘ã“ü‰‰Zqi‘ã“ü‰‰Zqƒg[ƒNƒ“‚Æ‚È‚è‚¤‚é‚©Hj
+        ///6.5.16 ä»£å…¥æ¼”ç®—å­ï¼ˆä»£å…¥æ¼”ç®—å­ãƒˆãƒ¼ã‚¯ãƒ³ã¨ãªã‚Šã†ã‚‹ã‹ï¼Ÿï¼‰
         /// </summary>
         /// <returns></returns>
-        private bool is_assignment_operator() {
-            return lexer.Peek((Token.TokenKind)'=', Token.TokenKind.MUL_ASSIGN, Token.TokenKind.DIV_ASSIGN, Token.TokenKind.MOD_ASSIGN, Token.TokenKind.ADD_ASSIGN, Token.TokenKind.SUB_ASSIGN, Token.TokenKind.LEFT_ASSIGN, Token.TokenKind.RIGHT_ASSIGN, Token.TokenKind.AND_ASSIGN, Token.TokenKind.XOR_ASSIGN, Token.TokenKind.OR_ASSIGN);
+        private bool IsAssignmentOperator() {
+            return _lexer.PeekToken((Token.TokenKind)'=', Token.TokenKind.MUL_ASSIGN, Token.TokenKind.DIV_ASSIGN, Token.TokenKind.MOD_ASSIGN, Token.TokenKind.ADD_ASSIGN, Token.TokenKind.SUB_ASSIGN, Token.TokenKind.LEFT_ASSIGN, Token.TokenKind.RIGHT_ASSIGN, Token.TokenKind.AND_ASSIGN, Token.TokenKind.XOR_ASSIGN, Token.TokenKind.OR_ASSIGN);
         }
 
         /// <summary>
-        /// 6.5.16 ‘ã“ü‰‰Zqi‘ã“ü‰‰Zqƒg[ƒNƒ“j
+        /// 6.5.16 ä»£å…¥æ¼”ç®—å­ï¼ˆä»£å…¥æ¼”ç®—å­ãƒˆãƒ¼ã‚¯ãƒ³ï¼‰
         /// </summary>
         /// <returns></returns>
-        private string assignment_operator() {
-            if (is_assignment_operator() == false) {
-                throw new CompilerException.SyntaxErrorException(lexer.current_token().Start, lexer.current_token().End, $"‘ã“ü‰‰Zq‚ª‚ ‚é‚×‚«êŠ‚É { lexer.current_token().ToString() } ‚ª‚ ‚è‚Ü‚·B");
+        private string AssignmentOperator() {
+            if (IsAssignmentOperator() == false) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ä»£å…¥æ¼”ç®—å­ãŒã‚ã‚‹ã¹ãå ´æ‰€ã« { _lexer.CurrentToken().ToString() } ãŒã‚ã‚Šã¾ã™ã€‚");
             }
-            var ret = lexer.current_token().Raw;
-            lexer.next_token();
+            var ret = _lexer.CurrentToken().Raw;
+            _lexer.NextToken();
             return ret;
         }
 
         /// <summary>
-        /// 6.6 ’è”®
+        /// 6.6 å®šæ•°å¼
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Expression constant_expression() {
-            // •â‘«à–¾  
-            // ’è”®‚ÍCÀs‚Å‚Í‚È‚­–|–ó‚É•]‰¿‚·‚é‚±‚Æ‚ª‚Å‚«‚éB‚µ‚½‚ª‚Á‚ÄC’è”‚ğg—p‚µ‚Ä‚æ‚¢‚Æ‚±‚ë‚È‚ç‚Î‚Ç‚±‚Å‚àg—p‚µ‚Ä‚æ‚¢B
+        private SyntaxTree.Expression ConstantExpression() {
+            // è£œè¶³èª¬æ˜  
+            // å®šæ•°å¼ã¯ï¼Œå®Ÿè¡Œæ™‚ã§ã¯ãªãç¿»è¨³æ™‚ã«è©•ä¾¡ã™ã‚‹ã“ã¨ãŒã§ãã‚‹ã€‚ã—ãŸãŒã£ã¦ï¼Œå®šæ•°ã‚’ä½¿ç”¨ã—ã¦ã‚ˆã„ã¨ã“ã‚ãªã‚‰ã°ã©ã“ã§ã‚‚ä½¿ç”¨ã—ã¦ã‚ˆã„ã€‚
             //
-            // §–ñ
-            // - ’è”®‚ÍC‘ã“üC‘•ªCŒ¸•ªCŠÖ”ŒÄo‚µ–”‚ÍƒRƒ“ƒ}‰‰Zq‚ğŠÜ‚ñ‚Å‚Í‚È‚ç‚È‚¢B
-            //   ‚½‚¾‚µC’è”®‚ª•]‰¿‚³‚ê‚È‚¢•”•ª®(sizeof‰‰Zq‚ÌƒIƒyƒ‰ƒ“ƒh“™)‚ÉŠÜ‚Ü‚ê‚Ä‚¢‚éê‡‚ğœ‚­B
-            // - ’è”®‚ğ•]‰¿‚µ‚½Œ‹‰Ê‚ÍC‚»‚ÌŒ^‚Å•\Œ»‰Â”\‚È’l‚Ì”ÍˆÍ“à‚É‚ ‚é’è”‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
+            // åˆ¶ç´„
+            // - å®šæ•°å¼ã¯ï¼Œä»£å…¥ï¼Œå¢—åˆ†ï¼Œæ¸›åˆ†ï¼Œé–¢æ•°å‘¼å‡ºã—åˆã¯ã‚³ãƒ³ãƒæ¼”ç®—å­ã‚’å«ã‚“ã§ã¯ãªã‚‰ãªã„ã€‚
+            //   ãŸã ã—ï¼Œå®šæ•°å¼ãŒè©•ä¾¡ã•ã‚Œãªã„éƒ¨åˆ†å¼(sizeofæ¼”ç®—å­ã®ã‚ªãƒšãƒ©ãƒ³ãƒ‰ç­‰)ã«å«ã¾ã‚Œã¦ã„ã‚‹å ´åˆã‚’é™¤ãã€‚
+            // - å®šæ•°å¼ã‚’è©•ä¾¡ã—ãŸçµæœã¯ï¼Œãã®å‹ã§è¡¨ç¾å¯èƒ½ãªå€¤ã®ç¯„å›²å†…ã«ã‚ã‚‹å®šæ•°ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
             // 
 
-            // ToDo: ‰Šú‰»q’†‚Ì’è”®‚Ìˆµ‚¢‚ğÀ‘•
-            return conditional_expression();
+            // ToDo: åˆæœŸåŒ–å­ä¸­ã®å®šæ•°å¼ã®æ‰±ã„ã‚’å®Ÿè£…
+            return ConditionalExpression();
 
+        }
+
+        //
+        // ä»¥é™ã¯å®Ÿè£…ä¸Šã®åˆ©ä¾¿æ€§ã®ãŸã‚ã«å®šç¾©
+        //
+
+
+        // å„å®£è¨€ã§ç™»å ´ã™ã‚‹è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­/å‹æŒ‡å®šå­/å‹ä¿®é£¾å­/é–¢æ•°ä¿®é£¾å­ã®èª­ã¿å–ã‚Šå‡¦ç†ã‚’å…±é€šåŒ–
+
+        [Flags]
+        private enum ReadDeclarationSpecifierPartFlag {
+            None = 0x00,
+            StorageClassSpecifier = 0x01,
+            TypeSpecifier = 0x02,
+            TypeQualifier = 0x04,
+            FunctionSpecifier = 0x08,
+
+            DeclarationSpecifiers = StorageClassSpecifier | TypeSpecifier | TypeQualifier,
+            SpecifierQualifiers = TypeSpecifier | TypeQualifier,
+            ExternalDeclaration = StorageClassSpecifier | TypeSpecifier | TypeQualifier | FunctionSpecifier,
+        }
+
+        /// <summary>
+        /// å„å®£è¨€ã§ç™»å ´ã™ã‚‹è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­/å‹æŒ‡å®šå­/å‹ä¿®é£¾å­/é–¢æ•°ä¿®é£¾å­ãªã©ã®å…±é€šèª­ã¿å–ã‚Šå‡¦ç†ã€‚flagsã§å‹•ä½œã‚’æŒ‡å®šã§ãã‚‹ã€‚
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="storageClass"></param>
+        /// <param name="functionSpecifier"></param>
+        /// <param name="flags"></param>
+        /// <returns></returns>
+        private int ReadDeclarationSpecifiers(
+            ref CType type,
+            ref StorageClassSpecifier storageClass,
+            //ref TypeSpecifier typeSpecifier,
+            //ref TypeQualifier typeQualifier,
+            ref FunctionSpecifier functionSpecifier,
+            ReadDeclarationSpecifierPartFlag flags
+        ) {
+
+            // èª­ã¿å–ã‚Š
+            int n = 0;
+            TypeSpecifier typeSpecifier = AnsiCParser.TypeSpecifier.None;
+            TypeQualifier typeQualifier = AnsiCParser.TypeQualifier.None;
+            while (IsDeclarationSpecifierPart(type, typeSpecifier, flags)) {
+                ReadDeclarationSpecifierPart(ref type, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier, flags);
+                n++;
+            }
+
+            // æ§‹ç¯‰
+
+            if (type != null) {
+                // å‹æŒ‡å®šå­éƒ¨ã«æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒå‡ºç¾ã™ã‚‹å ´åˆ
+                if (typeSpecifier != AnsiCParser.TypeSpecifier.None) {
+                    // 6.7.2 å‹æŒ‡å®šå­ã€Œå‹æŒ‡å®šå­ã®ä¸¦ã³ã¯ï¼Œæ¬¡ã«ç¤ºã™ã‚‚ã®ã®ã„ãšã‚Œã‹ä¸€ã¤ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ã€ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã¯ãã‚Œå˜ä½“ã®ã¿ã§ä½¿ã†ã“ã¨ãŒè¦å®šã•ã‚Œã¦ã„ã‚‹ãŸã‚ã€
+                    // æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã®ã„ãšã‚Œã‹ã¨ãã‚Œã‚‰ä»¥å¤–ã®å‹æŒ‡å®šå­ãŒçµ„ã¿åˆã‚ã›ã‚‰ã‚Œã¦ã„ã‚‹å ´åˆã¯ã‚¨ãƒ©ãƒ¼ã¨ã™ã‚‹ã€‚
+                    // ãªãŠã€æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒè¤‡æ•°å›åˆ©ç”¨ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ SpecifierQualifier å†…ã§ã‚¨ãƒ©ãƒ¼ã¨ãªã‚‹ã€‚
+                    // ï¼ˆæ­´å²çš„ãªè©±ï¼šK&R ã§ã¯ typedef ã¯ åˆ¥å(alias)æ‰±ã„ã ã£ãŸãŸã‚ã€typedef int INT; unsingned INT x; ã¯å¦¥å½“ã ã£ãŸï¼‰
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "å‹æŒ‡å®šå­ãƒ»å‹ä¿®é£¾å­ä¸¦ã³ä¸­ã§æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åã®ã„ãšã‚Œã‹ã¨ã€ãã‚Œã‚‰ä»¥å¤–ã®å‹æŒ‡å®šå­ãŒçµ„ã¿åˆã‚ã›ã‚‰ã‚Œã¦ã„ã‚‹ã€‚");
+                }
+            } else {
+                // å‹æŒ‡å®šå­éƒ¨ã«æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ã€åˆ—æŒ™å‹æŒ‡å®šå­ã€å‹å®šç¾©åãŒå‡ºç¾ã—ãªã„å ´åˆ
+                if (typeSpecifier == AnsiCParser.TypeSpecifier.None) {
+                    // 6.7.2 ãã‚Œãã‚Œã®å®£è¨€ã®å®£è¨€æŒ‡å®šå­åˆ—ã®ä¸­ã§ï¼Œåˆã¯ãã‚Œãã‚Œã®æ§‹é€ ä½“å®£è¨€åŠã³å‹åã®å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ã®ä¸­ã§ï¼Œå°‘ãªãã¨ã‚‚ä¸€ã¤ã®å‹æŒ‡å®šå­ã‚’æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+                    // ã¨ã‚ã‚‹ãŸã‚ã€å®£è¨€æŒ‡å®šå­ã‚’ä¸€ã¤ã‚‚æŒ‡å®šã—ãªã„ã“ã¨ã¯è¨±ã•ã‚Œãªã„ã€‚
+                    // ï¼ˆæ­´å²çš„ãªè©±ï¼šK&R ã§ã¯ å®£è¨€æŒ‡å®šå­ã‚’çœç•¥ã™ã‚‹ã¨ int æ‰±ã„ï¼‰
+                    // ToDo: C90ã¯äº’æ›æ€§ã®è¦³ç‚¹ã‹ã‚‰K&Rå‹•ä½œã‚‚æ®‹ã•ã‚Œã¦ã„ã‚‹ã®ã§é¸æŠã§ãã‚‹ã‚ˆã†ã«ã™ã‚‹
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ãã‚Œãã‚Œã®å®£è¨€ã®å®£è¨€æŒ‡å®šå­åˆ—ã®ä¸­ã§ï¼Œåˆã¯ãã‚Œãã‚Œã®æ§‹é€ ä½“å®£è¨€åŠã³å‹åã®å‹æŒ‡å®šå­å‹ä¿®é£¾å­ä¸¦ã³ã®ä¸­ã§ï¼Œå°‘ãªãã¨ã‚‚ä¸€ã¤ã®å‹æŒ‡å®šå­ã‚’æŒ‡å®šã—ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚");
+                } else {
+                    type = new CType.BasicType(typeSpecifier);
+                }
+            }
+
+            // å‹ä¿®é£¾å­ã‚’é©ç”¨
+            type = type.WrapTypeQualifier(typeQualifier);
+            
+            //
+
+            return n;
+        }
+
+        private bool IsDeclarationSpecifierPart(CType type, TypeSpecifier typeSpecifier, ReadDeclarationSpecifierPartFlag flags) {
+#if false
+            return  (
+                   (flags.HasFlag(ReadDeclarationSpecifierPartFlag.StorageClassSpecifier) && IsStorageClassSpecifier()                  )
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier        ) && IsTypeSpecifier()            && type == null) 
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier        ) && IsStructOrUnionSpecifier() && type == null) 
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier        ) && IsEnumSpecifier()            && type == null) 
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier        ) && IsTypedefName()              && type == null && typeSpecifier == TypeSpecifier.None) 
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier        ) && IsTypeQualifier()                           ) 
+                || (flags.HasFlag(ReadDeclarationSpecifierPartFlag.FunctionSpecifier    ) && IsFunctionSpecifier()                       )
+            );
+#else
+            if (IsStorageClassSpecifier()) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.StorageClassSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsTypeSpecifier() && type == null) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯å‹æŒ‡å®šå­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsStructOrUnionSpecifier() && type == null) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯æ§‹é€ ä½“å…±ç”¨ä½“æŒ‡å®šå­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsEnumSpecifier() && type == null) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯åˆ—æŒ™å‹æŒ‡å®šå­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯å‹å®šç¾©å { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsTypeQualifier()) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯å‹ä¿®é£¾å­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            if (IsFunctionSpecifier()) {
+                if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.FunctionSpecifier)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ã“ã“ã§ã¯é–¢æ•°ä¿®é£¾å­ { _lexer.CurrentToken().ToString() } ã¯ä½¿ãˆã¾ã›ã‚“ã€‚");
+                }
+                return true;
+            }
+            return false;
+#endif
+        }
+
+        private void ReadDeclarationSpecifierPart(
+            ref CType type,
+            ref StorageClassSpecifier storageClass,
+            ref TypeSpecifier typeSpecifier,
+            ref TypeQualifier typeQualifier,
+            ref FunctionSpecifier functionSpecifier,
+            ReadDeclarationSpecifierPartFlag flags
+        ) {
+            if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.StorageClassSpecifier) && IsStorageClassSpecifier()) {
+                // è¨˜æ†¶ã‚¯ãƒ©ã‚¹æŒ‡å®šå­
+                storageClass = storageClass.Marge(StorageClassSpecifier());
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsTypeSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆäºˆç´„èªï¼‰
+                typeSpecifier = typeSpecifier.Marge(TypeSpecifier());
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsStructOrUnionSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆæ§‹é€ ä½“æŒ‡å®šå­ã‚‚ã—ãã¯å…±ç”¨ä½“æŒ‡å®šå­ï¼‰
+                if (type != null) {
+                    throw new Exception("");
+                }
+                type = StructOrUnionSpecifier();
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsEnumSpecifier()) {
+                // å‹æŒ‡å®šå­ï¼ˆåˆ—æŒ™å‹æŒ‡å®šå­ï¼‰
+                if (type != null) {
+                    throw new Exception("");
+                }
+                type = EnumSpecifier();
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsTypedefName()) {
+                // å‹æŒ‡å®šå­ï¼ˆå‹å®šç¾©åï¼‰
+                SyntaxTree.Declaration.TypeDeclaration value;
+                if (_typedefScope.TryGetValue(_lexer.CurrentToken().Raw, out value) == false) {
+                    throw new Exception();
+                }
+                if (type != null) {
+                    if (CType.IsEqual(type, value.Type) == false) {
+                        throw new Exception("");
+                    }
+                }
+                type = new CType.TypedefedType(_lexer.CurrentToken().Raw, value.Type);
+                _lexer.NextToken();
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier) && IsTypeQualifier()) {
+                // å‹ä¿®é£¾å­
+                typeQualifier.Marge(TypeQualifier());
+            } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.FunctionSpecifier) && IsFunctionSpecifier()) {
+                // é–¢æ•°ä¿®é£¾å­
+                functionSpecifier.Marge(FunctionSpecifier());
+            } else {
+                throw new Exception("");
+            }
         }
 
     }

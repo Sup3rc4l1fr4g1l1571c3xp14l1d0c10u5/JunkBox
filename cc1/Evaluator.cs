@@ -180,7 +180,7 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant;
-                return e.Ret.Value;
+                return e.Info.Value;
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.EqualityExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.EqualityExpression;
@@ -343,14 +343,17 @@ namespace AnsiCParser {
                 var e = expr as SyntaxTree.Expression.UnaryReferenceExpression;
                 throw new Exception();
             }
+            if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression) {
+                var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression;
+                throw new Exception();
+            }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
-                // Argumentも含まれる
                 throw new Exception();
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression;
-                return ConstantEval(e.expression);
+                return ConstantEval(e.ParenthesesExpression);
             }
             throw new Exception();
         }

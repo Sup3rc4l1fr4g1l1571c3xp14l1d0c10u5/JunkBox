@@ -5,6 +5,7 @@ namespace AnsiCParser {
     /// 通常の識別子の名前空間の要素
     /// </summary>
     public abstract class IdentifierScopeValue {
+
         public virtual bool IsEnumValue() {
             return false;
         }
@@ -18,6 +19,14 @@ namespace AnsiCParser {
         }
 
         public virtual SyntaxTree.Declaration.VariableDeclaration ToVariable() {
+            throw new Exception("");
+        }
+
+        public virtual bool IsArgument() {
+            return false;
+        }
+
+        public virtual SyntaxTree.Declaration.ArgumentDeclaration ToArgument() {
             throw new Exception("");
         }
 
@@ -50,11 +59,18 @@ namespace AnsiCParser {
 
         public class Declaration : IdentifierScopeValue {
             public override bool IsVariable() {
-                return Decl is SyntaxTree.Declaration.VariableDeclaration;
+                return Decl is SyntaxTree.Declaration.VariableDeclaration && !(Decl is SyntaxTree.Declaration.ArgumentDeclaration);
             }
 
             public override SyntaxTree.Declaration.VariableDeclaration ToVariable() {
                 return Decl as SyntaxTree.Declaration.VariableDeclaration;
+            }
+            public override bool IsArgument() {
+                return Decl is SyntaxTree.Declaration.ArgumentDeclaration;
+            }
+
+            public override SyntaxTree.Declaration.ArgumentDeclaration ToArgument() {
+                return Decl as SyntaxTree.Declaration.ArgumentDeclaration;
             }
 
             public override bool IsFunction() {

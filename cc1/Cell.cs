@@ -5,17 +5,17 @@ using System.Text;
 
 namespace AnsiCParser {
     /// <summary>
-    /// S®—p‚ÌƒZƒ‹
+    /// Så¼ç”¨ã®ã‚»ãƒ«
     /// </summary>
     public abstract class Cell {
 
         /// <summary>
-        /// ‹óƒZƒ‹
+        /// ç©ºã‚»ãƒ«
         /// </summary>
         public static Cell Nil { get; } = new ConsCell();
 
         /// <summary>
-        /// ƒRƒ“ƒXƒZƒ‹
+        /// ã‚³ãƒ³ã‚¹ã‚»ãƒ«
         /// </summary>
         public class ConsCell : Cell {
             public Cell Car {
@@ -24,7 +24,9 @@ namespace AnsiCParser {
             public Cell Cdr {
                 get;
             }
-            public ConsCell(Cell car = null, Cell cdr = null) {
+            public ConsCell() {
+            }
+            public ConsCell(Cell car, Cell cdr) {
                 Car = car ?? Nil;
                 Cdr = cdr ?? Nil;
             }
@@ -40,7 +42,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// •¶š—ñ’lƒZƒ‹
+        /// æ–‡å­—åˆ—å€¤ã‚»ãƒ«
         /// </summary>
         public class ValueCell : Cell {
             public string Value {
@@ -55,7 +57,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// ƒŠƒXƒgì¬
+        /// ãƒªã‚¹ãƒˆä½œæˆ
         /// </summary>
         /// <param name="args"></param>
         /// <returns></returns>
@@ -75,7 +77,7 @@ namespace AnsiCParser {
 
 
         /// <summary>
-        /// S®‚Ì®Œ`o—Í
+        /// Så¼ã®æ•´å½¢å‡ºåŠ›
         /// </summary>
         private static class PrettyPrinter {
             private static void PrintINdent(StringBuilder sb, int lebel) {

@@ -32,6 +32,7 @@ namespace AnsiCParser {
             TResult OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, TArg value);
             TResult OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, TArg value);
             TResult OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, TArg value);
+            TResult OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, TArg value);
             TResult OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, TArg value);
             TResult OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, TArg value);
             TResult OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, TArg value);
@@ -66,12 +67,12 @@ namespace AnsiCParser {
             TResult OnTranslationUnit(SyntaxTree.TranslationUnit self, TArg value);
         }
 
-        private static TResult AcceptReflection<TResult, TArg>(dynamic ast, IVisitor<TResult, TArg> visitor, TArg value) {
+        private static TResult AcceptInner<TResult, TArg>(dynamic ast, IVisitor<TResult, TArg> visitor, TArg value) {
             return Accept<TResult, TArg>(ast, visitor, value);
         }
 
         public static TResult Accept<TResult, TArg>(this SyntaxTree syntaxTree, IVisitor<TResult, TArg> visitor, TArg value) {
-            return AcceptReflection(syntaxTree, visitor, value);
+            return AcceptInner(syntaxTree, visitor, value);
         }
 
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Declaration.ArgumentDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
@@ -166,6 +167,9 @@ namespace AnsiCParser {
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnUndefinedIdentifierExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnArgumentExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnVariableExpression(self, value);

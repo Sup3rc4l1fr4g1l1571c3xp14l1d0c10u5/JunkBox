@@ -1,6 +1,6 @@
 namespace AnsiCParser {
     public static class CTypeVisitor {
-        public interface IVisitor<TResult, TArg> {
+        public interface IVisitor<out TResult, in TArg> {
             TResult OnArrayType(CType.ArrayType self, TArg value);
             TResult OnBasicType(CType.BasicType self, TArg value);
             TResult OnFunctionType(CType.FunctionType self, TArg value);
@@ -12,12 +12,12 @@ namespace AnsiCParser {
             TResult OnTypeQualifierType(CType.TypeQualifierType self, TArg value);
         }
 
-        private static TResult Accept<TResult, TArg>(dynamic type, IVisitor<TResult, TArg> visitor, TArg value, bool dummy) {
+        private static TResult AcceptInner<TResult, TArg>(dynamic type, IVisitor<TResult, TArg> visitor, TArg value) {
             return Accept<TResult, TArg>(type, visitor, value);
         }
 
         public static TResult Accept<TResult, TArg>(this CType type, IVisitor<TResult, TArg> visitor, TArg value) {
-            return Accept<TResult, TArg>(type, visitor, value, true);
+            return AcceptInner(type, visitor, value);
         }
 
         public static TResult Accept<TResult, TArg>(this CType.ArrayType self, IVisitor<TResult, TArg> visitor, TArg value) {

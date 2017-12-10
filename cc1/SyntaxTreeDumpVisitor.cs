@@ -11,7 +11,11 @@ namespace AnsiCParser {
         }
 
         public Cell OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, Cell value) {
-            return Cell.Create("argument-declaration", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init.Accept(this, value));
+            return Cell.Create("argument-declaration", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init?.Accept(this, value)??Cell.Nil);
+        }
+
+        public Cell OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Cell value) {
+            return Cell.Create("arg-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident);
         }
 
         public Cell OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, Cell value) {
@@ -35,7 +39,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Cell value) {
-            return Cell.Create("comma-expr", self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.expressions.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("comma-expr", self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Expressions.Select(x => x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Cell value) {
@@ -104,11 +108,11 @@ namespace AnsiCParser {
         }
 
         public Cell OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Cell value) {
-            return Cell.Create("enclosed-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.expression.Accept(this, value));
+            return Cell.Create("enclosed-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.ParenthesesExpression.Accept(this, value));
         }
 
         public Cell OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Cell value) {
-            return Cell.Create("enum-const", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.Ret.Value.ToString());
+            return Cell.Create("enum-const", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.Info.Value.ToString());
         }
 
         public Cell OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, Cell value) {
@@ -145,7 +149,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Cell value) {
-            return Cell.Create("func-decl", self.Ty.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.FunctionSpecifier.ToString(), self.Body?.Accept(this, value) ?? Cell.Nil);
+            return Cell.Create("func-decl", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.FunctionSpecifier.ToString(), self.Body?.Accept(this, value) ?? Cell.Nil);
         }
 
         public Cell OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Cell value) {
@@ -273,7 +277,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnTranslationUnit(SyntaxTree.TranslationUnit self, Cell value) {
-            return Cell.Create("translation-unit", Cell.Create(self.declarations.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("translation-unit", Cell.Create(self.Declarations.Select(x => x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, Cell value) {
