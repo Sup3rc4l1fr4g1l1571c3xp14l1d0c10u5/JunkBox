@@ -1,51 +1,22 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace AnsiCParser {
     class Program {
 
+
         static void Main(string[] args) {
-            //args = System.IO.Directory.GetFiles(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\test\examples","*.c");
-            if (args.Length == 0) {
-                var ret = new Parser(@"
-double x = 1.0;
-int main(void) {
-	int x = 2;
-	{
-		extern double x;
-		x = 3.0;
-	}
-	return 0;
-}
 
-").Parse();
+            //var tc = new TestCase();
+            //foreach (var arg in System.IO.Directory.GetFiles(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\testcase", "*.c")) {
+            //    tc.AddTest(arg);
+            //}
+            //tc.RunTest();
 
-                Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
-
-                TestCase.RunTest();
-            } else {
-                var defaultStdout = Console.Out;
-                var defaultStderr = Console.Error;
-                foreach (var arg in args) {
-                    if (System.IO.File.Exists(arg) == false) {
-                        Console.WriteLine($"ファイル{arg}が見つかりません。");
-                        continue;
-                    }
-                    using (var tw = new System.IO.StreamWriter(arg + ".log")) {
-                        Console.SetOut(tw);
-                        Console.SetError(tw);
-                        try {
-                            new Parser(System.IO.File.ReadAllText(arg)).Parse();
-                        } catch (Exception e) {
-                            Console.WriteLine($"例外: {e.GetType().Name}");
-                            Console.WriteLine($"メッセージ: {e.Message}");
-                            Console.WriteLine($"スタックトレース: {e.StackTrace}");
-                        }
-                        Console.SetOut(defaultStdout);
-                        Console.SetError(defaultStderr);
-                    }
-                }
-            }
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\testcase\typedef-in-argument-badcase02.c")).Parse();
+            Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
         }
     }
 
