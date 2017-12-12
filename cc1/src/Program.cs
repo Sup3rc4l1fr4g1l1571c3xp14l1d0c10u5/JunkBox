@@ -8,16 +8,34 @@ namespace AnsiCParser {
 
 
         static void Main(string[] args) {
+            var ret = new Parser(@"
+extern int printf(const char *, ...);
 
-            //var tc = new TestCase();
-            //foreach (var arg in System.IO.Directory.GetFiles(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\testcase", "*.c")) {
-            //    tc.AddTest(arg);
-            //}
-            //tc.RunTest();
+int a = 10;  /* External linkage */
 
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\testcase\typedef-in-argument-badcase02.c")).Parse();
+void main(void)
+{
+	static int a = 5;  /* No linkage(staticの有無は関係ない) */
+
+    printf(""%d\n"", a);    /* Prints 5 */
+
+    {
+        extern int a;  /* External linkage */
+
+        printf(""%d\n"", a);    /* Prints 10 */
+    }
+}
+").Parse();
+            //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
-        }
+
+            var tc = new TestCase();
+            foreach (var arg in System.IO.Directory.GetFiles(@"..\..\testcase", "*.c")) {
+                tc.AddTest(arg);
+            }
+            tc.RunTest();
+
+            }
     }
 
 

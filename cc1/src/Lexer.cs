@@ -318,7 +318,7 @@ namespace AnsiCParser {
                 // 読み取りを行わずに終わる
                 return;
             }
-        rescan:
+            rescan:
 
             // 空白文字の連続の処理
             while (IsSpace(Peek())) {

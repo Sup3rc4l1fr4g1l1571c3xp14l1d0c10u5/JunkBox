@@ -48,9 +48,10 @@ namespace AnsiCParser {
             }
 
             TestTask.Add(() => {
+                var p = new Parser(src);
                 if (string.IsNullOrWhiteSpace(settings["assertion"])) {
                     try {
-                        new Parser(src).Parse();
+                        p.Parse();
                         return true;
                     } catch (Exception e) {
                         Console.Error.WriteLine($"");
@@ -67,7 +68,7 @@ namespace AnsiCParser {
                     }
                 } else {
                     try {
-                        new Parser(src).Parse();
+                        p.Parse();
                         Console.Error.WriteLine($"");
                         Console.Error.WriteLine($"{path}:");
                         Console.Error.WriteLine($"例外 {settings["assertion"]} が発生しませんでした。");

@@ -2346,6 +2346,10 @@ namespace AnsiCParser {
                 public FunctionSpecifier FunctionSpecifier {
                     get;
                 }
+                public LinkageObject LinkageObject {
+                    get; set;
+                }
+
                 public FunctionDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
                     Ident = ident;
                     Type = type;
@@ -2366,6 +2370,9 @@ namespace AnsiCParser {
                     get;
                 }
                 public Initializer Init {
+                    get; set;
+                }
+                public LinkageObject LinkageObject {
                     get; set;
                 }
 

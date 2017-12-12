@@ -809,7 +809,7 @@ namespace AnsiCParser {
                     StorageClass = storageClass;
                     // 6.7.5.3 関数宣言子（関数原型を含む）
                     // 制約
-                    // 仮引数を“∼型の配列”とする宣言は，“∼型への修飾されたポインタ”に型調整する。
+                    // 仮引数を“～型の配列”とする宣言は，“～型への修飾されたポインタ”に型調整する。
                     // そのときの型修飾子は，配列型派生の[及び]の間で指定したものとする。
                     // 配列型派生の[及び]の間にキーワード static がある場合，その関数の呼出しの際に対応する実引数の値は，大きさを指定する式で指定される数以上の要素をもつ配列の先頭要素を指していなければならない。
                     CType elementType;
@@ -950,6 +950,94 @@ namespace AnsiCParser {
                 };
                 return string.Join(" ", sb.Where(x => x != null));
             }
+        }
+
+
+        /// <summary>
+        /// 6.2.7適合型及び合成型
+        /// 合成型（composite type）は，適合する二つの型から構成することができる。
+        /// 合成型は，二つの型の両方に適合し，かつ次の条件を満たす型とする。
+        /// - 一方の型が既知の固定長をもつ配列の場合，合成型は，その大きさの配列とする。そうでなく，一方の型が可変長の配列の場合，合成型はその型とする。
+        /// - 一方の型だけが仮引数型並びをもつ関数型（関数原型）の場合，合成型は，その仮引数型並びをもつ関数原型とする。
+        /// - 両方の型が仮引数型並びをもつ関数型の場合，合成仮引数型並びにおける各仮引数の型は，対応する仮引数の型の合成型とする。
+        /// これらの規則は，二つの型が派生される元の型に再帰的に適用する。
+        /// 内部結合又は外部結合をもつ識別子が，ある有効範囲の中で宣言され，その識別子の以前の宣言が可視であり，以前の宣言が内部結合又は外部結合を指定している場合，現在の宣言での識別子の型は合成型となる。
+        /// </summary>
+        /// <param name="t1"></param>
+        /// <param name="t2"></param>
+        /// <returns></returns>
+        public static CType CompositeType(CType t1, CType t2) {
+            if (t1.IsQualifiedType() && t2.IsQualifiedType()) {
+
+                var ta1 = t1 as CType.TypeQualifierType;
+                var ta2 = t1 as CType.TypeQualifierType;
+                if (ta1.Qualifier != ta2.Qualifier) {
+                    return null;
+                }
+                var ret = CompositeType(ta1.Type, ta2.Type);
+                if (ret != null) {
+                    return new TypeQualifierType(ret, ta1.Qualifier);
+                } else {
+                    return null;
+                }
+            }
+            if (t1.IsArrayType() && t2.IsArrayType()) {
+                // 一方の型が既知の固定長をもつ配列の場合，合成型は，その大きさの配列とする。
+                // そうでなく，一方の型が可変長の配列の場合，合成型はその型とする   
+                // 可変長配列は未実装
+                var ta1 = t1.Unwrap() as CType.ArrayType;
+                var ta2 = t1.Unwrap() as CType.ArrayType;
+                if ((ta1.Length != -1 && ta2.Length == -1)
+                    || (ta1.Length == -1 && ta2.Length != -1)) {
+                    int len = ta1.Length != -1 ? ta1.Length : ta2.Length;
+                    var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                    if (ret != null) {
+                        return CreateArray(len, ret);
+                    } else {
+                        return null;
+                    }
+                }
+                return null;
+            }
+            if (t1.IsFunctionType() && t2.IsFunctionType()) {
+                var ta1 = t1.Unwrap() as CType.FunctionType;
+                var ta2 = t1.Unwrap() as CType.FunctionType;
+                if (ta1.HasVariadic != ta2.HasVariadic) {
+                    return null;
+                }
+                if ((ta1.Arguments != null && ta2.Arguments == null) || (ta1.Arguments == null && ta2.Arguments != null)) {
+                    // 一方の型だけが仮引数型並びをもつ関数型（関数原型）の場合，合成型は，その仮引数型並びをもつ関数原型とする。
+                    var arguments = (ta1.Arguments != null ? ta1.Arguments : ta2.Arguments).ToList();
+                    var retType = CompositeType(ta1.ResultType, ta2.ResultType);
+                    if (retType != null) {
+                        return new CType.FunctionType(arguments, ta1.HasVariadic, retType);
+                    } else {
+                        return null;
+                    }
+                } else if (ta1.Arguments != null && ta2.Arguments != null) {
+                    // 両方の型が仮引数型並びをもつ関数型の場合，合成仮引数型並びにおける各仮引数の型は，対応する仮引数の型の合成型とする。
+                    if (ta1.Arguments.Length != ta2.Arguments.Length) {
+                        return null;
+                    }
+                    var newArguments = new List<FunctionType.ArgumentInfo>();
+                    for (var i = 0; i < ta1.Arguments.Length; i++) {
+                        var newArgument = CompositeType(ta1.Arguments[i].Type, ta2.Arguments[i].Type);
+                        if (ta1.Arguments[i].StorageClass != ta2.Arguments[i].StorageClass) {
+                            return null;
+                        }
+                        var storageClass = ta1.Arguments[i].StorageClass;
+                        newArguments.Add(new FunctionType.ArgumentInfo(null, storageClass, newArgument));
+                    }
+                    var retType = CompositeType(ta1.ResultType, ta2.ResultType);
+                    if (retType != null) {
+                        return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
+                    } else {
+                        return null;
+                    }
+                }
+                return null;
+            }
+            return null;
         }
     }
 }

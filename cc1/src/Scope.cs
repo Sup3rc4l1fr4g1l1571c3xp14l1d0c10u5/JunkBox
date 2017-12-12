@@ -133,6 +133,10 @@ namespace AnsiCParser {
             return false;
         }
 
+        public bool IsGlobalScope() {
+            return Parent == Empty;
+        }
+
         public Scope<TValue> GetGlobalScope() {
             var it = this;
             if (it == Empty) {

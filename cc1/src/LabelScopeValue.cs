@@ -3,43 +3,36 @@ using System.Collections.Generic;
 namespace AnsiCParser {
     public class LabelScopeValue {
         /// <summary>
-        /// ラベル参照地点
+        /// ラベルの宣言地点
         /// </summary>
-        public List<SyntaxTree.Statement.GotoStatement> Reference { get; }
-        /// <summary>
-        /// ラベル定義
-        /// </summary>
-        public SyntaxTree.Statement.GenericLabeledStatement Declaration { get; private set; }
-        public LabelScopeValue() {
-            Reference = new List<SyntaxTree.Statement.GotoStatement>();
-            Declaration = null;
+        public SyntaxTree.Statement.GenericLabeledStatement Declaration {
+            get;
+            internal set;
         }
+
         /// <summary>
-        /// ラベルの参照地点を追加
+        /// ラベルの参照地点
         /// </summary>
-        /// <param name="gotoStmt"></param>
+        public List<SyntaxTree.Statement.GotoStatement> References {
+            get;
+        } = new List<SyntaxTree.Statement.GotoStatement>();
+
+        public void SetDeclaration(SyntaxTree.Statement.GenericLabeledStatement labelStmt) {
+            if (Declaration != null) {
+                throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "ラベルの宣言地点は既に設定済みです。（本処理系の誤りです。）");
+            }
+            Declaration = labelStmt;
+            foreach (var reference in References) {
+                reference.Target = labelStmt;
+            }
+        }
+
         public void AddReference(SyntaxTree.Statement.GotoStatement gotoStmt) {
+            References.Add(gotoStmt);
             if (Declaration != null) {
                 gotoStmt.Target = Declaration;
             }
-            Reference.Add(gotoStmt);
         }
-        /// <summary>
-        /// ラベルの定義地点を設定
-        /// </summary>
-        /// <param name="labeledStmt"></param>
-        public void SetDeclaration(SyntaxTree.Statement.GenericLabeledStatement labeledStmt) {
-            if (Declaration != null) {
-                throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty,"ラベルの定義地点を再定義しようとした。");
-            } else {
-                Declaration = labeledStmt;
-                Reference.ForEach(x => {
-                    if (x.Target != null) {
-                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "既に参照先の決まっているgoto文の参照先を再定義しようとした。");
-                    }
-                    x.Target = labeledStmt;
-                });
-            }
-        }
+
     }
 }

@@ -1,4 +1,4 @@
-﻿/**@
+/**@
  spec: 関数の引数宣言 中で typedef
  assertion: SpecificationErrorException
 @**/
