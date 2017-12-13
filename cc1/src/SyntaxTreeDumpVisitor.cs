@@ -149,7 +149,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Cell value) {
-            return Cell.Create("func-decl", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.FunctionSpecifier.ToString(), self.Body?.Accept(this, value) ?? Cell.Nil);
+            return Cell.Create("func-decl", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.FunctionSpecifier.ToString(), self.LinkageObject.LinkageId, self.Body?.Accept(this, value) ?? Cell.Nil);
         }
 
         public Cell OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Cell value) {
@@ -177,7 +177,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, Cell value) {
-            return Cell.Create("int-const", self.Type.Accept(new CTypeDumpVisitor(), null), self.Str, self.Value.ToString());
+            return Cell.Create("int-const", self.Type.Accept(new CTypeDumpVisitor(), null), self.Str, $"\"{self.Value.ToString()}\"");
         }
 
         public Cell OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, Cell value) {
@@ -343,7 +343,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, Cell value) {
-            return Cell.Create("var-decl", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init?.Accept(this, value) ?? Cell.Nil);
+            return Cell.Create("var-decl", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.LinkageObject?.LinkageId ?? "", self.Init?.Accept(this, value) ?? Cell.Nil);
         }
 
         public Cell OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Cell value) {

@@ -970,38 +970,79 @@ namespace AnsiCParser {
             if (t1.IsQualifiedType() && t2.IsQualifiedType()) {
 
                 var ta1 = t1 as CType.TypeQualifierType;
-                var ta2 = t1 as CType.TypeQualifierType;
+                var ta2 = t2 as CType.TypeQualifierType;
                 if (ta1.Qualifier != ta2.Qualifier) {
                     return null;
                 }
                 var ret = CompositeType(ta1.Type, ta2.Type);
-                if (ret != null) {
-                    return new TypeQualifierType(ret, ta1.Qualifier);
-                } else {
+                if (ret == null) {
                     return null;
                 }
+                return new TypeQualifierType(ret, ta1.Qualifier);
+            }
+            if (t1.IsPointerType() && t2.IsPointerType()) {
+                var ta1 = t1 as CType.PointerType;
+                var ta2 = t2 as CType.PointerType;
+                var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                if (ret == null) {
+                    return null;
+                }
+                return new PointerType(ret);
+            }
+            if ((t1.IsStructureType() && t2.IsStructureType()) ||(t1.IsUnionType() && t2.IsUnionType())) {
+                var ta1 = t1 as CType.TaggedType.StructUnionType;
+                var ta2 = t2 as CType.TaggedType.StructUnionType;
+                if (ta1.Kind != ta1.Kind) {
+                    return null;
+                }
+                if (ta1.TagName != ta2.TagName) {
+                    return null;
+                }
+                if (ta1.IsAnonymous != ta2.IsAnonymous) {
+                    return null;
+                }
+                if (ta1.Members.Count != ta2.Members.Count) {
+                    return null;
+                }
+
+                var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous);
+                var newMembers = new List<TaggedType.StructUnionType.MemberInfo>();
+                for (var i = 0; i < ta1.Members.Count; i++) {
+                    if (ta1.Members[i].Ident != ta2.Members[i].Ident) {
+                        return null;
+                    }
+                    if (ta1.Members[i].BitSize != ta2.Members[i].BitSize) {
+                        return null;
+                    }
+                    var composited = CompositeType(ta1.Members[i].Type, ta2.Members[i].Type);
+                    if (composited == null) {
+                        return null;
+                    }
+                    newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].BitSize));
+                }
+                newType.Members = newMembers;
+                return newType;
             }
             if (t1.IsArrayType() && t2.IsArrayType()) {
                 // 一方の型が既知の固定長をもつ配列の場合，合成型は，その大きさの配列とする。
                 // そうでなく，一方の型が可変長の配列の場合，合成型はその型とする   
                 // 可変長配列は未実装
                 var ta1 = t1.Unwrap() as CType.ArrayType;
-                var ta2 = t1.Unwrap() as CType.ArrayType;
+                var ta2 = t2.Unwrap() as CType.ArrayType;
                 if ((ta1.Length != -1 && ta2.Length == -1)
                     || (ta1.Length == -1 && ta2.Length != -1)) {
                     int len = ta1.Length != -1 ? ta1.Length : ta2.Length;
                     var ret = CompositeType(ta1.BaseType, ta2.BaseType);
-                    if (ret != null) {
-                        return CreateArray(len, ret);
-                    } else {
+                    if (ret == null) {
                         return null;
                     }
+                    return CreateArray(len, ret);
                 }
                 return null;
             }
             if (t1.IsFunctionType() && t2.IsFunctionType()) {
                 var ta1 = t1.Unwrap() as CType.FunctionType;
-                var ta2 = t1.Unwrap() as CType.FunctionType;
+                var ta2 = t2.Unwrap() as CType.FunctionType;
                 if (ta1.HasVariadic != ta2.HasVariadic) {
                     return null;
                 }
@@ -1009,11 +1050,10 @@ namespace AnsiCParser {
                     // 一方の型だけが仮引数型並びをもつ関数型（関数原型）の場合，合成型は，その仮引数型並びをもつ関数原型とする。
                     var arguments = (ta1.Arguments != null ? ta1.Arguments : ta2.Arguments).ToList();
                     var retType = CompositeType(ta1.ResultType, ta2.ResultType);
-                    if (retType != null) {
-                        return new CType.FunctionType(arguments, ta1.HasVariadic, retType);
-                    } else {
+                    if (retType == null) {
                         return null;
                     }
+                    return new CType.FunctionType(arguments, ta1.HasVariadic, retType);
                 } else if (ta1.Arguments != null && ta2.Arguments != null) {
                     // 両方の型が仮引数型並びをもつ関数型の場合，合成仮引数型並びにおける各仮引数の型は，対応する仮引数の型の合成型とする。
                     if (ta1.Arguments.Length != ta2.Arguments.Length) {
@@ -1022,6 +1062,9 @@ namespace AnsiCParser {
                     var newArguments = new List<FunctionType.ArgumentInfo>();
                     for (var i = 0; i < ta1.Arguments.Length; i++) {
                         var newArgument = CompositeType(ta1.Arguments[i].Type, ta2.Arguments[i].Type);
+                        if (newArgument == null) {
+                            return null;
+                        }
                         if (ta1.Arguments[i].StorageClass != ta2.Arguments[i].StorageClass) {
                             return null;
                         }
@@ -1029,13 +1072,15 @@ namespace AnsiCParser {
                         newArguments.Add(new FunctionType.ArgumentInfo(null, storageClass, newArgument));
                     }
                     var retType = CompositeType(ta1.ResultType, ta2.ResultType);
-                    if (retType != null) {
-                        return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
-                    } else {
+                    if (retType == null) {
                         return null;
                     }
+                    return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
                 }
                 return null;
+            }
+            if (IsEqual(t1, t2)) {
+                return t1;
             }
             return null;
         }

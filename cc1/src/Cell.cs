@@ -80,22 +80,22 @@ namespace AnsiCParser {
         /// S式の整形出力
         /// </summary>
         private static class PrettyPrinter {
-            private static void PrintINdent(StringBuilder sb, int lebel) {
+            private static void Indent(StringBuilder sb, int lebel) {
                 sb.Append(String.Concat(Enumerable.Repeat("  ", lebel)));
             }
-            private static void PrintOpenParen(StringBuilder sb) { sb.Append("("); }
-            private static void PrintCloseParen(StringBuilder sb) { sb.Append(")"); }
-            private static void PrintAtom(StringBuilder sb, Cell e, bool prefix) { sb.Append(prefix ? " " : "").Append((e as ValueCell)?.Value ?? ""); }
+            private static void OpenParen(StringBuilder sb) { sb.Append("("); }
+            private static void CloseParen(StringBuilder sb) { sb.Append(")"); }
+            private static void Atom(StringBuilder sb, Cell e, bool prefix) { sb.Append(prefix ? " " : "").Append((e as ValueCell)?.Value ?? ""); }
 
-            private static void PrintList(StringBuilder sb, Cell s, int lebel, bool prefix) {
+            private static void List(StringBuilder sb, Cell s, int lebel, bool prefix) {
                 if (prefix) {
-                    PrintINdent(sb,lebel);
+                    Indent(sb,lebel);
                 }
-                PrintOpenParen(sb);
+                OpenParen(sb);
                 prefix = false;
                 for (; ; ) {
                     if (s == Nil) {
-                        PrintCloseParen(sb);
+                        CloseParen(sb);
                         break;
                     } else if (s is ConsCell) {
                         var e = (s as ConsCell).Car;
@@ -103,9 +103,9 @@ namespace AnsiCParser {
                             if (prefix) {
                                 sb.AppendLine();
                             }
-                            PrintList(sb,e as ConsCell, lebel + 1, prefix);
+                            List(sb,e as ConsCell, lebel + 1, prefix);
                         } else {
-                            PrintAtom(sb,e, prefix);
+                            Atom(sb,e, prefix);
                         }
                         s = (s as ConsCell).Cdr;
                         prefix = true;
@@ -118,7 +118,7 @@ namespace AnsiCParser {
             public static string Print(Cell cell) {
                 StringBuilder sb = new StringBuilder();
                 if (cell is ConsCell) {
-                    PrintList(sb,cell, 0, false);
+                    List(sb,cell, 0, false);
                 } else if (cell is ValueCell) {
                     sb.Append(((ValueCell)cell).Value ?? "");
                 } else {

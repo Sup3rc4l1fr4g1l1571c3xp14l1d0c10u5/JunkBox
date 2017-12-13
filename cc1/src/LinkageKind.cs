@@ -2,10 +2,13 @@ namespace AnsiCParser {
     /// <summary>
     /// 6.2.2 識別子の結合 (結合（linkage）)
     /// </summary>
+    /// <remarks>
+    /// 結合は，外部結合，内部結合及び無結合の 3 種類
+    /// </remarks>
     public enum LinkageKind {
-        // 結合は，外部結合，内部結合及び無結合の 3 種類
         /// <summary>
         /// 指定なし
+        /// (便宜上作成したもので、6.2.2には登場しない)
         /// </summary>
         None,
 
@@ -23,7 +26,7 @@ namespace AnsiCParser {
 
         /// <summary>
         /// 無結合
-        /// （指し示し先はすべて独立している）
+        /// （指し示し先はすべて独立している。）
         /// </summary>
         NoLinkage
 

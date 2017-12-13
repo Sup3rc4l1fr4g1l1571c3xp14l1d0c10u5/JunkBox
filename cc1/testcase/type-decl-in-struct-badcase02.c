@@ -1,6 +1,6 @@
 /**@
  spec: 構造体の中で型定義はできない。
- assertion: 
+ assertion: SyntaxErrorException
 @**/
 
 struct A

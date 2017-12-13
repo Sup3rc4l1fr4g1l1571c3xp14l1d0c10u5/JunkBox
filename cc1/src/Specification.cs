@@ -1179,53 +1179,287 @@ namespace AnsiCParser {
             return null;
         }
 
-        // 6.2.2 識別子の結合
-        // 異なる有効範囲で又は同じ有効範囲で 2 回以上宣言された識別子は，結合（linkage）と呼ぶ過程によって，同じオブジェクト又は関数を参照することができる。
-        // 結合は，外部結合，内部結合及び無結合の 3 種類とする。
-        // プログラム全体を構成する翻訳単位及びライブラリの集合の中で，外部結合（external linkage）をもつ一つの識別子の各々の宣言は，同じオブジェクト又は関数を表す。
-        // 一つの翻訳単位の中で，内部結合（internal linkage）をもつ一つの識別子の各々の宣言は，同じオブジェクト又は関数を表す。
-        // 無結合（no linkage）をもつ識別子の各々の宣言は，それぞれが別々の実体を表す。
-        // オブジェクト又は関数に対するファイル有効範囲の識別子の宣言が記憶域クラス指定子 static を含む場合，その識別子は，内部結合をもつ。
-        // 識別子が，その識別子の以前の宣言が可視である有効範囲において，記憶域クラス指定子 extern を伴って宣言される場合，次のとおりとする。
-        // - 以前の宣言において内部結合又は外部結合が指定されているならば，新しい宣言における識別子は，以前の宣言と同じ結合をもつ。
-        // - 可視である以前の宣言がない場合，又は以前の宣言が無結合である場合，この識別子は外部結合をもつ。
-        // 関数の識別子の宣言が記憶域クラス指定子をもたない場合，その結合は，記憶域クラス指定子 externを伴って宣言された場合と同じ規則で決定する。
-        // オブジェクトの識別子の宣言がファイル有効範囲をもち，かつ記憶域クラス指定子をもたない場合，その識別子の結合は，外部結合とする。
-        // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子externを伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
-        // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
 
-        // 整理
-        // - 異なる有効範囲で又は同じ有効範囲で 2 回以上宣言された識別子は，結合（linkage）と呼ぶ過程によって，同じオブジェクト又は関数を参照することができる。 
-        //   => スコープに加えて linkage も解決しないと参照先が決まらない。
+
+        // 6.2.7 適合型及び合成型
+        // 二つの型が同じ場合，二つの型は適合する（compatible）とする。
+        // これ以外に二つの型が適合する場合を定める規則は，型指定子については 6.7.2 で，型修飾子については 6.7.3 で，宣言子については 6.7.5 で規定する
+        // さらに，別々の翻訳単位で宣言された二つの構造体型，共用体型又，それらのタグ及びメンバが次に示す要求を満たす場合に，適合する
+        // - 一方がタグ付きで宣言されている場合，もう一方も同じタグ付きで宣言されていなければならない。
+        // - 両方が完全型であれば，次に示す要求が新たに満たされなければならない。すなわち，両方のメンバの間に 1 対 1 の対応がつき，対応するメンバ同士が適合する型をもち，更に対応するメンバの一方が名前付きで宣言されているならば，もう一方も同じ名前付きで宣言されていなければならない。
+        // - 二つの構造体については，対応するメンバは同じ順序で宣言されていなければならない。
+        // - 二つの構造体又は共用体については，対応するビットフィールドは同じ幅をもたなければならない。
+        // - 二つの列挙体については，対応するメンバは同じ値をもたなければならない。
         //
-        // - 結合は，外部結合，内部結合及び無結合の 3 種類
-        //   - 外部結合（external linkage）
-        //     - プログラム全体を構成する翻訳単位及びライブラリの集合の中で，外部結合（external linkage）をもつ一つの識別子の各々の宣言は，同じオブジェクト又は関数を表す。
-        //       => 外部結合はスコープや翻訳単位の関係なく常に同じものを指す。
-        //   - 内部結合（internal linkage）
-        //     - 一つの翻訳単位の中で，内部結合（internal linkage）をもつ一つの識別子の各々の宣言は，同じオブジェクト又は関数を表す。 
-        //       => 内部結合は翻訳単位内で常に同じものを指す。
-        //     - オブジェクト又は関数に対するファイル有効範囲の識別子の宣言が記憶域クラス指定子 static を含む場合，その識別子は，内部結合をもつ。
-        //   - 無結合（no linkage）
-        //     - 無結合（no linkage）をもつ識別子の各々の宣言は，それぞれが別々の実体を表す。 => 指し示し先はすべて独立している
+        // 6.7.2 型指定子
+        // 型指定子の並びは，次に示すもののいずれか一つでなければならない。
+        // 型指定子は，いかなる順序で現れてもよく，更に，他の宣言指定子と混合してもよい。
+        // - void
+        // - char
+        // - signed char
+        // - unsigned char
+        // - short，signed short，short int，signed short int
+        // - unsigned short，unsigned short int
+        // - int，signed，signed int
+        // - unsigned，unsigned int
+        // - long，signed long，long int，signed long int
+        // - unsigned long，unsigned long int
+        // - long long，signed long long，long long int，signed long long int
+        // - unsigned long long，unsigned long long int
+        // - float
+        // - double
+        // - long double
+        // - _Bool
+        // - float _Complex
+        // - double _Complex
+        // - long double _Complex
+        // - float _Imaginary
+        // - double _Imaginary
+        // - long double _Imaginary
+        // - 構造体共用体指定子
+        // - 列挙型指定子
+        // - 型定義名
+        // 構造体，共用体及び列挙型の指定子は，6.7.2.1～6.7.2.3 で規定する。型定義名の宣言は，6.7.7で規定する。他の型の性質は，6.2.5 で規定する。
+        // コンマで区切られているそれぞれの組は，同じ型を表す。
+        // ただし，ビットフィールドの場合，型指定子 int が signed int と同じ型を表すか，unsigned int と同じ型を表すかは処理系定義とする。
         //
-        // - 識別子が，その識別子の以前の宣言が可視である有効範囲において，記憶域クラス指定子 extern を伴って宣言される場合，次のとおりとする。
-        //   - 以前の宣言において内部結合又は外部結合が指定されているならば，新しい宣言における識別子は，以前の宣言と同じ結合をもつ。
-        //   - 可視である以前の宣言がない場合，又は以前の宣言が無結合である場合，この識別子は外部結合をもつ。
-        //   => externを伴う宣言が登場
-        //      => 以前の宣言で結合の指定がある場合はその指定に従う。
-        //      => 以前の宣言が無い場合や、結合の指定が無い場合は外部結合とする。
+        // 6.7.2.1 構造体指定子及び共用体指定子
+        // （適合・合成型に触れる記述なし）
         //
-        // - 関数の識別子の宣言が記憶域クラス指定子をもたない場合，その結合は，記憶域クラス指定子 externを伴って宣言された場合と同じ規則で決定する。
-        //  => 関数宣言はデフォルトで extern 
+        // 6.7.2.2 列挙型指定子
+        // それぞれの列挙型は，char，符号付き整数型又は符号無し整数型と適合する型とする。型の選択は，処理系定義とする(処理系はすべての列挙定数が指定された後で整数型の選択を行うことができる)。
+        // しかし，その型は列挙型のすべてのメンバの値を表現できなければならない。
         //
-        // - オブジェクトの識別子の宣言がファイル有効範囲をもち，かつ記憶域クラス指定子をもたない場合，その識別子の結合は，外部結合とする。
-        // 
-        // - オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子externを伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
-        //   => オブジェクト又は関数以外を宣言する識別子 = 型名宣言、タグ型宣言
-        //   => 関数仮引数を宣言する識別子 = 関数宣言・関数定義・関数型宣言部
-        //   => 記憶域クラス指定子externを伴わないブロック有効範囲のオブジェクトを宣言する識別子 = ローカルスコープ中での変数宣言
-        // 
-        // - 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
+        // 6.7.3 型修飾子
+        // 二つの修飾型が適合するためには，双方が適合する型に同じ修飾を行ったものでなければならない。
+        // 型指定子又は型修飾子の並びにおける型修飾子の順序は，指定された型に影響を与えない。
+        //
+        // 6.7.5 宣言子
+        //
+        // 6.7.5.1 ポインタ宣言子
+        // 二つのポインタ型が適合するためには，いずれも同一の修飾がなされていなければならず，かつ両者が適合する型へのポインタでなければならない。
+        //
+        // 6.7.5.2 配列宣言子
+        // 二つの配列型が適合するためには，まず，両者が適合する要素型をもたなければならない。
+        // さらに，両者が配列の大きさを指定する整数定数式をもつ場合，それらの値は同じ定数値でなければならない。
+        // 二つの配列型が適合することを必要とする文脈で使われ，両者の大きさ指定子を評価した値が異なる場合，その動作は未定義とする。
+        //
+        // 6.7.5.3 関数宣言子（関数原型を含む）
+        // 二つの関数型が適合するためには，次の条件をすべて満たさなければならない。
+        // - 両方が適合する返却値の型をもつ
+        // - 両方が仮引数型並びをもつ場合，仮引数の個数及び省略記号の有無に関して一致し，対応する仮引数の型が適合する。
+        // - 一方の型が仮引数型並びをもち，他方の型が関数定義の一部でない関数宣言子によって指定され，識別子並びが空の場合，仮引数型並びは省略記号を含まない。
+        //   各仮引数の型は，既定の実引数拡張を適用した結果の型と適合する。
+        // - 一方の型が仮引数型並びをもち，他方の型が関数定義によって指定され，識別子並び（空でもよい）をもつ場合，両方の仮引数の個数は一致する。
+        //   さらに関数原型のほうの各仮引数の型は，対応する識別子の型に既定の実引数拡張を適用した結果の型と適合する。
+        //  （型の適合及び型の合成を判断するとき，関数型又は配列型で宣言される各仮引数は型調整後の型をもつものとして扱い，修飾型で宣言される各仮引数は宣言された型の非修飾版をもつものとして扱う。）
+        //
+        public static bool IsCompatible(CType t1, CType t2) {
+            for (;;) {
+                if (ReferenceEquals(t1, t2)) {
+                    return true;
+                }
+                if (t1 is CType.TypedefedType || t2 is CType.TypedefedType) {
+                    if (t1 is CType.TypedefedType) {
+                        t1 = (t1 as CType.TypedefedType).Type;
+                    }
+                    if (t2 is CType.TypedefedType) {
+                        t2 = (t2 as CType.TypedefedType).Type;
+                    }
+                    continue;
+                }
+                if ((t1 as CType.TypeQualifierType)?.Qualifier == TypeQualifier.None) {
+                    t1 = (t1 as CType.TypeQualifierType).Type;
+                    continue;
+                }
+                if ((t2 as CType.TypeQualifierType)?.Qualifier == TypeQualifier.None) {
+                    t2 = (t2 as CType.TypeQualifierType).Type;
+                    continue;
+                }
+                if (t1.GetType() != t2.GetType()) {
+                    return false;
+                }
+
+                if (t1 is CType.BasicType && t2 is CType.BasicType) {
+                    // 6.7.2 型指定子
+                    // 型指定子の並びは，次に示すもののいずれか一つでなければならない。
+                    if ((t1 as CType.BasicType).Kind != (t2 as CType.BasicType).Kind) {
+                        return false;
+                    }
+                    return true;
+                }
+
+                if (t1 is CType.TaggedType.StructUnionType && t2 is CType.TaggedType.StructUnionType) {
+                    // 6.7.2.1 構造体指定子及び共用体指定子
+                    // 構造体型、及び共用体型は無結合であるため、構文上の誤りが無ければ単一翻訳単位内では同名＝同一型である。
+                    // しかし、異なる翻訳単位間での規則も示されているためそちらで検証する
+                    // - 一方がタグ付きで宣言されている場合，もう一方も同じタグ付きで宣言されていなければならない。
+                    // - 両方が完全型であれば，次に示す要求が新たに満たされなければならない。すなわち，両方のメンバの間に 1 対 1 の対応がつき，対応するメンバ同士が適合する型をもち，
+                    //   更に対応するメンバの一方が名前付きで宣言されているならば，もう一方も同じ名前付きで宣言されていなければならない。
+                    //   - 二つの構造体については，対応するメンバは同じ順序で宣言されていなければならない。
+                    //   - 二つの構造体又は共用体については，対応するビットフィールドは同じ幅をもたなければならない。
+                    //   - 二つの列挙体については，対応するメンバは同じ値をもたなければならない。
+
+                    // - 一方がタグ付きで宣言されている場合，もう一方も同じタグ付きで宣言されていなければならない。
+                    if ((t1 as CType.TaggedType.StructUnionType).Kind != (t2 as CType.TaggedType.StructUnionType).Kind) {
+                        return false;
+                    } else if ((t1 as CType.TaggedType.StructUnionType).IsAnonymous != (t2 as CType.TaggedType.StructUnionType).IsAnonymous) {
+                        return false;
+                    } else if ((t1 as CType.TaggedType.StructUnionType).TagName != (t2 as CType.TaggedType.StructUnionType).TagName) {
+                        return false;
+                    }
+
+                    if ((t1 as CType.TaggedType.StructUnionType).Members != null && (t2 as CType.TaggedType.StructUnionType).Members != null) {
+                        // - 両方が完全型であれば，次に示す要求が新たに満たされなければならない。すなわち，両方のメンバの間に 1 対 1 の対応がつき，対応するメンバ同士が適合する型をもち，
+                        //   更に対応するメンバの一方が名前付きで宣言されているならば，もう一方も同じ名前付きで宣言されていなければならない。
+                        //   - 二つの構造体については，対応するメンバは同じ順序で宣言されていなければならない。
+                        //   - 二つの構造体又は共用体については，対応するビットフィールドは同じ幅をもたなければならない。
+
+                        // 両方のメンバの間に 1 対 1 の対応がつくか？
+                        if ((t1 as CType.TaggedType.StructUnionType).Members.Count != (t2 as CType.TaggedType.StructUnionType).Members.Count) {
+                            return false;
+                        }
+
+                        int len = (t1 as CType.TaggedType.StructUnionType).Members.Count;
+                        for (var i = 0; i < len; i++) {
+                            var m1 = (t1 as CType.TaggedType.StructUnionType).Members[i];
+                            var m2 = (t2 as CType.TaggedType.StructUnionType).Members[i];
+
+                            // 対応するメンバ同士が適合する型を持つか？
+                            if (IsCompatible(m1.Type, m2.Type) == false) {
+                                return false;
+                            }
+                            // 更に対応するメンバの一方が名前付きで宣言されているならば，もう一方も同じ名前付きで宣言されているか？
+                            if ((m1.Ident != null || m2.Ident != null) && (m1.Ident != m2.Ident)) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    } else {
+
+                        // 一方、もしくは、両方が不完全型
+                        return true;
+                    }
+                }
+
+                // 6.7.2.2 列挙型指定子
+                // それぞれの列挙型は，char，符号付き整数型又は符号無し整数型と適合する型とする。型の選択は，処理系定義とする(処理系はすべての列挙定数が指定された後で整数型の選択を行うことができる)。
+                // しかし，その型は列挙型のすべてのメンバの値を表現できなければならない。
+                if (t1 is CType.TaggedType.EnumType && t2 is CType.TaggedType.EnumType) {
+                    return true;
+                } else if (t1 is CType.TaggedType.EnumType && t2 is CType.BasicType) {
+                    // ToDo: 暫定的
+                    return (t2 as CType.BasicType).Kind == CType.BasicType.TypeKind.SignedInt;
+                } else if (t1 is CType.BasicType && t2 is CType.TaggedType.EnumType) {
+                    // ToDo: 暫定的
+                    return (t1 as CType.BasicType).Kind == CType.BasicType.TypeKind.SignedInt;
+                }
+
+                // 6.7.3 型修飾子
+                // 二つの修飾型が適合するためには，双方が適合する型に同じ修飾を行ったものでなければならない。
+                // 型指定子又は型修飾子の並びにおける型修飾子の順序は，指定された型に影響を与えない。
+                if (t1 is CType.TypeQualifierType && t2 is CType.TypeQualifierType) {
+                    if ((t1 as CType.TypeQualifierType).Qualifier != (t2 as CType.TypeQualifierType).Qualifier) {
+                        return false;
+                    }
+                    t1 = (t1 as CType.TypeQualifierType).Type;
+                    t2 = (t2 as CType.TypeQualifierType).Type;
+                    continue;
+                }
+
+                // 6.7.5.1 ポインタ宣言子
+                // 二つのポインタ型が適合するためには，いずれも同一の修飾がなされていなければならず，かつ両者が適合する型へのポインタでなければならない。
+                if (t1 is CType.PointerType && t2 is CType.PointerType) {
+                    t1 = (t1 as CType.PointerType).BaseType;
+                    t2 = (t2 as CType.PointerType).BaseType;
+                    continue;
+                }
+
+                // 6.7.5.2 配列宣言子
+                // 二つの配列型が適合するためには，まず，両者が適合する要素型をもたなければならない。
+                // さらに，両者が配列の大きさを指定する整数定数式をもつ場合，それらの値は同じ定数値でなければならない。
+                // 二つの配列型が適合することを必要とする文脈で使われ，両者の大きさ指定子を評価した値が異なる場合，その動作は未定義とする。
+                if (t1 is CType.ArrayType && t2 is CType.ArrayType) {
+                    if (((t1 as CType.ArrayType).Length != -1 && (t2 as CType.ArrayType).Length != -1) && ((t1 as CType.ArrayType).Length != (t2 as CType.ArrayType).Length)) {
+                        return false;
+                    }
+                    t1 = (t1 as CType.ArrayType).BaseType;
+                    t2 = (t2 as CType.ArrayType).BaseType;
+                    continue;
+                }
+
+                // 6.7.5.3 関数宣言子（関数原型を含む）
+                // 二つの関数型が適合するためには，次の条件をすべて満たさなければならない。
+                // - 両方が適合する返却値の型をもつ
+                // - 両方が仮引数型並びをもつ場合，仮引数の個数及び省略記号の有無に関して一致し，対応する仮引数の型が適合する。
+                // - 一方の型が仮引数型並びをもち，他方の型が関数定義の一部でない関数宣言子によって指定され，識別子並びが空の場合，仮引数型並びは省略記号を含まない。
+                //   各仮引数の型は，既定の実引数拡張を適用した結果の型と適合する。
+                // - 一方の型が仮引数型並びをもち，他方の型が関数定義によって指定され，識別子並び（空でもよい）をもつ場合，両方の仮引数の個数は一致する。
+                //   さらに関数原型のほうの各仮引数の型は，対応する識別子の型に既定の実引数拡張を適用した結果の型と適合する。
+                //  （型の適合及び型の合成を判断するとき，関数型又は配列型で宣言される各仮引数は型調整後の型をもつものとして扱い，修飾型で宣言される各仮引数は宣言された型の非修飾版をもつものとして扱う。）
+                //
+                if (t1 is CType.FunctionType && t2 is CType.FunctionType) {
+                    if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments != null) {
+                        if ((t1 as CType.FunctionType).HasVariadic != (t2 as CType.FunctionType).HasVariadic) {
+                            return false;
+                        }
+                        if ((t1 as CType.FunctionType).Arguments.Length != (t2 as CType.FunctionType).Arguments.Length) {
+                            return false;
+                        }
+
+                        int len = (t1 as CType.FunctionType).Arguments.Length;
+                        for (var i = 0; i < len; i++) {
+                            var m1 = (t1 as CType.FunctionType).Arguments[i];
+                            var m2 = (t2 as CType.FunctionType).Arguments[i];
+
+                            // 対応するメンバ同士が適合する型を持つか？
+                            if (IsCompatible(m1.Type, m2.Type) == false) {
+                                return false;
+                            }
+                        }
+                        t1 = (t1 as CType.FunctionType).ResultType;
+                        t2 = (t2 as CType.FunctionType).ResultType;
+                        continue;
+                    } else if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments == null) {
+                        // 新しい形式の関数宣言の後に古い形式の宣言が来た
+
+                        //// 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
+                        //if ((t1 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
+                        //    return false;
+                        //}
+                        // t1側は関数は引数部に省略記号を含まないとみなす
+                        if ((t1 as CType.FunctionType).HasVariadic == true) {
+                            return false;
+                        }
+                        t1 = (t1 as CType.FunctionType).ResultType;
+                        t2 = (t2 as CType.FunctionType).ResultType;
+                        continue;
+                    } else if ((t1 as CType.FunctionType).Arguments == null && (t2 as CType.FunctionType).Arguments != null) {
+                        // 古い形式の関数宣言の後に新しい形式の宣言が来た
+                        //// 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
+                        //if ((t2 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
+                        //    return false;
+                        //}
+                        // t2側は関数は引数部に省略記号を含まないとみなす
+                        if ((t2 as CType.FunctionType).HasVariadic == true) {
+                            return false;
+                        }
+                        t1 = (t1 as CType.FunctionType).ResultType;
+                        t2 = (t2 as CType.FunctionType).ResultType;
+                        continue;
+                    } else {
+                        return false;
+                    }
+                }
+
+                if (t1 is CType.StubType && t2 is CType.StubType) {
+                    throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型同士は適合できません。（本処理系の実装の誤りが原因です。）");
+                }
+
+                throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型の適合検証方法が定義されていません。（本処理系の実装の誤りが原因です。）");
+            }
+
+        }
     }
 }

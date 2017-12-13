@@ -1608,7 +1608,8 @@ namespace AnsiCParser {
 
                         if (thenExprPtr != null && thenExprPtr.Type.IsPointerType()
                             && elseExprPtr != null && elseExprPtr.Type.IsPointerType()
-                            && CType.IsEqual(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
+                            //&& CType.IsEqual(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
+                            && Specification.IsCompatible(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
                         ) {
                             // 制約 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
                             // 意味規則 第 2 及び第 3 オペランドがともにポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。
@@ -1617,8 +1618,10 @@ namespace AnsiCParser {
                             thenExpr = thenExprPtr;
                             elseExpr = elseExprPtr;
 
-                            // ToDo: 合成型を作る
-                            var baseType = thenExpr.Type.GetBasePointerType().Unwrap();
+                            var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
+                            if (baseType == null) {
+                                throw new Exception("合成型を作れなかった");
+                            }
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
                             ResultType = CType.CreatePointer(baseType);

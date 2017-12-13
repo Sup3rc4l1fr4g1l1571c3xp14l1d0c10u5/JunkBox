@@ -35,6 +35,23 @@ namespace AnsiCParser {
         private Dictionary<string, LinkageObject> LinkageTable = new Dictionary<string, LinkageObject>();
 
 
+        /// <summary>
+        /// 言語レベルの選択
+        /// </summary>
+        public enum LanguageMode {
+            None,
+            C89,
+            C99,    // 完全実装ではない
+        }
+
+        private LanguageMode Mode = LanguageMode.C89;
+
+        /// <summary>
+        /// 結合オブジェクト表への関数の登録
+        /// </summary>
+        /// <param name="linkage"></param>
+        /// <param name="funcdecl"></param>
+        /// <returns></returns>
         private LinkageObject AddFunctionToLinkageObject(LinkageKind linkage, SyntaxTree.Declaration.FunctionDeclaration funcdecl) {
             if (linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage) {
                 // 外部もしくは内部結合なのでOK
@@ -49,7 +66,8 @@ namespace AnsiCParser {
                 if (value.Linkage != linkage) {
                     throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "リンケージ種別が以前の型と一致しない");
                 }
-                if (CType.IsEqual(value.Type, funcdecl.Type) == false) {
+                if (Specification.IsCompatible(value.Type, funcdecl.Type) == false) {
+
                     throw new CompilerException.TypeMissmatchError(Location.Empty, Location.Empty, "リンケージ表上での関数の型が以前の型と一致しない");
                 }
                 if (value.Definition != null && funcdecl.Body != null) {
@@ -71,6 +89,12 @@ namespace AnsiCParser {
             return value;
         }
 
+        /// <summary>
+        /// 結合オブジェクト表への変数の登録
+        /// </summary>
+        /// <param name="linkage"></param>
+        /// <param name="funcdecl"></param>
+        /// <returns></returns>
         private LinkageObject AddVariableToLinkageObject(LinkageKind linkage, SyntaxTree.Declaration.VariableDeclaration vardecl) {
             if (linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage) {
                 // 外部もしくは内部結合なのでOK
@@ -119,6 +143,9 @@ namespace AnsiCParser {
         /// continue命令についてのスコープ
         /// </summary>
         private readonly Stack<SyntaxTree.Statement> _continueScope = new Stack<SyntaxTree.Statement>();
+
+        private readonly Stack<Func<string, CType, SyntaxTree.Declaration>> _insertImplictDeclarationOperatorStack = new Stack<Func<string, CType, SyntaxTree.Declaration>>();
+
 
         /// <summary>
         /// 字句解析器
@@ -550,9 +577,116 @@ namespace AnsiCParser {
         /// <returns></returns>
         public SyntaxTree.TranslationUnit TranslationUnit() {
             var ret = new SyntaxTree.TranslationUnit();
+            _insertImplictDeclarationOperatorStack.Push((ident, type) => {// ToDo: 共通化
+                var storageClass = AnsiCParser.StorageClassSpecifier.Extern;
+                var functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+#if false
+                // 記憶域クラス指定からリンケージを求める
+                LinkageKind linkage = ResolveLinkage(ident, type, storageClass);
+
+                // その識別子の以前の宣言が可視であるか？
+                IdentifierScopeValue iv;
+                bool isCurrent;
+                if (_identScope.TryGetValue(ident, out iv, out isCurrent)) {
+                    // 以前の宣言が可視である
+
+                    // 6.7 宣言
+                    // 識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。
+                    // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
+                    // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
+                    if ((linkage == LinkageKind.NoLinkage || iv.Linkage == LinkageKind.NoLinkage) && isCurrent == true) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
+                    }
+
+                    // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
+                    if ((iv.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
+                        || (iv.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"翻訳単位の中で同じ識別子{ident}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
+                    }
+
+
+                    // 以前の宣言が関数宣言でないならばエラー
+                    if (iv.IsFunction() == false) {
+                        // 以下のようなケースを想定
+                        // int x; int main(void) { int x(double); }
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}は既に関数以外として宣言されています。");
+                    }
+
+                    // 先に存在する関数定義の型を取得
+                    CType.FunctionType functionType;
+                    if (iv.ToFunction().Type.IsFunctionType(out functionType) == false) {
+                        throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数定義の型が関数型を含まない。（本処理系の実装に誤りがあることが原因です。）");
+                    }
+
+                    //// Todo: 型の合成
+                    //// たとえば、extern int foo(); と int foo() {} は合成しないと意味が違う
+
+                    if (functionType.Arguments != null && (type as CType.FunctionType).Arguments == null) {
+                        // 新しい形式の関数宣言の後に古い形式の宣言が来た
+
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        Console.Error.WriteLine("先に宣言されている関数が仮引数型並びをもち，そのあとに宣言された関数が関数定義の一部でない関数宣言子で，識別子並びが空です。" +
+                                                "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                        var resultType = (type as CType.FunctionType).ResultType;
+                        var argumentType = functionType.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                        type = new CType.FunctionType(argumentType, false, resultType);
+                        iv.ToFunction().LinkageObject.Type = type;
+                    } else if (functionType.Arguments == null && (type as CType.FunctionType).Arguments != null) {
+                        // 古い形式の関数宣言の後に新しい形式の宣言が来た
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                                                "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                        var resultType = (type as CType.FunctionType).ResultType;
+                        var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                        type = new CType.FunctionType(argumentType, false, resultType);
+                        iv.ToFunction().LinkageObject.Type = type;
+                    } else {
+                        // 仮引数が省略されていないので型のチェックを行う
+
+                        // 合成型を生成してから検査
+                        var ctype = CType.CompositeType(iv.ToFunction().Type.Unwrap(), type.Unwrap());
+                        //if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                        if (Specification.IsCompatible(iv.ToFunction().Type.Unwrap(), ctype.Unwrap()) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                        }
+                    }
+
+                    // ToDo: functionSpecifierについてのチェックを入れる
+
+                    var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc, linkage));
+
+                    // 結合スコープにオブジェクトを追加
+                    funcDelc.LinkageObject = AddFunctionToLinkageObject(linkage, funcDelc);
+
+                    ret.Declarations.Add(funcDelc);
+                    return funcDelc;
+                } else {
+                    // 以前の宣言は可視ではない
+
+                    var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc, linkage));
+
+                    // 結合スコープにオブジェクトを追加
+                    funcDelc.LinkageObject = AddFunctionToLinkageObject(linkage, funcDelc);
+
+                    ret.Declarations.Add(funcDelc);
+                    return funcDelc;
+                }
+#else
+                return FunctionDeclaration(ident, type, storageClass, functionSpecifier, true, false);
+#endif
+            });
             while (IsExternalDeclaration(null, AnsiCParser.TypeSpecifier.None)) {
                 ret.Declarations.AddRange(ExternalDeclaration());
             }
+            _insertImplictDeclarationOperatorStack.Pop();
             EoF();
             return ret;
         }
@@ -674,30 +808,6 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "識別子並び中の要素以外が宣言並びにある。");
                 }
 
-                // 標準化前のK＆R初版においては、引数には規定の実引数拡張が適用され、char, short型はintに、float型は double型に拡張される。つまり、引数として渡せる整数型はint/小数型はdoubleのみ。
-                //  -> int f(x,y,z) char x; float y; short* z; {...} は int f(int x, double y, short *z) { ... } になる(short*はポインタ型なので拡張されない)
-                //
-                // gccは非標準拡張として関数プロトタイプ宣言の後に同じ型のK&R型の関数定義が登場すると、プロトタイプ宣言を使ってK&Rの関数定義を書き換える。（"info gcc" -> "C Extension" -> "Function Prototypes"）
-                //  -> int f(char, float, short*); が事前にあると int f(x,y,z) char x; float y; short* z; {...} は int f(char x, float y, short* z) { ... } になる。（プロトタイプが無い場合は従来通り？）
-                // 
-                // これらより、
-                // K&R形式の仮引数定義の場合、規定の実引数拡張前後で型が食い違う引数宣言はエラーにする。
-
-                // 紛らわしい例の場合
-                // int f();
-                // void foo(void) { f(3.14f); }
-                // int f (x) floar x; { ... }
-                //
-                // int f(); 引数の情報がない関数のプロトタイプなので、実引数には規定の実引数拡張が適用され、引数として渡せる整数型はint/小数型はdoubleのみ。
-                // f(3.14f); は引数の情報がない関数のプロトタイプなので引数の型・数はチェックせず、既定の実引数拡張により引数はdouble型に変換される。（規定の実引数拡張で型が変化するなら警告を出したほうがいいよね）
-                // int f(x) float x; {...} は 規定の実引数拡張により inf f(x) double x; {... }相当となる。（ので警告出したほうがいいよね）
-                // なので、全体でみると型の整合性はとれている。
-
-                // 関数原型を含まない型で関数を定義し，かつ拡張後の実引数の型が，拡張後の仮引数の型と適合しない場合，その動作は未定義とする。
-                // 上の例でf(1) とすると、呼び出し側は引数をint型で渡すのに、受け取り側はdoubleで受け取るためバグの温床になる。
-                // 自動検査するには型推論するしかない
-
-
                 // K&R形式の識別子並びに宣言並びの型情報を規定の実引数拡張を伴って反映させる。
                 // 宣言並びを名前引きできる辞書に変換
                 var dic = argmuents.ToDictionary(x => x.Item1, x => x);
@@ -718,12 +828,31 @@ namespace AnsiCParser {
                 type.Arguments = mapped.ToArray();
 
             } else if (type.Arguments != null && argmuents == null) {
-                // ANSI形式の仮引数型並びのみなので何もしない
+                // 識別子並びあり
+
+                // 識別子並びがANSI形式の仮引数並びかどうか調べる
+                // 識別子並びの場合、type.Argumentsの全ての型がCType.BasicType(KAndRImplicitInt)になるので
+                // 一つでもそうではない場合を見つければいい
+                if (type.Arguments.All(x => (x.Type as CType.BasicType)?.Kind == CType.BasicType.TypeKind.KAndRImplicitInt)) {
+                    // K&R形式の識別子並び
+                    var mapped = type.Arguments.Select(x => {
+                        return new CType.FunctionType.ArgumentInfo(x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion());
+                    }).ToList();
+                    type.Arguments = mapped.ToArray();
+                } else if (type.Arguments.All(x => (x.Type as CType.BasicType)?.Kind != CType.BasicType.TypeKind.KAndRImplicitInt)) {
+                    // ANSI形式の仮引数並びなので変換不要
+                } else {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
+                }
             } else {
                 throw new Exception("ありえない");
             }
 
             // 6.9.1 関数定義
+
+
+#if false
+
             // 型定義名として宣言された識別子を仮引数として再宣言してはならない。
             if (type.Arguments != null) {
                 foreach (var arg in type.Arguments) {
@@ -732,7 +861,6 @@ namespace AnsiCParser {
                     }
                 }
             }
-
             // 記憶域クラス指定からリンケージを求める
             LinkageKind linkage = ResolveLinkage(ident, type, storageClass);
 
@@ -764,16 +892,44 @@ namespace AnsiCParser {
                 // Todo: 型の合成
                 // たとえば、extern int foo(); と int foo() {} は合成しないと意味が違う
 
-                // 型の整合性を確認
-                if (functionType.Arguments != null) {
-                    if (CType.IsEqual(functionType, type) == false) {
+                if (functionType.Arguments != null && (type as CType.FunctionType).Arguments == null) {
+                    // 新しい形式の関数宣言の後に古い形式の定義が来た
+                    throw new Exception("来ないはず。");  // (type as CType.FunctionType).Arguments == nullが成り立たないはず。
+                    if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                    }
+
+                    Console.Error.WriteLine("先に宣言されている関数が仮引数型並びをもち，そのあとに宣言された関数が関数定義の一部でない関数宣言子で，識別子並びが空です。" +
+                                            "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                    var resultType = (type as CType.FunctionType).ResultType;
+                    var argumentType = functionType.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                    type = new CType.FunctionType(argumentType, false, resultType);
+                    value.ToFunction().LinkageObject.Type = type;
+                } else if (functionType.Arguments == null && (type as CType.FunctionType).Arguments != null) {
+                    // 古い形式の関数宣言の後に新しい形式の定義が来た
+                    // - 一方の型が仮引数型並びをもち，他方の型が関数定義によって指定され，識別子並び（空でもよい）をもつ場合，両方の仮引数の個数は一致する。
+                    //   さらに関数原型のほうの各仮引数の型は，対応する識別子の型に既定の実引数拡張を適用した結果の型と適合する。
+
+                    if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                    }
+
+                    //Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                    //                        "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                    var resultType = (type as CType.FunctionType).ResultType;
+                    var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                    var newType = new CType.FunctionType(argumentType, false, resultType);
+
+                    // 型のチェックを行う
+                    if (CType.IsEqual(type.Unwrap(), newType.Unwrap()) == false) {
                         throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
                     }
+
+                    value.ToFunction().LinkageObject.Type = type;
                 } else {
-                    // 仮引数が省略されているため、引数の数や型はチェックしない
-                    Console.WriteLine($"仮引数が省略されて宣言された関数 {ident} の実体を宣言しています。");
-                    if (CType.IsEqual(functionType.ResultType, type.ResultType) == false) {
-                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                    // 仮引数が省略されていないので型のチェックを行う
+                    if (CType.IsEqual(value.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
                     }
                 }
 
@@ -797,7 +953,10 @@ namespace AnsiCParser {
 
             // 環境に名前を追加
             _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcdecl, linkage));
+#else
+            var funcdecl = FunctionDeclaration(ident, type, storageClass, functionSpecifier, false, true);
 
+#endif
             // 各スコープを積む
             _tagScope = _tagScope.Extend();
             _typedefScope = _typedefScope.Extend();
@@ -811,9 +970,11 @@ namespace AnsiCParser {
                 }
             }
 
+
             // 関数本体（複文）を解析
             // 引数変数を複文スコープに入れるために、関数側でスコープを作り、複文側でスコープを作成しないようにする。
             funcdecl.Body = CompoundStatement(skipCreateNewScope: true);
+
 
             // 未定義ラベルと未使用ラベルを調査
             foreach (var scopeValue in _labelScope.GetEnumertor()) {
@@ -907,14 +1068,7 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf('=')) {
                 // 初期化子を伴う宣言
                 // 宣言並びの中の宣言は初期化を含んではならない
-
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "宣言並びの中の宣言は初期化を含んではならない。");
-
-                //// エラー回復のために初期化式を読み飛ばす。
-                //var init = initializer(type);
-                //// 再宣言の確認は呼び出し側で行うこととする。
-
-                return Tuple.Create(ident, type, storageClass);
             } else if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
                 // 6.9.1 
                 // 制約 宣言並びの中の宣言は，register 以外の記憶域クラス指定子及び初期化を含んではならない。
@@ -937,38 +1091,181 @@ namespace AnsiCParser {
             CType baseType = null;
             StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
-#if false
-            TypeSpecifier typeSpecifier = TypeSpecifier.None;
-            TypeQualifier typeQualifier = TypeQualifier.None;
-            DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
 
-            while (IsDeclarationSpecifier(baseType, typeSpecifier)) {
-                DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
-            }
-            if (functionSpecifier != FunctionSpecifier.None) {
-                throw new Exception("inlineは関数定義でのみ使える。");
-            }
-            if (typeSpecifier != TypeSpecifier.None) {
-                if (baseType != null) {
-                    throw new Exception("");
-                } else {
-                    baseType = new CType.BasicType(typeSpecifier);
-                }
-            } else if (baseType == null) {
-                baseType = new CType.BasicType(TypeSpecifier.None);
-            }
-            baseType = baseType.WrapTypeQualifier(typeQualifier);
-#else
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
             }
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
-#endif
 
             sc = storageClass;
             return baseType;
         }
 
+
+        private SyntaxTree.Declaration.FunctionDeclaration FunctionDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier, bool isBlockScope, bool isFuncDef) {
+
+            if (isFuncDef) {
+                CType.FunctionType funcType = type as CType.FunctionType;
+                // 型定義名として宣言された識別子を仮引数として再宣言してはならない。
+
+                // 関数宣言では仮引数を省略できるためこのチェックは関数定義に限る？
+                // gcc等で検証する必要あり
+
+                if (funcType.Arguments != null) {
+                    foreach (var arg in funcType.Arguments) {
+                        if (_typedefScope.ContainsKey(arg.Ident)) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"型定義名として宣言された識別子{arg.Ident}を仮引数として再宣言してはならない。");
+                        }
+                    }
+                }
+            } else if (isBlockScope) {
+                // ブロックスコープ中での関数宣言の場合
+
+                // 6.7.1 記憶域クラス指定子
+                // 関数の識別子がブロック有効範囲で宣言される場合，extern 以外の明示的な記憶域クラス指定子をもってはならない。
+
+                if (storageClass != AnsiCParser.StorageClassSpecifier.None
+                    && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ローカルスコープ中での関数宣言に指定することができない記憶クラス指定子 extern が指定されている。");
+                }
+            }
+
+            // 記憶域クラス指定からリンケージを求める
+            LinkageKind linkage = ResolveLinkage(ident, type, storageClass);
+
+            // その識別子の以前の宣言が可視であるか？
+            IdentifierScopeValue iv;
+            bool isCurrent;
+            if (_identScope.TryGetValue(ident, out iv, out isCurrent)) {
+                // 以前の宣言が可視である
+
+                if (isFuncDef) { // この条件も必要か確認（たぶん不要）
+                    // 6.7 宣言
+                    // 識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。
+                    // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
+                    // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
+                    if ((linkage == LinkageKind.NoLinkage || iv.Linkage == LinkageKind.NoLinkage) && isCurrent == true) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
+                    }
+                }
+
+                // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
+                if ((iv.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
+                    || (iv.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"翻訳単位の中で同じ識別子{ident}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
+                }
+
+
+                // 以前の宣言が関数宣言でないならばエラー
+                if (iv.IsFunction() == false) {
+                    // 以下のようなケースを想定
+                    // int x; int main(void) { int x(double); }
+                    throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}は既に関数以外として宣言されています。");
+                }
+
+                // 先に存在する関数定義の型を取得
+                CType.FunctionType functionType;
+                if (iv.ToFunction().Type.IsFunctionType(out functionType) == false) {
+                    throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数定義の型が関数型を含まない。（本処理系の実装に誤りがあることが原因です。）");
+                }
+
+                if (!isBlockScope) { // 本当にブロックスコープの外だけで合成が必要か確認。（たぶん条件はいらないはず）
+                    //// Todo: 型の合成
+                    //// たとえば、extern int foo(); と int foo() {} は合成しないと意味が違う
+
+                    if (functionType.Arguments != null && (type as CType.FunctionType).Arguments == null) {
+                        // 新しい形式の関数宣言の後に古い形式の宣言が来た
+                        if (isFuncDef) {
+                            throw new Exception("来ないはず。");  // (type as CType.FunctionType).Arguments == nullが成り立たないはず。
+                        }
+
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        Console.Error.WriteLine("先に宣言されている関数が仮引数型並びをもち，そのあとに宣言された関数が関数定義の一部でない関数宣言子で，識別子並びが空です。" +
+                                                "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                        var resultType = (type as CType.FunctionType).ResultType;
+                        var argumentType = functionType.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                        type = new CType.FunctionType(argumentType, false, resultType);
+                        iv.ToFunction().LinkageObject.Type = type;
+                    } else if (functionType.Arguments == null && (type as CType.FunctionType).Arguments != null) {
+                        // 古い形式の関数宣言の後に新しい形式の宣言が来た
+                        // - 一方の型が仮引数型並びをもち，他方の型が関数定義によって指定され，識別子並び（空でもよい）をもつ場合，両方の仮引数の個数は一致する。
+                        //   さらに関数原型のほうの各仮引数の型は，対応する識別子の型に既定の実引数拡張を適用した結果の型と適合する。
+
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        if (isFuncDef) {
+                            //Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                            //                        "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                            var resultType = (type as CType.FunctionType).ResultType;
+                            var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                            var newType = new CType.FunctionType(argumentType, false, resultType);
+
+                            // 型のチェックを行う
+                            if (CType.IsEqual(type.Unwrap(), newType.Unwrap()) == false) {
+                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                            }
+
+                            iv.ToFunction().LinkageObject.Type = type;
+                        } else {
+                            Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                                                    "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                            var resultType = (type as CType.FunctionType).ResultType;
+                            var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                            type = new CType.FunctionType(argumentType, false, resultType);
+
+                            // 関数定義で行っている型チェックが必要か確認
+
+                            iv.ToFunction().LinkageObject.Type = type;
+                        }
+                    } else {
+                        // 仮引数が省略されていないので型のチェックを行う
+                        if (isFuncDef) { // ToDo: これも合成型でなくていいのか確認
+                            // 仮引数が省略されていないので型のチェックを行う
+                            if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                            }
+                        } else {
+
+                            // 合成型を生成してから検査
+                            var ctype = CType.CompositeType(iv.ToFunction().Type.Unwrap(), type.Unwrap());
+                            //if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                            if (Specification.IsCompatible(iv.ToFunction().Type.Unwrap(), ctype.Unwrap()) == false) {
+                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                            }
+                        }
+                    }
+                }
+
+                // ToDo: functionSpecifierについてのチェックを入れる
+
+                if (isFuncDef) {
+                    if (iv.ToFunction().Body != null) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "すでに本体を持っている関数を再定義しています。");
+                    }
+                }
+            } else {
+                // 以前の宣言は可視ではない
+            }
+
+            var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+            _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc, linkage));
+
+            if (isFuncDef) {
+                // 関数定義時は仮の文を入れておくことで、結合スコープにオブジェクトを追加する際に本登録だと認識させる。悪い実装例。
+                funcDelc.Body = new SyntaxTree.Statement.EmptyStatement();
+            }
+
+            // 結合スコープにオブジェクトを追加
+            funcDelc.LinkageObject = AddFunctionToLinkageObject(linkage, funcDelc);
+
+            return funcDelc;
+
+        }
 
         /// <summary>
         /// 6.9.2　外部オブジェクト定義、もしくは、宣言 
@@ -991,8 +1288,6 @@ namespace AnsiCParser {
             if (functionSpecifier != AnsiCParser.FunctionSpecifier.None) {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "inlineは関数定義に対してのみ使える。");
             }
-
-
 
             // ファイル有効範囲のオブジェクトの識別子を，初期化子を使わず，かつ，記憶域クラス指定子なしか又は記憶域クラス指定子 static で宣言する場合，そのオブジェクトの識別子の宣言を仮定義（tentativedefinition）という。
             // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
@@ -1110,7 +1405,7 @@ namespace AnsiCParser {
                     return typeDecl;
                 } else if (type.IsFunctionType()) {
                     // 関数宣言
-
+#if false
                     // 記憶域クラス指定からリンケージを求める
                     LinkageKind linkage = ResolveLinkage(ident, type, storageClass);
 
@@ -1151,32 +1446,39 @@ namespace AnsiCParser {
                         //// Todo: 型の合成
                         //// たとえば、extern int foo(); と int foo() {} は合成しないと意味が違う
 
-                        //// 記憶クラスの整合性を確認
-                        //if ((value.ToFunction().StorageClass == AnsiCParser.StorageClassSpecifier.None || value.ToFunction().StorageClass == AnsiCParser.StorageClassSpecifier.Extern)
-                        // && (storageClass == AnsiCParser.StorageClassSpecifier.None || storageClass == AnsiCParser.StorageClassSpecifier.Extern)) {
-                        //    // 整合する
-                        //} else if (value.ToFunction().StorageClass == AnsiCParser.StorageClassSpecifier.Static && storageClass == AnsiCParser.StorageClassSpecifier.Static) {
-                        //    // 整合する
-                        //} else {
-                        //    // 整合しない記憶クラス指定子の組み合わせ
-                        //    // 以下のようなケースを想定
-                        //    // static int foo(void); int main(void) { int foo(void); }
-                        //    // static int foo(void); int main(void) { extern int foo(void); }   
-                        //    // extern int foo(void); int main(void) { static int foo(void); }
-                        //    // static int foo(void); int main(void) { static int foo(void); }
-                        //    throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"関数{ident}と記憶クラス指定子型が一致しないため再宣言できません。");
-                        //}
+                        if (functionType.Arguments != null && (type as CType.FunctionType).Arguments == null) {
+                            // 新しい形式の関数宣言の後に古い形式の宣言が来た
 
-                        // 型の整合性を確認
-                        if (functionType.Arguments != null) {
-                            // 仮引数が省略されていないので型のチェックを行う
-                            if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
-                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
-                            }
-                        } else {
-                            // 仮引数が省略されているため、引数の数や型はチェックしない
                             if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
                                 throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                            }
+
+                            Console.Error.WriteLine("先に宣言されている関数が仮引数型並びをもち，そのあとに宣言された関数が関数定義の一部でない関数宣言子で，識別子並びが空です。" +
+                                                    "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                            var resultType = (type as CType.FunctionType).ResultType;
+                            var argumentType = functionType.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                            type = new CType.FunctionType(argumentType, false, resultType);
+                            iv.ToFunction().LinkageObject.Type = type;
+                        } else if (functionType.Arguments == null && (type as CType.FunctionType).Arguments != null) {
+                            // 古い形式の関数宣言の後に新しい形式の宣言が来た
+                            if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                            }
+
+                            Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                                                    "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                            var resultType = (type as CType.FunctionType).ResultType;
+                            var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                            type = new CType.FunctionType(argumentType, false, resultType);
+                            iv.ToFunction().LinkageObject.Type = type;
+                        } else {
+                            // 仮引数が省略されていないので型のチェックを行う
+
+                            // 合成型を生成してから検査
+                            var ctype = CType.CompositeType(iv.ToFunction().Type.Unwrap(), type.Unwrap());
+                            //if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                            if (Specification.IsCompatible(iv.ToFunction().Type.Unwrap(), ctype.Unwrap()) == false) {
+                                throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
                             }
                         }
 
@@ -1200,6 +1502,9 @@ namespace AnsiCParser {
 
                         return funcDelc;
                     }
+#else
+                    return FunctionDeclaration(ident,type,storageClass,functionSpecifier,false,false);
+#endif
                 } else {
                     // 変数の仮定義(tentative definition)
                     System.Diagnostics.Debug.Assert(storageClass != AnsiCParser.StorageClassSpecifier.Typedef);
@@ -1311,33 +1616,11 @@ namespace AnsiCParser {
             CType baseType = null;
             StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
-#if false
-            TypeSpecifier typeSpecifier = TypeSpecifier.None;
-            TypeQualifier typeQualifier = TypeQualifier.None;
-            DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
 
-            while (IsDeclarationSpecifier(baseType, typeSpecifier)) {
-                DeclarationSpecifier(ref baseType, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier);
-            }
-            if (functionSpecifier != FunctionSpecifier.None) {
-                throw new Exception("inlineは関数定義でのみ使える。");
-            }
-            if (typeSpecifier != TypeSpecifier.None) {
-                if (baseType != null) {
-                    throw new Exception("");
-                } else {
-                    baseType = new CType.BasicType(typeSpecifier);
-                }
-            } else if (baseType == null) {
-                baseType = new CType.BasicType(TypeSpecifier.None);
-            }
-            baseType = baseType.WrapTypeQualifier(typeQualifier);
-#else
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
             }
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
-#endif
 
             sc = storageClass;
             return baseType;
@@ -1417,6 +1700,9 @@ namespace AnsiCParser {
         private bool IsInitDeclarator() {
             return IsDeclarator();
         }
+
+
+
 
         /// <summary>
         /// 6.7 宣言 (初期化宣言子)
@@ -1537,12 +1823,14 @@ namespace AnsiCParser {
                     return typeDecl;
                 } else if (type.IsFunctionType()) {
                     // 関数の宣言
-
+#if true
+                    return FunctionDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None, true, false);
+#else
                     // 6.7.1 記憶域クラス指定子
                     // 関数の識別子がブロック有効範囲で宣言される場合，extern 以外の明示的な記憶域クラス指定子をもってはならない。
 
                     if (storageClass != AnsiCParser.StorageClassSpecifier.None
-                     && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                        && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
                         throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ローカルスコープ中での関数宣言に指定することができない記憶クラス指定子 extern が指定されている。");
                     }
 
@@ -1637,6 +1925,7 @@ namespace AnsiCParser {
 
                         return funcDelc;
                     }
+#endif
                 } else {
                     // 変数の仮定義(tentative definition)
                     System.Diagnostics.Debug.Assert(storageClass != AnsiCParser.StorageClassSpecifier.Typedef);
@@ -1918,46 +2207,6 @@ namespace AnsiCParser {
         /// <returns></returns>
         private CType SpecifierQualifiers() {
             CType baseType = null;
-#if false
-            TypeSpecifier typeSpecifier = TypeSpecifier.None;
-            TypeQualifier typeQualifier = TypeQualifier.None;
-            // 型指定子もしくは型修飾子を読み取る。
-            if (IsSpecifierQualifier(null, TypeSpecifier.None) == false) {
-                if (IsStorageClassSpecifier()) {
-                    // 記憶クラス指定子（文法上は無くてよい。エラーメッセージ表示のために用意。）
-                    throw new CompilerException.SyntaxErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, $"記憶クラス指定子 { lexer.CurrentToken().ToString() } は使えません。");
-                }
-                throw new CompilerException.SyntaxErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "型指定子もしくは型修飾子以外の要素がある。");
-            }
-            SpecifierQualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
-            while (IsSpecifierQualifier(baseType, typeSpecifier)) {
-                SpecifierQualifier(ref baseType, ref typeSpecifier, ref typeQualifier);
-            }
-            if (baseType != null) {
-                // 型指定子部に構造体共用体指定子、列挙型指定子、型定義名が出現する場合
-                if (typeSpecifier != TypeSpecifier.None) {
-                    // 6.7.2 型指定子「型指定子の並びは，次に示すもののいずれか一つでなければならない。」中で構造体共用体指定子、列挙型指定子、型定義名はそれ単体のみで使うことが規定されているため、
-                    // 構造体共用体指定子、列挙型指定子、型定義名のいずれかとそれら以外の型指定子が組み合わせられている場合はエラーとする。
-                    // なお、構造体共用体指定子、列挙型指定子、型定義名が複数回利用されている場合は SpecifierQualifier 内でエラーとなる。
-                    // （歴史的な話：K&R では typedef は 別名(alias)扱いだったため、typedef int INT; unsingned INT x; は妥当だった）
-                    throw new CompilerException.SpecificationErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "型指定子・型修飾子並び中で構造体共用体指定子、列挙型指定子、型定義名のいずれかと、それら以外の型指定子が組み合わせられている。");
-                }
-            } else {
-                // 型指定子部に構造体共用体指定子、列挙型指定子、型定義名が出現しない場合
-                if (typeSpecifier == TypeSpecifier.None) {
-                    // 6.7.2 それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。
-                    // とあるため、宣言指定子を一つも指定しないことは許されない。
-                    // （歴史的な話：K&R では 宣言指定子を省略すると int 扱い）
-                    // ToDo: C90は互換性の観点からK&R動作も残されているので選択できるようにする
-                    throw new CompilerException.SpecificationErrorException(lexer.CurrentToken().Start, lexer.CurrentToken().End, "それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。");
-                } else {
-                    baseType = new CType.BasicType(typeSpecifier);
-                }
-            }
-
-            // 型修飾子を適用
-            baseType = baseType.WrapTypeQualifier(typeQualifier);
-#else
             StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, /*ref typeSpecifier, ref typeQualifier, */ref functionSpecifier, ReadDeclarationSpecifierPartFlag.SpecifierQualifiers) < 1) {
@@ -1965,8 +2214,6 @@ namespace AnsiCParser {
             }
             System.Diagnostics.Debug.Assert(storageClass == AnsiCParser.StorageClassSpecifier.None);
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
-#endif
-
 
             return baseType;
         }
@@ -2666,7 +2913,19 @@ namespace AnsiCParser {
             return _typedefScope.ContainsKey(v);
         }
 
-        #region 6.7.8 初期化(初期化式の型検査)
+#region 6.7.8 初期化(初期化式の型検査)
+
+        private void CheckInitializerSimple(CType type, SyntaxTree.Initializer.SimpleInitializer ast) {
+            var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
+            if (type.IsAggregateType() || type.IsUnionType()) {
+                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
+            }
+            // 代入式を生成して検証
+            var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
+            var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
+            // 例外が起きないなら代入できる
+
+        }
 
         private void CheckInitializerExpression(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType()) {
@@ -2685,27 +2944,13 @@ namespace AnsiCParser {
                 CheckInitializerUnion(arrayType, ast);
                 return;
             } else {
-                var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
-                if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
-                }
-                // 代入式を生成して検証
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
-                var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // 例外が起きないなら代入できる
+                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             }
         }
 
         private void CheckInitializerArray(CType.ArrayType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
-                if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
-                }
-                // 代入式を生成して検証
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
-                var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // 例外が起きないなら代入できる
+                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Length == -1) {
@@ -2721,14 +2966,7 @@ namespace AnsiCParser {
         }
         private void CheckInitializerStruct(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
-                if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
-                }
-                // 代入式を生成して検証
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
-                var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // 例外が起きないなら代入できる
+                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Members.Count < inits.Count) {
@@ -2745,14 +2983,7 @@ namespace AnsiCParser {
         }
         private void CheckInitializerUnion(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
-                if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
-                }
-                // 代入式を生成して検証
-                var dummyVar = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression("<dummy>", new SyntaxTree.Declaration.VariableDeclaration("<dummy>", type, AnsiCParser.StorageClassSpecifier.None, null));
-                var assign = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression("=", dummyVar, expr);
-                // 例外が起きないなら代入できる
+                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 // 最初の要素とのみチェック
@@ -2820,7 +3051,7 @@ namespace AnsiCParser {
             }
         }
 
-        #endregion
+#endregion
 
         /// <summary>
         /// 6.7.8 初期化
@@ -2952,6 +3183,116 @@ namespace AnsiCParser {
             }
             _lexer.ReadToken('{');
             var decls = new List<SyntaxTree.Declaration>();
+
+
+            _insertImplictDeclarationOperatorStack.Push((ident, type) => {// ToDo: 共通化
+                var storageClass = AnsiCParser.StorageClassSpecifier.Extern;
+                var functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+#if false
+                // 記憶域クラス指定からリンケージを求める
+                LinkageKind linkage = ResolveLinkage(ident, type, storageClass);
+
+                // その識別子の以前の宣言が可視であるか？
+                IdentifierScopeValue iv;
+                bool isCurrent;
+                if (_identScope.TryGetValue(ident, out iv, out isCurrent)) {
+                    // 以前の宣言が可視である
+
+                    // 6.7 宣言
+                    // 識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。
+                    // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
+                    // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
+                    if ((linkage == LinkageKind.NoLinkage || iv.Linkage == LinkageKind.NoLinkage) && isCurrent == true) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
+                    }
+
+                    // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
+                    if ((iv.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
+                        || (iv.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"翻訳単位の中で同じ識別子{ident}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
+                    }
+
+
+                    // 以前の宣言が関数宣言でないならばエラー
+                    if (iv.IsFunction() == false) {
+                        // 以下のようなケースを想定
+                        // int x; int main(void) { int x(double); }
+                        throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"{ident}は既に関数以外として宣言されています。");
+                    }
+
+                    // 先に存在する関数定義の型を取得
+                    CType.FunctionType functionType;
+                    if (iv.ToFunction().Type.IsFunctionType(out functionType) == false) {
+                        throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数定義の型が関数型を含まない。（本処理系の実装に誤りがあることが原因です。）");
+                    }
+
+                    //// Todo: 型の合成
+                    //// たとえば、extern int foo(); と int foo() {} は合成しないと意味が違う
+
+                    if (functionType.Arguments != null && (type as CType.FunctionType).Arguments == null) {
+                        // 新しい形式の関数宣言の後に古い形式の宣言が来た
+
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        Console.Error.WriteLine("先に宣言されている関数が仮引数型並びをもち，そのあとに宣言された関数が関数定義の一部でない関数宣言子で，識別子並びが空です。" +
+                                                "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                        var resultType = (type as CType.FunctionType).ResultType;
+                        var argumentType = functionType.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                        type = new CType.FunctionType(argumentType, false, resultType);
+                        iv.ToFunction().LinkageObject.Type = type;
+                    } else if (functionType.Arguments == null && (type as CType.FunctionType).Arguments != null) {
+                        // 古い形式の関数宣言の後に新しい形式の宣言が来た
+                        if (CType.IsEqual(functionType.ResultType, (type as CType.FunctionType).ResultType) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と戻り値型が一致しないため再宣言できません。");
+                        }
+
+                        Console.Error.WriteLine("先に宣言されている関数が関数定義の一部でない関数宣言子で，識別子並びが空であり、そのあとに宣言された関数が仮引数型並びをもっています。" +
+                                                "規格に従い、関数は引数部に省略記号を含まず、各仮引数の型は，既定の実引数拡張を適用した結果の型として宣言します。");
+                        var resultType = (type as CType.FunctionType).ResultType;
+                        var argumentType = (type as CType.FunctionType).Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Ident, x.StorageClass, Specification.DefaultArgumentPromotion(x.Type))).ToList();
+                        type = new CType.FunctionType(argumentType, false, resultType);
+                        iv.ToFunction().LinkageObject.Type = type;
+                    } else {
+                        // 仮引数が省略されていないので型のチェックを行う
+
+                        // 合成型を生成してから検査
+                        var ctype = CType.CompositeType(iv.ToFunction().Type.Unwrap(), type.Unwrap());
+                        //if (CType.IsEqual(iv.ToFunction().Type.Unwrap(), type.Unwrap()) == false) {
+                        if (Specification.IsCompatible(iv.ToFunction().Type.Unwrap(), ctype.Unwrap()) == false) {
+                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている関数{ident}と型が一致しないため再宣言できません。");
+                        }
+                    }
+
+                    // ToDo: functionSpecifierについてのチェックを入れる
+
+                    var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc, linkage));
+
+                    // 結合スコープにオブジェクトを追加
+                    funcDelc.LinkageObject = AddFunctionToLinkageObject(linkage, funcDelc);
+
+                    decls.Add(funcDelc);
+                    return funcDelc;
+                } else {
+                    // 以前の宣言は可視ではない
+
+                    var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident, type, storageClass, functionSpecifier);
+                    _identScope.Add(ident, new IdentifierScopeValue.Declaration(funcDelc, linkage));
+
+                    // 結合スコープにオブジェクトを追加
+                    funcDelc.LinkageObject = AddFunctionToLinkageObject(linkage, funcDelc);
+
+                    decls.Add(funcDelc);
+                    return funcDelc;
+                }
+#else
+                return FunctionDeclaration(ident, type, storageClass, functionSpecifier, true, false);
+#endif
+            });
+
+
             while (IsDeclaration()) {
                 var d = Declaration();
                 if (d != null) {
@@ -2963,6 +3304,9 @@ namespace AnsiCParser {
                 stmts.Add(Statement());
             }
             _lexer.ReadToken('}');
+
+            _insertImplictDeclarationOperatorStack.Pop();
+
             var stmt = new SyntaxTree.Statement.CompoundStatement(decls, stmts, _tagScope, _identScope);
             if (skipCreateNewScope == false) {
                 _identScope = _identScope.Parent;
@@ -3292,9 +3636,15 @@ namespace AnsiCParser {
                 }
                 _lexer.ReadToken(')');
                 // 未定義の識別子の直後に関数呼び出し用の後置演算子 '(' がある場合、
-                // K&RおよびC89/90では暗黙的関数宣言 extern int 識別子(); が現在の宣言ブロックの先頭で定義されていると仮定して翻訳する
                 if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
-
+                    // K&RおよびC89/90では暗黙的関数宣言 extern int 識別子(); が現在の宣言ブロックの先頭で定義されていると仮定して翻訳する
+                    if (Mode == LanguageMode.C89) {
+                        var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
+                        var decl = this._insertImplictDeclarationOperatorStack.Peek().Invoke(identExpr.Ident, new CType.FunctionType(null, false, CType.CreateSignedInt()));
+                        expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(identExpr.Ident, decl as SyntaxTree.Declaration.FunctionDeclaration);
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "未定義の識別子を関数として用いています。");
+                    }
                 }
                 return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(expr, args));
             }
@@ -3799,7 +4149,12 @@ namespace AnsiCParser {
                     // とあるため、宣言指定子を一つも指定しないことは許されない。
                     // （歴史的な話：K&R では 宣言指定子を省略すると int 扱い）
                     // ToDo: C90は互換性の観点からK&R動作も残されているので選択できるようにする
-                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。");
+                    if (Mode == LanguageMode.C89) {
+                        Console.Error.WriteLine("型が省略された宣言は、暗黙的に signed int 型と見なします。");
+                        type = new CType.BasicType(CType.BasicType.TypeKind.SignedInt);
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "C99以降ではそれぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。");
+                    }
                 } else {
                     type = new CType.BasicType(typeSpecifier);
                 }

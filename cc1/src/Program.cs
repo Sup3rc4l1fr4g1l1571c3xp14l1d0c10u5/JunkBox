@@ -9,22 +9,17 @@ namespace AnsiCParser {
 
         static void Main(string[] args) {
             var ret = new Parser(@"
-extern int printf(const char *, ...);
+typedef int Foo(int, int);
 
-int a = 10;  /* External linkage */
-
-void main(void)
-{
-	static int a = 5;  /* No linkage(staticã®æœ‰ç„¡ã¯é–¢ä¿‚ãªã„) */
-
-    printf(""%d\n"", a);    /* Prints 5 */
-
-    {
-        extern int a;  /* External linkage */
-
-        printf(""%d\n"", a);    /* Prints 10 */
-    }
+int main(void) {
+	Foo sum;	// ŠÖ”éŒ¾‚Æ‚µ‚Ä‘Ã“–
+	sum(1,2);
 }
+
+int sum(int x, int y) {
+	return 0;
+}
+
 ").Parse();
             //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
@@ -35,7 +30,7 @@ void main(void)
             }
             tc.RunTest();
 
-            }
+        }
     }
 
 

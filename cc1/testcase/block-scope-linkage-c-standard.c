@@ -10,6 +10,6 @@ int foo() {
 
 int foo() {
     static int a; //no linkage
-    extern int a; //external linkage, and get an error because this code violates a constraint in §6.7
+    extern int a; //external linkage, and get an error because this code violates a constraint in 則6.7
 }
 
