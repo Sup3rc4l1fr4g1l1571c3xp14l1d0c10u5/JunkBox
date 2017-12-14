@@ -286,7 +286,7 @@ namespace AnsiCParser {
                     }
 
                     public override bool IsLValue() {
-                        // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                        // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                         // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                         return false;
                     }
@@ -427,78 +427,6 @@ namespace AnsiCParser {
                         }
                     }
 
-                    /// <summary>
-                    /// 実引数を仮引数に代入できるか判定
-                    /// </summary>
-                    /// <param name="lType"></param>
-                    /// <param name="rhs"></param>
-                    private void CheckAssignment(CType lType, Expression rhs) {
-                        // 実引数に対して仮引数型への型変換を適用
-                        rhs = Specification.TypeConvert(lType, rhs);
-
-                        // 制約 (単純代入)（コピペ）
-                        // 次のいずれかの条件が成立しなければならない。
-                        // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-                        // - 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        // - 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
-                        // - 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
-                        //   さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
-                        // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
-                        // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
-
-                        if (lType.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                            // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-                        } else if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
-                            // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        } else {
-                            // 左辺型への暗黙的型変換を試みる
-                            var rhsPtr = rhs;
-                            if (rhsPtr != null && CType.IsEqual(lType, rhsPtr.Type) && ((lType.GetTypeQualifier() & rhsPtr.Type.GetTypeQualifier()) == rhsPtr.Type.GetTypeQualifier())) {
-                                // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
-                            } else if (
-                                (rhsPtr != null)
-                                && (
-                                    (lType.IsPointerType() && (lType.GetBasePointerType().IsObjectType() || lType.GetBasePointerType().IsIncompleteType()) && (rhsPtr.Type.IsPointerType() && rhsPtr.Type.GetBasePointerType().IsVoidType())) ||
-                                    (rhsPtr.Type.IsPointerType() && (rhsPtr.Type.GetBasePointerType().IsObjectType() || rhsPtr.Type.GetBasePointerType().IsIncompleteType()) && (lType.IsPointerType() && lType.GetBasePointerType().IsVoidType()))
-                                )
-                                && ((lType.GetTypeQualifier() & rhsPtr.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
-                                // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
-                                // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
-                                rhs = rhsPtr;
-                            } else if (lType.IsPointerType() && rhs.IsNullPointerConstant()) {
-                                // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
-                            } else if (lType.IsBoolType() && rhsPtr != null && rhsPtr.Type.IsPointerType()) {
-                                // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
-                                rhs = rhsPtr;
-                            } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "実引数と仮引数の間で単純代入の条件を満たしていない。");
-                            }
-                        }
-
-
-                        // 意味規則(代入演算子(代入式))
-                        // 代入演算子は，左オペランドで指し示されるオブジェクトに値を格納する。
-                        // 代入式は，代入後の左オペランドの値をもつが，左辺値ではない。
-                        // 代入式の型は，左オペランドの型とする。
-                        // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        // 左オペランドに格納されている値を更新する副作用は，直前の副作用完了点から次の副作用完了点までの間に起こらなければならない。
-                        // オペランドの評価順序は，未規定とする。
-                        // 代入演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は未定義とする。
-
-                        // 意味規則(単純代入)
-                        //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                        // オブジェクトに格納されている値を，何らかの形でそのオブジェクトの記憶域に重なる他のオブジェクトを通してアクセスする場合，重なりは完全に一致していなければならない。
-                        // さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。
-                        // そうでない場合，動作は未定義とする。
-
-                        if (!CType.IsEqual(lType, rhs.Type)) {
-                            //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new TypeConversionExpression(lType, rhs);
-                        }
-
-
-                    }
-
                     public FunctionCallExpression(Expression expr, List<Expression> args) {
                         // 6.3 型変換 
                         expr = Specification.TypeConvert(null, expr);
@@ -530,7 +458,7 @@ namespace AnsiCParser {
                                 var targ = functionType.Arguments[i];
                                 var lhs = targ.Type.UnwrapTypeQualifier();
                                 var rhs = args[i];
-                                CheckAssignment(lhs, rhs);
+                                SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(lhs, rhs);
                             }
 
                         } else {
@@ -755,6 +683,11 @@ namespace AnsiCParser {
                     }
                 }
 
+                public override bool IsLValue() {
+                    return Expr.IsLValue();
+                }
+
+
                 public UnaryAddressExpression(Expression expr) {
                     // 制約  
                     // 単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。
@@ -777,7 +710,7 @@ namespace AnsiCParser {
 
                     // 意味規則  
                     // 単項 &演算子は，そのオペランドのアドレスを返す。
-                    // オペランドが型“∼型”をもっている場合，結果は，型“∼型へのポインタ”をもつ。
+                    // オペランドが型“～型”をもっている場合，結果は，型“～型へのポインタ”をもつ。
                     // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
                     // ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
                     // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，&演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
@@ -838,7 +771,7 @@ namespace AnsiCParser {
                     // 単項*演算子は，間接参照を表す。
                     // オペランドが関数を指している場合，その結果は関数指示子とする。
                     // オペランドがオブジェクトを指している場合，その結果はそのオブジェクトを指し示す左辺値とする。
-                    // オペランドが型“∼型へのポインタ”をもつ場合，その結果は型“∼型”をもつ。
+                    // オペランドが型“～型へのポインタ”をもつ場合，その結果は型“～型”をもつ。
                     // 正しくない値がポインタに代入されている場合，単項*演算子の動作は，未定義とする
                     Expr = expr;
                     ResultType = expr.Type.GetBasePointerType();
@@ -1674,9 +1607,6 @@ namespace AnsiCParser {
             /// 6.5.16 代入演算子(代入式)
             /// </summary>
             public abstract class AssignmentExpression : Expression {
-                public string Op {
-                    get; protected set;
-                }
                 public Expression Lhs {
                     get; protected set;
                 }
@@ -1696,7 +1626,78 @@ namespace AnsiCParser {
                 /// 6.5.16.1 単純代入
                 /// </summary>
                 public class SimpleAssignmentExpression : AssignmentExpression {
-                    public SimpleAssignmentExpression(string op, Expression lhs, Expression rhs) {
+
+                    /// <summary>
+                    /// 単純代入の制約規則（いろいろな部分で使うため規則として独立させている）
+                    /// </summary>
+                    /// <param name="lType"></param>
+                    /// <param name="rhs"></param>
+                    public static Expression ApplyAssignmentRule(CType lType, Expression rhs) {
+                        // 代入元式に対して代入先型への(暗黙的)型変換を適用
+                        rhs = Specification.ImplicitConversion(lType, rhs);
+
+                        // 制約 (単純代入)
+                        // 次のいずれかの条件が成立しなければならない。
+                        // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
+                        // - 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
+                        // - 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
+                        // - 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
+                        //   さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
+                        // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
+                        // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
+
+                        if (lType.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                            // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
+                        } else if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
+                            // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
+                        } else {
+                            // 左辺型への暗黙的型変換を試みる
+                            if (rhs != null && CType.IsEqual(lType, rhs.Type) && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
+                                // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
+                            } else if (
+                                (rhs != null)
+                                && (
+                                    (lType.IsPointerType() && (lType.GetBasePointerType().IsObjectType() || lType.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
+                                    (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lType.IsPointerType() && lType.GetBasePointerType().IsVoidType()))
+                                )
+                                && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
+                                // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
+                                // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
+                            } else if (lType.IsPointerType() && rhs.IsNullPointerConstant()) {
+                                // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
+                            } else if (lType.IsBoolType() && rhs != null && rhs.Type.IsPointerType()) {
+                                // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
+                            } else {
+                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "実引数と仮引数の間で単純代入の条件を満たしていない。");
+                            }
+                        }
+
+
+                        // 意味規則(代入演算子(代入式))
+                        // 代入演算子は，左オペランドで指し示されるオブジェクトに値を格納する。
+                        // 代入式は，代入後の左オペランドの値をもつが，左辺値ではない。
+                        // 代入式の型は，左オペランドの型とする。
+                        // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
+                        // 左オペランドに格納されている値を更新する副作用は，直前の副作用完了点から次の副作用完了点までの間に起こらなければならない。
+                        // オペランドの評価順序は，未規定とする。
+                        // 代入演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は未定義とする。
+
+                        // 意味規則(単純代入)
+                        //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
+                        // オブジェクトに格納されている値を，何らかの形でそのオブジェクトの記憶域に重なる他のオブジェクトを通してアクセスする場合，重なりは完全に一致していなければならない。
+                        // さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。
+                        // そうでない場合，動作は未定義とする。
+
+                        if (!CType.IsEqual(lType, rhs.Type)) {
+                            //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
+                            rhs = new TypeConversionExpression(lType, rhs);
+                        }
+
+                        return rhs;
+
+                    }
+
+                    public SimpleAssignmentExpression(Expression lhs, Expression rhs) {
 
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
@@ -1704,6 +1705,7 @@ namespace AnsiCParser {
                             // ToDo: 変更可能であることをチェック
                             throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
+#if false
                         // 左辺型への暗黙的型変換を試みる
                         rhs = Specification.ImplicitConversion(lhs.Type, rhs);
 
@@ -1751,7 +1753,6 @@ namespace AnsiCParser {
                             }
                         }
 
-
                         // 意味規則(代入演算子(代入式))
                         // 代入演算子は，左オペランドで指し示されるオブジェクトに値を格納する。
                         // 代入式は，代入後の左オペランドの値をもつが，左辺値ではない。
@@ -1771,7 +1772,11 @@ namespace AnsiCParser {
                             rhs = new TypeConversionExpression(lhs.Type, rhs);
                         }
 
-                        Op = op;
+#else
+                        // 代入の制約条件と意味規則を適用する
+                        rhs = ApplyAssignmentRule(lhs.Type, rhs);
+#endif
+
                         Lhs = lhs;
                         Rhs = rhs;
                         // 代入式の型は，左オペランドの型とする。
@@ -1784,6 +1789,10 @@ namespace AnsiCParser {
                 /// 6.5.16.2 複合代入
                 /// </summary>
                 public class CompoundAssignmentExpression : AssignmentExpression {
+                    public string Op {
+                        get; protected set;
+                    }
+
                     public CompoundAssignmentExpression(string op, Expression lhs, Expression rhs) {
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
@@ -1802,8 +1811,10 @@ namespace AnsiCParser {
                             case "-=": {
                                 if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
                                     // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
-                                } else if (lhs.Type.IsIntegerType() && rhs.Type.IsArithmeticType()) {
+                                } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                                     // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
+
+
                                 } else {
                                     throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
                                 }
@@ -2265,8 +2276,8 @@ namespace AnsiCParser {
             // 静的記憶域期間をもつオブジェクトを明示的に初期化しない場合，次の規定に従う。
             // a) そのオブジェクトの型がポインタ型の場合，空ポインタに初期化する。
             // b) そのオブジェクトの型が算術型の場合，（正又は符号無しの）0 に初期化する。
-            // c) そのオブジェクトが集成体の場合，各メンバに a）∼d）の規定を（再帰的に）適用し初期化する。
-            // d) そのオブジェクトが共用体の場合，最初の名前付きメンバに a）∼d）の規定を（再帰的に）適用し初期化する。
+            // c) そのオブジェクトが集成体の場合，各メンバに a）～d）の規定を（再帰的に）適用し初期化する。
+            // d) そのオブジェクトが共用体の場合，最初の名前付きメンバに a）～d）の規定を（再帰的に）適用し初期化する。
             // スカラオブジェクトに対する初期化子は，単一の式でなければならない。それを波括弧で囲んでもよい。
             // そのオブジェクトの初期値は（型変換後の）その式の値とする。型の制限及び型変換は，単純代入と同じとする。
             // このとき，宣言した型の非修飾版を，スカラオブジェクトの型とみなす

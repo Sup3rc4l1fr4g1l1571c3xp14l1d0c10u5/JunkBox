@@ -39,6 +39,15 @@ namespace AnsiCParser {
         }
 
 
+        public virtual bool IsTypedefType() {
+            return false;
+        }
+
+        public virtual SyntaxTree.Declaration.TypeDeclaration ToTypedefType() {
+            throw new Exception("");
+        }
+
+
         // int foo();  
         // static int foo() { }
         // 
@@ -108,6 +117,15 @@ namespace AnsiCParser {
             public override SyntaxTree.Declaration.FunctionDeclaration ToFunction() {
                 return Decl as SyntaxTree.Declaration.FunctionDeclaration;
             }
+
+            public override bool IsTypedefType() {
+                return Decl is SyntaxTree.Declaration.TypeDeclaration;
+            }
+
+            public override SyntaxTree.Declaration.TypeDeclaration ToTypedefType() {
+                return Decl as SyntaxTree.Declaration.TypeDeclaration;
+            }
+
 
             public SyntaxTree.Declaration Decl {
                 get;

@@ -966,12 +966,12 @@ namespace AnsiCParser {
                     CType elementType;
                     if (expr.Type.IsFunctionType()) {
                         // 関数指示子（function designator）は，関数型をもつ式とする。
-                        // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
-                        // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                        // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
+                        // 型“～型を返す関数へのポインタ”をもつ式に変換する。
                         return TypeConvert(targetType, new SyntaxTree.Expression.PostfixExpression.UnaryAddressExpression(expr));
                     } else if (expr.Type.IsArrayType(out elementType)) {
                         // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
-                        // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                        // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                         // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                         // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
                         return TypeConvert(targetType, new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(elementType), expr));
@@ -981,12 +981,12 @@ namespace AnsiCParser {
                 CType elementType;
                 if (expr.Type.IsFunctionType()) {
                     // 関数指示子（function designator）は，関数型をもつ式とする。
-                    // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
-                    // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                    // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
+                    // 型“～型を返す関数へのポインタ”をもつ式に変換する。
                     return new SyntaxTree.Expression.PostfixExpression.UnaryAddressExpression(expr);
                 } else if (expr.Type.IsArrayType(out elementType)) {
                     // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
-                    // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                    // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(elementType), expr);
@@ -1158,12 +1158,12 @@ namespace AnsiCParser {
                 CType elementType;
                 if (expr.Type.IsFunctionType()) {
                     // 関数指示子（function designator）は，関数型をもつ式とする。
-                    // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“∼型を返す関数”をもつ関数指示子は，
-                    // 型“∼型を返す関数へのポインタ”をもつ式に変換する。
+                    // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
+                    // 型“～型を返す関数へのポインタ”をもつ式に変換する。
                     return new SyntaxTree.Expression.PostfixExpression.UnaryAddressExpression(expr);
                 } else if (expr.Type.IsArrayType(out elementType)) {
                     // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
-                    // 型“∼型の配列”をもつ式は，型“∼型へのポインタ”の式に型変換する。
+                    // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(CType.CreatePointer(elementType), expr);

@@ -9,18 +9,21 @@ namespace AnsiCParser {
 
         static void Main(string[] args) {
             var ret = new Parser(@"
-typedef int Foo(int, int);
-
 int main(void) {
-	Foo sum;	// ŠÖ”éŒ¾‚Æ‚µ‚Ä‘Ã“–
-	sum(1,2);
+    //double x = 0.0;
+    //int y = 1;
+    //x += y;
+    //x = x + y;
+    //return y;
+    double *x;
+    char y = 1;
+    x += y;
+    x = x + y;
+    return y;
+
 }
 
-int sum(int x, int y) {
-	return 0;
-}
-
-").Parse();
+            ").Parse();
             //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 

@@ -1,6 +1,6 @@
 /**@
  spec: clang/test/Parser/argument_scope.c
- assertion: SpecificationErrorException
+ assertion: 
 @**/
 
 typedef struct foo foo;
