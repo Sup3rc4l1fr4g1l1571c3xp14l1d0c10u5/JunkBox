@@ -742,7 +742,7 @@ namespace AnsiCParser {
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
                         var retTy = new CType.BasicType(realConversionPair.Item2);
-                        rhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(retTy, rhs);
+                        rhs = new SyntaxTree.Expression.TypeConversionExpression(retTy, rhs);
                         return retTy;
                     } else {
                         rhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(new CType.BasicType(realConversionPair.Item1), rhs);
@@ -1054,6 +1054,9 @@ namespace AnsiCParser {
                     // オブジェクト型又は不完全型へのポインタは，他のオブジェクト型又は不完全型へのポインタに型変換できる。
                     // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
                     // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
+                    if (Specification.IsCompatible(targetPointedType, exprPointedType) == false) {
+                        Console.Error.WriteLine("互換性のないポインタ型への変換です。");
+                    }
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
                 }
 
@@ -1069,6 +1072,9 @@ namespace AnsiCParser {
                     // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
                     // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
                     // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
+                    if (Specification.IsCompatible(targetPointedType, exprPointedType) == false) {
+                        Console.Error.WriteLine("互換性のないポインタ型への変換です。");
+                    }
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(targetType, expr);
                 }
 
@@ -1445,6 +1451,11 @@ namespace AnsiCParser {
                         if ((t2 as CType.FunctionType).HasVariadic == true) {
                             return false;
                         }
+                        t1 = (t1 as CType.FunctionType).ResultType;
+                        t2 = (t2 as CType.FunctionType).ResultType;
+                        continue;
+                    } else if ((t1 as CType.FunctionType).Arguments == null && (t2 as CType.FunctionType).Arguments == null) {
+                        // 古い形式（引数省略）同士なので引数については見ない。
                         t1 = (t1 as CType.FunctionType).ResultType;
                         t2 = (t2 as CType.FunctionType).ResultType;
                         continue;

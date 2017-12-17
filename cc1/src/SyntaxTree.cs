@@ -1705,77 +1705,8 @@ namespace AnsiCParser {
                             // ToDo: 変更可能であることをチェック
                             throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
-#if false
-                        // 左辺型への暗黙的型変換を試みる
-                        rhs = Specification.ImplicitConversion(lhs.Type, rhs);
-
-                        // 制約 (単純代入)
-                        // 次のいずれかの条件が成立しなければならない。
-                        // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-                        // - 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        // - 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
-                        // - 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
-                        //   さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
-                        // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
-                        // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
-
-                        if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                            // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-                        } else if (lhs.Type.IsStructureType() && CType.IsEqual(lhs.Type.Unwrap(), rhs.Type.Unwrap())) {
-                            // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
-                        } else  {
-                            var rhsPtr = rhs;
-                            var lhsPtr = lhs;
-                            if ((lhsPtr != null && rhsPtr != null) 
-                                && (lhsPtr.Type.IsPointerType() && rhsPtr.Type.IsPointerType()) 
-                                && CType.IsEqual(lhsPtr.Type.GetBasePointerType(), rhsPtr.Type.GetBasePointerType()) 
-                                && ((lhsPtr.Type.GetTypeQualifier() & rhsPtr.Type.GetTypeQualifier()) == rhsPtr.Type.GetTypeQualifier())) {
-                                // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
-                            } else if (
-                                (lhsPtr != null && rhsPtr != null) 
-                                && (
-                                    (lhsPtr.Type.IsPointerType() && (lhsPtr.Type.GetBasePointerType().IsObjectType() || lhsPtr.Type.GetBasePointerType().IsIncompleteType()) && (rhsPtr.Type.IsPointerType() && rhsPtr.Type.GetBasePointerType().IsVoidType())) ||
-                                    (rhsPtr.Type.IsPointerType() && (rhsPtr.Type.GetBasePointerType().IsObjectType() || rhsPtr.Type.GetBasePointerType().IsIncompleteType()) && (lhsPtr.Type.IsPointerType() && lhsPtr.Type.GetBasePointerType().IsVoidType()))
-                                ) 
-                                && ((lhsPtr.Type.GetTypeQualifier() & rhsPtr.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
-                                // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
-                                // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
-                                lhs = lhsPtr;
-                                rhs = rhsPtr;
-                            } else if (lhsPtr != null && lhsPtr.Type.IsPointerType() && rhs.IsNullPointerConstant()) {
-                                // - 左オペランドがポインタであり，かつ右オペランドが空ポインタ定数である。
-                                lhs = lhsPtr;
-                            } else if (lhs.Type.IsBoolType() && rhsPtr != null && rhsPtr.Type.IsPointerType()) {
-                                // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
-                                rhs = rhsPtr;
-                            } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "単純代入の両オペランドがクソ長い条件を満たしていない。");
-                            }
-                        }
-
-                        // 意味規則(代入演算子(代入式))
-                        // 代入演算子は，左オペランドで指し示されるオブジェクトに値を格納する。
-                        // 代入式は，代入後の左オペランドの値をもつが，左辺値ではない。
-                        // 代入式の型は，左オペランドの型とする。
-                        // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
-                        // 左オペランドに格納されている値を更新する副作用は，直前の副作用完了点から次の副作用完了点までの間に起こらなければならない。
-                        // オペランドの評価順序は，未規定とする。
-                        // 代入演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は未定義とする。
-
-                        // 意味規則(単純代入)
-                        //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                        // オブジェクトに格納されている値を，何らかの形でそのオブジェクトの記憶域に重なる他のオブジェクトを通してアクセスする場合，重なりは完全に一致していなければならない。
-                        // さらに，二つのオブジェクトの型は，適合する型の修飾版又は非修飾版でなければならない。
-                        // そうでない場合，動作は未定義とする。
-                        if (!CType.IsEqual(lhs.Type, rhs.Type)) {
-                            //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                            rhs = new TypeConversionExpression(lhs.Type, rhs);
-                        }
-
-#else
                         // 代入の制約条件と意味規則を適用する
                         rhs = ApplyAssignmentRule(lhs.Type, rhs);
-#endif
 
                         Lhs = lhs;
                         Rhs = rhs;
@@ -2422,6 +2353,11 @@ namespace AnsiCParser {
         }
 
         public class TranslationUnit : SyntaxTree {
+            /// <summary>
+            /// 結合オブジェクト表
+            /// </summary>
+            public Dictionary<string, LinkageObject> LinkageTable;
+
             public List<Declaration> Declarations { get; } = new List<Declaration>();
         }
     }

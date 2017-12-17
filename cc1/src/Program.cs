@@ -9,21 +9,17 @@ namespace AnsiCParser {
 
         static void Main(string[] args) {
             var ret = new Parser(@"
-int main(void) {
-    //double x = 0.0;
-    //int y = 1;
-    //x += y;
-    //x = x + y;
-    //return y;
-    double *x;
-    char y = 1;
-    x += y;
-    x = x + y;
-    return y;
+int x;
 
+int main(void) {
+   int x;
+    {
+        extern int x;
+        return x;
+    }
 }
 
-            ").Parse();
+").Parse();
             //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 

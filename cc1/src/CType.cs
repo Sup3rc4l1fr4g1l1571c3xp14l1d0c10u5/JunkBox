@@ -800,9 +800,6 @@ namespace AnsiCParser {
                 return string.Join(" ", sb);
             }
 
-            /// K&amp;R書式で関数を定義した場合、仮引数の宣言で宣言した型に規定の実引数拡張を適用した結果が外から見える仮引数の型になる。
-            /// 関数本体中では仮引数の型は宣言した型そのものが使われる。
-            /// 例: int foo(f) float f { ... } の場合、int foo(double _t) { float f = (float)_t; ... } と読み替えられる。
             public class ArgumentInfo {
                 public ArgumentInfo(string ident, StorageClassSpecifier storageClass, CType type) {
                     Ident = ident;
@@ -815,6 +812,7 @@ namespace AnsiCParser {
                     CType elementType;
                     if (type.IsArrayType(out elementType)) {
                         //ToDo: 及び。の間の型修飾子、static について実装
+                        Console.Error.WriteLine($"仮引数 {ident} は“～型の配列”として宣言されていますが、6.7.5.3 関数宣言子の制約に従って“～型への修飾されたポインタ”に型調整されます。");
                         type = CreatePointer(elementType);
                     }
                     Type = type;
@@ -980,6 +978,16 @@ namespace AnsiCParser {
                 }
                 return new TypeQualifierType(ret, ta1.Qualifier);
             }
+            if (t1 is TypedefedType) {
+
+                var ta1 = t1 as CType.TypedefedType;
+                return CompositeType(ta1.Type, t2);
+            }
+            if (t2 is TypedefedType) {
+
+                var ta2 = t2 as CType.TypedefedType;
+                return CompositeType(t1, ta2.Type);
+            }
             if (t1.IsPointerType() && t2.IsPointerType()) {
                 var ta1 = t1 as CType.PointerType;
                 var ta2 = t2 as CType.PointerType;
@@ -1037,6 +1045,12 @@ namespace AnsiCParser {
                         return null;
                     }
                     return CreateArray(len, ret);
+                } else if (ta1.Length == ta2.Length) {
+                    var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                    if (ret == null) {
+                        return null;
+                    }
+                    return CreateArray(ta1.Length, ret);
                 }
                 return null;
             }
@@ -1076,6 +1090,13 @@ namespace AnsiCParser {
                         return null;
                     }
                     return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
+                } else if (ta1.Arguments == null && ta2.Arguments == null) {
+                    // 両方仮引数が無いなら仮引数を持たない合成型とする
+                    var retType = CompositeType(ta1.ResultType, ta2.ResultType);
+                    if (retType == null) {
+                        return null;
+                    }
+                    return new CType.FunctionType(null, ta1.HasVariadic, retType);
                 }
                 return null;
             }
