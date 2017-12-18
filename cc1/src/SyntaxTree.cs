@@ -429,7 +429,11 @@ namespace AnsiCParser {
 
                     public FunctionCallExpression(Expression expr, List<Expression> args) {
                         // 6.3 型変換 
-                        expr = Specification.TypeConvert(null, expr);
+                        // 関数呼出しの準備の段階で，実引数を評価し，各実引数の値を対応する仮引数に代入する
+                        // 関数は，その仮引数の値を変更してもよいが，これらの変更が実引数の値に影響を与えることはできない。
+                        // 一方，オブジェクトへのポインタを渡すことは可能であり，関数はそれによって指されるオブジェクトの値を変更してもよい。配列型又は関数型をもつと宣言された仮引数は，ポインタ型をもつように型調整される
+
+                        expr = Specification.ImplicitConversion(null, expr);
 
                         // 制約
                         // 呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない。

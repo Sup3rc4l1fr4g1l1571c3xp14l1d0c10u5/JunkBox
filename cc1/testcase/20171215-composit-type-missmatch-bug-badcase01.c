@@ -6,7 +6,7 @@
 extern int foo();
 
 int main(void) {
-    extern int foo(short);
+    extern int foo(short);	/* conflicting type */
     return foo(1);
 }
 

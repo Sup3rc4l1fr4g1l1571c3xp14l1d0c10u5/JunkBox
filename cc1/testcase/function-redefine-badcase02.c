@@ -23,14 +23,14 @@ int foo();
 /*
  * int foo(); のみでは、引数情報を持たない関数（K&Rプロトタイプ）となる。
  * しかし、上記ルールにより、その前の foo の引数型に既定の実引数拡張を適用した結果の型(floatなのでdouble)と適合するようにされる。
- * よって、ANSIスタイルの int foo(double); として見なされる
+ * よって、ANSIスタイルの int foo(double); として見なされるため、型の不適合となる
  */
 
 int main(void) {
 	return foo(1.0f);
 }
 
-int foo(double x) {	// 前のfoo定義が int foo(double); であるため、適合となる。
+int foo(double x) {
 	return (int)x;
 }
 

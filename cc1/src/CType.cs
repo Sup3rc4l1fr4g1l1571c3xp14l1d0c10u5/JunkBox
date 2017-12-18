@@ -1057,9 +1057,6 @@ namespace AnsiCParser {
             if (t1.IsFunctionType() && t2.IsFunctionType()) {
                 var ta1 = t1.Unwrap() as CType.FunctionType;
                 var ta2 = t2.Unwrap() as CType.FunctionType;
-                if (ta1.HasVariadic != ta2.HasVariadic) {
-                    return null;
-                }
                 if ((ta1.Arguments != null && ta2.Arguments == null) || (ta1.Arguments == null && ta2.Arguments != null)) {
                     // 一方の型だけが仮引数型並びをもつ関数型（関数原型）の場合，合成型は，その仮引数型並びをもつ関数原型とする。
                     var arguments = (ta1.Arguments != null ? ta1.Arguments : ta2.Arguments).ToList();
@@ -1069,13 +1066,25 @@ namespace AnsiCParser {
                     }
                     return new CType.FunctionType(arguments, ta1.HasVariadic, retType);
                 } else if (ta1.Arguments != null && ta2.Arguments != null) {
-                    // 両方の型が仮引数型並びをもつ関数型の場合，合成仮引数型並びにおける各仮引数の型は，対応する仮引数の型の合成型とする。
+                    // 両方が仮引数型並びをもつ場合，仮引数の個数及び省略記号の有無に関して一致し，対応する仮引数の型が適合する。
+
+                    // 仮引数の個数が一致？
                     if (ta1.Arguments.Length != ta2.Arguments.Length) {
                         return null;
                     }
+
+                    // 省略記号の有無が一致？
+                    if (ta1.HasVariadic != ta2.HasVariadic) {
+                        return null;
+                    }
+
+                    // 対応する仮引数の型が適合する?
                     var newArguments = new List<FunctionType.ArgumentInfo>();
                     for (var i = 0; i < ta1.Arguments.Length; i++) {
-                        var newArgument = CompositeType(ta1.Arguments[i].Type, ta2.Arguments[i].Type);
+                        // 既定の実引数拡張を適用
+                        var pt1 = Specification.DefaultArgumentPromotion(ta1.Arguments[i].Type);
+                        var pt2 = Specification.DefaultArgumentPromotion(ta2.Arguments[i].Type);
+                        var newArgument = CompositeType(pt1, pt2);
                         if (newArgument == null) {
                             return null;
                         }
@@ -1085,10 +1094,13 @@ namespace AnsiCParser {
                         var storageClass = ta1.Arguments[i].StorageClass;
                         newArguments.Add(new FunctionType.ArgumentInfo(null, storageClass, newArgument));
                     }
+
+                    // 戻り値の型が適合する？
                     var retType = CompositeType(ta1.ResultType, ta2.ResultType);
                     if (retType == null) {
                         return null;
                     }
+
                     return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
                 } else if (ta1.Arguments == null && ta2.Arguments == null) {
                     // 両方仮引数が無いなら仮引数を持たない合成型とする

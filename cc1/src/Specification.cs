@@ -1430,10 +1430,10 @@ namespace AnsiCParser {
                     } else if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments == null) {
                         // 新しい形式の関数宣言の後に古い形式の宣言が来た
 
-                        //// 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
-                        //if ((t1 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
-                        //    return false;
-                        //}
+                        // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
+                        if ((t1 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
+                            return false;
+                        }
                         // t1側は関数は引数部に省略記号を含まないとみなす
                         if ((t1 as CType.FunctionType).HasVariadic == true) {
                             return false;
@@ -1443,10 +1443,10 @@ namespace AnsiCParser {
                         continue;
                     } else if ((t1 as CType.FunctionType).Arguments == null && (t2 as CType.FunctionType).Arguments != null) {
                         // 古い形式の関数宣言の後に新しい形式の宣言が来た
-                        //// 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
-                        //if ((t2 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
-                        //    return false;
-                        //}
+                        // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
+                        if ((t2 as CType.FunctionType).Arguments.Any(x => !IsCompatible(Specification.DefaultArgumentPromotion(x.Type), x.Type))) {
+                            return false;
+                        }
                         // t2側は関数は引数部に省略記号を含まないとみなす
                         if ((t2 as CType.FunctionType).HasVariadic == true) {
                             return false;

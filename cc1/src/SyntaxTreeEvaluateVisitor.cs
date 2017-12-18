@@ -3,152 +3,68 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace AnsiCParser {
-    public class SyntaxTreeEvaluateVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeEvaluateVisitor.Value, object> {
-
+    public class SyntaxTreeEvaluateVisitor : SyntaxTreeVisitor.IVisitor<object, SyntaxTreeEvaluateVisitor.Value> {
         public class Value {
-            public virtual bool IsInteger() { return false; }
-            public virtual bool IsDouble() { return false; }
-            public virtual bool IsPointer() { return false; }
-
-            public class IntegerValue : Value {
-                public override bool IsInteger() { return true; }
-                public long Value { get; }
-                public IntegerValue(long value) {
-                    Value = value;
-                }
-            }
-
-            public class DoubleValue : Value {
-                public override bool IsDouble() { return true; }
-                public double Value { get; }
-                public DoubleValue(double value) {
-                    Value = value;
-                }
-            }
-
-            public class HeapValue : Value {
-                public byte[] Block { get; }
-                public HeapValue(int size) {
-                    Block = new byte[size];
-                }
-            }
-
-            public class PointerValue : Value {
-                public override bool IsPointer() { return true; }
-                public HeapValue Heap { get; }
-                public long Offset { get; }
-                public PointerValue(HeapValue heap, long offset) {
-                    Heap = heap;
-                    Offset = offset;
-                }
-
-            }
         }
 
-        public Value OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, object value) {
-            var lhs = self.Lhs.Accept(this, value);
-            var rhs = self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
-                    // â¡éZÇÃèÍçáÅCóºÉIÉyÉâÉìÉhÇ™éZèpå^ÇÇ‡Ç¬Ç©ÅCñîÇÕàÍï˚ÇÃÉIÉyÉâÉìÉhÇ™ÉIÉuÉWÉFÉNÉgå^Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈ÅC
-                    // Ç‡Ç§àÍï˚ÇÃÉIÉyÉâÉìÉhÇÃå^Ç™êÆêîå^Ç≈Ç»ÇØÇÍÇŒÇ»ÇÁÇ»Ç¢ÅBÅiëùï™ÇÕ 1 ÇÃâ¡éZÇ…ìôÇµÇ¢ÅB)
-                    if (lhs.IsInteger() && rhs.IsInteger()) {
-                        var ret = (lhs as Value.IntegerValue).Value + (rhs as Value.IntegerValue).Value;
-                        return new Value.IntegerValue(ret);
-                    } else if (lhs.IsInteger() && rhs.IsDouble()) {
-                        var ret = (lhs as Value.IntegerValue).Value + (rhs as Value.DoubleValue).Value;
-                        return new Value.DoubleValue(ret);
-                    } else if (lhs.IsDouble() && rhs.IsInteger()) {
-                        var ret = (lhs as Value.DoubleValue).Value + (rhs as Value.IntegerValue).Value;
-                        return new Value.DoubleValue(ret);
-                    } else if (lhs.IsInteger() && rhs.IsPointer()) {
-                        var offset = (lhs as Value.IntegerValue).Value * self.Rhs.Type.Sizeof() + (rhs as Value.PointerValue).Offset;
-                        return new Value.PointerValue((rhs as Value.PointerValue).Heap, offset);
-                    } else if (lhs.IsPointer() && rhs.IsInteger()) {
-                        var offset = (lhs as Value.PointerValue).Offset + (rhs as Value.IntegerValue).Value * self.Lhs.Type.Sizeof();
-                        return new Value.PointerValue((lhs as Value.PointerValue).Heap, offset);
-                    } else {
-                        throw new Exception("â¡éZÇÃèÍçáÅCóºÉIÉyÉâÉìÉhÇ™éZèpå^ÇÇ‡Ç¬Ç©ÅCñîÇÕàÍï˚ÇÃÉIÉyÉâÉìÉhÇ™ÉIÉuÉWÉFÉNÉgå^Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈ÅCÇ‡Ç§àÍï˚ÇÃÉIÉyÉâÉìÉhÇÃå^Ç™êÆêîå^Ç≈Ç»ÇØÇÍÇŒÇ»ÇÁÇ»Ç¢ÅBÅiëùï™ÇÕ 1 ÇÃâ¡éZÇ…ìôÇµÇ¢ÅB)");
-                    }
-                    break;
-                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
-                    // å∏éZÇÃèÍçáÅCéüÇÃÇ¢Ç∏ÇÍÇ©ÇÃèåèÇñûÇΩÇ≥Ç»ÇØÇÍÇŒÇ»ÇÁÇ»Ç¢ÅB
-                    // - óºÉIÉyÉâÉìÉhÇ™éZèpå^ÇÇ‡Ç¬ÅB 
-                    // - óºÉIÉyÉâÉìÉhÇ™ìKçáÇ∑ÇÈÉIÉuÉWÉFÉNÉgå^ÇÃèCè¸î≈ñîÇÕîÒèCè¸î≈Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈Ç†ÇÈÅB
-                    // - ç∂ÉIÉyÉâÉìÉhÇ™ÉIÉuÉWÉFÉNÉgå^Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈ÅCâEÉIÉyÉâÉìÉhÇÃå^Ç™êÆêîå^Ç≈Ç†ÇÈÅBÅiå∏ï™ÇÕ 1 ÇÃå∏éZÇ…ìôÇµÇ¢ÅB
-                    if (lhs.IsInteger() && rhs.IsInteger()) {
-                        var ret = (lhs as Value.IntegerValue).Value - (rhs as Value.IntegerValue).Value;
-                        return new Value.IntegerValue(ret);
-                    } else if (lhs.IsInteger() && rhs.IsDouble()) {
-                        var ret = (lhs as Value.IntegerValue).Value - (rhs as Value.DoubleValue).Value;
-                        return new Value.DoubleValue(ret);
-                    } else if (lhs.IsDouble() && rhs.IsInteger()) {
-                        var ret = (lhs as Value.DoubleValue).Value - (rhs as Value.IntegerValue).Value;
-                        return new Value.DoubleValue(ret);
-                    } else if (lhs.IsPointer() && rhs.IsPointer()) {
-                        if ((lhs as Value.PointerValue).Heap != (rhs as Value.PointerValue).Heap) {
-                            throw new Exception("ìØÇ∂îzóÒÉIÉuÉWÉFÉNÉgÇÃóvëfÇ©ÅCÇªÇÃîzóÒÉIÉuÉWÉFÉNÉgÇÃç≈å„ÇÃóvëfÇàÍÇ¬âzÇ¶ÇΩÇ∆Ç±ÇÎÇéwÇµÇƒÇ¢Ç»ÇØÇÍÇŒÇ»ÇÁÇ»Ç¢");
-                        }
-                        var diff  = ((lhs as Value.PointerValue).Offset - (rhs as Value.PointerValue).Offset) / self.Lhs.Type.Sizeof();
-                        return new Value.IntegerValue(diff);
-                    } else if (lhs.IsPointer() && rhs.IsInteger()) {
-                        var offset = (lhs as Value.PointerValue).Offset - (rhs as Value.IntegerValue).Value * self.Rhs.Type.Sizeof();
-                        return new Value.PointerValue((lhs as Value.PointerValue).Heap, offset);
-                    } else {
-                        throw new Exception(@"å∏éZÇÃèÍçáÅCéüÇÃÇ¢Ç∏ÇÍÇ©ÇÃèåèÇñûÇΩÇ≥Ç»ÇØÇÍÇŒÇ»ÇÁÇ»Ç¢ÅB
-- óºÉIÉyÉâÉìÉhÇ™éZèpå^ÇÇ‡Ç¬ÅB 
-- óºÉIÉyÉâÉìÉhÇ™ìKçáÇ∑ÇÈÉIÉuÉWÉFÉNÉgå^ÇÃèCè¸î≈ñîÇÕîÒèCè¸î≈Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈Ç†ÇÈÅB
-- ç∂ÉIÉyÉâÉìÉhÇ™ÉIÉuÉWÉFÉNÉgå^Ç÷ÇÃÉ|ÉCÉìÉ^Ç≈ÅCâEÉIÉyÉâÉìÉhÇÃå^Ç™êÆêîå^Ç≈Ç†ÇÈÅBÅiå∏ï™ÇÕ 1 ÇÃå∏éZÇ…ìôÇµÇ¢ÅB"
-                            );
-                    }
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-        }
-
-        public Value OnAndExpression(SyntaxTree.Expression.AndExpression self, object value) {
+        /// <summary>
+        /// 6.5.6 Âä†Ê∏õÊºîÁÆóÂ≠ê
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, object value) {
+        public object OnAndExpression(SyntaxTree.Expression.AndExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, object value) {
+        public object OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, object value) {
+        public object OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, object value) {
+        public object OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnCaseStatement(SyntaxTree.Statement.CaseStatement self, object value) {
+        public object OnBreakStatement(SyntaxTree.Statement.BreakStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnCastExpression(SyntaxTree.Expression.CastExpression self, object value) {
+        public object OnCaseStatement(SyntaxTree.Statement.CaseStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, object value) {
+        /// <summary>
+        /// 6.5.4 „Ç≠„É£„Çπ„ÉàÊºîÁÆóÂ≠ê
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnCastExpression(SyntaxTree.Expression.CastExpression self, SyntaxTreeEvaluateVisitor.Value value) {
+            // todo: cast
+            return self.Expr.Accept(this, value);
+        }
+
+        public object OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, object value) {
+        public object OnCommaExpression(SyntaxTree.Expression.CommaExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, object value) {
+        public object OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, object value) {
+        public object OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case "+=":
@@ -185,39 +101,39 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, object value) {
+        public object OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, object value) {
+        public object OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, object value) {
+        public object OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnDefaultStatement(SyntaxTree.Statement.DefaultStatement self, object value) {
+        public object OnDefaultStatement(SyntaxTree.Statement.DefaultStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, object value) {
+        public object OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, object value) {
+        public object OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, object value) {
+        public object OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, object value) {
+        public object OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, object value) {
+        public object OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal:
@@ -230,95 +146,89 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, object value) {
+        public object OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, object value) {
+        public object OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, object value) {
+        public object OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnForStatement(SyntaxTree.Statement.ForStatement self, object value) {
+        public object OnForStatement(SyntaxTree.Statement.ForStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, object value) {
+        public object OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, object value) {
+        public object OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, object value) {
+        public object OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, object value) {
+        public object OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, object value) {
+        public object OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnGotoStatement(SyntaxTree.Statement.GotoStatement self, object value) {
+        public object OnGotoStatement(SyntaxTree.Statement.GotoStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnIfStatement(SyntaxTree.Statement.IfStatement self, object value) {
+        public object OnIfStatement(SyntaxTree.Statement.IfStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, object value) {
+        public object OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, object value) {
+        public object OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, object value) {
+        public object OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, object value) {
+        public object OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, object value) {
+        public object OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, object value) {
+        public object OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, object value) {
+        public object OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnMultiplicitiveExpression(SyntaxTree.Expression.MultiplicitiveExpression self, object value) {
-            var ops = "";
-            switch (self.Op) {
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                    ops = "mul-expr";
-                    break;
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
-                    ops = "div-expr";
-                    break;
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
-                    ops = "mod-expr";
-                    break;
-            }
+        /// <summary>
+        /// 6.5.5 ‰πóÈô§ÊºîÁÆóÂ≠ê
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnMultiplicitiveExpression(SyntaxTree.Expression.MultiplicitiveExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, object value) {
+        public object OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan:
@@ -337,11 +247,11 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, object value) {
+        public object OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnShiftExpression(SyntaxTree.Expression.ShiftExpression self, object value) {
+        public object OnShiftExpression(SyntaxTree.Expression.ShiftExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.ShiftExpression.OperatorKind.Left:
@@ -354,63 +264,145 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, object value) {
+        public object OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, object value) {
+        public object OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.4 sizeof ÊºîÁÆóÂ≠ê(Âºè„Å´ÂØæ„Åô„Çãsizeof)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.4 sizeof ÊºîÁÆóÂ≠ê(Âûã„Å´ÂØæ„Åô„Çãsizeof)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, object value) {
+        public object OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, object value) {
+        public object OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, SyntaxTreeEvaluateVisitor.Value value) {
+            return null;
+        }
+        public class Code {
+        }
+        public class Heap {
+            public byte[] block;
+            public int Length {
+            get {
+                    return block.Length;
+                }
+            }
+            public Heap(int v) {
+                this.block = new byte[v];
+            }
+        }
+
+        List<Tuple<string, Heap>> HeapBlock = new List<Tuple<string, Heap>>();
+        List<Tuple<string, SyntaxTree.Declaration, List<Code>>> TextBlock = new List<Tuple<string, SyntaxTree.Declaration, List<Code>>>();
+        List<Code> TextSegment = new List<Code>();
+
+
+        public object OnTranslationUnit(SyntaxTree.TranslationUnit self, SyntaxTreeEvaluateVisitor.Value value) {
+            foreach (var obj in self.LinkageTable) {
+                if (obj.Value.Type.IsFunctionType()) {
+                    TextBlock.Add(Tuple.Create(obj.Value.LinkageId, obj.Value.Definition, new List<Code>()));
+                } else if (obj.Value.Type.IsObjectType()) {
+                    HeapBlock.Add(Tuple.Create(obj.Value.LinkageId, new Heap(obj.Value.Type.Sizeof())));
+                } else {
+                    Console.WriteLine($"{obj.Value.LinkageId} = ???");
+                }
+            }
+            foreach (var obj in self.LinkageTable) {
+                if (obj.Value.Type.IsFunctionType() && !(obj.Value.Type is CType.TypedefedType)) {
+                    obj.Value.Definition.Accept(this, value);
+                }
+            }
+            Console.WriteLine("TextBlock:");
+            foreach (var tb in TextBlock) {
+                Console.WriteLine($"{tb.Item1} = {tb.Item2}");
+            }
+            Console.WriteLine("HeapBlock:");
+            foreach (var hb in HeapBlock) {
+                Console.WriteLine($"{hb.Item1} = {hb.Item2.Length} byte");
+            }
             return null;
         }
 
-        public Value OnTranslationUnit(SyntaxTree.TranslationUnit self, object value) {
+        public object OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, object value) {
+        public object OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, object value) {
+        /// <summary>
+        /// 6.5.3.2 „Ç¢„Éâ„É¨„ÇπÂèä„Å≥ÈñìÊé•ÊºîÁÆóÂ≠ê
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.3 ÂçòÈ†ÖÁÆóË°ìÊºîÁÆóÂ≠ê(ÂçòÈ†Ö„Éû„Ç§„Éä„Çπ)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.3 ÂçòÈ†ÖÁÆóË°ìÊºîÁÆóÂ≠ê(ÂçòÈ†Ö„Éì„ÉÉ„ÉàÂê¶ÂÆö)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.3 ÂçòÈ†ÖÁÆóË°ìÊºîÁÆóÂ≠ê(ÂçòÈ†ÖË´ñÁêÜÂê¶ÂÆö)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, object value) {
+        /// <summary>
+        /// 6.5.3.3 ÂçòÈ†ÖÁÆóË°ìÊºîÁÆóÂ≠ê(ÂçòÈ†Ö„Éó„É©„Çπ)
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public object OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, object value) {
-            return null;
-        }
-
-        public Value OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, object value) {
+        public object OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
@@ -423,7 +415,7 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, object value) {
+        public object OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             var ops = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc:
@@ -436,23 +428,23 @@ namespace AnsiCParser {
             return null;
         }
 
-        public Value OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, object value) {
+        public object OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, object value) {
+        public object OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, object value) {
+        public object OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, object value) {
+        public object OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
 
-        public Value OnWhileStatement(SyntaxTree.Statement.WhileStatement self, object value) {
+        public object OnWhileStatement(SyntaxTree.Statement.WhileStatement self, SyntaxTreeEvaluateVisitor.Value value) {
             return null;
         }
     }
