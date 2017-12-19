@@ -4,7 +4,7 @@
 @**/
 
 int main(void) {
-    static int hoge(void);	// static は使えない
+    static int hoge(void);	/* static は使えない */
 	return 4;
 }
 static int hoge(void) {

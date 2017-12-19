@@ -3,7 +3,7 @@
  assertion: 
 @**/
 
-int x = 0;   // 完全な宣言と不完全な宣言の組み合わせ
+int x = 0;   /* 完全な宣言と不完全な宣言の組み合わせ */
 int x;
 int main(void) {
 	return 0;

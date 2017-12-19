@@ -3,5 +3,5 @@
  assertion: SpecificationErrorException
 @**/
 
-struct { int x; }; // 文法の制約・意味上は問題がないが、意味のない宣言である。
+struct { int x; }; /* 文法の制約・意味上は問題がないが、意味のない宣言である。 */
 

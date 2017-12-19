@@ -5,5 +5,5 @@
 
 void test1() {
 	int a[] = {0,1,1,2,3};
-	int y = a;  /* 不正な代入 */
+	int y = a;  /* (Warning): initialization makes integer from pointer without a cast */
 }

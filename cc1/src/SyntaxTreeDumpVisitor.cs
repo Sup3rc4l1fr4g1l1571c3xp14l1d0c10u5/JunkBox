@@ -11,7 +11,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, Cell value) {
-            return Cell.Create("argument-declaration", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString(), self.Init?.Accept(this, value)??Cell.Nil);
+            return Cell.Create("argument-declaration", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident, self.StorageClass.ToString());
         }
 
         public Cell OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Cell value) {

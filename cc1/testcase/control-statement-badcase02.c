@@ -4,5 +4,5 @@
 @**/
 
 void foo() { 
-  continue; // ループ外で continue 命令を使用
+  continue; /* ループ外で continue 命令を使用 */
 }

@@ -4,7 +4,7 @@
 @**/
 
 int f(x) 
-auto int  x;	// autoは使えない
+auto int  x;	/* autoは使えない */
 {
 	return x;
 }

@@ -9,6 +9,6 @@ int main(void) {
 	buf dummy = {'f','r','e','e'};
 	buf x;
 	
-	x = dummy; // 無効な代入
+	x = dummy; /* 無効な代入 */
 }
 

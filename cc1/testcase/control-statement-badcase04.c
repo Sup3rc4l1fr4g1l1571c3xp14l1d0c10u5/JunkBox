@@ -4,6 +4,6 @@
 @**/
 
 void foo() { 
-  for (({break;});;); // gcc拡張構文を使って for 文の評価式中で breakを使っている。
+  for (({break;});;); /* gcc拡張構文を使って for 文の評価式中で breakを使っている。 */
 
 }

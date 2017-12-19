@@ -6,7 +6,7 @@
 int main(void) {
 	typedef double SINT;
 	{
-		typedef int SINT;   // OK(override)
+		typedef int SINT;   /* OK(override) */
 		SINT x = 1;
 		return (int)x;
 	}

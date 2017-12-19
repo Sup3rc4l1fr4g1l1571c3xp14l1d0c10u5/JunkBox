@@ -49,13 +49,15 @@ namespace AnsiCParser {
 
             TestTask.Add(() => {
                 var p = new Parser(src);
+                Console.Error.WriteLine($"");
+                Console.Error.WriteLine($"{path}:{settings["spec"]}");
                 if (string.IsNullOrWhiteSpace(settings["assertion"])) {
                     try {
                         p.Parse();
                         return true;
                     } catch (Exception e) {
-                        Console.Error.WriteLine($"");
-                        Console.Error.WriteLine($"{path}:");
+                        var orgForegroundColor = Console.ForegroundColor;
+                        Console.ForegroundColor = ConsoleColor.Red;
                         Console.Error.WriteLine($"例外 {e.GetType().Name } が発生しました。");
                         if (e is CompilerException) {
                             var ce = e as CompilerException;
@@ -64,22 +66,24 @@ namespace AnsiCParser {
                             Console.Error.WriteLine($"{e.Message}");
                             Console.Error.WriteLine($"{e.StackTrace}");
                         }
+                        Console.ForegroundColor = orgForegroundColor;
                         return false;
                     }
                 } else {
                     try {
                         p.Parse();
-                        Console.Error.WriteLine($"");
-                        Console.Error.WriteLine($"{path}:");
+                        var orgForegroundColor = Console.ForegroundColor;
+                        Console.ForegroundColor = ConsoleColor.Red;
                         Console.Error.WriteLine($"例外 {settings["assertion"]} が発生しませんでした。");
+                        Console.ForegroundColor = orgForegroundColor;
                         return false;
                     } catch (Exception e) {
                         if (e.GetType().Name.ToUpper() == settings["assertion"].ToUpper()) {
                             // ok.
                             return true;
                         } else {
-                            Console.Error.WriteLine($"");
-                            Console.Error.WriteLine($"{path}:");
+                            var orgForegroundColor = Console.ForegroundColor;
+                            Console.ForegroundColor = ConsoleColor.Red;
                             Console.Error.WriteLine($"例外 {settings["assertion"]} が発生せず、 例外 {e.GetType().Name } が発生しました。{e.Message}");
                             if (e is CompilerException) {
                                 var ce = e as CompilerException;
@@ -88,6 +92,7 @@ namespace AnsiCParser {
                                 Console.Error.WriteLine($"{e.Message}");
                                 Console.Error.WriteLine($"{e.StackTrace}");
                             }
+                            Console.ForegroundColor = orgForegroundColor;
                             return false;
                         }
                     }

@@ -4,7 +4,7 @@
 @**/
 
 int main(void) {
-	extern int x;   // 外部定義なので問題なし
+	extern int x;   /* 外部定義なので問題なし */
 	extern int x;
 	return 0;
 }

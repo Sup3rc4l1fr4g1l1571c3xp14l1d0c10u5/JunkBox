@@ -31,7 +31,7 @@ int main(void) {
 	return foo(1.0f);
 }
 
-int foo(float x) {	// 前のfoo定義が int foo(double); であるため、型違反となる
+int foo(float x) {	/* 前のfoo定義が int foo(double); であるため、型違反となる */
 	return (int)x;
 }
 

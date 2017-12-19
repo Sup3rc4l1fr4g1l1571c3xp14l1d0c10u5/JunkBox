@@ -4,6 +4,6 @@
 @**/
 
 void foo() { 
-  for (({continue;});;); // gcc拡張構文を使って for 文の評価式中で continueを使っている。
+  for (({continue;});;); /* gcc拡張構文を使って for 文の評価式中で continueを使っている。 */
 
 }

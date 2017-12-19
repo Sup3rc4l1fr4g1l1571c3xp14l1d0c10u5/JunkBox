@@ -5,5 +5,5 @@
 
 typedef char buf[4];
 buf dummy = {'f','r','e','e'};
-buf x = dummy; // 無効な初期化
+buf x = dummy; /* 無効な初期化 */
 

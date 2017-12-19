@@ -29,7 +29,7 @@ namespace AnsiCParser {
             if (m.Success == false) {
                 throw new Exception();
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x)));
+            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
         public static Tuple<string, string> ParseHeximal(string str) {
@@ -37,21 +37,21 @@ namespace AnsiCParser {
             if (m.Success == false) {
                 throw new Exception();
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x)));
+            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
         public static Tuple<string, string> ParseDecimal(string str) {
             var m = RegexDecimal.Match(str);
             if (m.Success == false) {
                 throw new Exception();
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x)));
+            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
         public static Tuple<string, string> ParseOctal(string str) {
             var m = RegexOctal.Match(str);
             if (m.Success == false) {
                 throw new Exception();
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToUpper().ToCharArray().OrderBy(x => x)));
+            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
         /// <summary>

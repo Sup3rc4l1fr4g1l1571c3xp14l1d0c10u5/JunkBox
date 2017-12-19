@@ -5,6 +5,6 @@
 
 int main(void) {
 	extern int x;
-	       int x;   // 同一スコープで名前が衝突
+	       int x;   /* 同一スコープで名前が衝突 */
 	return 0;
 }

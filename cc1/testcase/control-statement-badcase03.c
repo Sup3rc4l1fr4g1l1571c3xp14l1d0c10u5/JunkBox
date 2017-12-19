@@ -4,7 +4,7 @@
 @**/
 
 void foo(int first) { 
-  switch(({ if (first) { first = 0; break; } 1; })) { // gcc拡張構文を使って switch 文の評価式中で breakを使っている。
+  switch(({ if (first) { first = 0; break; } 1; })) { /* gcc拡張構文を使って switch 文の評価式中で breakを使っている。 */
   case 2: return 2;
   default: return 0;
   }

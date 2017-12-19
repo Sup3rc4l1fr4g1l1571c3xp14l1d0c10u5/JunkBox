@@ -7,7 +7,7 @@ void foo(void) {
     long double    ld  = 0;
     unsigned int   *p  = 0;
 
-    // ポインターは、浮動小数点型に変換できない
-    ld = p; // gcc =>  error: incompatible types when assigning to type ‘long double’ from type ‘float *’
+    /* ポインターは、浮動小数点型に変換できない */
+    ld = p; /* gcc =>  error: incompatible types when assigning to type ‘long double’ from type ‘float *’ */
 
 }

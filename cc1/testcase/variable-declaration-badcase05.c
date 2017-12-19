@@ -4,6 +4,6 @@
 @**/
 int main(void) {
 	static int x;
-	extern int x;	// リンケージ違いのエラーになる
+	extern int x;	/* リンケージ違いのエラーになる */
 	return 0;
 }

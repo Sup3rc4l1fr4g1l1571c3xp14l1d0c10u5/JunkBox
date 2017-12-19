@@ -100,9 +100,14 @@ namespace AnsiCParser {
             var it = this;
             while (it != Empty) {
                 var val = it._entries.FindLast(x => x.Item1 == ident);
-                if (val != null && val.Item2 is T) {
-                    value = (T)val.Item2;
-                    return true;
+                if (val != null) {
+                    if (val.Item2 is T) {
+                        value = (T)val.Item2;
+                        return true;
+                    } else {
+                        value = default(T);
+                        return false;
+                    }
                 }
                 it = it.Parent;
             }

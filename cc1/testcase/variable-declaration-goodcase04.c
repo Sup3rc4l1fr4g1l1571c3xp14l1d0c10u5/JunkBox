@@ -3,9 +3,9 @@
  assertion: 
 @**/
 
-extern int x;	// 不完全な宣言
-int x;	// 不完全な宣言
+extern int x;	/* 不完全な宣言 */
+int x;	/* 不完全な宣言 */
 int main(void) {
 	return 0;
 }
-int x = 0;	// 完全な宣言は一つなのでOK
+int x = 0;	/* 完全な宣言は一つなのでOK */

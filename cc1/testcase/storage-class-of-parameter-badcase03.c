@@ -4,7 +4,7 @@
 @**/
 
 int f(x) 
-static int  x;	// static は使えない
+static int  x;	/* static は使えない */
 {
 	return x;
 }

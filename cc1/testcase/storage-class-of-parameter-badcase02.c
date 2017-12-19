@@ -4,7 +4,7 @@
 @**/
 
 int f(x) 
-extern int x; // extern は使えない
+extern int x; /* extern は使えない */
 {
 	return x;
 }

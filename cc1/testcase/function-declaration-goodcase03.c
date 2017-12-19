@@ -8,7 +8,7 @@
 typedef int Foo(int, int);
 
 int main(void) {
-	Foo sum;	// 関数宣言として妥当
+	Foo sum;	/* 関数宣言として妥当 */
 	sum(1,2);
 }
 

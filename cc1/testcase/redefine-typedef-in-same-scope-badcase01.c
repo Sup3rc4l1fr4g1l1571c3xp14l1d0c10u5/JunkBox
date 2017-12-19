@@ -4,7 +4,7 @@
 @**/
 
 typedef int SINT;
-typedef int SINT;   // NG(redefine)
+typedef int SINT;   /* NG(redefine) */
 
 int main(void) {
 	SINT x = 1;

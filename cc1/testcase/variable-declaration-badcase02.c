@@ -3,7 +3,7 @@
  assertion: SpecificationErrorException
 @**/
 
-int x = 0;   // 完全な宣言が重複
+int x = 0;   /* 完全な宣言が重複 */
 int x = 1;
 
 int main(void) {

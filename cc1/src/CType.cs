@@ -519,7 +519,7 @@ namespace AnsiCParser {
                     case TypeKind.LongDouble_Imaginary:
                         return "long double _Imaginary";
                     default:
-                        throw new Exception();
+                        return $"<{Kind}>";
                 }
             }
         }
@@ -784,6 +784,45 @@ namespace AnsiCParser {
 
             public override int Sizeof() {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のサイズは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
+            }
+
+            public enum FunctionStyle {
+                OldStyle,       // 古い形式の関数宣言型（引数部が識別子並び）
+                NewStyle,       // 新しい形式の関数宣言型（引数部が仮引数型並び）
+                AmbiguityStyle, // 引数が省略されており曖昧
+                InvalidStyle,   // 不正な形式
+            }
+
+            public FunctionStyle GetFunctionStyle() {
+                var candidate = FunctionStyle.AmbiguityStyle;
+                if (Arguments == null) {
+                    return candidate;
+                }
+                foreach (var x in Arguments) {
+                    if ((x.Type as CType.BasicType)?.Kind == CType.BasicType.TypeKind.KAndRImplicitInt) {
+                        // 型が省略されている＝識別子並びの要素
+                        System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(x.Ident));
+                        if (candidate == FunctionStyle.AmbiguityStyle || candidate == FunctionStyle.OldStyle) {
+                            // 現在の候補が古い形式、もしくは、曖昧形式なら、現在の候補を古い形式として継続判定
+                            candidate = FunctionStyle.OldStyle;
+                        } else {
+                            // それ以外の場合は、不正な形式なので打ち切り。
+                            // 識別子並び中に型名を記述してしまった場合もこのエラーになる
+                            return FunctionStyle.InvalidStyle;
+                        }
+                    } else {
+                        // 型が省略されていない＝仮引数型並びの要素
+                        if (candidate == FunctionStyle.AmbiguityStyle || candidate == FunctionStyle.NewStyle) {
+                            // 現在の候補が新しい形式、もしくは、曖昧形式なら、現在の候補を新しい形式として継続判定
+                            candidate = FunctionStyle.NewStyle;
+                        } else {
+                            // それ以外の場合は、不正な形式なので打ち切り。
+                            // 識別子並び中に型名を記述してしまった場合もこのエラーになる
+                            return FunctionStyle.InvalidStyle;
+                        }
+                    }
+                }
+                return candidate;
             }
 
             public override string ToString() {
@@ -1116,6 +1155,54 @@ namespace AnsiCParser {
                 return t1;
             }
             return null;
+        }
+
+        /// <summary>
+        /// 型中の関数型に（型の無い）仮引数名があるか確認
+        /// </summary>
+        /// <param name="baseType"></param>
+        /// <returns></returns>
+        public static bool CheckContainOldStyleArgument(CType t1) {
+            for (;;) {
+                if (t1 is TypeQualifierType) {
+                    t1 = (t1 as TypeQualifierType).Type;
+                    continue;
+                }
+                if (t1 is TypedefedType) {
+                    // typedef型については宣言時に警告を出し、使用時には警告を出さない。
+                    return false;
+                }
+                if (t1 is PointerType) {
+                    t1 = (t1 as PointerType).BaseType;
+                    continue;
+                }
+                if (t1 is ArrayType) {
+                    t1 = (t1 as ArrayType).BaseType;
+                    continue;
+                }
+                if (t1 is TaggedType.StructUnionType) {
+                    if ((t1 as TaggedType.StructUnionType).Members == null) {
+                        return false;
+                    }
+                    return (t1 as TaggedType.StructUnionType).Members.Any(x => CheckContainOldStyleArgument(x.Type));
+                }
+                if (t1 is FunctionType) {
+                    if ((t1 as FunctionType).Arguments == null) {
+                        return false;
+                    }
+                    if ((t1 as FunctionType).Arguments.Any(x => CheckContainOldStyleArgument(x.Type))) {
+                        return true;
+                    }
+                    t1 = (t1 as FunctionType).ResultType;
+                    continue;
+                }
+                if (t1 is BasicType) {
+                    if ((t1 as BasicType).Kind == BasicType.TypeKind.KAndRImplicitInt) {
+                        return true;
+                    }
+                }
+                return false;
+            }
         }
     }
 }

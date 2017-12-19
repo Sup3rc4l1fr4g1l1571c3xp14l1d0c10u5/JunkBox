@@ -3,8 +3,8 @@
  assertion: SpecificationErrorException
 @**/
 
-int foo(const x,  const y)  // ANSI形式の仮引数並びになるので
-int x, y;   // これは不正
+int foo(const x,  const y)  /* ANSI形式の仮引数並びになるので */
+int x, y;   /* これは不正 */
 {
 return x;
 }

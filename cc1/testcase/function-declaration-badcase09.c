@@ -4,7 +4,7 @@
 @**/
 
 int main(void) {
-	// 不正な再宣言の組み合わせ
+	/* 不正な再宣言の組み合わせ */
 	int sum(int,double);
 	sum(1,2);
 }

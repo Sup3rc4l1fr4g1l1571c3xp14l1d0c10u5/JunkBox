@@ -5,7 +5,7 @@
 
 int f(x) 
 int x;
-int x;  // 同名の宣言並びが存在
+int x;  /* 同名の宣言並びが存在 */
 {
     return x;
 }

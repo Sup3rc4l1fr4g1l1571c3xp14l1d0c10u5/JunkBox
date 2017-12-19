@@ -3,11 +3,11 @@
  assertion: 
 @**/
 
-static int x;	// スコープ
-extern int x;	// グローバルスコープのXを参照するので上のxを示す
+static int x;	/* スコープ */
+extern int x;	/* グローバルスコープのXを参照するので上のxを示す */
 
 int main(void) {
-	extern int x;	// グローバルスコープのXを参照する
+	extern int x;	/* グローバルスコープのXを参照する */
 	return 0;
 }
 

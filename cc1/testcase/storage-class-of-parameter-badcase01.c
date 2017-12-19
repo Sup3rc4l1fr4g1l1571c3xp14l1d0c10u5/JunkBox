@@ -4,7 +4,7 @@
 @**/
 
 int f(x) 
-typedef int SINT; // typedef は使えない
+typedef int SINT; /* typedef は使えない */
 SINT x;
 {
 	return x;

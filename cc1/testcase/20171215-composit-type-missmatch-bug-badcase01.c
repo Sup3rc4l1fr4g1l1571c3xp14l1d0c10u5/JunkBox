@@ -1,6 +1,6 @@
 /**@
- spec: 2017-12-15 型合成の実装漏れを確認した例(3)
- assertion: 
+ spec: 2017-12-15 型合成の実装漏れを確認した例(1)
+ assertion: TypeMissmatchError
 @**/
 
 extern int foo();

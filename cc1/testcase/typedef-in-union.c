@@ -4,7 +4,7 @@
 @**/
 
 union Z {
-    typedef int SINT ;  // NG
+    typedef int SINT ;  /* NG */
     SINT x;
 };
 

@@ -6,6 +6,7 @@
 static int    i1;
 
 int f1() {
-    extern double i1;     // 型が違うため違反
+    extern double i1;     /* error: conflicting types for ‘i1’ */
+                          /* 型が違うため違反 */
 }
 

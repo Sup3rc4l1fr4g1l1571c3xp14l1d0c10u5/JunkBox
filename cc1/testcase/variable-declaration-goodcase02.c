@@ -3,7 +3,7 @@
  assertion: 
 @**/
 
-int x;   // 不完全な定義同士の多重宣言なので問題なし
+int x;   /* 不完全な定義同士の多重宣言なので問題なし */
 int x;
 int main(void) {
 	return 0;

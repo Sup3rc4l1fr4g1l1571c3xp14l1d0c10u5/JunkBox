@@ -6,6 +6,6 @@
 static int x;
 
 int main(void) {
-	extern double x;	// 型違いエラーになる
+	extern double x;	/* 型違いエラーになる */
 	return 0;
 }

@@ -3,7 +3,7 @@
  assertion: 
 @**/
 
-int foo(x,y)    // yの型は int になる（警告対象）
+int foo(x,y)    /* yの型は int になる（警告対象） */
 int x;
 {
 return x;

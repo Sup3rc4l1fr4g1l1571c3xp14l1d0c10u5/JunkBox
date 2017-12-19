@@ -1555,10 +1555,11 @@ namespace AnsiCParser {
                             thenExpr = thenExprPtr;
                             elseExpr = elseExprPtr;
 
-                            var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
-                            if (baseType == null) {
-                                throw new Exception("合成型を作れなかった");
+                            if (Specification.IsCompatible(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType()) == false) {
+                                throw new Exception("両オペランドが適合する型ではない。");
                             }
+                            var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
+                            System.Diagnostics.Debug.Assert(baseType != null);
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
                             ResultType = CType.CreatePointer(baseType);
@@ -1672,7 +1673,7 @@ namespace AnsiCParser {
                             } else if (lType.IsBoolType() && rhs != null && rhs.Type.IsPointerType()) {
                                 // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
                             } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "実引数と仮引数の間で単純代入の条件を満たしていない。");
+                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入元と代入先の間で単純代入の条件を満たしていない。");
                             }
                         }
 
@@ -2126,11 +2127,11 @@ namespace AnsiCParser {
                 public Scope<CType.TaggedType> TagScope {
                     get;
                 }
-                public Scope<IdentifierScopeValue> IdentScope {
+                public Scope<Declaration> IdentScope {
                     get;
                 }
 
-                public CompoundStatement(List<Declaration> decls, List<Statement> stmts, Scope<CType.TaggedType> tagScope, Scope<IdentifierScopeValue> identScope) {
+                public CompoundStatement(List<Declaration> decls, List<Statement> stmts, Scope<CType.TaggedType> tagScope, Scope<Declaration> identScope) {
                     Decls = decls;
                     Stmts = stmts;
                     TagScope = tagScope;
@@ -2278,80 +2279,82 @@ namespace AnsiCParser {
 
         public abstract class Declaration : SyntaxTree {
 
+            public string Ident {
+                get;
+            }
+            public CType Type {
+                get;
+            }
+            public StorageClassSpecifier StorageClass {
+                get;
+            }
+            public LinkageObject LinkageObject {
+                get; set;
+            }
+
+            protected Declaration(string ident, CType type, StorageClassSpecifier storageClass) {
+                Ident = ident;
+                Type = type;
+                StorageClass = storageClass;
+            }
+
             public class FunctionDeclaration : Declaration {
 
-                public string Ident {
-                    get;
-                }
-                public CType Type {
-                    get;
-                }
-                public StorageClassSpecifier StorageClass {
-                    get;
-                }
                 public Statement Body {
                     get; set;
                 }
                 public FunctionSpecifier FunctionSpecifier {
                     get;
                 }
-                public LinkageObject LinkageObject {
-                    get; set;
-                }
 
-                public FunctionDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) {
-                    Ident = ident;
-                    Type = type;
-                    StorageClass = storageClass;
+                public FunctionDeclaration(string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) : base(ident, type, storageClass){
                     Body = null;
                     FunctionSpecifier = functionSpecifier;
+                    LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
                 }
             }
 
             public class VariableDeclaration : Declaration {
-                public string Ident {
-                    get;
-                }
-                public CType Type {
-                    get;
-                }
-                public StorageClassSpecifier StorageClass {
-                    get;
-                }
                 public Initializer Init {
                     get; set;
                 }
-                public LinkageObject LinkageObject {
-                    get; set;
-                }
 
-
-                public VariableDeclaration(string ident, CType type, StorageClassSpecifier storageClass, Initializer init) {
-                    // Initializerを構築するときに検証済み
-                    Ident = ident;
-                    Type = type;
-                    StorageClass = storageClass;
+                public VariableDeclaration(string ident, CType type, StorageClassSpecifier storageClass, Initializer init) : base(ident, type, storageClass) {
                     Init = init;
+                    LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
                 }
             }
 
-            public class ArgumentDeclaration : VariableDeclaration {
+            public class ArgumentDeclaration : Declaration {
 
                 public ArgumentDeclaration(string ident, CType type, StorageClassSpecifier storageClass)
-                    : base(ident, type, storageClass, null) { }
+                    : base(ident, type, storageClass) {
+                    LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
+                }
             }
 
             public class TypeDeclaration : Declaration {
-                public string Ident {
-                    get;
+                public TypeDeclaration(string ident, CType type) : base(ident, type, StorageClassSpecifier.None) {
+                    LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
                 }
-                public CType Type {
-                    get;
+            }
+
+            /// <summary>
+            ///     列挙型のメンバ宣言（便宜上ここに挿入）
+            /// </summary>
+            /// <remarks>
+            ///     6.4.4.3 列挙定数
+            ///     意味規則
+            ///     列挙定数として宣言された識別子は，型 int をもつ。
+            /// </remarks>
+            public class EnumMemberDeclaration : Declaration {
+                public EnumMemberDeclaration(CType.TaggedType.EnumType.MemberInfo mi) : base(mi.Ident, CType.CreateSignedInt(), StorageClassSpecifier.None) {
+                    MemberInfo = mi;
+                    LinkageObject = new LinkageObject(mi.Ident, CType.CreateSignedInt(), LinkageKind.NoLinkage);
                 }
 
-                public TypeDeclaration(string ident, CType type) {
-                    Ident = ident;
-                    Type = type;
+                public CType.TaggedType.EnumType.MemberInfo MemberInfo {
+                    get;
                 }
             }
         }

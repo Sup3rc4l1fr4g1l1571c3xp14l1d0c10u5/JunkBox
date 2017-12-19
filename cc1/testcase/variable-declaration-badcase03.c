@@ -6,6 +6,6 @@
 int x ;
 
 int main(void) {
-	extern double x;	// 型が違う
+	extern double x;	/* 型が違う */
 	return 0;
 }
