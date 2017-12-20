@@ -7,64 +7,86 @@ namespace AnsiCParser {
     public class SyntaxTreeEvaluateVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeEvaluateVisitor.Value, SyntaxTreeEvaluateVisitor.Value> {
 
         /*
-         * +----+----------------------+
-         * | SP | 未使用領域           |
-         * +----+----------------------+
-         * | +n | ローカル変数領域     |
-         * +----+----------------------+
-         * | ・・・・・・・            |
-         * +----+----------------------+
-         * | -1 | ローカル変数領域     |
-         * +----+----------------------+
-         * | BP | 以前のベースポインタ |
-         * +----+----------------------+
-         * | +1 | 引数[n-1]            |
-         * +----+----------------------+
-         * | +2 | 引数[n-2]            |
-         * +----+----------------------+
-         * | ・・・・・・・            |
-         * +----+----------------------+
-         * | +n | 引数[0]              |
-         * +----+----------------------+
+         * +------+----------------------+
+         * | SP   | 未使用領域           |
+         * +------+----------------------+
+         * | +n   | ローカル変数領域     |
+         * +------+----------------------+
+         * | ・・・・・・・・            |
+         * +------+----------------------+
+         * | -1   | ローカル変数領域     |
+         * +------+----------------------+
+         * | BP   | 以前のSP             |
+         * +------+----------------------+
+         * | (※戻り値格納先アドレス)    |
+         * +------+----------------------+
+         * | +1   | 引数[0]              |
+         * +------+----------------------+
+         * | ・・・・・・・・            |
+         * +------+----------------------+
+         * | +n-1 | 引数[n-2]            |
+         * +------+----------------------+
+         * | +n   | 引数[n-1]            |
+         * +------+----------------------+
          * 
+         */
+
+        /*
+         * Calling Convention: cdecl
+         *  - 関数への引数は右から左の順でスタックに積まれる。
+         *    - 引数にはベースポインタ相対でアクセスする
+         *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+         *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
+         *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
+         *  - スタックポインタの処理は呼び出し側で行う。  
+         *  
+         */
+
+        /*
+         * コード生成:
+         *  - 式の評価結果は Value で表現する
+         *  - 
          */
 
         public class Value {
             public enum ValueKind {
-                IntValue,
-                FloatValue,
-                GlobalVar,
-                LocalVar,
-                BinOp,
-                UnaryOp,
-
+                Register,   // 式の結果はレジスタ(EAX/AX/AL)上にある。
+                IntConst,   // 式の結果は整数定数値である
+                FloatConst, // 式の結果は浮動小数点定数値である
+                GlobalVar,  // 式の結果はグローバル変数である
+                LocalVar,   // 式の結果はローカル変数である
+                Address,    // 式の結果は参照(参照先アドレスはEAXに格納)である
             }
 
             public ValueKind Kind;
 
             public CType Type;
 
-            // IntValue
-            public long IntValue;
+            // Register
+            public string Register;
 
-            // FloatValue
-            public double FloatValue;
+            // IntConst
+            public long IntConst;
+
+            // FloatConst
+            public double FloatConst;
 
             // GlobalVar
             // LocalVar
             public string Label;
-            public int Offset;  // offset of Basepointer
+            public int Offset;
+            public Value() {
+            }
 
-            // BinOp
-            public string BinOp;
-            public Value Left;
-            public Value Right;
-
-            // UnaryOp
-            public string UnaryOp;
-            public Value Operand;
-
-
+            public Value(Value ret) {
+                this.Kind = ret.Kind;
+                this.Type = ret.Type;
+                this.Register = ret.Register;
+                this.IntConst = ret.IntConst;
+                this.FloatConst = ret.FloatConst;
+                this.Label = ret.Label;
+                this.Offset = ret.Offset;
+            }
         }
 
 
@@ -73,7 +95,18 @@ namespace AnsiCParser {
         }
 
         public Value OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Value value) {
-            throw new NotImplementedException();
+            if (self.Body != null) {
+                Console.WriteLine($".section .text");
+                Console.WriteLine($".globl {self.LinkageObject.LinkageId}");
+                Console.WriteLine($"{self.LinkageObject.LinkageId}:");
+                Console.WriteLine($"pushl %ebp");
+                Console.WriteLine($"movl  %esp, %ebp");
+                self.Body.Accept(this, value);
+                Console.WriteLine($"movl %ebp, %esp");
+                Console.WriteLine($"popl %ebp");
+                Console.WriteLine($"ret");
+            }
+            return value;
         }
 
         public Value OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, Value value) {
@@ -81,11 +114,40 @@ namespace AnsiCParser {
         }
 
         public Value OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, Value value) {
-            throw new NotImplementedException();
+            if (self.LinkageObject.Linkage != LinkageKind.NoLinkage) {
+                Console.WriteLine($".section .bss");
+                Console.WriteLine($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}");
+            } else {
+                if (self.Init != null) {
+                    return self.Init.Accept(this, value);
+                }
+            }
+            return value;
         }
 
         public Value OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, Value value) {
-            throw new NotImplementedException();
+            var lhs = self.Lhs.Accept(this, value);
+            var rhs = self.Rhs.Accept(this, value);
+
+            if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                rhs = Load(rhs);
+                Console.WriteLine($"pushl %ecx");
+                if (rhs.Kind == Value.ValueKind.IntConst) {
+                    Console.WriteLine($"pushl ${rhs.IntConst}");
+                } else if (rhs.Kind == Value.ValueKind.Register) {
+                    Console.WriteLine($"pushl {rhs.Register}");
+                }
+                lhs = Load(lhs);
+                if (lhs.Kind == Value.ValueKind.IntConst) {
+                    Console.WriteLine($"movl ${lhs.IntConst}, %eax");
+                }
+                Console.WriteLine($"popl %ecx");
+                Console.WriteLine("addl %ecx, %eax");
+                Console.WriteLine($"popl %ecx");
+                return new Value() { Kind = Value.ValueKind.Register, Type = self.Type, Register = "%eax" };
+            } else {
+                throw new NotImplementedException();
+            }
         }
 
         public Value OnAndExpression(SyntaxTree.Expression.AndExpression self, Value value) {
@@ -97,11 +159,135 @@ namespace AnsiCParser {
         }
 
         public Value OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
-            throw new NotImplementedException();
+            var rhs = self.Rhs.Accept(this, value);
+            var lhs = self.Lhs.Accept(this, value);
+
+            switch (self.Type.Sizeof()) {
+                case 4:
+                    if (lhs.Kind == Value.ValueKind.LocalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movl ${rhs.IntConst}, -{lhs.Offset}(%ebp)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movl {rhs.Register}, -{lhs.Offset}(%ebp)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.GlobalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movl ${rhs.IntConst}, {lhs.Label}");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movl {rhs.Register}, {lhs.Label}");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.Address) {
+                        Console.WriteLine($"push %ecx");
+                        Console.WriteLine($"movl {lhs.Register}, %ecx");
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movl ${rhs.IntConst}, (%ecx)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movl {rhs.Register}, (%ecx)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        Console.WriteLine($"pop %ecx");
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                    return lhs;
+                case 2:
+                    if (lhs.Kind == Value.ValueKind.LocalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movw ${rhs.IntConst}, -{lhs.Offset}(%ebp)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movw ${rhs.Register}, -{lhs.Offset}(%ebp)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.GlobalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movw ${rhs.IntConst}, {lhs.Label}");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movw ${rhs.Register}, {lhs.Label}");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.Address) {
+                        Console.WriteLine($"push %ecx");
+                        Console.WriteLine($"movl {lhs.Register}, %ecx");
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movw ${rhs.IntConst}, (%ecx)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movw {rhs.Register}, (%ecx)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        Console.WriteLine($"pop %ecx");
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                    return lhs;
+                case 1:
+                    if (lhs.Kind == Value.ValueKind.LocalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movb ${rhs.IntConst}, -{lhs.Offset}(%ebp)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movb {rhs.Register}, -{lhs.Offset}(%ebp)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.GlobalVar) {
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movb ${rhs.IntConst}, {lhs.Label}");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movb {rhs.Register}, {lhs.Label}");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    } else if (lhs.Kind == Value.ValueKind.Address) {
+                        Console.WriteLine($"push %ecx");
+                        Console.WriteLine($"movb {lhs.Register}, %ecx");
+                        rhs = Load(rhs);
+                        if (rhs.Kind == Value.ValueKind.IntConst) {
+                            Console.WriteLine($"movb ${rhs.IntConst}, (%ecx)");
+                        } else if (rhs.Kind == Value.ValueKind.Register) {
+                            Console.WriteLine($"movb {rhs.Register}, (%ecx)");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        Console.WriteLine($"pop %ecx");
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                    return lhs;
+                default:
+                throw new NotImplementedException();
+            }
         }
 
         public Value OnCastExpression(SyntaxTree.Expression.CastExpression self, Value value) {
-            throw new NotImplementedException();
+            var ret = self.Expr.Accept(this, value);
+            if (ret.Type.IsIntegerType() && self.Type.IsIntegerType()) {
+                var retty = ret.Type.Unwrap() as CType.BasicType;
+                var selfty = self.Type.Unwrap() as CType.BasicType;
+
+                var key = Tuple.Create(retty.Kind == CType.BasicType.TypeKind.Char ? CType.BasicType.TypeKind.SignedChar : retty.Kind, selfty.Kind == CType.BasicType.TypeKind.Char ? CType.BasicType.TypeKind.SignedChar : selfty.Kind);
+                Func<Value, CType, Value> func;
+                if (ConvertTable.TryGetValue(key, out func) == false) {
+                    throw new NotImplementedException();
+                }
+                return func(Load(ret), selfty);
+            } else {
+                throw new NotImplementedException();
+            }
         }
 
         public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Value value) {
@@ -169,11 +355,11 @@ namespace AnsiCParser {
         }
 
         public Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
-            return new Value() { Kind = Value.ValueKind.FloatValue, Type=self.Type, FloatValue = self.Value };
+            return new Value() { Kind = Value.ValueKind.FloatConst, Type=self.Type, FloatConst = self.Value };
         }
 
         public Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
-            return new Value() {Kind = Value.ValueKind.IntValue, Type = self.Type, IntValue = self.Value};
+            return new Value() {Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value};
         }
 
         public Value OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
@@ -197,7 +383,12 @@ namespace AnsiCParser {
         }
 
         public Value OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
-            throw new NotImplementedException();
+            int offset;
+            if (localScope.TryGetValue(self.Ident, out offset)) {
+                return new Value() { Kind = Value.ValueKind.LocalVar, Type = self.Type, Offset = offset };
+            } else {
+                return new Value() { Kind = Value.ValueKind.GlobalVar, Type = self.Type, Offset = 0, Label = self.Decl.LinkageObject.LinkageId };
+            }
         }
 
         public Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, Value value) {
@@ -220,12 +411,81 @@ namespace AnsiCParser {
             throw new NotImplementedException();
         }
 
+        Dictionary<Tuple<CType.BasicType.TypeKind, CType.BasicType.TypeKind>, Func<Value, CType, Value>> ConvertTable = new Dictionary<Tuple<CType.BasicType.TypeKind, CType.BasicType.TypeKind>, Func<Value, CType, Value>>() {
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movzbl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movzbl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.SignedChar), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovzbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\ncbtw", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.SignedShortInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovzbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax\r\nmovzwl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovsbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.SignedInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movzbl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movzbl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.UnsignedChar), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%al" }; }},
+
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovzbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\ncbtw", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.UnsignedShortInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%ax" }; }},
+
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedChar,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovzbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedShortInt,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax\r\nmovzwl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.UnsignedInt,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedChar,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movzbl {0}, %eax\r\nmovsbl %al, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedShortInt,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movzwl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+            {Tuple.Create(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.UnsignedInt), (value, ty) => { Console.WriteLine("movl {0}, %eax", (value.Kind == Value.ValueKind.IntConst ? "$"+value.IntConst.ToString() : value.Register) ); return new Value() { Kind = Value.ValueKind.Register, Type = ty, Register = "%eax" }; }},
+
+        };
+
         public Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, Value value) {
-            throw new NotImplementedException();
+            var ret = self.Expr.Accept(this, value);
+            if (ret.Type.IsIntegerType() && self.Type.IsIntegerType()) {
+                var retty = ret.Type.Unwrap() as CType.BasicType;
+                var selfty = self.Type.Unwrap() as CType.BasicType;
+
+                var key = Tuple.Create(retty.Kind == CType.BasicType.TypeKind.Char ? CType.BasicType.TypeKind.SignedChar : retty.Kind, selfty.Kind == CType.BasicType.TypeKind.Char ? CType.BasicType.TypeKind.SignedChar : selfty.Kind);
+                Func<Value, CType, Value> func;
+                if (ConvertTable.TryGetValue(key, out func) == false) {
+                    throw new NotImplementedException();
+                }
+                return func(Load(ret), selfty);
+            } else if (ret.Type.IsPointerType() && self.Type.IsPointerType()) {
+                return ret;
+            } else {
+                throw new NotImplementedException();
+            }
         }
 
         public Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, Value value) {
-            throw new NotImplementedException();
+            var operand = self.Expr.Accept(this, value);
+            if (operand.Kind == Value.ValueKind.LocalVar) {
+                Console.WriteLine($"leal {-operand.Offset}(%ebp), %eax");
+                return new Value() { Kind = Value.ValueKind.Register, Type = self.Type, Register = "%eax" };
+            } else if (operand.Kind == Value.ValueKind.GlobalVar) {
+                Console.WriteLine($"leal {operand.Label}, %eax");
+                return new Value() { Kind = Value.ValueKind.Register, Type = self.Type, Register = "%eax" };
+            } else {
+                throw new NotImplementedException();
+            }
         }
 
         public Value OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, Value value) {
@@ -249,7 +509,8 @@ namespace AnsiCParser {
         }
 
         public Value OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, Value value) {
-            throw new NotImplementedException();
+            var operand = Load(self.Expr.Accept(this, value));
+            return new Value(operand) { Kind = Value.ValueKind.Address, Type = self.Type };
         }
 
         public Value OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Value value) {
@@ -268,8 +529,35 @@ namespace AnsiCParser {
             throw new NotImplementedException();
         }
 
+        Scope<int> localScope = Scope<int>.Empty;
+        int localScopeTotalSize = 0;
+
         public Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, Value value) {
-            throw new NotImplementedException();
+            localScope = localScope.Extend();
+            var prevLocalScopeSize = localScopeTotalSize;
+
+            int localScopeSize = 0;
+            foreach (var x in self.Decls) {
+                if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                    localScopeSize += (x.LinkageObject.Type.Sizeof() + 3) & ~3;
+                    localScope.Add(x.Ident, localScopeTotalSize + localScopeSize);
+                } else {
+                    localScope.Add(x.Ident, -1);
+                }
+            }
+            Console.WriteLine($"andl $-16, %esp");
+            Console.WriteLine($"subl ${localScopeSize}, %esp");
+
+            foreach (var x in self.Decls) {
+                x.Accept(this, value);
+            }
+            foreach (var x in self.Stmts) {
+                x.Accept(this, value);
+            }
+
+            localScopeTotalSize = prevLocalScopeSize;
+            localScope = localScope.Parent;
+            return value;
         }
 
         public Value OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, Value value) {
@@ -289,7 +577,7 @@ namespace AnsiCParser {
         }
 
         public Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, Value value) {
-            throw new NotImplementedException();
+            return self.Expr.Accept(this, value);
         }
 
         public Value OnForStatement(SyntaxTree.Statement.ForStatement self, Value value) {
@@ -308,8 +596,76 @@ namespace AnsiCParser {
             throw new NotImplementedException();
         }
 
+
+        
+        private Value Load(Value value) {
+            if (value.Kind == Value.ValueKind.IntConst) {
+                return value;
+            } else if (value.Kind == Value.ValueKind.FloatConst) {
+                return value;
+            } else if (value.Kind == Value.ValueKind.Register) {
+                return value;
+            } else if (value.Kind == Value.ValueKind.LocalVar) {
+                if (value.Type.Sizeof() == 4) {
+                    Console.WriteLine($"movl {-value.Offset}(%ebp), %eax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%eax" };
+                } else if (value.Type.Sizeof() == 2) {
+                    Console.WriteLine($"movw {-value.Offset}(%ebp), %ax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%ax" };
+                } else if (value.Type.Sizeof() == 1) {
+                    Console.WriteLine($"movb {-value.Offset}(%ebp), %al");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%al" };
+                } else {
+                    throw new NotImplementedException();
+                }
+            } else if (value.Kind == Value.ValueKind.GlobalVar) {
+                if (value.Type.Sizeof() == 4) {
+                    Console.WriteLine($"movl {value.Label}, %eax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%eax" };
+                } else if (value.Type.Sizeof() == 2) {
+                    Console.WriteLine($"movw {value.Label}, %ax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%ax" };
+                } else if (value.Type.Sizeof() == 1) {
+                    Console.WriteLine($"movb {value.Label}, %al");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%al" };
+                } else {
+                    throw new NotImplementedException();
+                }
+            } else if (value.Kind == Value.ValueKind.Address) {
+                if (value.Type.Sizeof() == 4) {
+                    Console.WriteLine($"movl ({value.Register}), %eax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%eax" };
+                } else if (value.Type.Sizeof() == 2) {
+                    Console.WriteLine($"movw ({value.Register}), %ax");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%ax" };
+                } else if (value.Type.Sizeof() == 1) {
+                    Console.WriteLine($"movb ({value.Register}), %al");
+                    return new Value() { Kind = Value.ValueKind.Register, Type = value.Type, Register = "%al" };
+                } else {
+                    throw new NotImplementedException();
+                }
+            } else {
+                throw new NotImplementedException();
+            }
+        }
+
         public Value OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, Value value) {
-            throw new NotImplementedException();
+            if (!self.Expr.Type.IsVoidType()) {
+                value = self.Expr.Accept(this, value);
+                if (self.Expr.Type.Sizeof() == 4) {
+                    value = Load(value);
+                    if (value.Kind == Value.ValueKind.IntConst) {
+                        Console.WriteLine($"movl {value.IntConst}, %eax");
+                    } else if (value.Kind == Value.ValueKind.Register) {
+                        Console.WriteLine($"movl {value.Register}, %eax");
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+            return value;
         }
 
         public Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Value value) {
@@ -321,7 +677,10 @@ namespace AnsiCParser {
         }
 
         public Value OnTranslationUnit(SyntaxTree.TranslationUnit self, Value value) {
-            throw new NotImplementedException();
+            foreach (var obj in self.LinkageTable) {
+                obj.Value.Definition.Accept(this, value);
+            }
+            return value;
         }
     }
 }

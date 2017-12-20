@@ -9,23 +9,24 @@ namespace AnsiCParser {
 
         static void Main(string[] args) {
             var ret = new Parser(@"
-float min(float x, float y) {
-    return x < y ? x : y;
-}
 
-int main(void) {
-    int y;
-    y = min(2, 3.14);
-    return 0;
-}
+int test(void) {
+    int a;
+    int *x;
+    a = 0;
+    x = &a;
+    *x = *x + 5;
+    return a;
+}   
+
 
 
 ").Parse();
             //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
-            //var v = new SyntaxTreeEvaluateVisitor.Value();
-            //ret.Accept(new SyntaxTreeEvaluateVisitor(), v);
+            var v = new SyntaxTreeEvaluateVisitor.Value();
+            ret.Accept(new SyntaxTreeEvaluateVisitor(), v);
 
             var tc = new TestCase();
             foreach (var arg in System.IO.Directory.GetFiles(@"..\..\testcase", "*.c")) {
