@@ -47,36 +47,36 @@ namespace AnsiCParser {
         }
 
         public Cell OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, Cell value) {
-            var ops = "";
+            string ops = "";
             switch (self.Op) {
-                case "+=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
                     ops = "add-assign-expr";
                     break;
-                case "-=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
                     ops = "sub-assign-expr";
                     break;
-                case "*=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
                     ops = "mul-assign-expr";
                     break;
-                case "/=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
                     ops = "div-assign-expr";
                     break;
-                case "%=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
                     ops = "mod-assign-expr";
                     break;
-                case "&=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
                     ops = "and-assign-expr";
                     break;
-                case "|=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
                     ops = "or-assign-expr";
                     break;
-                case "^=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
                     ops = "xor-assign-expr";
                     break;
-                case "<<=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
                     ops = "shl-assign-expr";
                     break;
-                case ">>=":
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
                     ops = "shr-assign-expr";
                     break;
             }

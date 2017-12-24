@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -54,12 +55,103 @@ namespace AnsiCParser {
             return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
+        public static void CharIterator(Func<int> peek, Action next, Action<byte> write) {
+            int ret = 0;
+            if (peek() == '\\') {
+                next();
+                switch (peek()) {
+                    case '\'': case '"': case '?': case '\\':
+                        write((byte)peek());
+                        next();
+                        return;
+                    case 'a': next(); write((byte)'\a'); return;
+                    case 'b': next(); write((byte)'\b'); return;
+                    case 'f': next(); write((byte)'\f'); return;
+                    case 'n': next(); write((byte)'\n'); return;
+                    case 'r': next(); write((byte)'\r'); return;
+                    case 't': next(); write((byte)'\t'); return;
+                    case 'v': next(); write((byte)'\v'); return;
+                    case 'x': {
+                        next();
+                        int n = 0;
+                        while (IsXDigit(peek())) {
+                            ret = (ret << 4) | XDigitToInt(peek());
+                            next();
+                            n++;
+                            if (n == 2) {
+                                write((byte)ret);
+                                n = 0;
+                                ret = 0;
+                            }
+                        }
+                        if (n != 0) {
+                            write((byte)ret);
+                        }
+                        return;
+                    }
+                    case 'u':
+                        next();
+                        for (var i = 0; i < 4; i++) {
+                            if (IsXDigit(peek()) == false) {
+                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "invalid universal character");
+                            }
+                            ret = (ret << 4) | XDigitToInt(peek());
+                            next();
+                            if ((i % 2) == 1) {
+                                write((byte)ret);
+                                ret = 0;
+                            }
+                        }
+                        return;
+                    case 'U':
+                        next();
+                        for (var i = 0; i < 8; i++) {
+                            if (IsXDigit(peek()) == false) {
+                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "invalid universal character");
+                            }
+                            ret = (ret << 4) | XDigitToInt(peek());
+                            next();
+                            if ((i % 2) == 1) {
+                                write((byte)ret);
+                                ret = 0;
+                            }
+                        }
+                        return;
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                        for (var i = 0; i < 3; i++) {
+                            if (IsOct(peek()) == false) {
+                                break;
+                            }
+                            ret = (ret << 3) | (peek()-'0');
+                            next();
+                        }
+                        write((byte)ret);
+                        return;
+                    default:
+                        throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "unknown escape character");
+
+                }
+            } else {
+                ret = peek();
+                next();
+                write((byte)ret);
+                return;
+            }
+        }
+
         /// <summary>
         /// 識別子の先頭に出現できる文字なら真
         /// </summary>
         /// <param name="ch"></param>
         /// <returns></returns>
-        private bool IsIdentifierHead(int ch) {
+        private static bool IsIdentifierHead(int ch) {
             return ('A' <= ch && ch <= 'Z') || ('a' <= ch && ch <= 'z') || (ch == '_');
         }
 
@@ -68,17 +160,48 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="ch"></param>
         /// <returns></returns>
-        private bool IsIdentifierBody(int ch) {
+        private static bool IsIdentifierBody(int ch) {
             return ('A' <= ch && ch <= 'Z') || ('a' <= ch && ch <= 'z') || ('0' <= ch && ch <= '9') || (ch == '_');
         }
 
         /// <summary>
-        /// 数字なら真
+        /// 八進数字なら真
         /// </summary>
         /// <param name="ch"></param>
         /// <returns></returns>
-        private bool IsDigit(int ch) {
+        private static bool IsOct(int ch) {
+            return ('0' <= ch && ch <= '7');
+        }
+
+
+        /// <summary>
+        /// 十進数字なら真
+        /// </summary>
+        /// <param name="ch"></param>
+        /// <returns></returns>
+        private static bool IsDigit(int ch) {
             return ('0' <= ch && ch <= '9');
+        }
+
+        /// <summary>
+        /// 十六進数字なら真
+        /// </summary>
+        /// <param name="ch"></param>
+        /// <returns></returns>
+        private static bool IsXDigit(int ch) {
+            return ('0' <= ch && ch <= '9') || ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f');
+        }
+
+        /// <summary>
+        /// 十六進数字をintに
+        /// </summary>
+        /// <param name="ch"></param>
+        /// <returns></returns>
+        private static int XDigitToInt(int ch) {
+            if ('0' <= ch && ch <= '9') { return ch - '0'; }
+            if ('A' <= ch && ch <= 'F') { return ch - 'A'; }
+            if ('a' <= ch && ch <= 'f') { return ch - 'a'; }
+            throw new Exception();
         }
 
         /// <summary>
@@ -86,7 +209,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="ch"></param>
         /// <returns></returns>
-        private bool IsSpace(int ch) {
+        private static bool IsSpace(int ch) {
             return "\r\n\v\f\t ".Any(x => (int)x == ch);
         }
 
@@ -456,16 +579,14 @@ namespace AnsiCParser {
                 // 文字定数の読み取り
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
-                    if (Peek("\\")) {
-                        IncPos(2);
-                    } else if (Peek("'")) {
+                    if (Peek("'")) {
                         IncPos(1);
                         var end = GetCurrentLocation();
                         var str = Substring(start, end);
                         _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start, end, str));
                         return;
                     } else {
-                        IncPos(1);
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();
@@ -475,16 +596,14 @@ namespace AnsiCParser {
             if (Peek("\"")) {
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
-                    if (Peek("\\")) {
-                        IncPos(2);
-                    } else if (Peek("\"")) {
+                    if (Peek("\"")) {
                         IncPos(1);
                         var end = GetCurrentLocation();
                         var str = Substring(start, end);
                         _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start, end, str));
                         return;
                     } else {
-                        IncPos(1);
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();

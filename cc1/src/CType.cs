@@ -418,56 +418,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int Sizeof() {
-                switch (Kind) {
-                    case TypeKind.KAndRImplicitInt:
-                        return 4;
-                    case TypeKind.Void:
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
-                    case TypeKind.Char:
-                        return 1;
-                    case TypeKind.SignedChar:
-                        return 1;
-                    case TypeKind.UnsignedChar:
-                        return 1;
-                    case TypeKind.SignedShortInt:
-                        return 2;
-                    case TypeKind.UnsignedShortInt:
-                        return 2;
-                    case TypeKind.SignedInt:
-                        return 4;
-                    case TypeKind.UnsignedInt:
-                        return 4;
-                    case TypeKind.SignedLongInt:
-                        return 4;
-                    case TypeKind.UnsignedLongInt:
-                        return 4;
-                    case TypeKind.SignedLongLongInt:
-                        return 4;
-                    case TypeKind.UnsignedLongLongInt:
-                        return 4;
-                    case TypeKind.Float:
-                        return 4;
-                    case TypeKind.Double:
-                        return 8;
-                    case TypeKind.LongDouble:
-                        return 12;
-                    case TypeKind._Bool:
-                        return 1;
-                    case TypeKind.Float_Complex:
-                        return 4 * 2;
-                    case TypeKind.Double_Complex:
-                        return 8 * 2;
-                    case TypeKind.LongDouble_Complex:
-                        return 12 * 2;
-                    case TypeKind.Float_Imaginary:
-                        return 4;
-                    case TypeKind.Double_Imaginary:
-                        return 8;
-                    case TypeKind.LongDouble_Imaginary:
-                        return 12;
-                    default:
-                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のサイズを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
-                }
+                return CType.Sizeof(Kind);
             }
 
             public override string ToString() {
@@ -521,6 +472,59 @@ namespace AnsiCParser {
                     default:
                         return $"<{Kind}>";
                 }
+            }
+        }
+
+        public static int Sizeof(BasicType.TypeKind kind) {
+            switch (kind) {
+                case BasicType.TypeKind.KAndRImplicitInt:
+                    return 4;
+                case BasicType.TypeKind.Void:
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
+                case BasicType.TypeKind.Char:
+                    return 1;
+                case BasicType.TypeKind.SignedChar:
+                    return 1;
+                case BasicType.TypeKind.UnsignedChar:
+                    return 1;
+                case BasicType.TypeKind.SignedShortInt:
+                    return 2;
+                case BasicType.TypeKind.UnsignedShortInt:
+                    return 2;
+                case BasicType.TypeKind.SignedInt:
+                    return 4;
+                case BasicType.TypeKind.UnsignedInt:
+                    return 4;
+                case BasicType.TypeKind.SignedLongInt:
+                    return 4;
+                case BasicType.TypeKind.UnsignedLongInt:
+                    return 4;
+                case BasicType.TypeKind.SignedLongLongInt:
+                    return 4;
+                case BasicType.TypeKind.UnsignedLongLongInt:
+                    return 4;
+                case BasicType.TypeKind.Float:
+                    return 4;
+                case BasicType.TypeKind.Double:
+                    return 8;
+                case BasicType.TypeKind.LongDouble:
+                    return 12;
+                case BasicType.TypeKind._Bool:
+                    return 1;
+                case BasicType.TypeKind.Float_Complex:
+                    return 4 * 2;
+                case BasicType.TypeKind.Double_Complex:
+                    return 8 * 2;
+                case BasicType.TypeKind.LongDouble_Complex:
+                    return 12 * 2;
+                case BasicType.TypeKind.Float_Imaginary:
+                    return 4;
+                case BasicType.TypeKind.Double_Imaginary:
+                    return 8;
+                case BasicType.TypeKind.LongDouble_Imaginary:
+                    return 12;
+                default:
+                    throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のサイズを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
             }
         }
 
@@ -649,7 +653,7 @@ namespace AnsiCParser {
                 }
 
                 public override int Sizeof() {
-                    return 4;
+                    return Sizeof(BasicType.TypeKind.SignedInt);
                 }
 
                 public override string ToString() {
@@ -886,7 +890,7 @@ namespace AnsiCParser {
             }
 
             public override int Sizeof() {
-                return 4;
+                return Sizeof(BasicType.TypeKind.SignedInt);
             }
 
             public override string ToString() {
@@ -920,7 +924,7 @@ namespace AnsiCParser {
             }
 
             public override int Sizeof() {
-                return Length < 0 ? 4 : BaseType.Sizeof() * Length;
+                return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : BaseType.Sizeof() * Length;
             }
 
             public override string ToString() {

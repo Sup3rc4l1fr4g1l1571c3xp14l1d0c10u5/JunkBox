@@ -201,9 +201,27 @@ namespace AnsiCParser {
                         }
 
                         public IntegerConstant(string str, long value, CType.BasicType.TypeKind kind) {
+                            var ctype = new CType.BasicType(kind);
+
+                            int lowerBits = 8 * ctype.Sizeof();
+                            System.Diagnostics.Debug.Assert(lowerBits > 0);
+
+                            int upperBits = (8 * sizeof(long)) - lowerBits;
+                            System.Diagnostics.Debug.Assert(upperBits > 0);
+
+                            // 符号拡張を実行
+                            if (ctype.IsSignedIntegerType()) {
+                                value = unchecked((value << upperBits) >> upperBits);
+                            }
+                            else {
+                                value = unchecked((long)((ulong)(value << upperBits) >> upperBits));
+                            }
+
                             Str = str;
                             Value = value;
-                            ConstantType = new CType.BasicType(kind);
+                            ConstantType = ctype;
+
+
                         }
                     }
 
@@ -212,6 +230,9 @@ namespace AnsiCParser {
                     /// </summary>
                     public class CharacterConstant : Constant {
                         public string Str {
+                            get;
+                        }
+                        public int Value {
                             get;
                         }
 
@@ -228,6 +249,11 @@ namespace AnsiCParser {
                         public CharacterConstant(string str) {
                             Str = str;
                             ConstantType = CType.CreateChar();
+
+                            int[] i = new[] { 1 };
+                            int value = 0;
+                            Lexer.CharIterator(() => str[i[0]], () => i[0]++, (b) => value = (value << 8) | b);
+                            Value = value;
                         }
 
                     }
@@ -256,10 +282,9 @@ namespace AnsiCParser {
                         }
 
                         public FloatingConstant(string str, double value, CType.BasicType.TypeKind kind) {
-                            // Todo: WideChar未対応
-                            Str = str;
-                            Value = value;
                             ConstantType = new CType.BasicType(kind);
+                            Str = str;
+                            Value = kind == CType.BasicType.TypeKind.Float ? (float) value : value;
                         }
                     }
                 }
@@ -274,6 +299,8 @@ namespace AnsiCParser {
                     public List<string> Strings {
                         get;
                     }
+
+                    public List<byte> Value { get; }
 
                     private CType ConstantType {
                         get;
@@ -293,8 +320,17 @@ namespace AnsiCParser {
 
                     public StringExpression(List<string> strings) {
                         // Todo: WideChar未対応
+
+                        Value = new List<byte>();
+                        foreach (var str in strings) {
+                            int[] i  = new[] {1};
+                            while (str[i[0]] != '"') {
+                                Lexer.CharIterator(() => str[i[0]], () => i[0]++, (b) => Value.Add(b));
+                            }
+                        }
+                        Value.Add(0x00);
                         Strings = strings;
-                        ConstantType = CType.CreateArray(String.Concat(Strings).Length, CType.CreateChar());
+                        ConstantType = CType.CreateArray(Value.Count, CType.CreateChar());
                     }
                 }
 
@@ -462,7 +498,7 @@ namespace AnsiCParser {
                                 var targ = functionType.Arguments[i];
                                 var lhs = targ.Type.UnwrapTypeQualifier();
                                 var rhs = args[i];
-                                SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(lhs, rhs);
+                                args[i] = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(lhs, rhs);
                             }
 
                         } else {
@@ -1725,11 +1761,14 @@ namespace AnsiCParser {
                 /// 6.5.16.2 複合代入
                 /// </summary>
                 public class CompoundAssignmentExpression : AssignmentExpression {
-                    public string Op {
-                        get; protected set;
+                    public enum OperatorKind {
+                        None, 
+                        MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN, ADD_ASSIGN, SUB_ASSIGN, LEFT_ASSIGN, RIGHT_ASSIGN, AND_ASSIGN, XOR_ASSIGN, OR_ASSIGN
                     }
-
-                    public CompoundAssignmentExpression(string op, Expression lhs, Expression rhs) {
+                    public OperatorKind Op {
+                        get;
+                    }
+                    public CompoundAssignmentExpression(OperatorKind op, Expression lhs, Expression rhs) {
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
@@ -1743,8 +1782,8 @@ namespace AnsiCParser {
                         // - 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
                         // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
                         switch (op) {
-                            case "+=":
-                            case "-=": {
+                            case OperatorKind.ADD_ASSIGN:
+                            case OperatorKind.SUB_ASSIGN: {
                                 if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
                                     // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
                                 } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
@@ -1756,16 +1795,16 @@ namespace AnsiCParser {
                                 }
                                 break;
                             }
-                            case "*=":
-                            case "/=":
-                            case "%=": {
+                            case OperatorKind.MUL_ASSIGN:
+                            case OperatorKind.DIV_ASSIGN:
+                            case OperatorKind.MOD_ASSIGN: {
                                 // 制約(複合代入)
                                 // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
                                 // 制約(6.5.5 乗除演算子)
                                 // 各オペランドは，算術型をもたなければならない。
                                 // %演算子のオペランドは，整数型をもたなければならない
-                                if (op == "%=") {
+                                if (op == OperatorKind.MOD_ASSIGN) {
                                     if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
                                         throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "%=演算子のオペランドは，整数型をもたなければならない。");
                                     }
@@ -1776,8 +1815,8 @@ namespace AnsiCParser {
                                 }
                                 break;
                             }
-                            case "<<=":
-                            case ">>=": {
+                            case OperatorKind.LEFT_ASSIGN:
+                            case OperatorKind.RIGHT_ASSIGN: {
                                 // 制約(複合代入)
                                 // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
@@ -1788,7 +1827,7 @@ namespace AnsiCParser {
                                 }
                                 break;
                             }
-                            case "&=": {
+                            case OperatorKind.AND_ASSIGN: {
                                 // 制約(複合代入)
                                 // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
@@ -1799,7 +1838,7 @@ namespace AnsiCParser {
                                 }
                                 break;
                             }
-                            case "^=": {
+                            case OperatorKind.XOR_ASSIGN: {
                                 // 制約(複合代入)
                                 // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
@@ -1810,7 +1849,7 @@ namespace AnsiCParser {
                                 }
                                 break;
                             }
-                            case "|=": {
+                            case OperatorKind.OR_ASSIGN: {
                                 // 制約(複合代入)
                                 // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
@@ -1820,6 +1859,9 @@ namespace AnsiCParser {
                                     throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
                                 }
                                 break;
+                            }
+                            default: {
+                                throw new Exception();
                             }
                         }
 

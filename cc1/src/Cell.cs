@@ -14,6 +14,8 @@ namespace AnsiCParser {
         /// </summary>
         public static Cell Nil { get; } = new ConsCell();
 
+
+
         /// <summary>
         /// コンスセル
         /// </summary>
@@ -55,6 +57,7 @@ namespace AnsiCParser {
                 return Value;
             }
         }
+
 
         /// <summary>
         /// リスト作成
@@ -134,4 +137,35 @@ namespace AnsiCParser {
             return PrettyPrinter.Print(cell);
         }
     }
+
+    public static class S {
+        public static bool IsAtom(this Cell self) {
+            return (!IsPair(self) && !IsNull(self));
+        }
+        public static bool IsPair(this Cell self) {
+            return (self != Cell.Nil) && (self is Cell.ConsCell);
+        }
+        public static bool IsNull(this Cell self) {
+            return self == Cell.Nil;
+        }
+        public static Cell Car(this Cell self) {
+            return (self as Cell.ConsCell).Car;
+        }
+        public static Cell Cdr(this Cell self) {
+            return (self as Cell.ConsCell).Cdr;
+        }
+        private static Cell ToCell(object arg) {
+            if (arg is String) {
+                return new Cell.ValueCell(arg as string);
+            } else if (arg is Cell) {
+                return arg as Cell;
+            } else {
+                throw new Exception();
+            }
+        }
+        public static Cell Cons(object lhs, object rhs) {
+            return new Cell.ConsCell(ToCell(lhs), ToCell(rhs));
+        }
+    }
+
 }

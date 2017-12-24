@@ -77,7 +77,7 @@ namespace AnsiCParser {
             if (!isDefine) {
                 // 仮定義
                 value.TentativeDefinitions.Add(decl);
-            } else if (value.Definition == null && isDefine) {
+            } else if (value.Definition == null) {
                 // 本定義
                 value.Definition = decl;
             }
@@ -1220,17 +1220,28 @@ namespace AnsiCParser {
                 }
 
                 // ビットフィールド部分(opt)
-                SyntaxTree.Expression expr = null;
+                int? size = null;
                 if (_lexer.ReadTokenIf(':')) {
-                    expr = ConstantExpression();
+                    var expr = ConstantExpression();
+                    var ret = Evaluator.ConstantEval(expr);
+                    size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ビットフィールドには０以上の整数を指定してください。");
+                    }
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
+                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, size);
             } else if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
-                SyntaxTree.Expression expr = ConstantExpression();
+                int? size = null;
+                var expr = ConstantExpression();
+                var ret = Evaluator.ConstantEval(expr);
+                size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                if (size.HasValue == false || size < 0) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ビットフィールドには０以上の整数を指定してください。");
+                }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, expr == null ? (int?)null : Evaluator.ConstantEval(expr));
+                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, size);
             } else {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
@@ -1332,7 +1343,12 @@ namespace AnsiCParser {
             var ident = Identifier(false);
             if (_lexer.ReadTokenIf('=')) {
                 var expr = ConstantExpression();
-                i = Evaluator.ConstantEval(expr);
+                var ret = Evaluator.ConstantEval(expr);
+                int? size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                if (size.HasValue == false || size < 0) {
+                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "列挙定数には整数を指定してください。");
+                }
+                i = size.Value;
             }
             return new CType.TaggedType.EnumType.MemberInfo(enumType, ident, i);
         }
@@ -1465,7 +1481,12 @@ namespace AnsiCParser {
                 int len = -1;
                 if (_lexer.PeekToken(']') == false) {
                     var expr = ConstantExpression();
-                    len = Evaluator.ConstantEval(expr);
+                    var ret = Evaluator.ConstantEval(expr);
+                    var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                    }
+                    len = size.Value;
                 }
                 _lexer.ReadToken(']');
                 MoreDirectDeclarator(stack, index);
@@ -1622,7 +1643,12 @@ namespace AnsiCParser {
                 int len = -1;
                 if (_lexer.PeekToken(']') == false) {
                     var expr = ConstantExpression();
-                    len = Evaluator.ConstantEval(expr);
+                    var ret = Evaluator.ConstantEval(expr);
+                    var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                    }
+                    len = size.Value;
                 }
                 _lexer.ReadToken(']');
                 MoreDdOrDad(stack, index);
@@ -1659,7 +1685,12 @@ namespace AnsiCParser {
                 int len = -1;
                 if (_lexer.PeekToken(']') == false) {
                     var expr = ConstantExpression();
-                    len = Evaluator.ConstantEval(expr);
+                    var ret = Evaluator.ConstantEval(expr);
+                    var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                    }
+                    len = size.Value;
                 }
                 _lexer.ReadToken(']');
                 MoreDdOrDad(stack, index);
@@ -1796,7 +1827,12 @@ namespace AnsiCParser {
                 int len = -1;
                 if (_lexer.PeekToken(']') == false) {
                     var expr = ConstantExpression();
-                    len = Evaluator.ConstantEval(expr);
+                    var ret = Evaluator.ConstantEval(expr);
+                    var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                    }
+                    len = size.Value;
                 }
                 _lexer.ReadToken(']');
                 MoreDirectAbstractDeclarator(stack, index);
@@ -1814,7 +1850,12 @@ namespace AnsiCParser {
                 int len = -1;
                 if (_lexer.PeekToken(']') == false) {
                     var expr = ConstantExpression();
-                    len = Evaluator.ConstantEval(expr);
+                    var ret = Evaluator.ConstantEval(expr);
+                    var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                    if (size.HasValue == false || size < 0) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                    }
+                    len = size.Value;
                 }
                 _lexer.ReadToken(']');
                 MoreDirectAbstractDeclarator(stack, index);
@@ -2847,10 +2888,42 @@ namespace AnsiCParser {
             if (IsAssignmentOperator()) {
                 var op = AssignmentOperator();
                 var rhs = AssignmentExpression();
-                if (op == "=") {
-                    lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(lhs, rhs);
-                } else {
-                    lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(op, lhs, rhs);
+                switch (op) {
+                    case "=": 
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(lhs, rhs);
+                        break;
+                    case "+=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN, lhs, rhs);
+                        break;
+                    case "-=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN, lhs, rhs);
+                        break;
+                    case "*=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN, lhs, rhs);
+                        break;
+                    case "/=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN, lhs, rhs);
+                        break;
+                    case "%=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN, lhs, rhs);
+                        break;
+                    case "&=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN, lhs, rhs);
+                        break;
+                    case "^=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN, lhs, rhs);
+                        break;
+                    case "|=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN, lhs, rhs);
+                        break;
+                    case "<<=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN, lhs, rhs);
+                        break;
+                    case ">>=":
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN, lhs, rhs);
+                        break;
+                    default:
+                        throw new Exception("来ないはず");
                 }
             }
             return lhs;

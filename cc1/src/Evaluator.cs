@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 
 namespace AnsiCParser {
     /// <summary>
@@ -6,12 +7,42 @@ namespace AnsiCParser {
     /// </summary>
     public static class Evaluator {
 
+        private static double DoubleValue(this SyntaxTree.Expression self) {
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                return (double)(((SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
+                return (double)(((SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                return (double)(((SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant)self).Info.Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
+                return (double)(((SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
+            }
+            throw new NotSupportedException(self.GetType().Name);
+        }
+        private static long LongValue(this SyntaxTree.Expression self) {
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant)self).Info.Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
+            }
+            throw new NotSupportedException(self.GetType().Name);
+        }
         /// <summary>
         /// 定数式の評価
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        public static int ConstantEval(SyntaxTree.Expression expr) {
+        public static SyntaxTree.Expression.PrimaryExpression.Constant ConstantEval(SyntaxTree.Expression expr) {
             // 6.6 定数式
             // 補足説明  
             // 定数式は，実行時ではなく翻訳時に評価することができる。したがって，定数を使用してよいところならばどこでも使用してよい。
@@ -39,25 +70,40 @@ namespace AnsiCParser {
                 // 結果が配列オブジェクトの最後の要素を一つ越えたところを指す場合，評価される単項*演算子のオペランドとしてはならない。
 
                 var e = expr as SyntaxTree.Expression.PostfixExpression.AdditiveExpression;
+
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
-                switch (e.Op) {
-                    case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
-                        return lhs + rhs;
-                    case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
-                        return lhs - rhs;
-                    default:
-                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+
+                if (expr.Type.IsRealFloatingType()) {
+                    switch (e.Op) {
+                        case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", lhs.DoubleValue() + rhs.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", lhs.DoubleValue() - rhs.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        default:
+                            throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                    }
+                } else if (expr.Type.IsIntegerType()) {
+                    switch (e.Op) {
+                        case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", lhs.LongValue() + rhs.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", lhs.LongValue() - rhs.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        default:
+                            throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                    }
+                } else {
+                    throw new NotImplementedException();
                 }
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.AndExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.AndExpression;
-                var lhs = ConstantEval(e.Lhs);
+                var lhs = ConstantEval(e.Lhs).LongValue();
+                long ret = 0;
                 if (lhs != 0) {
-                    return ConstantEval(e.Rhs) == 0 ? 0 : 1;
-                } else {
-                    return 0;
+                    ret = ConstantEval(e.Rhs).LongValue() == 0 ? 0 : 1;
                 }
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret, (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression;
@@ -73,7 +119,8 @@ namespace AnsiCParser {
                 // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
                 if (e.Type.IsBoolType()) {
                     if (e.Expr.Type.IsScalarType()) {
-                        return ConstantEval(e.Expr) == 0 ? 0 : 1;
+                        var ret = ConstantEval(e.Expr).LongValue() == 0 ? 0 : 1;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret, CType.BasicType.TypeKind._Bool);
                     } else {
                         throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "スカラ値以外を_Bool 型に変換しようとした。");
                     }
@@ -84,31 +131,8 @@ namespace AnsiCParser {
                 // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
                 // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
                 if (e.Type.IsIntegerType() && e.Expr.Type.IsIntegerType()) {
-                    var value = ConstantEval(e.Expr);
-                    var target = (e.Type is CType.BasicType) ? (e.Type as CType.BasicType).Kind : CType.BasicType.TypeKind.SignedInt;
-                    switch (target) {
-                        case CType.BasicType.TypeKind.Char:
-                        case CType.BasicType.TypeKind.SignedChar:
-                            return unchecked((int)(SByte)value);
-                        case CType.BasicType.TypeKind.UnsignedChar:
-                            return unchecked((int)(Byte)value);
-                        case CType.BasicType.TypeKind.SignedShortInt:
-                            return unchecked((int)(Int16)value);
-                        case CType.BasicType.TypeKind.UnsignedShortInt:
-                            return unchecked((int)(UInt16)value);
-                        case CType.BasicType.TypeKind.SignedInt:
-                        case CType.BasicType.TypeKind.SignedLongInt:
-                            return unchecked((int)(Int32)value);
-                        case CType.BasicType.TypeKind.UnsignedInt:
-                        case CType.BasicType.TypeKind.UnsignedLongInt:
-                            return unchecked((int)(UInt32)value);
-                        case CType.BasicType.TypeKind.SignedLongLongInt:
-                            return unchecked((int)(Int64)value);
-                        case CType.BasicType.TypeKind.UnsignedLongLongInt:
-                            return unchecked((int)(UInt64)value);
-                        default:
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "整数値の変換先の型が不正です。");
-                    }
+                    var value = ConstantEval(e.Expr).LongValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", value, (e.Type.Unwrap() as CType.BasicType).Kind);
                 }
 
                 // 6.3.1.4実浮動小数点型及び整数型  
@@ -162,8 +186,7 @@ namespace AnsiCParser {
                 return ConstantEval(e.Expr);
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
-                var e = expr as SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant;
-                return (int)e.Str[1];
+                return expr as SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant;
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.CommaExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.CommaExpression;
@@ -172,7 +195,7 @@ namespace AnsiCParser {
             if (expr is SyntaxTree.Expression.PostfixExpression.ConditionalExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.ConditionalExpression;
                 var cond = ConstantEval(e.CondExpr);
-                if (cond != 0) {
+                if (cond.LongValue() != 0) {
                     return ConstantEval(e.ThenExpr);
                 } else {
                     return ConstantEval(e.ElseExpr);
@@ -180,17 +203,23 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant;
-                return e.Info.Value;
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", e.Info.Value, (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.EqualityExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.EqualityExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
+                var ret = false;
+                if (lhs.Type.IsRealFloatingType() || rhs.Type.IsRealFloatingType()) {
+                    ret = lhs.DoubleValue() == rhs.DoubleValue();
+                } else {
+                    ret = lhs.LongValue() == rhs.LongValue();
+                }
                 switch (e.Op) {
                     case SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal:
-                        return lhs == rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     case SyntaxTree.Expression.EqualityExpression.OperatorKind.NotEqual:
-                        return lhs != rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     default:
                         throw new Exception();
                 }
@@ -199,12 +228,14 @@ namespace AnsiCParser {
                 var e = expr as SyntaxTree.Expression.ExclusiveOrExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
-                return lhs ^ rhs;
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    var ret = lhs.LongValue() ^ rhs.LongValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret, (e.Type.Unwrap() as CType.BasicType).Kind);
+                }
+                throw new Exception();
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
-                var e = expr as SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant;
-                // 未実装
-                throw new Exception();
+                return expr as SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant;
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.FunctionCallExpression) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.FunctionCallExpression;
@@ -219,32 +250,37 @@ namespace AnsiCParser {
                 throw new Exception();
             }
             if (expr is SyntaxTree.Expression.InclusiveOrExpression) {
-                var e = expr as SyntaxTree.Expression.InclusiveOrExpression;
+                var e = expr as SyntaxTree.Expression.ExclusiveOrExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
-                return lhs | rhs;
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    var ret = lhs.LongValue() | rhs.LongValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret, (e.Type.Unwrap() as CType.BasicType).Kind);
+                }
+                throw new Exception();
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
-                var e = expr as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant;
-                return (int)e.Value;
+                return expr as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant;
             }
             if (expr is SyntaxTree.Expression.LogicalAndExpression) {
                 var e = expr as SyntaxTree.Expression.LogicalAndExpression;
                 var lhs = ConstantEval(e.Lhs);
-                if (lhs != 0) {
-                    return ConstantEval(e.Rhs) == 0 ? 0 : 1;
-                } else {
-                    return 1;
+                var ret = false;
+                if (lhs.LongValue() != 0) {
+                    var rhs = ConstantEval(e.Rhs);
+                    ret = rhs.LongValue() != 0;
                 }
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"",  ret ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.LogicalOrExpression) {
-                var e = expr as SyntaxTree.Expression.LogicalOrExpression;
+                var e = expr as SyntaxTree.Expression.LogicalAndExpression;
                 var lhs = ConstantEval(e.Lhs);
-                if (lhs == 0) {
-                    return ConstantEval(e.Rhs) == 0 ? 0 : 1;
-                } else {
-                    return 1;
+                var ret = true;
+                if (lhs.LongValue() == 0) {
+                    var rhs = ConstantEval(e.Rhs);
+                    ret = rhs.LongValue() != 0;
                 }
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.MemberDirectAccess) {
                 var e = expr as SyntaxTree.Expression.PostfixExpression.MemberDirectAccess;
@@ -258,30 +294,59 @@ namespace AnsiCParser {
                 var e = expr as SyntaxTree.Expression.MultiplicitiveExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
-                switch (e.Op) {
-                    case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                        return lhs * rhs;
-                    case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
-                        return lhs / rhs;
-                    case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
-                        return lhs % rhs;
-                    default:
-                        throw new Exception();
+
+                if (expr.Type.IsRealFloatingType()) {
+                    switch (e.Op) {
+                        case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", lhs.DoubleValue() * rhs.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", lhs.DoubleValue() / rhs.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        //case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                        //    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", lhs.DoubleValue() % rhs.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        default:
+                            throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                    }
+                } else if (expr.Type.IsIntegerType()) {
+                    switch (e.Op) {
+                        case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", lhs.LongValue() * rhs.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", lhs.LongValue() / rhs.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", lhs.LongValue() % rhs.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                        default:
+                            throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                    }
+                } else {
+                    throw new NotImplementedException();
                 }
             }
             if (expr is SyntaxTree.Expression.RelationalExpression) {
                 var e = expr as SyntaxTree.Expression.RelationalExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
+                var le = false;
+                var ge = false;
+                if (lhs.Type.IsRealFloatingType() || rhs.Type.IsRealFloatingType()) {
+                    var vl = lhs.DoubleValue();
+                    var vr = rhs.DoubleValue();
+                    le = vl <= vr;
+                    ge = vl >= vr;
+                } else {
+                    var vl = lhs.LongValue();
+                    var vr = rhs.LongValue();
+                    le = vl <= vr;
+                    ge = vl >= vr;
+                }
                 switch (e.Op) {
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan:
-                        return lhs < rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", (le && !ge) ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterThan:
-                        return lhs > rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", (!le && ge) ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessOrEqual:
-                        return lhs <= rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", (le ) ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
-                        return lhs >= rhs ? 1 : 0;
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", (!le) ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
                     default:
                         throw new Exception();
                 }
@@ -290,22 +355,29 @@ namespace AnsiCParser {
                 var e = expr as SyntaxTree.Expression.ShiftExpression;
                 var lhs = ConstantEval(e.Lhs);
                 var rhs = ConstantEval(e.Rhs);
-                switch (e.Op) {
-                    case SyntaxTree.Expression.ShiftExpression.OperatorKind.Left:
-                        return lhs << rhs;
-                    case SyntaxTree.Expression.ShiftExpression.OperatorKind.Right:
-                        return lhs >> rhs;
-                    default:
-                        throw new Exception();
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    long v;
+                    switch (e.Op) {
+                        case SyntaxTree.Expression.ShiftExpression.OperatorKind.Left:
+                            v= lhs.LongValue() << (int)rhs.LongValue();
+                            break;
+                        case SyntaxTree.Expression.ShiftExpression.OperatorKind.Right:
+                            v = lhs.LongValue() >> (int)rhs.LongValue();
+                            break;
+                        default:
+                            throw new Exception();
+                    }
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", v, (e.Type.Unwrap() as CType.BasicType).Kind);
                 }
+                throw new Exception();
             }
             if (expr is SyntaxTree.Expression.SizeofExpression) {
                 var e = expr as SyntaxTree.Expression.SizeofExpression;
-                return e.Type.Sizeof();
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", e.Type.Sizeof(), (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.SizeofTypeExpression) {
                 var e = expr as SyntaxTree.Expression.SizeofTypeExpression;
-                return e.TypeOperand.Sizeof();
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", e.TypeOperand.Sizeof(), (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.StringExpression;
@@ -317,15 +389,29 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.UnaryMinusExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryMinusExpression;
-                return -ConstantEval(e.Expr);
+                var ret = ConstantEval(e.Expr);
+                if (ret.Type.IsRealFloatingType()) {
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant($"", -ret.DoubleValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                } else if (ret.Type.IsIntegerType()) {
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", -ret.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                }
+                else {
+                    throw new Exception();
+                }
             }
             if (expr is SyntaxTree.Expression.UnaryNegateExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryNegateExpression;
-                return ~ConstantEval(e.Expr);
+                var ret = ConstantEval(e.Expr);
+                if (ret.Type.IsIntegerType()) {
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ~ret.LongValue(), (e.Type.Unwrap() as CType.BasicType).Kind);
+                } else {
+                    throw new Exception();
+                }
             }
             if (expr is SyntaxTree.Expression.UnaryNotExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryNotExpression;
-                return ConstantEval(e.Expr) == 0 ? 0 : 1;
+                var ret = ConstantEval(e.Expr);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant($"", ret.LongValue() == 0 ? 1 : 0, (e.Type.Unwrap() as CType.BasicType).Kind);
             }
             if (expr is SyntaxTree.Expression.UnaryPlusExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryPlusExpression;

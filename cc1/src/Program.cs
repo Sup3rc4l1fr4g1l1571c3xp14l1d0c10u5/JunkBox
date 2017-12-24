@@ -9,25 +9,49 @@ namespace AnsiCParser {
 
         static void Main(string[] args) {
             var ret = new Parser(@"
+extern int printf(char *str, ...);
+
+void bubbleSort(int numbers[], int array_size)
+{
+int i, j, temp;
+  for (i = 0; i < (array_size - 1); i++) {
+    for (j = (array_size - 1); j > i; j--) {
+      if (numbers[j-1] > numbers[j]) {
+        temp = numbers[j-1];
+        numbers[j-1] = numbers[j];
+        numbers[j] = temp;
+      }
+    }
+  }
+}
+void q(int x, int y, int z)
+{
+printf(""x = %d\n"", x);
+printf(""y = %d\n"", y);
+printf(""z = %d\n"", z);
+}
 
 int test(void) {
-    int a;
-    int *x;
-    a = 0;
-    x = &a;
-    *x = *x + 5;
-    return a;
-}   
-
-
+    int i, n[10]; // = {5,4,3,2,1,0,9,8,7,6,};
+    n[0] = 5;
+    q((void*)(&n[0]),2,3);
+    //bubbleSort(n,10);
+    return 1;
+}
 
 ").Parse();
             //var ret = new Parser(System.IO.File.ReadAllText(@"C:\cygwin\home\0079595\smallerc\smlrc.i.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
-            var v = new SyntaxTreeEvaluateVisitor.Value();
-            ret.Accept(new SyntaxTreeEvaluateVisitor(), v);
-
+            var v = new SyntaxTreeCompileVisitor.Value();
+            var orgOut = Console.Out;
+            //using (var o = new System.IO.StreamWriter(@"C:\cygwin\home\0079595\test.s")) {
+            using (var o = new System.IO.StreamWriter(@".\test.s")) {
+                Console.SetOut(o);
+                ret.Accept(new SyntaxTreeCompileVisitor(), v);
+                Console.SetOut(orgOut);
+            }
+            return;
             var tc = new TestCase();
             foreach (var arg in System.IO.Directory.GetFiles(@"..\..\testcase", "*.c")) {
                 tc.AddTest(arg);
@@ -37,7 +61,6 @@ int test(void) {
 
         }
     }
-
 
     public static class Ext {
         public static StorageClassSpecifier Marge(this StorageClassSpecifier self, StorageClassSpecifier other) {

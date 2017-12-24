@@ -1143,7 +1143,12 @@ namespace AnsiCParser {
 
             // 整数定数式又はその定数式とあるので定数演算を試みる
             try {
-                return Evaluator.ConstantEval(expr) == 0;
+                var ret = Evaluator.ConstantEval(expr);
+                var value = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                if (value.HasValue == false) {
+                    return false;
+                }
+                return value == 0;
             } catch {
                 return false;
             }
