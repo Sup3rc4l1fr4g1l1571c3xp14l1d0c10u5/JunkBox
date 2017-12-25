@@ -24,19 +24,25 @@ int i, j, temp;
     }
   }
 }
-void q(int x, int y, int z)
-{
-printf(""x = %d\n"", x);
-printf(""y = %d\n"", y);
-printf(""z = %d\n"", z);
-}
 
-int test(void) {
+int main(void) {
     int i, n[10]; // = {5,4,3,2,1,0,9,8,7,6,};
     n[0] = 5;
-    q((void*)(&n[0]),2,3);
-    //bubbleSort(n,10);
-    return 1;
+    n[1] = 4;
+    n[2] = 3;
+    n[3] = 2;
+    n[4] = 1;
+    n[5] = 0;
+    n[6] = 9;
+    n[7] = 8;
+    n[8] = 7;
+    n[9] = 6;
+    bubbleSort(n,10);
+    for (i=0;i<10;i++) {
+        printf(""numbers[%d] = %d\n"", i, n[i]);
+    }
+
+    return 0;
 }
 
 ").Parse();

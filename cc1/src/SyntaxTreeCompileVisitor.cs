@@ -125,7 +125,7 @@ namespace AnsiCParser {
                 int offset = 4; // prev return position
 
                 // 戻り値領域
-                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4) {
+                if ((!ft.ResultType.IsVoidType()) && ft.ResultType.Sizeof() > 4) {
                     offset += (ft.ResultType.Sizeof() + 3) & ~3;
                 }
                 // 引数（先頭から）
@@ -191,10 +191,13 @@ namespace AnsiCParser {
                 Load(index, "%ecx");
 
                 if (target.Kind == Value.ValueKind.LocalVar) {
-                    Console.WriteLine($"leal {-target.Offset}(%ebp), %eax");
+                    Console.WriteLine($"movl {-target.Offset}(%ebp), %eax");
                 } else if (target.Kind == Value.ValueKind.GlobalVar) {
-                    Console.WriteLine($"leal {target.Label}, %eax");
+                    Console.WriteLine($"movl {target.Label}, %eax");
                 } else if (target.Kind == Value.ValueKind.Address) {
+                    Console.WriteLine($"popl %eax");
+                    Console.WriteLine($"movl (%eax), %eax");
+                } else if (target.Kind == Value.ValueKind.Temp) {
                     Console.WriteLine($"popl %eax");
                 } else {
                     throw new NotImplementedException();
@@ -206,16 +209,19 @@ namespace AnsiCParser {
 
                 return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
             } else if (self.Lhs.Type.IsIntegerType() && self.Rhs.Type.IsPointerType()) {
-                var target = self.Lhs.Accept(this, value);
-                var index = self.Rhs.Accept(this, value);
+                var target = self.Rhs.Accept(this, value);
+                var index = self.Lhs.Accept(this, value);
 
                 Load(index, "%ecx");
 
                 if (target.Kind == Value.ValueKind.LocalVar) {
-                    Console.WriteLine($"leal {-target.Offset}(%ebp), %eax");
+                    Console.WriteLine($"movl {-target.Offset}(%ebp), %eax");
                 } else if (target.Kind == Value.ValueKind.GlobalVar) {
-                    Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
+                    Console.WriteLine($"movl {target.Label}, %eax");
                 } else if (target.Kind == Value.ValueKind.Address) {
+                    Console.WriteLine($"popl %eax");
+                    Console.WriteLine($"movl (%eax), %eax");
+                } else if (target.Kind == Value.ValueKind.Temp) {
                     Console.WriteLine($"popl %eax");
                 } else {
                     throw new NotImplementedException();
@@ -527,16 +533,30 @@ namespace AnsiCParser {
             var index = self.Index.Accept(this, value);
 
             Load(index, "%ecx");
-            if (target.Kind == Value.ValueKind.LocalVar) {
-                Console.WriteLine($"leal {-target.Offset}(%ebp), %eax");
-            } else if (target.Kind == Value.ValueKind.GlobalVar) {
-                Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
-            } else if (target.Kind == Value.ValueKind.Address || target.Kind == Value.ValueKind.Temp) {
-                Console.WriteLine($"popl %eax");
+            if (target.Type.IsPointerType()) {
+                if (target.Kind == Value.ValueKind.LocalVar) {
+                    Console.WriteLine($"movl {-target.Offset}(%ebp), %eax");
+                } else if (target.Kind == Value.ValueKind.GlobalVar) {
+                    Console.WriteLine($"movl {target.Label}+{target.Offset}, %eax");
+                } else if (target.Kind == Value.ValueKind.Address) {
+                    Console.WriteLine($"popl %eax");
+                    Console.WriteLine($"movl (%eax), %eax");
+                } else if (target.Kind == Value.ValueKind.Temp) {
+                    Console.WriteLine($"popl %eax");
+                } else {
+                    throw new NotImplementedException();
+                }
             } else {
-                throw new NotImplementedException();
+                if (target.Kind == Value.ValueKind.LocalVar) {
+                    Console.WriteLine($"leal {-target.Offset}(%ebp), %eax");
+                } else if (target.Kind == Value.ValueKind.GlobalVar) {
+                    Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
+                } else if (target.Kind == Value.ValueKind.Address || target.Kind == Value.ValueKind.Temp) {
+                    Console.WriteLine($"popl %eax");
+                } else {
+                    throw new NotImplementedException();
+                }
             }
-
             Console.WriteLine($"imull ${self.Type.Sizeof()}, %ecx, %ecx");
             Console.WriteLine($"leal (%eax, %ecx), %eax");
             Console.WriteLine($"pushl %eax");
@@ -607,7 +627,7 @@ namespace AnsiCParser {
             Load(func, "%eax");
             Console.WriteLine($"call *%eax");
             if (resultSize > 4) {
-                // 戻り値をコピー
+                // 戻り値をコピー(4バイトより大きい)
                 Console.WriteLine($"movl ${resultSize / 4}, %ecx");
                 Console.WriteLine($"movl (%esp), %esi");
                 Console.WriteLine($"leal ${(argSize + bakSize)}(%esp), %edi");
@@ -615,7 +635,7 @@ namespace AnsiCParser {
                 Console.WriteLine($"rep movsd");
                 Console.WriteLine($"addl ${resultSize + argSize}, %esp");
             } else if (resultSize > 0) {
-                // 戻り値をコピー
+                // 戻り値をコピー(4バイト以下)
                 Console.WriteLine($"movl %eax, {(argSize + bakSize)}(%esp)");
                 Console.WriteLine($"addl ${argSize}, %esp");
             }
@@ -650,27 +670,46 @@ namespace AnsiCParser {
             var op = "";
             switch (self.Op) {
                 case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
-                    op = "dec";
+                    op = "sub";
                     break;
                 case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
-                    op = "inc";
+                    op = "add";
                     break;
                 default:
                     throw new NotImplementedException();
             }
+
+            CType baseType;
+            int size;
+            if (ret.Type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
+                size =  baseType.Sizeof();
+            } else {
+                size = 1;
+            }
+
             // load value
             switch (ret.Type.Sizeof()) {
                 case 4:
                     Console.WriteLine($"movl (%eax), %ecx");
-                    Console.WriteLine($"{op}l (%eax)");
+                    Console.WriteLine($"{op}l ${size}, (%eax)");
                     break;
                 case 2:
-                    Console.WriteLine($"movw (%eax), %ecx");
-                    Console.WriteLine($"{op}w (%eax)");
+                    Console.WriteLine($"movw (%eax), %cx");
+                    if (ret.Type.IsSignedIntegerType()) {
+                        Console.WriteLine($"movswl %cx, %ecx");
+                    } else {
+                        Console.WriteLine($"movzwl %cx, %ecx");
+                    }
+                    Console.WriteLine($"{op}w ${size}, (%eax)");
                     break;
                 case 1:
-                    Console.WriteLine($"movb (%eax), %ecx");
-                    Console.WriteLine($"{op}b (%eax)");
+                    Console.WriteLine($"movb (%eax), %cl");
+                    if (ret.Type.IsSignedIntegerType()) {
+                        Console.WriteLine($"movsbl %cl, %ecx");
+                    } else {
+                        Console.WriteLine($"movzbl %cl, %ecx");
+                    }
+                    Console.WriteLine($"{op}b ${size}, (%eax)");
                     break;
                 default:
                     throw new NotImplementedException();
@@ -996,7 +1035,7 @@ namespace AnsiCParser {
 
             Console.WriteLine($"{labelContinue}:");
             var update = self.Update.Accept(this, value);
-            discard(stmt);
+            discard(update);
 
             Console.WriteLine($"jmp {labelHead}");
             Console.WriteLine($"{labelBreak}:");

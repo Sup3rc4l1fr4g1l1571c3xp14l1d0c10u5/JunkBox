@@ -658,7 +658,8 @@ namespace AnsiCParser {
                         // 制約，型，並びにポインタに対する型変換及び 演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                         // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                         Op = op;
-                        Expr = new TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
+                        Expr = expr;
+                        // new TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
 
                     }
 
