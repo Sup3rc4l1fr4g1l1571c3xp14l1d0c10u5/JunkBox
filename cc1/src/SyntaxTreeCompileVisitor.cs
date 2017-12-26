@@ -977,6 +977,8 @@ namespace AnsiCParser {
             Console.WriteLine($"andl $-16, %esp");
             Console.WriteLine($"subl ${localScopeSize}, %esp");
 
+            localScopeTotalSize += localScopeSize;
+
             foreach (var x in self.Decls) {
                 x.Accept(this, value);
             }
