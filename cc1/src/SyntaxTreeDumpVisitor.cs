@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 namespace AnsiCParser {
@@ -16,6 +17,10 @@ namespace AnsiCParser {
 
         public Cell OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Cell value) {
             return Cell.Create("arg-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.Ident);
+        }
+
+        public Cell OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, Cell value) {
+            return Cell.Create("array-assign-init", self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, Cell value) {
@@ -43,6 +48,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Cell value) {
+            throw new Exception("来ないはず");
             return Cell.Create("complex-init", Cell.Create(self.Ret.Select(x => x.Accept(this, value)).ToArray()));
         }
 
@@ -109,6 +115,10 @@ namespace AnsiCParser {
 
         public Cell OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Cell value) {
             return Cell.Create("enclosed-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.ParenthesesExpression.Accept(this, value));
+        }
+
+        public Cell OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, Cell value) {
+            return Cell.Create("address-constant", self.Type.Accept(new CTypeDumpVisitor(), null), self.Identifier.Accept(this, value), self.Offset.Accept(this, value));
         }
 
         public Cell OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Cell value) {
@@ -252,11 +262,16 @@ namespace AnsiCParser {
             return Cell.Create(ops, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
+        public Cell OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, Cell value) {
+            return Cell.Create("simple-assign-init", self.Type.Accept(new CTypeDumpVisitor(), null), self.Expr.Accept(this, value));
+        }
+
         public Cell OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, Cell value) {
             return Cell.Create("assign-expr", self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
         public Cell OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, Cell value) {
+            throw new Exception("来ないはず");
             return Cell.Create("simple-init", self.AssignmentExpression.Accept(this, value));
         }
 
@@ -270,6 +285,10 @@ namespace AnsiCParser {
 
         public Cell OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, Cell value) {
             return Cell.Create("string-expr", self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Strings.ToArray()));
+        }
+
+        public Cell OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, Cell value) {
+            return Cell.Create("struct-union-assign-init", self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Cell value) {

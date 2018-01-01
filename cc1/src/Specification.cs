@@ -388,6 +388,24 @@ namespace AnsiCParser {
                 return false;
             }
         }
+        /// <summary>
+        /// 配列型（array type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="elementType">配列型の場合、要素型が入る</param>
+        /// <returns></returns>
+        public static bool IsArrayType(this CType self, out CType elementType, out int len) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is CType.ArrayType) {
+                elementType = (unwrappedSelf as CType.ArrayType).BaseType;
+                len = (unwrappedSelf as CType.ArrayType).Length;
+                return true;
+            } else {
+                elementType = null;
+                len = 0;
+                return false;
+            }
+        }
 
         /// <summary>
         /// 構造体型（structure type）ならば真

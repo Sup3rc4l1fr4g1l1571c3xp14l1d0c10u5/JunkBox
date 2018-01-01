@@ -579,7 +579,9 @@ namespace AnsiCParser {
                     if (Kind == StructOrUnion.Struct) {
                         return Members.Sum(x => x.Type.Sizeof());
                     }
-                    return Members.Max(x => x.Type.Sizeof());
+                    else {
+                        return Members.Max(x => x.Type.Sizeof());
+                    }
                 }
 
                 public override string ToString() {

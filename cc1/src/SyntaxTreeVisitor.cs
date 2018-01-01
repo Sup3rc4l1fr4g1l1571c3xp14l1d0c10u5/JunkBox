@@ -29,6 +29,7 @@ namespace AnsiCParser {
             TResult OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, TArg value);
             TResult OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, TArg value);
             TResult OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, TArg value);
+            TResult OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, TArg value);
             TResult OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, TArg value);
             TResult OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, TArg value);
             TResult OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, TArg value);
@@ -49,6 +50,9 @@ namespace AnsiCParser {
             TResult OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, TArg value);
             TResult OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, TArg value);
             TResult OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, TArg value);
+            TResult OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, TArg value);
+            TResult OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, TArg value);
+            TResult OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, TArg value);
             TResult OnBreakStatement(SyntaxTree.Statement.BreakStatement self, TArg value);
             TResult OnCaseStatement(SyntaxTree.Statement.CaseStatement self, TArg value);
             TResult OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, TArg value);
@@ -218,6 +222,15 @@ namespace AnsiCParser {
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Initializer.SimpleInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnSimpleInitializer(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Initializer.SimpleAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnSimpleAssignInitializer(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Initializer.ArrayAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnArrayAssignInitializer(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Initializer.StructUnionAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnStructUnionAssignInitializer(self, value);
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Statement.BreakStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnBreakStatement(self, value);

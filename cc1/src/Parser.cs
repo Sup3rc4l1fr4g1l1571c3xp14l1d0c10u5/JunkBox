@@ -39,15 +39,16 @@ namespace AnsiCParser {
         private Scope<SyntaxTree.Declaration> _identScope = Scope<SyntaxTree.Declaration>.Empty.Extend();
 
         /// <summary>
-        /// 結合オブジェクト表
+        /// リンケージオブジェクト表
         /// </summary>
         private readonly Dictionary<string, LinkageObject> _linkageTable = new Dictionary<string, LinkageObject>();
 
         /// <summary>
-        /// 結合オブジェクト表への登録
+        /// リンケージオブジェクトの生成とリンケージ表への登録
         /// </summary>
         /// <param name="linkage"></param>
         /// <param name="decl"></param>
+        /// <param name="isDefine"></param>
         /// <returns></returns>
         private LinkageObject AddLinkageObject(LinkageKind linkage, SyntaxTree.Declaration decl, bool isDefine) {
             if (linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage) {
@@ -97,6 +98,11 @@ namespace AnsiCParser {
         /// continue命令についてのスコープ
         /// </summary>
         private readonly Stack<SyntaxTree.Statement> _continueScope = new Stack<SyntaxTree.Statement>();
+
+        /// <summary>
+        /// switch文についてのスコープ
+        /// </summary>
+        private readonly Stack<SyntaxTree.Statement.SwitchStatement> _switchScope = new Stack<SyntaxTree.Statement.SwitchStatement>();
 
         /// <summary>
         /// 暗黙的宣言の挿入を行うクロージャー
@@ -193,14 +199,15 @@ namespace AnsiCParser {
                     // 6.2.2 識別子の結合
                     // 関数の識別子の宣言が記憶域クラス指定子をもたない場合，その結合は，記憶域クラス指定子 externを伴って宣言された場合と同じ規則で決定する。
                     // オブジェクトの識別子の宣言がファイル有効範囲をもち，かつ記憶域クラス指定子をもたない場合，その識別子の結合は，外部結合とする
-                    // 整理すると
+                    // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
+                    // 整理すると 
                     // 記憶域クラス指定子をもたない場合
                     //  -> 関数の識別子の宣言の場合、記憶域クラス指定子 externを伴って宣言された場合と同じ規則で決定
                     //  -> オブジェクトの識別子の宣言がファイル有効範囲場合，その識別子の結合は，外部結合とする
                     if (type.IsFunctionType()) {
                         //  -> 関数の識別子の宣言の場合、記憶域クラス指定子 externを伴って宣言された場合と同じ規則で決定
                         goto case AnsiCParser.StorageClassSpecifier.Extern;
-                    } else if (type.IsObjectType()) {
+                    } else {
                         if (scope == ScopeKind.FileScope) {
                             //  -> オブジェクトの識別子の宣言がファイル有効範囲場合，その識別子の結合は，外部結合とする
                             return LinkageKind.ExternalLinkage;// 外部結合
@@ -209,11 +216,6 @@ namespace AnsiCParser {
                             return LinkageKind.NoLinkage;// 無結合
                         }
 
-                    } else {
-                        // 6.2.2 識別子の結合
-                        // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
-                        // オブジェクト又は関数以外を宣言する識別子なので無結合とする
-                        return LinkageKind.NoLinkage;// 無結合
                     }
                 case AnsiCParser.StorageClassSpecifier.Extern: {
                         // 識別子が，その識別子の以前の宣言が可視である有効範囲において，記憶域クラス指定子 extern を伴って宣言される場合，次のとおりとする。
@@ -301,7 +303,7 @@ namespace AnsiCParser {
         private static readonly Dictionary<string, CType.BasicType.TypeKind[]> CandidateTypeTableDigit = new Dictionary<string, CType.BasicType.TypeKind[]> {
             { "LLU", new[] { CType.BasicType.TypeKind.UnsignedLongLongInt } },
             { "LL", new[] { CType.BasicType.TypeKind.SignedLongLongInt } },
-            { "UL", new[] { CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt } },
+            { "LU", new[] { CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt } },
             { "L", new[] { CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt } },
             { "U", new[] { CType.BasicType.TypeKind.UnsignedInt, CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt } },
             { "", new[] { CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt } },
@@ -556,6 +558,17 @@ namespace AnsiCParser {
             }
             _insertImplictDeclarationOperatorStack.Pop();
             EoF();
+
+            // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，その翻訳単位に，翻訳単位の終わりの時点での合成型，
+            // 及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
+            foreach (var entry in this._linkageTable) {
+                if (entry.Value.Definition == null) {
+                    if (entry.Value.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                        entry.Value.Definition = entry.Value.TentativeDefinitions[0];
+                        entry.Value.TentativeDefinitions.RemoveAt(0);
+                    }
+                }
+            }
             ret.LinkageTable = this._linkageTable;
             return ret;
         }
@@ -1885,14 +1898,14 @@ namespace AnsiCParser {
             return _identScope.TryGetValue(v, out typeDeclaration);
         }
 
-#region 6.7.8 初期化(初期化式の型検査)
-
+        #region 6.7.8 初期化(初期化式の型検査)
+        public static class InitializerChecker {
         /// <summary>
         /// 単純初期化式
         /// </summary>
         /// <param name="type"></param>
         /// <param name="ast"></param>
-        private void CheckInitializerSimple(CType type, SyntaxTree.Initializer.SimpleInitializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerSimple(CType type, SyntaxTree.Initializer.SimpleInitializer ast) {
             var expr = ast.AssignmentExpression;
             if (type.IsAggregateType() || type.IsUnionType()) {
                 throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
@@ -1901,26 +1914,25 @@ namespace AnsiCParser {
             // 単純代入の規則を適用して検証
             var assign = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(type, expr);
 
+            return new SyntaxTree.Initializer.SimpleAssignInitializer(type, assign);
+
         }
 
-        private void CheckInitializerExpression(CType type, SyntaxTree.Initializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerExpression(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType()) {
                 // 配列型の場合
                 var arrayType = type.Unwrap() as CType.ArrayType;
-                CheckInitializerArray(arrayType, ast);
-                return;
+                return CheckInitializerArray(arrayType, ast);
             } else if (type.IsStructureType()) {
                 // 構造体型の場合
                 var arrayType = type.Unwrap() as CType.TaggedType.StructUnionType;
-                CheckInitializerStruct(arrayType, ast);
-                return;
+                return CheckInitializerStruct(arrayType, ast);
             } else if (type.IsUnionType()) {
                 // 共用体型の場合
                 var arrayType = type.Unwrap() as CType.TaggedType.StructUnionType;
-                CheckInitializerUnion(arrayType, ast);
-                return;
+                return CheckInitializerUnion(arrayType, ast);
             } else {
-                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
+                return CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             }
         }
 
@@ -1929,21 +1941,25 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <param name="ast"></param>
-        private void CheckInitializerArray(CType.ArrayType type, SyntaxTree.Initializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerArray(CType.ArrayType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
+                return CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Length == -1) {
                     type.Length = inits.Count;
                 } else if (type.Length < inits.Count) {
-                    throw new Exception("要素数が違う");
+                    throw new Exception("要素数が領域サイズよりも大きい");
                 }
                 // 要素数分回す
+                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                 for (var i = 0; type.Length == -1 || i < inits.Count; i++) {
-                    CheckInitializerExpression(type.BaseType, inits[i]);
+                        assigns.Add(CheckInitializerExpression(type.BaseType, inits[i]));
                 }
+                // ToDo:足りない分は0で埋める
+                return new SyntaxTree.Initializer.ArrayAssignInitializer(type, assigns);
             }
+                throw new Exception("");
         }
 
         /// <summary>
@@ -1951,9 +1967,9 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <param name="ast"></param>
-        private void CheckInitializerStruct(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerStruct(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
+                return CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
                 var inits = (ast as SyntaxTree.Initializer.ComplexInitializer).Ret;
                 if (type.Members.Count < inits.Count) {
@@ -1961,12 +1977,13 @@ namespace AnsiCParser {
                 }
                 // 要素数分回す
                 // Todo: ビットフィールド
+                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                 for (var i = 0; i < inits.Count; i++) {
-                    CheckInitializerExpression(type.Members[i].Type, inits[i]);
+                        assigns.Add(CheckInitializerExpression(type.Members[i].Type, inits[i]));
                 }
-            } else {
-                throw new Exception("");
+                return new SyntaxTree.Initializer.StructUnionAssignInitializer(type, assigns);
             }
+                throw new Exception("");
         }
 
         /// <summary>
@@ -1974,12 +1991,12 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <param name="ast"></param>
-        private void CheckInitializerUnion(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerUnion(CType.TaggedType.StructUnionType type, SyntaxTree.Initializer ast) {
             if (ast is SyntaxTree.Initializer.SimpleInitializer) {
-                CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
+                return CheckInitializerSimple(type, ast as SyntaxTree.Initializer.SimpleInitializer);
             } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
-                // 最初の要素とのみチェック
-                CheckInitializerExpression(type.Members[0].Type, ast);
+                    // 最初の要素とのみチェック
+                    return CheckInitializerExpression(type.Members[0].Type, ast);
             } else {
                 throw new Exception("");
             }
@@ -1990,7 +2007,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <param name="ast"></param>
-        private void CheckInitializerList(CType type, SyntaxTree.Initializer ast) {
+        private static SyntaxTree.Initializer CheckInitializerList(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType()) {
                 // 配列型の場合
                 var arrayType = type.Unwrap() as CType.ArrayType;
@@ -1998,44 +2015,42 @@ namespace AnsiCParser {
                 if (arrayType.BaseType.IsCharacterType()) {
 
                     if (ast is SyntaxTree.Initializer.SimpleInitializer && (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
-                        // 初期化先の型が文字配列の場合は、文字列式を文字配列式と見なして初期化
+                        // 初期化先の型が文字配列の場合は、文字列式を文字配列式と見なして初期化するので、配列型を書き換える
                         var strExpr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
                         if (arrayType.Length == -1) {
-                            arrayType.Length = string.Concat(strExpr.Strings).Length + 1;
+                            arrayType.Length = strExpr.Value.Count;
                         }
-                        return;
+                        return new SyntaxTree.Initializer.SimpleAssignInitializer(arrayType, strExpr);
+
                     } else if (ast is SyntaxTree.Initializer.ComplexInitializer) {
-                        // 波括弧で括られた文字列で初期化
+                        // 波括弧で括られた文字列で初期化も同様
                         if ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret?.Count == 1
                             && ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret[0] as SyntaxTree.Initializer.SimpleInitializer)?.AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
                             var strExpr = ((ast as SyntaxTree.Initializer.ComplexInitializer).Ret[0] as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
                             if (arrayType.Length == -1) {
-                                arrayType.Length = string.Concat(strExpr.Strings).Length + 1;
+                                arrayType.Length = strExpr.Value.Count + 1;
                             }
-                            return;
+                                return new SyntaxTree.Initializer.SimpleAssignInitializer(arrayType, strExpr);
+                            }
                         }
-                    }
                 }
-                CheckInitializerArray(arrayType, ast);
-                return;
+                return CheckInitializerArray(arrayType, ast);
             } else if (type.IsStructureType()) {
                 // 構造体型の場合
                 var suType = type.Unwrap() as CType.TaggedType.StructUnionType;
-                CheckInitializerStruct(suType, ast);
-                return;
+                return CheckInitializerStruct(suType, ast);
             } else if (type.IsUnionType()) {
                 // 共用体型の場合
                 var suType = type.Unwrap() as CType.TaggedType.StructUnionType;
-                CheckInitializerUnion(suType, ast);
-                return;
+                return CheckInitializerUnion(suType, ast);
             } else {
                 throw new Exception();
             }
         }
 
-        private void CheckInitializer(CType type, SyntaxTree.Initializer ast) {
+        public static SyntaxTree.Initializer CheckInitializer(CType type, SyntaxTree.Initializer ast) {
             if (type.IsArrayType() || type.IsStructureType() || type.IsUnionType()) {
-                CheckInitializerList(type, ast);
+                return CheckInitializerList(type, ast);
             } else {
                 var expr = (ast as SyntaxTree.Initializer.SimpleInitializer).AssignmentExpression;
                 if (type.IsAggregateType() || type.IsUnionType()) {
@@ -2043,10 +2058,12 @@ namespace AnsiCParser {
                 }
                 // 単純代入の規則を適用して検証
                 var assign = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(type, expr);
+                    return new SyntaxTree.Initializer.SimpleAssignInitializer(type, assign);
+                }
             }
         }
 
-#endregion
+        #endregion
 
         /// <summary>
         /// 6.7.8 初期化
@@ -2054,8 +2071,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Initializer Initializer(CType type) {
             var init = InitializerItem();
-            CheckInitializer(type, init);
-            return init;
+            return InitializerChecker.CheckInitializer(type, init);
         }
 
         /// <summary>
@@ -2136,14 +2152,28 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Statement LabeledStatement() {
             if (_lexer.ReadTokenIf(Token.TokenKind.CASE)) {
+                if (_switchScope.Any() == false) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"caseラベルがswitch文外にあります。");
+                }
                 var expr = ConstantExpression();
+                var value = Evaluator.ConstantEval(expr);
+                if (value.Type.IsIntegerType() == false) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"caseラベルの値が整数定数値ではありません。");
+                }
                 _lexer.ReadToken(':');
                 var stmt = Statement();
-                return new SyntaxTree.Statement.CaseStatement(expr, stmt);
+                var caseStatement =  new SyntaxTree.Statement.CaseStatement(expr, (value as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value, stmt);
+                _switchScope.Peek().AddCaseStatement(caseStatement);
+                return caseStatement;
             } else if (_lexer.ReadTokenIf(Token.TokenKind.DEFAULT)) {
+                if (_switchScope.Any() == false) {
+                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"defaultラベルがswitch文外にあります。");
+                }
                 _lexer.ReadToken(':');
                 var stmt = Statement();
-                return new SyntaxTree.Statement.DefaultStatement(stmt);
+                var defaultStatement = new SyntaxTree.Statement.DefaultStatement(stmt);
+                _switchScope.Peek().SetDefaultLabel(defaultStatement);
+                return defaultStatement;
             } else {
                 var ident = Identifier(true);
                 _lexer.ReadToken(':');
@@ -2241,7 +2271,9 @@ namespace AnsiCParser {
                 _lexer.ReadToken(')');
                 var ss = new SyntaxTree.Statement.SwitchStatement(cond);
                 _breakScope.Push(ss);
+                _switchScope.Push(ss);
                 ss.Stmt = Statement();
+                _switchScope.Pop();
                 _breakScope.Pop();
                 return ss;
             }
@@ -2565,10 +2597,26 @@ namespace AnsiCParser {
         /// <returns></returns>
         private List<SyntaxTree.Expression> ArgumentExpressionList() {
             var ret = new List<SyntaxTree.Expression>();
-            ret.Add(AssignmentExpression());
+            ret.Add(ArgumentExpression());
             while (_lexer.ReadTokenIf(',')) {
-                ret.Add(AssignmentExpression());
+                ret.Add(ArgumentExpression());
             }
+            return ret;
+        }
+
+        /// <summary>
+        /// 6.5.2 後置演算子(実引数)
+        /// </summary>
+        /// <returns></returns>
+        private SyntaxTree.Expression ArgumentExpression() {
+            var ret = AssignmentExpression();
+
+            // 6.3.2.1: 配列型の場合はポインタ型に変換する
+            CType baseType;
+            if (ret.Type.IsArrayType(out baseType)) {
+                ret = new SyntaxTree.Expression.TypeConversionExpression(CType.CreatePointer(baseType), ret);
+            }
+
             return ret;
         }
 
@@ -2888,8 +2936,10 @@ namespace AnsiCParser {
             if (IsAssignmentOperator()) {
                 var op = AssignmentOperator();
                 var rhs = AssignmentExpression();
+
+                
                 switch (op) {
-                    case "=": 
+                    case "=":
                         lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(lhs, rhs);
                         break;
                     case "+=":
@@ -3397,11 +3447,11 @@ namespace AnsiCParser {
 
                 // 匿名ではないタグ付き型（構造体/共用体/列挙型）の宣言は許可するが、
                 // それ以外の宣言についてはエラーを出力する
-                if (!baseType.IsStructureType() && !baseType.IsEnumeratedType()) {
+                if (!baseType.IsStructureType() && !baseType.IsUnionType() && !baseType.IsEnumeratedType()) {
                     throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "空の宣言は使用できません。");
                 }
                 CType.TaggedType.StructUnionType suType;
-                if (baseType.IsStructureType(out suType) && suType.IsAnonymous) {
+                if ((baseType.IsStructureType(out suType) || baseType.IsUnionType(out suType)) && suType.IsAnonymous) {
                     throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "無名構造体/共用体が宣言されていますが、そのインスタンスを定義していません。");
                 }
                 if (CType.CheckContainOldStyleArgument(baseType)) {

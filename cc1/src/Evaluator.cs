@@ -42,7 +42,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        public static SyntaxTree.Expression.PrimaryExpression.Constant ConstantEval(SyntaxTree.Expression expr) {
+        public static SyntaxTree.Expression ConstantEval(SyntaxTree.Expression expr) {
             // 6.6 定数式
             // 補足説明  
             // 定数式は，実行時ではなく翻訳時に評価することができる。したがって，定数を使用してよいところならばどこでも使用してよい。
@@ -93,7 +93,7 @@ namespace AnsiCParser {
                             throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else {
-                    throw new NotImplementedException();
+                    return new SyntaxTree.Expression.AdditiveExpression(SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add, lhs, rhs);
                 }
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.AndExpression) {
@@ -385,7 +385,8 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.UnaryAddressExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryAddressExpression;
-                throw new Exception();
+                var ret = ConstantEval(e.Expr);
+                return ret;
             }
             if (expr is SyntaxTree.Expression.UnaryMinusExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryMinusExpression;
@@ -435,12 +436,18 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
-                throw new Exception();
+                return e;
+                //throw new Exception();
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression;
                 return ConstantEval(e.ParenthesesExpression);
             }
+            if (expr is SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression) {
+                var e = expr as SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression;
+                throw new Exception();
+            }
+            
             throw new Exception();
         }
     }

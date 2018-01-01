@@ -360,6 +360,27 @@ namespace AnsiCParser {
                         ParenthesesExpression = parenthesesExpression;
                     }
                 }
+
+
+                /// <summary>
+                /// アドレス定数(定数式の解釈結果として得られる構文ノード)
+                /// </summary>
+                public class AddressConstantExpression : PrimaryExpression {
+
+                    public override CType Type {
+                        get {
+                            return CType.CreatePointer(Identifier.Type);
+                        }
+                    }
+                    public Expression.PrimaryExpression.IdentifierExpression Identifier { get; }
+                    public Expression.PrimaryExpression.Constant.IntegerConstant Offset { get; }
+
+                    public AddressConstantExpression(IdentifierExpression identifier, Constant.IntegerConstant offset) {
+                        Identifier = identifier;
+                        Offset = offset;
+                    }
+
+                }
             }
 
             /// <summary>
@@ -704,7 +725,7 @@ namespace AnsiCParser {
                     // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                     // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                     Op = op;
-                    Expr = new TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
+                    Expr = expr;    // new TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
                 }
             }
 
@@ -768,7 +789,7 @@ namespace AnsiCParser {
                         expr =
                             new AdditiveExpression(
                                 AdditiveExpression.OperatorKind.Add,
-                                new TypeConversionExpression(CType.CreatePointer(aexpr.Target.Type), aexpr),
+                                new TypeConversionExpression(aexpr.Target.Type, aexpr.Target),
                                 Specification.ImplicitConversion(CType.CreateSignedInt(), aexpr.Index)
                             );
                     } else {
@@ -1675,8 +1696,12 @@ namespace AnsiCParser {
                     /// <param name="lType"></param>
                     /// <param name="rhs"></param>
                     public static Expression ApplyAssignmentRule(CType lType, Expression rhs) {
-                        // 代入元式に対して代入先型への(暗黙的)型変換を適用
-                        rhs = Specification.ImplicitConversion(lType, rhs);
+                        if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
+                            // 構造体・共用体については暗黙的型変換を用いない
+                        } else {
+                            // 代入元式に対して代入先型への(暗黙的)型変換を適用
+                            rhs = Specification.ImplicitConversion(lType, rhs);
+                        }
 
                         // 制約 (単純代入)
                         // 次のいずれかの条件が成立しなければならない。
@@ -2154,9 +2179,30 @@ namespace AnsiCParser {
                 public Statement Stmt {
                     get; set;
                 }
+                public List<CaseStatement> CaseLabels {
+                    get;
+                }
+                public DefaultStatement DefaultLabel {
+                    get; private set;
+                }
 
                 public SwitchStatement(Expression cond) {
                     Cond = cond;
+                    CaseLabels = new List<CaseStatement>();
+                    DefaultLabel = null;
+                }
+
+                public void AddCaseStatement(CaseStatement caseStatement) {
+                    if (CaseLabels.Any(x => x.Value == caseStatement.Value)) {
+                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "caseラベルの値は既に使われています。");
+                    }
+                    CaseLabels.Add(caseStatement);
+                }
+                public void SetDefaultLabel(DefaultStatement defaultStatement) {
+                    if (DefaultLabel != null) {
+                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "defaultラベルは既に使われています。");
+                    }
+                    DefaultLabel = defaultStatement;
                 }
             }
 
@@ -2199,12 +2245,16 @@ namespace AnsiCParser {
                 public Expression Expr {
                     get;
                 }
+                public long Value {
+                    get;
+                }
                 public Statement Stmt {
                     get;
                 }
 
-                public CaseStatement(Expression expr, Statement stmt) {
+                public CaseStatement(Expression expr, long value, Statement stmt) {
                     Expr = expr;
+                    Value = value;
                     Stmt = stmt;
                 }
             }
@@ -2317,7 +2367,40 @@ namespace AnsiCParser {
                 }
             }
 
+            // 以降は実装の都合上
 
+            /// <summary>
+            /// 式の結果をブロックコピーする初期化子
+            /// </summary>
+            public class SimpleAssignInitializer : Initializer {
+                public Expression Expr { get; }
+                public CType Type { get; }
+
+                public SimpleAssignInitializer(CType type, Expression expr) {
+                    this.Type = type;
+                    this.Expr = expr;
+                }
+            }
+
+            public class ArrayAssignInitializer : Initializer {
+                public List<Initializer> Inits { get; }
+                public CType.ArrayType Type { get; }
+
+                public ArrayAssignInitializer(CType.ArrayType type, List<Initializer> inits) {
+                    this.Type = type;
+                    this.Inits = inits;
+                }
+            }
+
+            public class StructUnionAssignInitializer : Initializer {
+                public List<Initializer> Inits { get; }
+                public CType.TaggedType.StructUnionType Type { get; }
+
+                public StructUnionAssignInitializer(CType.TaggedType.StructUnionType type, List<Initializer> inits) {
+                    this.Type = type;
+                    this.Inits = inits;
+                }
+            }
         }
 
         public abstract class Declaration : SyntaxTree {
