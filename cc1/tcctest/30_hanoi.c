@@ -26,21 +26,23 @@
  *
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+//#include <stdio.h>
+extern int printf(char*,...);
+//#include <stdlib.h>
 
-#define TRUE 1
-#define FALSE 0
+//#define TRUE 1
+//#define FALSE 0
 
 /* This is the number of "disks" on tower A initially. Taken to be 64 in the
  * legend. The number of moves required, in general, is 2^N - 1. For N = 64,
  * this is 18,446,744,073,709,551,615 */
-#define N 4
+//#define N 4
 
 /* These are the three towers. For example if the state of A is 0,1,3,4, that
  * means that there are three discs on A of sizes 1, 3, and 4. (Think of right
  * as being the "down" direction.) */
-int A[N], B[N], C[N]; 
+//int A[N], B[N], C[N]; 
+int A[4], B[4], C[4]; 
 
 void Hanoi(int,int*,int*,int*);
 
@@ -50,15 +52,15 @@ void PrintAll()
    int i;
 
    printf("A: ");
-   for(i=0;i<N;i++)printf(" %d ",A[i]);
+   for(i=0;i<4;i++)printf(" %d ",A[i]);
    printf("\n");
 
    printf("B: ");
-   for(i=0;i<N;i++)printf(" %d ",B[i]);
+   for(i=0;i<4;i++)printf(" %d ",B[i]);
    printf("\n");
 
    printf("C: ");
-   for(i=0;i<N;i++)printf(" %d ",C[i]);
+   for(i=0;i<4;i++)printf(" %d ",C[i]);
    printf("\n");
    printf("------------------------------------------\n");
    return;
@@ -70,8 +72,8 @@ int Move(int *source, int *dest)
 {
    int i = 0, j = 0;
 
-   while (i<N && (source[i])==0) i++;
-   while (j<N && (dest[j])==0) j++;
+   while (i<4 && (source[i])==0) i++;
+   while (j<4 && (dest[j])==0) j++;
 
    dest[j-1] = source[i];
    source[i] = 0;
@@ -102,11 +104,11 @@ int main()
    int i;
 
    /* initialize the towers */
-   for(i=0;i<N;i++)A[i]=i+1;
-   for(i=0;i<N;i++)B[i]=0;
-   for(i=0;i<N;i++)C[i]=0;
+   for(i=0;i<4;i++)A[i]=i+1;
+   for(i=0;i<4;i++)B[i]=0;
+   for(i=0;i<4;i++)C[i]=0;
 
-   printf("Solution of Tower of Hanoi Problem with %d Disks\n\n",N);
+   printf("Solution of Tower of Hanoi Problem with %d Disks\n\n",4);
 
    /* Print the starting state */
    printf("Starting state:\n");
@@ -114,7 +116,7 @@ int main()
    printf("\n\nSubsequent states:\n\n");
 
    /* Do it! Use A = Source, B = Destination, C = Spare */
-   Hanoi(N,A,B,C);
+   Hanoi(4,A,B,C);
 
    return 0;
 }

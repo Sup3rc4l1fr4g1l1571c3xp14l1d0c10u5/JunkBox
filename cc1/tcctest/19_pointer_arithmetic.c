@@ -9,16 +9,16 @@ int main()
 
    a = 42;
    b = &a;
-   c = NULL;
+	c = 0;
 
    printf("%d\n", *b);
 
-   if (b == NULL)
+   if (b == 0)
       printf("b is NULL\n");
    else
       printf("b is not NULL\n");
 
-   if (c == NULL)
+   if (c == 0)
       printf("c is NULL\n");
    else
       printf("c is not NULL\n");

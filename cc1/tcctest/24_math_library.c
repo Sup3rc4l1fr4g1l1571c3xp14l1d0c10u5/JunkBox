@@ -1,7 +1,27 @@
-#define _ISOC99_SOURCE 1
+//#define _ISOC99_SOURCE 1
 
-#include <stdio.h>
-#include <math.h>
+//#include <stdio.h>
+extern int printf(char*,...);
+
+//#include <math.h>
+extern double sin(double);
+extern double cos(double);
+extern double tan(double);
+extern double asin(double);
+extern double acos(double);
+extern double atan(double);
+extern double sinh(double);
+extern double cosh(double);
+extern double tanh(double);
+extern double exp(double);
+extern double fabs(double);
+extern double log(double);
+extern double log10(double);
+extern double pow(double, double);
+extern double sqrt(double);
+extern double round(double);
+extern double ceil(double);
+extern double floor(double);
 
 int main()
 {

@@ -1,5 +1,18 @@
-#include <stdio.h>
-#include <string.h>
+//#include <stdio.h>
+extern int printf(char*,...);
+//#include <string.h>
+extern int strcpy(char*,char*);
+extern int strncpy(char*,char*,int);
+extern int strcmp(char*,char*);
+extern int strncmp(char*,char*,int);
+extern int strlen(char*);
+extern int strcat(char*,char*);
+extern int strncmp(char*,char*,int);
+extern int strchr(char*,int);
+extern int strrchr(char*,int);
+extern int memset(char*,int,int);
+extern int memcpy(char*,char*,int);
+extern int memcmp(char*,char*,int);
 
 int main()
 {
@@ -27,7 +40,7 @@ int main()
 
    printf("%s\n", strchr(a, 'o'));
    printf("%s\n", strrchr(a, 'l'));
-   printf("%d\n", strrchr(a, 'x') == NULL);
+   printf("%d\n", strrchr(a, 'x') == /*NULL*/0);
 
    memset(&a[1], 'r', 4);
    printf("%s\n", a);

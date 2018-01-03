@@ -14,10 +14,12 @@ int main()
    int c;
    c = *a;
 
+	{
    char *b;
    for (b = a; *b != 0; b++)
       printf("%c: %d\n", *b, *b);
-
+	}
+		{
    char destarray[10];
    char *dest = &destarray[0];
    char *src = a;
@@ -28,6 +30,7 @@ int main()
    *dest = 0;
 
    printf("copied string is %s\n", destarray);
+		}
 	}
 
    return 0;

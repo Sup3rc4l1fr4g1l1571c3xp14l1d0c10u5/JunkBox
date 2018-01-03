@@ -3265,6 +3265,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"翻訳単位の中で同じ識別子{ident}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
                 }
 
+                var prevType = type;
                 // 型適合のチェック
                 if (Specification.IsCompatible(iv.Type.Unwrap(), type.Unwrap()) == false) {
                     throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"既に宣言されている{ident}と型が適合しないため再宣言できません。");
@@ -3275,8 +3276,14 @@ namespace AnsiCParser {
                 System.Diagnostics.Debug.Assert(type != null);
 
                 if (scope == ScopeKind.FileScope && isDefine) {
-                    if ((iv as SyntaxTree.Declaration.FunctionDeclaration).Body != null) {
+                    var prevFd = (iv as SyntaxTree.Declaration.FunctionDeclaration);
+                    if (prevFd.Body != null) {
                         throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "すでに本体を持っている関数を再定義しています。");
+                    }
+                    var compoundFt = type.Unwrap() as CType.FunctionType;
+                    var ft = (prevType.Unwrap() as CType.FunctionType);
+                    for (var i=0; i < ft.Arguments.Length; i++) {
+                        compoundFt.Arguments[i].Ident = ft.Arguments[i].Ident;
                     }
                 }
             } else {

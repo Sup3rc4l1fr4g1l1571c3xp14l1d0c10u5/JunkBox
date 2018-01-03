@@ -5,11 +5,11 @@ extern double sin(double);
 
 int main()
 {
-   // variables
-   float a = 12.34 + 56.78;
+  // variables
+   double a = 12.34 + 56.78;
    printf("%f\n", a);
 
-   // infix operators
+  // infix operators
    printf("%f\n", 12.34 + 56.78);
    printf("%f\n", 12.34 - 56.78);
    printf("%f\n", 12.34 * 56.78);
@@ -46,7 +46,7 @@ int main()
    printf("%f\n", a);
    printf("%f\n", sin(2));
 
-   return 0;
+  return 0;
 }
 
 /* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/

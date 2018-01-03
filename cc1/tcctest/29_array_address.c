@@ -1,5 +1,7 @@
-#include <stdio.h>
-#include <string.h>
+//#include <stdio.h>
+extern int printf(char*,...);
+//#include <string.h>
+extern int strcpy(char*,char*);
 
 int main()
 {

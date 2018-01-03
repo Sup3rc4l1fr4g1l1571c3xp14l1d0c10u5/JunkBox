@@ -522,6 +522,12 @@ namespace AnsiCParser {
                                 args[i] = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(lhs, rhs);
                             }
 
+                            if (functionType.HasVariadic) {
+                                for (var i = functionType.Arguments.Length; i < args.Count; i++) {
+                                    args[i] = (Expression)new TypeConversionExpression(args[i].Type.DefaultArgumentPromotion(), args[i]);
+                                }
+                            }
+
                         } else {
                             // 呼び出される関数を表す式が，関数原型を含まない型をもつ場合，各実引数に対して既定の実引数拡張を行う。
                             args = args.Select(x => (Expression)new TypeConversionExpression(x.Type.DefaultArgumentPromotion(), x)).ToList();

@@ -863,7 +863,7 @@ namespace AnsiCParser {
                     Type = type;
                 }
 
-                public string Ident { get; }
+                public string Ident { get; set;  }
 
                 public StorageClassSpecifier StorageClass { get; }
 
