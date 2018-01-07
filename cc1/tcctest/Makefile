@@ -1,4 +1,5 @@
-CC=../bin/debug/AnsiCParser.exe
+CC=gcc
+MYCC=../bin/debug/AnsiCParser.exe
 AS=gcc -g
 FILES=$(shell ls *.c)
 OUTDIR=result
@@ -9,17 +10,20 @@ LOGS=$(patsubst %.c,$(OUTDIR)/%.log,$(FILES))
 OUTS=$(patsubst %.c,$(OUTDIR)/%.out,$(FILES))
 RESULTS=$(patsubst %.c,$(OUTDIR)/%.result,$(FILES))
 
-.phony: all clean
+GCCOUTDIR=gccout
+EXPECTS=$(patsubst %.c,%.expect,$(FILES))
 
-all: $(OUTDIR) $(TARGETS)
+.phony: all clean expects
+
+all: $(GCCOUTDIR) $(EXPECTS) $(OUTDIR) $(TARGETS)
 
 $(TARGETS): $(OUTDIR)/%.exe: $(OUTDIR)/%.s
 	-$(AS) -o $@ $< > $(OUTDIR)/$*.log 2>&1 && \
 	$@ > $(OUTDIR)/$*.out 2>&1 && \
-	diff --strip-trailing-cr $*.expect $(OUTDIR)/$*.out > $(OUTDIR)/$*.result 2>&1
+	diff -u --strip-trailing-cr $*.expect $(OUTDIR)/$*.out > $(OUTDIR)/$*.result 2>&1
 
 $(ASMS): $(OUTDIR)/%.s: %.c
-	-$(CC) $< > $(OUTDIR)/$*.log 2>&1 && mv $*.s $(OUTDIR)/ && mv $*.ast $(OUTDIR)/
+	-$(MYCC) $< > $(OUTDIR)/$*.log 2>&1 && mv $*.s $(OUTDIR)/ && mv $*.ast $(OUTDIR)/
 
 $(OUTDIR):
 	mkdir -p $(OUTDIR)
@@ -27,5 +31,13 @@ $(OUTDIR):
 clean: 
 	-$(RM) -rf $(TARGETS) $(ASMS) $(LOGS) $(OUTS) $(RESULTS)
 
+expects: $(GCCOUTDIR) $(EXPECTS)
+
+$(GCCOUTDIR):
+	mkdir -p $(GCCOUTDIR)
+
+$(EXPECTS): %.expect: %.c
+	-$(CC) -o $(GCCOUTDIR)/$*.exe $< && \
+	$(GCCOUTDIR)/$*.exe > $@
 
 
