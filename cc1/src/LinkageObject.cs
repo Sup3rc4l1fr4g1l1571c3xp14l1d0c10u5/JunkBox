@@ -60,7 +60,7 @@ namespace AnsiCParser {
             Ident = ident;
             Type = type;
             Linkage = linakge;
-            LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : $"@{ident}";
+            LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : $"{ident}";
         }
 
         /// <summary>
@@ -96,6 +96,7 @@ namespace AnsiCParser {
 
         public string LinkageId {
             get;
+            set;
         }
     }
 }

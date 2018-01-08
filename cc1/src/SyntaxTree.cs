@@ -2495,7 +2495,7 @@ namespace AnsiCParser {
             /// <summary>
             /// 結合オブジェクト表
             /// </summary>
-            public Dictionary<string, LinkageObject> LinkageTable;
+            public List<LinkageObject> LinkageTable;
 
             public List<Declaration> Declarations { get; } = new List<Declaration>();
         }

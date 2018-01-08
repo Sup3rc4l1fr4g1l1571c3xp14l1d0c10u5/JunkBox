@@ -39,9 +39,14 @@ namespace AnsiCParser {
         private Scope<SyntaxTree.Declaration> _identScope = Scope<SyntaxTree.Declaration>.Empty.Extend();
 
         /// <summary>
-        /// リンケージオブジェクト表
+        /// リンケージオブジェクト表(外部結合・内部結合解決用)
         /// </summary>
         private readonly Dictionary<string, LinkageObject> _linkageTable = new Dictionary<string, LinkageObject>();
+
+        /// <summary>
+        /// リンケージオブジェクトリスト
+        /// </summary>
+        private readonly List<LinkageObject> _linkageList = new List<LinkageObject>();
 
         /// <summary>
         /// リンケージオブジェクトの生成とリンケージ表への登録
@@ -54,8 +59,14 @@ namespace AnsiCParser {
             if (linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage) {
                 // 外部もしくは内部結合なので再定義チェック
             } else if (linkage == LinkageKind.NoLinkage) {
-                // 無結合なので再定義チェックせず、リンケージ表にも登録しない
-                return new LinkageObject(decl.Ident, decl.Type, linkage);
+                // 無結合なので再定義チェックしない
+                var v = new LinkageObject(decl.Ident, decl.Type, linkage);
+                if (decl.StorageClass == AnsiCParser.StorageClassSpecifier.Static) {
+                    v.Definition = decl;
+                    v.LinkageId = $"{decl.Ident}.{_linkageList.Count}";
+                    _linkageList.Add(v);
+                }
+                return v;
             } else {
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "リンケージが指定されていません。");
             }
@@ -73,6 +84,7 @@ namespace AnsiCParser {
             } else {
                 value = new LinkageObject(decl.Ident, decl.Type, linkage);
                 _linkageTable[decl.Ident] = value;
+                _linkageList.Add(value);
             }
 
             if (!isDefine) {
@@ -120,7 +132,6 @@ namespace AnsiCParser {
             var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(ident, type);
             return _insertImplictDeclarationOperatorStack.Peek().Invoke(typeDecl);
         }
-
 
         /// <summary>
         /// 字句解析器
@@ -561,15 +572,15 @@ namespace AnsiCParser {
 
             // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，その翻訳単位に，翻訳単位の終わりの時点での合成型，
             // 及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
-            foreach (var entry in this._linkageTable) {
-                if (entry.Value.Definition == null) {
-                    if (entry.Value.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
-                        entry.Value.Definition = entry.Value.TentativeDefinitions[0];
-                        entry.Value.TentativeDefinitions.RemoveAt(0);
+            foreach (var entry in this._linkageList) {
+                if (entry.Definition == null) {
+                    if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                        entry.Definition = entry.TentativeDefinitions[0];
+                        entry.TentativeDefinitions.RemoveAt(0);
                     }
                 }
             }
-            ret.LinkageTable = this._linkageTable;
+            ret.LinkageTable = this._linkageList;
             return ret;
         }
 

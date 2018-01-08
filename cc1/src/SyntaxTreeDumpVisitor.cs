@@ -298,7 +298,7 @@ namespace AnsiCParser {
         public Cell OnTranslationUnit(SyntaxTree.TranslationUnit self, Cell value) {
             return Cell.Create("translation-unit",
                 Cell.Create("linkage-table",
-                    Cell.Create(self.LinkageTable.Select(x => Cell.Create(x.Value.LinkageId, x.Value.Linkage.ToString(), x.Value.Type.Accept(new CTypeDumpVisitor(), value))).ToArray())
+                    Cell.Create(self.LinkageTable.Select(x => Cell.Create(x.LinkageId, x.Linkage.ToString(), x.Type.Accept(new CTypeDumpVisitor(), value))).ToArray())
                 ),
                 Cell.Create(self.Declarations.Select(x => x.Accept(this, value)).ToArray())
             );

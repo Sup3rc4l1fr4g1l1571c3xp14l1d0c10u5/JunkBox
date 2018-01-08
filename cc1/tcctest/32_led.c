@@ -28,11 +28,12 @@ cursor to a previous line.
 
 
 
-#include <stdlib.h>
-#include <stdio.h>
+//#include <stdlib.h>
+extern int printf(char *, ...);
+//#include <stdio.h>
 
-#define MAX_DIGITS 32
-#define NO_MAIN
+//#define MAX_DIGITS 32
+//#define NO_MAIN
 
 
 /* Print the top line of the digit d into buffer. 
@@ -179,7 +180,7 @@ void print_led(unsigned long x, char *buf)
 {
 
    int i=0,n;
-   static int d[MAX_DIGITS];
+   static int d[/*MAX_DIGITS*/32];
 
 
    /* extract digits from x */
@@ -188,7 +189,7 @@ void print_led(unsigned long x, char *buf)
 
    while(x){
       d[n++] = (int)(x%10L);
-      if(n >= MAX_DIGITS)break;
+      if(n >= /*MAX_DIGITS*/32)break;
       x = x/10L;
    }
 
@@ -223,44 +224,11 @@ void print_led(unsigned long x, char *buf)
 
 int main()
 {
-   char buf[5*MAX_DIGITS];
+   char buf[5*/*MAX_DIGITS*/32];
    print_led(1234567, buf);
    printf("%s\n",buf);
 
    return 0;
 }
-
-#ifndef NO_MAIN
-int main(int argc, char **argv)
-{
-
-   int i=0,n;
-   long x;
-   static int d[MAX_DIGITS];
-   char buf[5*MAX_DIGITS];
-
-   if(argc != 2){
-      fprintf(stderr,"led: usage: led integer\n");
-      return 1;
-   }
-
-   /* fetch argument from command line */
-
-   x = atol(argv[1]);
-
-   /* sanity check */
-
-   if(x<0){
-      fprintf(stderr,"led: %d must be non-negative\n",x);
-      return 1;
-   }
-
-   print_led(x,buf);
-   printf("%s\n",buf);
-
-   return 0;
-
-}
-#endif
 
 /* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/

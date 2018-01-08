@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*, ...);
 
 int main()
 {
@@ -10,12 +11,6 @@ int main()
    a[3] = 45;
 
    printf("%d %d %d %d\n", a[0], a[1], a[2], a[3]);
-
-   int b[4];
-
-   b = a;
-
-   printf("%d %d %d %d\n", b[0], b[1], b[2], b[3]);
 
    return 0;
 }

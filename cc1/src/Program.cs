@@ -38,7 +38,7 @@ namespace AnsiCParser {
                 return;
             } else {
 
-                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\30_hanoi.c")).Parse();
+                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\32_led.c")).Parse();
                 Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
                 var v = new SyntaxTreeCompileVisitor.Value();
