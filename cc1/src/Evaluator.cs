@@ -243,7 +243,7 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
-                throw new Exception();
+                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression( e, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant("0", 0, CType.BasicType.TypeKind.SignedInt) );
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
@@ -381,7 +381,7 @@ namespace AnsiCParser {
             }
             if (expr is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
                 var e = expr as SyntaxTree.Expression.PrimaryExpression.StringExpression;
-                throw new Exception();
+                return e;
             }
             if (expr is SyntaxTree.Expression.UnaryAddressExpression) {
                 var e = expr as SyntaxTree.Expression.UnaryAddressExpression;

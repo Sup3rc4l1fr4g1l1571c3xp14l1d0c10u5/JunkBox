@@ -2171,9 +2171,20 @@ namespace AnsiCParser {
                 if (value.Type.IsIntegerType() == false) {
                     throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"caseラベルの値が整数定数値ではありません。");
                 }
+                long v = 0;
+                if (value is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                    v = (value as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value;
+                } else if (value is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
+                    v = (value as SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant).Value;
+                } else if (value is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                    v = (value as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant).Info.Value;
+                } else {
+                    throw new Exception("");
+                }
+
                 _lexer.ReadToken(':');
                 var stmt = Statement();
-                var caseStatement =  new SyntaxTree.Statement.CaseStatement(expr, (value as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value, stmt);
+                var caseStatement =  new SyntaxTree.Statement.CaseStatement(expr, v, stmt);
                 _switchScope.Peek().AddCaseStatement(caseStatement);
                 return caseStatement;
             } else if (_lexer.ReadTokenIf(Token.TokenKind.DEFAULT)) {

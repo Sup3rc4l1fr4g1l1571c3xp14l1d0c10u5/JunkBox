@@ -163,6 +163,9 @@ namespace AnsiCParser {
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnEnclosedInParenthesesExpression(self, value);
         }
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnAddressConstantExpression(self, value);
+        }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnEnumerationConstant(self, value);
         }

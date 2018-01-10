@@ -1,9 +1,9 @@
 #include <stdio.h>
 double привет=0.1;
-int Lefèvre=2;
+int Lefevre=2;
 int main(){
     printf("привет=%g\n",привет);
-    printf("Lefèvre=%d\n",Lefèvre);
+    printf("Lefevre=%d\n",Lefevre);
     return 0;
 }
 // pcc & tcc only

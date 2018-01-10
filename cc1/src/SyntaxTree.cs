@@ -296,6 +296,9 @@ namespace AnsiCParser {
                 /// 文字列リテラルは，一次式とする。それは，6.4.5 の規則で決まる型をもつ左辺値とする。
                 /// </remarks>
                 public class StringExpression : PrimaryExpression {
+
+
+
                     public List<string> Strings {
                         get;
                     }
@@ -788,6 +791,8 @@ namespace AnsiCParser {
                         // オペランドが，単項*演算子の結果の場合，*演算子も&演算子も評価せず，両演算子とも取り除いた場合と同じ結果となる。
                         // ToDo: ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
                         expr = ((UnaryReferenceExpression) expr).Expr;
+                        Expr = expr;
+                        ResultType = CType.CreatePointer(expr.Type);
                     } else if (expr is PostfixExpression.ArraySubscriptingExpression) {
                         // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，
                         // &演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
@@ -798,11 +803,13 @@ namespace AnsiCParser {
                                 new TypeConversionExpression(aexpr.Target.Type, aexpr.Target),
                                 Specification.ImplicitConversion(CType.CreateSignedInt(), aexpr.Index)
                             );
+                        Expr = expr;
+                        ResultType = expr.Type;
                     } else {
                         // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
+                        Expr = expr;
+                        ResultType = CType.CreatePointer(expr.Type);
                     }
-                    Expr = expr;
-                    ResultType = CType.CreatePointer(expr.Type);
                 }
             }
 
@@ -823,7 +830,8 @@ namespace AnsiCParser {
                 }
 
                 public override bool IsLValue() {
-                    return Expr.IsLValue();
+                    return true;
+                    //Expr.IsLValue();
                 }
                 public UnaryReferenceExpression(Expression expr) {
                     // 暗黙の型変換

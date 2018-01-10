@@ -60,8 +60,16 @@ namespace AnsiCParser {
                 FloatConst, // 式の結果は浮動小数点定数値である
                 Var,        // 式の結果は変数参照、もしくは引数参照である（アドレス値の示す先が値である）
                 Ref,        // 式の結果はオブジェクト参照である(アドレス値自体が値である)
-                Address,    // 式の結果はアドレス参照である（スタックの一番上に参照先のアドレス値がある）
+                Address,    // 式の結果はアドレス参照である（スタックの一番上に参照先自体が積まれているような想定。実際には参照先のアドレス値がある）
             }
+
+            // v は (Var v+0) となる
+            // &v は (Var v+0)を (Ref v+0)に書き換える
+            // &v + 1 は (Ref v+1) となる
+            // int *p とした場合の p は (Temp)となる 
+            // p[3] は (Temp)となる
+            // str[] = {...} とした場合の str は (Ref str+0)となる
+            // str[3] = (Ref str+3)となる
 
             public ValueKind Kind;
 
@@ -102,7 +110,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 文字列リテラルなどの静的データ
         /// </summary>
-        List<Tuple<string, byte[]>> dataBlock = new List<Tuple<string, byte[]>>();
+        public List<Tuple<string, byte[]>> dataBlock = new List<Tuple<string, byte[]>>();
 
         int n = 0;
 
@@ -166,15 +174,23 @@ namespace AnsiCParser {
             Console.WriteLine($"imull ${elemType.Sizeof()}, {index}, {index}");
             Console.WriteLine($"subl {index}, {target}");
         }
-
+        private void diff_ptr(CType type, string lhs, string rhs) {
+            CType elemType = type.GetBasePointerType();
+            Console.WriteLine($"subl {rhs}, {lhs}");
+            Console.WriteLine($"cltd");
+            Console.WriteLine($"movl {lhs}, %edx");
+            Console.WriteLine($"movl ${elemType.Sizeof()}, {rhs}");
+            Console.WriteLine($"idivl {rhs}");
+            Console.WriteLine($"movl %eax, {lhs}");
+        }
 
         private Value pointer_add(CType type, Value target, Value index) {
             CType elemType = type.GetBasePointerType();
 
             if (index.Kind == Value.ValueKind.IntConst) {
                 switch (target.Kind) {
-                    case Value.ValueKind.Var:
-                        return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
+                    //case Value.ValueKind.Var:
+                        //return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
                     case Value.ValueKind.Ref:
                         return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
 
@@ -195,8 +211,8 @@ namespace AnsiCParser {
 
             if (index.Kind == Value.ValueKind.IntConst) {
                 switch (target.Kind) {
-                    case Value.ValueKind.Var:
-                        return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
+                    //case Value.ValueKind.Var:
+                    //return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
                     case Value.ValueKind.Ref:
                         return new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = target.Label, Offset = (int)(target.Offset + index.IntConst * elemType.Sizeof()) };
 
@@ -211,6 +227,174 @@ namespace AnsiCParser {
 
             return new Value() { Kind = Value.ValueKind.Temp, Type = type };
         }
+
+        private Value pointer_diff(CType type, Value lhs, Value rhs) {
+            LoadP(rhs, "%eax");
+            LoadP(lhs, "%eax");
+            diff_ptr(lhs.Type, "%eax", "%ecx");
+            Console.WriteLine($"pushl %eax");
+
+            return new Value() { Kind = Value.ValueKind.Temp, Type = type };
+        }
+
+        private Value cast_to(CType type, Value ret) {
+            if (ret.Type.IsIntegerType() && type.IsIntegerType()) {
+                var retty = ret.Type.Unwrap() as CType.BasicType;
+                CType.BasicType.TypeKind selftykind;
+                if (type.Unwrap() is CType.BasicType) {
+                    selftykind = (type.Unwrap() as CType.BasicType).Kind;
+                } else if (type.Unwrap() is CType.TaggedType.EnumType) {
+                    selftykind = CType.BasicType.TypeKind.SignedInt;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                LoadI(ret, "%eax");
+                if (ret.Type.IsSignedIntegerType()) {
+                    if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                        Console.WriteLine($"movsbl %al, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                        Console.WriteLine($"movswl %ax, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                        Console.WriteLine($"movzbl %al, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                        Console.WriteLine($"movzwl %ax, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                } else {
+                    if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                        Console.WriteLine($"movzbl %al, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                        Console.WriteLine($"movzwl %ax, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                        Console.WriteLine($"movzbl %al, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                        Console.WriteLine($"movzwl %ax, %eax");
+                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                }
+                Console.WriteLine($"pushl %eax");
+                return new Value() { Kind = Value.ValueKind.Temp, Type = type };
+            } else if (ret.Type.IsPointerType() && type.IsPointerType()) {
+                return new Value(ret) { Type = type };
+            } else if (ret.Type.IsArrayType() && type.IsPointerType()) {
+                // 手抜き
+                if (ret.Kind == Value.ValueKind.Var) {
+                    ret = new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                    return ret;
+                } else if (ret.Kind == Value.ValueKind.Ref) {
+                    ret = new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                    return ret;
+                } else if (ret.Kind == Value.ValueKind.Address) {
+                    ret = new Value() { Kind = Value.ValueKind.Temp, Type = type };
+                    return ret;
+                } else {
+                    throw new NotImplementedException();
+                }
+            } else if (ret.Type.IsArrayType() && type.IsArrayType()) {
+                return new Value(ret) { Type = type };
+            } else if (ret.Type.IsPointerType() && type.IsArrayType()) {
+                throw new NotImplementedException();
+            } else if (ret.Type.IsIntegerType() && type.IsPointerType()) {
+                return new Value(ret) { Type = type };
+            } else if (ret.Type.IsPointerType() && type.IsIntegerType()) {
+                return new Value(ret) { Type = type };
+            } else if (ret.Type.IsRealFloatingType() && type.IsRealFloatingType()) {
+                LoadF(ret);
+                StoreF(type);
+                return new Value() { Kind = Value.ValueKind.Temp, Type = type };
+            } else if (ret.Type.IsRealFloatingType() && type.IsIntegerType()) {
+                LoadF(ret);
+
+                // double -> unsigned char
+                // 	movzwl <value>, %eax
+                //  movzbl %al, %eax
+                if (type.IsSignedIntegerType()) {
+                    switch (type.Sizeof()) {
+                        case 1:
+                            Console.WriteLine($"sub $4, %esp");
+                            Console.WriteLine($"fistps (%esp)");
+                            Console.WriteLine($"movzwl (%esp), %eax");
+                            Console.WriteLine($"movsbl %al, %eax");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        case 2:
+                            Console.WriteLine($"sub $4, %esp");
+                            Console.WriteLine($"fistps (%esp)");
+                            Console.WriteLine($"movzwl (%esp), %eax");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        case 4:
+                            Console.WriteLine($"sub $4, %esp");
+                            Console.WriteLine($"fistpl (%esp)");
+                            Console.WriteLine($"movl (%esp), %eax");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                } else {
+                    switch (type.Sizeof()) {
+                        case 1:
+                            Console.WriteLine($"sub $4, %esp");
+                            Console.WriteLine($"fistps (%esp)");
+                            Console.WriteLine($"movzwl (%esp), %eax");
+                            Console.WriteLine($"movzbl %al, %eax");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        case 2:
+                            Console.WriteLine($"sub $4, %esp");
+                            Console.WriteLine($"fistpl (%esp)");
+                            Console.WriteLine($"movl (%esp), %eax");
+                            Console.WriteLine($"movzwl %ax, %eax");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        case 4:
+                            // fistpq  16(%esp)
+                            // movl    16(%esp), % eax
+                            Console.WriteLine($"sub $8, %esp");
+                            Console.WriteLine($"fistpq (%esp)");
+                            Console.WriteLine($"movl (%esp), %eax");
+                            Console.WriteLine($"add $4, %esp");
+                            Console.WriteLine($"movl %eax, (%esp)");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+
+                }
+
+                return new Value() { Kind = Value.ValueKind.Temp, Type = type };
+            } else if (ret.Type.IsIntegerType() && type.IsRealFloatingType()) {
+                var retty = ret.Type.Unwrap() as CType.BasicType;
+                CType.BasicType.TypeKind selftykind;
+                if (type.Unwrap() is CType.BasicType) {
+                    selftykind = (type.Unwrap() as CType.BasicType).Kind;
+                } else if (type.Unwrap() is CType.TaggedType.EnumType) {
+                    selftykind = CType.BasicType.TypeKind.SignedInt;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                LoadF(ret);
+                StoreF(type);
+                return new Value() { Kind = Value.ValueKind.Temp, Type = type };
+
+            } else {
+                throw new NotImplementedException();
+            }
+        }
+
 
         public Value OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, Value value) {
             throw new NotImplementedException();
@@ -298,6 +482,16 @@ namespace AnsiCParser {
                         return pointer_add(self.Type, target, index);
                     case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
                         return pointer_sub(self.Type, target, index);
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            } else if (self.Lhs.Type.IsPointerType() && self.Rhs.Type.IsPointerType()) {
+                var lhs = self.Lhs.Accept(this, value);
+                var rhs = self.Rhs.Accept(this, value);
+
+                switch (self.Op) {
+                    case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
+                        return pointer_diff(self.Type, lhs, rhs);
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
@@ -537,6 +731,7 @@ namespace AnsiCParser {
                     Console.WriteLine($"pushl (%eax)");
                     break;
                 default:
+                    LoadS(rhs);
                     Console.WriteLine($"movl %esp, %esi");
                     Console.WriteLine($"movl ${self.Type.Sizeof()}, %ecx");
                     Console.WriteLine($"movl %eax, %edi");
@@ -552,53 +747,7 @@ namespace AnsiCParser {
 
         public Value OnCastExpression(SyntaxTree.Expression.CastExpression self, Value value) {
             var ret = self.Expr.Accept(this, value);
-            if (ret.Type.IsIntegerType() && self.Type.IsIntegerType()) {
-                var retty = ret.Type.Unwrap() as CType.BasicType;
-                var selfty = self.Type.Unwrap() as CType.BasicType;
-
-                LoadI(ret, "%eax");
-                if (retty.IsSignedIntegerType()) {
-                    if (selfty.Kind == CType.BasicType.TypeKind.Char || selfty.Kind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movsbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movswl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedInt || selfty.Kind == CType.BasicType.TypeKind.SignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax"); // do nothing;
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedInt || selfty.Kind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        // Console.WriteLine($"movl %eax, %eax"); // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                } else {
-                    if (selfty.Kind == CType.BasicType.TypeKind.Char || selfty.Kind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedInt || selfty.Kind == CType.BasicType.TypeKind.SignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax"); // do nothing;
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedInt || selfty.Kind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax"); // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                }
-
-                Console.WriteLine($"pushl %eax");
-
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsPointerType() && self.Type.IsPointerType()) {
-                return new Value(ret) { Type = self.Type };
-            } else {
-                throw new NotImplementedException();
-            }
+            return cast_to(self.Type, ret);
         }
 
         public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Value value) {
@@ -618,74 +767,9 @@ namespace AnsiCParser {
             var thenRet = self.ThenExpr.Accept(this, value);
             if (cond.Type.IsVoidType()) {
                 discard(thenRet);
-            } else if (thenRet.Kind == Value.ValueKind.Temp) {
-                // すでにスタック上にある
             } else {
-                if (thenRet.Type.IsIntegerType()) {
-                    LoadI(thenRet, "%eax");
-                    Console.WriteLine($"pushl %eax");
-                } else if (thenRet.Type.IsRealFloatingType()) {
-                    LoadF(thenRet);
-                    if (thenRet.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                        Console.WriteLine($"sub $4, %esp");
-                        Console.WriteLine($"fstps (%esp)");
-                    } else if (thenRet.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                        Console.WriteLine($"sub $8, %esp");
-                        Console.WriteLine($"fstpl (%esp)");
-                    } else {
-                        throw new Exception("");
-                    }
-                }
-                else {
-                    switch (thenRet.Kind) {
-                        case Value.ValueKind.Var:
-                            if (thenRet.Label == null) {
-                                Console.WriteLine($"movl {thenRet.Offset}(%ebp), %eax");
-                            }
-                            else {
-                                Console.WriteLine($"movl {thenRet.Label}+{thenRet.Offset}, %eax");
-                            }
-
-                            break;
-                        case Value.ValueKind.Ref:
-                            if (thenRet.Label == null) {
-                                Console.WriteLine($"leal {thenRet.Offset}(%ebp), %eax");
-                            }
-                            else {
-                                Console.WriteLine($"leal {thenRet.Label}+{thenRet.Offset}, %eax");
-                            }
-
-                            break;
-                        case Value.ValueKind.Address:
-                            Console.WriteLine($"popl %eax");
-                            break;
-                        default:
-                            throw new Exception("");
-                    }
-
-                    switch (self.Type.Sizeof()) {
-                        case 1:
-                            Console.WriteLine($"movzbl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        case 2:
-                            Console.WriteLine($"movzwl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        case 4:
-                            Console.WriteLine($"movl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        default:
-                            Console.WriteLine($"subl {(thenRet.Type.Sizeof() + 3) & (~3)}, %esp");
-                            Console.WriteLine($"movl %eax, %esi");
-                            Console.WriteLine($"movl ${thenRet.Type.Sizeof()}, %ecx");
-                            Console.WriteLine($"movl %esp, %edi");
-                            Console.WriteLine($"cld");
-                            Console.WriteLine($"rep movsb");
-                            break;
-                    }
-                }
+                // スタック上に結果をロードする
+                LoadS(thenRet);
             }
 
 
@@ -694,71 +778,9 @@ namespace AnsiCParser {
             var elseRet = self.ElseExpr.Accept(this, value);
             if (cond.Type.IsVoidType()) {
                 discard(elseRet);
-            } else if (elseRet.Kind == Value.ValueKind.Temp) {
-                // すでにスタック上にある
             } else {
-                if (elseRet.Type.IsIntegerType()) {
-                    LoadI(elseRet, "%eax");
-                    Console.WriteLine($"pushl %eax");
-                } else if (elseRet.Type.IsRealFloatingType()) {
-                    LoadF(elseRet);
-                    if (elseRet.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                        Console.WriteLine($"sub $4, %esp");
-                        Console.WriteLine($"fstps (%esp)");
-                    } else if (elseRet.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                        Console.WriteLine($"sub $8, %esp");
-                        Console.WriteLine($"fstpl (%esp)");
-                    } else {
-                        throw new Exception("");
-                    }
-                } else {
-                    switch (elseRet.Kind) {
-                        case Value.ValueKind.Var:
-                            if (elseRet.Label == null) {
-                                Console.WriteLine($"movl {elseRet.Offset}(%ebp), %eax");
-                            } else {
-                                Console.WriteLine($"movl {elseRet.Label}+{elseRet.Offset}, %eax");
-                            }
-
-                            break;
-                        case Value.ValueKind.Ref:
-                            if (elseRet.Label == null) {
-                                Console.WriteLine($"leal {elseRet.Offset}(%ebp), %eax");
-                            } else {
-                                Console.WriteLine($"leal {elseRet.Label}+{elseRet.Offset}, %eax");
-                            }
-
-                            break;
-                        case Value.ValueKind.Address:
-                            Console.WriteLine($"popl %eax");
-                            break;
-                        default:
-                            throw new Exception("");
-                    }
-
-                    switch (self.Type.Sizeof()) {
-                        case 1:
-                            Console.WriteLine($"movzbl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        case 2:
-                            Console.WriteLine($"movzwl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        case 4:
-                            Console.WriteLine($"movl (%eax), %eax");
-                            Console.WriteLine($"pushl %eax");
-                            break;
-                        default:
-                            Console.WriteLine($"subl {(elseRet.Type.Sizeof() + 3) & (~3)}, %esp");
-                            Console.WriteLine($"movl %eax, %esi");
-                            Console.WriteLine($"movl ${elseRet.Type.Sizeof()}, %ecx");
-                            Console.WriteLine($"movl %esp, %edi");
-                            Console.WriteLine($"cld");
-                            Console.WriteLine($"rep movsb");
-                            break;
-                    }
-                }
+                // スタック上に結果をロードする
+                LoadS(elseRet);
             }
             Console.WriteLine($"{junctionLabel}:");
 
@@ -854,46 +876,7 @@ namespace AnsiCParser {
         public Value OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, Value value) {
             var ret = self.Expr.Accept(this, value);
             if (ret.Type.IsIntegerType() && self.Type.IsIntegerType()) {
-                var retty = ret.Type.Unwrap() as CType.BasicType;
-                var selfty = self.Type.Unwrap() as CType.BasicType;
-
-                LoadI(ret, "%eax");
-                if (retty.IsSignedIntegerType()) {
-                    if (selfty.Kind == CType.BasicType.TypeKind.Char || selfty.Kind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movsbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movswl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedInt || selfty.Kind == CType.BasicType.TypeKind.SignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedInt || selfty.Kind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                } else {
-                    if (selfty.Kind == CType.BasicType.TypeKind.Char || selfty.Kind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.SignedInt || selfty.Kind == CType.BasicType.TypeKind.SignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selfty.Kind == CType.BasicType.TypeKind.UnsignedInt || selfty.Kind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        //Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                }
-                Console.WriteLine($"pushl %eax");
-
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
+                return cast_to(self.Type, ret);
             } else {
                 throw new NotImplementedException();
             }
@@ -997,15 +980,7 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                 }
 
-                if (self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                    Console.WriteLine($"sub $4, %esp");
-                    Console.WriteLine($"fstps (%esp)");
-                } else if (self.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                    Console.WriteLine($"sub $8, %esp");
-                    Console.WriteLine($"fstpl (%esp)");
-                } else {
-                    throw new NotImplementedException();
-                }
+                StoreF(self.Type);
 
                 return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
             }
@@ -1018,54 +993,9 @@ namespace AnsiCParser {
 
             LoadI(index, "%ecx");
             if (target.Type.IsPointerType()) {
-                switch (target.Kind) {
-                    case Value.ValueKind.Var:
-                        if (target.Label == null) {
-                            Console.WriteLine($"movl {target.Offset}(%ebp), %eax");
-                        } else {
-                            Console.WriteLine($"movl {target.Label}+{target.Offset}, %eax");
-                        }
-                        break;
-                    case Value.ValueKind.Ref:
-                        if (target.Label == null) {
-                            Console.WriteLine($"leal {target.Offset}(%ebp), %eax");
-                        } else {
-                            Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
-                        }
-                        break;
-                    case Value.ValueKind.Address:
-                        Console.WriteLine($"popl %eax");
-                        Console.WriteLine($"movl (%eax), %eax");
-                        break;
-                    case Value.ValueKind.Temp:
-                        Console.WriteLine($"popl %eax");
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }
+                LoadP(target, "%eax");
             } else {
-                switch (target.Kind) {
-                    case Value.ValueKind.Var:
-                        if (target.Label == null) {
-                            Console.WriteLine($"leal {target.Offset}(%ebp), %eax");
-                        } else {
-                            Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
-                        }
-                        break;
-                    case Value.ValueKind.Ref:
-                        if (target.Label == null) {
-                            Console.WriteLine($"leal {target.Offset}(%ebp), %eax");
-                        } else {
-                            Console.WriteLine($"leal {target.Label}+{target.Offset}, %eax");
-                        }
-                        break;
-                    case Value.ValueKind.Address:
-                    case Value.ValueKind.Temp:
-                        Console.WriteLine($"popl %eax");
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }
+                LoadVA(target, "%eax");
             }
             Console.WriteLine($"imull ${self.Type.Sizeof()}, %ecx, %ecx");
             Console.WriteLine($"leal (%eax, %ecx), %eax");
@@ -1110,47 +1040,10 @@ namespace AnsiCParser {
             // 引数を右側（末尾側）からスタックに積む
             foreach (var x in self.Args.Reverse<SyntaxTree.Expression>()) {
                 var _argSize = (x.Type.Sizeof() + 3) & ~3;
-
                 argSize += _argSize;
-
                 var a = x.Accept(this, value);
-                if (x.Type.Sizeof() <= 4) {
-                    LoadI(a, "%eax");
-                    Console.WriteLine($"push %eax");
-                } else if (a.Kind == Value.ValueKind.FloatConst) {
-                    if (a.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
-                        var bytes = BitConverter.GetBytes((float)a.FloatConst);
-                        var dword = BitConverter.ToUInt32(bytes, 0);
-                        Console.WriteLine($"pushl ${dword}");
-                    } else if (a.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Double)) {
-                        var bytes = BitConverter.GetBytes(a.FloatConst);
-                        var qwordlo = BitConverter.ToUInt32(bytes, 0);
-                        var qwordhi = BitConverter.ToUInt32(bytes, 4);
-                        Console.WriteLine($"pushl ${qwordhi}");
-                        Console.WriteLine($"pushl ${qwordlo}");
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                    break;
-                } else if (a.Kind == Value.ValueKind.Var) {
-                    Console.WriteLine($"subl ${_argSize}, %esp");
-                    Console.WriteLine($"movl ${a.Type.Sizeof()}, %ecx");
-                    if (a.Label == null) {
-                        Console.WriteLine($"leal {a.Offset}(%ebp), %esi");
-                    } else {
-                        Console.WriteLine($"leal {a.Label}+{a.Offset}, %esi");
-                    }
-                    Console.WriteLine($"movl %esp, %edi");
-                    Console.WriteLine($"cld");
-                    Console.WriteLine($"rep movsb");
-
-                } else if (a.Kind == Value.ValueKind.Temp) {
-                    // 式の値はスタックの上にあるので積み直し不要
-
-                } else {
-                    throw new NotImplementedException();
-                }
-            }
+                LoadS(a);
+           }
 
             // 戻り値が浮動小数点数ではなく、eaxにも入らないならスタック上に格納先アドレスを積む
             if (resultSize > 4 && !funcType.ResultType.IsRealFloatingType()) {
@@ -1196,7 +1089,7 @@ namespace AnsiCParser {
         public Value OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, Value value) {
             var ret = self.Expr.Accept(this, value);
             var offset = 0;
-            var st = self.Expr.Type as CType.TaggedType.StructUnionType;
+            var st = self.Expr.Type.Unwrap() as CType.TaggedType.StructUnionType;
             CType.TaggedType.StructUnionType.MemberInfo target = null;
             foreach (var member in st.Members) {
                 if (member.Ident == self.Ident) {
@@ -1208,39 +1101,17 @@ namespace AnsiCParser {
                     offset += member.Type.Sizeof();
                 }
             }
-            switch (ret.Kind) {
-                case Value.ValueKind.Var:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"leal {ret.Offset + offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"leal {ret.Label}+{ret.Offset + offset}, %eax");
-                    }
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                case Value.ValueKind.Ref:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"leal {ret.Offset + offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"leal {ret.Label}+{ret.Offset + offset}, %eax");
-                    }
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                    break;
-                case Value.ValueKind.Address:
-                    Console.WriteLine($"popl %eax");
-                    Console.WriteLine($"addl ${offset}, %eax");
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                default:
-                    throw new Exception("");
-            }
-            throw new NotImplementedException();
+
+            LoadVA(ret, "%eax");
+            Console.WriteLine($"addl ${offset}, %eax");
+            Console.WriteLine($"pushl %eax");
+            return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
         }
 
         public Value OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
             var ret = self.Expr.Accept(this, value);
             var offset = 0;
-            var st = (self.Expr.Type as CType.TaggedType.PointerType).BaseType as CType.TaggedType.StructUnionType;
+            var st = self.Expr.Type.GetBasePointerType().Unwrap() as CType.TaggedType.StructUnionType;
             CType.TaggedType.StructUnionType.MemberInfo target = null;
             foreach (var member in st.Members) {
                 if (member.Ident == self.Ident) {
@@ -1252,63 +1123,18 @@ namespace AnsiCParser {
                     offset += member.Type.Sizeof();
                 }
             }
-            switch (ret.Kind) {
-                case Value.ValueKind.Var:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"movl {ret.Offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"movl {ret.Label}+{ret.Offset}, %eax");
-                    }
-                    Console.WriteLine($"addl ${offset}, %eax");
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                case Value.ValueKind.Ref:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"movl {ret.Offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"movl {ret.Label}+{ret.Offset}, %eax");
-                    }
-                    Console.WriteLine($"addl ${offset}, %eax");
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                    break;
-                case Value.ValueKind.Address:
-                    Console.WriteLine($"popl %eax");
-                    Console.WriteLine($"movl (%eax), %eax");
-                    Console.WriteLine($"addl ${offset}, %eax");
-                    Console.WriteLine($"pushl %eax");
-                    return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
-                default:
-                    throw new Exception("");
-            }
-            throw new NotImplementedException();
+
+            LoadP(ret, "%eax");
+            Console.WriteLine($"addl ${offset}, %eax");
+            Console.WriteLine($"pushl %eax");
+            return new Value() { Kind = Value.ValueKind.Address, Type = self.Type };
+
         }
 
         public Value OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
             var ret = self.Expr.Accept(this, value);
-            // load address
-            switch (ret.Kind) {
-                case Value.ValueKind.Var:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
-                    }
-                    break;
-                case Value.ValueKind.Ref:
-                    if (ret.Label == null) {
-                        Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
-                    } else {
-                        Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
-                    }
-                    break;
-                case Value.ValueKind.Address:
-                case Value.ValueKind.Temp:
-                    Console.WriteLine($"popl %eax");
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
+
+            LoadVA(ret, "%eax");
 
             var op = "";
             switch (self.Op) {
@@ -1426,7 +1252,7 @@ namespace AnsiCParser {
         }
 
         public Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, Value value) {
-            if (self.Lhs.Type.IsIntegerType() && self.Rhs.Type.IsIntegerType()) {
+            if ((self.Lhs.Type.IsIntegerType() && self.Rhs.Type.IsIntegerType())||(self.Lhs.Type.IsPointerType() && self.Rhs.Type.IsPointerType())) {
 
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
@@ -1536,185 +1362,7 @@ namespace AnsiCParser {
 
         public Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, Value value) {
             var ret = self.Expr.Accept(this, value);
-            if (ret.Type.IsIntegerType() && self.Type.IsIntegerType()) {
-                var retty = ret.Type.Unwrap() as CType.BasicType;
-                CType.BasicType.TypeKind selftykind;
-                if (self.Type.Unwrap() is CType.BasicType) {
-                    selftykind = (self.Type.Unwrap() as CType.BasicType).Kind;
-                } else if (self.Type.Unwrap() is CType.TaggedType.EnumType) {
-                    selftykind = CType.BasicType.TypeKind.SignedInt;
-                } else {
-                    throw new NotImplementedException();
-                }
-
-                LoadI(ret, "%eax");
-                if (ret.Type.IsSignedIntegerType()) {
-                    if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movsbl %al, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movswl %ax, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
-                        Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                } else {
-                    if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
-                        Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
-                        Console.WriteLine($"movzbl %al, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                        Console.WriteLine($"movzwl %ax, %eax");
-                    } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                        Console.WriteLine($"movl %eax, %eax");  // do nothing;
-                    } else {
-                        throw new NotImplementedException();
-                    }
-                }
-                Console.WriteLine($"pushl %eax");
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsPointerType() && self.Type.IsPointerType()) {
-                return ret;
-            } else if (ret.Type.IsArrayType() && self.Type.IsPointerType()) {
-                // 手抜き
-                if (ret.Kind == Value.ValueKind.Var) {
-                    ret = new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Label = ret.Label, Offset = ret.Offset };
-                    return ret;
-                } else if (ret.Kind == Value.ValueKind.Ref) {
-                    ret = new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Label = ret.Label, Offset = ret.Offset };
-                    return ret;
-                } else if (ret.Kind == Value.ValueKind.Address) {
-                    ret = new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-                    return ret;
-                } else {
-                    throw new NotImplementedException();
-                }
-            } else if (ret.Type.IsArrayType() && self.Type.IsArrayType()) {
-                return ret;
-            } else if (ret.Type.IsPointerType() && self.Type.IsArrayType()) {
-                throw new NotImplementedException();
-            } else if (ret.Type.IsIntegerType() && self.Type.IsPointerType()) {
-                return ret;
-            } else if (ret.Type.IsPointerType() && self.Type.IsIntegerType()) {
-                return ret;
-            } else if (ret.Type.IsBasicType(CType.BasicType.TypeKind.Float) && self.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                LoadF(ret);
-                Console.WriteLine($"sub $8, %esp");
-                Console.WriteLine($"fstpl (%esp)");
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsBasicType(CType.BasicType.TypeKind.Double) && self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                LoadF(ret);
-                Console.WriteLine($"sub $4, %esp");
-                Console.WriteLine($"fstps (%esp)");
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsBasicType(CType.BasicType.TypeKind.Double) && self.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                LoadF(ret);
-                Console.WriteLine($"sub $8, %esp");
-                Console.WriteLine($"fstpl (%esp)");
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsBasicType(CType.BasicType.TypeKind.Float) && self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                LoadF(ret);
-                Console.WriteLine($"sub $4, %esp");
-                Console.WriteLine($"fstps (%esp)");
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsRealFloatingType() && self.Type.IsIntegerType()) {
-                LoadF(ret);
-
-                // double -> unsigned char
-                // 	movzwl <value>, %eax
-                //  movzbl %al, %eax
-                if (self.Type.IsSignedIntegerType()) {
-                    switch (self.Type.Sizeof()) {
-                        case 1:
-                            Console.WriteLine($"sub $4, %esp");
-                            Console.WriteLine($"fistps (%esp)");
-                            Console.WriteLine($"movzwl (%esp), %eax");
-                            Console.WriteLine($"movsbl %al, %eax");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        case 2:
-                            Console.WriteLine($"sub $4, %esp");
-                            Console.WriteLine($"fistps (%esp)");
-                            Console.WriteLine($"movzwl (%esp), %eax");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        case 4:
-                            Console.WriteLine($"sub $4, %esp");
-                            Console.WriteLine($"fistpl (%esp)");
-                            Console.WriteLine($"movl (%esp), %eax");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        default:
-                            throw new NotImplementedException();
-                    }
-                } else {
-                    switch (self.Type.Sizeof()) {
-                        case 1:
-                            Console.WriteLine($"sub $4, %esp");
-                            Console.WriteLine($"fistps (%esp)");
-                            Console.WriteLine($"movzwl (%esp), %eax");
-                            Console.WriteLine($"movzbl %al, %eax");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        case 2:
-                            Console.WriteLine($"sub $4, %esp");
-                            Console.WriteLine($"fistpl (%esp)");
-                            Console.WriteLine($"movl (%esp), %eax");
-                            Console.WriteLine($"movzwl %ax, %eax");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        case 4:
-                            // fistpq  16(%esp)
-                            // movl    16(%esp), % eax
-                            Console.WriteLine($"sub $8, %esp");
-                            Console.WriteLine($"fistpq (%esp)");
-                            Console.WriteLine($"movl (%esp), %eax");
-                            Console.WriteLine($"add $4, %esp");
-                            Console.WriteLine($"movl %eax, (%esp)");
-                            break;
-                        default:
-                            throw new NotImplementedException();
-                    }
-
-                }
-
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-            } else if (ret.Type.IsIntegerType() && self.Type.IsRealFloatingType()) {
-                var retty = ret.Type.Unwrap() as CType.BasicType;
-                CType.BasicType.TypeKind selftykind;
-                if (self.Type.Unwrap() is CType.BasicType) {
-                    selftykind = (self.Type.Unwrap() as CType.BasicType).Kind;
-                } else if (self.Type.Unwrap() is CType.TaggedType.EnumType) {
-                    selftykind = CType.BasicType.TypeKind.SignedInt;
-                } else {
-                    throw new NotImplementedException();
-                }
-
-                LoadF(ret);
-                if (self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                    Console.WriteLine($"sub $4, %esp");
-                    Console.WriteLine($"fstps (%esp)");
-                } else if (self.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                    Console.WriteLine($"sub $8, %esp");
-                    Console.WriteLine($"fstpl (%esp)");
-                } else {
-                    throw new NotImplementedException();
-                }
-                return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
-
-            } else {
-                throw new NotImplementedException();
-            }
+            return cast_to(self.Type, ret);
         }
 
         public Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, Value value) {
@@ -1754,15 +1402,7 @@ namespace AnsiCParser {
             } else if (operand.Type.IsRealFloatingType()) {
                 LoadF(operand);
                 Console.WriteLine($"fchs");
-                if (self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                    Console.WriteLine($"sub $4, %esp");
-                    Console.WriteLine($"fstps (%esp)");
-                } else if (self.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                    Console.WriteLine($"sub $8, %esp");
-                    Console.WriteLine($"fstpl (%esp)");
-                } else {
-                    throw new NotImplementedException();
-                }
+                StoreF(self.Type);
                 return new Value() { Kind = Value.ValueKind.Temp, Type = self.Type };
             } else {
                 throw new NotImplementedException();
@@ -1794,23 +1434,24 @@ namespace AnsiCParser {
         public Value OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, Value value) {
             var ret = self.Expr.Accept(this, value);
             // load address
-            if (ret.Kind == Value.ValueKind.Var) {
-                if (ret.Label == null) {
-                    Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
-                } else {
-                    Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
-                }
-            } else if (ret.Kind == Value.ValueKind.Ref) {
-                if (ret.Label == null) {
-                    Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
-                } else {
-                    Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
-                }
-            } else if (ret.Kind == Value.ValueKind.Address || ret.Kind == Value.ValueKind.Temp) {
-                Console.WriteLine($"popl %eax");
-            } else {
-                throw new NotImplementedException();
-            }
+            LoadVA(ret, "%eax");
+            //if (ret.Kind == Value.ValueKind.Var) {
+            //    if (ret.Label == null) {
+            //        Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
+            //    } else {
+            //        Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
+            //    }
+            //} else if (ret.Kind == Value.ValueKind.Ref) {
+            //    if (ret.Label == null) {
+            //        Console.WriteLine($"leal {ret.Offset}(%ebp), %eax");
+            //    } else {
+            //        Console.WriteLine($"leal {ret.Label}+{ret.Offset}, %eax");
+            //    }
+            //} else if (ret.Kind == Value.ValueKind.Address || ret.Kind == Value.ValueKind.Temp) {
+            //    Console.WriteLine($"popl %eax");
+            //} else {
+            //    throw new NotImplementedException();
+            //}
 
             string op = "";
             switch (self.Op) {
@@ -1896,67 +1537,74 @@ namespace AnsiCParser {
                     throw new NotImplementedException();
             }
 
-            switch (self.Type.Sizeof()) {
-                case 1:
-                    rhs = LoadI(rhs, "%ecx");
-                    Console.WriteLine($"movb %cl, (%eax)");
-                    break;
-                case 2:
-                    rhs = LoadI(rhs, "%ecx");
-                    Console.WriteLine($"movw %cx, (%eax)");
-                    break;
-                case 4:
-                    rhs = LoadI(rhs, "%ecx");
-                    Console.WriteLine($"movl %ecx, (%eax)");
-                    break;
-                default: {
-                        switch (rhs.Kind) {
-                            case Value.ValueKind.FloatConst: {
-                                    var bytes = BitConverter.GetBytes(rhs.FloatConst);
-                                    var qwordlo = BitConverter.ToUInt32(bytes, 0);
-                                    var qwordhi = BitConverter.ToUInt32(bytes, 4);
-                                    Console.WriteLine($"movl ${qwordlo}, 0(%eax)");
-                                    Console.WriteLine($"movl ${qwordhi}, 4(%eax)");
-                                    return new Value() { Kind = Value.ValueKind.Void };
-                                }
-                            case Value.ValueKind.Var:
-                                if (value.Label == null) {
-                                    Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
-                                } else {
-                                    Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
-                                }
-                                break;
-                            case Value.ValueKind.Ref:
-                                if (rhs.Label == null) {
-                                    Console.WriteLine($"leal {rhs.Offset}(%ebp), %esi");
-                                } else {
-                                    Console.WriteLine($"leal {rhs.Label}+{rhs.Offset}, %esi");
-                                }
-                                break;
-                            case Value.ValueKind.Address:
-                                Console.WriteLine($"popl %esi");
-                                break;
-                            case Value.ValueKind.Temp:
-                                Console.WriteLine($"leal (%esp), %esi");
-                                Console.WriteLine($"pushl %ecx");
-                                Console.WriteLine($"movl ${self.Type.Sizeof()}, %ecx");
-                                Console.WriteLine($"movl %eax, %edi");
-                                Console.WriteLine($"cld");
-                                Console.WriteLine($"rep movsb");
-                                Console.WriteLine($"pop %ecx");
-                                Console.WriteLine($"add ${self.Type.Sizeof()}, %esp");
-                                return new Value() { Kind = Value.ValueKind.Void };
-                            default:
-                                throw new NotImplementedException();
+            if (self.Type.IsIntegerType()) {
+                LoadI(rhs, "%ecx");
+                switch (self.Type.Sizeof()) {
+                    case 1:
+                        Console.WriteLine($"movb %cl, (%eax)");
+                        break;
+                    case 2:
+                        Console.WriteLine($"movw %cx, (%eax)");
+                        break;
+                    case 4:
+                        Console.WriteLine($"movl %ecx, (%eax)");
+                        break;
+                    default:
+                        throw new Exception();
+                }
+            } else {
+                switch (rhs.Kind) {
+                    case Value.ValueKind.FloatConst: {
+                            if (self.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                                var bytes = BitConverter.GetBytes((float)rhs.FloatConst);
+                                var qwordlo = BitConverter.ToUInt32(bytes, 0);
+                                Console.WriteLine($"movl ${qwordlo}, 0(%eax)");
+                            } else {
+                                var bytes = BitConverter.GetBytes(rhs.FloatConst);
+                                var qwordlo = BitConverter.ToUInt32(bytes, 0);
+                                var qwordhi = BitConverter.ToUInt32(bytes, 4);
+                                Console.WriteLine($"movl ${qwordlo}, 0(%eax)");
+                                Console.WriteLine($"movl ${qwordhi}, 4(%eax)");
+                            }
+                            return new Value() { Kind = Value.ValueKind.Void };
                         }
+                    case Value.ValueKind.Var:
+                        if (rhs.Label == null) {
+                            Console.WriteLine($"leal {rhs.Offset}(%ebp), %esi");
+                        } else {
+                            Console.WriteLine($"leal {rhs.Label}+{rhs.Offset}, %esi");
+                        }
+                        break;
+                    case Value.ValueKind.Ref:
+                        if (rhs.Label == null) {
+                            Console.WriteLine($"leal {rhs.Offset}(%ebp), %esi");
+                        } else {
+                            Console.WriteLine($"leal {rhs.Label}+{rhs.Offset}, %esi");
+                        }
+                        Console.WriteLine($"movl %esi, (%eax)");
+                        return new Value() { Kind = Value.ValueKind.Void };
+                    case Value.ValueKind.Address:
+                        Console.WriteLine($"popl %esi");
+                        break;
+                    case Value.ValueKind.Temp:
+                        Console.WriteLine($"movl %esp, %esi");
                         Console.WriteLine($"pushl %ecx");
                         Console.WriteLine($"movl ${self.Type.Sizeof()}, %ecx");
                         Console.WriteLine($"movl %eax, %edi");
                         Console.WriteLine($"cld");
                         Console.WriteLine($"rep movsb");
                         Console.WriteLine($"pop %ecx");
-                        break;
-                    }
+                        Console.WriteLine($"add ${self.Type.Sizeof()}, %esp");
+                        return new Value() { Kind = Value.ValueKind.Void };
+                    default:
+                        throw new NotImplementedException();
+                }
+                Console.WriteLine($"pushl %ecx");
+                Console.WriteLine($"movl ${self.Type.Sizeof()}, %ecx");
+                Console.WriteLine($"movl %eax, %edi");
+                Console.WriteLine($"cld");
+                Console.WriteLine($"rep movsb");
+                Console.WriteLine($"pop %ecx");
             }
             return new Value() { Kind = Value.ValueKind.Void };
         }
@@ -1987,6 +1635,7 @@ namespace AnsiCParser {
         public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, Value value) {
             var label = BreakTarget.Peek();
             Console.WriteLine($"jmp {label}");
+            // ToDo: 変数宣言を含む複文の内側から外側に脱出するとメモリリークするのを治す
             return new Value() { Kind = Value.ValueKind.Void };
         }
 
@@ -1994,6 +1643,7 @@ namespace AnsiCParser {
             var label = _switchLabelTableStack.Peek()[self];
             Console.WriteLine($"{label}:");
             self.Stmt.Accept(this, value);
+            // ToDo: 変数宣言を含む複文の内側から外側に脱出するとメモリリークするのを治す
             return new Value() { Kind = Value.ValueKind.Void };
         }
 
@@ -2021,7 +1671,7 @@ namespace AnsiCParser {
                     //localScope.Add(x.Ident, 0);
                 }
             }
-            Console.WriteLine($"andl $-16, %esp");
+            //Console.WriteLine($"andl $-16, %esp");
             Console.WriteLine($"subl ${localScopeSize}, %esp");
 
             localScopeTotalSize -= localScopeSize;
@@ -2073,7 +1723,8 @@ namespace AnsiCParser {
         }
 
         public Value OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, Value value) {
-            throw new NotImplementedException();
+            return new Value() { Kind = Value.ValueKind.Void };
+            //throw new NotImplementedException();
         }
 
         public Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, Value value) {
@@ -2084,8 +1735,10 @@ namespace AnsiCParser {
 
         public Value OnForStatement(SyntaxTree.Statement.ForStatement self, Value value) {
             // Initialize
-            var ret = self.Init.Accept(this, value);
-            discard(ret);
+            if (self.Init != null) {
+                var ret = self.Init.Accept(this, value);
+                discard(ret);
+            }
 
             var labelHead = LAlloc();
             var labelContinue = LAlloc();
@@ -2093,10 +1746,13 @@ namespace AnsiCParser {
 
             // Check Loop Condition
             Console.WriteLine($"{labelHead}:");
-            ret = self.Cond.Accept(this, value);
-            LoadI(ret, "%eax");
-            Console.WriteLine($"cmpl $0, %eax");
-            Console.WriteLine($"je {labelBreak}");
+            if (self.Cond != null) {
+                var ret = self.Cond.Accept(this, value);
+                LoadI(ret, "%eax");
+                Console.WriteLine($"cmpl $0, %eax");
+                Console.WriteLine($"je {labelBreak}");
+            }
+
             ContinueTarget.Push(labelContinue);
             BreakTarget.Push(labelBreak);
             var stmt = self.Stmt.Accept(this, value);
@@ -2105,8 +1761,10 @@ namespace AnsiCParser {
             BreakTarget.Pop();
 
             Console.WriteLine($"{labelContinue}:");
-            var update = self.Update.Accept(this, value);
-            discard(update);
+            if (self.Update != null) { 
+                var ret = self.Update.Accept(this, value);
+                discard(ret);
+            }
 
             Console.WriteLine($"jmp {labelHead}");
             Console.WriteLine($"{labelBreak}:");
@@ -2174,13 +1832,14 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 値を指定したレジスタにロードする。レジスタに入らないサイズはエラーになる
+        /// 整数値もしくはポインタ値を指定したレジスタにロードする。レジスタに入らないサイズはエラーになる
         /// </summary>
         /// <param name="value"></param>
         /// <param name="register"></param>
         /// <returns></returns>
         private Value LoadI(Value value, string register) {
             var ValueType = value.Type;
+            System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
             CType elementType;
             switch (value.Kind) {
                 case Value.ValueKind.IntConst: {
@@ -2230,6 +1889,7 @@ namespace AnsiCParser {
                         return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
 
                     } else {
+                        throw new NotImplementedException();
                         // スタックトップのアドレスをレジスタにロード
                         Console.WriteLine($"mov %esp, {register}");
                         return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
@@ -2264,17 +1924,31 @@ namespace AnsiCParser {
                         string op = "";
                         if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char) || ValueType.IsEnumeratedType()) {
                             switch (ValueType.Sizeof()) {
-                                case 1: op = "movsbl"; break;
-                                case 2: op = "movswl"; break;
-                                case 4: op = "movl"; break;
-                                default: throw new NotImplementedException();
+                                case 1:
+                                    op = "movsbl";
+                                    break;
+                                case 2:
+                                    op = "movswl";
+                                    break;
+                                case 4:
+                                    op = "movl";
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
                             }
                         } else if (ValueType.IsUnsignedIntegerType()) {
                             switch (ValueType.Sizeof()) {
-                                case 1: op = "movzbl"; break;
-                                case 2: op = "movzwl"; break;
-                                case 4: op = "movl"; break;
-                                default: throw new NotImplementedException();
+                                case 1:
+                                    op = "movzbl";
+                                    break;
+                                case 2:
+                                    op = "movzwl";
+                                    break;
+                                case 4:
+                                    op = "movl";
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
                             }
                         } else if (ValueType.IsBasicType(CType.BasicType.TypeKind.Float)) {
                             op = "movl";
@@ -2297,6 +1971,129 @@ namespace AnsiCParser {
                     }
                     return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
                     break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// 値をスタックトップに積む。もともとスタックトップにある場合は何もしない
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="register"></param>
+        /// <returns></returns>
+        private Value LoadS(Value value) {
+            var ValueType = value.Type;
+            CType elementType;
+            switch (value.Kind) {
+                case Value.ValueKind.IntConst: {
+                        // 定数値をスタックに積む
+                        string op = "";
+                        if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char)) {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Console.WriteLine($"pushl ${unchecked((int)(sbyte)value.IntConst)}");
+                                    break;
+                                case 2:
+                                    Console.WriteLine($"pushl ${unchecked((int)(short)value.IntConst)}");
+                                    break;
+                                case 4:
+                                    Console.WriteLine($"pushl ${unchecked((int)value.IntConst)}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        } else {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Console.WriteLine($"pushl ${unchecked((int)(byte)value.IntConst)}");
+                                    break;
+                                case 2:
+                                    Console.WriteLine($"pushl ${unchecked((int)(ushort)value.IntConst)}");
+                                    break;
+                                case 4:
+                                    Console.WriteLine($"pushl ${unchecked((int)(uint)value.IntConst)}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        }
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Temp:
+                    // 何もしない
+                    return value;
+                case Value.ValueKind.FloatConst: {
+                        if (value.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                            var bytes = BitConverter.GetBytes((float)value.FloatConst);
+                            var dword = BitConverter.ToUInt32(bytes, 0);
+                            Console.WriteLine($"pushl ${dword}");
+                        } else if (value.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Double)) {
+                            var bytes = BitConverter.GetBytes(value.FloatConst);
+                            var qwordlo = BitConverter.ToUInt32(bytes, 0);
+                            var qwordhi = BitConverter.ToUInt32(bytes, 4);
+                            Console.WriteLine($"pushl ${qwordhi}");
+                            Console.WriteLine($"pushl ${qwordlo}");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Register: {
+                        // レジスタをスタックへ
+                        Console.WriteLine($"pushl ${value.Register}");
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                    throw new NotImplementedException();
+                case Value.ValueKind.Var:
+                case Value.ValueKind.Address: {
+
+
+                        // コピー先アドレスをロード
+                        switch (value.Kind) {
+                            case Value.ValueKind.Var:
+                                // ラベル参照
+                                if (value.Label == null) {
+                                    // ローカル変数のアドレスはebp相対
+                                    Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
+                                } else {
+                                    // グローバル変数のアドレスはラベル絶対
+                                    Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
+                                }
+                                break;
+                            case Value.ValueKind.Address:
+                                // アドレス参照のアドレスはスタックトップの値
+                                Console.WriteLine($"popl %esi");
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+
+                        // コピー先を確保
+                        Console.WriteLine($"subl ${(ValueType.Sizeof() + 3) & (~3)}, %esp");
+                        Console.WriteLine($"movl %esp, %edi");
+
+                        // 転送
+                        Console.WriteLine($"pushl %ecx");
+                        Console.WriteLine($"movl ${ValueType.Sizeof()}, %ecx");
+                        Console.WriteLine($"cld");
+                        Console.WriteLine($"rep movsb");
+                        Console.WriteLine($"popl %ecx");
+
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Ref: {
+                        // ラベル参照
+                        if (value.Label == null) {
+                            // ローカル変数のアドレスはebp相対
+                            Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
+                        } else {
+                            // グローバル変数のアドレスはラベル絶対
+                            Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
+                        }
+                        Console.WriteLine("pushl %esi");
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
                 default:
                     throw new NotImplementedException();
             }
@@ -2361,6 +2158,10 @@ namespace AnsiCParser {
             }
         }
 
+        /// <summary>
+        /// FPUスタックの一番上の値をポップし、CPUスタックの一番上に積む
+        /// </summary>
+        /// <param name="ty"></param>
         public void StoreF(CType ty) {
             if (ty.IsBasicType(CType.BasicType.TypeKind.Float)) {
                 Console.WriteLine($"sub $4, %esp");
@@ -2374,9 +2175,17 @@ namespace AnsiCParser {
 
         }
 
+        /// <summary>
+        /// ポインタをロード
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="reg"></param>
         public void LoadP(Value target, string reg) {
+            System.Diagnostics.Debug.Assert(target.Type.IsPointerType());
+
             switch (target.Kind) {
                 case Value.ValueKind.Var:
+                    // ポインタ型の変数 => 変数の値をロード
                     if (target.Label == null) {
                         Console.WriteLine($"movl {target.Offset}(%ebp), {reg}");
                     } else {
@@ -2384,6 +2193,7 @@ namespace AnsiCParser {
                     }
                     break;
                 case Value.ValueKind.Ref:
+                    // ラベル => ラベルのアドレスをロード
                     if (target.Label == null) {
                         Console.WriteLine($"leal {target.Offset}(%ebp), {reg}");
                     } else {
@@ -2391,10 +2201,12 @@ namespace AnsiCParser {
                     }
                     break;
                 case Value.ValueKind.Address:
+                    // 左辺値(LValue)参照 => スタックトップの値が参照先アドレスなので、参照先アドレスが示す値をロード
                     Console.WriteLine($"popl {reg}");
-                    Console.WriteLine($"movl (%eax), {reg}");
+                    Console.WriteLine($"movl ({reg}), {reg}");
                     break;
                 case Value.ValueKind.Temp:
+                    // テンポラリ値 => スタックトップの値をロード
                     Console.WriteLine($"popl {reg}");
                     break;
                 default:
@@ -2459,27 +2271,28 @@ namespace AnsiCParser {
                     if (value.Type.Sizeof() <= 4) {
                         value = LoadI(value, "%eax");
                     } else {
-                        switch (value.Kind) {
-                            case Value.ValueKind.Var:
-                                if (value.Label == null) {
-                                    Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
-                                } else {
-                                    Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
-                                }
-                                break;
-                            case Value.ValueKind.Ref:
-                                if (value.Label == null) {
-                                    Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
-                                } else {
-                                    Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
-                                }
-                                break;
-                            case Value.ValueKind.Temp:
-                                Console.WriteLine($"movl %esp, %esi");
-                                break;
-                            default:
-                                throw new NotImplementedException();
-                        }
+                        LoadVA(value, "%esi");
+                        //switch (value.Kind) {
+                        //    case Value.ValueKind.Var:
+                        //        if (value.Label == null) {
+                        //            Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
+                        //        } else {
+                        //            Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
+                        //        }
+                        //        break;
+                        //    case Value.ValueKind.Ref:
+                        //        if (value.Label == null) {
+                        //            Console.WriteLine($"leal {value.Offset}(%ebp), %esi");
+                        //        } else {
+                        //            Console.WriteLine($"leal {value.Label}+{value.Offset}, %esi");
+                        //        }
+                        //        break;
+                        //    case Value.ValueKind.Temp:
+                        //        Console.WriteLine($"movl %esp, %esi");
+                        //        break;
+                        //    default:
+                        //        throw new NotImplementedException();
+                        //}
                         Console.WriteLine($"movl ${value.Type.Sizeof()}, %ecx");
                         Console.WriteLine($"movl 8(%ebp), %edi");
                         Console.WriteLine($"cld");
@@ -2570,9 +2383,8 @@ namespace AnsiCParser {
             Console.WriteLine($".data");
             foreach (var data in dataBlock) {
                 Console.WriteLine($"{data.Item1}:");
-                foreach (var b in data.Item2) {
-                    Console.WriteLine($".byte {b}");
-                }
+                Console.Write($".byte ");
+                Console.WriteLine(String.Join(" ,", data.Item2.Select(x => x.ToString())));
             }
 
             return value;
@@ -2743,7 +2555,14 @@ namespace AnsiCParser {
         }
 
         public SyntaxTreeCompileVisitor.Value OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, SyntaxTreeCompileVisitor.Value value) {
-            return new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = self.Identifier.Ident, Offset = (int)self.Offset.Value, Type = self.Type };
+            if (self.Identifier is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
+                var f = self.Identifier as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
+                return new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+            } else if (self.Identifier is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
+                var f = self.Identifier as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
+                return new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+            }
+            throw new NotImplementedException();
         }
 
         public SyntaxTreeCompileVisitor.Value OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTreeCompileVisitor.Value value) {
@@ -2767,7 +2586,10 @@ namespace AnsiCParser {
         }
 
         public SyntaxTreeCompileVisitor.Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
+            int no = syntaxTreeCompileVisitor.dataBlock.Count;
+            var label = $"D{no}";
+            syntaxTreeCompileVisitor.dataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
+            return new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = label, Offset = 0, Type = self.Type };
         }
 
         public SyntaxTreeCompileVisitor.Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, SyntaxTreeCompileVisitor.Value value) {

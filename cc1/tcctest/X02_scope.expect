@@ -1,4 +1,0 @@
-x = abcd
-nonstatic_var = 34
-x = 1234
-nonstatic_var; = 1234

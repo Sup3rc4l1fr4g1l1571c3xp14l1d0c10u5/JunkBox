@@ -1,4 +1,6 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*,...);
+extern int sprintf(char*,char*,...);
 
 int main()
 {

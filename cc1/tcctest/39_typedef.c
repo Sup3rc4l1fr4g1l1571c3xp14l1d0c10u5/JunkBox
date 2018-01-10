@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*,...);
 
 typedef int MyInt;
 
@@ -16,15 +17,16 @@ int main()
 {
    MyInt a = 1;
    printf("%d\n", a);
-
+{
    MyFunStruct b;
    b.i = 12;
    b.j = 34;
    printf("%d,%d\n", b.i, b.j);
-
+{
    MoreFunThanEver c = &b;
    printf("%d,%d\n", c->i, c->j);
-
+}
+}
    return 0;
 }
 
@@ -59,7 +61,7 @@ int set_anon_super(void)
    return 42;
 }
 typedef int sas_type (void);
-extern typeof(set_anon_super) set_anon_super;
+/*extern typeof(set_anon_super) set_anon_super;*/
 extern sas_type set_anon_super;
 
 /* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/
