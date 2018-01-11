@@ -69,7 +69,7 @@ namespace AnsiCParser {
                 return;
             } else {
 
-                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\46_grep.c")).Parse();
+                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\55_lshift_type.c")).Parse();
                 Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
                 var v = new SyntaxTreeCompileVisitor.Value();

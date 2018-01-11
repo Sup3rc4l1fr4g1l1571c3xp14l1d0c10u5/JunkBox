@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*, ...);
 
 static int fred = 1234;
 static int joe;

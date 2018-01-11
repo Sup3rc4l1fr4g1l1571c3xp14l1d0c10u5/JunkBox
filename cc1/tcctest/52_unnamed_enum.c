@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*, ...);
 
 enum fred { a, b, c };
 
@@ -7,7 +8,7 @@ int main()
    printf("a=%d\n", a);
    printf("b=%d\n", b);
    printf("c=%d\n", c);
-
+{
    enum fred d;
 
    typedef enum { e, f, g } h;
@@ -20,7 +21,7 @@ int main()
    printf("i=%d\n", i);
    printf("j=%d\n", j);
    printf("k=%d\n", k);
-
+}
    return 0;
 }
 

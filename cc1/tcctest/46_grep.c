@@ -17,12 +17,13 @@
 //#include <stdio.h>
 typedef unsigned long size_t;
 
-//typedef struct tagFILE FILE;
-//struct _reent {
-//  int _errno;
-//  FILE *_stdin, *_stdout, *_stderr;
-//};
-//extern struct _reent *__getreent(void);
+typedef struct tagFILE FILE;
+struct _reent {
+  int _errno;
+  FILE *_stdin, *_stdout, *_stderr;
+};
+extern struct _reent *__getreent(void);
+/*
 typedef struct _iobuf FILE;
 struct _iobuf {
     char *_ptr;
@@ -35,7 +36,7 @@ struct _iobuf {
     char *_tmpfname;
 };
 extern FILE (* _imp___iob)[];
-
+*/
 extern FILE *fopen(char*, char*);
 extern size_t fread(void *, size_t, size_t, FILE *);
 extern size_t fwrite(const void *, size_t, size_t, FILE *);
@@ -126,7 +127,7 @@ void file(char *s)
 /*** Report unopenable file ****************************/
 void cant(char *s)
 {
-   fprintf((&(* _imp___iob)[2]), "%s: cannot open\n", s);
+   fprintf((__getreent()->_stderr), "%s: cannot open\n", s);
 }
 
 /*** Give good help ************************************/
@@ -141,8 +142,8 @@ void help(char **hp)
 /*** Display usage summary *****************************/
 void usage(char *s)
 {
-   fprintf((&(* _imp___iob)[2]), "?GREP-E-%s\n", s);
-   fprintf((&(* _imp___iob)[2]),
+   fprintf((__getreent()->_stderr), "?GREP-E-%s\n", s);
+   fprintf((__getreent()->_stderr),
          "Usage: grep [-cfnv] pattern [file ...].  grep ? for help\n");
    exit(1);
 }
@@ -317,8 +318,8 @@ void badpat(char *message, char *source, char *stop)
    /* char  *source;        // Pattern start */
    /* char  *stop;          // Pattern end   */
 {
-   fprintf((&(* _imp___iob)[2]), "-GREP-E-%s, pattern is\"%s\"\n", message, source);
-   fprintf((&(* _imp___iob)[2]), "-GREP-E-Stopped at byte %ld, '%c'\n",
+   fprintf((__getreent()->_stderr), "-GREP-E-%s, pattern is\"%s\"\n", message, source);
+   fprintf((__getreent()->_stderr), "-GREP-E-Stopped at byte %ld, '%c'\n",
          stop-source, stop[-1]);
    error("?GREP-E-Bad pattern\n");
 }
@@ -488,7 +489,7 @@ char *pmatch(char *line, char *pattern)
 /*** Report an error ***********************************/
 void error(char *s)
 {
-   fprintf((&(* _imp___iob)[2]), "%s", s);
+   fprintf((__getreent()->_stderr), "%s", s);
    exit(1);
 }
 
@@ -562,7 +563,7 @@ int main(int argc, char **argv)
    if (!gotpattern)
       usage("No pattern");
    if (nfile == 0)
-      grep((&(* _imp___iob)[0]), 0);
+      grep((__getreent()->_stdin), 0);
    else {
       fflag = fflag ^ (nfile > 0);
       for (i=1; i < argc; ++i) {

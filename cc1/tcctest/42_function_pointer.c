@@ -1,12 +1,12 @@
 //#include <stdio.h>
-//struct _reent {
-//  int _errno;
-//  FILE *_stdin, *_stdout, *_stderr;
-//};
-//
-//extern struct _reent *__getreent(void);
-
 typedef struct _iobuf FILE;
+struct _reent {
+  int _errno;
+  FILE *_stdin, *_stdout, *_stderr;
+};
+
+extern struct _reent *__getreent(void);
+/*
 struct _iobuf {
     char *_ptr;
     int _cnt;
@@ -18,7 +18,7 @@ struct _iobuf {
     char *_tmpfname;
 };
 extern FILE (* _imp___iob)[];
-
+*/
 extern int printf(char*, ...);
 extern int fprintf(FILE *, char*, ...);
 
@@ -36,7 +36,7 @@ int (*fprintfptr)(FILE *, const char *, ...) = &fprintf;
 
 int main()
 {
-   fprintfptr((&(* _imp___iob)[1]), "%d\n", (*f)(24));
+   fprintfptr((__getreent()->_stdout), "%d\n", (*f)(24));
 
    return 0;
 }

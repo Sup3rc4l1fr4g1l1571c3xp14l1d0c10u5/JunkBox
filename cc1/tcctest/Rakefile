@@ -1,8 +1,7 @@
-require 'open3'
-
 OUTDIR = 'result'
 GCC    = 'gcc'
-MYCC   = '../bin/debug/AnsiCParser.exe'
+#MYCC   = '../bin/debug/AnsiCParser.exe'
+MYCC   = '../bin/debug/cc1.exe'
 
 SRCS    = FileList['*.c']
 EXPECTS = SRCS.ext('expect')
@@ -14,43 +13,33 @@ directory TEMP
 rule '.expect' => '.c' do |t|
   cd TEMP do
     sh "#{GCC} -o #{t.name}.exe ../#{t.prerequisites[0]}"
-    (o, e, s) =  Open3.capture3("#{t.name}.exe")
-    File.open("../#{t.name}", 'w') do |f|
-      f.print(o)
-      f.print(e)
-    end
+    arg = File.exists?("../#{t.name.ext('arg')}") ? IO.readlines("../#{t.name.ext('arg')}").map(&:chomp).join(' ') : ""
+    sh "./#{t.name}.exe #{arg} > ../#{t.name} 2>&1"
   end
 end
-
-
-task :test => [TEMP, :do_test]
-task :do_test => RESULTS
 
 rule '.result' => '.c' do |t|
   Rake::Task[t.name.ext('expect')].invoke()
   cd TEMP do
     sh "../#{MYCC} -o #{t.name.ext('s')} -ast #{t.name.ext('ast')} ../#{t.prerequisites[0]}"
     sh "#{GCC} -g -o #{t.name.ext('exe')} #{t.name.ext('s')}"
-    (o, e, s) =  Open3.capture3(t.name.ext('exe'))
-    File.open("#{t.name.ext('output')}", 'w') do |f|
-      f.print(o)
-      f.print(e)
-    end
-    (o, e, s) =  Open3.capture3("diff #{t.name.ext('output')} ../#{t.name.ext('expect')}")
-    File.open("../#{t.name}", 'w') do |f|
-      f.print(o)
-    end
+    arg = File.exists?("../#{t.name.ext('arg')}") ? IO.readlines("../#{t.name.ext('arg')}").map(&:chomp).join(' ') : ""
+    sh "./#{t.name.ext('exe')} #{arg} > #{t.name.ext('output')} 2>&1"
+    sh "diff #{t.name.ext('output')} ../#{t.name.ext('expect')} > ../#{t.name} 2>&1"
   end
 end
 
+task :test => [TEMP, :do_test]
+task :do_test => RESULTS
+
 task :clean do
-  rm_r(TEMP)
-  rm_r(RESULTS)
+  rm_rf TEMP
+  rm_rf RESULTS
 end
 
 task :clobber do
-  rm_rf(TEMP)
-  rm_rf(RESULTS)
-  rm_rf(EXPECTS)
+  rm_rf TEMP
+  rm_rf RESULTS
+  rm_rf EXPECTS
 end
 
