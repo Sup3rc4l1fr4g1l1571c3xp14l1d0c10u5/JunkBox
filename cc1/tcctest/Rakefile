@@ -1,7 +1,7 @@
 OUTDIR = 'result'
 GCC    = 'gcc'
-#MYCC   = '../bin/debug/AnsiCParser.exe'
-MYCC   = '../bin/debug/cc1.exe'
+MYCC   = '../bin/debug/AnsiCParser.exe'
+#MYCC   = '../bin/debug/cc1.exe'
 
 SRCS    = FileList['*.c']
 EXPECTS = SRCS.ext('expect')
@@ -10,21 +10,26 @@ TEMP    = 'tmp'
 
 directory TEMP
 
+def exec(cmd)
+  cmd = cmd.gsub(File::SEPARATOR) { File::ALT_SEPARATOR }
+  sh cmd
+end
+
 rule '.expect' => '.c' do |t|
   cd TEMP do
-    sh "#{GCC} -o #{t.name}.exe ../#{t.prerequisites[0]}"
+    exec "#{GCC} -o #{t.name}.exe ../#{t.prerequisites[0]}"
     arg = File.exists?("../#{t.name.ext('arg')}") ? IO.readlines("../#{t.name.ext('arg')}").map(&:chomp).join(' ') : ""
-    sh "./#{t.name}.exe #{arg} > ../#{t.name} 2>&1"
+    exec "./#{t.name}.exe #{arg} > ../#{t.name} 2>&1"
   end
 end
 
 rule '.result' => '.c' do |t|
   Rake::Task[t.name.ext('expect')].invoke()
   cd TEMP do
-    sh "../#{MYCC} -o #{t.name.ext('s')} -ast #{t.name.ext('ast')} ../#{t.prerequisites[0]}"
-    sh "#{GCC} -g -o #{t.name.ext('exe')} #{t.name.ext('s')}"
+    exec "../#{MYCC} -o #{t.name.ext('s')} -ast #{t.name.ext('ast')} ../#{t.prerequisites[0]}"
+    exec "#{GCC} -g -o #{t.name.ext('exe')} #{t.name.ext('s')}"
     arg = File.exists?("../#{t.name.ext('arg')}") ? IO.readlines("../#{t.name.ext('arg')}").map(&:chomp).join(' ') : ""
-    sh "./#{t.name.ext('exe')} #{arg} > #{t.name.ext('output')} 2>&1"
+    exec "./#{t.name.ext('exe')} #{arg} > #{t.name.ext('output')} 2>&1"
     sh "diff #{t.name.ext('output')} ../#{t.name.ext('expect')} > ../#{t.name} 2>&1"
   end
 end

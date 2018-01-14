@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Permissions;
 using System.Security.Policy;
@@ -101,6 +102,7 @@ namespace AnsiCParser {
                 this.Label = ret.Label;
                 this.Offset = ret.Offset;
             }
+
         }
 
         Stack<string> ContinueTarget = new Stack<string>();
@@ -118,7 +120,6 @@ namespace AnsiCParser {
         private string LAlloc() {
             return $".L{n++}";
         }
-        int line = 1;
 
         private void discard(Value v) {
             if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
@@ -126,11 +127,24 @@ namespace AnsiCParser {
             }
         }
 
-        public List<string> code = new List<string>();
+        public class Code {
+            public string Body;
 
-        public void Emit(string code) {
-            line++;
-            Console.WriteLine(code);
+            public Code(string body) {
+                Body = body;
+            }
+
+            public override string ToString() {
+                return Body;
+            }
+        }
+
+        public List<Code> codes = new List<Code>();
+
+        public Code Emit(string body) {
+            var code = new Code(body);
+            codes.Add(code);
+            return code;
         }
 
 
@@ -230,7 +244,7 @@ namespace AnsiCParser {
             }
             LoadI(index, "%ecx");
             LoadP(target, "%eax");
-            inc_ptr(type, "%eax", "%ecx");
+            dec_ptr(type, "%eax", "%ecx");
             Emit($"pushl %eax");
 
             return new Value() { Kind = Value.ValueKind.Temp, Type = type };
@@ -433,7 +447,10 @@ namespace AnsiCParser {
                 Emit($"{self.LinkageObject.LinkageId}:");
                 Emit($"pushl %ebp");
                 Emit($"movl %esp, %ebp");
+                var c = Emit(".error \"Stack size is need backpatch.\"");
+                maxLocalScopeTotalSize = 0;
                 self.Body.Accept(this, value);
+                c.Body = $"subl ${maxLocalScopeTotalSize}, %esp";
                 Emit($"movl %ebp, %esp");
                 Emit($"popl %ebp");
                 Emit($"ret");
@@ -1624,7 +1641,6 @@ namespace AnsiCParser {
         public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, Value value) {
             var label = BreakTarget.Peek();
             Emit($"jmp {label}");
-            // ToDo: 変数宣言を含む複文の内側から外側に脱出するとメモリリークするのを治す
             return new Value() { Kind = Value.ValueKind.Void };
         }
 
@@ -1632,38 +1648,36 @@ namespace AnsiCParser {
             var label = _switchLabelTableStack.Peek()[self];
             Emit($"{label}:");
             self.Stmt.Accept(this, value);
-            // ToDo: 変数宣言を含む複文の内側から外側に脱出するとメモリリークするのを治す
             return new Value() { Kind = Value.ValueKind.Void };
         }
 
         Scope<Tuple<string, int>> localScope = Scope<Tuple<string, int>>.Empty;
         int localScopeTotalSize = 0;
+        private int maxLocalScopeTotalSize = 0;
 
         public Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, Value value) {
             localScope = localScope.Extend();
             var prevLocalScopeSize = localScopeTotalSize;
 
-            int localScopeSize = 0;
             foreach (var x in self.Decls.Reverse<SyntaxTree.Declaration>()) {
                 if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                     if (x.StorageClass == StorageClassSpecifier.Static) {
                         // static
                         localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
                     } else {
-                        localScopeSize += (x.LinkageObject.Type.Sizeof() + 3) & ~3;
-                        localScope.Add(x.Ident, Tuple.Create((string)null, localScopeTotalSize - localScopeSize));
+                        localScopeTotalSize += (x.LinkageObject.Type.Sizeof() + 3) & ~3;
+                        localScope.Add(x.Ident, Tuple.Create((string)null, -localScopeTotalSize));
                     }
                 } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
                     // externなのでスキップ
                 } else {
                     throw new NotImplementedException();
-                    //localScope.Add(x.Ident, 0);
                 }
             }
-            //Emil($"andl $-16, %esp");
-            Emit($"subl ${localScopeSize}, %esp");
 
-            localScopeTotalSize -= localScopeSize;
+            if (maxLocalScopeTotalSize < localScopeTotalSize) {
+                maxLocalScopeTotalSize = localScopeTotalSize;
+            }
 
             foreach (var x in self.Decls) {
                 x.Accept(this, value);
@@ -2303,30 +2317,9 @@ namespace AnsiCParser {
                     LoadF(value);
                 } else {
                     if (value.Type.Sizeof() <= 4) {
-                        value = LoadI(value, "%eax");
+                        LoadI(value, "%eax");
                     } else {
                         LoadVA(value, "%esi");
-                        //switch (value.Kind) {
-                        //    case Value.ValueKind.Var:
-                        //        if (value.Label == null) {
-                        //            Emil($"leal {value.Offset}(%ebp), %esi");
-                        //        } else {
-                        //            Emil($"leal {value.Label}+{value.Offset}, %esi");
-                        //        }
-                        //        break;
-                        //    case Value.ValueKind.Ref:
-                        //        if (value.Label == null) {
-                        //            Emil($"leal {value.Offset}(%ebp), %esi");
-                        //        } else {
-                        //            Emil($"leal {value.Label}+{value.Offset}, %esi");
-                        //        }
-                        //        break;
-                        //    case Value.ValueKind.Temp:
-                        //        Emil($"movl %esp, %esi");
-                        //        break;
-                        //    default:
-                        //        throw new NotImplementedException();
-                        //}
                         Emit($"movl ${value.Type.Sizeof()}, %ecx");
                         Emit($"movl 8(%ebp), %edi");
                         Emit($"cld");
@@ -2417,13 +2410,15 @@ namespace AnsiCParser {
             Emit($".data");
             foreach (var data in dataBlock) {
                 Emit($"{data.Item1}:");
-                Console.Write($".byte ");
-                Emit(String.Join(" ,", data.Item2.Select(x => x.ToString())));
+                Emit(".byte " + String.Join(" ,", data.Item2.Select(x => x.ToString())));
             }
 
             return value;
         }
 
+        public void WriteCode(StreamWriter writer) {
+            codes.ForEach(x => writer.WriteLine(x.ToString()));
+        }
     }
 
     public class FileScopeInitializerVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
@@ -2798,8 +2793,8 @@ namespace AnsiCParser {
 signed long long +/- signed long long
 	movl	yl, %eax
 	movl	yh, %edx
-	movl	al, %ecx
-	movl	ah, %ebx
+	movl	xl, %ecx
+	movl	xh, %ebx
 	
     // add
     addl	%ecx, %eax
@@ -2808,6 +2803,20 @@ signed long long +/- signed long long
     // sub
     subl	%ecx, %eax
 	sbbl	%ebx, %edx
+
+    // mul 筆算のアルゴリズム
+	movl	xh, %eax
+	imull	yl, %edx		// a:b = yl * xh
+	movl	yh, %eax
+	imull	xl, %eax		// c:d = yh * xl
+	leal	(%edx,%eax), %ecx	// e = b + d
+	movl	16(%esp), %eax		// 
+	mull	24(%esp)			// f:g = xl * yl
+	addl	%edx, %ecx			// e:0 + f:g
+	movl	%ecx, %edx
+	movl	%eax, 8(%esp)       // zl = g
+	movl	%edx, 12(%esp)      // zh = f + e
+
 
 	movl	%eax, zl
 	movl	%edx, zh

@@ -15,6 +15,7 @@
  * privileges were granted by DECUS.
  */
 //#include <stdio.h>
+/*
 typedef unsigned long size_t;
 
 typedef struct tagFILE FILE;
@@ -23,7 +24,7 @@ struct _reent {
   FILE *_stdin, *_stdout, *_stderr;
 };
 extern struct _reent *__getreent(void);
-/*
+/*/
 typedef struct _iobuf FILE;
 struct _iobuf {
     char *_ptr;
@@ -36,7 +37,7 @@ struct _iobuf {
     char *_tmpfname;
 };
 extern FILE (* _imp___iob)[];
-*/
+//*/
 extern FILE *fopen(char*, char*);
 extern size_t fread(void *, size_t, size_t, FILE *);
 extern size_t fwrite(const void *, size_t, size_t, FILE *);

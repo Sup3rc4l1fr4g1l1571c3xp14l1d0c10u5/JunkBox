@@ -52,11 +52,10 @@ namespace AnsiCParser {
                         }
 
                         using (var o = new System.IO.StreamWriter(output_file)) {
-                            var orgOut = Console.Out;
-                            Console.SetOut(o);
                             var v = new SyntaxTreeCompileVisitor.Value();
-                            ret.Accept(new SyntaxTreeCompileVisitor(), v);
-                            Console.SetOut(orgOut);
+                            var visitor = new SyntaxTreeCompileVisitor();
+                            ret.Accept(visitor, v);
+                            visitor.WriteCode(o);
                         }
                     }
                     catch (Exception e) {
@@ -69,16 +68,15 @@ namespace AnsiCParser {
                 return;
             } else {
 
-                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\55_lshift_type.c")).Parse();
+                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c")).Parse();
                 Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
                 var v = new SyntaxTreeCompileVisitor.Value();
-                var orgOut = Console.Out;
                 //using (var o = new System.IO.StreamWriter(@"C:\cygwin\home\0079595\test.s")) {
                 using (var o = new System.IO.StreamWriter(@"..\..\tcctest\test.s")) {
-                    Console.SetOut(o);
-                    ret.Accept(new SyntaxTreeCompileVisitor(), v);
-                    Console.SetOut(orgOut);
+                    var visitor = new SyntaxTreeCompileVisitor();
+                    ret.Accept(visitor, v);
+                    visitor.WriteCode(o);
                 }
                 return;
                 var tc = new TestCase();

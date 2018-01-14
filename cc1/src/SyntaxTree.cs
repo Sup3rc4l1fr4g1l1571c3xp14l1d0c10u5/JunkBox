@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace AnsiCParser {
@@ -2507,5 +2508,6 @@ namespace AnsiCParser {
 
             public List<Declaration> Declarations { get; } = new List<Declaration>();
         }
+
     }
 }
