@@ -2704,13 +2704,13 @@ namespace AnsiCParser {
             while (filledSize > 0) {
                 if (filledSize >= 4) {
                     filledSize -= 4;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant("0", 0, CType.BasicType.TypeKind.UnsignedLongInt));
+                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedLongInt));
                 } else if (filledSize >= 2) {
                     filledSize -= 2;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant("0", 0, CType.BasicType.TypeKind.UnsignedShortInt));
+                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedShortInt));
                 } else if (filledSize >= 1) {
                     filledSize -= 1;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant("0", 0, CType.BasicType.TypeKind.UnsignedChar));
+                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedChar));
                 }
             }
 
