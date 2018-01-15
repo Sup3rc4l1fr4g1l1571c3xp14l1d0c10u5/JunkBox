@@ -11,7 +11,9 @@ TEMP    = 'tmp'
 directory TEMP
 
 def exec(cmd)
-  cmd = cmd.gsub(File::SEPARATOR) { File::ALT_SEPARATOR }
+  if File::ALT_SEPARATOR
+    cmd = cmd.gsub(File::SEPARATOR) { File::ALT_SEPARATOR }
+  end
   sh cmd
 end
 
@@ -34,8 +36,7 @@ rule '.result' => '.c' do |t|
   end
 end
 
-task :test => [TEMP, :do_test]
-task :do_test => RESULTS
+task :test => [TEMP, RESULTS].flatten
 
 task :clean do
   rm_rf TEMP

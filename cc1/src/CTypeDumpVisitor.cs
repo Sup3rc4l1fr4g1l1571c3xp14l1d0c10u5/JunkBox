@@ -63,11 +63,11 @@ namespace AnsiCParser {
         }
 
         public Cell OnEnumType(CType.TaggedType.EnumType self, Cell value) {
-            return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident, x.Value.ToString())).ToArray()));
+            return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw??"", x.Value.ToString())).ToArray()));
         }
 
         public Cell OnFunctionType(CType.FunctionType self, Cell value) {
-            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null ? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Ident ?? "", x.StorageClass.ToString(), x.Type.Accept(this, null))).ToArray()) : Cell.Nil);
+            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null ? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.StorageClass.ToString(), x.Type.Accept(this, null))).ToArray()) : Cell.Nil);
         }
 
         public Cell OnPointerType(CType.PointerType self, Cell value) {
@@ -75,7 +75,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
-            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident, x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()) : Cell.Nil);
+            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()) : Cell.Nil);
         }
 
         public Cell OnStubType(CType.StubType self, Cell value) {
@@ -83,7 +83,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnTypedefedType(CType.TypedefedType self, Cell value) {
-            return Cell.Create("typedef", self.Ident, self.Type.Accept(this, null));
+            return Cell.Create("typedef", self.Ident?.Raw??"", self.Type.Accept(this, null));
         }
 
         public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {

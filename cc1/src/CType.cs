@@ -589,7 +589,7 @@ namespace AnsiCParser {
                     if (Members != null) {
                         sb.Add("{");
                         sb.AddRange(Members.SelectMany(x =>
-                            new[] {x.Type?.ToString(), x.Ident, x.BitSize > 0 ? $":{x.BitSize}" : null, ";"}.Where(y => y != null)
+                            new[] {x.Type?.ToString(), x.Ident.Raw, x.BitSize > 0 ? $":{x.BitSize}" : null, ";"}.Where(y => y != null)
                         ));
                         sb.Add("}");
                     }
@@ -598,7 +598,7 @@ namespace AnsiCParser {
                 }
 
                 public class MemberInfo {
-                    public MemberInfo(string ident, CType type, int? bitSize) {
+                    public MemberInfo(Token ident, CType type, int? bitSize) {
                         if (bitSize.HasValue) {
                             // 制約
                             // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
@@ -633,7 +633,7 @@ namespace AnsiCParser {
                         }
                     }
 
-                    public string Ident { get; }
+                    public Token Ident { get; }
 
                     public CType Type { get; }
 
@@ -663,7 +663,7 @@ namespace AnsiCParser {
                     if (Members != null) {
                         sb.Add("{");
                         sb.AddRange(Members.SelectMany(x =>
-                            new[] {x.Ident, "=", x.Value.ToString(), ","}
+                            new[] {x.Ident.Raw, "=", x.Value.ToString(), ","}
                         ));
                         sb.Add("}");
                     }
@@ -680,13 +680,13 @@ namespace AnsiCParser {
                 ///     列挙定数として宣言された識別子は，型 int をもつ。
                 /// </remarks>
                 public class MemberInfo {
-                    public MemberInfo(EnumType parentType, string ident, int value) {
+                    public MemberInfo(EnumType parentType, Token ident, int value) {
                         ParentType = parentType;
                         Ident = ident;
                         Value = value;
                     }
 
-                    public string Ident { get; }
+                    public Token Ident { get; }
 
                     public EnumType ParentType { get; }
 
@@ -807,7 +807,7 @@ namespace AnsiCParser {
                 foreach (var x in Arguments) {
                     if ((x.Type as CType.BasicType)?.Kind == CType.BasicType.TypeKind.KAndRImplicitInt) {
                         // 型が省略されている＝識別子並びの要素
-                        System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(x.Ident));
+                        System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(x.Ident?.Raw));
                         if (candidate == FunctionStyle.AmbiguityStyle || candidate == FunctionStyle.OldStyle) {
                             // 現在の候補が古い形式、もしくは、曖昧形式なら、現在の候補を古い形式として継続判定
                             candidate = FunctionStyle.OldStyle;
@@ -846,7 +846,8 @@ namespace AnsiCParser {
             }
 
             public class ArgumentInfo {
-                public ArgumentInfo(string ident, StorageClassSpecifier storageClass, CType type) {
+
+                public ArgumentInfo(Token ident, StorageClassSpecifier storageClass, CType type) {
                     Ident = ident;
                     StorageClass = storageClass;
                     // 6.7.5.3 関数宣言子（関数原型を含む）
@@ -857,13 +858,13 @@ namespace AnsiCParser {
                     CType elementType;
                     if (type.IsArrayType(out elementType)) {
                         //ToDo: 及び。の間の型修飾子、static について実装
-                        Console.Error.WriteLine($"仮引数 {ident} は“～型の配列”として宣言されていますが、6.7.5.3 関数宣言子の制約に従って“～型への修飾されたポインタ”に型調整されます。");
+                        Logger.Warning(ident.Start, ident.End, $"仮引数 {ident.Raw} は“～型の配列”として宣言されていますが、6.7.5.3 関数宣言子の制約に従って“～型への修飾されたポインタ”に型調整されます。");
                         type = CreatePointer(elementType);
                     }
                     Type = type;
                 }
 
-                public string Ident { get; set;  }
+                public Token Ident { get; set;  }
 
                 public StorageClassSpecifier StorageClass { get; }
 
@@ -938,12 +939,12 @@ namespace AnsiCParser {
         ///     Typedefされた型
         /// </summary>
         public class TypedefedType : CType {
-            public TypedefedType(string ident, CType type) {
+            public TypedefedType(Token ident, CType type) {
                 Ident = ident;
                 Type = type;
             }
 
-            public string Ident { get; }
+            public Token Ident { get; }
 
             public CType Type { get; }
 
@@ -952,7 +953,7 @@ namespace AnsiCParser {
             }
 
             public override string ToString() {
-                return Ident;
+                return Ident.Raw;
             }
         }
 
@@ -1061,7 +1062,7 @@ namespace AnsiCParser {
                 var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous);
                 var newMembers = new List<TaggedType.StructUnionType.MemberInfo>();
                 for (var i = 0; i < ta1.Members.Count; i++) {
-                    if (ta1.Members[i].Ident != ta2.Members[i].Ident) {
+                    if (ta1.Members[i].Ident.Raw != ta2.Members[i].Ident.Raw) {
                         return null;
                     }
                     if (ta1.Members[i].BitSize != ta2.Members[i].BitSize) {

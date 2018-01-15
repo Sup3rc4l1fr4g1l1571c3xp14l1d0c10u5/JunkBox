@@ -678,6 +678,15 @@ namespace AnsiCParser {
                 return false;
             }
         }
+        public bool ReadTokenIf(out Token t, params char[] s) {
+            if (PeekToken(s)) {
+                t = ReadToken(s);
+                return true;
+            } else {
+                t = null;
+                return false;
+            }
+        }
 
         public bool PeekNextToken(params Token.TokenKind[] s) {
             if (_tokens.Count <= _currentTokenPos + 1) {

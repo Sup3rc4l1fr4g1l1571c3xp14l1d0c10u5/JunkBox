@@ -434,8 +434,10 @@ namespace AnsiCParser {
                 }
                 // 引数（先頭から）
                 arguments = new Dictionary<string, int>();
+                var vars = new List<string>();
                 foreach (var arg in ft.Arguments) {
-                    arguments.Add(arg.Ident, offset);
+                    vars.Add($"// <LocalVariable Name=\"{arg.Ident.Raw}\" Offset=\"{offset}\" />");
+                    arguments.Add(arg.Ident.Raw, offset);
                     offset += (arg.Type.Sizeof() + 3) & ~3;
                 }
 
@@ -445,6 +447,7 @@ namespace AnsiCParser {
                 Emit($".section .text");
                 Emit($".globl {self.LinkageObject.LinkageId}");
                 Emit($"{self.LinkageObject.LinkageId}:");
+                vars.ForEach(x => Emit(x));
                 Emit($"pushl %ebp");
                 Emit($"movl %esp, %ebp");
                 var c = Emit(".error \"Stack size is need backpatch.\"");
@@ -1115,7 +1118,7 @@ namespace AnsiCParser {
             var st = self.Expr.Type.Unwrap() as CType.TaggedType.StructUnionType;
             CType.TaggedType.StructUnionType.MemberInfo target = null;
             foreach (var member in st.Members) {
-                if (member.Ident == self.Ident) {
+                if (member.Ident.Raw == self.Ident.Raw) {
                     target = member;
                     break;
                 }
@@ -1137,7 +1140,7 @@ namespace AnsiCParser {
             var st = self.Expr.Type.GetBasePointerType().Unwrap() as CType.TaggedType.StructUnionType;
             CType.TaggedType.StructUnionType.MemberInfo target = null;
             foreach (var member in st.Members) {
-                if (member.Ident == self.Ident) {
+                if (member.Ident.Raw == self.Ident.Raw) {
                     target = member;
                     break;
                 }

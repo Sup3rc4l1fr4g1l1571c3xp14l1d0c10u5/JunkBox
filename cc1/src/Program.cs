@@ -1,57 +1,55 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace AnsiCParser {
     class Program {
 
 
         static void Main(string[] args) {
-            if (System.Diagnostics.Debugger.IsAttached == false) {
+            if (Debugger.IsAttached == false) {
                 //args = System.IO.Directory.EnumerateFiles(@"..\..\tcctest", "*.c").ToArray();
 
                 CommandLineOptionsParser clop = new CommandLineOptionsParser();
 
-                string output_file = null;
-                string ast_file = null;
+                string outputFile = null;
+                string astFile = null;
 
                 clop.Entry("-o", 1, (s) => {
-                    output_file = s[0];
+                    outputFile = s[0];
                     return true;
                 });
                 clop.Entry("-ast", 1, (s) => {
-                    ast_file = s[0];
+                    astFile = s[0];
                     return true;
                 });
                 args = clop.Parse(args);
                 if (args.Length == 0) {
-                    Console.Error.WriteLine("ソースファイルをひとつ指定してください。");
-                    System.Environment.Exit(-1);
-                    return;
+                    Logger.Error("コンパイル対象のCソースファイルを１つ指定してください。");
+                    Environment.Exit(-1);
                 } else if (args.Length > 1) {
-                        Console.Error.WriteLine("ソースファイルが２つ以上指定されています。");
-                    System.Environment.Exit(-1);
+                    Logger.Error("コンパイル対象のCソースファイルが２つ以上指定されています。");
+                    Environment.Exit(-1);
                 }
                 var arg = args[0];
                 {
+
                     if (System.IO.File.Exists(arg) == false) {
-                        Console.Error.WriteLine($"{arg}がみつかりません。");
-                        System.Environment.Exit(-1);
+                        Logger.Error($"{arg}がみつかりません。");
+                        Environment.Exit(-1);
                     }
-                    if (output_file == null) {
-                        output_file = System.IO.Path.ChangeExtension(arg, "s");
+                    if (outputFile == null) {
+                        outputFile = System.IO.Path.ChangeExtension(arg, "s");
                     }
-                    if (ast_file == null) {
-                        ast_file = System.IO.Path.ChangeExtension(arg, "ast");
+                    if (astFile == null) {
+                        astFile = System.IO.Path.ChangeExtension(arg, "ast");
                     }
                     try {
                         var ret = new Parser(System.IO.File.ReadAllText(arg)).Parse();
-                        using (var o = new System.IO.StreamWriter(ast_file)) {
+                        using (var o = new System.IO.StreamWriter(astFile)) {
                             o.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
                         }
 
-                        using (var o = new System.IO.StreamWriter(output_file)) {
+                        using (var o = new System.IO.StreamWriter(outputFile)) {
                             var v = new SyntaxTreeCompileVisitor.Value();
                             var visitor = new SyntaxTreeCompileVisitor();
                             ret.Accept(visitor, v);
@@ -59,16 +57,14 @@ namespace AnsiCParser {
                         }
                     }
                     catch (Exception e) {
-                        Console.Error.WriteLine(e.Message);
-                        Console.Error.WriteLine(e.StackTrace);
-                        System.Environment.Exit(-1);
+                        Logger.Error(e.Message);
+                        Logger.Error(e.StackTrace);
+                        Environment.Exit(-1);
                     }
                 }
-
-                return;
             } else {
 
-                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c")).Parse();
+                var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\39_typedef.c")).Parse();
                 Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
                 var v = new SyntaxTreeCompileVisitor.Value();
@@ -78,13 +74,6 @@ namespace AnsiCParser {
                     ret.Accept(visitor, v);
                     visitor.WriteCode(o);
                 }
-                return;
-                var tc = new TestCase();
-                foreach (var arg in System.IO.Directory.GetFiles(@"..\..\testcase", "*.c")) {
-                    tc.AddTest(arg);
-                }
-
-                tc.RunTest();
             }
 
         }

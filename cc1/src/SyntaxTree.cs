@@ -9,9 +9,11 @@ namespace AnsiCParser {
     /// </summary>
     public abstract class SyntaxTree {
 
-        public Tuple<Location,Location> LocationRange { get; }
+        public LocationRange LocationRange {
+            get; set;
+        }
 
-        protected SyntaxTree(Tuple<Location, Location> locationRange) {
+        protected SyntaxTree(LocationRange locationRange) {
             LocationRange = locationRange;
         }
 
@@ -54,13 +56,13 @@ namespace AnsiCParser {
             public virtual bool IsLValue() {
                 return false;
             }
-            protected Expression(Tuple<Location, Location> locationRange) : base(locationRange) { }
+            protected Expression(LocationRange locationRange) : base(locationRange) { }
 
             /// <summary>
             /// 6.5.1 一次式
             /// </summary>
             public abstract class PrimaryExpression : Expression {
-                protected PrimaryExpression(Tuple<Location, Location> locationRange) : base(locationRange) { }
+                protected PrimaryExpression(LocationRange locationRange) : base(locationRange) { }
 
                 /// <summary>
                 /// 識別子式
@@ -75,7 +77,7 @@ namespace AnsiCParser {
                         get;
                     }
 
-                    protected IdentifierExpression(Tuple<Location, Location> locationRange, string ident) : base(locationRange){
+                    protected IdentifierExpression(LocationRange locationRange, string ident) : base(locationRange){
                         Ident = ident;
                     }
 
@@ -90,11 +92,11 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public UndefinedIdentifierExpression(Tuple<Location, Location> locationRange, string ident) : base(locationRange, ident) {
+                        public UndefinedIdentifierExpression(LocationRange locationRange, string ident) : base(locationRange, ident) {
                         }
 
                         public override bool IsLValue() {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "左辺値が必要な場所に未定義の識別子が登場しています。");
+                            throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, "左辺値が必要な場所に未定義の識別子が登場しています。");
                         }
 
                     }
@@ -117,7 +119,7 @@ namespace AnsiCParser {
                             return true;
                         }
 
-                        public VariableExpression(Tuple<Location, Location> locationRange, string ident, Declaration.VariableDeclaration decl) : base(locationRange, ident) {
+                        public VariableExpression(LocationRange locationRange, string ident, Declaration.VariableDeclaration decl) : base(locationRange, ident) {
                             Decl = decl;
                         }
                     }
@@ -140,7 +142,7 @@ namespace AnsiCParser {
                             return true;
                         }
 
-                        public ArgumentExpression(Tuple<Location, Location> locationRange, string ident, Declaration.ArgumentDeclaration decl) : base(locationRange, ident) {
+                        public ArgumentExpression(LocationRange locationRange, string ident, Declaration.ArgumentDeclaration decl) : base(locationRange, ident) {
                             Decl = decl;
                         }
                     }
@@ -158,7 +160,7 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public FunctionExpression(Tuple<Location, Location> locationRange, string ident, Declaration.FunctionDeclaration decl) : base(locationRange, ident) {
+                        public FunctionExpression(LocationRange locationRange, string ident, Declaration.FunctionDeclaration decl) : base(locationRange, ident) {
                             Decl = decl;
                         }
                     }
@@ -176,7 +178,7 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public EnumerationConstant(Tuple<Location, Location> locationRange, CType.TaggedType.EnumType.MemberInfo info) : base(locationRange, info.Ident) {
+                        public EnumerationConstant(LocationRange locationRange, CType.TaggedType.EnumType.MemberInfo info) : base(locationRange, info.Ident.Raw) {
                             Info = info;
                         }
                     }
@@ -209,7 +211,7 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public IntegerConstant(Tuple<Location, Location> locationRange, string str, long value, CType.BasicType.TypeKind kind) : base(locationRange) {
+                        public IntegerConstant(LocationRange locationRange, string str, long value, CType.BasicType.TypeKind kind) : base(locationRange) {
                             var ctype = new CType.BasicType(kind);
 
                             int lowerBits = 8 * ctype.Sizeof();
@@ -254,7 +256,7 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public CharacterConstant(Tuple<Location, Location> locationRange, string str) : base(locationRange) {
+                        public CharacterConstant(LocationRange locationRange, string str) : base(locationRange) {
                             Str = str;
                             ConstantType = CType.CreateChar();
 
@@ -289,14 +291,14 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public FloatingConstant(Tuple<Location, Location> locationRange, string str, double value, CType.BasicType.TypeKind kind) : base(locationRange) {
+                        public FloatingConstant(LocationRange locationRange, string str, double value, CType.BasicType.TypeKind kind) : base(locationRange) {
                             ConstantType = new CType.BasicType(kind);
                             Str = str;
                             Value = kind == CType.BasicType.TypeKind.Float ? (float)value : value;
                         }
                     }
 
-                    protected Constant(Tuple<Location, Location> locationRange) : base(locationRange) {
+                    protected Constant(LocationRange locationRange) : base(locationRange) {
                     }
                 }
 
@@ -332,7 +334,7 @@ namespace AnsiCParser {
                         return false;
                     }
 
-                    public StringExpression(Tuple<Location, Location> locationRange, List<string> strings) : base(locationRange) {
+                    public StringExpression(LocationRange locationRange, List<string> strings) : base(locationRange) {
                         // Todo: WideChar未対応
 
                         Value = new List<byte>();
@@ -370,7 +372,7 @@ namespace AnsiCParser {
                         return ParenthesesExpression.IsLValue();
                     }
 
-                    public EnclosedInParenthesesExpression(Tuple<Location, Location> locationRange, Expression parenthesesExpression) : base(locationRange) {
+                    public EnclosedInParenthesesExpression(LocationRange locationRange, Expression parenthesesExpression) : base(locationRange) {
                         ParenthesesExpression = parenthesesExpression;
                     }
                 }
@@ -389,7 +391,7 @@ namespace AnsiCParser {
                     public Expression.PrimaryExpression.IdentifierExpression Identifier { get; }
                     public Expression.PrimaryExpression.Constant.IntegerConstant Offset { get; }
 
-                    public AddressConstantExpression(Tuple<Location, Location> locationRange, IdentifierExpression identifier, Constant.IntegerConstant offset) : base(locationRange) {
+                    public AddressConstantExpression(LocationRange locationRange, IdentifierExpression identifier, Constant.IntegerConstant offset) : base(locationRange) {
                         Identifier = identifier;
                         Offset = offset;
                     }
@@ -443,7 +445,7 @@ namespace AnsiCParser {
                         return Target.IsLValue();
                     }
 
-                    public ArraySubscriptingExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                    public ArraySubscriptingExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                         // 6.3 型変換
 
                         // 制約
@@ -471,7 +473,7 @@ namespace AnsiCParser {
                             Index = lhs;
                         } else {
 
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "式の一方は，型“オブジェクト型へのポインタ”をもたなければならず、もう一方の式は，整数型をもたなければならない。");
+                            throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, "式の一方は，型“オブジェクト型へのポインタ”をもたなければならず、もう一方の式は，整数型をもたなければならない。");
                         }
                         Lhs = lhs;
                         Rhs = rhs;
@@ -498,7 +500,7 @@ namespace AnsiCParser {
                         }
                     }
 
-                    public FunctionCallExpression(Tuple<Location, Location> locationRange, Expression expr, List<Expression> args) : base(locationRange) {
+                    public FunctionCallExpression(LocationRange locationRange, Expression expr, List<Expression> args) : base(locationRange) {
                         // 6.3 型変換 
                         // 関数呼出しの準備の段階で，実引数を評価し，各実引数の値を対応する仮引数に代入する
                         // 関数は，その仮引数の値を変更してもよいが，これらの変更が実引数の値に影響を与えることはできない。
@@ -533,7 +535,7 @@ namespace AnsiCParser {
                                 var targ = functionType.Arguments[i];
                                 var lhs = targ.Type.UnwrapTypeQualifier();
                                 var rhs = args[i];
-                                args[i] = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(lhs, rhs);
+                                args[i] = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
                             }
 
                             if (functionType.HasVariadic) {
@@ -560,7 +562,7 @@ namespace AnsiCParser {
                     public Expression Expr {
                         get;
                     }
-                    public string Ident {
+                    public Token Ident {
                         get;
                     }
                     private CType MemberType {
@@ -577,16 +579,19 @@ namespace AnsiCParser {
                         }
                     }
 
-                    public MemberDirectAccess(Tuple<Location, Location> locationRange, Expression expr, string ident) : base(locationRange) {
+                    public MemberDirectAccess(LocationRange locationRange, Expression expr, Token ident) : base(locationRange) {
                         // 制約  
                         // .演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならず，2 番目のオペランドは，その型のメンバの名前でなければならない
                         CType.TaggedType.StructUnionType sType;
                         if (!expr.Type.IsStructureType(out sType) && !expr.Type.IsUnionType(out sType)) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならない。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, ".演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならない。");
                         }
-                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident == ident);
+                        if (sType.Members == null) {
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, ".演算子の最初のオペランドの構造体/共用体が不完全型です。");
+                        }
+                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
                         if (memberInfo == null) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, ".演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, ".演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
                         }
 
                         // 意味規則
@@ -613,7 +618,7 @@ namespace AnsiCParser {
                     public Expression Expr {
                         get;
                     }
-                    public string Ident {
+                    public Token Ident {
                         get;
                     }
                     private CType MemberType {
@@ -630,19 +635,19 @@ namespace AnsiCParser {
                         }
                     }
 
-                    public MemberIndirectAccess(Tuple<Location, Location> locationRange, Expression expr, string ident) : base(locationRange) {
+                    public MemberIndirectAccess(LocationRange locationRange, Expression expr, Token ident) : base(locationRange) {
                         // 制約  
                         // ->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならず，2 番目のオペランドは，指される型のメンバの名前でなければならない
                         CType.TaggedType.StructUnionType sType;
                         if (!(expr.Type.IsPointerType() && (expr.Type.GetBasePointerType().IsStructureType(out sType) || expr.Type.GetBasePointerType().IsUnionType(out sType)))) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならない。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならない。");
                         }
                         if (sType.Members == null) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "構造体/共用体が不完全型です。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "->演算子の最初のオペランドの構造体/共用体が不完全型です。");
                         }
-                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident == ident);
+                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
                         if (memberInfo == null) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "->演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "->演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
                         }
 
                         // 意味規則
@@ -683,14 +688,14 @@ namespace AnsiCParser {
                         return Expr.IsLValue();
                     }
 
-                    public UnaryPostfixExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression expr) : base(locationRange) {
+                    public UnaryPostfixExpression(LocationRange locationRange, OperatorKind op, Expression expr) : base(locationRange) {
                         // 制約  
                         // 後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならず，
                         // 変更可能な左辺値でなければならない。
                         if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならない。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならない。");
                         } else if (!expr.IsLValue()) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "変更可能な左辺値でなければならない。変更可能な左辺値でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "変更可能な左辺値でなければならない。変更可能な左辺値でなければならない。");
                         }
 
                         // 意味規則  
@@ -707,7 +712,7 @@ namespace AnsiCParser {
                 }
 
                 // Todo: C99の複合リテラル式はここに入る
-                protected PostfixExpression(Tuple<Location, Location> locationRange) : base(locationRange) {
+                protected PostfixExpression(LocationRange locationRange) : base(locationRange) {
                 }
             }
 
@@ -734,12 +739,12 @@ namespace AnsiCParser {
                     return Expr.IsLValue();
                 }
 
-                public UnaryPrefixExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression expr) : base(locationRange) {
+                public UnaryPrefixExpression(LocationRange locationRange, OperatorKind op, Expression expr) : base(locationRange) {
                     // 制約 
                     // 前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならず，
                     // 変更可能な左辺値でなければならない。    
                     if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "前置増分演算子又は前置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版をもたなければならない。");
                     }
                     // ToDo: 変更可能な左辺値でなければならない。    
 
@@ -772,7 +777,7 @@ namespace AnsiCParser {
                 }
 
 
-                public UnaryAddressExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryAddressExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 制約  
                     // 単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。
                     // 左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。
@@ -788,7 +793,7 @@ namespace AnsiCParser {
                     ) {
 
                     } else {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "単項&演算子のオペランドは，関数指示子，[]演算子若しくは単項*演算子の結果，又は左辺値でなければならない。左辺値の場合，ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクトを指し示さなければならない。");
                     }
 
 
@@ -847,14 +852,14 @@ namespace AnsiCParser {
                     return true;
                     //Expr.IsLValue();
                 }
-                public UnaryReferenceExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryReferenceExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 暗黙の型変換
                     expr = Specification.ImplicitConversion(null, expr);
 
                     // 制約
                     // 単項*演算子のオペランドは，ポインタ型をもたなければならない。
                     if (!expr.Type.IsPointerType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "ポインタ型の式以外に単項参照演算子を適用しようとした。（左辺値型とか配列型とか色々見なければいけない部分は未実装。）");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ポインタ型の式以外に単項参照演算子を適用しようとした。（左辺値型とか配列型とか色々見なければいけない部分は未実装。）");
                     }
 
                     // 意味規則
@@ -881,11 +886,11 @@ namespace AnsiCParser {
                     }
                 }
 
-                public UnaryPlusExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryPlusExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 制約 
                     // 単項+演算子のオペランドは，算術型をもたなければならない。
                     if (!expr.Type.IsArithmeticType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "単項+演算子のオペランドは，算術型をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "単項+演算子のオペランドは，算術型をもたなければならない。");
                     }
 
                     // 意味規則 
@@ -908,11 +913,11 @@ namespace AnsiCParser {
                     }
                 }
 
-                public UnaryMinusExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryMinusExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 制約 
                     // 単項-演算子のオペランドは，算術型をもたなければならない。
                     if (!expr.Type.IsArithmeticType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "単項-演算子のオペランドは，算術型をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "単項-演算子のオペランドは，算術型をもたなければならない。");
                     }
 
                     // 意味規則 
@@ -935,11 +940,11 @@ namespace AnsiCParser {
                     }
                 }
 
-                public UnaryNegateExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryNegateExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 制約 
                     // ~演算子のオペランドは，整数型をもたなければならない。
                     if (!expr.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "~演算子のオペランドは，整数型をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "~演算子のオペランドは，整数型をもたなければならない。");
                     }
 
                     // 意味規則 
@@ -963,11 +968,11 @@ namespace AnsiCParser {
                     }
                 }
 
-                public UnaryNotExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public UnaryNotExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 制約
                     // !演算子のオペランドは，スカラ型をもたなければならない。
                     if (!expr.Type.IsScalarType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "!演算子のオペランドは，スカラ型をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "!演算子のオペランドは，スカラ型をもたなければならない。");
                     }
 
                     // 意味規則 
@@ -990,11 +995,11 @@ namespace AnsiCParser {
                     }
                 }
 
-                public SizeofTypeExpression(Tuple<Location, Location> locationRange, CType operand) : base(locationRange) {
+                public SizeofTypeExpression(LocationRange locationRange, CType operand) : base(locationRange) {
                     // 制約
                     // sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。
                     if (operand.IsIncompleteType() || operand.IsFunctionType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
+                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
                     }
                     TypeOperand = operand;
                 }
@@ -1013,9 +1018,9 @@ namespace AnsiCParser {
                     }
                 }
 
-                public SizeofExpression(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public SizeofExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     if (expr.Type.IsIncompleteType() || expr.Type.IsFunctionType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
                     }
                     // ToDo: ビットフィールドメンバを示す式のチェック
                     ExprOperand = expr;
@@ -1028,7 +1033,7 @@ namespace AnsiCParser {
             public class CastExpression : TypeConversionExpression {
                 // 制約 
                 // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
-                public CastExpression(Tuple<Location, Location> locationRange, CType type, Expression expr) : base(locationRange, type, expr) {
+                public CastExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange, type, expr) {
                     // 制約 
                     // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
                     if (type.IsVoidType()) {
@@ -1037,11 +1042,11 @@ namespace AnsiCParser {
                     }
 
                     if (!type.IsScalarType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
                     }
 
                     if (!expr.Type.IsScalarType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
                     }
 
                 }
@@ -1073,17 +1078,23 @@ namespace AnsiCParser {
                     }
                 }
 
-                public MultiplicitiveExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public MultiplicitiveExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約 
                     // 各オペランドは，算術型をもたなければならない。
                     // %演算子のオペランドは，整数型をもたなければならない
                     if (op == OperatorKind.Mod) {
-                        if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "%演算子のオペランドは，整数型をもたなければならない。");
+                        if (!lhs.Type.IsIntegerType()) {
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "%演算子のオペランドは，整数型をもたなければならない。");
+                        }
+                        if (!rhs.Type.IsIntegerType()) {
+                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "%演算子のオペランドは，整数型をもたなければならない。");
                         }
                     } else {
-                        if (!(lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType())) {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，算術型をもたなければならない。");
+                        if (!lhs.Type.IsArithmeticType()) {
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
+                        }
+                        if (!rhs.Type.IsArithmeticType()) {
+                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
                         }
                     }
                     // 意味規則  
@@ -1121,7 +1132,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public AdditiveExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public AdditiveExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約  
                     // 加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。
                     // 減算の場合，次のいずれかの条件を満たさなければならない
@@ -1158,7 +1169,7 @@ namespace AnsiCParser {
                                 // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                                 ResultType = rhs.Type;
                             } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
+                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
                             }
                         }
 
@@ -1191,7 +1202,7 @@ namespace AnsiCParser {
                                 lhs = lhsPtr;
                                 ResultType = lhs.Type;
                             } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
+                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
                             }
                         }
                     }
@@ -1224,11 +1235,14 @@ namespace AnsiCParser {
                     }
                 }
 
-                public ShiftExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public ShiftExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約  
                     // 各オペランドは，整数型をもたなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    if (!lhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!rhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                     }
                     // 意味規則 
                     // 整数拡張を各オペランドに適用する。
@@ -1264,7 +1278,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public RelationalExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public RelationalExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約  
                     // 次のいずれかの条件を満たさなければならない。 
                     // - 両オペランドが実数型をもつ。 
@@ -1278,7 +1292,7 @@ namespace AnsiCParser {
                     } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsIncompleteType() && rhs.Type.GetBasePointerType().IsIncompleteType() && CType.IsEqual(lhs.Type.GetBasePointerType(), rhs.Type.GetBasePointerType())) {
                         // - 両オペランドが適合する不完全型の修飾版又は非修飾版へのポインタである。
                     } else {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "関係演算子は両オペランドが実数型をもつ、もしくは、両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタでなければならない。");
+                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "関係演算子は両オペランドが実数型をもつ、もしくは、両オペランドが適合するオブジェクト型の修飾版又は非修飾版へのポインタでなければならない。");
                     }
                     // 意味規則  
                     // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
@@ -1317,7 +1331,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public EqualityExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public EqualityExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 次のいずれかの条件を満たさなければならない。
                     // - 両オペランドは算術型をもつ。
@@ -1355,7 +1369,7 @@ namespace AnsiCParser {
                             // 右辺のオペランドがポインタで左辺が空ポインタ定数である。
                             rhs = rhsPtr;
                         } else {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
+                            throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
                         }
                     }
 
@@ -1394,11 +1408,14 @@ namespace AnsiCParser {
                     }
                 }
 
-                public AndExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                public AndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    if (!lhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!rhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                     }
 
                     // 意味規則  
@@ -1430,11 +1447,14 @@ namespace AnsiCParser {
                     }
                 }
 
-                public ExclusiveOrExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                public ExclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    if (!lhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!rhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                     }
 
                     // 意味規則
@@ -1467,11 +1487,14 @@ namespace AnsiCParser {
                     }
                 }
 
-                public InclusiveOrExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                public InclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，整数型でなければならない。
-                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                    if (!lhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!rhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                     }
 
                     // 意味規則
@@ -1500,13 +1523,15 @@ namespace AnsiCParser {
                     }
                 }
 
-                public LogicalAndExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                public LogicalAndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，スカラ型でなければならない。
-                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
+                    if (!lhs.Type.IsScalarType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，スカラ型でなければならない。");
                     }
-
+                    if (!rhs.Type.IsScalarType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，スカラ型でなければならない。");
+                    }
                     // 意味規則
                     // &&演算子の結果の値は，両オペランドの値が 0 と比較してともに等しくない場合は 1，それ以外の場合は 0 とする。
                     // 結果の型は，int とする。
@@ -1535,11 +1560,14 @@ namespace AnsiCParser {
                     }
                 }
 
-                public LogicalOrExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                public LogicalOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，スカラ型でなければならない。
-                    if (!(lhs.Type.IsScalarType() && rhs.Type.IsScalarType())) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドの型は，スカラ型でなければならない。");
+                    if (!lhs.Type.IsScalarType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，スカラ型でなければならない。");
+                    }
+                    if (!rhs.Type.IsScalarType()) {
+                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，スカラ型でなければならない。");
                     }
 
                     // 意味規則
@@ -1577,7 +1605,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public ConditionalExpression(Tuple<Location, Location> locationRange, Expression cond, Expression thenExpr, Expression elseExpr) : base(locationRange) {
+                public ConditionalExpression(LocationRange locationRange, Expression cond, Expression thenExpr, Expression elseExpr) : base(locationRange) {
 
                     //// 暗黙の型変換を適用
                     //thenExpr = Specification.TypeConvert(null, thenExpr);
@@ -1595,7 +1623,7 @@ namespace AnsiCParser {
 
                     // 第 1 オペランドの型は，スカラ型でなければならない。
                     if (!cond.Type.IsScalarType()) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 1 オペランドの型は，スカラ型でなければならない。");
+                        throw new CompilerException.SpecificationErrorException(cond.LocationRange.Start, cond.LocationRange.End, "条件演算子の第 1 オペランドの型は，スカラ型でなければならない。");
                     }
 
                     // 意味規則
@@ -1642,7 +1670,7 @@ namespace AnsiCParser {
                             elseExpr = elseExprPtr;
 
                             if (Specification.IsCompatible(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType()) == false) {
-                                throw new Exception("両オペランドが適合する型ではない。");
+                                throw new CompilerException.SpecificationErrorException(thenExpr.LocationRange.Start, elseExpr.LocationRange.End, "条件演算子の第 2, 第 3 オペランドが適合する型ではない。");
                             }
                             var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
                             System.Diagnostics.Debug.Assert(baseType != null);
@@ -1682,7 +1710,7 @@ namespace AnsiCParser {
                             baseType = baseType.WrapTypeQualifier(tq);
                             ResultType = CType.CreatePointer(baseType);
                         } else {
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
+                            throw new CompilerException.SpecificationErrorException(thenExpr.LocationRange.Start, elseExpr.LocationRange.End, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
                         }
                     }
 
@@ -1723,7 +1751,7 @@ namespace AnsiCParser {
                     /// </summary>
                     /// <param name="lType"></param>
                     /// <param name="rhs"></param>
-                    public static Expression ApplyAssignmentRule(CType lType, Expression rhs) {
+                    public static Expression ApplyAssignmentRule(LocationRange locationRange, CType lType, Expression rhs) {
                         if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
                             // 構造体・共用体については暗黙的型変換を用いない
                         } else {
@@ -1763,7 +1791,7 @@ namespace AnsiCParser {
                             } else if (lType.IsBoolType() && rhs != null && rhs.Type.IsPointerType()) {
                                 // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
                             } else {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入元と代入先の間で単純代入の条件を満たしていない。");
+                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "代入元と代入先の間で単純代入の条件を満たしていない。");
                             }
                         }
 
@@ -1792,16 +1820,16 @@ namespace AnsiCParser {
 
                     }
 
-                    public SimpleAssignmentExpression(Tuple<Location, Location> locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                    public SimpleAssignmentExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
 
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
                             // ToDo: 変更可能であることをチェック
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
                         // 代入の制約条件と意味規則を適用する
-                        rhs = ApplyAssignmentRule(lhs.Type, rhs);
+                        rhs = ApplyAssignmentRule(locationRange, lhs.Type, rhs);
 
                         Lhs = lhs;
                         Rhs = rhs;
@@ -1822,12 +1850,12 @@ namespace AnsiCParser {
                     public OperatorKind Op {
                         get;
                     }
-                    public CompoundAssignmentExpression(Tuple<Location, Location> locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                    public CompoundAssignmentExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
                             // ToDo: 変更可能であることをチェック
-                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
 
                         // 制約(複合代入)
@@ -1845,7 +1873,7 @@ namespace AnsiCParser {
 
 
                                     } else {
-                                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
+                                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
                                     }
                                     break;
                                 }
@@ -1859,12 +1887,18 @@ namespace AnsiCParser {
                                     // 各オペランドは，算術型をもたなければならない。
                                     // %演算子のオペランドは，整数型をもたなければならない
                                     if (op == OperatorKind.MOD_ASSIGN) {
-                                        if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                        if (!lhs.Type.IsIntegerType()) {
+                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                        }
+                                        if (!rhs.Type.IsIntegerType()) {
+                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "%=演算子のオペランドは，整数型をもたなければならない。");
                                         }
                                     } else {
-                                        if (!(lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType())) {
-                                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，算術型をもたなければならない。");
+                                        if (!lhs.Type.IsArithmeticType()) {
+                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
+                                        }
+                                        if (!rhs.Type.IsArithmeticType()) {
+                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
                                         }
                                     }
                                     break;
@@ -1876,8 +1910,11 @@ namespace AnsiCParser {
 
                                     // 制約(6.5.7 ビット単位のシフト演算子)  
                                     // 各オペランドは，整数型をもたなければならない。
-                                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                                    if (!lhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     break;
                                 }
@@ -1887,8 +1924,11 @@ namespace AnsiCParser {
 
                                     // 制約(6.5.10 ビット単位の AND 演算子)
                                     // 各オペランドの型は，整数型でなければならない。
-                                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                                    if (!lhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     break;
                                 }
@@ -1898,8 +1938,11 @@ namespace AnsiCParser {
 
                                     // 制約(6.5.11 ビット単位の排他 OR 演算子)
                                     // 各オペランドの型は，整数型でなければならない。
-                                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                                    if (!lhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     break;
                                 }
@@ -1909,8 +1952,11 @@ namespace AnsiCParser {
 
                                     // 制約(6.5.12 ビット単位の OR 演算子)
                                     // 各オペランドの型は，整数型でなければならない。
-                                    if (!(lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType())) {
-                                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "各オペランドは，整数型をもたなければならない。");
+                                    if (!lhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     break;
                                 }
@@ -1938,7 +1984,7 @@ namespace AnsiCParser {
 
                 }
 
-                protected AssignmentExpression(Tuple<Location, Location> locationRange) : base(locationRange) {
+                protected AssignmentExpression(LocationRange locationRange) : base(locationRange) {
                 }
             }
 
@@ -1952,7 +1998,7 @@ namespace AnsiCParser {
                         return Expressions.Last().Type;
                     }
                 }
-                public CommaExpression(Tuple<Location, Location> locationRange) : base(locationRange) {
+                public CommaExpression(LocationRange locationRange) : base(locationRange) {
                     // 意味規則 
                     // コンマ演算子は，左オペランドをボイド式として評価する。
                     // その評価の直後を副作用完了点とする。
@@ -1978,7 +2024,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public GccStatementExpression(Tuple<Location, Location> locationRange, Statement statements, CType resultType) : base(locationRange) {
+                public GccStatementExpression(LocationRange locationRange, Statement statements, CType resultType) : base(locationRange) {
                     Statements = statements;
                     ResultType = resultType;
                 }
@@ -2061,7 +2107,7 @@ namespace AnsiCParser {
                     return Expr.IsLValue();
                 }
 
-                public TypeConversionExpression(Tuple<Location, Location> locationRange, CType type, Expression expr) : base(locationRange) {
+                public TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
                     Ty = type;
                     Expr = expr;
                 }
@@ -2083,7 +2129,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public IntegerPromotionExpression(Tuple<Location, Location> locationRange, CType.BasicType type, Expression expr) : base(locationRange) {
+                public IntegerPromotionExpression(LocationRange locationRange, CType.BasicType type, Expression expr) : base(locationRange) {
                     Ty = type;
                     Expr = expr;
                 }
@@ -2106,7 +2152,7 @@ namespace AnsiCParser {
                     get; set;
                 }
 
-                public GotoStatement(Tuple<Location, Location> locationRange, string label) : base(locationRange) {
+                public GotoStatement(LocationRange locationRange, string label) : base(locationRange) {
                     Label = label;
                     Target = null;
                 }
@@ -2117,7 +2163,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public ContinueStatement(Tuple<Location, Location> locationRange, Statement stmt) : base(locationRange) {
+                public ContinueStatement(LocationRange locationRange, Statement stmt) : base(locationRange) {
                     Stmt = stmt;
                 }
             }
@@ -2127,7 +2173,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public BreakStatement(Tuple<Location, Location> locationRange, Statement stmt) : base(locationRange) {
+                public BreakStatement(LocationRange locationRange, Statement stmt) : base(locationRange) {
                     Stmt = stmt;
                 }
             }
@@ -2137,7 +2183,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public ReturnStatement(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public ReturnStatement(LocationRange locationRange, Expression expr) : base(locationRange) {
                     Expr = expr;
                 }
             }
@@ -2150,7 +2196,7 @@ namespace AnsiCParser {
                     get; set;
                 }
 
-                public WhileStatement(Tuple<Location, Location> locationRange, Expression cond) : base(locationRange) {
+                public WhileStatement(LocationRange locationRange, Expression cond) : base(locationRange) {
                     Cond = cond;
                 }
             }
@@ -2163,7 +2209,7 @@ namespace AnsiCParser {
                     get; set;
                 }
 
-                public DoWhileStatement(Tuple<Location, Location> locationRange) : base(locationRange) {
+                public DoWhileStatement(LocationRange locationRange) : base(locationRange) {
                 }
             }
 
@@ -2181,7 +2227,7 @@ namespace AnsiCParser {
                     get; set;
                 }
 
-                public ForStatement(Tuple<Location, Location> locationRange, Expression init, Expression cond, Expression update) : base(locationRange) {
+                public ForStatement(LocationRange locationRange, Expression init, Expression cond, Expression update) : base(locationRange) {
                     Init = init;
                     Cond = cond;
                     Update = update;
@@ -2199,7 +2245,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public IfStatement(Tuple<Location, Location> locationRange, Expression cond, Statement thenStmt, Statement elseStmt) : base(locationRange) {
+                public IfStatement(LocationRange locationRange, Expression cond, Statement thenStmt, Statement elseStmt) : base(locationRange) {
                     Cond = cond;
                     ThenStmt = thenStmt;
                     ElseStmt = elseStmt;
@@ -2220,7 +2266,7 @@ namespace AnsiCParser {
                     get; private set;
                 }
 
-                public SwitchStatement(Tuple<Location, Location> locationRange, Expression cond) : base(locationRange) {
+                public SwitchStatement(LocationRange locationRange, Expression cond) : base(locationRange) {
                     Cond = cond;
                     CaseLabels = new List<CaseStatement>();
                     DefaultLabel = null;
@@ -2228,13 +2274,13 @@ namespace AnsiCParser {
 
                 public void AddCaseStatement(CaseStatement caseStatement) {
                     if (CaseLabels.Any(x => x.Value == caseStatement.Value)) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "caseラベルの値は既に使われています。");
+                        throw new CompilerException.SpecificationErrorException(caseStatement.LocationRange.Start, caseStatement.LocationRange.End, "caseラベルの値は既に使われています。");
                     }
                     CaseLabels.Add(caseStatement);
                 }
                 public void SetDefaultLabel(DefaultStatement defaultStatement) {
                     if (DefaultLabel != null) {
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "defaultラベルは既に使われています。");
+                        throw new CompilerException.SpecificationErrorException(defaultStatement.LocationRange.Start, defaultStatement.LocationRange.End, "defaultラベルは既に使われています。");
                     }
                     DefaultLabel = defaultStatement;
                 }
@@ -2254,7 +2300,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public CompoundStatement(Tuple<Location, Location> locationRange, List<Declaration> decls, List<Statement> stmts, Scope<CType.TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
+                public CompoundStatement(LocationRange locationRange, List<Declaration> decls, List<Statement> stmts, Scope<CType.TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
                     Decls = decls;
                     Stmts = stmts;
                     TagScope = tagScope;
@@ -2263,7 +2309,7 @@ namespace AnsiCParser {
             }
 
             public class EmptyStatement : Statement {
-                public EmptyStatement(Tuple<Location, Location> locationRange) : base(locationRange) {
+                public EmptyStatement(LocationRange locationRange) : base(locationRange) {
                 }
             }
 
@@ -2272,7 +2318,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public ExpressionStatement(Tuple<Location, Location> locationRange, Expression expr) : base(locationRange) {
+                public ExpressionStatement(LocationRange locationRange, Expression expr) : base(locationRange) {
                     Expr = expr;
                 }
             }
@@ -2288,7 +2334,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public CaseStatement(Tuple<Location, Location> locationRange, Expression expr, long value, Statement stmt) : base(locationRange) {
+                public CaseStatement(LocationRange locationRange, Expression expr, long value, Statement stmt) : base(locationRange) {
                     Expr = expr;
                     Value = value;
                     Stmt = stmt;
@@ -2300,7 +2346,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public DefaultStatement(Tuple<Location, Location> locationRange, Statement stmt) : base(locationRange) {
+                public DefaultStatement(LocationRange locationRange, Statement stmt) : base(locationRange) {
                     Stmt = stmt;
                 }
             }
@@ -2313,13 +2359,13 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public GenericLabeledStatement(Tuple<Location, Location> locationRange, string ident, Statement stmt) : base(locationRange) {
+                public GenericLabeledStatement(LocationRange locationRange, string ident, Statement stmt) : base(locationRange) {
                     Ident = ident;
                     Stmt = stmt;
                 }
             }
 
-            protected Statement(Tuple<Location, Location> locationRange) : base(locationRange) {
+            protected Statement(LocationRange locationRange) : base(locationRange) {
             }
         }
 
@@ -2388,7 +2434,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public SimpleInitializer(Tuple<Location, Location> locationRange, Expression assignmentExpression) : base(locationRange) {
+                public SimpleInitializer(LocationRange locationRange, Expression assignmentExpression) : base(locationRange) {
                     AssignmentExpression = assignmentExpression;
                 }
             }
@@ -2401,7 +2447,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public ComplexInitializer(Tuple<Location, Location> locationRange, List<Initializer> ret) : base(locationRange) {
+                public ComplexInitializer(LocationRange locationRange, List<Initializer> ret) : base(locationRange) {
                     Ret = ret;
                 }
             }
@@ -2415,7 +2461,7 @@ namespace AnsiCParser {
                 public Expression Expr { get; }
                 public CType Type { get; }
 
-                public SimpleAssignInitializer(Tuple<Location, Location> locationRange, CType type, Expression expr) : base(locationRange) {
+                public SimpleAssignInitializer(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
                     this.Type = type;
                     this.Expr = expr;
                 }
@@ -2425,7 +2471,7 @@ namespace AnsiCParser {
                 public List<Initializer> Inits { get; }
                 public CType.ArrayType Type { get; }
 
-                public ArrayAssignInitializer(Tuple<Location, Location> locationRange, CType.ArrayType type, List<Initializer> inits) : base(locationRange) {
+                public ArrayAssignInitializer(LocationRange locationRange, CType.ArrayType type, List<Initializer> inits) : base(locationRange) {
                     this.Type = type;
                     this.Inits = inits;
                 }
@@ -2435,13 +2481,13 @@ namespace AnsiCParser {
                 public List<Initializer> Inits { get; }
                 public CType.TaggedType.StructUnionType Type { get; }
 
-                public StructUnionAssignInitializer(Tuple<Location, Location> locationRange, CType.TaggedType.StructUnionType type, List<Initializer> inits) : base(locationRange) {
+                public StructUnionAssignInitializer(LocationRange locationRange, CType.TaggedType.StructUnionType type, List<Initializer> inits) : base(locationRange) {
                     this.Type = type;
                     this.Inits = inits;
                 }
             }
 
-            protected Initializer(Tuple<Location, Location> locationRange) : base(locationRange) {
+            protected Initializer(LocationRange locationRange) : base(locationRange) {
             }
         }
 
@@ -2460,7 +2506,7 @@ namespace AnsiCParser {
                 get; set;
             }
 
-            protected Declaration(Tuple<Location, Location> locationRange, string ident, CType type, StorageClassSpecifier storageClass) : base(locationRange) {
+            protected Declaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass) : base(locationRange) {
                 Ident = ident;
                 Type = type;
                 StorageClass = storageClass;
@@ -2475,7 +2521,7 @@ namespace AnsiCParser {
                     get;
                 }
 
-                public FunctionDeclaration(Tuple<Location, Location> locationRange, string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) : base(locationRange, ident, type, storageClass) {
+                public FunctionDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) : base(locationRange, ident, type, storageClass) {
                     Body = null;
                     FunctionSpecifier = functionSpecifier;
                     LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
@@ -2487,7 +2533,7 @@ namespace AnsiCParser {
                     get; set;
                 }
 
-                public VariableDeclaration(Tuple<Location, Location> locationRange, string ident, CType type, StorageClassSpecifier storageClass, Initializer init) : base(locationRange, ident, type, storageClass) {
+                public VariableDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass, Initializer init) : base(locationRange, ident, type, storageClass) {
                     Init = init;
                     LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
                 }
@@ -2495,14 +2541,14 @@ namespace AnsiCParser {
 
             public class ArgumentDeclaration : Declaration {
 
-                public ArgumentDeclaration(Tuple<Location, Location> locationRange, string ident, CType type, StorageClassSpecifier storageClass)
+                public ArgumentDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass)
                    : base(locationRange, ident, type, storageClass) {
                     LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
                 }
             }
 
             public class TypeDeclaration : Declaration {
-                public TypeDeclaration(Tuple<Location, Location> locationRange, string ident, CType type) : base(locationRange, ident, type, StorageClassSpecifier.None) {
+                public TypeDeclaration(LocationRange locationRange, string ident, CType type) : base(locationRange, ident, type, StorageClassSpecifier.None) {
                     LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
                 }
             }
@@ -2516,9 +2562,9 @@ namespace AnsiCParser {
             ///     列挙定数として宣言された識別子は，型 int をもつ。
             /// </remarks>
             public class EnumMemberDeclaration : Declaration {
-                public EnumMemberDeclaration(Tuple<Location, Location> locationRange, CType.TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident, CType.CreateSignedInt(), StorageClassSpecifier.None) {
+                public EnumMemberDeclaration(LocationRange locationRange, CType.TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident.Raw, CType.CreateSignedInt(), StorageClassSpecifier.None) {
                     MemberInfo = mi;
-                    LinkageObject = new LinkageObject(mi.Ident, CType.CreateSignedInt(), LinkageKind.NoLinkage);
+                    LinkageObject = new LinkageObject(mi.Ident.Raw, CType.CreateSignedInt(), LinkageKind.NoLinkage);
                 }
 
                 public CType.TaggedType.EnumType.MemberInfo MemberInfo {
@@ -2535,7 +2581,7 @@ namespace AnsiCParser {
 
             public List<Declaration> Declarations { get; } = new List<Declaration>();
 
-            public TranslationUnit(Tuple<Location, Location> locationRange) : base(locationRange) {
+            public TranslationUnit(LocationRange locationRange) : base(locationRange) {
             }
         }
     }

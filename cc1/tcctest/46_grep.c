@@ -15,7 +15,7 @@
  * privileges were granted by DECUS.
  */
 //#include <stdio.h>
-/*
+//*
 typedef unsigned long size_t;
 
 typedef struct tagFILE FILE;

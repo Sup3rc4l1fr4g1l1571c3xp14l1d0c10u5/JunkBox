@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 
 namespace AnsiCParser {
     /// <summary>
@@ -114,7 +113,7 @@ namespace AnsiCParser {
                 throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
             }
             if (expr is SyntaxTree.Expression.PostfixExpression.TypeConversionExpression) {
-                var e = expr as SyntaxTree.Expression.PostfixExpression.TypeConversionExpression;
+                var e = expr as SyntaxTree.Expression.Expression.TypeConversionExpression;
                 // 6.3.1.2 論理型  
                 // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
                 if (e.Type.IsBoolType()) {

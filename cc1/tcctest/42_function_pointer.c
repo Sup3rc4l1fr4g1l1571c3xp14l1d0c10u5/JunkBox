@@ -1,5 +1,5 @@
 //#include <stdio.h>
-/*
+//*
 typedef struct _iobuf FILE;
 struct _reent {
   int _errno;
@@ -38,8 +38,8 @@ int (*fprintfptr)(FILE *, const char *, ...) = &fprintf;
 
 int main()
 {
-//   fprintfptr((__getreent()->_stdout), "%d\n", (*f)(24));
-   fprintfptr((&(* _imp___iob)[1]), "%d\n", (*f)(24));
+   fprintfptr((__getreent()->_stdout), "%d\n", (*f)(24));
+//   fprintfptr((&(* _imp___iob)[1]), "%d\n", (*f)(24));
 
    return 0;
 }
