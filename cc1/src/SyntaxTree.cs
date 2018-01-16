@@ -44,6 +44,12 @@ namespace AnsiCParser {
         public abstract class Expression : SyntaxTree {
 
             /// <summary>
+            /// コンストラクタ
+            /// </summary>
+            /// <param name="locationRange"></param>
+            protected Expression(LocationRange locationRange) : base(locationRange) { }
+
+            /// <summary>
             /// 式の結果の型
             /// </summary>
             public abstract CType Type {
@@ -56,7 +62,6 @@ namespace AnsiCParser {
             public virtual bool IsLValue() {
                 return false;
             }
-            protected Expression(LocationRange locationRange) : base(locationRange) { }
 
             /// <summary>
             /// 6.5.1 一次式

@@ -56,11 +56,21 @@ namespace AnsiCParser {
         // 
         // - 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
 
+        static private int IdCnt = 0;
+
         public LinkageObject(string ident, CType type, LinkageKind linakge) {
+            Id = IdCnt++;
             Ident = ident;
             Type = type;
             Linkage = linakge;
             LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : $"{ident}";
+        }
+
+        /// <summary>
+        /// Id
+        /// </summary>
+        public int Id {
+            get;
         }
 
         /// <summary>

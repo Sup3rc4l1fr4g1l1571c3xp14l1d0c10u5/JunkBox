@@ -4,9 +4,12 @@ using System.Collections.Generic;
 namespace AnsiCParser {
     public static class Logger {
 
-        // エラー
+        #region エラー
+
+        public static int ErrorCount { get; private set; }= 0;
 
         private static void ErrorBanner() {
+            ErrorCount++;
             Console.Error.Write("**error: ");
         }
         public static void Error(string msg) {
@@ -28,9 +31,18 @@ namespace AnsiCParser {
             Console.Error.WriteLine(msg);
         }
 
-        // 警告
+        public static void Error(LocationRange range, string msg) {
+            Error(range.Start, range.End, msg);
+        }
+        #endregion
+
+        #region 警告
+
+        public static int WarningCount { get; private set; }= 0;
+
 
         private static void WarningBanner() {
+            WarningCount++;
             Console.Error.Write("**warning: ");
         }
         public static void Warning(string msg) {
@@ -51,6 +63,11 @@ namespace AnsiCParser {
             }
             Console.Error.WriteLine(msg);
         }
+        public static void Warning(LocationRange range, string msg) {
+            Warning(range.Start, range.End, msg);
+        }
+        #endregion
+
     }
 
 

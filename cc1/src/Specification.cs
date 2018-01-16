@@ -668,7 +668,7 @@ namespace AnsiCParser {
                             return new SyntaxTree.Expression.PostfixExpression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                         }
                     default:
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                 }
             }
         }
@@ -887,7 +887,7 @@ namespace AnsiCParser {
                         } else if (expr.Type.IsBoolType() || expr.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.SignedInt | CType.BasicType.TypeKind.UnsignedInt) /*ToDo: bitfield*/) {
                             // - _Bool 型，int 型，signed int 型，又は unsigned int 型のビットフィールド
                         } else {
-                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "int型又は unsigned int 型を使用してよい式の中で使えないものが指定された。");
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange, "int型又は unsigned int 型を使用してよい式の中で使えないものが指定された。");
                         }
                         // これらのものの元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。
                         // そうでない場合，unsigned int 型に変換する。
@@ -926,7 +926,7 @@ namespace AnsiCParser {
                     } else if (expr.Type.IsBoolType()) {
                         return expr;
                     } else {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "スカラ値以外は_Bool 型に変換できません。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "スカラ値以外は_Bool 型に変換できません。");
                     }
                 }
             }
@@ -1021,7 +1021,7 @@ namespace AnsiCParser {
                     if (targetType.IsVoidType()) {
                         return expr;
                     } else {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "void型の式の値をvoid型以外へ型変換しようとしました。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "void型の式の値をvoid型以外へ型変換しようとしました。");
                     }
                 } else if (targetType.IsVoidType()) {
                     // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
@@ -1073,7 +1073,13 @@ namespace AnsiCParser {
                     // その結果のポインタが，被参照型に関して正しく境界調整されていなければ，その動作は未定義とする。
                     // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
                     if (Specification.IsCompatible(targetPointedType, exprPointedType) == false) {
-                        Logger.Warning(expr.LocationRange.Start, expr.LocationRange.End, "互換性のないポインタ型への変換です。");
+                        if (exprPointedType.IsVoidType()) {
+                            Logger.Warning(expr.LocationRange, $"void型ポインタ を {targetPointedType.ToCString()} 型ポインタに変換します。");
+                        } else if (targetPointedType.IsVoidType()) {
+                            Logger.Warning(expr.LocationRange, $"{exprPointedType.ToCString()} 型ポインタを void型ポインタに変換します。");
+                        } else {
+                            Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToCString()} 変換先={targetType.ToCString()} ");
+                        }
                     }
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
@@ -1090,8 +1096,8 @@ namespace AnsiCParser {
                     // ある型の関数へのポインタを，別の型の関数へのポインタに型変換することができる。
                     // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
                     // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
-                    if (Specification.IsCompatible(targetPointedType, exprPointedType) == false) {
-                        Logger.Warning(expr.LocationRange.Start, expr.LocationRange.End, "互換性のないポインタ型への変換です。");
+                    if (Specification.IsCompatible(targetPointedType, exprPointedType) == false && (targetPointedType.IsVoidType() == false && exprPointedType.IsVoidType() == false)) {
+                        Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToCString()} 変換先={targetType.ToCString()} ");
                     }
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
@@ -1102,7 +1108,7 @@ namespace AnsiCParser {
                 }
             }
 
-            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "型変換できない組み合わせを型変換しようとした");
+            throw new CompilerException.SpecificationErrorException(expr.LocationRange, "型変換できない組み合わせを型変換しようとした");
 
         }
 

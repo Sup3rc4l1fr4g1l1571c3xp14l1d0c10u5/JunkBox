@@ -48,6 +48,9 @@ namespace AnsiCParser {
     }
 
 
+    /// <summary>
+    /// ソースコード中の範囲を示す位置情報
+    /// </summary>
     public class LocationRange {
         public Location Start { get; }
         public Location End { get; }

@@ -20,6 +20,8 @@ namespace AnsiCParser {
 
             public SyntaxErrorException(Location start, Location end, string message) : base(start, end, message) {
             }
+            public SyntaxErrorException(LocationRange range, string message) : base(range.Start, range.End, message) {
+            }
         }
 
         /// <summary>
@@ -29,6 +31,8 @@ namespace AnsiCParser {
 
             public UndefinedIdentifierErrorException(Location start, Location end, string message) : base(start, end, message) {
             }
+            public UndefinedIdentifierErrorException(LocationRange range, string message) : base(range.Start, range.End, message) {
+            }
         }
 
         /// <summary>
@@ -36,6 +40,8 @@ namespace AnsiCParser {
         /// </summary>
         public class SpecificationErrorException : CompilerException {
             public SpecificationErrorException(Location start, Location end, string message) : base(start, end, message) {
+            }
+            public SpecificationErrorException(LocationRange range, string message) : base(range.Start, range.End, message) {
             }
         }
 
@@ -45,6 +51,8 @@ namespace AnsiCParser {
         public class TypeMissmatchError : CompilerException {
             public TypeMissmatchError(Location start, Location end, string message) : base(start, end, message) {
             }
+            public TypeMissmatchError(LocationRange range, string message) : base(range.Start, range.End, message) {
+            }
         }
 
         /// <summary>
@@ -52,6 +60,8 @@ namespace AnsiCParser {
         /// </summary>
         public class InternalErrorException : CompilerException {
             public InternalErrorException(Location start, Location end, string message) : base(start, end, message) {
+            }
+            public InternalErrorException(LocationRange range, string message) : base(range.Start, range.End, message) {
             }
         }
     }
