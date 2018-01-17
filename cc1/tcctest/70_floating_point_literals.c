@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*, ...);
 
 int main()
 {
@@ -48,30 +49,6 @@ int main()
     double dd2 = 0x1acp+12;
     printf("%f\n%f\n%f\n\n", dd0, dd1, dd2);
     printf("\n");
-
-#ifdef __TINYC__
-    /* TCC extension
-       binary floating constant */
-    long double la0 = 0B.110101100P12L;
-    long double la1 = 0b.110101100p-12l;
-    long double la2 = 0b.110101100p+12l;
-    printf("%Lf\n%Lf\n%Lf\n\n", la0, la1, la2);
-
-    long double lb0 = 0B110101100.10111101P12L;
-    long double lb1 = 0b110101100.10111101p-12l;
-    long double lb2 = 0b110101100.10111101p+12l;
-    printf("%Lf\n%Lf\n%Lf\n\n", lb0, lb1, lb2);
-
-    long double lc0 = 0B110101100.P12L;
-    long double lc1 = 0b110101100.p-12l;
-    long double lc2 = 0b110101100.p+12l;
-    printf("%Lf\n%Lf\n%Lf\n\n", lc0, lc1, lc2);
-
-    long double ld0 = 0B110101100P12L;
-    long double ld1 = 0b110101100p-12l;
-    long double ld2 = 0b110101100p+12l;
-    printf("%Lf\n%Lf\n%Lf\n\n", ld0, ld1, ld2);
-#endif
 
     return 0;
 }

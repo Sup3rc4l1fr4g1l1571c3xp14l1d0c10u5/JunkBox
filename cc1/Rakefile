@@ -1,0 +1,39 @@
+require 'fileutils'
+
+WORKDIR = '.work'
+SRC     = FileList['./src/*.cs', './tcctest/*.*', './Rakefile', './tcctest/Rakefile', './tcctest/LICENSE', './tcctest/notsupported/*.*', './tcctest/notsupported/LICENSE']
+NEWDIR  = File.join(WORKDIR, "new")
+OLDDIR  = File.join(WORKDIR, "old")
+NEWS    = FileList.new(SRC.map {|x| File.join(NEWDIR, x) })
+TARGET  = 'diff.patch'
+
+directory WORKDIR
+
+task :all => [TARGET]
+
+file TARGET => NEWS do |t|
+  cd WORKDIR do
+    sh "diff -ruN --strip-trailing-cr old new > ../#{TARGET}" do
+	end
+  end
+end
+
+
+rule %r{^#{NEWDIR}/} => "%{^#{NEWDIR}/,./}p" do |t|
+  FileUtils.mkdir_p(File.dirname(t.name))
+  File.open(t.prerequisites[0],"r") do |fi|
+    File.open(t.name,"w") do |fo|
+      fo.puts(fi.readlines.map(&:chomp).join("\n").encode("utf-8"))
+    end
+  end
+end
+
+
+task :clean do
+  rm_rf NEWDIR
+  rm_rf TARGET
+end
+
+task :clobber do
+  rm_rf WORKDIR
+end

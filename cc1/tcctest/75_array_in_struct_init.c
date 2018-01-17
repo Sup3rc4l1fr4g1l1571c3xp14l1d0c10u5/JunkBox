@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+extern int printf(char*, ...);
 
 /* This test is a snippet from the J interpreter */
 

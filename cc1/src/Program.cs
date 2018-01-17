@@ -71,7 +71,17 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             {
-            CTypeDumpVisitor2 vis = new CTypeDumpVisitor2();
+                var g = new SyntaxTreeCompileVisitor.Generator();
+                // a + 1
+                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Var, Label = "_a", Offset = 0, Type = CType.CreateFloat() });
+                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst= 3.14, Type = CType.CreateFloat() });
+                g.add(CType.CreateFloat());
+                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = 2, Type = CType.CreateFloat() });
+                g.add(CType.CreateFloat());
+
+            }
+            {
+                CTypeDumpVisitor2 vis = new CTypeDumpVisitor2();
                 //Console.WriteLine(CType.CreateUnsignedInt().Accept(vis, "a"));
                 //Console.WriteLine(CType.CreatePointer(CType.CreateUnsignedInt()).Accept(vis, "a"));
                 //Console.WriteLine(CType.CreateArray(10, CType.CreatePointer(CType.CreateUnsignedInt())).Accept(vis, "a"));   // unsigned int *x[10]
