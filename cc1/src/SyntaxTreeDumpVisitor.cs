@@ -3,6 +3,8 @@ using System.Linq;
 
 namespace AnsiCParser {
     public class SyntaxTreeDumpVisitor : SyntaxTreeVisitor.IVisitor<Cell, Cell> {
+        private CTypeDumpVisitor typeDumpVisitor = new CTypeDumpVisitor();
+
         public Cell OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, Cell value) {
             return Cell.Create(self.Op == SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }

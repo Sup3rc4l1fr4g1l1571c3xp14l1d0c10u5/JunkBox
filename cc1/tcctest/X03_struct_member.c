@@ -42,4 +42,3 @@ int main(void) {
 	printf("w=%8.8x\n", c.w);
 return 0;
 }
-

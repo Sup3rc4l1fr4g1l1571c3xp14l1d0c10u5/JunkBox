@@ -4,11 +4,15 @@ using System.Linq;
 
 namespace AnsiCParser {
     public class CTypeDumpVisitor : CTypeVisitor.IVisitor<Cell, Cell> {
+        private HashSet<CType> visited = new HashSet<CType>();
+
         public Cell OnArrayType(CType.ArrayType self, Cell value) {
+            visited.Add(self);
             return Cell.Create("array", self.Length.ToString(), self.BaseType.Accept(this, null));
         }
 
         public Cell OnBasicType(CType.BasicType self, Cell value) {
+            visited.Add(self);
             switch (self.Kind) {
                 case CType.BasicType.TypeKind.KAndRImplicitInt:
                     return Cell.Create("int");
@@ -63,27 +67,41 @@ namespace AnsiCParser {
         }
 
         public Cell OnEnumType(CType.TaggedType.EnumType self, Cell value) {
-            return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Value.ToString())).ToArray()));
+            if (visited.Contains(self) == false) {
+                visited.Add(self);
+                return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Value.ToString())).ToArray()));
+            } else {
+                return Cell.Create("enum", self.TagName);
+            }
         }
 
         public Cell OnFunctionType(CType.FunctionType self, Cell value) {
+                visited.Add(self);
             return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null ? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.StorageClass.ToString(), x.Type.Accept(this, null))).ToArray()) : Cell.Nil);
         }
 
         public Cell OnPointerType(CType.PointerType self, Cell value) {
+                visited.Add(self);
             return Cell.Create("pointer", self.BaseType.Accept(this, null));
         }
 
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
-            return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()) : Cell.Nil);
+            if (visited.Contains(self) == false) {
+                visited.Add(self);
+                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()) : Cell.Nil);
+            } else {
+                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName);
+            }
         }
 
         public Cell OnStubType(CType.StubType self, Cell value) {
+            visited.Add(self);
             return Cell.Create("$");
         }
 
         public Cell OnTypedefedType(CType.TypedefedType self, Cell value) {
-            return Cell.Create("typedef", self.Ident?.Raw ?? "", self.Type.Accept(this, null));
+            visited.Add(self);
+            return Cell.Create("typedef", self.Ident?.Raw);
         }
 
         public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {
@@ -115,11 +133,16 @@ namespace AnsiCParser {
 
 
     public class CTypeDumpVisitor2 : CTypeVisitor.IVisitor<string, string> {
+
+        private HashSet<CType> visited = new HashSet<CType>();
+
         public string OnArrayType(CType.ArrayType self, string value) {
+            visited.Add(self);
             return $"{self.BaseType.Accept(this, value+$"[{(self.Length != -1 ? self.Length.ToString() : "")}]")}";
         }
 
         public string OnBasicType(CType.BasicType self, string value) {
+            visited.Add(self);
             var str = "";
             switch (self.Kind) {
                 case CType.BasicType.TypeKind.KAndRImplicitInt:
@@ -199,8 +222,13 @@ namespace AnsiCParser {
         }
 
         public string OnEnumType(CType.TaggedType.EnumType self, string value) {
-            var members = string.Join(", ", self.Members.Select(x => $"{x.Ident.Raw} = {x.Value.ToString()}"));
-            return $"enum {self.TagName} {{ {members} }}";
+            if (visited.Contains(self)) {
+                return $"enum {self.TagName}";
+            } else {
+                visited.Add(self);
+                var members = string.Join(", ", self.Members.Select(x => $"{x.Ident.Raw} = {x.Value.ToString()}"));
+                return $"enum {self.TagName} {{ {members} }}";
+            }
         }
 
         private string StorageClassToString(StorageClassSpecifier sc) {
@@ -219,6 +247,7 @@ namespace AnsiCParser {
         }
 
         public string OnFunctionType(CType.FunctionType self, string value) {
+            visited.Add(self);
             var args = self.Arguments?.Select(x => StorageClassToString(x.StorageClass) + x.Type.Accept(this, x.Ident?.Raw ?? "")).ToList();
             if (args == null) {
                 args = new List<string>();
@@ -232,6 +261,7 @@ namespace AnsiCParser {
         }
 
         public string OnPointerType(CType.PointerType self, string value) {
+            visited.Add(self);
             if (self.BaseType is CType.ArrayType || self.BaseType is CType.FunctionType) {
                 return $"{self.BaseType.Accept(this, $"(*{value})")}";
             } else {
@@ -240,8 +270,13 @@ namespace AnsiCParser {
         }
 
         public string OnStructUnionType(CType.TaggedType.StructUnionType self, string value) {
-            var members = string.Join(" ", self.Members.Select(x => $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((x.BitSize != -1) ? " : " + x.BitSize.ToString() : "")};"));
-            return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} {{ {members} }}"+(String.IsNullOrEmpty(value)?"" : (" "+value));
+            if (visited.Contains(self)) {
+                return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName}";
+            } else {
+                visited.Add(self);
+                var members = string.Join(" ", self.Members.Select(x => $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((x.BitSize != -1) ? " : " + x.BitSize.ToString() : "")};"));
+                return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} {{ {members} }}" + (String.IsNullOrEmpty(value) ? "" : (" " + value));
+            }
         }
 
         public string OnStubType(CType.StubType self, string value) {
@@ -249,6 +284,7 @@ namespace AnsiCParser {
         }
 
         public string OnTypedefedType(CType.TypedefedType self, string value) {
+            visited.Add(self);
             return self.Ident.Raw + (String.IsNullOrEmpty(value) ? "" : (" " + value));
         }
 

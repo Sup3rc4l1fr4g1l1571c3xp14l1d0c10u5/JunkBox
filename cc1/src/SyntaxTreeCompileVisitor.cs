@@ -112,11 +112,11 @@ namespace AnsiCParser {
         }
 
         public class Generator {
-            List<Code> codes = new List<Code>();
-            Stack<Value> stack = new Stack<Value>();
+            public List<Code> codes = new List<Code>();
+            private Stack<Value> stack = new Stack<Value>();
 
 
-            protected Code Emit(string body) {
+            public Code Emit(string body) {
                 var code = new Code(body);
                 codes.Add(code);
                 return code;
@@ -130,7 +130,7 @@ namespace AnsiCParser {
                 return stack.Pop();
             }
 
-            private void discard() {
+            public void discard() {
                 Value v = pop();
                 if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
                     Emit($"addl ${(v.Type.Sizeof() + 3) & ~3}, %esp");  // discard
@@ -139,6 +139,45 @@ namespace AnsiCParser {
 
             public Value peek(int i) {
                 return stack.ElementAt(i);
+            }
+            public void dup(int n) {
+                var v = peek(n);
+                if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
+                    int skipsize = 0;
+                    for (int i = 0; i < n; i++) {
+                        var v2 = peek(i);
+                        if (v2.Kind == Value.ValueKind.Temp) {
+                            skipsize += (v2.Type.Sizeof() + 3) & (~3);
+                        } else if (v2.Kind == Value.ValueKind.Address) {
+                            skipsize += (v2.Type.Sizeof() + 3) & (~3);
+                        } else {
+                        }
+                    }
+
+                    if (v.Kind == Value.ValueKind.Temp) {
+                        int size = (v.Type.Sizeof() + 3) & (~3);
+                        if (size <= 4) {
+                            Emit($"leal ${skipsize}(%esp), %esi");
+                            Emit($"push (%esi)");
+                        } else {
+                            Emit($"leal ${skipsize}(%esp), %esi");
+                            Emit($"leal {-size}(%esp), %esp");
+                            Emit("movl %esp, %edi");
+                            Emit($"movl ${size}, %ecx");
+                            Emit($"cld");
+                            Emit($"rep movsb");
+                        }
+                        push(new Value() { Kind = Value.ValueKind.Temp, Type = v.Type, StackPos = stack.Count });
+                    } else if (v.Kind == Value.ValueKind.Address) {
+                        Emit($"leal ${skipsize}(%esp), %esi");
+                        Emit($"push (%esi)");
+                        push(new Value() { Kind = Value.ValueKind.Address, Type = v.Type, StackPos = stack.Count });
+                    } else {
+                        throw new Exception();
+                    }
+                } else {
+                    push(v);
+                }
             }
 
             public void add(CType type) {
@@ -395,41 +434,81 @@ namespace AnsiCParser {
                 }
 
             }
-
-            public void assign(CType type) {
+            public void shl(CType type) {
                 var rhs = peek(0);
                 var lhs = peek(1);
 
-                LoadVA("%eax");
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    LoadI("%ecx"); // rhs
+                    LoadI("%eax"); // lhs
+                    if (lhs.Type.IsUnsignedIntegerType()) {
+                        Emit($"shll %cl, %eax");
+                    } else {
+                        Emit($"sall %cl, %eax");
+                    }
+                    Emit($"pushl %eax");
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public void shr(CType type) {
+                var rhs = peek(0);
+                var lhs = peek(1);
+
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    LoadI("%ecx"); // rhs
+                    LoadI("%eax"); // lhs
+                    if (lhs.Type.IsUnsignedIntegerType()) {
+                        Emit($"shrl %cl, %eax");
+                    } else {
+                        Emit($"sarl %cl, %eax");
+                    }
+                    Emit($"pushl %eax");
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public void assign(CType type) {
+                var lhs = peek(0);
+                var rhs = peek(1);
+
+                LoadVA("%eax"); // lhs
 
                 switch (type.Sizeof()) {
                     case 1:
                         rhs = LoadI("%ecx");
                         Emit($"movb %cl, (%eax)");
                         Emit($"pushl (%eax)");
+                        push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         break;
                     case 2:
                         rhs = LoadI("%ecx");
                         Emit($"movw %cx, (%eax)");
                         Emit($"pushl (%eax)");
+                        push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         break;
                     case 3:
                     case 4:
                         rhs = LoadI("%ecx");
                         Emit($"movl %ecx, (%eax)");
                         Emit($"pushl (%eax)");
+                        push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         break;
                     default:
                         LoadS(rhs.Type);
                         Emit($"movl %esp, %esi");
                         Emit($"movl ${type.Sizeof()}, %ecx");
-                        Emit($"movl %eax, %edi");
                         Emit($"cld");
                         Emit($"rep movsb");
-                        // スタックトップにrhsの値があるのでpushは不要
+                        Emit($"addl ${(rhs.Type.Sizeof() + 3) & (~3)}, %esp");
+                        Emit($"pushl %eax");
+                        push(new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
                         break;
                 }
-                push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
 
             }
 
@@ -501,7 +580,7 @@ namespace AnsiCParser {
                 Emit($"{label}:");
             }
             public void jmp(string label) {
-                Emit($"je {label}");
+                Emit($"jmp {label}");
             }
             public void jmp_false(string label) {
                 LoadI("%eax");
@@ -512,6 +591,12 @@ namespace AnsiCParser {
                 LoadI("%eax");
                 Emit($"cmpl $0, %eax");
                 Emit($"jne {label}");
+            }
+            public void emit_push_true() {
+                Emit($"pushl $1");
+            }
+            public void emit_push_false() {
+                Emit($"pushl $0");
             }
 
             public void cast_to(CType type) {
@@ -568,7 +653,19 @@ namespace AnsiCParser {
                     push(new Value(ret) { Type = type });
                 } else if (ret.Type.IsArrayType() && type.IsPointerType()) {
                     pop();
-                    push(new Value(ret) { Type = type });
+                    // 手抜き
+                    if (ret.Kind == Value.ValueKind.Var) {
+                        ret = new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                        push(ret);
+                    } else if (ret.Kind == Value.ValueKind.Ref) {
+                        ret = new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                        push(ret);
+                    } else if (ret.Kind == Value.ValueKind.Address) {
+                        ret = new Value() { Kind = Value.ValueKind.Temp, Type = type };
+                        push(ret);
+                    } else {
+                        throw new NotImplementedException();
+                    }
                 } else if (ret.Type.IsArrayType() && type.IsArrayType()) {
                     pop();
                     push(new Value(ret) { Type = type });
@@ -656,26 +753,13 @@ namespace AnsiCParser {
             }
 
             public void arraySubscript(CType type) {
-                var rhs = peek(0);
-                var lhs = peek(1);
-                Value target = null;
-                Value index = null;
-                if ((lhs.Type.IsArrayType() || lhs.Type.IsPointerType()) && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx");
-                    if (target.Type.IsPointerType()) {
-                        LoadP("%eax");
-                    } else {
-                        LoadVA("%eax");
-                    }
-                } else if ((rhs.Type.IsArrayType() || rhs.Type.IsPointerType()) && lhs.Type.IsIntegerType()) {
-                    if (target.Type.IsPointerType()) {
-                        LoadP("%eax");
-                    } else {
-                        LoadVA("%eax");
-                    }
-                    LoadI("%ecx");
+                var index = peek(0);
+                var target = peek(1);
+                LoadI("%ecx");
+                if (target.Type.IsPointerType()) {
+                    LoadP("%eax");
                 } else {
-                    throw new Exception();
+                    LoadVA("%eax");
                 }
 
                 Emit($"imull ${type.Sizeof()}, %ecx, %ecx");
@@ -770,6 +854,49 @@ namespace AnsiCParser {
                 }
 
                 push(new Value() { Kind = resultSize == 0 ? Value.ValueKind.Void : Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
+            }
+
+            public void mem(CType type, string member) {
+                var obj = peek(0);
+                var st = obj.Type.Unwrap() as CType.TaggedType.StructUnionType;
+                CType.TaggedType.StructUnionType.MemberInfo target = null;
+                int offset = 0;
+                foreach (var m in st.Members) {
+                    if (m.Ident.Raw == member) {
+                        target = m;
+                        break;
+                    }
+
+                    if (st.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct) {
+                        offset += m.Type.Sizeof();
+                    }
+                }
+
+                LoadVA("%eax");
+                Emit($"addl ${offset}, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
+            }
+            public void imem(CType type, string member) {
+                var obj = peek(0);
+                var st = obj.Type.GetBasePointerType().Unwrap() as CType.TaggedType.StructUnionType;
+                CType.TaggedType.StructUnionType.MemberInfo target = null;
+                int offset = 0;
+                foreach (var m in st.Members) {
+                    if (m.Ident.Raw == member) {
+                        target = m;
+                        break;
+                    }
+
+                    if (st.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct) {
+                        offset += m.Type.Sizeof();
+                    }
+                }
+
+                LoadP("%eax");
+                Emit($"addl ${offset}, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
             }
 
             protected string ToByteReg(string s) {
@@ -1082,7 +1209,7 @@ namespace AnsiCParser {
             /// <param name="lhs"></param>
             /// <param name="reg"></param>
             public void LoadVA(string reg) {
-                Value lhs = peek(0);
+                Value lhs = pop();
                 switch (lhs.Kind) {
                     case Value.ValueKind.Var:
                         if (lhs.Label == null) {
@@ -1101,13 +1228,11 @@ namespace AnsiCParser {
 
                         break;
                     case Value.ValueKind.Address:
-                        pop();
                         Emit($"popl {reg}");
                         break;
                     default:
                         throw new NotImplementedException();
                 }
-
             }
 
             /// <summary>
@@ -1237,7 +1362,364 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                 }
             }
+
+            private void postop(CType type, string op) {
+
+                LoadVA("%eax");
+
+                CType baseType;
+                int size;
+                if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
+                    size = baseType.Sizeof();
+                } else {
+                    size = 1;
+                }
+
+                // load value
+                switch (type.Sizeof()) {
+                    case 4:
+                        Emit($"movl (%eax), %ecx");
+                        Emit($"{op}l ${size}, (%eax)");
+                        break;
+                    case 2:
+                        Emit($"movw (%eax), %cx");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movswl %cx, %ecx");
+                        } else {
+                            Emit($"movzwl %cx, %ecx");
+                        }
+                        Emit($"{op}w ${size}, (%eax)");
+                        break;
+                    case 1:
+                        Emit($"movb (%eax), %cl");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movsbl %cl, %ecx");
+                        } else {
+                            Emit($"movzbl %cl, %ecx");
+                        }
+                        Emit($"{op}b ${size}, (%eax)");
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+                Emit($"push %ecx");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
+            }
+            public void incp(CType type) {
+                postop(type, "add");
+            }
+            public void decp(CType type) {
+                postop(type, "sub");
+            }
+
+            public void const_addr_offset(CType type, long offset) {
+                var ret = pop();
+                switch (ret.Kind) {
+                    case Value.ValueKind.Var:
+                        push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = (int)(ret.Offset + offset) });
+                        break;
+                    case Value.ValueKind.Ref:
+                        push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = (int)(ret.Offset + offset) });
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+
+            public void gt(CType type) {
+                var rhs = peek(0);
+                var lhs = peek(1);
+
+                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
+                    LoadI("%ecx");  // rhs
+                    LoadI("%eax");  // lhs
+                    Emit("cmpl %ecx, %eax");
+                    Emit("setg	%al");
+                } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
+                           (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
+                    LoadF();
+                    LoadF();
+                    Emit($"fcomip");
+                    Emit($"fstp %st(0)");
+                    Emit("seta	%al");
+                } else {
+                    throw new NotImplementedException();
+                }
+                Emit("movzbl %al, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+
+            public void lt(CType type) {
+                var rhs = peek(0);
+                var lhs = peek(1);
+
+                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
+                    LoadI("%ecx");  // rhs
+                    LoadI("%eax");  // lhs
+                    Emit("cmpl %ecx, %eax");
+                    Emit("setl	%al");  // signedなら seta
+                } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
+                           (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
+                    LoadF();
+                    LoadF();
+                    Emit($"fcomip");
+                    Emit($"fstp %st(0)");
+                    Emit("setb	%al");  // signedなら seta
+                } else {
+                    throw new NotImplementedException();
+                }
+                Emit("movzbl %al, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+
+            public void ge(CType type) {
+                var rhs = peek(0);
+                var lhs = peek(1);
+
+                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
+                    LoadI("%ecx");  // rhs
+                    LoadI("%eax");  // lhs
+                    Emit("cmpl %ecx, %eax");
+                    Emit("setge	%al");
+                } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
+                           (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
+                    LoadF();
+                    LoadF();
+                    Emit($"fcomip");
+                    Emit($"fstp %st(0)");
+                    Emit("setae	%al");
+                } else {
+                    throw new NotImplementedException();
+                }
+                Emit("movzbl %al, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+
+            public void le(CType type) {
+                var rhs = peek(0);
+                var lhs = peek(1);
+
+                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
+                    LoadI("%ecx");  // rhs
+                    LoadI("%eax");  // lhs
+                    Emit("cmpl %ecx, %eax");
+                    Emit("setle	%al");
+                } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
+                           (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
+                    LoadF();
+                    LoadF();
+                    Emit($"fcomip");
+                    Emit($"fstp %st(0)");
+                    Emit("setbe	%al");
+                } else {
+                    throw new NotImplementedException();
+                }
+                Emit("movzbl %al, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+
+            public void address(CType type) {
+                var operand = peek(0);
+
+                if (operand.Kind == Value.ValueKind.Var) {
+                    if (operand.Label == null) {
+                        Emit($"leal {operand.Offset}(%ebp), %eax");
+                    } else {
+                        Emit($"leal {operand.Label}+{operand.Offset}, %eax");
+                    }
+                    Emit($"pushl %eax");
+                    push( new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else if (operand.Kind == Value.ValueKind.Ref) {
+                    if (operand.Label == null) {
+                        Emit($"leal {operand.Offset}(%ebp), %eax");
+                    } else {
+                        Emit($"leal {operand.Label}+{operand.Offset}, %eax");
+                    }
+                    Emit($"pushl %eax");
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else if (operand.Kind == Value.ValueKind.Address) {
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else if (operand.Kind == Value.ValueKind.Temp) {
+                    // nothing
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public void umin(CType type) {
+                var operand = peek(0);
+                if (operand.Type.IsIntegerType()) {
+                    operand = LoadI("%eax");
+                    Emit($"negl %eax");
+                    Emit($"pushl %eax");
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else if (operand.Type.IsRealFloatingType()) {
+                    LoadF();
+                    Emit($"fchs");
+                    StoreF(type);
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+            public void uneg(CType type) {
+                var operand = peek(0);
+                if (operand.Type.IsIntegerType()) {
+                    operand = LoadI("%eax");
+                    Emit($"notl %eax");
+                    Emit($"pushl %eax");
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public void unot(CType type) {
+                var operand = peek(0);
+                LoadI("%eax");
+                Emit($"cmpl $0, %eax");
+                Emit($"sete %al");
+                Emit($"movzbl %al, %eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+
+            private void preop(CType type, string op) {
+                // load address
+                LoadVA("%eax");
+
+                CType baseType;
+                int size;
+                if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
+                    size = baseType.Sizeof();
+                } else {
+                    size = 1;
+                }
+
+                // load value
+                switch (type.Sizeof()) {
+                    case 4:
+                        Emit($"movl (%eax), %ecx");
+                        Emit($"{op}l ${size}, (%eax)");
+                        break;
+                    case 2:
+                        Emit($"movw (%eax), %cx");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movswl %cx, %ecx");
+                        } else {
+                            Emit($"movzwl %cx, %ecx");
+                        }
+                        Emit($"{op}w ${size}, (%eax)");
+                        break;
+                    case 1:
+                        Emit($"movb (%eax), %cl");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movsbl %cl, %ecx");
+                        } else {
+                            Emit($"movzbl %cl, %ecx");
+                        }
+                        Emit($"{op}b ${size}, (%eax)");
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+                Emit($"push (%eax)");
+                push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
+            }
+            public void pinc(CType type) {
+                preop(type, "add");
+            }
+            public void pdec(CType type) {
+                preop(type, "sub");
+            }
+
+            public void refe(CType type) {
+                LoadI("%eax");
+                Emit($"pushl %eax");
+                push(new Value() { Kind = Value.ValueKind.Address, Type = type });
+
+            }
+
+            public void ret(CType type) {
+                if (type != null) {
+                    var value = peek(0);
+                    if (value.Type.IsSignedIntegerType()) {
+                        value = LoadI("%ecx");
+                        switch (value.Type.Sizeof()) {
+                            case 1:
+                                Emit($"movsbl %cl, %eax");
+                                break;
+                            case 2:
+                                Emit($"movswl %cx, %eax");
+                                break;
+                            case 4:
+                                Emit($"movl %ecx, %eax");
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+                    } else if (value.Type.IsUnsignedIntegerType()) {
+                        value = LoadI("%ecx");
+                        switch (value.Type.Sizeof()) {
+                            case 1:
+                                Emit($"movzbl %cl, %eax");
+                                break;
+                            case 2:
+                                Emit($"movxwl %cx, %eax");
+                                break;
+                            case 4:
+                                Emit($"movl %ecx, %eax");
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+                    } else if (value.Type.IsRealFloatingType()) {
+                        LoadF();
+                    } else {
+                        if (value.Type.Sizeof() <= 4) {
+                            LoadI("%eax");
+                        } else {
+                            LoadVA("%esi");
+                            Emit($"movl ${value.Type.Sizeof()}, %ecx");
+                            Emit($"movl 8(%ebp), %edi");
+                            Emit($"cld");
+                            Emit($"rep movsb");
+                            if (value.Kind == Value.ValueKind.Temp) {
+                                Emit($"addl {(value.Type.Sizeof() + 3) & ~3}, %esp");
+                            }
+                        }
+
+                    }
+                }
+
+                Emit($"movl %ebp, %esp");
+                Emit($"popl %ebp");
+                Emit($"ret");
+            }
+
+            public void when(long caseValue, string label) {
+                Emit($"cmp ${caseValue}, %eax");
+                Emit($"je {label}");
+            }
+
+            internal void case_of(Action<Generator> p) {
+                LoadI("%eax");
+                p(this);
+            }
+
+            internal void data(string key, byte[] value) {
+                Emit($".data");
+                Emit($"{key}:");
+                Emit(".byte " + String.Join(" ,", value.Select(x => x.ToString())));
+            }
         }
+
+
+        public Generator g = new Generator();
 
         Stack<string> ContinueTarget = new Stack<string>();
         Stack<string> BreakTarget = new Stack<string>();
@@ -1254,13 +1736,13 @@ namespace AnsiCParser {
         private string LAlloc() {
             return $".L{n++}";
         }
-
+#if false
         private void discard(Value v) {
             if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
                 Emit($"addl ${(v.Type.Sizeof() + 3) & ~3}, %esp");  // discard
             }
         }
-
+#endif
         public class Code {
             public string Body;
 
@@ -1273,6 +1755,7 @@ namespace AnsiCParser {
             }
         }
 
+#if false
         public List<Code> codes = new List<Code>();
 
         public Code Emit(string body) {
@@ -1280,7 +1763,6 @@ namespace AnsiCParser {
             codes.Add(code);
             return code;
         }
-
 
         private Value arith_add(CType type, Value lhs, Value rhs) {
             if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
@@ -3552,16 +4034,1264 @@ namespace AnsiCParser {
 
             return value;
         }
+#else
 
+        public Value OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, Value value) {
+            throw new NotImplementedException();
+        }
+
+        public Value OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Value value) {
+            if (self.Body != null) {
+                // 引数表
+                var ft = (self.Type as CType.FunctionType);
+                int offset = 8; // prev return position
+
+                // 戻り値領域
+                if ((!ft.ResultType.IsVoidType()) && ft.ResultType.Sizeof() > 4 && !ft.ResultType.IsRealFloatingType()) {
+                    offset += 4; //(ft.ResultType.Sizeof() + 3) & ~3;
+                }
+                // 引数（先頭から）
+                arguments = new Dictionary<string, int>();
+                var vars = new List<string>();
+                foreach (var arg in ft.Arguments) {
+                    vars.Add($"// <LocalVariable Name=\"{arg.Ident.Raw}\" Offset=\"{offset}\" />");
+                    arguments.Add(arg.Ident.Raw, offset);
+                    offset += (arg.Type.Sizeof() + 3) & ~3;
+                }
+
+                // ラベル
+                genericlabels = new Dictionary<string, string>();
+
+                g.Emit($".section .text");
+                g.Emit($".globl {self.LinkageObject.LinkageId}");
+                g.Emit($"{self.LinkageObject.LinkageId}:");
+                vars.ForEach(x => g.Emit(x));
+                g.Emit($"pushl %ebp");
+                g.Emit($"movl %esp, %ebp");
+                var c = g.Emit(".error \"Stack size is need backpatch.\"");
+                maxLocalScopeTotalSize = 0;
+                self.Body.Accept(this, value);
+                c.Body = $"subl ${maxLocalScopeTotalSize}, %esp";
+                g.Emit($"movl %ebp, %esp");
+                g.Emit($"popl %ebp");
+                g.Emit($"ret");
+            }
+            return value;
+        }
+
+        public Value OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, Value value) {
+            // なにもしない
+            return value;
+        }
+
+        public Value OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, Value value) {
+            // ブロックスコープ変数
+            if (self.LinkageObject.Linkage == LinkageKind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
+                if (self.Init != null) {
+                    Tuple<string, int> offset;
+                    if (localScope.TryGetValue(self.Ident, out offset) == false) {
+                        throw new Exception("初期化対象変数が見つからない。");
+                    }
+                    return self.Init.Accept(this, new Value() { Kind = Value.ValueKind.Var, Label = offset.Item1, Offset = offset.Item2, Type = self.Type });
+                }
+            }
+            return value;
+        }
+
+        public Value OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            switch (self.Op) {
+                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
+                    g.add(self.Type);
+                    break;
+                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
+                    g.sub(self.Type);
+                    break;
+            }
+            return value;
+        }
+
+        public Value OnAndExpression(SyntaxTree.Expression.AndExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            g.and(self.Type);
+            return value;
+        }
+
+        public Value OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            g.dup(1);
+            switch (self.Op) {
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
+                    g.add(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
+                    g.sub(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
+                    g.mul(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
+                    g.div(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
+                    g.mod(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
+                    g.and(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
+                    g.or(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
+                    g.xor(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
+                    g.shl(self.Type);
+                    break;
+                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
+                    g.shr(self.Type);
+                    break;
+                default:
+                    throw new Exception("来ないはず");
+            }
+            g.assign(self.Type);
+            return value;
+        }
+
+        public Value OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
+            var rhs = self.Rhs.Accept(this, value);
+            var lhs = self.Lhs.Accept(this, value);
+
+            g.assign(self.Type);
+            return value;
+        }
+
+        public Value OnCastExpression(SyntaxTree.Expression.CastExpression self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.cast_to(self.Type);
+            return value;
+        }
+
+        public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Value value) {
+            throw new NotImplementedException();
+        }
+
+        public Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, Value value) {
+            var cond = self.CondExpr.Accept(this, value);
+
+            var elseLabel = LAlloc();
+            var junctionLabel = LAlloc();
+
+            g.jmp_false(elseLabel);
+
+            var thenRet = self.ThenExpr.Accept(this, value);
+            if (self.Type.IsVoidType()) {
+                // スタック上の結果を捨てる
+                g.discard();
+            }
+
+            g.jmp(junctionLabel);
+            g.label(elseLabel);
+
+            var elseRet = self.ElseExpr.Accept(this, value);
+            if (self.Type.IsVoidType()) {
+                // スタック上の結果を捨てる
+                g.discard();
+            }
+            g.label(junctionLabel);
+
+            if (cond.Type.IsVoidType()) {
+                g.push(new Value() { Kind = Value.ValueKind.Void });
+            }
+            return value;
+        }
+
+        public Value OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            switch (self.Op) {
+                case SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal:
+                    g.eq(self.Type);
+                    break;
+                case SyntaxTree.Expression.EqualityExpression.OperatorKind.NotEqual:
+                    g.ne(self.Type);
+                    break;
+                case SyntaxTree.Expression.EqualityExpression.OperatorKind.None:
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            return value;
+        }
+
+        public Value OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            g.xor(self.Type);
+            return value;
+        }
+
+        public Value OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, Value value) {
+            throw new NotImplementedException();
+        }
+
+        public Value OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            g.or(self.Type);
+            return value;
+        }
+
+        public Value OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, Value value) {
+            self.Expr.Accept(this, value);
+            g.cast_to(self.Type);
+            return value;
+        }
+
+        public Value OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, Value value) {
+            var labelFalse = LAlloc();
+            var labelJunction = LAlloc();
+            self.Lhs.Accept(this, value);
+            g.jmp_false(labelFalse);
+            self.Rhs.Accept(this, value);
+            g.jmp_false(labelFalse);
+            g.emit_push_true();
+            g.jmp(labelJunction);
+            g.label(labelFalse);
+            g.emit_push_false();
+            g.label(labelJunction);
+            g.push(new Value() { Kind = Value.ValueKind.Temp, Type = self.Type });
+            return value;
+        }
+
+        public Value OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, Value value) {
+            var labelTrue = LAlloc();
+            var labelJunction = LAlloc();
+            self.Lhs.Accept(this, value);
+            g.jmp_true(labelTrue);
+            self.Rhs.Accept(this, value);
+            g.jmp_true(labelTrue);
+            g.emit_push_false();
+            g.jmp(labelJunction);
+            g.label(labelTrue);
+            g.emit_push_true();
+            g.label(labelJunction);
+            g.push(new Value() { Kind = Value.ValueKind.Temp, Type = self.Type });
+            return value;
+        }
+
+        public Value OnMultiplicitiveExpression(SyntaxTree.Expression.MultiplicitiveExpression self, Value value) {
+            self.Lhs.Accept(this, value);
+            self.Rhs.Accept(this, value);
+            switch (self.Op) {
+                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                    g.mul(self.Type);
+                    break;
+                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
+                    g.div(self.Type);
+                    break;
+                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                    g.mod(self.Type);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            return value;
+        }
+
+        public Value OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
+            var target = self.Target.Accept(this, value);
+            var index = self.Index.Accept(this, value);
+            g.arraySubscript(self.Type);
+            return value;
+        }
+
+        public Value OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, Value value) {
+            /*
+             *  - 関数への引数は右から左の順でスタックに積まれる。
+             *    - 引数にはベースポインタ相対でアクセスする
+             *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+             *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
+             *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
+             *  - スタックポインタの処理は呼び出し側で行う。  
+             */
+            var funcType = (self.Expr.Type as CType.PointerType).BaseType as CType.FunctionType;
+
+            g.call(self.Type, funcType, self.Args.Count, (_g) => { self.Expr.Accept(this, value); }, (_g, i) => { self.Args[i].Accept(this, value); });
+
+            //return new Value() { kIND = self.Type.IsVoidType() ? Value.ValueKind.Void : Value.ValueKind.Temp, Type = self.Type };
+            return value;
+        }
+
+        public Value OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.mem(self.Type, self.Ident.Raw);
+            return value;
+        }
+
+        public Value OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.imem(self.Type, self.Ident.Raw);
+            return value;
+
+        }
+
+        public Value OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            switch (self.Op) {
+                case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
+                    g.decp(self.Type);
+                    break;
+                case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
+                    g.incp(self.Type);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            return value;
+        }
+
+        public Value OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
+            return value;
+        }
+
+        public Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.FloatConst, Type = self.Type, FloatConst = self.Value });
+            return value;
+        }
+
+        public Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
+            return value;
+        }
+
+        public Value OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+            return self.ParenthesesExpression.Accept(this, value);
+        }
+
+        public Value OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
+            var ret = self.Identifier.Accept(this, value);
+            g.const_addr_offset(self.Type, self.Offset.Value);
+            return value;
+        }
+
+        public Value OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Info.Value });
+            return value;
+        }
+
+        public Value OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
+            return value;
+        }
+
+        public Value OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
+            throw new NotImplementedException();
+        }
+
+        public Value OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
+            g.push(new Value() { Kind = Value.ValueKind.Var, Type = self.Type, Label = null, Offset = arguments[self.Ident] });
+            return value;
+        }
+
+        public Value OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
+            Tuple<string, int> offset;
+            if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                if (localScope.TryGetValue(self.Ident, out offset)) {
+                    g.push( new Value() { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2, });
+                } else {
+                    throw new Exception("");
+                }
+            } else {
+                g.push(new Value() { Kind = Value.ValueKind.Var, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
+            }
+            return value;
+        }
+
+        public Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, Value value) {
+            int no = dataBlock.Count;
+            var label = $"D{no}";
+            dataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
+            g.push( new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
+            return value;
+        }
+
+        public Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, Value value) {
+            var lhs = self.Lhs.Accept(this, value);
+            var rhs = self.Rhs.Accept(this, value);
+            switch (self.Op) {
+                case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterThan:
+                    g.gt(self.Type);
+                    break;
+                case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan:
+                    g.lt(self.Type);
+                    break;
+                case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
+                    g.ge(self.Type);
+                    break;
+                case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessOrEqual:
+                    g.le(self.Type);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            return value;
+        }
+
+        public Value OnShiftExpression(SyntaxTree.Expression.ShiftExpression self, Value value) {
+            var lhs = self.Lhs.Accept(this, value);
+            var rhs = self.Rhs.Accept(this, value);
+
+            switch (self.Op) {
+                case SyntaxTree.Expression.ShiftExpression.OperatorKind.Left:
+                    g.shl(self.Type);
+                    break;
+                case SyntaxTree.Expression.ShiftExpression.OperatorKind.Right:
+                    g.shr(self.Type);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            return value;
+        }
+
+        public Value OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, Value value) {
+            // todo: C99可変長配列型
+            return new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() };
+        }
+
+        public Value OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, Value value) {
+            // todo: C99可変長配列型
+            return new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() };
+        }
+
+
+
+        public Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.cast_to(self.Type);
+            return value;
+        }
+
+        public Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, Value value) {
+            var operand = self.Expr.Accept(this, value);
+            g.address(self.Type);
+            return value;
+        }
+
+        public Value OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, Value value) {
+            var operand = self.Expr.Accept(this, value);
+            g.umin(self.Type);
+            return value;
+        }
+
+        public Value OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, Value value) {
+            var operand = self.Expr.Accept(this, value);
+            g.uneg(self.Type);
+            return value;
+        }
+
+        public Value OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, Value value) {
+            var operand = self.Expr.Accept(this, value);
+            g.unot(self.Type);
+            return value;
+        }
+
+        public Value OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, Value value) {
+            self.Expr.Accept(this, value);
+            return value;
+        }
+
+        public Value OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+
+            switch (self.Op) {
+                case SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc:
+                    g.pinc(self.Type);
+                    break;
+                case SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec:
+                    g.pdec(self.Type);
+                    break;
+                default:
+                    throw new Exception("来ないはず");
+            }
+
+            return value;
+
+        }
+
+        public Value OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.refe(self.Type);
+            return value;
+        }
+
+        public Value OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Value value) {
+            throw new Exception("来ないはず");
+        }
+
+        public Value OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, Value value) {
+            throw new Exception("来ないはず");
+        }
+
+        public Value OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, Value value) {
+            self.Expr.Accept(this, value);
+            g.push(value);
+            g.assign(self.Type);
+            g.discard();
+            return value;
+        }
+
+        public Value OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, Value value) {
+            var elementSize = self.Type.BaseType.Sizeof();
+            var v = new Value(value) { Type = self.Type.BaseType };
+            foreach (var init in self.Inits) {
+                init.Accept(this, v);
+                switch (v.Kind) {
+                    case Value.ValueKind.Var:
+                        if (v.Label == null) {
+                            v.Offset += elementSize;
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, Value value) {
+            throw new NotImplementedException();
+        }
+
+        public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, Value value) {
+            var label = BreakTarget.Peek();
+            g.jmp(label);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnCaseStatement(SyntaxTree.Statement.CaseStatement self, Value value) {
+            var label = _switchLabelTableStack.Peek()[self];
+            g.label(label);
+            self.Stmt.Accept(this, value);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        Scope<Tuple<string, int>> localScope = Scope<Tuple<string, int>>.Empty;
+        int localScopeTotalSize = 0;
+        private int maxLocalScopeTotalSize = 0;
+
+        public Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, Value value) {
+            localScope = localScope.Extend();
+            var prevLocalScopeSize = localScopeTotalSize;
+
+            foreach (var x in self.Decls.Reverse<SyntaxTree.Declaration>()) {
+                if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                    if (x.StorageClass == StorageClassSpecifier.Static) {
+                        // static
+                        localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
+                    } else {
+                        localScopeTotalSize += (x.LinkageObject.Type.Sizeof() + 3) & ~3;
+                        localScope.Add(x.Ident, Tuple.Create((string)null, -localScopeTotalSize));
+                    }
+                } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                    // externなのでスキップ
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            if (maxLocalScopeTotalSize < localScopeTotalSize) {
+                maxLocalScopeTotalSize = localScopeTotalSize;
+            }
+
+            foreach (var x in self.Decls) {
+                x.Accept(this, value);
+            }
+            foreach (var x in self.Stmts) {
+                x.Accept(this, value);
+            }
+
+            localScopeTotalSize = prevLocalScopeSize;
+            localScope = localScope.Parent;
+            return value;
+        }
+
+        public Value OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, Value value) {
+            var label = ContinueTarget.Peek();
+            g.jmp(label);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnDefaultStatement(SyntaxTree.Statement.DefaultStatement self, Value value) {
+            var label = _switchLabelTableStack.Peek()[self];
+            g.label(label);
+            self.Stmt.Accept(this, value);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, Value value) {
+            var labelContinue = LAlloc();
+            var labelBreak = LAlloc();
+
+            // Check Loop Condition
+            g.label(labelContinue);
+            ContinueTarget.Push(labelContinue);
+            BreakTarget.Push(labelBreak);
+            var stmt = self.Stmt.Accept(this, value);
+            ContinueTarget.Pop();
+            BreakTarget.Pop();
+
+            var ret = self.Cond.Accept(this, value);
+            g.jmp_true(labelContinue);
+            g.label(labelBreak);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, Value value) {
+            return new Value() { Kind = Value.ValueKind.Void };
+            //throw new NotImplementedException();
+        }
+
+        public Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, Value value) {
+            var ret = self.Expr.Accept(this, value);
+            g.discard();
+            return value;
+        }
+
+        public Value OnForStatement(SyntaxTree.Statement.ForStatement self, Value value) {
+            // Initialize
+            if (self.Init != null) {
+                var ret = self.Init.Accept(this, value);
+                g.discard();
+            }
+
+            var labelHead = LAlloc();
+            var labelContinue = LAlloc();
+            var labelBreak = LAlloc();
+
+            // Check Loop Condition
+            g.label(labelHead);
+            if (self.Cond != null) {
+                var ret = self.Cond.Accept(this, value);
+                g.jmp_false(labelBreak);
+            }
+
+            ContinueTarget.Push(labelContinue);
+            BreakTarget.Push(labelBreak);
+            var stmt = self.Stmt.Accept(this, value);
+            ContinueTarget.Pop();
+            BreakTarget.Pop();
+
+            g.label(labelContinue);
+            if (self.Update != null) {
+                var ret = self.Update.Accept(this, value);
+                g.discard();
+            }
+
+            g.jmp(labelHead);
+            g.label(labelBreak);
+
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, Value value) {
+            if (genericlabels.ContainsKey(self.Ident) == false) {
+                genericlabels[self.Ident] = LAlloc();
+            }
+            g.label(genericlabels[self.Ident]);
+            self.Stmt.Accept(this, value);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnGotoStatement(SyntaxTree.Statement.GotoStatement self, Value value) {
+            if (genericlabels.ContainsKey(self.Label) == false) {
+                genericlabels[self.Label] = LAlloc();
+            }
+            g.jmp(genericlabels[self.Label]);
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnIfStatement(SyntaxTree.Statement.IfStatement self, Value value) {
+            var cond = self.Cond.Accept(this, value);
+            if (self.ElseStmt != null) {
+                var elseLabel = LAlloc();
+                var junctionLabel = LAlloc();
+
+                g.jmp_false(elseLabel);
+
+                var thenRet = self.ThenStmt.Accept(this, value);
+                g.jmp(junctionLabel);
+                g.label(elseLabel);
+                var elseRet = self.ElseStmt.Accept(this, value);
+                g.label(junctionLabel);
+            } else {
+                var junctionLabel = LAlloc();
+
+                g.jmp_false(junctionLabel);
+
+                var thenRet = self.ThenStmt.Accept(this, value);
+                g.label(junctionLabel);
+            }
+
+
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+#if false
+        private string ToByteReg(string s) {
+            switch (s) {
+                case "%eax":
+                    return "%al";
+                case "%ebx":
+                    return "%bl";
+                case "%ecx":
+                    return "%cl";
+                case "%edx":
+                    return "%dl";
+                default:
+                    throw new Exception();
+            }
+        }
+        private string ToWordReg(string s) {
+            switch (s) {
+                case "%eax":
+                    return "%ax";
+                case "%ebx":
+                    return "%bx";
+                case "%ecx":
+                    return "%cx";
+                case "%edx":
+                    return "%dx";
+                default:
+                    throw new Exception();
+            }
+        }
+
+        /// <summary>
+        /// 整数値もしくはポインタ値を指定したレジスタにロードする。レジスタに入らないサイズはエラーになる
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="register"></param>
+        /// <returns></returns>
+        private Value LoadI(Value value, string register) {
+            var ValueType = value.Type;
+            System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
+            CType elementType;
+            switch (value.Kind) {
+                case Value.ValueKind.IntConst: {
+                        // 定数値をレジスタにロードする。
+                        string op = "";
+                        if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char)) {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Emit($"movb ${value.IntConst}, {ToByteReg(register)}");
+                                    Emit($"movsbl {ToByteReg(register)}, {register}");
+                                    break;
+                                case 2:
+                                    Emit($"movw ${value.IntConst}, {ToWordReg(register)}");
+                                    Emit($"movswl {ToWordReg(register)}, {register}");
+                                    break;
+                                case 3:
+                                case 4:
+                                    Emit($"movl ${value.IntConst}, {register}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        } else {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Emit($"movb ${value.IntConst}, {ToByteReg(register)}");
+                                    Emit($"movzbl {ToByteReg(register)}, {register}");
+                                    break;
+                                case 2:
+                                    Emit($"movw ${value.IntConst}, {ToWordReg(register)}");
+                                    Emit($"movzwl {ToWordReg(register)}, {register}");
+                                    break;
+                                case 3:
+                                case 4:
+                                    Emit($"movl ${value.IntConst}, {register}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        }
+                        return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
+                    }
+                case Value.ValueKind.Temp:
+                    if (ValueType.Sizeof() <= 4) {
+                        // スタックトップの値をレジスタにロード
+                        Emit($"popl {register}");
+                        return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
+
+                    } else {
+                        throw new NotImplementedException();
+                        // スタックトップのアドレスをレジスタにロード
+                        Emit($"mov %esp, {register}");
+                        return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
+                    }
+                case Value.ValueKind.FloatConst:
+                    throw new NotImplementedException();
+                case Value.ValueKind.Register:
+                    throw new NotImplementedException();
+                case Value.ValueKind.Var:
+                case Value.ValueKind.Address: {
+                        // 変数値もしくは参照値をレジスタにロード
+                        string src = "";
+                        switch (value.Kind) {
+                            case Value.ValueKind.Var:
+                                if (value.Label == null) {
+                                    // ローカル変数のアドレスはebp相対
+                                    src = $"{value.Offset}(%ebp)";
+                                } else {
+                                    // グローバル変数のアドレスはラベル絶対
+                                    src = $"{value.Label}+{value.Offset}";
+                                }
+                                break;
+                            case Value.ValueKind.Address:
+                                // アドレス参照のアドレスはスタックトップの値
+                                Emit($"popl {register}");
+                                src = $"({register})";
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+
+                        string op = "";
+                        if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char) || ValueType.IsEnumeratedType()) {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    op = "movsbl";
+                                    break;
+                                case 2:
+                                    op = "movswl";
+                                    break;
+                                case 4:
+                                    op = "movl";
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        } else if (ValueType.IsUnsignedIntegerType()) {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    op = "movzbl";
+                                    break;
+                                case 2:
+                                    op = "movzwl";
+                                    break;
+                                case 4:
+                                    op = "movl";
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        } else if (ValueType.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                            op = "movl";
+                        } else if (ValueType.IsPointerType() || ValueType.IsArrayType()) {
+                            op = "movl";
+                        } else if (ValueType.IsStructureType()) {
+                            op = "leal";
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        Emit($"{op} {src}, {register}");
+                        return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
+                    }
+                    break;
+                case Value.ValueKind.Ref:
+                    if (value.Label == null) {
+                        Emit($"leal {value.Offset}(%ebp), {register}");
+                    } else {
+                        Emit($"leal {value.Label}+{value.Offset}, {register}");
+                    }
+                    return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = register };
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// 値をスタックトップに積む。もともとスタックトップにある場合は何もしない
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="register"></param>
+        /// <returns></returns>
+        private Value LoadS(Value value) {
+            var ValueType = value.Type;
+            CType elementType;
+            switch (value.Kind) {
+                case Value.ValueKind.IntConst: {
+                        // 定数値をスタックに積む
+                        string op = "";
+                        if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char)) {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Emit($"pushl ${unchecked((int)(sbyte)value.IntConst)}");
+                                    break;
+                                case 2:
+                                    Emit($"pushl ${unchecked((int)(short)value.IntConst)}");
+                                    break;
+                                case 4:
+                                    Emit($"pushl ${unchecked((int)value.IntConst)}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        } else {
+                            switch (ValueType.Sizeof()) {
+                                case 1:
+                                    Emit($"pushl ${unchecked((int)(byte)value.IntConst)}");
+                                    break;
+                                case 2:
+                                    Emit($"pushl ${unchecked((int)(ushort)value.IntConst)}");
+                                    break;
+                                case 4:
+                                    Emit($"pushl ${unchecked((int)(uint)value.IntConst)}");
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+                        }
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Temp:
+                    // 何もしない
+                    return value;
+                case Value.ValueKind.FloatConst: {
+                        if (value.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                            var bytes = BitConverter.GetBytes((float)value.FloatConst);
+                            var dword = BitConverter.ToUInt32(bytes, 0);
+                            Emit($"pushl ${dword}");
+                        } else if (value.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Double)) {
+                            var bytes = BitConverter.GetBytes(value.FloatConst);
+                            var qwordlo = BitConverter.ToUInt32(bytes, 0);
+                            var qwordhi = BitConverter.ToUInt32(bytes, 4);
+                            Emit($"pushl ${qwordhi}");
+                            Emit($"pushl ${qwordlo}");
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Register: {
+                        // レジスタをスタックへ
+                        Emit($"pushl ${value.Register}");
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                    throw new NotImplementedException();
+                case Value.ValueKind.Var:
+                case Value.ValueKind.Address: {
+
+
+                        // コピー先アドレスをロード
+                        switch (value.Kind) {
+                            case Value.ValueKind.Var:
+                                // ラベル参照
+                                if (value.Label == null) {
+                                    // ローカル変数のアドレスはebp相対
+                                    Emit($"leal {value.Offset}(%ebp), %esi");
+                                } else {
+                                    // グローバル変数のアドレスはラベル絶対
+                                    Emit($"leal {value.Label}+{value.Offset}, %esi");
+                                }
+                                break;
+                            case Value.ValueKind.Address:
+                                // アドレス参照のアドレスはスタックトップの値
+                                Emit($"popl %esi");
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+
+                        // コピー先を確保
+                        Emit($"subl ${(ValueType.Sizeof() + 3) & (~3)}, %esp");
+                        Emit($"movl %esp, %edi");
+
+                        // 転送
+                        Emit($"pushl %ecx");
+                        Emit($"movl ${ValueType.Sizeof()}, %ecx");
+                        Emit($"cld");
+                        Emit($"rep movsb");
+                        Emit($"popl %ecx");
+
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                case Value.ValueKind.Ref: {
+                        // ラベル参照
+                        if (value.Label == null) {
+                            // ローカル変数のアドレスはebp相対
+                            Emit($"leal {value.Offset}(%ebp), %esi");
+                        } else {
+                            // グローバル変数のアドレスはラベル絶対
+                            Emit($"leal {value.Label}+{value.Offset}, %esi");
+                        }
+                        Emit("pushl %esi");
+                        return new Value() { Kind = Value.ValueKind.Temp, Type = ValueType };
+                    }
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// FPUスタック上に値をロードする
+        /// </summary>
+        /// <param name="rhs"></param>
+        private void LoadF(Value rhs) {
+            switch (rhs.Kind) {
+                case Value.ValueKind.IntConst:
+                    Emit($"pushl ${rhs.IntConst}");
+                    Emit($"fild (%esp)");
+                    Emit($"addl $4, %esp");
+                    break;
+                case Value.ValueKind.FloatConst:
+                    if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        var bytes = BitConverter.GetBytes((float)rhs.FloatConst);
+                        var dword = BitConverter.ToUInt32(bytes, 0);
+                        Emit($"pushl ${dword}");
+                        Emit($"flds (%esp)");
+                        Emit($"addl $4, %esp");
+                    } else if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Double)) {
+                        var bytes = BitConverter.GetBytes(rhs.FloatConst);
+                        var qwordlo = BitConverter.ToUInt32(bytes, 0);
+                        var qwordhi = BitConverter.ToUInt32(bytes, 4);
+                        Emit($"pushl ${qwordhi}");
+                        Emit($"pushl ${qwordlo}");
+                        Emit($"fldl (%esp)");
+                        Emit($"addl $8, %esp");
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                    break;
+                case Value.ValueKind.Var: {
+                        string op = "";
+                        if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                            op = "flds";
+                        } else {
+                            op = "fldl";
+                        }
+
+                        if (rhs.Label == null) {
+                            Emit($"{op} {rhs.Offset}(%ebp)");
+                        } else {
+                            Emit($"{op} {rhs.Label}+{rhs.Offset}");
+                        }
+                        break;
+                    }
+                case Value.ValueKind.Temp:
+                    if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        Emit($"flds (%esp)");
+                        Emit($"addl $4, %esp");
+                    } else {
+                        Emit($"fldl (%esp)");
+                        Emit($"addl $8, %esp");
+                    }
+                    break;
+                case Value.ValueKind.Address:
+                    Emit($"pushl %eax");
+                    Emit($"leal 4(%esp), %eax");
+                    Emit($"movl (%eax), %eax");
+                    if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        Emit($"flds (%eax)");
+                    } else {
+                        Emit($"fldl (%eax)");
+                    }
+                    Emit($"popl %eax");
+                    Emit($"addl $4, %esp");
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// FPUスタックの一番上の値をポップし、CPUスタックの一番上に積む
+        /// </summary>
+        /// <param name="ty"></param>
+        public void StoreF(CType ty) {
+            if (ty.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                Emit($"sub $4, %esp");
+                Emit($"fstps (%esp)");
+            } else if (ty.IsBasicType(CType.BasicType.TypeKind.Double)) {
+                Emit($"sub $8, %esp");
+                Emit($"fstpl (%esp)");
+            } else {
+                throw new NotImplementedException();
+            }
+
+        }
+
+        /// <summary>
+        /// ポインタをロード
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="reg"></param>
+        public void LoadP(Value target, string reg) {
+            System.Diagnostics.Debug.Assert(target.Type.IsPointerType());
+
+            switch (target.Kind) {
+                case Value.ValueKind.Var:
+                    // ポインタ型の変数 => 変数の値をロード
+                    if (target.Label == null) {
+                        Emit($"movl {target.Offset}(%ebp), {reg}");
+                    } else {
+                        Emit($"movl {target.Label}+{target.Offset}, {reg}");
+                    }
+                    break;
+                case Value.ValueKind.Ref:
+                    // ラベル => ラベルのアドレスをロード
+                    if (target.Label == null) {
+                        Emit($"leal {target.Offset}(%ebp), {reg}");
+                    } else {
+                        Emit($"leal {target.Label}+{target.Offset}, {reg}");
+                    }
+                    break;
+                case Value.ValueKind.Address:
+                    // 左辺値(LValue)参照 => スタックトップの値が参照先アドレスなので、参照先アドレスが示す値をロード
+                    Emit($"popl {reg}");
+                    Emit($"movl ({reg}), {reg}");
+                    break;
+                case Value.ValueKind.Temp:
+                    // テンポラリ値 => スタックトップの値をロード
+                    Emit($"popl {reg}");
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// 左辺値変数のアドレスをロード
+        /// </summary>
+        /// <param name="lhs"></param>
+        /// <param name="reg"></param>
+        public void LoadVA(Value lhs, string reg) {
+            switch (lhs.Kind) {
+                case Value.ValueKind.Var:
+                    if (lhs.Label == null) {
+                        Emit($"leal {lhs.Offset}(%ebp), {reg}");
+                    } else {
+                        Emit($"leal {lhs.Label}+{lhs.Offset}, {reg}");
+                    }
+
+                    break;
+                case Value.ValueKind.Ref:
+                    if (lhs.Label == null) {
+                        Emit($"leal {lhs.Offset}(%ebp), {reg}");
+                    } else {
+                        Emit($"leal {lhs.Label}+{lhs.Offset}, {reg}");
+                    }
+
+                    break;
+                case Value.ValueKind.Address:
+                    Emit($"popl {reg}");
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+        }
+#endif
+        public Value OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, Value value) {
+            if (self.Expr != null) {
+                value = self.Expr.Accept(this, value);
+            }
+            g.ret(self.Expr?.Type);
+
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        private Stack<Dictionary<SyntaxTree.Statement, string>> _switchLabelTableStack = new Stack<Dictionary<SyntaxTree.Statement, string>>();
+
+        public Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Value value) {
+            var labelBreak = LAlloc();
+
+            var ret = self.Cond.Accept(this, value);
+
+            var labelDic = new Dictionary<SyntaxTree.Statement, string>();
+            g.case_of((_g) => {
+                foreach (var caseLabel in self.CaseLabels) {
+                    var caseValue = caseLabel.Value;
+                    var label = LAlloc();
+                    labelDic.Add(caseLabel, label);
+                    g.when(caseValue, label);
+                }
+            });
+            if (self.DefaultLabel != null) {
+                var label = LAlloc();
+                labelDic.Add(self.DefaultLabel, label);
+                g.jmp(label);
+            } else {
+                g.jmp(labelBreak);
+            }
+
+            _switchLabelTableStack.Push(labelDic);
+            BreakTarget.Push(labelBreak);
+            var stmt = self.Stmt.Accept(this, value);
+            BreakTarget.Pop();
+            _switchLabelTableStack.Pop();
+            g.label(labelBreak);
+
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnWhileStatement(SyntaxTree.Statement.WhileStatement self, Value value) {
+            var labelContinue = LAlloc();
+            var labelBreak = LAlloc();
+
+            // Check Loop Condition
+            g.label(labelContinue);
+            var ret = self.Cond.Accept(this, value);
+            g.jmp_false(labelBreak);
+            ContinueTarget.Push(labelContinue);
+            BreakTarget.Push(labelBreak);
+            var stmt = self.Stmt.Accept(this, value);
+            ContinueTarget.Pop();
+            BreakTarget.Pop();
+
+            g.jmp(labelContinue);
+            g.label(labelBreak);
+
+            return new Value() { Kind = Value.ValueKind.Void };
+        }
+
+        public Value OnTranslationUnit(SyntaxTree.TranslationUnit self, Value value) {
+            foreach (var obj in self.LinkageTable) {
+                if (obj.Definition is SyntaxTree.Declaration.VariableDeclaration) {
+                    var visitor = new FileScopeInitializerVisitor(this);
+                    obj.Definition?.Accept(visitor, value);
+                }
+            }
+            foreach (var obj in self.LinkageTable) {
+                if (!(obj.Definition is SyntaxTree.Declaration.VariableDeclaration)) {
+                    obj.Definition?.Accept(this, value);
+                }
+            }
+
+            foreach (var data in dataBlock) {
+                g.data(data.Item1, data.Item2);
+            }
+
+            return value;
+        }
+
+#endif
         public void WriteCode(StreamWriter writer) {
-            codes.ForEach(x => writer.WriteLine(x.ToString()));
+            g.codes.ForEach(x => writer.WriteLine(x.ToString()));
         }
     }
 
     public class FileScopeInitializerVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
         private SyntaxTreeCompileVisitor syntaxTreeCompileVisitor;
         public void Emit(string s) {
-            syntaxTreeCompileVisitor.Emit(s);
+            syntaxTreeCompileVisitor.g.Emit(s);
         }
         public List<SyntaxTree.Expression> Values { get; } = new List<SyntaxTree.Expression>();
 

@@ -34,4 +34,3 @@ int main(void) {
 	printf("w=%8.8x\n", b.w);
 	return 0;
 }
-

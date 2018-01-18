@@ -31,6 +31,11 @@ namespace AnsiCParser {
             throw new ApplicationException();
         }
 
+        public override string ToString() {
+            return ToString(new HashSet<CType>());
+        }
+        protected abstract string ToString(HashSet<CType> outputed);
+
         /// <summary>
         ///     型のサイズを取得
         /// </summary>
@@ -421,7 +426,7 @@ namespace AnsiCParser {
                 return CType.Sizeof(Kind);
             }
 
-            public override string ToString() {
+            protected override string ToString(HashSet<CType> outputed) {
                 switch (Kind) {
                     case TypeKind.KAndRImplicitInt:
                         return "int";
@@ -584,47 +589,44 @@ namespace AnsiCParser {
                     }
                 }
 
-                public override string ToString() {
-                    var sb = new List<string> {Kind == StructOrUnion.Struct ? "strunct" : "union", TagName};
-                    if (Members != null) {
+                protected override string ToString(HashSet<CType> outputed) {
+                    var sb = new List<string> {Kind == StructOrUnion.Struct ? "struct" : "union", TagName};
+                    if (Members != null && outputed.Contains(this) == false) {
+                        outputed.Add(this);
                         sb.Add("{");
                         sb.AddRange(Members.SelectMany(x =>
-                            new[] {x.Type?.ToString(), x.Ident.Raw, x.BitSize > 0 ? $":{x.BitSize}" : null, ";"}.Where(y => y != null)
+                            new[] {x.Type?.ToString(outputed), x.Ident.Raw, x.BitSize > 0 ? $":{x.BitSize}" : null, ";"}.Where(y => y != null)
                         ));
                         sb.Add("}");
                     }
-                    sb.Add(";");
                     return string.Join(" ", sb);
                 }
 
                 public class MemberInfo {
-                    public MemberInfo(Token ident, CType type, int? bitSize) {
-                        if (bitSize.HasValue) {
+                    public MemberInfo(Token ident, CType type, int bitSize) {
+                        if (bitSize >= 0) {
                             // 制約
                             // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
                             //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
                             //   - 値が 0 の場合，その宣言に宣言子があってはならない。
                             // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
                             if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                             }
-                            if (bitSize.Value < 0) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの幅の値は，0 以上でなければならない。");
+                            if (bitSize > type.Sizeof() * 8) {
+                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
                             }
-                            if (bitSize.Value > type.Sizeof() * 8) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
-                            }
-                            if (bitSize.Value == 0) {
+                            if (bitSize == 0) {
                                 // 値が 0 の場合，その宣言に宣言子があってはならない。
                                 // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
                                 // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
                                 if (ident != null) {
-                                    throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
+                                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
                                 }
                             }
                             Ident = ident;
                             Type = type;
-                            BitSize = bitSize.Value;
+                            BitSize = bitSize;
                         }
                         else {
                             Ident = ident;
@@ -658,9 +660,10 @@ namespace AnsiCParser {
                     return Sizeof(BasicType.TypeKind.SignedInt);
                 }
 
-                public override string ToString() {
+                protected override string ToString(HashSet<CType> outputed) {
                     var sb = new List<string> {"enum", TagName};
-                    if (Members != null) {
+                    if (Members != null && outputed.Contains(this) == false) {
+                        outputed.Add(this);
                         sb.Add("{");
                         sb.AddRange(Members.SelectMany(x =>
                             new[] {x.Ident.Raw, "=", x.Value.ToString(), ","}
@@ -703,7 +706,7 @@ namespace AnsiCParser {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型のサイズを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
             }
 
-            public override string ToString() {
+            protected override string ToString(HashSet<CType> outputed) {
                 return "$";
             }
         }
@@ -831,11 +834,11 @@ namespace AnsiCParser {
                 return candidate;
             }
 
-            public override string ToString() {
-                var sb = new List<string> {ResultType.ToString()};
+            protected override string ToString(HashSet<CType> outputed) {
+                var sb = new List<string> {ResultType.ToString(outputed) };
                 if (Arguments != null) {
                     sb.Add("(");
-                    sb.Add(string.Join(", ", Arguments.Select(x => x.Type.ToString())));
+                    sb.Add(string.Join(", ", Arguments.Select(x => x.Type.ToString(outputed))));
                     if (HasVariadic) {
                         sb.Add(", ...");
                     }
@@ -896,8 +899,8 @@ namespace AnsiCParser {
                 return Sizeof(BasicType.TypeKind.SignedInt);
             }
 
-            public override string ToString() {
-                return "*" + BaseType;
+            protected override string ToString(HashSet<CType> outputed) {
+                return "*" + BaseType.ToString(outputed);
             }
         }
 
@@ -930,8 +933,8 @@ namespace AnsiCParser {
                 return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : BaseType.Sizeof() * Length;
             }
 
-            public override string ToString() {
-                return BaseType + $"[{Length}]";
+            protected override string ToString(HashSet<CType> outputed) {
+                return BaseType.ToString(outputed)+ $"[{Length}]";
             }
         }
 
@@ -952,7 +955,7 @@ namespace AnsiCParser {
                 return Type.Sizeof();
             }
 
-            public override string ToString() {
+            protected override string ToString(HashSet<CType> outputed) {
                 return Ident.Raw;
             }
         }
@@ -983,7 +986,7 @@ namespace AnsiCParser {
                 return Type.Sizeof();
             }
 
-            public override string ToString() {
+            protected override string ToString(HashSet<CType> outputed) {
                 var sb = new List<string> {
                     (Qualifier & TypeQualifier.Const) != 0 ? "const" : null,
                     (Qualifier & TypeQualifier.Volatile) != 0 ? "volatile" : null,
@@ -1011,6 +1014,9 @@ namespace AnsiCParser {
         /// <param name="t2"></param>
         /// <returns></returns>
         public static CType CompositeType(CType t1, CType t2) {
+            if (ReferenceEquals(t1, t2)) {
+                return t1;
+            }
             if (t1.IsQualifiedType() && t2.IsQualifiedType()) {
 
                 var ta1 = t1 as CType.TypeQualifierType;
@@ -1170,8 +1176,15 @@ namespace AnsiCParser {
         /// <param name="baseType"></param>
         /// <returns></returns>
         public static bool CheckContainOldStyleArgument(CType t1) {
+            return CheckContainOldStyleArgument(t1, new HashSet<CType>());
+        }
+        private static bool CheckContainOldStyleArgument(CType t1,HashSet<CType> checkedType) {
+            if (checkedType.Contains(t1)) {
+                return false;
+            }
+            checkedType.Add(t1);
             for (;;) {
-                if (t1 is TypeQualifierType) {
+                    if (t1 is TypeQualifierType) {
                     t1 = (t1 as TypeQualifierType).Type;
                     continue;
                 }
@@ -1191,13 +1204,13 @@ namespace AnsiCParser {
                     if ((t1 as TaggedType.StructUnionType).Members == null) {
                         return false;
                     }
-                    return (t1 as TaggedType.StructUnionType).Members.Any(x => CheckContainOldStyleArgument(x.Type));
+                    return (t1 as TaggedType.StructUnionType).Members.Any(x => CheckContainOldStyleArgument(x.Type, checkedType));
                 }
                 if (t1 is FunctionType) {
                     if ((t1 as FunctionType).Arguments == null) {
                         return false;
                     }
-                    if ((t1 as FunctionType).Arguments.Any(x => CheckContainOldStyleArgument(x.Type))) {
+                    if ((t1 as FunctionType).Arguments.Any(x => CheckContainOldStyleArgument(x.Type, checkedType))) {
                         return true;
                     }
                     t1 = (t1 as FunctionType).ResultType;

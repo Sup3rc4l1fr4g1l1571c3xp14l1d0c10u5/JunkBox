@@ -70,6 +70,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
+#if false
             {
                 var g = new SyntaxTreeCompileVisitor.Generator();
                 // a + 1
@@ -129,9 +130,9 @@ namespace AnsiCParser {
                 }
             }
 
+#endif
 
-
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c")).Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\22_floating_point.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();

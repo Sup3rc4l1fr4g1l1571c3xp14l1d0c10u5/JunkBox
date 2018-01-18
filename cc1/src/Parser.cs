@@ -1261,7 +1261,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, size);
+                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, size.HasValue? size.Value : -1);
             } else if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
                 int? size = null;
@@ -1272,7 +1272,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドには０以上の定数式を指定してください。");
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, size);
+                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, size.HasValue ? size.Value : -1);
             } else {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
