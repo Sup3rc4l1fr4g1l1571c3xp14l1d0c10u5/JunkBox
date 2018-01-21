@@ -197,7 +197,7 @@ namespace AnsiCParser {
                     LoadF();    // lhs
                     Emit($"faddp");
                     StoreF(type);
-                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos  = stack.Count});
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                     return;
                 } else if (lhs.Type.IsPointerType() && rhs.Type.IsIntegerType()) {
                     CType elemType = type.GetBasePointerType();
@@ -288,7 +288,7 @@ namespace AnsiCParser {
                     }
                     return;
                 } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
-                    CType elemType = type.GetBasePointerType();
+                    CType elemType = lhs.Type.GetBasePointerType();
 
                     if (lhs.Kind == Value.ValueKind.Ref && rhs.Kind == Value.ValueKind.Ref && lhs.Label == rhs.Label) {
                         pop();
@@ -493,7 +493,7 @@ namespace AnsiCParser {
                         break;
                     case 3:
                     case 4:
-                        rhs = LoadI("%ecx");
+                        rhs = LoadI("%ecx");    // ToDo: float のコピーにLoadIを転用しているのを修正
                         Emit($"movl %ecx, (%eax)");
                         Emit($"pushl (%eax)");
                         push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
@@ -502,11 +502,12 @@ namespace AnsiCParser {
                         LoadS(rhs.Type);
                         Emit($"movl %esp, %esi");
                         Emit($"movl ${type.Sizeof()}, %ecx");
+                        Emit($"movl %eax, %edi");
                         Emit($"cld");
                         Emit($"rep movsb");
-                        Emit($"addl ${(rhs.Type.Sizeof() + 3) & (~3)}, %esp");
-                        Emit($"pushl %eax");
-                        push(new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
+                        //Emit($"addl ${(rhs.Type.Sizeof() + 3) & (~3)}, %esp");
+                        pop();
+                        push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         break;
                 }
 
@@ -600,7 +601,7 @@ namespace AnsiCParser {
             }
 
             public void cast_to(CType type) {
-                Value ret = peek(0); 
+                Value ret = peek(0);
                 if (ret.Type.IsIntegerType() && type.IsIntegerType()) {
                     var retty = ret.Type.Unwrap() as CType.BasicType;
                     CType.BasicType.TypeKind selftykind;
@@ -766,7 +767,7 @@ namespace AnsiCParser {
                 Emit($"leal (%eax, %ecx), %eax");
                 Emit($"pushl %eax");
 
-                push( new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
+                push(new Value() { Kind = Value.ValueKind.Address, Type = type, StackPos = stack.Count });
 
             }
 
@@ -823,9 +824,9 @@ namespace AnsiCParser {
                 if (resultSize > 4) {
                     if (funcType.ResultType.IsRealFloatingType()) {
                         // 浮動小数点数はFPUスタック上にある
-                        if (funcType.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Float)) {
                             Emit($"fstps {(argSize + bakSize)}(%esp)");
-                        } else if (funcType.IsBasicType(CType.BasicType.TypeKind.Double)) {
+                        } else if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Double)) {
                             Emit($"fstpl {(argSize + bakSize)}(%esp)");
                         } else {
                             throw new NotImplementedException();
@@ -848,7 +849,7 @@ namespace AnsiCParser {
                 Emit($"popl %ecx");
                 Emit($"popl %eax");
 
-                pop();  // fun 
+                System.Diagnostics.Debug.Assert(stack.Count >= argnum);
                 for (int i = 0; i < argnum; i++) {
                     pop(); // args
                 }
@@ -937,7 +938,7 @@ namespace AnsiCParser {
             private Value LoadI(string register) {
                 var value = pop();
                 var ValueType = value.Type;
-                System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
+                //System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
                 CType elementType;
                 switch (value.Kind) {
                     case Value.ValueKind.IntConst: {
@@ -1073,7 +1074,7 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                 }
             }
-            
+
             /// <summary>
             /// FPUスタック上に値をロードする
             /// </summary>
@@ -1241,7 +1242,7 @@ namespace AnsiCParser {
             /// <param name="value"></param>
             /// <param name="register"></param>
             /// <returns></returns>
-            private void LoadS(CType type) {
+            public void LoadS(CType type) {
                 Value value = peek(0);
                 var ValueType = value.Type;
                 CType elementType;
@@ -1278,11 +1279,11 @@ namespace AnsiCParser {
                                         throw new NotImplementedException();
                                 }
                             }
+                            pop();
                             push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         }
                         break;
                     case Value.ValueKind.Temp:
-                        // ToDo:値をスタック内で複製する
                         break;
                     case Value.ValueKind.FloatConst: {
                             if (value.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
@@ -1298,12 +1299,14 @@ namespace AnsiCParser {
                             } else {
                                 throw new NotImplementedException();
                             }
+                            pop();
                             push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         }
                         break;
                     case Value.ValueKind.Register: {
                             // レジスタをスタックへ
                             Emit($"pushl ${value.Register}");
+                            pop();
                             push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         }
                         break;
@@ -1342,6 +1345,7 @@ namespace AnsiCParser {
                             Emit($"rep movsb");
                             Emit($"popl %ecx");
 
+                            pop();
                             push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         }
                         break;
@@ -1355,6 +1359,7 @@ namespace AnsiCParser {
                                 Emit($"leal {value.Label}+{value.Offset}, %esi");
                             }
                             Emit("pushl %esi");
+                            pop();
                             push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = stack.Count });
                         }
                         break;
@@ -1434,14 +1439,18 @@ namespace AnsiCParser {
                     LoadI("%ecx");  // rhs
                     LoadI("%eax");  // lhs
                     Emit("cmpl %ecx, %eax");
-                    Emit("setg	%al");
+                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                        Emit("seta %al");
+                    } else {
+                        Emit("setg %al");
+                    }
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
                     LoadF();
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
-                    Emit("seta	%al");
+                    Emit("seta %al");
                 } else {
                     throw new NotImplementedException();
                 }
@@ -1458,14 +1467,18 @@ namespace AnsiCParser {
                     LoadI("%ecx");  // rhs
                     LoadI("%eax");  // lhs
                     Emit("cmpl %ecx, %eax");
-                    Emit("setl	%al");  // signedなら seta
+                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                        Emit("setb %al");
+                    } else {
+                        Emit("setl %al");
+                    }
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
                     LoadF();
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
-                    Emit("setb	%al");  // signedなら seta
+                    Emit("setb %al");
                 } else {
                     throw new NotImplementedException();
                 }
@@ -1482,7 +1495,11 @@ namespace AnsiCParser {
                     LoadI("%ecx");  // rhs
                     LoadI("%eax");  // lhs
                     Emit("cmpl %ecx, %eax");
-                    Emit("setge	%al");
+                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                        Emit("setae %al");
+                    } else {
+                        Emit("setge %al");
+                    }
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -1506,14 +1523,18 @@ namespace AnsiCParser {
                     LoadI("%ecx");  // rhs
                     LoadI("%eax");  // lhs
                     Emit("cmpl %ecx, %eax");
-                    Emit("setle	%al");
+                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                        Emit("setbe %al");
+                    } else {
+                        Emit("setle %al");
+                    }
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
                     LoadF();
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
-                    Emit("setbe	%al");
+                    Emit("setbe %al");
                 } else {
                     throw new NotImplementedException();
                 }
@@ -1532,7 +1553,8 @@ namespace AnsiCParser {
                         Emit($"leal {operand.Label}+{operand.Offset}, %eax");
                     }
                     Emit($"pushl %eax");
-                    push( new Value() { Kind = Value.ValueKind.Temp, Type = type });
+                    pop();
+                    push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (operand.Kind == Value.ValueKind.Ref) {
                     if (operand.Label == null) {
                         Emit($"leal {operand.Offset}(%ebp), %eax");
@@ -1540,8 +1562,10 @@ namespace AnsiCParser {
                         Emit($"leal {operand.Label}+{operand.Offset}, %eax");
                     }
                     Emit($"pushl %eax");
+                    pop();
                     push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (operand.Kind == Value.ValueKind.Address) {
+                    pop();
                     push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (operand.Kind == Value.ValueKind.Temp) {
                     // nothing
@@ -1706,15 +1730,19 @@ namespace AnsiCParser {
                 Emit($"je {label}");
             }
 
-            internal void case_of(Action<Generator> p) {
+            public void case_of(Action<Generator> p) {
                 LoadI("%eax");
                 p(this);
             }
 
-            internal void data(string key, byte[] value) {
+            public void data(string key, byte[] value) {
                 Emit($".data");
                 Emit($"{key}:");
                 Emit(".byte " + String.Join(" ,", value.Select(x => x.ToString())));
+            }
+
+            public void swap() {
+
             }
         }
 
@@ -4054,7 +4082,7 @@ namespace AnsiCParser {
                 arguments = new Dictionary<string, int>();
                 var vars = new List<string>();
                 foreach (var arg in ft.Arguments) {
-                    vars.Add($"// <LocalVariable Name=\"{arg.Ident.Raw}\" Offset=\"{offset}\" />");
+                    vars.Add($"// <Argument Name=\"{arg.Ident.Raw}\" Offset=\"{offset}\" />");
                     arguments.Add(arg.Ident.Raw, offset);
                     offset += (arg.Type.Sizeof() + 3) & ~3;
                 }
@@ -4121,8 +4149,8 @@ namespace AnsiCParser {
 
         public Value OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
             self.Lhs.Accept(this, value);
+            g.dup(0);
             self.Rhs.Accept(this, value);
-            g.dup(1);
             switch (self.Op) {
                 case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
                     g.add(self.Type);
@@ -4157,7 +4185,9 @@ namespace AnsiCParser {
                 default:
                     throw new Exception("来ないはず");
             }
+            g.dup(1);
             g.assign(self.Type);
+            g.discard();
             return value;
         }
 
@@ -4192,6 +4222,10 @@ namespace AnsiCParser {
                 // スタック上の結果を捨てる
                 g.discard();
             }
+            else {
+                g.LoadS(self.Type);
+                g.pop();
+            }
 
             g.jmp(junctionLabel);
             g.label(elseLabel);
@@ -4200,11 +4234,17 @@ namespace AnsiCParser {
             if (self.Type.IsVoidType()) {
                 // スタック上の結果を捨てる
                 g.discard();
+            } else {
+                g.LoadS(self.Type);
+                g.pop();
             }
             g.label(junctionLabel);
 
-            if (cond.Type.IsVoidType()) {
+            if (self.Type.IsVoidType()) {
                 g.push(new Value() { Kind = Value.ValueKind.Void });
+            }
+            else {
+                g.push(new Value() { Kind = Value.ValueKind.Temp, Type = self.Type });
             }
             return value;
         }
@@ -4401,7 +4441,7 @@ namespace AnsiCParser {
             Tuple<string, int> offset;
             if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                 if (localScope.TryGetValue(self.Ident, out offset)) {
-                    g.push( new Value() { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2, });
+                    g.push(new Value() { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2, });
                 } else {
                     throw new Exception("");
                 }
@@ -4415,7 +4455,7 @@ namespace AnsiCParser {
             int no = dataBlock.Count;
             var label = $"D{no}";
             dataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
-            g.push( new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
+            g.push(new Value() { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
             return value;
         }
 
@@ -4460,12 +4500,14 @@ namespace AnsiCParser {
 
         public Value OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, Value value) {
             // todo: C99可変長配列型
-            return new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() };
+            g.push(new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() });
+            return value;
         }
 
         public Value OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, Value value) {
             // todo: C99可変長配列型
-            return new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() };
+            g.push(new Value() { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() });
+            return value;
         }
 
 

@@ -132,7 +132,7 @@ namespace AnsiCParser {
 
 #endif
 
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\22_floating_point.c")).Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\70_floating_point_literals.c")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();
