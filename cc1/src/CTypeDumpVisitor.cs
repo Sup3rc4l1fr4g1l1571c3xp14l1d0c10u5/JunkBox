@@ -67,7 +67,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnEnumType(CType.TaggedType.EnumType self, Cell value) {
-            if (visited.Contains(self) == false) {
+            if (visited.Contains(self) == false && self.Members != null) {
                 visited.Add(self);
                 return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Value.ToString())).ToArray()));
             } else {

@@ -1875,8 +1875,6 @@ namespace AnsiCParser {
                                         // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
                                     } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                                         // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-
-
                                     } else {
                                         throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
                                     }
@@ -1909,52 +1907,16 @@ namespace AnsiCParser {
                                     break;
                                 }
                             case OperatorKind.LEFT_ASSIGN:
-                            case OperatorKind.RIGHT_ASSIGN: {
-                                    // 制約(複合代入)
-                                    // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
-
-                                    // 制約(6.5.7 ビット単位のシフト演算子)  
-                                    // 各オペランドは，整数型をもたなければならない。
-                                    if (!lhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    if (!rhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    break;
-                                }
-                            case OperatorKind.AND_ASSIGN: {
-                                    // 制約(複合代入)
-                                    // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
-
-                                    // 制約(6.5.10 ビット単位の AND 演算子)
-                                    // 各オペランドの型は，整数型でなければならない。
-                                    if (!lhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    if (!rhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    break;
-                                }
-                            case OperatorKind.XOR_ASSIGN: {
-                                    // 制約(複合代入)
-                                    // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
-
-                                    // 制約(6.5.11 ビット単位の排他 OR 演算子)
-                                    // 各オペランドの型は，整数型でなければならない。
-                                    if (!lhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    if (!rhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                                    }
-                                    break;
-                                }
+                            case OperatorKind.RIGHT_ASSIGN:
+                            case OperatorKind.AND_ASSIGN: 
+                            case OperatorKind.XOR_ASSIGN:
                             case OperatorKind.OR_ASSIGN: {
                                     // 制約(複合代入)
                                     // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
+                                    // 制約(6.5.7 ビット単位のシフト演算子)  
+                                    // 制約(6.5.10 ビット単位の AND 演算子)
+                                    // 制約(6.5.11 ビット単位の排他 OR 演算子)
                                     // 制約(6.5.12 ビット単位の OR 演算子)
                                     // 各オペランドの型は，整数型でなければならない。
                                     if (!lhs.Type.IsIntegerType()) {

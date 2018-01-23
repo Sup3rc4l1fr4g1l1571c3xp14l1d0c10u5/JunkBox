@@ -17,7 +17,8 @@ namespace AnsiCParser {
         private static string FS { get; } = @"(f|F|l|L)?";
         private static string IS { get; } = @"(u|U|l|L)*";
         //private static Regex RegexPreprocessingNumber { get; } = new Regex($@"^(\.?\d([eEpP][\+\-]|\.|({L}|{D}|_))*)$");
-        private static Regex RegexFloat { get; } = new Regex($@"^(?<Body>{D}+{E}|{D}*\.{D}+({E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$");
+        private static Regex RegexDecimalFloat { get; } = new Regex($@"^(?<Body>{D}+{E}|{D}*\.{D}+({E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$");
+        private static Regex RegexHeximalFloat { get; } = new Regex($@"^(0[xX])(?<Fact>({H}*?\.{H}+|{H}+\.?))[pP](?<Exp>[\+\-]?{D}+)(?<Suffix>{FS})$");
         private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$");
         private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$");
         private static Regex RegexOctal { get; } = new Regex($@"^0(?<Body>{D}+)(?<Suffix>{IS})$");
@@ -25,12 +26,77 @@ namespace AnsiCParser {
         //private static Regex RegexStringLiteral { get; } = new Regex($@"^L?""(\.|[^\""])*""$");
 
 
-        public static Tuple<string, string> ParseFloat(string str) {
-            var m = RegexFloat.Match(str);
-            if (m.Success == false) {
-                throw new Exception();
+        public static Tuple<int, string, string, string> ParseDecimalFloat(string str) {
+            var m = RegexDecimalFloat.Match(str);
+            if (m.Success) {
+                return Tuple.Create(10, m.Groups["Body"].Value, "", String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+            m = RegexHeximalFloat.Match(str);
+            if (m.Success) {
+                return Tuple.Create(16, m.Groups["Fact"].Value, m.Groups["Exp"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+            }
+            throw new Exception();
+        }
+
+        public static double ParseHeximalFloat(string fact, string exp, string suffix) {
+            var dp = fact.IndexOf('.');
+            string fs;
+            if (dp == -1) {
+                dp = fact.Length;
+                fs = fact;
+            } else {
+                fs = fact.Remove(dp,1);
+            }
+            var sign = false;
+            if (fs.FirstOrDefault() == '-') {
+                fs.Remove(0,1);
+                sign = true;
+            } else if (fs.FirstOrDefault() == '+') {
+                fs.Remove(0,1);
+            }
+            if (Convert.ToUInt64(fs, 16) == 0) {
+                return 0;
+            }
+            if (suffix == "f") {
+                fs = (fs + "0000000000000000").Substring(0, 8);
+                var f = Convert.ToUInt32(fs, 16);
+                dp *= 4;
+                while ((f & (1UL << 31)) == 0) {
+                    f <<= 1;
+                    dp--;
+                }
+                {
+                    f <<= 1;
+                    dp--;
+                }
+                var e = dp + int.Parse(exp);
+
+                var qw = (sign ? (1U << 31) : 0) | (((UInt32)(e + 127) & ((1U << 8) - 1)) << 23) | ((f >> (32 - 23)) & ((1U << 23) - 1));
+                var d = BitConverter.ToSingle(BitConverter.GetBytes(qw), 0);
+
+                return d;
+            } else {
+                fs = (fs + "0000000000000000").Substring(0, 16);
+                var f = Convert.ToUInt64(fs, 16);
+                dp *= 4;
+                while ((f & (1UL << 63)) == 0) {
+                    f <<= 1;
+                    dp--;
+                }
+                {
+                    f <<= 1;
+                    dp--;
+                }
+                var e = dp + int.Parse(exp);
+
+                var qw = (sign ? (1UL << 63) : 0) | (((UInt64)(e + 1023) & ((1UL << 11) - 1)) << 52) | ((f >> (64 - 52)) & ((1UL << 52) - 1));
+                var d = BitConverter.ToDouble(BitConverter.GetBytes(qw), 0);
+
+                return d;
+
+
+            }
+            throw new NotImplementedException();
         }
 
         public static Tuple<string, string> ParseHeximal(string str) {
@@ -563,7 +629,7 @@ namespace AnsiCParser {
                 }
                 var end = GetCurrentLocation();
                 var str = Substring(start, end);
-                if (RegexFloat.IsMatch(str)) {
+                if (RegexDecimalFloat.IsMatch(str)|| RegexHeximalFloat.IsMatch(str)) {
                     _tokens.Add(new Token(Token.TokenKind.FLOAT_CONSTANT, start, end, str));
                 } else if (RegexHeximal.IsMatch(str)) {
                     _tokens.Add(new Token(Token.TokenKind.HEXIMAL_CONSTANT, start, end, str));

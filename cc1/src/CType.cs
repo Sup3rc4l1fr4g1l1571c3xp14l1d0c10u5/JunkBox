@@ -254,7 +254,11 @@ namespace AnsiCParser {
         /// <returns></returns>
         public bool IsBasicType(params BasicType.TypeKind[] kind) {
             var unwrappedSelf = Unwrap();
-            return unwrappedSelf is BasicType && kind.Contains((unwrappedSelf as BasicType).Kind);
+            if (kind.Length > 0) {
+                return unwrappedSelf is BasicType && kind.Contains((unwrappedSelf as BasicType).Kind);
+            } else {
+                return unwrappedSelf is BasicType;
+            }
         }
 
         /// <summary>
@@ -747,7 +751,12 @@ namespace AnsiCParser {
                         // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
                         foreach (var arg in value) {
                             if (arg.StorageClass != StorageClassSpecifier.None && arg.StorageClass != StorageClassSpecifier.Register) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
+                                throw new CompilerException.SpecificationErrorException(arg.Range, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
+                            }
+                            if (arg.Type.IsFunctionType()) {
+                                // 仮引数を“～型を返却する関数”とする宣言は，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整する。
+                                Logger.Warning(arg.Range, $"仮引数は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
+                                arg.Type = CreatePointer(arg.Type);
                             }
                         }
                         // 意味規則
@@ -808,7 +817,7 @@ namespace AnsiCParser {
                     return candidate;
                 }
                 foreach (var x in Arguments) {
-                    if ((x.Type as CType.BasicType)?.Kind == CType.BasicType.TypeKind.KAndRImplicitInt) {
+                    if (x.Type.IsBasicType(BasicType.TypeKind.KAndRImplicitInt)) {
                         // 型が省略されている＝識別子並びの要素
                         System.Diagnostics.Debug.Assert(!string.IsNullOrEmpty(x.Ident?.Raw));
                         if (candidate == FunctionStyle.AmbiguityStyle || candidate == FunctionStyle.OldStyle) {
@@ -850,7 +859,7 @@ namespace AnsiCParser {
 
             public class ArgumentInfo {
 
-                public ArgumentInfo(Token ident, StorageClassSpecifier storageClass, CType type) {
+                public ArgumentInfo(LocationRange range, Token ident, StorageClassSpecifier storageClass, CType type) {
                     Ident = ident;
                     StorageClass = storageClass;
                     // 6.7.5.3 関数宣言子（関数原型を含む）
@@ -861,18 +870,19 @@ namespace AnsiCParser {
                     CType elementType;
                     if (type.IsArrayType(out elementType)) {
                         //ToDo: 及び。の間の型修飾子、static について実装
-                        Logger.Warning(ident.Start, ident.End, $"仮引数 {ident.Raw} は“～型の配列”として宣言されていますが、6.7.5.3 関数宣言子の制約に従って“～型への修飾されたポインタ”に型調整されます。");
+                        Logger.Warning(range.Start, range.End, "仮引数は“～型の配列”として宣言されていますが、6.7.5.3 関数宣言子の制約に従って“～型への修飾されたポインタ”に型調整されます。");
                         type = CreatePointer(elementType);
                     }
                     Type = type;
+                    Range = range;
                 }
 
-                public Token Ident { get; set;  }
-
+                public Token Ident { get; set; }
+                public LocationRange Range { get; set;}
                 public StorageClassSpecifier StorageClass { get; }
 
                 // 関数型として外から見える引数型
-                public CType Type { get; }
+                public CType Type { get; set; }
             }
         }
 
@@ -1019,8 +1029,8 @@ namespace AnsiCParser {
             }
             if (t1.IsQualifiedType() && t2.IsQualifiedType()) {
 
-                var ta1 = t1 as CType.TypeQualifierType;
-                var ta2 = t2 as CType.TypeQualifierType;
+                var ta1 = t1 as TypeQualifierType;
+                var ta2 = t2 as TypeQualifierType;
                 if (ta1.Qualifier != ta2.Qualifier) {
                     return null;
                 }
@@ -1032,17 +1042,17 @@ namespace AnsiCParser {
             }
             if (t1 is TypedefedType) {
 
-                var ta1 = t1 as CType.TypedefedType;
+                var ta1 = t1 as TypedefedType;
                 return CompositeType(ta1.Type, t2);
             }
             if (t2 is TypedefedType) {
 
-                var ta2 = t2 as CType.TypedefedType;
+                var ta2 = t2 as TypedefedType;
                 return CompositeType(t1, ta2.Type);
             }
             if (t1.IsPointerType() && t2.IsPointerType()) {
-                var ta1 = t1 as CType.PointerType;
-                var ta2 = t2 as CType.PointerType;
+                var ta1 = t1 as PointerType;
+                var ta2 = t2 as PointerType;
                 var ret = CompositeType(ta1.BaseType, ta2.BaseType);
                 if (ret == null) {
                     return null;
@@ -1050,8 +1060,8 @@ namespace AnsiCParser {
                 return new PointerType(ret);
             }
             if ((t1.IsStructureType() && t2.IsStructureType()) ||(t1.IsUnionType() && t2.IsUnionType())) {
-                var ta1 = t1 as CType.TaggedType.StructUnionType;
-                var ta2 = t2 as CType.TaggedType.StructUnionType;
+                var ta1 = t1 as TaggedType.StructUnionType;
+                var ta2 = t2 as TaggedType.StructUnionType;
                 if (ta1.Kind != ta1.Kind) {
                     return null;
                 }
@@ -1087,8 +1097,8 @@ namespace AnsiCParser {
                 // 一方の型が既知の固定長をもつ配列の場合，合成型は，その大きさの配列とする。
                 // そうでなく，一方の型が可変長の配列の場合，合成型はその型とする   
                 // 可変長配列は未実装
-                var ta1 = t1.Unwrap() as CType.ArrayType;
-                var ta2 = t2.Unwrap() as CType.ArrayType;
+                var ta1 = t1.Unwrap() as ArrayType;
+                var ta2 = t2.Unwrap() as ArrayType;
                 if ((ta1.Length != -1 && ta2.Length == -1)
                     || (ta1.Length == -1 && ta2.Length != -1)) {
                     int len = ta1.Length != -1 ? ta1.Length : ta2.Length;
@@ -1107,16 +1117,16 @@ namespace AnsiCParser {
                 return null;
             }
             if (t1.IsFunctionType() && t2.IsFunctionType()) {
-                var ta1 = t1.Unwrap() as CType.FunctionType;
-                var ta2 = t2.Unwrap() as CType.FunctionType;
+                var ta1 = t1.Unwrap() as FunctionType;
+                var ta2 = t2.Unwrap() as FunctionType;
                 if ((ta1.Arguments != null && ta2.Arguments == null) || (ta1.Arguments == null && ta2.Arguments != null)) {
                     // 一方の型だけが仮引数型並びをもつ関数型（関数原型）の場合，合成型は，その仮引数型並びをもつ関数原型とする。
-                    var arguments = (ta1.Arguments != null ? ta1.Arguments : ta2.Arguments).ToList();
+                    var arguments = (ta1.Arguments ?? ta2.Arguments).ToList();
                     var retType = CompositeType(ta1.ResultType, ta2.ResultType);
                     if (retType == null) {
                         return null;
                     }
-                    return new CType.FunctionType(arguments, ta1.HasVariadic, retType);
+                    return new FunctionType(arguments, ta1.HasVariadic, retType);
                 } else if (ta1.Arguments != null && ta2.Arguments != null) {
                     // 両方が仮引数型並びをもつ場合，仮引数の個数及び省略記号の有無に関して一致し，対応する仮引数の型が適合する。
 
@@ -1144,7 +1154,7 @@ namespace AnsiCParser {
                             return null;
                         }
                         var storageClass = ta1.Arguments[i].StorageClass;
-                        newArguments.Add(new FunctionType.ArgumentInfo(null, storageClass, newArgument));
+                        newArguments.Add(new FunctionType.ArgumentInfo(ta1.Arguments[i].Range ?? ta2.Arguments[i].Range, null, storageClass, newArgument));
                     }
 
                     // 戻り値の型が適合する？
@@ -1153,14 +1163,14 @@ namespace AnsiCParser {
                         return null;
                     }
 
-                    return new CType.FunctionType(newArguments, ta1.HasVariadic, retType);
+                    return new FunctionType(newArguments, ta1.HasVariadic, retType);
                 } else if (ta1.Arguments == null && ta2.Arguments == null) {
                     // 両方仮引数が無いなら仮引数を持たない合成型とする
                     var retType = CompositeType(ta1.ResultType, ta2.ResultType);
                     if (retType == null) {
                         return null;
                     }
-                    return new CType.FunctionType(null, ta1.HasVariadic, retType);
+                    return new FunctionType(null, ta1.HasVariadic, retType);
                 }
                 return null;
             }
@@ -1173,7 +1183,6 @@ namespace AnsiCParser {
         /// <summary>
         /// 型中の関数型に（型の無い）仮引数名があるか確認
         /// </summary>
-        /// <param name="baseType"></param>
         /// <returns></returns>
         public static bool CheckContainOldStyleArgument(CType t1) {
             return CheckContainOldStyleArgument(t1, new HashSet<CType>());
@@ -1216,10 +1225,8 @@ namespace AnsiCParser {
                     t1 = (t1 as FunctionType).ResultType;
                     continue;
                 }
-                if (t1 is BasicType) {
-                    if ((t1 as BasicType).Kind == BasicType.TypeKind.KAndRImplicitInt) {
-                        return true;
-                    }
+                if (t1.IsBasicType(BasicType.TypeKind.KAndRImplicitInt)) {
+                    return true;
                 }
                 return false;
             }

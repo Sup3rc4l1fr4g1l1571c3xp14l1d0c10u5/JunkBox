@@ -132,6 +132,93 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnCastExpression(SyntaxTree.Expression.CastExpression self, SyntaxTree.Expression value) {
+                var ret = self.Expr.Accept(this, value);
+
+                if (ret is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                    long reti = (ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value;
+
+                    if (self.Type.Unwrap() is CType.BasicType) {
+                        var bt = (self.Type.Unwrap() as CType.BasicType).Kind;
+                        switch (bt) {
+                            case CType.BasicType.TypeKind.Char:
+                            case CType.BasicType.TypeKind.SignedChar:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((sbyte)reti), bt);
+                            case CType.BasicType.TypeKind.SignedShortInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((short)reti), bt);
+                            case CType.BasicType.TypeKind.SignedInt:
+                            case CType.BasicType.TypeKind.SignedLongInt:
+                            case CType.BasicType.TypeKind._Bool:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((int)reti), bt);
+                            case CType.BasicType.TypeKind.SignedLongLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((long)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedChar:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((byte)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedShortInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((ushort)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedInt:
+                            case CType.BasicType.TypeKind.UnsignedLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((uint)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedLongLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((ulong)reti), bt);
+                            case CType.BasicType.TypeKind.Float:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (float)reti, bt);
+                            case CType.BasicType.TypeKind.Double:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (double)reti, bt);
+                            case CType.BasicType.TypeKind.LongDouble:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (double)reti, bt);
+                            default:
+                                throw new NotSupportedException();
+                        }
+                    } else if (self.Type.Unwrap().IsPointerType()) {
+                        return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
+                        //return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, null )
+                    } else {
+                        throw new NotSupportedException();
+                    }
+                } else if (ret is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
+                    double reti = (ret as SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant).Value;
+
+                    if (self.Type.Unwrap() is CType.BasicType) {
+                        var bt = (self.Type.Unwrap() as CType.BasicType).Kind;
+                        switch (bt) {
+                            case CType.BasicType.TypeKind.Char:
+                            case CType.BasicType.TypeKind.SignedChar:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((sbyte)reti), bt);
+                            case CType.BasicType.TypeKind.SignedShortInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((short)reti), bt);
+                            case CType.BasicType.TypeKind.SignedInt:
+                            case CType.BasicType.TypeKind.SignedLongInt:
+                            case CType.BasicType.TypeKind._Bool:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((int)reti), bt);
+                            case CType.BasicType.TypeKind.SignedLongLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((long)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedChar:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((byte)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedShortInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((ushort)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedInt:
+                            case CType.BasicType.TypeKind.UnsignedLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((uint)reti), bt);
+                            case CType.BasicType.TypeKind.UnsignedLongLongInt:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (long)((ulong)reti), bt);
+                            case CType.BasicType.TypeKind.Float:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (float)reti, bt);
+                            case CType.BasicType.TypeKind.Double:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (double)reti, bt);
+                            case CType.BasicType.TypeKind.LongDouble:
+                                return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", (double)reti, bt);
+                            default:
+                                throw new NotSupportedException();
+                        }
+                    } else {
+                        throw new NotSupportedException();
+                    }
+                } else if (ret is SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression.AddressConstantExpression) {
+                    return ret;
+                } else {
+                    throw new NotSupportedException();
+                }
+
                 throw new NotImplementedException();
             }
 
