@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace AnsiCParser {
     /// <summary>
@@ -223,13 +224,15 @@ namespace AnsiCParser {
                             System.Diagnostics.Debug.Assert(lowerBits > 0);
 
                             int upperBits = (8 * sizeof(long)) - lowerBits;
-                            System.Diagnostics.Debug.Assert(upperBits > 0);
 
-                            // 符号拡張を実行
-                            if (ctype.IsSignedIntegerType()) {
-                                value = unchecked((value << upperBits) >> upperBits);
-                            } else {
-                                value = unchecked((long)((ulong)(value << upperBits) >> upperBits));
+                            if (upperBits > 0) {
+
+                                // 符号拡張を実行
+                                if (ctype.IsSignedIntegerType()) {
+                                    value = unchecked((value << upperBits) >> upperBits);
+                                } else {
+                                    value = unchecked((long)((ulong)(value << upperBits) >> upperBits));
+                                }
                             }
 
                             Str = str;
@@ -350,6 +353,7 @@ namespace AnsiCParser {
                             }
                         }
                         Value.Add(0x00);
+                        
                         Strings = strings;
                         ConstantType = CType.CreateArray(Value.Count, CType.CreateChar());
                     }
@@ -522,17 +526,17 @@ namespace AnsiCParser {
                                 goto Valid;
                             }
                         }
-                        throw new Exception("呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
+                        throw new CompilerException.TypeMissmatchError(LocationRange.Start, LocationRange.End, "呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
                         Valid:
                         if (functionType.Arguments != null) {
                             // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
                             if (functionType.HasVariadic) { // 可変長引数を持つ
                                 if (functionType.Arguments.Length > args.Count) {
-                                    throw new Exception("実引数の個数が，仮引数の個数よりも少ない。");
+                                    throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)よりも少ない。");
                                 }
                             } else {
                                 if (functionType.Arguments.Length != args.Count) {
-                                    throw new Exception("実引数の個数が，仮引数の個数と一致しない。");
+                                    throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)と一致しない。");
                                 }
                             }
                             // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
@@ -575,7 +579,7 @@ namespace AnsiCParser {
                     }
 
                     public override bool IsLValue() {
-                        return Expr.IsLValue();
+                        return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
                     }
 
                     public override CType Type {
@@ -596,7 +600,7 @@ namespace AnsiCParser {
                         }
                         var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
                         if (memberInfo == null) {
-                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, ".演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $".演算子の2番目のオペランドは，その型のメンバの名前でなければならない。(メンバ名{ident.Raw}が見つかりません)");
                         }
 
                         // 意味規則
@@ -631,7 +635,7 @@ namespace AnsiCParser {
                     }
 
                     public override bool IsLValue() {
-                        return ((Expr.Type.GetTypeQualifier() & TypeQualifier.Const) != TypeQualifier.Const) && Expr.IsLValue();
+                        return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
                     }
 
                     public override CType Type {
@@ -652,7 +656,7 @@ namespace AnsiCParser {
                         }
                         var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
                         if (memberInfo == null) {
-                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "->演算子の2 番目のオペランドは，その型のメンバの名前でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"->演算子の2番目のオペランドは，その型のメンバの名前でなければならない。(メンバ名{ident.Raw}が見つかりません)");
                         }
 
                         // 意味規則
@@ -951,7 +955,9 @@ namespace AnsiCParser {
                     if (!expr.Type.IsIntegerType()) {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "~演算子のオペランドは，整数型をもたなければならない。");
                     }
-
+                    if (!expr.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(expr.LocationRange, "単項演算子~のオペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
                     // 意味規則 
                     // ~演算子の結果は，その（拡張された）オペランドのビット単位の補数とする（すなわち，結果の各ビットは，拡張されたオペランドの対応するビットがセットされていない場合，そしてその場合に限り，セットされる。）。
                     // オペランドに対して整数拡張を行い，その結果は，拡張された型をもつ。
@@ -1174,7 +1180,7 @@ namespace AnsiCParser {
                                 // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                                 ResultType = rhs.Type;
                             } else {
-                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
+                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
                             }
                         }
 
@@ -1253,6 +1259,11 @@ namespace AnsiCParser {
                     // 整数拡張を各オペランドに適用する。
                     // 結果の型は，左オペランドを拡張した後の型とする。
                     // 右オペランドの値が負であるか，又は拡張した左オペランドの幅以上の場合，その動作は，未定義とする。
+
+                    if (!lhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(lhs.LocationRange, "ビットシフト演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
+
                     lhs = Specification.IntegerPromotion(lhs);
                     rhs = Specification.IntegerPromotion(rhs);
                     Op = op;
@@ -1370,8 +1381,10 @@ namespace AnsiCParser {
                         } else if (lhsPtr != null && lhsPtr.Type.IsPointerType() && rhs.IsNullPointerConstant()) {
                             // 左辺のオペランドがポインタで右辺が空ポインタ定数である。
                             lhs = lhsPtr;
+                            rhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(rhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), rhs);
                         } else if (rhsPtr != null && rhsPtr.Type.IsPointerType() && lhs.IsNullPointerConstant()) {
                             // 右辺のオペランドがポインタで左辺が空ポインタ定数である。
+                            lhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(lhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), lhs);
                             rhs = rhsPtr;
                         } else {
                             throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
@@ -1422,6 +1435,12 @@ namespace AnsiCParser {
                     if (!rhs.Type.IsIntegerType()) {
                         throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
                     }
+                    if (!lhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(lhs.LocationRange, "ビット単位の AND 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
+                    if (!rhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(rhs.LocationRange, "ビット単位の AND 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
 
                     // 意味規則  
                     // オペランドに対して通常の算術型変換を適用する。
@@ -1460,6 +1479,12 @@ namespace AnsiCParser {
                     }
                     if (!rhs.Type.IsIntegerType()) {
                         throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!lhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(rhs.LocationRange, "ビット単位の 排他 OR 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
+                    if (!rhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(lhs.LocationRange, "ビット単位の 排他 OR 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
                     }
 
                     // 意味規則
@@ -1500,6 +1525,12 @@ namespace AnsiCParser {
                     }
                     if (!rhs.Type.IsIntegerType()) {
                         throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    }
+                    if (!lhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(rhs.LocationRange, "ビット単位の OR 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                    }
+                    if (!rhs.Type.IsUnsignedIntegerType()) {
+                        Logger.Warning(lhs.LocationRange, "ビット単位の OR 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
                     }
 
                     // 意味規則
@@ -1780,7 +1811,7 @@ namespace AnsiCParser {
                             // 左オペランドの型が右オペランドの型に適合する構造体型又は共用体型の修飾版又は非修飾版である。
                         } else {
                             // 左辺型への暗黙的型変換を試みる
-                            if (rhs != null && CType.IsEqual(lType, rhs.Type) && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
+                            if (rhs != null && CType.IsEqual(lType, rhs.Type) && lType.GetTypeQualifier().HasFlag(rhs.Type.GetTypeQualifier())) {
                                 // 両オペランドが適合する型の修飾版又は非修飾版へのポインタであり，かつ左オペランドで指される型が右オペランドで指される型の型修飾子をすべてもつ。
                             } else if (
                                 (rhs != null)
@@ -1788,7 +1819,7 @@ namespace AnsiCParser {
                                     (lType.IsPointerType() && (lType.GetBasePointerType().IsObjectType() || lType.GetBasePointerType().IsIncompleteType()) && (rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsVoidType())) ||
                                     (rhs.Type.IsPointerType() && (rhs.Type.GetBasePointerType().IsObjectType() || rhs.Type.GetBasePointerType().IsIncompleteType()) && (lType.IsPointerType() && lType.GetBasePointerType().IsVoidType()))
                                 )
-                                && ((lType.GetTypeQualifier() & rhs.Type.GetTypeQualifier()) == rhs.Type.GetTypeQualifier())) {
+                                && lType.GetTypeQualifier().HasFlag(rhs.Type.GetTypeQualifier())) {
                                 // 一方のオペランドがオブジェクト型又は不完全型へのポインタであり，かつ他方が void の修飾版又は非修飾版へのポインタである。
                                 // さらに，左オペランドで指される型が，右オペランドで指される型の型修飾子をすべてもつ。
                             } else if (lType.IsPointerType() && rhs.IsNullPointerConstant()) {

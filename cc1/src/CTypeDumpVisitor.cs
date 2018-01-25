@@ -106,31 +106,30 @@ namespace AnsiCParser {
 
         public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {
             List<string> qual = new List<string>();
-            if ((self.Qualifier & TypeQualifier.None) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.None)) {
                 qual.Add("none");
             }
-            if ((self.Qualifier & TypeQualifier.Const) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Const)) {
                 qual.Add("const");
             }
-            if ((self.Qualifier & TypeQualifier.Restrict) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Restrict)) {
                 qual.Add("restrict");
             }
-            if ((self.Qualifier & TypeQualifier.Volatile) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Volatile)) {
                 qual.Add("volatile");
             }
-            if ((self.Qualifier & TypeQualifier.Near) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Near)) {
                 qual.Add("near");
             }
-            if ((self.Qualifier & TypeQualifier.Far) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Far)) {
                 qual.Add("far");
             }
-            if ((self.Qualifier & TypeQualifier.Invalid) == TypeQualifier.Const) {
+            if (self.Qualifier.HasFlag(TypeQualifier.Invalid)) {
                 qual.Add("invalid");
             }
             return Cell.Create("type-qual", Cell.Create(qual.ToArray()), self.Type.Accept(this, null));
         }
     }
-
 
     public class CTypeDumpVisitor2 : CTypeVisitor.IVisitor<string, string> {
 

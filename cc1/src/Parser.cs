@@ -120,6 +120,12 @@ namespace AnsiCParser {
         private readonly Stack<SyntaxTree.Statement.SwitchStatement> _switchScope = new Stack<SyntaxTree.Statement.SwitchStatement>();
 
         /// <summary>
+        /// 現在解析中の関数定義
+        /// </summary>
+        private SyntaxTree.Declaration.FunctionDeclaration _currentFuncDecl = null;
+
+
+        /// <summary>
         /// 暗黙的宣言の挿入を行うクロージャー
         /// </summary>
         private readonly Stack<Func<SyntaxTree.Declaration, SyntaxTree.Declaration>> _insertImplictDeclarationOperatorStack = new Stack<Func<SyntaxTree.Declaration, SyntaxTree.Declaration>>();
@@ -717,10 +723,14 @@ namespace AnsiCParser {
             _tagScope = _tagScope.Extend();
             _identScope = _identScope.Extend();
             _labelScope = _labelScope.Extend();
+            _currentFuncDecl = funcdecl;
 
             // 引数をスコープに追加
             if (ftype.Arguments != null) {
                 foreach (var arg in ftype.Arguments) {
+                    if (arg.Ident == null) {
+                        throw new CompilerException.SpecificationErrorException(arg.Range, $"関数定義では引数名を省略することはできません。");
+                    }
                     _identScope.Add(arg.Ident.Raw, new SyntaxTree.Declaration.ArgumentDeclaration(new LocationRange(arg.Ident.Start, arg.Ident.End), arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
                 }
             }
@@ -744,6 +754,7 @@ namespace AnsiCParser {
             }
 
             //各スコープから出る
+            _currentFuncDecl = null;
             _labelScope = _labelScope.Parent;
             _identScope = _identScope.Parent;
             _tagScope = _tagScope.Parent;
@@ -1077,7 +1088,8 @@ namespace AnsiCParser {
         /// <returns></returns>
         private CType StructOrUnionSpecifier() {
             // 構造体/共用体
-            var kind = _lexer.ReadToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION).Kind == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union;
+            var tok = _lexer.ReadToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
+            var kind = tok.Kind == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union;
 
             // 識別子の有無で分岐
             if (IsIdentifier(true)) {
@@ -1096,11 +1108,11 @@ namespace AnsiCParser {
                         _tagScope.Add(ident, structUnionType);
                         AddImplictTypeDeclaration(token, structUnionType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new Exception($"構造体/共用体 {ident} は既に列挙型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new Exception($"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
+                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Members != null) {
-                        throw new Exception($"構造体/共用体 {ident} は既に完全型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
                         structUnionType = (tagType as CType.TaggedType.StructUnionType);
@@ -1119,9 +1131,9 @@ namespace AnsiCParser {
                         _tagScope.Add(ident, tagType);
                         AddImplictTypeDeclaration(token, tagType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new Exception($"構造体/共用体 {ident} は既に列挙型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new Exception($"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
+                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
                     } else {
                         // 既に定義されているものが完全型・不完全型問わず何もしない。
                     }
@@ -1196,8 +1208,10 @@ namespace AnsiCParser {
             CType baseType = null;
             StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
+            var start = _lexer.CurrentToken().Start;
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, ref functionSpecifier, ReadDeclarationSpecifierPartFlag.SpecifierQualifiers) < 1) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "型指定子/型修飾子が一つ以上指定されている必要がある。");
+                var end = _lexer.CurrentToken().End;
+                throw new CompilerException.SyntaxErrorException(start, end, "型指定子/型修飾子が一つ以上指定されている必要がある。");
             }
             System.Diagnostics.Debug.Assert(storageClass == AnsiCParser.StorageClassSpecifier.None);
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
@@ -1257,7 +1271,7 @@ namespace AnsiCParser {
                     var ret = Evaluator.ConstantEval(expr);
                     size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
                     if (size.HasValue == false || size < 0) {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドには０以上の定数式を指定してください。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドには0以上の定数式を指定してください。");
                     }
                 }
 
@@ -1269,7 +1283,7 @@ namespace AnsiCParser {
                 var ret = Evaluator.ConstantEval(expr);
                 size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
                 if (size.HasValue == false || size < 0) {
-                    throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドには０以上の定数式を指定してください。");
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "ビットフィールドには0以上の定数式を指定してください。");
                 }
 
                 return new CType.TaggedType.StructUnionType.MemberInfo(null, type, size.HasValue ? size.Value : -1);
@@ -1375,12 +1389,15 @@ namespace AnsiCParser {
             var ident = Identifier(false);
             if (_lexer.ReadTokenIf('=')) {
                 var expr = ConstantExpression();
-                var ret = Evaluator.ConstantEval(expr);
-                int? size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
-                if (size.HasValue == false || size < 0) {
-                    throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "列挙定数には整数を指定してください。");
+                if (expr.Type.IsIntegerType() == false) {
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "列挙定数の値には整数値を指定してください。");
                 }
-                i = size.Value;
+                var ret = Evaluator.ConstantEval(expr);
+                int? value = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                if (value.HasValue == false) {
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "列挙定数の値に定数演算できない値が指定されました。");
+                }
+                i = value.Value;
             }
             return new CType.TaggedType.EnumType.MemberInfo(enumType, ident, i);
         }
@@ -2446,9 +2463,22 @@ namespace AnsiCParser {
                 }
                 if (_lexer.ReadTokenIf(Token.TokenKind.RETURN)) {
                     var expr = _lexer.PeekToken(';') ? null : Expression();
-                    //現在の関数の戻り値と型チェック
                     _lexer.ReadToken(';');
                     var end = _lexer.CurrentToken().End;
+
+                    // 現在の関数の戻り値と型チェック
+                    CType.FunctionType ft;
+                    _currentFuncDecl.Type.IsFunctionType(out ft);
+                    if (ft.ResultType.IsVoidType()) {
+                        if (expr != null) {
+                            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "戻り値型が void 型の関数中で、値を返すreturn文が使われています。");
+                        } else {
+                            return new SyntaxTree.Statement.ReturnStatement(new LocationRange(start, end), null);
+                        }
+                    }
+                    if (CType.IsEqual(ft.ResultType, expr.Type) == false) {
+                        expr = Specification.TypeConvert(ft.ResultType, expr);
+                    }
                     return new SyntaxTree.Statement.ReturnStatement(new LocationRange(start, end), expr);
                 }
                 throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"分岐文は goto, continue, break, return の何れかで始まりますが、 { _lexer.CurrentToken() } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
@@ -2553,11 +2583,12 @@ namespace AnsiCParser {
                 }
                 if (_lexer.ReadTokenIf('(')) {
                     if (_lexer.PeekToken('{')) {
-                        // gcc statement expression
-                        var statements = CompoundStatement();
-                        _lexer.ReadToken(')');
-                        var end = _lexer.CurrentToken().End;
-                        return new SyntaxTree.Expression.GccStatementExpression(new LocationRange(start, end), statements, null);// todo: implement type
+                    // gcc statement expression
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"GCC拡張構文である複文式(statement expression)には対応していません。");
+                        //var statements = CompoundStatement();
+                        //_lexer.ReadToken(')');
+                        //var end = _lexer.CurrentToken().End;
+                        //return new SyntaxTree.Expression.GccStatementExpression(new LocationRange(start, end), statements, null);// todo: implement type
                     } else {
                         var e = Expression();
                         _lexer.ReadToken(')');
@@ -3626,49 +3657,74 @@ namespace AnsiCParser {
                     Declarator(ref ident, stack, 0);
                     var type = CType.Resolve(baseType, stack);
 
-                    if (_lexer.PeekToken('=', ',', ';')) {
-                        // 外部オブジェクト定義
-
-                        if (CType.CheckContainOldStyleArgument(type)) {
-                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数型中に型の無い仮引数名があります");
-                        }
-
-                        if (functionSpecifier != AnsiCParser.FunctionSpecifier.None) {
-                            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "inlineは関数定義に対してのみ使える。");
-                        }
-
-                        if (scope == ScopeKind.FileScope) {
-                            // 記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。
-                            if (storageClass == AnsiCParser.StorageClassSpecifier.Auto || storageClass == AnsiCParser.StorageClassSpecifier.Register) {
-                                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
+                if (_lexer.PeekToken((Token.TokenKind)'=', (Token.TokenKind)',', (Token.TokenKind)';', Token.TokenKind.__ASM__)) {
+                    // 外部オブジェクト定義 ( 関数プロトタイプ宣言にGCC拡張インラインアセンブラがくっついてくる場合もあるでここで読み飛ばす）
+                    if (_lexer.PeekToken(Token.TokenKind.__ASM__)) {
+                        var tok = _lexer.ReadToken(Token.TokenKind.__ASM__);
+                        Logger.Warning(tok.Start, tok.End, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
+                        _lexer.ReadToken('(');
+                        Stack<char> parens = new Stack<char>();
+                        parens.Push('(');
+                        while (parens.Any()) {
+                            if (_lexer.PeekToken('(', '[')) {
+                                parens.Push((char)_lexer.CurrentToken().Kind);
+                            } else if (_lexer.PeekToken(')')) {
+                                if (parens.Peek() == '(') {
+                                    parens.Pop();
+                                } else {
+                                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 丸括弧閉じ ) が使用されていますが、対応する丸括弧開き ( がありません。");
+                                }
+                            } else if (_lexer.PeekToken(']')) {
+                                if (parens.Peek() == '[') {
+                                    parens.Pop();
+                                } else {
+                                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 角括弧閉じ ] が使用されていますが、対応する角括弧開き [ がありません。");
+                                }
                             }
+                            _lexer.NextToken();
                         }
+                    }
 
-                        // ファイル有効範囲のオブジェクトの識別子を，初期化子を使わず，かつ，記憶域クラス指定子なしか又は記憶域クラス指定子 static で宣言する場合，そのオブジェクトの識別子の宣言を仮定義（tentativedefinition）という。
-                        // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
-                        //
-                        // 整理すると
-                        // 仮定義（tentative　definition）とは
-                        //  - ファイルスコープで宣言した識別子で、初期化子（初期値）を使っていない
-                        //  - 記憶域クラス指定子がなし、もしくは static のもの
-                        // 仮定義された識別子に対する外部定義を含まない場合、翻訳単位の末尾に合成型で0の初期化子付き宣言があるとして扱う
+                    if (CType.CheckContainOldStyleArgument(type)) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数型中に型の無い仮引数名があります");
+                    }
 
-                        for (;;) {
-                            var decl = FunctionOrVariableOrTypedefDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None, scope);
-                            decls.Add(decl);
+                    if (functionSpecifier != AnsiCParser.FunctionSpecifier.None) {
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "inlineは関数定義に対してのみ使える。");
+                    }
 
-                            if (_lexer.ReadTokenIf(',')) {
-
-                                ident = null;
-                                stack = new List<CType>() { new CType.StubType() };
-                                Declarator(ref ident, stack, 0);
-                                type = CType.Resolve(baseType, stack);
-                                continue;
-                            }
-                            _lexer.ReadToken(';');
-                            break;
+                    if (scope == ScopeKind.FileScope) {
+                        // 記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。
+                        if (storageClass == AnsiCParser.StorageClassSpecifier.Auto || storageClass == AnsiCParser.StorageClassSpecifier.Register) {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
                         }
-                    } else if (type.IsFunctionType()) {
+                    }
+
+                    // ファイル有効範囲のオブジェクトの識別子を，初期化子を使わず，かつ，記憶域クラス指定子なしか又は記憶域クラス指定子 static で宣言する場合，そのオブジェクトの識別子の宣言を仮定義（tentativedefinition）という。
+                    // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
+                    //
+                    // 整理すると
+                    // 仮定義（tentative　definition）とは
+                    //  - ファイルスコープで宣言した識別子で、初期化子（初期値）を使っていない
+                    //  - 記憶域クラス指定子がなし、もしくは static のもの
+                    // 仮定義された識別子に対する外部定義を含まない場合、翻訳単位の末尾に合成型で0の初期化子付き宣言があるとして扱う
+
+                    for (;;) {
+                        var decl = FunctionOrVariableOrTypedefDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None, scope);
+                        decls.Add(decl);
+
+                        if (_lexer.ReadTokenIf(',')) {
+
+                            ident = null;
+                            stack = new List<CType>() { new CType.StubType() };
+                            Declarator(ref ident, stack, 0);
+                            type = CType.Resolve(baseType, stack);
+                            continue;
+                        }
+                        _lexer.ReadToken(';');
+                        break;
+                    }
+                } else if (type.IsFunctionType()) {
                         // 関数定義
                         if (scope == ScopeKind.FileScope) {
                             // ファイルスコープでは関数定義は可能
@@ -3693,7 +3749,7 @@ namespace AnsiCParser {
                     var ret = Evaluator.ConstantEval(expr);
                     var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
                     if (size.HasValue == false || size < 0) {
-                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には0以上の整数値を指定してください。");
                     }
                     len = size.Value;
                 }

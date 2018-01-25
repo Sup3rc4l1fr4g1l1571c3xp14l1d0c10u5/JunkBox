@@ -205,9 +205,12 @@ namespace AnsiCParser {
 
                 }
             } else {
-                ret = peek();
+                char ch = (char)peek();
                 next();
-                write((byte)ret);
+                var bytes = System.Text.Encoding.UTF8.GetBytes(new[] {ch});
+                foreach (var b in bytes) {
+                    write(b);
+                }
                 return;
             }
         }

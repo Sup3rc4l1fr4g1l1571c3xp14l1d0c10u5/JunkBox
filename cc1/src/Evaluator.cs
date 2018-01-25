@@ -171,7 +171,6 @@ namespace AnsiCParser {
                         }
                     } else if (self.Type.Unwrap().IsPointerType()) {
                         return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
-                        //return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, null )
                     } else {
                         throw new NotSupportedException();
                     }
@@ -531,6 +530,11 @@ namespace AnsiCParser {
                     var v = self.Expr.Accept(this, value).LongValue();
                     return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
                 }
+                if (self.Type.IsIntegerType() && self.Expr.Type.IsFloatingType()) {
+                    var v = self.Expr.Accept(this, value).LongValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                }
+
 
                 // 6.3.1.4実浮動小数点型及び整数型  
                 // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
@@ -544,7 +548,15 @@ namespace AnsiCParser {
                 // double を float に変換する場合，long double を double 若しくは float に変換する場合，又は，意味上の型（6.3.1.8 参照）が要求するより高い精度及び広い範囲で表現された値をその意味上の型に明示的に変換する場合，変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
                 // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
                 // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                // 
+                if (self.Type.IsFloatingType() && self.Expr.Type.IsIntegerType()) {
+                    var v = self.Expr.Accept(this, value).DoubleValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                }
+                if (self.Type.IsFloatingType() && self.Expr.Type.IsFloatingType()) {
+                    var v = self.Expr.Accept(this, value).DoubleValue();
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                }
+
                 // 6.3.1.6 複素数型  
                 // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
                 // 

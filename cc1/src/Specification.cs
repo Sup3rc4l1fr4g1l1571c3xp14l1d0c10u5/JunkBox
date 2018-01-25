@@ -1040,7 +1040,6 @@ namespace AnsiCParser {
                     // 値0をもつ整数定数式又はその定数式を型void* にキャストした式を，空ポインタ定数（null pointer constant） と呼ぶ。
                     // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
                     // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
-
                     return new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsQualifiedType()
@@ -1205,12 +1204,12 @@ namespace AnsiCParser {
                 }
             }
 
-
             // 元々ポインタ型の式はそのまま
             if (expr.Type.IsPointerType()) {
                 return expr;
             }
 
+            // 変換できなかった
             return null;
         }
 

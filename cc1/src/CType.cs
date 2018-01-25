@@ -509,9 +509,9 @@ namespace AnsiCParser {
                 case BasicType.TypeKind.UnsignedLongInt:
                     return 4;
                 case BasicType.TypeKind.SignedLongLongInt:
-                    return 4;
+                    return 8;
                 case BasicType.TypeKind.UnsignedLongLongInt:
-                    return 4;
+                    return 8;
                 case BasicType.TypeKind.Float:
                     return 4;
                 case BasicType.TypeKind.Double:
@@ -998,11 +998,11 @@ namespace AnsiCParser {
 
             protected override string ToString(HashSet<CType> outputed) {
                 var sb = new List<string> {
-                    (Qualifier & TypeQualifier.Const) != 0 ? "const" : null,
-                    (Qualifier & TypeQualifier.Volatile) != 0 ? "volatile" : null,
-                    (Qualifier & TypeQualifier.Restrict) != 0 ? "restrict" : null,
-                    (Qualifier & TypeQualifier.Near) != 0 ? "near" : null,
-                    (Qualifier & TypeQualifier.Far) != 0 ? "far" : null,
+                    Qualifier.HasFlag(TypeQualifier.Const) ? "const" : null,
+                    Qualifier.HasFlag(TypeQualifier.Volatile) ? "volatile" : null,
+                    Qualifier.HasFlag(TypeQualifier.Restrict) ? "restrict" : null,
+                    Qualifier.HasFlag(TypeQualifier.Near) ? "near" : null,
+                    Qualifier.HasFlag(TypeQualifier.Far) ? "far" : null,
                     Type.ToString()
                 };
                 return string.Join(" ", sb.Where(x => x != null));

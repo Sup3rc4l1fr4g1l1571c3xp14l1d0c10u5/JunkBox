@@ -132,7 +132,7 @@ namespace AnsiCParser {
 
 #endif
 
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\test.c")).Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\algo\tmp\area.i")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();

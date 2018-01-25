@@ -116,6 +116,16 @@ namespace AnsiCParser {
             private readonly Stack<Value> _stack = new Stack<Value>();
 
 
+            private int n = 0;
+
+            public string LAlloc() {
+                return $".L{n++}";
+            }
+
+            public static int Align(int x) {
+                return (x + 3) & (~3);
+            }
+
             public Code Emit(string body) {
                 var code = new Code(body);
                 Codes.Add(code);
@@ -138,7 +148,7 @@ namespace AnsiCParser {
             public void Discard() {
                 Value v = Pop();
                 if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
-                    Emit($"addl ${(v.Type.Sizeof() + 3) & ~3}, %esp");  // discard
+                    Emit($"addl ${Align(v.Type.Sizeof())}, %esp");  // discard
                 }
             }
 
@@ -148,16 +158,13 @@ namespace AnsiCParser {
                     int skipsize = 0;
                     for (int i = 0; i < n; i++) {
                         var v2 = Peek(i);
-                        if (v2.Kind == Value.ValueKind.Temp) {
-                            skipsize += (v2.Type.Sizeof() + 3) & (~3);
-                        } else if (v2.Kind == Value.ValueKind.Address) {
-                            skipsize += (v2.Type.Sizeof() + 3) & (~3);
-                        } else {
+                        if (v2.Kind == Value.ValueKind.Temp || v2.Kind == Value.ValueKind.Address) {
+                            skipsize += Align(v2.Type.Sizeof());
                         }
                     }
 
                     if (v.Kind == Value.ValueKind.Temp) {
-                        int size = (v.Type.Sizeof() + 3) & (~3);
+                        int size = Align(v.Type.Sizeof());
                         if (size <= 4) {
                             Emit($"leal ${skipsize}(%esp), %esi");
                             Emit($"push (%esi)");
@@ -187,11 +194,21 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    Emit("addl %ecx, %eax");
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("addl %eax, %ecx");
+                        Emit("adcl %ebx, %edx");
+                        Emit("pushl %edx");
+                        Emit("pushl %ecx");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else {
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        Emit("addl %ecx, %eax");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    }
                     return;
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
@@ -209,7 +226,11 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset + rhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        LoadI("%ecx");  // rhs = index
+                        if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                            LoadI64("%ecx", "%edx");    // rhs(loのみ使う)
+                        } else {
+                            LoadI32("%ecx");  // rhs = index
+                        }
                         LoadP("%eax");  // lhs = base
                         Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("addl %ecx, %eax");                        // base += index
@@ -225,8 +246,12 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset + lhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        LoadI("%eax");  // rhs = base
-                        LoadP("%ecx");  // lhs = index
+                        LoadP("%ecx");    // rhs = base
+                        if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                            LoadI64("%eax", "%edx");    // lhs(loのみ使う)
+                        } else {
+                            LoadI32("%eax");  // lhs = index
+                        }
                         Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("addl %ecx, %eax");                        // base += index
                         Emit("pushl %eax");
@@ -243,11 +268,21 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    Emit("subl %ecx, %eax");
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("subl %eax, %ecx");
+                        Emit("sbbl %ebx, %edx");
+                        Emit("pushl %edx");
+                        Emit("pushl %ecx");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else {
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        Emit("subl %ecx, %eax");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    }
                     return;
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
@@ -265,7 +300,11 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset - rhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        LoadI("%ecx");  // rhs = index
+                        if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                            LoadI64("%ecx", "%edx");    // rhs(loのみ使う)
+                        } else {
+                            LoadI32("%ecx");  // rhs = index
+                        }
                         LoadP("%eax");  // lhs = base
                         Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("subl %ecx, %eax");                        // base += index
@@ -281,8 +320,12 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value() { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset - lhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        LoadP("%eax");  // rhs = base
-                        LoadI("%ecx");  // lhs = index
+                        LoadP("%ecx");    // rhs = base
+                        if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                            LoadI64("%eax", "%edx");    // lhs(loのみ使う)
+                        } else {
+                            LoadI32("%eax");  // lhs = index
+                        }
                         Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("subl %ecx, %eax");                        // base += index
                         Emit("pushl %eax");
@@ -318,15 +361,42 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    if (type.IsSignedIntegerType()) {
-                        Emit("imull %ecx");
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("pushl %edx"); // 12(%esp) : lhs.hi
+                        Emit("pushl %ecx"); //  8(%esp) : lhs.lo
+                        Emit("pushl %ebx"); //  4(%esp) : rhs.hi
+                        Emit("pushl %eax"); //  0(%esp) : rhs.lo
+
+                        Emit("movl 4(%esp), %eax");     // rhs.hi
+                        Emit("movl %eax, %ecx");
+                        Emit("imull 8(%esp), %ecx");    // lhs.lo
+                        Emit("movl 12(%esp), %eax");    // lhs.hi
+                        Emit("imull 0(%esp), %eax");    // rhs.lo
+                        Emit("addl %eax, %ecx");
+                        Emit("movl 8(%esp), %eax");     // lhs.lo
+                        Emit("mull 0(%esp)");           // rhs.lo
+                        Emit("addl %edx, %ecx");
+                        Emit("movl %ecx, %edx");
+
+                        Emit("addl $16, %esp");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     } else {
-                        Emit("mull %ecx");
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        if (type.IsSignedIntegerType()) {
+                            Emit("imull %ecx");
+                        } else {
+                            Emit("mull %ecx");
+                        }
+                        Emit("push %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
-                    Emit("push %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -346,16 +416,42 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    Emit("cltd");
-                    if (type.IsSignedIntegerType()) {
-                        Emit("idivl %ecx");
+                    if (type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("pushl %ebx"); // 12(%esp) : rhs.hi
+                        Emit("pushl %eax"); //  8(%esp) : rhs.lo
+                        Emit("pushl %edx"); //  4(%esp) : lhs.hi
+                        Emit("pushl %ecx"); //  0(%esp) : lhs.lo
+                        Emit("call ___divdi3");
+                        Emit("addl $16, %esp");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else if (type.IsBasicType(CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("pushl %ebx"); // 12(%esp) : rhs.hi
+                        Emit("pushl %eax"); //  8(%esp) : rhs.lo
+                        Emit("pushl %edx"); //  4(%esp) : lhs.hi
+                        Emit("pushl %ecx"); //  0(%esp) : lhs.lo
+                        Emit("call ___udivdi3");
+                        Emit("addl $16, %esp");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     } else {
-                        Emit("divl %ecx");
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        Emit("cltd");
+                        if (type.IsSignedIntegerType()) {
+                            Emit("idivl %ecx");
+                        } else {
+                            Emit("divl %ecx");
+                        }
+                        Emit("push %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
-                    Emit("push %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -375,16 +471,42 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    Emit("cltd");
-                    if (type.IsSignedIntegerType()) {
-                        Emit("idivl %ecx");
+                    if (type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("pushl %ebx"); // 12(%esp) : rhs.hi
+                        Emit("pushl %eax"); //  8(%esp) : rhs.lo
+                        Emit("pushl %edx"); //  4(%esp) : lhs.hi
+                        Emit("pushl %ecx"); //  0(%esp) : lhs.lo
+                        Emit("call ___moddi3");
+                        Emit("addl $16, %esp");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else if (type.IsBasicType(CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("pushl %ebx"); // 12(%esp) : rhs.hi
+                        Emit("pushl %eax"); //  8(%esp) : rhs.lo
+                        Emit("pushl %edx"); //  4(%esp) : lhs.hi
+                        Emit("pushl %ecx"); //  0(%esp) : lhs.lo
+                        Emit("call ___umoddi3");
+                        Emit("addl $16, %esp");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     } else {
-                        Emit("divl %ecx");
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        Emit("cltd");
+                        if (type.IsSignedIntegerType()) {
+                            Emit("idivl %ecx");
+                        } else {
+                            Emit("divl %ecx");
+                        }
+                        Emit("push %edx");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
-                    Emit("push %edx");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else {
                     throw new NotImplementedException();
                 }
@@ -395,11 +517,21 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%eax"); // rhs
-                    LoadI("%ecx"); // lhs
-                    Emit("andl %ecx, %eax");
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("andl %ebx, %edx");
+                        Emit("andl %ecx, %eax");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else {
+                        LoadI32("%eax"); // rhs
+                        LoadI32("%ecx"); // lhs
+                        Emit("andl %ecx, %eax");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    }
                 } else {
                     throw new NotImplementedException();
                 }
@@ -411,11 +543,21 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%eax"); // rhs
-                    LoadI("%ecx"); // lhs
-                    Emit("orl %ecx, %eax");
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("orl %ebx, %edx");
+                        Emit("orl %ecx, %eax");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else {
+                        LoadI32("%eax"); // rhs
+                        LoadI32("%ecx"); // lhs
+                        Emit("orl %ecx, %eax");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    }
                 } else {
                     throw new NotImplementedException();
                 }
@@ -426,11 +568,21 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%eax"); // rhs
-                    LoadI("%ecx"); // lhs
-                    Emit("xorl %ecx, %eax");
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");    // rhs
+                        LoadI64("%ecx", "%edx");    // lhs
+                        Emit("xorl %ebx, %edx");
+                        Emit("xorl %ecx, %eax");
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    } else {
+                        LoadI32("%eax"); // rhs
+                        LoadI32("%ecx"); // lhs
+                        Emit("xorl %ecx, %eax");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                    }
                 } else {
                     throw new NotImplementedException();
                 }
@@ -441,15 +593,35 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    if (lhs.Type.IsUnsignedIntegerType()) {
-                        Emit("shll %cl, %eax");
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%ecx", "%ebx"); // rhs
+                        LoadI64("%eax", "%edx"); // lhs
+                        Emit("shldl %cl, %eax, %edx");
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            Emit("shll %cl, %eax");
+                        } else {
+                            Emit("sall %cl, %eax");
+                        }
+                        Emit("testb $32, %cl");
+                        var l = LAlloc();
+                        Emit($"je {l}");
+                        Emit("movl %eax, %edx");
+                        Emit("xorl %eax, %eax");
+                        Label(l);
+                        Emit("pushl %edx");
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     } else {
-                        Emit("sall %cl, %eax");
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            Emit("shll %cl, %eax");
+                        } else {
+                            Emit("sall %cl, %eax");
+                        }
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else {
                     throw new NotImplementedException();
                 }
@@ -460,15 +632,43 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    LoadI("%ecx"); // rhs
-                    LoadI("%eax"); // lhs
-                    if (lhs.Type.IsUnsignedIntegerType()) {
-                        Emit("shrl %cl, %eax");
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%ecx", "%ebx"); // rhs
+                        LoadI64("%eax", "%edx"); // lhs
+                        Emit("shrdl %cl, %edx, %eax");
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            Emit("shrl %cl, %edx");
+                            Emit("testb $32, %cl");
+                            var l = LAlloc();
+                            Emit($"je {l}");
+                            Emit("movl %edx, %eax");
+                            Emit("xorl %edx, %edx");
+                            Label(l);
+                            Emit("pushl %edx");
+                            Emit("pushl %eax");
+                        } else {
+                            Emit("sarl %cl, %edx");
+                            Emit("testb $32, %cl");
+                            var l = LAlloc();
+                            Emit($"je {l}");
+                            Emit("movl %edx, %eax");
+                            Emit("sarl $31, %edx");
+                            Label(l);
+                            Emit("pushl %edx");
+                            Emit("pushl %eax");
+                        }
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     } else {
-                        Emit("sarl %cl, %eax");
+                        LoadI32("%ecx"); // rhs
+                        LoadI32("%eax"); // lhs
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            Emit("shrl %cl, %eax");
+                        } else {
+                            Emit("sarl %cl, %eax");
+                        }
+                        Emit("pushl %eax");
+                        Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
-                    Emit("pushl %eax");
-                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else {
                     throw new NotImplementedException();
                 }
@@ -482,22 +682,22 @@ namespace AnsiCParser {
 
                 switch (type.Sizeof()) {
                     case 1:
-                        rhs = LoadI("%ecx");
+                        rhs = LoadI32("%ecx");
                         Emit($"movb %cl, (%eax)");
-                        Emit($"pushl (%eax)");
+                        Emit($"pushl %ecx");
                         Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                         break;
                     case 2:
-                        rhs = LoadI("%ecx");
+                        rhs = LoadI32("%ecx");
                         Emit($"movw %cx, (%eax)");
-                        Emit($"pushl (%eax)");
+                        Emit($"pushl %ecx");
                         Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                         break;
                     case 3:
                     case 4:
-                        rhs = LoadI("%ecx");    // ToDo: float のコピーにLoadIを転用しているのを修正
+                        rhs = LoadI32("%ecx");    // ToDo: float のコピーにLoadI32を転用しているのを修正
                         Emit($"movl %ecx, (%eax)");
-                        Emit($"pushl (%eax)");
+                        Emit($"pushl %ecx");
                         Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                         break;
                     default:
@@ -507,7 +707,6 @@ namespace AnsiCParser {
                         Emit($"movl %eax, %edi");
                         Emit($"cld");
                         Emit($"rep movsb");
-                        //Emit($"addl ${(rhs.Type.Sizeof() + 3) & (~3)}, %esp");
                         Pop();
                         Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                         break;
@@ -518,16 +717,38 @@ namespace AnsiCParser {
             public void Eq(CType type) {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
-                if ((lhs.Type.IsIntegerType() || lhs.Type.IsPointerType()) ||
-                    (rhs.Type.IsIntegerType() || rhs.Type.IsPointerType())) {
-                    LoadI("%eax");
-                    LoadI("%ecx");
-                    Emit($"cmpl %ecx, %eax");
 
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");
+                        LoadI64("%ecx", "%edx");
+                        var lFalse = LAlloc();
+                        Emit($"cmp %eax, %ecx");
+                        Emit($"movl $0, %eax");
+                        Emit($"jne {lFalse}");
+                        Emit($"cmp %ebx, %edx");
+                        Emit($"jne {lFalse}");
+                        Emit($"movl $1, %eax");
+                        Label(lFalse);
+                        Emit($"pushl %eax");
+                    } else {
+                        LoadI32("%eax");
+                        LoadI32("%ecx");
+                        Emit($"cmpl %ecx, %eax");
+
+                        Emit($"sete %al");
+                        Emit($"movzbl %al, %eax");
+                        Emit($"pushl %eax");
+                    }
+                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    LoadI32("%eax");
+                    LoadI32("%ecx");
+                    Emit($"cmpl %ecx, %eax");
                     Emit($"sete %al");
                     Emit($"movzbl %al, %eax");
                     Emit($"pushl %eax");
-
                     Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
@@ -550,16 +771,38 @@ namespace AnsiCParser {
             public void Ne(CType type) {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
-                if ((lhs.Type.IsIntegerType() || lhs.Type.IsPointerType()) ||
-                    (rhs.Type.IsIntegerType() || rhs.Type.IsPointerType())) {
-                    LoadI("%eax");
-                    LoadI("%ecx");
-                    Emit($"cmpl %ecx, %eax");
 
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%ebx");
+                        LoadI64("%ecx", "%edx");
+                        var lFalse = LAlloc();
+                        Emit($"cmp %eax, %ecx");
+                        Emit($"movl $1, %eax");
+                        Emit($"jne {lFalse}");
+                        Emit($"cmp %ebx, %edx");
+                        Emit($"jne {lFalse}");
+                        Emit($"movl $0, %eax");
+                        Label(lFalse);
+                        Emit($"pushl %eax");
+                    } else {
+                        LoadI32("%eax");
+                        LoadI32("%ecx");
+                        Emit($"cmpl %ecx, %eax");
+
+                        Emit($"setne %al");
+                        Emit($"movzbl %al, %eax");
+                        Emit($"pushl %eax");
+                    }
+                    Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    LoadI32("%eax");
+                    LoadI32("%ecx");
+                    Emit($"cmpl %ecx, %eax");
                     Emit($"setne %al");
                     Emit($"movzbl %al, %eax");
                     Emit($"pushl %eax");
-
                     Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
@@ -586,12 +829,12 @@ namespace AnsiCParser {
                 Emit($"jmp {label}");
             }
             public void jmp_false(string label) {
-                LoadI("%eax");
+                LoadI32("%eax");
                 Emit($"cmpl $0, %eax");
                 Emit($"je {label}");
             }
             public void jmp_true(string label) {
-                LoadI("%eax");
+                LoadI32("%eax");
                 Emit($"cmpl $0, %eax");
                 Emit($"jne {label}");
             }
@@ -614,42 +857,127 @@ namespace AnsiCParser {
                     } else {
                         throw new NotImplementedException();
                     }
-
-                    LoadI("%eax");
-                    if (ret.Type.IsSignedIntegerType()) {
-                        if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
-                            Emit($"movsbl %al, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
-                            Emit($"movswl %ax, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
-                            //Emil($"movl %eax, %eax");  // do nothing;
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
-                            Emit($"movzbl %al, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                            Emit($"movzwl %ax, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                            //Emil($"movl %eax, %eax");  // do nothing;
+                    if (ret.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedLongLongInt, CType.BasicType.TypeKind.SignedLongLongInt)) {
+                        LoadI64("%eax", "%ecx");
+                        if (ret.Type.IsSignedIntegerType()) {
+                            if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                                Emit($"movsbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                                Emit($"cwtl");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedLongLongInt) {
+                                Emit($"pushl %ecx");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                                Emit($"movzbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                                Emit($"movzwl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedLongLongInt) {
+                                Emit($"pushl %ecx");
+                                Emit($"pushl %eax");
+                            } else {
+                                throw new NotImplementedException();
+                            }
                         } else {
-                            throw new NotImplementedException();
+                            if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                                Emit($"movsbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                                Emit($"cwtl");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedLongLongInt) {
+                                Emit($"pushl %ecx");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                                Emit($"movzbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                                Emit($"movzwl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedLongLongInt) {
+                                Emit($"pushl %ecx");
+                                Emit($"pushl %eax");
+                            } else {
+                                throw new NotImplementedException();
+                            }
                         }
                     } else {
-                        if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
-                            Emit($"movzbl %al, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
-                            Emit($"movzwl %ax, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
-                            //Emil($"movl %eax, %eax");  // do nothing;
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
-                            Emit($"movzbl %al, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
-                            Emit($"movzwl %ax, %eax");
-                        } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
-                            //Emil($"movl %eax, %eax");  // do nothing;
+                        LoadI32("%eax");
+                        if (ret.Type.IsSignedIntegerType()) {
+                            if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                                Emit($"movsbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                                Emit($"movswl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedLongLongInt) {
+                                Emit($"pushl $0");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                                Emit($"movzbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                                Emit($"movzwl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedLongLongInt) {
+                                Emit($"movl %eax, %edx");
+                                Emit($"sarl $31, %edx");
+                                Emit($"pushl %edx");
+                                Emit($"pushl %eax");
+                            } else {
+                                throw new NotImplementedException();
+                            }
                         } else {
-                            throw new NotImplementedException();
+                            if (selftykind == CType.BasicType.TypeKind.Char || selftykind == CType.BasicType.TypeKind.SignedChar) {
+                                Emit($"movzbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedShortInt) {
+                                Emit($"movzwl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedInt || selftykind == CType.BasicType.TypeKind.SignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.SignedLongLongInt) {
+                                Emit($"pushl $0");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedChar) {
+                                Emit($"movzbl %al, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedShortInt) {
+                                Emit($"movzwl %ax, %eax");
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedInt || selftykind == CType.BasicType.TypeKind.UnsignedLongInt) {
+                                //Emil($"movl %eax, %eax");  // do nothing;
+                                Emit($"pushl %eax");
+                            } else if (selftykind == CType.BasicType.TypeKind.UnsignedLongLongInt) {
+                                Emit($"pushl $0");
+                                Emit($"pushl %eax");
+                            } else {
+                                throw new NotImplementedException();
+                            }
                         }
                     }
-                    Emit($"pushl %eax");
                     Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if (ret.Type.IsPointerType() && type.IsPointerType()) {
                     Pop();
@@ -691,25 +1019,61 @@ namespace AnsiCParser {
                     // 	movzwl <value>, %eax
                     //  movzbl %al, %eax
                     if (type.IsSignedIntegerType()) {
+                        // sp+[0..1] -> [fpucwの退避値]
+                        // sp+[2..3] -> [(精度=単精度, 丸め=ゼロ方向への丸め)を設定したfpucw]
+                        // sp+[4..7] -> [浮動小数点数の整数への変換結果、その後は、int幅での変換結果]
                         switch (type.Sizeof()) {
                             case 1:
-                                Emit($"sub $4, %esp");
-                                Emit($"fistps (%esp)");
-                                Emit($"movzwl (%esp), %eax");
+                                Emit($"sub $8, %esp");
+                                Emit($"fnstcw 0(%esp)");
+                                Emit($"movzwl 0(%esp), %eax");
+                                Emit($"movb	$12, %ah");
+                                Emit($"movw	%ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistps 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"movzwl 4(%esp), %eax");
                                 Emit($"movsbl %al, %eax");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"movl %eax, 4(%esp)");
+                                Emit($"add $4, %esp");
                                 break;
                             case 2:
-                                Emit($"sub $4, %esp");
-                                Emit($"fistps (%esp)");
-                                Emit($"movzwl (%esp), %eax");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"sub $8, %esp");
+                                Emit($"fnstcw 0(%esp)");
+                                Emit($"movzwl 0(%esp), %eax");
+                                Emit($"movb	$12, %ah");
+                                Emit($"movw	%ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistps 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"movzwl 4(%esp), %eax");
+                                Emit($"cwtl");
+                                Emit($"movl %eax, 4(%esp)");
+                                Emit($"add $4, %esp");
                                 break;
                             case 4:
-                                Emit($"sub $4, %esp");
-                                Emit($"fistpl (%esp)");
-                                Emit($"movl (%esp), %eax");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"sub $8, %esp");
+                                Emit($"fnstcw 0(%esp)");
+                                Emit($"movzwl 0(%esp), %eax");
+                                Emit($"movb $12, %ah");
+                                Emit($"movw	%ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistpl 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                //Emit($"movl 4(%esp), %eax");
+                                //Emit($"movl %eax, 4(%esp)");
+                                Emit($"add $4, %esp");
+                                break;
+                            case 8:
+                                Emit($"sub $12, %esp");
+                                Emit($"fnstcw 0(%esp)");
+                                Emit($"movzwl 0(%esp), %eax");
+                                Emit($"movb $12, %ah");
+                                Emit($"movw %ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistpq 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"add $4, %esp");
                                 break;
                             default:
                                 throw new NotImplementedException();
@@ -717,27 +1081,53 @@ namespace AnsiCParser {
                     } else {
                         switch (type.Sizeof()) {
                             case 1:
-                                Emit($"sub $4, %esp");
-                                Emit($"fistps (%esp)");
-                                Emit($"movzwl (%esp), %eax");
+                                Emit($"sub $8, %esp");
+                                Emit($"fnstcw 0(%esp)");
+                                Emit($"movzwl 0(%esp), %eax");
+                                Emit($"movb $12, %ah");
+                                Emit($"movw %ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistps 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"movzwl 4(%esp), %eax");
                                 Emit($"movzbl %al, %eax");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"movl %eax, 4(%esp)");
+                                Emit($"add $4, %esp");
                                 break;
                             case 2:
-                                Emit($"sub $4, %esp");
-                                Emit($"fistpl (%esp)");
-                                Emit($"movl (%esp), %eax");
-                                Emit($"movzwl %ax, %eax");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"sub $8, %esp");
+                                Emit($"fnstcw (%esp)");
+                                Emit($"movzwl (%esp), %eax");
+                                Emit($"movb $12, %ah");
+                                Emit($"movw %ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistps 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"movzwl 4(%esp), %eax");
+                                Emit($"cwtl");
+                                Emit($"movl %eax, 4(%esp)");
+                                Emit($"add $4, %esp");
                                 break;
                             case 4:
-                                // fistpq  16(%esp)
-                                // movl    16(%esp), % eax
+                                Emit($"sub $12, %esp");
+                                Emit($"fnstcw (%esp)");
+                                Emit($"movzwl (%esp), %eax");
+                                Emit($"movb $12, %ah");
+                                Emit($"movw %ax, 2(%esp)");
+                                Emit($"fldcw 2(%esp)");
+                                Emit($"fistpq 4(%esp)");
+                                Emit($"fldcw 0(%esp)");
+                                Emit($"movl 4(%esp), %eax");
+                                Emit($"movl %eax, 8(%esp)");
+                                Emit($"add $8, %esp");
+                                break;
+                            case 8:
                                 Emit($"sub $8, %esp");
-                                Emit($"fistpq (%esp)");
-                                Emit($"movl (%esp), %eax");
-                                Emit($"add $4, %esp");
-                                Emit($"movl %eax, (%esp)");
+                                Emit($"fstpl (%esp)");
+                                Emit($"call	___fixunsdfdi");
+                                Emit($"add $8, %esp");
+                                Emit($"pushl %edx");
+                                Emit($"pushl %eax");
                                 break;
                             default:
                                 throw new NotImplementedException();
@@ -758,7 +1148,7 @@ namespace AnsiCParser {
             public void arraySubscript(CType type) {
                 var index = Peek(0);
                 var target = Peek(1);
-                LoadI("%ecx");
+                LoadI32("%ecx");
                 if (target.Type.IsPointerType()) {
                     LoadP("%eax");
                 } else {
@@ -786,10 +1176,8 @@ namespace AnsiCParser {
                 int resultSize = 0;
                 if (funcType.ResultType.IsVoidType()) {
                     resultSize = 0;
-                } else if (funcType.ResultType.Sizeof() > 4) {
-                    resultSize = ((funcType.ResultType.Sizeof() + 3) & ~3);
                 } else {
-                    resultSize = 4;
+                    resultSize = Align(funcType.ResultType.Sizeof());
                 }
 
                 // 戻り値格納先
@@ -809,35 +1197,38 @@ namespace AnsiCParser {
                     args(this, i);
                     var ao = Peek(0);
                     LoadS(ao.Type);
-                    var _argSize = (ao.Type.Sizeof() + 3) & ~3;
+                    var _argSize = Align(ao.Type.Sizeof());
                     argSize += _argSize;
                 }
 
-                // 戻り値が浮動小数点数ではなく、eaxにも入らないならスタック上に格納先アドレスを積む
-                if (resultSize > 4 && !funcType.ResultType.IsRealFloatingType()) {
+                // 戻り値が浮動小数点数およびlonglongではなく、eaxにも入らないならスタック上に格納先アドレスを積む
+                if (resultSize > 4 && !funcType.ResultType.IsRealFloatingType() && !funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
                     Emit($"leal {argSize + bakSize}(%esp), %eax");
                     Emit($"push %eax");
                 }
 
                 fun(this);
-                LoadI("%eax");
+                LoadI32("%eax");
                 Emit($"call *%eax");
 
-                if (resultSize > 4) {
-                    if (funcType.ResultType.IsRealFloatingType()) {
-                        // 浮動小数点数はFPUスタック上にある
-                        if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                            Emit($"fstps {(argSize + bakSize)}(%esp)");
-                        } else if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Double)) {
-                            Emit($"fstpl {(argSize + bakSize)}(%esp)");
-                        } else {
-                            throw new NotImplementedException();
-                        }
-                        Emit($"addl ${argSize}, %esp");
+                if (funcType.ResultType.IsRealFloatingType()) {
+                    // 浮動小数点数はFPUスタック上にある
+                    if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        Emit($"fstps {(argSize + bakSize)}(%esp)");
+                    } else if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.Double)) {
+                        Emit($"fstpl {(argSize + bakSize)}(%esp)");
                     } else {
-                        // 戻り値は格納先アドレスに入れられているはず
-                        Emit($"addl ${argSize + 4}, %esp");
+                        throw new NotImplementedException();
                     }
+                    Emit($"addl ${argSize}, %esp");
+                } else if (funcType.ResultType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    // longlongはedx:eax
+                    Emit($"mov %eax, {(argSize + bakSize + 0)}(%esp)");
+                    Emit($"mov %edx, {(argSize + bakSize + 4)}(%esp)");
+                    Emit($"addl ${argSize}, %esp");
+                } else if (resultSize > 4) {
+                    // 戻り値は格納先アドレスに入れられているはず
+                    Emit($"addl ${argSize + 4}, %esp");
                 } else if (resultSize > 0) {
                     // 戻り値をコピー(4バイト以下)
                     Emit($"movl %eax, {(argSize + bakSize)}(%esp)");
@@ -932,12 +1323,12 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            /// 整数値もしくはポインタ値を指定したレジスタにロードする。レジスタに入らないサイズはエラーになる
+            /// 整数値もしくはポインタ値を指定した32ビットレジスタにロードする。レジスタに入らないサイズはエラーになる
             /// </summary>
             /// <param name="value"></param>
             /// <param name="register"></param>
             /// <returns></returns>
-            private Value LoadI(string register) {
+            private Value LoadI32(string register) {
                 var value = Pop();
                 var ValueType = value.Type;
                 //System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
@@ -1077,6 +1468,174 @@ namespace AnsiCParser {
                 }
             }
 
+            private Value LoadI64(string reg_lo, string reg_hi) {
+                var value = Pop();
+                var ValueType = value.Type;
+                //System.Diagnostics.Debug.Assert(ValueType.IsIntegerType() || ValueType.IsPointerType() || ValueType.IsArrayType());
+                CType elementType;
+                switch (value.Kind) {
+                    case Value.ValueKind.IntConst: {
+                            // 定数値をレジスタにロードする。
+                            string op = "";
+                            if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char)) {
+                                switch (ValueType.Sizeof()) {
+                                    case 1:
+                                        Emit($"movb ${value.IntConst}, {ToByteReg(reg_lo)}");
+                                        Emit($"movsbl {ToByteReg(reg_lo)}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 2:
+                                        Emit($"movw ${value.IntConst}, {ToWordReg(reg_lo)}");
+                                        Emit($"movswl {ToWordReg(reg_lo)}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 4:
+                                        Emit($"movl ${value.IntConst}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 8: {
+                                            var bytes = BitConverter.GetBytes(value.IntConst);
+                                            var lo = BitConverter.ToUInt32(bytes, 0);
+                                            var hi = BitConverter.ToUInt32(bytes, 4);
+                                            Emit($"movl ${lo}, {reg_lo}");
+                                            Emit($"movl ${hi}, {reg_hi}");
+                                            break;
+                                        }
+                                    default:
+                                        throw new NotImplementedException();
+                                }
+                            } else {
+                                switch (ValueType.Sizeof()) {
+                                    case 1:
+                                        Emit($"movb ${value.IntConst}, {ToByteReg(reg_lo)}");
+                                        Emit($"movzbl {ToByteReg(reg_lo)}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 2:
+                                        Emit($"movw ${value.IntConst}, {ToWordReg(reg_lo)}");
+                                        Emit($"movzwl {ToWordReg(reg_lo)}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 4:
+                                        Emit($"movl ${value.IntConst}, {reg_lo}");
+                                        Emit($"movl $0, {reg_hi}");
+                                        break;
+                                    case 8: {
+                                            var bytes = BitConverter.GetBytes(value.IntConst);
+                                            var lo = BitConverter.ToUInt32(bytes, 0);
+                                            var hi = BitConverter.ToUInt32(bytes, 4);
+                                            Emit($"movl ${lo}, {reg_lo}");
+                                            Emit($"movl ${hi}, {reg_hi}");
+                                            break;
+                                        }
+                                    default:
+                                        throw new NotImplementedException();
+                                }
+                            }
+                            return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = "high={{reg_hi}, lo={reg_lo}" };
+                        }
+                    case Value.ValueKind.Temp:
+                        if (ValueType.Sizeof() <= 4) {
+                            // スタックトップの値をレジスタにロード
+                            Emit($"popl {reg_lo}");
+                            Emit($"movl $0, {reg_hi}");
+                            return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = "high={{reg_hi}, lo={reg_lo}" };
+                        } else if (ValueType.Sizeof() == 8) {
+                            // スタックトップの値をレジスタにロード
+                            Emit($"popl {reg_lo}");
+                            Emit($"popl {reg_hi}");
+                            return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = "high={{reg_hi}, lo={reg_lo}" };
+
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                    case Value.ValueKind.FloatConst:
+                        throw new NotImplementedException();
+                    case Value.ValueKind.Register:
+                        throw new NotImplementedException();
+                    case Value.ValueKind.Var:
+                    case Value.ValueKind.Address: {
+                            // 変数値もしくは参照値をレジスタにロード
+                            Func<int, string> src = null;
+                            switch (value.Kind) {
+                                case Value.ValueKind.Var:
+                                    if (value.Label == null) {
+                                        // ローカル変数のアドレスはebp相対
+                                        src = (i) => $"{value.Offset + i}(%ebp)";
+                                    } else {
+                                        // グローバル変数のアドレスはラベル絶対
+                                        src = (i) => $"{value.Label}+{value.Offset + i}";
+                                    }
+                                    break;
+                                case Value.ValueKind.Address:
+                                    // アドレス参照のアドレスはスタックトップの値
+                                    Emit($"popl {reg_hi}");
+                                    src = (i) => $"{i}({reg_hi})";
+                                    break;
+                                default:
+                                    throw new NotImplementedException();
+                            }
+
+                            if (ValueType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt, CType.BasicType.TypeKind.Double)) {
+                                Emit($"movl {src(0)}, {reg_lo}");
+                                Emit($"movl {src(4)}, {reg_hi}");
+                            } else {
+                                string op = "";
+                                if (ValueType.IsSignedIntegerType() || ValueType.IsBasicType(CType.BasicType.TypeKind.Char) || ValueType.IsEnumeratedType()) {
+                                    switch (ValueType.Sizeof()) {
+                                        case 1:
+                                            op = "movsbl";
+                                            break;
+                                        case 2:
+                                            op = "movswl";
+                                            break;
+                                        case 4:
+                                            op = "movl";
+                                            break;
+                                        default:
+                                            throw new NotImplementedException();
+                                    }
+                                } else if (ValueType.IsUnsignedIntegerType()) {
+                                    switch (ValueType.Sizeof()) {
+                                        case 1:
+                                            op = "movzbl";
+                                            break;
+                                        case 2:
+                                            op = "movzwl";
+                                            break;
+                                        case 4:
+                                            op = "movl";
+                                            break;
+                                        default:
+                                            throw new NotImplementedException();
+                                    }
+                                } else if (ValueType.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                                    op = "movl";
+                                } else if (ValueType.IsPointerType() || ValueType.IsArrayType()) {
+                                    op = "movl";
+                                } else if (ValueType.IsStructureType()) {
+                                    op = "leal";
+                                } else {
+                                    throw new NotImplementedException();
+                                }
+                                Emit($"{op} {src(0)}, {reg_lo}");
+                                Emit($"movl 0, {reg_hi}");
+                            }
+                            return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = "high={{reg_hi}, lo={reg_lo}" };
+                        }
+                        break;
+                    case Value.ValueKind.Ref:
+                        if (value.Label == null) {
+                            Emit($"leal {value.Offset}(%ebp), {reg_lo}");
+                        } else {
+                            Emit($"leal {value.Label}+{value.Offset}, {reg_lo}");
+                        }
+                        Emit($"movl 0, {reg_hi}");
+                        return new Value() { Kind = Value.ValueKind.Register, Type = ValueType, Register = "high={{reg_hi}, lo={reg_lo}" };
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
             /// <summary>
             /// FPUスタック上に値をロードする
             /// </summary>
@@ -1085,18 +1644,28 @@ namespace AnsiCParser {
                 var rhs = Pop();
                 switch (rhs.Kind) {
                     case Value.ValueKind.IntConst:
-                        Emit($"pushl ${rhs.IntConst}");
-                        Emit($"fild (%esp)");
-                        Emit($"addl $4, %esp");
+                        if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt, CType.BasicType.TypeKind.Double)) {
+                            var bytes = BitConverter.GetBytes(rhs.IntConst);
+                            var lo = BitConverter.ToUInt32(bytes, 0);
+                            var hi = BitConverter.ToUInt32(bytes, 4);
+                            Emit($"pushl ${hi}");
+                            Emit($"pushl ${lo}");
+                            Emit($"filq (%esp)");
+                            Emit($"addl $8, %esp");
+                        } else {
+                            Emit($"pushl ${rhs.IntConst}");
+                            Emit($"fild (%esp)");
+                            Emit($"addl $4, %esp");
+                        }
                         break;
                     case Value.ValueKind.FloatConst:
-                        if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                        if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
                             var bytes = BitConverter.GetBytes((float)rhs.FloatConst);
                             var dword = BitConverter.ToUInt32(bytes, 0);
                             Emit($"pushl ${dword}");
                             Emit($"flds (%esp)");
                             Emit($"addl $4, %esp");
-                        } else if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Double)) {
+                        } else if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
                             var bytes = BitConverter.GetBytes(rhs.FloatConst);
                             var qwordlo = BitConverter.ToUInt32(bytes, 0);
                             var qwordhi = BitConverter.ToUInt32(bytes, 4);
@@ -1110,10 +1679,12 @@ namespace AnsiCParser {
                         break;
                     case Value.ValueKind.Var: {
                             string op = "";
-                            if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                            if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Float)) {
                                 op = "flds";
-                            } else {
+                            } else if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
                                 op = "fldl";
+                            } else {
+                                throw new NotImplementedException();
                             }
 
                             if (rhs.Label == null) {
@@ -1127,9 +1698,11 @@ namespace AnsiCParser {
                         if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
                             Emit($"flds (%esp)");
                             Emit($"addl $4, %esp");
-                        } else {
+                        } else if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
                             Emit($"fldl (%esp)");
                             Emit($"addl $8, %esp");
+                        } else {
+                            throw new NotImplementedException();
                         }
                         break;
                     case Value.ValueKind.Address:
@@ -1138,8 +1711,10 @@ namespace AnsiCParser {
                         Emit($"movl (%eax), %eax");
                         if (rhs.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
                             Emit($"flds (%eax)");
-                        } else {
+                        } else if (rhs.Type.IsBasicType(CType.BasicType.TypeKind.Double)) {
                             Emit($"fldl (%eax)");
+                        } else {
+                            throw new NotImplementedException();
                         }
                         Emit($"popl %eax");
                         Emit($"addl $4, %esp");
@@ -1263,6 +1838,14 @@ namespace AnsiCParser {
                                     case 4:
                                         Emit($"pushl ${unchecked((int)value.IntConst)}");
                                         break;
+                                    case 8: {
+                                            var bytes = BitConverter.GetBytes(value.IntConst);
+                                            var lo = BitConverter.ToUInt32(bytes, 0);
+                                            var hi = BitConverter.ToUInt32(bytes, 4);
+                                            Emit($"pushl ${hi}");
+                                            Emit($"pushl ${lo}");
+                                            break;
+                                        }
                                     default:
                                         throw new NotImplementedException();
                                 }
@@ -1277,6 +1860,14 @@ namespace AnsiCParser {
                                     case 4:
                                         Emit($"pushl ${unchecked((int)(uint)value.IntConst)}");
                                         break;
+                                    case 8: {
+                                            var bytes = BitConverter.GetBytes(value.IntConst);
+                                            var lo = BitConverter.ToUInt32(bytes, 0);
+                                            var hi = BitConverter.ToUInt32(bytes, 4);
+                                            Emit($"pushl ${hi}");
+                                            Emit($"pushl ${lo}");
+                                            break;
+                                        }
                                     default:
                                         throw new NotImplementedException();
                                 }
@@ -1337,7 +1928,7 @@ namespace AnsiCParser {
                             }
 
                             // コピー先を確保
-                            Emit($"subl ${(ValueType.Sizeof() + 3) & (~3)}, %esp");
+                            Emit($"subl ${Align(ValueType.Sizeof())}, %esp");
                             Emit($"movl %esp, %edi");
 
                             // 転送
@@ -1384,8 +1975,15 @@ namespace AnsiCParser {
 
                 // load value
                 switch (type.Sizeof()) {
+                    case 8:
+                        var subop = (op == "add") ? "adc" : "sbb";
+                        Emit($"pushl 4(%eax)");
+                        Emit($"pushl 0(%eax)");
+                        Emit($"{op}l ${size}, 0(%eax)");
+                        Emit($"{subop}l $0, 4(%eax)");
+                        break;
                     case 4:
-                        Emit($"movl (%eax), %ecx");
+                        Emit($"pushl (%eax)");
                         Emit($"{op}l ${size}, (%eax)");
                         break;
                     case 2:
@@ -1395,6 +1993,7 @@ namespace AnsiCParser {
                         } else {
                             Emit($"movzwl %cx, %ecx");
                         }
+                        Emit($"pushl %ecx");
                         Emit($"{op}w ${size}, (%eax)");
                         break;
                     case 1:
@@ -1404,12 +2003,12 @@ namespace AnsiCParser {
                         } else {
                             Emit($"movzbl %cl, %ecx");
                         }
+                        Emit($"pushl %ecx");
                         Emit($"{op}b ${size}, (%eax)");
                         break;
                     default:
                         throw new NotImplementedException();
                 }
-                Emit($"push %ecx");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
             }
             public void incp(CType type) {
@@ -1433,19 +2032,54 @@ namespace AnsiCParser {
                 }
             }
 
+            private void gen_cmp_I32(string cmp) {
+                LoadI32("%ecx");  // rhs
+                LoadI32("%eax");  // lhs
+                Emit("cmpl %ecx, %eax");
+                Emit($"{cmp} %al");
+                Emit("movzbl %al, %eax");
+                Emit($"pushl %eax");
+            }
+
+            private void gen_cmp_I64(string cmp1, string cmp2, string cmp3) {
+                var lTrue = LAlloc();
+                var lFalse = LAlloc();
+                // 
+                LoadI64("%eax", "%ebx");  // rhs
+                LoadI64("%ecx", "%edx");  // lhs
+                Emit("cmpl %ebx, %edx");
+                Emit("movl $1, %edx");
+                Emit($"{cmp1} {lTrue}");
+                Emit($"{cmp2} {lFalse}");
+                Emit("cmpl %eax, %ecx");
+                Emit($"{cmp3} {lTrue}");
+                Label(lFalse);
+                Emit("movl  $0, %edx");
+                Label(lTrue);
+                Emit("pushl %edx");
+            }
+
             public void gt(CType type) {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
-                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
-                    LoadI("%ecx");  // rhs
-                    LoadI("%eax");  // lhs
-                    Emit("cmpl %ecx, %eax");
-                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
-                        Emit("seta %al");
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I64("ja", "jb", "ja");
+                        } else {
+                            gen_cmp_I64("jg", "jl", "ja");
+                        }
                     } else {
-                        Emit("setg %al");
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I32("seta");
+                        } else {
+                            gen_cmp_I32("setg");
+                        }
                     }
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    gen_cmp_I32("seta");
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -1453,11 +2087,11 @@ namespace AnsiCParser {
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
                     Emit("seta %al");
+                    Emit("movzbl %al, %eax");
+                    Emit($"pushl %eax");
                 } else {
                     throw new NotImplementedException();
                 }
-                Emit("movzbl %al, %eax");
-                Emit($"pushl %eax");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
 
@@ -1465,15 +2099,23 @@ namespace AnsiCParser {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
-                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
-                    LoadI("%ecx");  // rhs
-                    LoadI("%eax");  // lhs
-                    Emit("cmpl %ecx, %eax");
-                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
-                        Emit("setb %al");
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I64("jb", "ja", "jb");
+                        } else {
+                            gen_cmp_I64("jl", "jg", "jb");
+                        }
                     } else {
-                        Emit("setl %al");
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I32("setb");
+                        } else {
+                            gen_cmp_I32("setl");
+                        }
                     }
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    gen_cmp_I32("setb");
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -1481,11 +2123,11 @@ namespace AnsiCParser {
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
                     Emit("setb %al");
+                    Emit("movzbl %al, %eax");
+                    Emit($"pushl %eax");
                 } else {
                     throw new NotImplementedException();
                 }
-                Emit("movzbl %al, %eax");
-                Emit($"pushl %eax");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
 
@@ -1493,15 +2135,23 @@ namespace AnsiCParser {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
-                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
-                    LoadI("%ecx");  // rhs
-                    LoadI("%eax");  // lhs
-                    Emit("cmpl %ecx, %eax");
-                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
-                        Emit("setae %al");
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I64("ja", "jb", "jae");
+                        } else {
+                            gen_cmp_I64("jg", "jl", "jae");
+                        }
                     } else {
-                        Emit("setge %al");
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I32("setae");
+                        } else {
+                            gen_cmp_I32("setge");
+                        }
                     }
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    gen_cmp_I32("setae");
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -1509,11 +2159,11 @@ namespace AnsiCParser {
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
                     Emit("setae	%al");
+                    Emit("movzbl %al, %eax");
+                    Emit($"pushl %eax");
                 } else {
                     throw new NotImplementedException();
                 }
-                Emit("movzbl %al, %eax");
-                Emit($"pushl %eax");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
 
@@ -1521,15 +2171,23 @@ namespace AnsiCParser {
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
-                if ((lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) || (lhs.Type.IsPointerType() && rhs.Type.IsPointerType())) {
-                    LoadI("%ecx");  // rhs
-                    LoadI("%eax");  // lhs
-                    Emit("cmpl %ecx, %eax");
-                    if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
-                        Emit("setbe %al");
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    if (lhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I64("jb", "ja", "jbe");
+                        } else {
+                            gen_cmp_I64("jl", "jg", "jbe");
+                        }
                     } else {
-                        Emit("setle %al");
+                        if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
+                            gen_cmp_I32("setbe");
+                        } else {
+                            gen_cmp_I32("setle");
+                        }
                     }
+                } else if (lhs.Type.IsPointerType() && rhs.Type.IsPointerType()) {
+                    gen_cmp_I32("setbe");
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
                     LoadF();
@@ -1537,11 +2195,11 @@ namespace AnsiCParser {
                     Emit($"fcomip");
                     Emit($"fstp %st(0)");
                     Emit("setbe %al");
+                    Emit("movzbl %al, %eax");
+                    Emit($"pushl %eax");
                 } else {
                     throw new NotImplementedException();
                 }
-                Emit("movzbl %al, %eax");
-                Emit($"pushl %eax");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
 
@@ -1579,9 +2237,19 @@ namespace AnsiCParser {
             public void umin(CType type) {
                 var operand = Peek(0);
                 if (operand.Type.IsIntegerType()) {
-                    operand = LoadI("%eax");
-                    Emit($"negl %eax");
-                    Emit($"pushl %eax");
+                    if (operand.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%edx");
+                        Emit($"negl	%eax");
+                        Emit($"adcl	$0, %edx");
+                        Emit($"negl	%edx");
+                        Emit($"pushl %edx");
+                        Emit($"pushl %eax");
+                    } else {
+                        LoadI32("%eax");
+                        Emit($"negl %eax");
+                        Emit($"pushl %eax");
+                    }
+
                     Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (operand.Type.IsRealFloatingType()) {
                     LoadF();
@@ -1595,9 +2263,17 @@ namespace AnsiCParser {
             public void uneg(CType type) {
                 var operand = Peek(0);
                 if (operand.Type.IsIntegerType()) {
-                    operand = LoadI("%eax");
-                    Emit($"notl %eax");
-                    Emit($"pushl %eax");
+                    if (operand.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        LoadI64("%eax", "%edx");
+                        Emit($"notl	%eax");
+                        Emit($"notl	%edx");
+                        Emit($"pushl %edx");
+                        Emit($"pushl %eax");
+                    } else {
+                        LoadI32("%eax");
+                        Emit($"notl %eax");
+                        Emit($"pushl %eax");
+                    }
                     Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
                 } else {
                     throw new NotImplementedException();
@@ -1606,11 +2282,20 @@ namespace AnsiCParser {
 
             public void unot(CType type) {
                 var operand = Peek(0);
-                LoadI("%eax");
-                Emit($"cmpl $0, %eax");
-                Emit($"sete %al");
-                Emit($"movzbl %al, %eax");
-                Emit($"pushl %eax");
+                if (operand.Type.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    LoadI64("%eax", "%edx");
+                    Emit($"orl %edx, %eax");
+                    Emit($"cmpl $0, %eax");
+                    Emit($"sete %al");
+                    Emit($"movzbl %al, %eax");
+                    Emit($"pushl %eax");
+                } else {
+                    LoadI32("%eax");
+                    Emit($"cmpl $0, %eax");
+                    Emit($"sete %al");
+                    Emit($"movzbl %al, %eax");
+                    Emit($"pushl %eax");
+                }
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
 
@@ -1628,32 +2313,38 @@ namespace AnsiCParser {
 
                 // load value
                 switch (type.Sizeof()) {
+                    case 8:
+                        var subop = (op == "add") ? "adc" : "sbb";
+                        Emit($"{op}l ${size}, 0(%eax)");
+                        Emit($"{subop}l $0, 4(%eax)");
+                        Emit($"pushl 4(%eax)");
+                        Emit($"pushl 0(%eax)");
+                        break;
                     case 4:
-                        Emit($"movl (%eax), %ecx");
                         Emit($"{op}l ${size}, (%eax)");
+                        Emit($"pushl (%eax)");
                         break;
                     case 2:
-                        Emit($"movw (%eax), %cx");
-                        if (type.IsSignedIntegerType()) {
-                            Emit($"movswl %cx, %ecx");
-                        } else {
-                            Emit($"movzwl %cx, %ecx");
-                        }
                         Emit($"{op}w ${size}, (%eax)");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movswl (%eax), %ecx");
+                        } else {
+                            Emit($"movzwl (%eax), %ecx");
+                        }
+                        Emit($"pushl %ecx");
                         break;
                     case 1:
-                        Emit($"movb (%eax), %cl");
-                        if (type.IsSignedIntegerType()) {
-                            Emit($"movsbl %cl, %ecx");
-                        } else {
-                            Emit($"movzbl %cl, %ecx");
-                        }
                         Emit($"{op}b ${size}, (%eax)");
+                        if (type.IsSignedIntegerType()) {
+                            Emit($"movsbl (%eax), %ecx");
+                        } else {
+                            Emit($"movzbl (%eax), %ecx");
+                        }
+                        Emit($"pushl %ecx");
                         break;
                     default:
                         throw new NotImplementedException();
                 }
-                Emit($"push (%eax)");
                 Push(new Value() { Kind = Value.ValueKind.Temp, Type = type });
             }
             public void pinc(CType type) {
@@ -1664,7 +2355,7 @@ namespace AnsiCParser {
             }
 
             public void refe(CType type) {
-                LoadI("%eax");
+                LoadI32("%eax");
                 Emit($"pushl %eax");
                 Push(new Value() { Kind = Value.ValueKind.Address, Type = type });
 
@@ -1674,31 +2365,39 @@ namespace AnsiCParser {
                 if (type != null) {
                     var value = Peek(0);
                     if (value.Type.IsSignedIntegerType()) {
-                        value = LoadI("%ecx");
                         switch (value.Type.Sizeof()) {
                             case 1:
-                                Emit($"movsbl %cl, %eax");
+                                value = LoadI32("%eax");
+                                Emit($"movsbl %al, %eax");
                                 break;
                             case 2:
-                                Emit($"movswl %cx, %eax");
+                                value = LoadI32("%eax");
+                                Emit($"movswl %ax, %eax");
                                 break;
                             case 4:
-                                Emit($"movl %ecx, %eax");
+                                value = LoadI32("%eax");
+                                break;
+                            case 8:
+                                value = LoadI64("%eax", "%edx");
                                 break;
                             default:
                                 throw new NotImplementedException();
                         }
                     } else if (value.Type.IsUnsignedIntegerType()) {
-                        value = LoadI("%ecx");
                         switch (value.Type.Sizeof()) {
                             case 1:
-                                Emit($"movzbl %cl, %eax");
+                                value = LoadI32("%eax");
+                                Emit($"movzbl %al, %eax");
                                 break;
                             case 2:
-                                Emit($"movxwl %cx, %eax");
+                                value = LoadI32("%eax");
+                                Emit($"movxwl %ax, %eax");
                                 break;
                             case 4:
-                                Emit($"movl %ecx, %eax");
+                                value = LoadI32("%eax");
+                                break;
+                            case 8:
+                                value = LoadI64("%eax", "%edx");
                                 break;
                             default:
                                 throw new NotImplementedException();
@@ -1707,7 +2406,7 @@ namespace AnsiCParser {
                         LoadF();
                     } else {
                         if (value.Type.Sizeof() <= 4) {
-                            LoadI("%eax");
+                            LoadI32("%eax");
                         } else {
                             LoadVA("%esi");
                             Emit($"movl ${value.Type.Sizeof()}, %ecx");
@@ -1715,25 +2414,43 @@ namespace AnsiCParser {
                             Emit($"cld");
                             Emit($"rep movsb");
                             if (value.Kind == Value.ValueKind.Temp) {
-                                Emit($"addl {(value.Type.Sizeof() + 3) & ~3}, %esp");
+                                Emit($"addl {Align(value.Type.Sizeof())}, %esp");
                             }
                         }
 
                     }
                 }
 
+                Emit($"popl %ebx");
                 Emit($"movl %ebp, %esp");
                 Emit($"popl %ebp");
                 Emit($"ret");
             }
 
-            public void when(long caseValue, string label) {
-                Emit($"cmp ${caseValue}, %eax");
-                Emit($"je {label}");
+            public void when(CType condType, long caseValue, string label) {
+                if (condType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    var bytes = BitConverter.GetBytes(caseValue);
+                    var lo = BitConverter.ToUInt32(bytes, 0);
+                    var hi = BitConverter.ToUInt32(bytes, 4);
+                    var lFalse = LAlloc();
+                    Emit($"cmp ${lo}, %eax");
+                    Emit($"jne {lFalse}");
+                    Emit($"cmp ${hi}, %edx");
+                    Emit($"jne {lFalse}");
+                    Emit($"jmp {label}");
+                    Label(lFalse);
+                } else {
+                    Emit($"cmp ${caseValue}, %eax");
+                    Emit($"je {label}");
+                }
             }
 
-            public void case_of(Action<Generator> p) {
-                LoadI("%eax");
+            public void case_of(CType condType, Action<Generator> p) {
+                if (condType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    LoadI64("%eax", "%edx");
+                } else {
+                    LoadI32("%eax");
+                }
                 p(this);
             }
 
@@ -1761,12 +2478,6 @@ namespace AnsiCParser {
         /// </summary>
         public List<Tuple<string, byte[]>> dataBlock = new List<Tuple<string, byte[]>>();
 
-        int n = 0;
-
-        private string LAlloc() {
-            return $".L{n++}";
-        }
-
         public class Code {
             public string Body;
 
@@ -1789,9 +2500,9 @@ namespace AnsiCParser {
                 var ft = (self.Type as CType.FunctionType);
                 int offset = 8; // prev return position
 
-                // 戻り値領域
+                // 戻り値領域へのポインタ
                 if ((!ft.ResultType.IsVoidType()) && ft.ResultType.Sizeof() > 4 && !ft.ResultType.IsRealFloatingType()) {
-                    offset += 4; //(ft.ResultType.Sizeof() + 3) & ~3;
+                    offset += 4;
                 }
                 // 引数（先頭から）
                 arguments = new Dictionary<string, int>();
@@ -1799,7 +2510,7 @@ namespace AnsiCParser {
                 foreach (var arg in ft.Arguments) {
                     vars.Add($"// <Argument Name=\"{arg.Ident.Raw}\" Offset=\"{offset}\" />");
                     arguments.Add(arg.Ident.Raw, offset);
-                    offset += (arg.Type.Sizeof() + 3) & ~3;
+                    offset += Generator.Align(arg.Type.Sizeof());
                 }
 
                 // ラベル
@@ -1811,10 +2522,13 @@ namespace AnsiCParser {
                 vars.ForEach(x => g.Emit(x));
                 g.Emit($"pushl %ebp");
                 g.Emit($"movl %esp, %ebp");
-                var c = g.Emit(".error \"Stack size is need backpatch.\"");
-                maxLocalScopeTotalSize = 0;
+                g.Emit($"pushl %ebx");
+                var c = g.Emit(".error \"Stack size is need backpatch.\"");// スタックサイズは仮置き
+                localScopeTotalSize = 4;    // pushl %ebx分
+                maxLocalScopeTotalSize = 4;
                 self.Body.Accept(this, value);
-                c.Body = $"subl ${maxLocalScopeTotalSize}, %esp";
+                c.Body = $"subl ${maxLocalScopeTotalSize}, %esp";   // スタックサイズをバックパッチ
+                g.Emit($"popl %ebx");
                 g.Emit($"movl %ebp, %esp");
                 g.Emit($"popl %ebp");
                 g.Emit($"ret");
@@ -1927,8 +2641,8 @@ namespace AnsiCParser {
         public Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, Value value) {
             var cond = self.CondExpr.Accept(this, value);
 
-            var elseLabel = LAlloc();
-            var junctionLabel = LAlloc();
+            var elseLabel = g.LAlloc();
+            var junctionLabel = g.LAlloc();
 
             g.jmp_false(elseLabel);
 
@@ -1936,8 +2650,7 @@ namespace AnsiCParser {
             if (self.Type.IsVoidType()) {
                 // スタック上の結果を捨てる
                 g.Discard();
-            }
-            else {
+            } else {
                 g.LoadS(self.Type);
                 g.Pop();
             }
@@ -1957,8 +2670,7 @@ namespace AnsiCParser {
 
             if (self.Type.IsVoidType()) {
                 g.Push(new Value() { Kind = Value.ValueKind.Void });
-            }
-            else {
+            } else {
                 g.Push(new Value() { Kind = Value.ValueKind.Temp, Type = self.Type });
             }
             return value;
@@ -2006,8 +2718,8 @@ namespace AnsiCParser {
         }
 
         public Value OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, Value value) {
-            var labelFalse = LAlloc();
-            var labelJunction = LAlloc();
+            var labelFalse = g.LAlloc();
+            var labelJunction = g.LAlloc();
             self.Lhs.Accept(this, value);
             g.jmp_false(labelFalse);
             self.Rhs.Accept(this, value);
@@ -2022,8 +2734,8 @@ namespace AnsiCParser {
         }
 
         public Value OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, Value value) {
-            var labelTrue = LAlloc();
-            var labelJunction = LAlloc();
+            var labelTrue = g.LAlloc();
+            var labelJunction = g.LAlloc();
             self.Lhs.Accept(this, value);
             g.jmp_true(labelTrue);
             self.Rhs.Accept(this, value);
@@ -2353,7 +3065,7 @@ namespace AnsiCParser {
                         // static
                         localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
                     } else {
-                        localScopeTotalSize += (x.LinkageObject.Type.Sizeof() + 3) & ~3;
+                        localScopeTotalSize += Generator.Align(x.LinkageObject.Type.Sizeof());
                         localScope.Add(x.Ident, Tuple.Create((string)null, -localScopeTotalSize));
                     }
                 } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
@@ -2393,8 +3105,8 @@ namespace AnsiCParser {
         }
 
         public Value OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, Value value) {
-            var labelContinue = LAlloc();
-            var labelBreak = LAlloc();
+            var labelContinue = g.LAlloc();
+            var labelBreak = g.LAlloc();
 
             // Check Loop Condition
             g.Label(labelContinue);
@@ -2428,9 +3140,9 @@ namespace AnsiCParser {
                 g.Discard();
             }
 
-            var labelHead = LAlloc();
-            var labelContinue = LAlloc();
-            var labelBreak = LAlloc();
+            var labelHead = g.LAlloc();
+            var labelContinue = g.LAlloc();
+            var labelBreak = g.LAlloc();
 
             // Check Loop Condition
             g.Label(labelHead);
@@ -2459,7 +3171,7 @@ namespace AnsiCParser {
 
         public Value OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, Value value) {
             if (genericlabels.ContainsKey(self.Ident) == false) {
-                genericlabels[self.Ident] = LAlloc();
+                genericlabels[self.Ident] = g.LAlloc();
             }
             g.Label(genericlabels[self.Ident]);
             self.Stmt.Accept(this, value);
@@ -2468,7 +3180,7 @@ namespace AnsiCParser {
 
         public Value OnGotoStatement(SyntaxTree.Statement.GotoStatement self, Value value) {
             if (genericlabels.ContainsKey(self.Label) == false) {
-                genericlabels[self.Label] = LAlloc();
+                genericlabels[self.Label] = g.LAlloc();
             }
             g.Jmp(genericlabels[self.Label]);
             return new Value() { Kind = Value.ValueKind.Void };
@@ -2477,8 +3189,8 @@ namespace AnsiCParser {
         public Value OnIfStatement(SyntaxTree.Statement.IfStatement self, Value value) {
             var cond = self.Cond.Accept(this, value);
             if (self.ElseStmt != null) {
-                var elseLabel = LAlloc();
-                var junctionLabel = LAlloc();
+                var elseLabel = g.LAlloc();
+                var junctionLabel = g.LAlloc();
 
                 g.jmp_false(elseLabel);
 
@@ -2488,7 +3200,7 @@ namespace AnsiCParser {
                 var elseRet = self.ElseStmt.Accept(this, value);
                 g.Label(junctionLabel);
             } else {
-                var junctionLabel = LAlloc();
+                var junctionLabel = g.LAlloc();
 
                 g.jmp_false(junctionLabel);
 
@@ -2512,21 +3224,21 @@ namespace AnsiCParser {
         private Stack<Dictionary<SyntaxTree.Statement, string>> _switchLabelTableStack = new Stack<Dictionary<SyntaxTree.Statement, string>>();
 
         public Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Value value) {
-            var labelBreak = LAlloc();
+            var labelBreak = g.LAlloc();
 
             var ret = self.Cond.Accept(this, value);
 
             var labelDic = new Dictionary<SyntaxTree.Statement, string>();
-            g.case_of((_g) => {
+            g.case_of(self.Cond.Type, (_g) => {
                 foreach (var caseLabel in self.CaseLabels) {
                     var caseValue = caseLabel.Value;
-                    var label = LAlloc();
+                    var label = g.LAlloc();
                     labelDic.Add(caseLabel, label);
-                    g.when(caseValue, label);
+                    g.when(self.Cond.Type, caseValue, label);
                 }
             });
             if (self.DefaultLabel != null) {
-                var label = LAlloc();
+                var label = g.LAlloc();
                 labelDic.Add(self.DefaultLabel, label);
                 g.Jmp(label);
             } else {
@@ -2544,8 +3256,8 @@ namespace AnsiCParser {
         }
 
         public Value OnWhileStatement(SyntaxTree.Statement.WhileStatement self, Value value) {
-            var labelContinue = LAlloc();
-            var labelBreak = LAlloc();
+            var labelContinue = g.LAlloc();
+            var labelBreak = g.LAlloc();
 
             // Check Loop Condition
             g.Label(labelContinue);
@@ -2637,7 +3349,23 @@ namespace AnsiCParser {
                             }
                             break;
                         case SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst:
-                            throw new NotImplementedException();
+                            switch (v.Type.Sizeof()) {
+                                case 4: {
+                                    var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)v.FloatConst),0);
+                                    Emit($".long {dwords}");
+                                    break;
+
+                                }
+                                case 8: {
+                                    var lo = BitConverter.ToUInt32(BitConverter.GetBytes((float)v.FloatConst), 0);
+                                    var hi = BitConverter.ToUInt32(BitConverter.GetBytes((float)v.FloatConst), 0);
+
+                                    Emit($".long {lo}, {hi}");
+                                    break;
+                                }
+                                default:
+                                    throw new ArgumentOutOfRangeException();
+                            }
                             break;
                         case SyntaxTreeCompileVisitor.Value.ValueKind.Var:
                             if (v.Label == null) {
@@ -2750,7 +3478,7 @@ namespace AnsiCParser {
         }
 
         public SyntaxTreeCompileVisitor.Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
+            return new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = self.Value, Type = self.Type };
         }
 
         public SyntaxTreeCompileVisitor.Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTreeCompileVisitor.Value value) {
@@ -2891,7 +3619,7 @@ namespace AnsiCParser {
             var suType = self.Type.Unwrap() as CType.TaggedType.StructUnionType;
             if (suType.IsStructureType()) {
 
-                var filledSize = suType.Members.Skip(self.Inits.Count).Aggregate(0, (s,x) => s + x.Type.Sizeof());
+                var filledSize = suType.Members.Skip(self.Inits.Count).Aggregate(0, (s, x) => s + x.Type.Sizeof());
                 while (filledSize > 0) {
                     if (filledSize >= 4) {
                         filledSize -= 4;
@@ -2976,39 +3704,3 @@ namespace AnsiCParser {
 
 }
 
-
-/*
-signed long long +/- signed long long
-	movl	yl, %eax
-	movl	yh, %edx
-	movl	xl, %ecx
-	movl	xh, %ebx
-	
-    // add
-    addl	%ecx, %eax
-	adcl	%ebx, %edx
-	
-    // sub
-    subl	%ecx, %eax
-	sbbl	%ebx, %edx
-
-    // mul 筆算のアルゴリズム
-	movl	xh, %eax
-	imull	yl, %edx		// a:b = yl * xh
-	movl	yh, %eax
-	imull	xl, %eax		// c:d = yh * xl
-	leal	(%edx,%eax), %ecx	// e = b + d
-	movl	16(%esp), %eax		// 
-	mull	24(%esp)			// f:g = xl * yl
-	addl	%edx, %ecx			// e:0 + f:g
-	movl	%ecx, %edx
-	movl	%eax, 8(%esp)       // zl = g
-	movl	%edx, 12(%esp)      // zh = f + e
-
-
-	movl	%eax, zl
-	movl	%edx, zh
-
-    
-     
-     */
