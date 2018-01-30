@@ -88,7 +88,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// リンケージ
+        /// リンケージ種別
         /// </summary>
         public LinkageKind Linkage {
             get;
@@ -104,6 +104,9 @@ namespace AnsiCParser {
         /// </summary>
         public SyntaxTree.Declaration Definition { get; set; }
 
+        /// <summary>
+        /// リンケージを考慮した名前
+        /// </summary>
         public string LinkageId {
             get;
             set;

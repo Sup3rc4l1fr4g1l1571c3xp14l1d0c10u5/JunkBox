@@ -52,8 +52,17 @@ namespace AnsiCParser {
     /// ソースコード中の範囲を示す位置情報
     /// </summary>
     public class LocationRange {
+            /// <summary>
+            /// 範囲の開始地点
+            /// </summary>
         public Location Start { get; }
+
+        /// <summary>
+        /// 範囲の終了地点
+        /// </summary>
         public Location End { get; }
+
+        public static readonly LocationRange Empty = new LocationRange(Location.Empty, Location.Empty);
 
         public LocationRange(Location start, Location end) {
             Start = start;

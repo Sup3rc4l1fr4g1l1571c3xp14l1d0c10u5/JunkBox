@@ -21,45 +21,45 @@ namespace AnsiCParser {
                 case CType.BasicType.TypeKind.Char:
                     return Cell.Create("char");
                 case CType.BasicType.TypeKind.SignedChar:
-                    return Cell.Create("signed char");
+                    return Cell.Create("signed-char");
                 case CType.BasicType.TypeKind.UnsignedChar:
-                    return Cell.Create("unsigned char");
+                    return Cell.Create("unsigned-char");
                 case CType.BasicType.TypeKind.SignedShortInt:
-                    return Cell.Create("signed short int");
+                    return Cell.Create("signed-short-int");
                 case CType.BasicType.TypeKind.UnsignedShortInt:
-                    return Cell.Create("unsigned short int");
+                    return Cell.Create("unsigned-short-int");
                 case CType.BasicType.TypeKind.SignedInt:
-                    return Cell.Create("signed int");
+                    return Cell.Create("signed-int");
                 case CType.BasicType.TypeKind.UnsignedInt:
-                    return Cell.Create("unsigned int");
+                    return Cell.Create("unsigned-int");
                 case CType.BasicType.TypeKind.SignedLongInt:
-                    return Cell.Create("signed long int");
+                    return Cell.Create("signed-long-int");
                 case CType.BasicType.TypeKind.UnsignedLongInt:
-                    return Cell.Create("unsigned long int");
+                    return Cell.Create("unsigned-long-int");
                 case CType.BasicType.TypeKind.SignedLongLongInt:
-                    return Cell.Create("signed long long int");
+                    return Cell.Create("signed-long-long-int");
                 case CType.BasicType.TypeKind.UnsignedLongLongInt:
-                    return Cell.Create("unsigned long long int");
+                    return Cell.Create("unsigned-long-long-int");
                 case CType.BasicType.TypeKind.Float:
                     return Cell.Create("float");
                 case CType.BasicType.TypeKind.Double:
                     return Cell.Create("double");
                 case CType.BasicType.TypeKind.LongDouble:
-                    return Cell.Create("long double");
+                    return Cell.Create("long-double");
                 case CType.BasicType.TypeKind._Bool:
                     return Cell.Create("_Bool");
                 case CType.BasicType.TypeKind.Float_Complex:
-                    return Cell.Create("float _Complex");
+                    return Cell.Create("float-_Complex");
                 case CType.BasicType.TypeKind.Double_Complex:
-                    return Cell.Create("double _Complex");
+                    return Cell.Create("double-_Complex");
                 case CType.BasicType.TypeKind.LongDouble_Complex:
-                    return Cell.Create("long double _Complex");
+                    return Cell.Create("long-double-_Complex");
                 case CType.BasicType.TypeKind.Float_Imaginary:
-                    return Cell.Create("float _Imaginary");
+                    return Cell.Create("float-_Imaginary");
                 case CType.BasicType.TypeKind.Double_Imaginary:
-                    return Cell.Create("double _Imaginary");
+                    return Cell.Create("double-_Imaginary");
                 case CType.BasicType.TypeKind.LongDouble_Imaginary:
-                    return Cell.Create("long double _Imaginary");
+                    return Cell.Create("long-double-_Imaginary");
                 default:
                     throw new Exception();
 
