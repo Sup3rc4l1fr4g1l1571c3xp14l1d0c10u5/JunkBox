@@ -10,9 +10,10 @@ namespace AnsiCParser {
         }
 
         protected CompilerException(Location start, Location end, string message) : base(message) {
-            this.Start = start;
-            this.End = end;
+            Start = start;
+            End = end;
         }
+
         /// <summary>
         /// 構文エラー
         /// </summary>

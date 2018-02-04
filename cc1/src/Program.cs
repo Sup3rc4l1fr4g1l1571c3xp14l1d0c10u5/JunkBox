@@ -10,33 +10,31 @@ namespace AnsiCParser {
             } else {
                 DebugMain(args);
             }
-
         }
 
         static void CommonMain(string[] args) {
-            CommandLineOptionsParser clop = new CommandLineOptionsParser();
-
             string outputFile = null;
             string astFile = null;
 
-            clop.Entry("-o", 1, (s) => {
-                outputFile = s[0];
-                return true;
-            });
-            clop.Entry("-ast", 1, (s) => {
-                astFile = s[0];
-                return true;
-            });
-            args = clop.Parse(args);
+            args = new CommandLineOptionsParser()
+                .Entry("-o", 1, (s) => {
+                    outputFile = s[0];
+                    return true;
+                })
+                .Entry("-ast", 1, (s) => {
+                    astFile = s[0];
+                    return true;
+                })
+                .Parse(args);
+
             if (args.Length == 0) {
                 Logger.Error("コンパイル対象のCソースファイルを１つ指定してください。");
                 Environment.Exit(-1);
             } else if (args.Length > 1) {
                 Logger.Error("コンパイル対象のCソースファイルが２つ以上指定されています。");
                 Environment.Exit(-1);
-            }
-            var arg = args[0];
-            {
+            } else {
+                var arg = args[0];
 
                 if (System.IO.File.Exists(arg) == false) {
                     Logger.Error($"{arg}がみつかりません。");
@@ -72,13 +70,13 @@ namespace AnsiCParser {
         static void DebugMain(string[] args) {
 #if false
             {
-                var g = new SyntaxTreeCompileVisitor.Generator();
+                var generator = new SyntaxTreeCompileVisitor.Generator();
                 // a + 1
-                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Var, Label = "_a", Offset = 0, Type = CType.CreateFloat() });
-                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst= 3.14, Type = CType.CreateFloat() });
-                g.add(CType.CreateFloat());
-                g.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = 2, Type = CType.CreateFloat() });
-                g.add(CType.CreateFloat());
+                generator.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Var, Label = "_a", Offset = 0, Type = CType.CreateFloat() });
+                generator.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst= 3.14, Type = CType.CreateFloat() });
+                generator.add(CType.CreateFloat());
+                generator.push(new SyntaxTreeCompileVisitor.Value() { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = 2, Type = CType.CreateFloat() });
+                generator.add(CType.CreateFloat());
 
             }
             {
@@ -132,7 +130,7 @@ namespace AnsiCParser {
 
 #endif
 
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\46_grep.c")).Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\tmp\19_pointer_arithmetic.i")).Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();

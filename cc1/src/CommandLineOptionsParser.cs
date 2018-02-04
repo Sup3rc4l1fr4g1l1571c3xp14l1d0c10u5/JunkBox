@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace AnsiCParser {
 
@@ -9,6 +7,7 @@ namespace AnsiCParser {
     /// コマンドライン引数を解析する
     /// </summary>
     public class CommandLineOptionsParser {
+
         /// <summary>
         /// コマンドライン引数に応じた処理を行うイベントハンドラ
         /// </summary>
@@ -22,21 +21,21 @@ namespace AnsiCParser {
         private class OptionDefinition {
 
             public OptionDefinition(string name, int argc, OptionHandler handler) {
-                this.Name = name;
-                this.Argc = argc;
-                this.Handler = handler;
+                Name = name;
+                Argc = argc;
+                Handler = handler;
             }
 
             public string Name {
-                get; private set;
+                get;
             }
 
             public int Argc {
-                get; private set;
+                get;
             }
 
             public OptionHandler Handler {
-                get; private set;
+                get;
             }
 
             public override int GetHashCode() {
@@ -47,7 +46,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数定義のテーブル
         /// </summary>
-        private Dictionary<String, OptionDefinition> Options = new Dictionary<String, OptionDefinition>();
+        private readonly Dictionary<String, OptionDefinition> _options = new Dictionary<String, OptionDefinition>();
 
         /// <summary>
         /// 引数の定義を登録する
@@ -55,25 +54,26 @@ namespace AnsiCParser {
         /// <param name="name">引数文字列</param>
         /// <param name="argc">受け取る引数の数</param>
         /// <param name="handler">処理用のハンドラ</param>
-        public void Entry(string name, int argc, OptionHandler handler) {
-            Options.Add(name, new OptionDefinition(name, argc, handler));
+        public CommandLineOptionsParser Entry(string name, int argc, OptionHandler handler) {
+            _options.Add(name, new OptionDefinition(name, argc, handler));
+            return this;
         }
 
         /// <summary>
         /// 引数の数が少なかった場合に発生させる例外
         /// </summary>
-        public class TooFewArgumentException : System.ArgumentException {
+        public class TooFewArgumentException : ArgumentException {
             public string Name {
-                get; private set;
+                get;
             }
             public int ArgCount {
-                get; private set;
+                get;
             }
             public int ParamCount {
-                get; private set;
+                get;
             }
             public TooFewArgumentException(string name, int argc, int paramc) :
-                base(String.Format("コマンドライン引数 {0} には {1}個の引数が必要ですが、指定されているのは{2}個です。", name, argc, paramc)) {
+                base($"コマンドライン引数 {name} には {argc}個の引数が必要ですが、指定されているのは{paramc}個です。") {
                 Name = name;
                 ArgCount = argc;
                 ParamCount = paramc;
@@ -83,15 +83,15 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数の解析失敗時に発生させる例外
         /// </summary>
-        public class ArgumentFormatException : System.ArgumentException {
+        public class ArgumentFormatException : ArgumentException {
             public string Name {
-                get; private set;
+                get;
             }
             public string[] Params {
-                get; private set;
+                get;
             }
             public ArgumentFormatException(string name, string[] paramv) :
-                base(String.Format("コマンドライン引数 {0} {1} の書式に誤りがあります。", name, string.Join(" ", paramv))) {
+                base($"コマンドライン引数 {name} {string.Join(" ", paramv)} の書式に誤りがあります。") {
                 Name = name;
                 Params = paramv;
             }
@@ -103,31 +103,34 @@ namespace AnsiCParser {
         /// <param name="args">引数列</param>
         /// <returns>余りの引数列</returns>
         public string[] Parse(string[] args) {
-            IEnumerator<string> it = new List<string>(args).GetEnumerator();
-            List<String> s = new List<string>();
-            while (it.MoveNext()) {
-                var key = it.Current;
-                OptionDefinition info;
-                if (Options.TryGetValue(key, out info)) {
-                    List<string> tmp = new List<string>();
-                    for (int i = 0; i < info.Argc; i++) {
-                        if (it.MoveNext() == false) {
-                            throw new TooFewArgumentException(info.Name, info.Argc, tmp.Count);
-                        } else {
-                            tmp.Add(it.Current);
+            using (IEnumerator<string> it = new List<string>(args).GetEnumerator()) {
+
+                var s = new List<string>();
+                while (it.MoveNext()) {
+                    var key = it.Current;
+                    OptionDefinition info;
+                    if (key == null) { continue; }
+                    if (_options.TryGetValue(key, out info)) {
+                        var tmp = new List<string>();
+                        for (int i = 0; i < info.Argc; i++) {
+                            if (it.MoveNext() == false) {
+                                throw new TooFewArgumentException(info.Name, info.Argc, tmp.Count);
+                            } else {
+                                tmp.Add(it.Current);
+                            }
                         }
+                        var ary = tmp.ToArray();
+                        if (info.Handler(ary) == false) {
+                            throw new ArgumentFormatException(info.Name, ary);
+                        }
+                    } else {
+                        do {
+                            s.Add(it.Current);
+                        } while (it.MoveNext());
                     }
-                    var ary = tmp.ToArray();
-                    if (info.Handler(ary) == false) {
-                        throw new ArgumentFormatException(info.Name, ary);
-                    }
-                } else {
-                    do {
-                        s.Add(it.Current);
-                    } while (it.MoveNext());
                 }
+                return s.ToArray();
             }
-            return s.ToArray();
         }
     }
 }

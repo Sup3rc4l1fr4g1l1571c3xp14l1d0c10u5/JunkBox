@@ -99,10 +99,10 @@ namespace AnsiCParser {
             // 符号を読んでおく
             var sign = false;
             if (fs.FirstOrDefault() == '-') {
-                fs.Remove(0, 1);
+                fs = fs.Remove(0, 1);
                 sign = true;
             } else if (fs.FirstOrDefault() == '+') {
-                fs.Remove(0, 1);
+                fs = fs.Remove(0, 1);
             }
 
             // 仮数部が0の場合は特別扱い
@@ -112,13 +112,14 @@ namespace AnsiCParser {
 
             if (suffix == "f") {
                 // float 型として解析
-                fs = (fs + "0000000000000000").Substring(0, 8);
+                fs = (fs + new string(Enumerable.Repeat('0',8).ToArray())).Substring(0, 8);
                 var f = Convert.ToUInt32(fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 31)) == 0) {
                     f <<= 1;
                     dp--;
                 }
+                // ケチ表現化
                 {
                     f <<= 1;
                     dp--;
@@ -131,13 +132,14 @@ namespace AnsiCParser {
                 return d;
             } else {
                 // double 型として解析
-                fs = (fs + "0000000000000000").Substring(0, 16);
+                fs = (fs + new string(Enumerable.Repeat('0', 16).ToArray())).Substring(0, 16);
                 var f = Convert.ToUInt64(fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 63)) == 0) {
                     f <<= 1;
                     dp--;
                 }
+                // ケチ表現化
                 {
                     f <<= 1;
                     dp--;
@@ -515,7 +517,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 入力ファイル名
         /// </summary>
-        private readonly string _filepath;
+        private string _filepath;
 
         /// <summary>
         /// 読み取り位置の行番号
@@ -697,13 +699,23 @@ namespace AnsiCParser {
                     while (Peek("\n") == false) {
                         IncPos(1);
                     }
+                    var end = GetCurrentLocation();
+                    var str = Substring(start, end);
                     IncPos(1);
+
+                    var match = Regex.Match(str, @"^#\s*(line\s+)?(?<line>\d+)\s+""(?<file>(\\""|[^""])*)""(\s+(\d+)){0,3}\s*$");
+                    if (match.Success) {
+                        // line 指令
+                        this._filepath = match.Groups["file"].Value;
+                        this._line = int.Parse(match.Groups["line"].Value);
+                        this._column = 1;
+                    }
                     goto rescan;
                 } else {
                     _tokens.Add(new Token((Token.TokenKind)'#', start, GetCurrentLocation(), "#"));
                     IncPos(1);
+                    return;
                 }
-                return;
             }
 
             // トークンを読み取った結果、行頭以外になるので先に行頭フラグを立てておく
@@ -769,8 +781,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => {
-                        });
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => {});
                     }
                 }
                 throw new Exception();
@@ -787,8 +798,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => {
-                        });
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => {});
                     }
                 }
                 throw new Exception();
@@ -805,7 +815,16 @@ namespace AnsiCParser {
                         return;
                     }
                 }
-                throw new Exception();
+            }
+
+            // 不正な文字
+            {
+                IncPos(1);
+                var end = GetCurrentLocation();
+                var str = Substring(start, end);
+                _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
+                return;
+
             }
 
         }

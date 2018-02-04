@@ -91,7 +91,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 指定した名前の要素が存在するなら取得する。
+        /// 指定した名前と型の要素が存在するなら取得する。
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="value"></param>

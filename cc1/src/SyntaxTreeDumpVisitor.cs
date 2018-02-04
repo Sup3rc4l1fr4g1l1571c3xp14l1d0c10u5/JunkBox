@@ -1,15 +1,15 @@
 using System;
+using System.Globalization;
 using System.Linq;
 
 namespace AnsiCParser {
     public class SyntaxTreeDumpVisitor : SyntaxTreeVisitor.IVisitor<Cell, Cell> {
-        private CTypeDumpVisitor typeDumpVisitor = new CTypeDumpVisitor();
 
         public Cell OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, Cell value) {
             return Cell.Create(self.Op == SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
-        public Cell OnAndExpression(SyntaxTree.Expression.AndExpression self, Cell value) {
+        public Cell OnAndExpression(SyntaxTree.Expression.BitExpression.AndExpression self, Cell value) {
             return Cell.Create("and-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
@@ -22,7 +22,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, Cell value) {
-            return Cell.Create("array-assign-init", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("array-assign-init", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => (object)x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, Cell value) {
@@ -46,12 +46,11 @@ namespace AnsiCParser {
         }
 
         public Cell OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Cell value) {
-            return Cell.Create("comma-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Expressions.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("comma-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Expressions.Select(x => (object)x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Cell value) {
             throw new Exception("来ないはず");
-            return Cell.Create("complex-init", self.LocationRange, Cell.Create(self.Ret.Select(x => x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, Cell value) {
@@ -92,7 +91,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, Cell value) {
-            return Cell.Create("compound-stmt", self.LocationRange, Cell.Create(self.Decls.Select(x => x.Accept(this, value)).Concat(self.Stmts.Select(x => x.Accept(this, value))).ToArray()));
+            return Cell.Create("compound-stmt", self.LocationRange, Cell.Create(self.Decls.Select(x => (object)x.Accept(this, value)).Concat(self.Stmts.Select(x => x.Accept(this, value))).ToArray()));
         }
 
         public Cell OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, Cell value) {
@@ -140,7 +139,7 @@ namespace AnsiCParser {
             return Cell.Create(ops, self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
-        public Cell OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, Cell value) {
+        public Cell OnExclusiveOrExpression(SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, Cell value) {
             return Cell.Create("xor-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
@@ -149,7 +148,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, Cell value) {
-            return Cell.Create("float-const", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Str, self.Value.ToString());
+            return Cell.Create("float-const", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Str, self.Value.ToString(CultureInfo.InvariantCulture));
         }
 
         public Cell OnForStatement(SyntaxTree.Statement.ForStatement self, Cell value) {
@@ -157,7 +156,7 @@ namespace AnsiCParser {
         }
 
         public Cell OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, Cell value) {
-            return Cell.Create("call-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Expr.Accept(this, value), Cell.Create(self.Args.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("call-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Expr.Accept(this, value), Cell.Create(self.Args.Select(x => (object)x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Cell value) {
@@ -184,7 +183,7 @@ namespace AnsiCParser {
             return Cell.Create("if-stmt", self.LocationRange, self.Cond.Accept(this, value), self.ThenStmt?.Accept(this, value) ?? Cell.Nil, self.ElseStmt?.Accept(this, value) ?? Cell.Nil);
         }
 
-        public Cell OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, Cell value) {
+        public Cell OnInclusiveOrExpression(SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, Cell value) {
             return Cell.Create("or-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), self.Lhs.Accept(this, value), self.Rhs.Accept(this, value));
         }
 
@@ -274,7 +273,6 @@ namespace AnsiCParser {
 
         public Cell OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, Cell value) {
             throw new Exception("来ないはず");
-            return Cell.Create("simple-init", self.LocationRange, self.AssignmentExpression.Accept(this, value));
         }
 
         public Cell OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, Cell value) {
@@ -286,11 +284,11 @@ namespace AnsiCParser {
         }
 
         public Cell OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, Cell value) {
-            return Cell.Create("string-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Strings.ToArray()));
+            return Cell.Create("string-expr", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Strings.Cast<object>().ToArray()));
         }
 
         public Cell OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, Cell value) {
-            return Cell.Create("struct-union-assign-init", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => x.Accept(this, value)).ToArray()));
+            return Cell.Create("struct-union-assign-init", self.LocationRange, self.Type.Accept(new CTypeDumpVisitor(), null), Cell.Create(self.Inits.Select(x => (object)x.Accept(this, value)).ToArray()));
         }
 
         public Cell OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Cell value) {
@@ -300,9 +298,9 @@ namespace AnsiCParser {
         public Cell OnTranslationUnit(SyntaxTree.TranslationUnit self, Cell value) {
             return Cell.Create("translation-unit", self.LocationRange,
                 Cell.Create("linkage-table", 
-                    Cell.Create(self.LinkageTable.Select(x => Cell.Create($"{x.LinkageId}#{x.Id}", (x.Definition ?? x.TentativeDefinitions[0]).LocationRange, x.Linkage.ToString(), x.Type.Accept(new CTypeDumpVisitor(), value))).ToArray())
+                    Cell.Create(self.LinkageTable.Select(x => (object)Cell.Create($"{x.LinkageId}#{x.Id}", (x.Definition ?? x.TentativeDefinitions[0]).LocationRange, x.Linkage.ToString(), x.Type.Accept(new CTypeDumpVisitor(), value))).ToArray())
                 ),
-                Cell.Create(self.Declarations.Select(x => x.Accept(this, value)).ToArray())
+                Cell.Create(self.Declarations.Select(x => (object)x.Accept(this, value)).ToArray())
             );
         }
 

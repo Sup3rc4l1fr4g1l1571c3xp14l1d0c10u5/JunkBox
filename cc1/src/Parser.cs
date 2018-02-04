@@ -699,7 +699,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "識別子並び中の要素以外が宣言並びにある。");
                 }
 
-                // K&R形式の識別子並びに宣言並びの型情報を規定の実引数拡張を伴って反映させる。
+                // K&R形式の識別子並びに宣言並びの型情報を既定の実引数拡張を伴って反映させる。
                 // 宣言並びを名前引きできる辞書に変換
                 var dic = argmuents.ToDictionary(x => x.Item1.Raw, x => x);
 
@@ -708,7 +708,7 @@ namespace AnsiCParser {
                     if (dic.ContainsKey(x.Ident.Raw)) {
                         var dapType = dic[x.Ident.Raw].Item2.DefaultArgumentPromotion();
                         if (CType.IsEqual(dapType, dic[x.Ident.Raw].Item2) == false) {
-                            throw new CompilerException.TypeMissmatchError(x.Ident.Start, x.Ident.End, $"仮引数 {x.Ident.Raw} は規定の実引数拡張で型が変化します。");
+                            throw new CompilerException.TypeMissmatchError(x.Ident.Start, x.Ident.End, $"仮引数 {x.Ident.Raw} は既定の実引数拡張で型が変化します。");
                         }
                         return new CType.FunctionType.ArgumentInfo(x.Range, x.Ident, dic[x.Ident.Raw].Item3, dic[x.Ident.Raw].Item2.DefaultArgumentPromotion());
                     } else {
@@ -2057,58 +2057,95 @@ namespace AnsiCParser {
                     }
                     it.Leave();
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                } else if (it.IsInComplexInitializer()) {
-                    // 初期化リスト内を舐めてる場合
-                    if (type.Length == -1) {
-                        if (depth != 1) {
-                            throw new Exception("ネストした可変配列を初期化しています。");
-                        }
-                        // 要素数分回す
-                        List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                        var loc = it.Current.LocationRange;
-                        var len = 0;
-                        while (it.Current != null) {
-                            assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                            len++;
-                        }
-                        // 配列の長さを固定する。
-                        type.Length = len;
-                        return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                    } else {
-                        var len = type.Length;
-                        // 要素数分回す
-                        List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                        var loc = it.Current.LocationRange;
-                        while (it.Current != null && len > 0) {
-                            assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                            len--;
-                        }
-                        return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                    }
                 } else if (it.IsSimpleInitializer()) {
                     if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
-                        var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
+                        if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
+                            // 文字列式を用いた初期化
+                            var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
+                            // 初期化リスト内を舐めてる場合
+                            if (type.Length == -1) {
+                                if (depth != 1) {
+                                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                                }
+                                // 要素数分回す
+                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                                var loc = it.Current.LocationRange;
+                                var len = sexpr.Value.Count;
+                                foreach (var b in sexpr.Value) {
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                                }
+                                // 配列の長さを固定する。
+                                type.Length = len;
+                                it.Next();
+                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                            } else {
+                                var len = sexpr.Value.Count;
+                                if (len > type.Length) {
+                                    Logger.Warning(sexpr.LocationRange, $"配列変数の要素数よりも長い文字列が初期化子として与えられているため、文字列末尾の {len - type.Length}バイトは無視され、終端文字なし文字列 (つまり、終端を示す 0 値のない文字列) が作成されます。");
+                                    len = type.Length;
+                                }
+                                // 要素数分回す
+                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                                var loc = it.Current.LocationRange;
+                                foreach (var b in sexpr.Value.Take(len)) {
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                                }
+                                it.Next();
+                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                            }
+                        } else {
+                            if (type.Length == -1) {
+                                if (depth != 1) {
+                                    throw new Exception("ネストした可変配列を初期化しています。");
+                                }
+                                // 要素数分回す
+                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                                var loc = it.Current.LocationRange;
+                                var len = 0;
+                                while (it.Current != null) {
+                                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                                    len++;
+                                }
+                                // 配列の長さを固定する。
+                                type.Length = len;
+                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                            } else {
+                                var len = type.Length;
+                                // 要素数分回す
+                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                                var loc = it.Current.LocationRange;
+                                while (it.Current != null && len > 0) {
+                                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                                    len--;
+                                }
+                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                            }
+                        }
+                    } else if (it.IsInComplexInitializer()) {
                         // 初期化リスト内を舐めてる場合
                         if (type.Length == -1) {
                             if (depth != 1) {
-                                throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                                throw new Exception("ネストした可変配列を初期化しています。");
                             }
                             // 要素数分回す
                             List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                             var loc = it.Current.LocationRange;
-                            var len = sexpr.Value.Count;
-                            foreach (var b in sexpr.Value) {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                            var len = 0;
+                            while (it.Current != null) {
+                                assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                                len++;
                             }
                             // 配列の長さを固定する。
                             type.Length = len;
                             return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
                         } else {
+                            var len = type.Length;
                             // 要素数分回す
                             List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                             var loc = it.Current.LocationRange;
-                            foreach (var b in sexpr.Value) {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                            while (it.Current != null && len > 0) {
+                                assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                                len--;
                             }
                             return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
                         }
@@ -2123,7 +2160,7 @@ namespace AnsiCParser {
                 if (it.IsComplexInitializer()) {
                     var inits = it.AsComplexInitializer().Ret;
                     if (type.Members.Count < inits.Count) {
-                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "要素数が型で指定された領域サイズを超えています。");
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えています。");
                     }
                     // 要素数分回す
                     // Todo: ビットフィールド
@@ -2156,6 +2193,10 @@ namespace AnsiCParser {
 
             private static SyntaxTree.Initializer CheckInitializerUnion(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it) {
                 if (it.IsComplexInitializer()) {
+                    var inits = it.AsComplexInitializer().Ret;
+                    if (1 < inits.Count) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "共用体の初期化子が２つ以上指定されています。");
+                    }
                     // Todo: ビットフィールド
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
@@ -2181,7 +2222,11 @@ namespace AnsiCParser {
             public static SyntaxTree.Initializer CheckInitializer(CType type, SyntaxTree.Initializer init) {
                 var it = new InitializerIterator(init);
                 it.Next();
-                return CheckInitializerBase(0, type, it);
+                var ret =  CheckInitializerBase(0, type, it);
+                if (it.Current != null) {
+                    Logger.Warning(init.LocationRange, "初期化子の要素が多すぎます。");
+                }
+                return ret;
             }
         }
 
@@ -2543,15 +2588,7 @@ namespace AnsiCParser {
             throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"分岐文は goto, continue, break, return の何れかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
-        /// <summary>
-        /// X.X.X GCC拡張インラインアセンブラ
-        /// </summary>
-        /// <returns></returns>
-        private SyntaxTree.Statement GnuAsmStatement() {
-
-            var start = _lexer.CurrentToken().Start;
-            Logger.Warning(start, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
-
+        private void GnuAsmPart() {
             _lexer.ReadToken(Token.TokenKind.__ASM__);
             _lexer.ReadTokenIf(Token.TokenKind.__VOLATILE__);
             _lexer.ReadToken('(');
@@ -2575,6 +2612,17 @@ namespace AnsiCParser {
                 }
                 _lexer.NextToken();
             }
+        }
+
+        /// <summary>
+        /// X.X.X GCC拡張インラインアセンブラ
+        /// </summary>
+        /// <returns></returns>
+            private SyntaxTree.Statement GnuAsmStatement() {
+
+            var start = _lexer.CurrentToken().Start;
+            Logger.Warning(start, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
+            GnuAsmPart();
             _lexer.ReadToken(';');
             var end = _lexer.CurrentToken().End;
             return new SyntaxTree.Statement.EmptyStatement(new LocationRange(start, end));
@@ -2893,6 +2941,9 @@ namespace AnsiCParser {
                     var type = TypeName();
                     _lexer.ReadToken(')');
                     var expr = CastExpression();
+                    if (expr.Type.IsArrayType()) {
+                        expr = Specification.ToPointerTypeExpr(expr);
+                    }
                     return new SyntaxTree.Expression.CastExpression(new LocationRange(tok.Start, expr.LocationRange.End), type, expr);
                 } else {
                     _lexer.Restore(saveCurrent);
@@ -3051,7 +3102,7 @@ namespace AnsiCParser {
             var lhs = EqualityExpression();
             while (_lexer.ReadTokenIf('&')) {
                 var rhs = EqualityExpression();
-                lhs = new SyntaxTree.Expression.AndExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
+                lhs = new SyntaxTree.Expression.BitExpression.AndExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
             }
             return lhs;
         }
@@ -3064,7 +3115,7 @@ namespace AnsiCParser {
             var lhs = AndExpression();
             while (_lexer.ReadTokenIf('^')) {
                 var rhs = AndExpression();
-                lhs = new SyntaxTree.Expression.ExclusiveOrExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
+                lhs = new SyntaxTree.Expression.BitExpression.ExclusiveOrExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
             }
             return lhs;
         }
@@ -3077,7 +3128,7 @@ namespace AnsiCParser {
             var lhs = ExclusiveOrExpression();
             while (_lexer.ReadTokenIf('|')) {
                 var rhs = ExclusiveOrExpression();
-                lhs = new SyntaxTree.Expression.InclusiveOrExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
+                lhs = new SyntaxTree.Expression.BitExpression.InclusiveOrExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
             }
             return lhs;
         }
@@ -3677,27 +3728,7 @@ namespace AnsiCParser {
                     // 外部オブジェクト定義 ( 関数プロトタイプ宣言にGCC拡張インラインアセンブラがくっついてくる場合もあるでここで読み飛ばす）
                     if (tok.Kind == Token.TokenKind.__ASM__) {
                         Logger.Warning(tok.Start, tok.End, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
-                        _lexer.ReadToken('(');
-                        Stack<char> parens = new Stack<char>();
-                        parens.Push('(');
-                        while (parens.Any()) {
-                            if (_lexer.PeekToken('(', '[')) {
-                                parens.Push((char)_lexer.CurrentToken().Kind);
-                            } else if (_lexer.PeekToken(')')) {
-                                if (parens.Peek() == '(') {
-                                    parens.Pop();
-                                } else {
-                                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 丸括弧閉じ ) が使用されていますが、対応する丸括弧開き ( がありません。");
-                                }
-                            } else if (_lexer.PeekToken(']')) {
-                                if (parens.Peek() == '[') {
-                                    parens.Pop();
-                                } else {
-                                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 角括弧閉じ ] が使用されていますが、対応する角括弧開き [ がありません。");
-                                }
-                            }
-                            _lexer.NextToken();
-                        }
+                        GnuAsmPart();
                     }
 
                     if (CType.CheckContainOldStyleArgument(type)) {

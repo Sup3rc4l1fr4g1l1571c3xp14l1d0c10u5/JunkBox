@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace AnsiCParser {
     /// <summary>
@@ -24,7 +22,7 @@ namespace AnsiCParser {
         ///   - 直前の副作用完了点から次の副作用完了点までの間に，式の評価によって一つのオブジェクトに格納された値を変更する回数は，高々 1 回でなければならない。
         ///     さらに，変更前の値の読取りは，格納される値を決定するためだけに行われなければならない。
         ///   - （関数呼出しの()，&&，||，?:及びコンマ演算子に対して）後で規定する場合を除いて，部分式の評価順序及び副作用が生じる順序は未規定とする。
-        ///   - 幾つかの演算子［総称してビット単位の演算子（bitwise operator）と呼ぶ単項演算子~並びに 2 項演算子 <<，>>，&，^及び|］は，整数型のオペランドを必要とする。
+        ///   - 幾つかの演算子［総称してビット単位の演算子（bitwise operator）と呼ぶ単項演算子~並びに 2 項演算子 &lt;&lt;，>>，&amp;，^及び|］は，整数型のオペランドを必要とする。
         ///     これらの演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつ。
         ///   - 式の評価中に例外条件（exceptional condition）が発生した場合（すなわち，結果が数学的に定義できないか，又は結果の型で表現可能な値の範囲にない場合），その動作は未定義とする。
         ///   - 格納された値にアクセスするときのオブジェクトの有効型（effective type）は，（もしあれば）そのオブジェクトの宣言された型とする。
@@ -75,7 +73,7 @@ namespace AnsiCParser {
                 /// </summary>
                 /// <remarks>
                 /// 識別子がオブジェクト（この場合，識別子は左辺値となる。），又は関数（この場合，関数指示子となる。）を指し示すと宣言されている場合，識別子は一次式とする。
-                /// 宣言されていない識別子は構文規則違反である。（脚注：C89以降では宣言されていない識別子は構文規則違反であるとなっているが、K&Rでは未定義識別子が許されちゃってるので文脈から変数/関数を判断する必要がある。）
+                /// 宣言されていない識別子は構文規則違反である。（脚注：C89以降では宣言されていない識別子は構文規則違反であるとなっているが、K&amp;Rでは未定義識別子が許されちゃってるので文脈から変数/関数を判断する必要がある。）
                 /// </remarks>
                 public abstract class IdentifierExpression : PrimaryExpression {
 
@@ -397,8 +395,8 @@ namespace AnsiCParser {
                             return CType.CreatePointer(Identifier.Type);
                         }
                     }
-                    public Expression.PrimaryExpression.IdentifierExpression Identifier { get; }
-                    public Expression.PrimaryExpression.Constant.IntegerConstant Offset { get; }
+                    public IdentifierExpression Identifier { get; }
+                    public Constant.IntegerConstant Offset { get; }
 
                     public AddressConstantExpression(LocationRange locationRange, IdentifierExpression identifier, Constant.IntegerConstant offset) : base(locationRange) {
                         Identifier = identifier;
@@ -544,12 +542,12 @@ namespace AnsiCParser {
                                 var targ = functionType.Arguments[i];
                                 var lhs = targ.Type.UnwrapTypeQualifier();
                                 var rhs = args[i];
-                                args[i] = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
+                                args[i] = AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
                             }
 
                             if (functionType.HasVariadic) {
                                 for (var i = functionType.Arguments.Length; i < args.Count; i++) {
-                                    args[i] = (Expression)new TypeConversionExpression(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
+                                    args[i] = new TypeConversionExpression(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
                                 }
                             }
 
@@ -1381,10 +1379,10 @@ namespace AnsiCParser {
                         } else if (lhsPtr != null && lhsPtr.Type.IsPointerType() && rhs.IsNullPointerConstant()) {
                             // 左辺のオペランドがポインタで右辺が空ポインタ定数である。
                             lhs = lhsPtr;
-                            rhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(rhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), rhs);
+                            rhs = new TypeConversionExpression(rhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), rhs);
                         } else if (rhsPtr != null && rhsPtr.Type.IsPointerType() && lhs.IsNullPointerConstant()) {
                             // 右辺のオペランドがポインタで左辺が空ポインタ定数である。
-                            lhs = new SyntaxTree.Expression.PostfixExpression.TypeConversionExpression(lhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), lhs);
+                            lhs = new TypeConversionExpression(lhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), lhs);
                             rhs = rhsPtr;
                         } else {
                             throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
@@ -1407,10 +1405,7 @@ namespace AnsiCParser {
                 }
             }
 
-            /// <summary>
-            ///  6.5.10 ビット単位の AND 演算子(AND式)
-            /// </summary>
-            public class AndExpression : Expression {
+            public abstract class BitExpression : Expression {
                 public Expression Lhs {
                     get;
                 }
@@ -1426,122 +1421,57 @@ namespace AnsiCParser {
                     }
                 }
 
-                public AndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                /// <summary>
+                ///  6.5.10-12 ビット単位演算子基底クラス
+                /// </summary>
+                protected BitExpression(string name, LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，整数型でなければならない。
-                    if (!lhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                    }
-                    if (!rhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                    if (!lhs.Type.IsIntegerType() || !rhs.Type.IsIntegerType()) {
+                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, $"{ name }の各オペランドは，整数型をもたなければならない。");
                     }
                     if (!lhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(lhs.LocationRange, "ビット単位の AND 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                        Logger.Warning(lhs.LocationRange, $"{name}の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
                     }
                     if (!rhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(rhs.LocationRange, "ビット単位の AND 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
+                        Logger.Warning(rhs.LocationRange, $"{name}の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
                     }
 
                     // 意味規則  
                     // オペランドに対して通常の算術型変換を適用する。
-                    // 2項&演算子の結果は，オペランドのビット単位の論理積とする（すなわち，型変換されたオペランドの対応するビットが両者ともセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
-
-            /// <summary>
-            /// 6.5.11 ビット単位の排他 OR 演算子(排他OR式)
-            /// </summary>
-            public class ExclusiveOrExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType ResultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return ResultType;
-                    }
-                }
-
-                public ExclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
-                    // 制約
-                    // 各オペランドの型は，整数型でなければならない。
-                    if (!lhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                    }
-                    if (!rhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                    }
-                    if (!lhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(rhs.LocationRange, "ビット単位の 排他 OR 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
-                    }
-                    if (!rhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(lhs.LocationRange, "ビット単位の 排他 OR 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
-                    }
-
-                    // 意味規則
-                    // オペランドに対して通常の算術型変換を適用する。
-                    // ^演算子の結果は，オペランドのビット単位の排他的論理和とする（すなわち，型変換されたオペランドの対応するビットのいずれか一方だけがセットされている場合，そしてその場合に限り，結果のそのビットをセットする。） 。
+                    //  - 2項&演算子の結果は，オペランドのビット単位の論理積とする（すなわち，型変換されたオペランドの対応するビットが両者ともセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
+                    //  - ^演算子の結果は，オペランドのビット単位の排他的論理和とする（すなわち，型変換されたオペランドの対応するビットのいずれか一方だけがセットされている場合，そしてその場合に限り，結果のそのビットをセットする。） 。
+                    //  - |演算子の結果は，オペランドのビット単位の論理和とする（すなわち，型変換されたオペランドの対応するビットの少なくとも一方がセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
                     ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
 
                     Lhs = lhs;
                     Rhs = rhs;
                 }
 
+                /// <summary>
+                ///  6.5.10 ビット単位の AND 演算子(AND式)
+                /// </summary>
+                public class AndExpression : BitExpression {
+
+                    public AndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の AND 演算子", locationRange, lhs, rhs) {}
+                }
+
+                /// <summary>
+                /// 6.5.11 ビット単位の排他 OR 演算子(排他OR式)
+                /// </summary>
+                public class ExclusiveOrExpression : BitExpression {
+                    public ExclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の 排他 OR 演算子", locationRange, lhs, rhs) {}
+
+                }
+
+                /// <summary>
+                /// 6.5.12 ビット単位の OR 演算子(OR式)
+                /// </summary>
+                public class InclusiveOrExpression : BitExpression {
+                    public InclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の OR 演算子", locationRange, lhs, rhs) { }
+                }
             }
 
-            /// <summary>
-            /// 6.5.12 ビット単位の OR 演算子(OR式)
-            /// </summary>
-            public class InclusiveOrExpression : Expression {
-                public Expression Lhs {
-                    get;
-                }
-                public Expression Rhs {
-                    get;
-                }
-                private CType ResultType {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return ResultType;
-                    }
-                }
-
-                public InclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
-                    // 制約
-                    // 各オペランドの型は，整数型でなければならない。
-                    if (!lhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                    }
-                    if (!rhs.Type.IsIntegerType()) {
-                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
-                    }
-                    if (!lhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(rhs.LocationRange, "ビット単位の OR 演算子の左オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
-                    }
-                    if (!rhs.Type.IsUnsignedIntegerType()) {
-                        Logger.Warning(lhs.LocationRange, "ビット単位の OR 演算子の右オペランドに符号付き整数型が使われていますが、この演算子は，整数の内部表現に依存した値を返すので，符号付き整数型に対して処理系定義又は未定義の側面をもつことになります。");
-                    }
-
-                    // 意味規則
-                    // オペランドに対して通常の算術型変換を適用する。
-                    // |演算子の結果は，オペランドのビット単位の論理和とする（すなわち，型変換されたオペランドの対応するビットの少なくとも一方がセットされている場合，そしてその場合に限り，結果のそのビットをセットする。）。
-                    ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
-
-                    Lhs = lhs;
-                    Rhs = rhs;
-                }
-            }
 
             /// <summary>
             /// 6.5.13 論理 AND 演算子(論理AND式)
@@ -1781,10 +1711,10 @@ namespace AnsiCParser {
                 /// 6.5.16.1 単純代入
                 /// </summary>
                 public class SimpleAssignmentExpression : AssignmentExpression {
-
                     /// <summary>
                     /// 単純代入の制約規則（いろいろな部分で使うため規則として独立させている）
                     /// </summary>
+                    /// <param name="locationRange"></param>
                     /// <param name="lType"></param>
                     /// <param name="rhs"></param>
                     public static Expression ApplyAssignmentRule(LocationRange locationRange, CType lType, Expression rhs) {
@@ -2132,7 +2062,6 @@ namespace AnsiCParser {
                     Expr = expr;
                 }
             }
-
         }
 
         public abstract class Statement : SyntaxTree {
@@ -2460,8 +2389,8 @@ namespace AnsiCParser {
                 public CType Type { get; }
 
                 public SimpleAssignInitializer(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
-                    this.Type = type;
-                    this.Expr = expr;
+                    Type = type;
+                    Expr = expr;
                 }
             }
 
@@ -2470,8 +2399,8 @@ namespace AnsiCParser {
                 public CType.ArrayType Type { get; }
 
                 public ArrayAssignInitializer(LocationRange locationRange, CType.ArrayType type, List<Initializer> inits) : base(locationRange) {
-                    this.Type = type;
-                    this.Inits = inits;
+                    Type = type;
+                    Inits = inits;
                 }
             }
 
@@ -2480,8 +2409,8 @@ namespace AnsiCParser {
                 public CType.TaggedType.StructUnionType Type { get; }
 
                 public StructUnionAssignInitializer(LocationRange locationRange, CType.TaggedType.StructUnionType type, List<Initializer> inits) : base(locationRange) {
-                    this.Type = type;
-                    this.Inits = inits;
+                    Type = type;
+                    Inits = inits;
                 }
             }
 
@@ -2571,6 +2500,9 @@ namespace AnsiCParser {
             }
         }
 
+        /// <summary>
+        /// 翻訳単位
+        /// </summary>
         public class TranslationUnit : SyntaxTree {
             /// <summary>
             /// 結合オブジェクト表

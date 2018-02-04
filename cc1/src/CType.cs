@@ -17,9 +17,10 @@ namespace AnsiCParser {
             return stack.Aggregate(baseType, (s, x) => {
                 if (x is StubType) {
                     return s;
+                } else {
+                    x.Fixup(s);
+                    return x;
                 }
-                x.Fixup(s);
-                return x;
             });
         }
 
@@ -34,6 +35,7 @@ namespace AnsiCParser {
         public override string ToString() {
             return ToString(new HashSet<CType>());
         }
+
         protected abstract string ToString(HashSet<CType> outputed);
 
         /// <summary>
@@ -755,7 +757,7 @@ namespace AnsiCParser {
                             }
                             if (arg.Type.IsFunctionType()) {
                                 // 仮引数を“～型を返却する関数”とする宣言は，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整する。
-                                Logger.Warning(arg.Range, $"仮引数は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
+                                Logger.Warning(arg.Range, "仮引数は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
                                 arg.Type = CreatePointer(arg.Type);
                             }
                         }
@@ -1187,6 +1189,7 @@ namespace AnsiCParser {
         public static bool CheckContainOldStyleArgument(CType t1) {
             return CheckContainOldStyleArgument(t1, new HashSet<CType>());
         }
+
         private static bool CheckContainOldStyleArgument(CType t1,HashSet<CType> checkedType) {
             if (checkedType.Contains(t1)) {
                 return false;

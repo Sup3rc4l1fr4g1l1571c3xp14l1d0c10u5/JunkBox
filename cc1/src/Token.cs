@@ -10,6 +10,7 @@ namespace AnsiCParser {
         /// </summary>
         [Flags]
         public enum TokenKind {
+            INVALID = -2,
             EOF = -1,
             // ReserveWords
             AUTO = 256,

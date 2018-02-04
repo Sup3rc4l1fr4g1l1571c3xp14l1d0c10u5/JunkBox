@@ -98,7 +98,7 @@ namespace AnsiCParser {
                 throw new Exception();
             }
 
-            public SyntaxTree.Expression OnAndExpression(SyntaxTree.Expression.AndExpression self, SyntaxTree.Expression value) {
+            public SyntaxTree.Expression OnAndExpression(SyntaxTree.Expression.BitExpression.AndExpression self, SyntaxTree.Expression value) {
                 var lhs = self.Lhs.Accept(this, value).LongValue();
                 long ret = 0;
                 if (lhs != 0) {
@@ -212,7 +212,7 @@ namespace AnsiCParser {
                     } else {
                         throw new NotSupportedException();
                     }
-                } else if (ret is SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression.AddressConstantExpression) {
+                } else if (ret is SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression) {
                     return ret;
                 } else {
                     throw new NotSupportedException();
@@ -293,7 +293,7 @@ namespace AnsiCParser {
                 }
             }
 
-            public SyntaxTree.Expression OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, SyntaxTree.Expression value) {
+            public SyntaxTree.Expression OnExclusiveOrExpression(SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, SyntaxTree.Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
@@ -343,7 +343,7 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
-            public SyntaxTree.Expression OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, SyntaxTree.Expression value) {
+            public SyntaxTree.Expression OnInclusiveOrExpression(SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, SyntaxTree.Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
@@ -354,7 +354,7 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTree.Expression value) {
-                return self as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant;
+                return self;
             }
 
             public SyntaxTree.Expression OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, SyntaxTree.Expression value) {

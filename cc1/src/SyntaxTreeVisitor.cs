@@ -6,16 +6,16 @@ namespace AnsiCParser {
             TResult OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, TArg value);
             TResult OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, TArg value);
             TResult OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, TArg value);
-            TResult OnAndExpression(SyntaxTree.Expression.AndExpression self, TArg value);
+            TResult OnAndExpression(SyntaxTree.Expression.BitExpression.AndExpression self, TArg value);
             TResult OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, TArg value);
             TResult OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, TArg value);
             TResult OnCastExpression(SyntaxTree.Expression.CastExpression self, TArg value);
             TResult OnCommaExpression(SyntaxTree.Expression.CommaExpression self, TArg value);
             TResult OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, TArg value);
             TResult OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, TArg value);
-            TResult OnExclusiveOrExpression(SyntaxTree.Expression.ExclusiveOrExpression self, TArg value);
+            TResult OnExclusiveOrExpression(SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, TArg value);
             TResult OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, TArg value);
-            TResult OnInclusiveOrExpression(SyntaxTree.Expression.InclusiveOrExpression self, TArg value);
+            TResult OnInclusiveOrExpression(SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, TArg value);
             TResult OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, TArg value);
             TResult OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, TArg value);
             TResult OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, TArg value);
@@ -94,7 +94,7 @@ namespace AnsiCParser {
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.AdditiveExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnAdditiveExpression(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.AndExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.BitExpression.AndExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnAndExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
@@ -115,13 +115,13 @@ namespace AnsiCParser {
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.EqualityExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnEqualityExpression(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.ExclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnExclusiveOrExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.GccStatementExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnGccStatementExpression(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.InclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+        public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnInclusiveOrExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this SyntaxTree.Expression.IntegerPromotionExpression self, IVisitor<TResult, TArg> visitor, TArg value) {

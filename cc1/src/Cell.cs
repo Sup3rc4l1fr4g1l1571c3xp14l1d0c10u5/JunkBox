@@ -74,9 +74,9 @@ namespace AnsiCParser {
                 } else if (arg is Cell) {
                     chain = new ConsCell(arg as Cell, chain);
                 } else if (arg is Location) {
-                    chain = new ConsCell(Cell.Create((arg as Location).FilePath, (arg as Location).Line, (arg as Location).Column), chain);
+                    chain = new ConsCell(Create((arg as Location).FilePath, (arg as Location).Line, (arg as Location).Column), chain);
                 } else if (arg is LocationRange) {
-                    chain = new ConsCell(Cell.Create((arg as LocationRange).Start.FilePath, (arg as LocationRange).Start.Line, (arg as LocationRange).Start.Column, (arg as LocationRange).End.FilePath, (arg as LocationRange).End.Line, (arg as LocationRange).End.Column), chain);
+                    chain = new ConsCell(Create((arg as LocationRange).Start.FilePath, (arg as LocationRange).Start.Line, (arg as LocationRange).Start.Column, (arg as LocationRange).End.FilePath, (arg as LocationRange).End.Line, (arg as LocationRange).End.Column), chain);
                 } else {
                     throw new Exception();
                 }
