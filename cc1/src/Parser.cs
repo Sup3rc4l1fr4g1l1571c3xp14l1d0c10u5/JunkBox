@@ -1149,7 +1149,7 @@ namespace AnsiCParser {
                     // メンバ宣言並びを解析する
                     structUnionType.Members = StructDeclarations();
                     _lexer.ReadToken('}');
-
+                    structUnionType.Build();
                     return structUnionType;
                 } else {
                     // 不完全型の宣言
@@ -1185,6 +1185,9 @@ namespace AnsiCParser {
                 _lexer.ReadToken('{');
                 structUnionType.Members = StructDeclarations();
                 _lexer.ReadToken('}');
+
+                structUnionType.Build();
+
                 return structUnionType;
             }
         }
@@ -1304,7 +1307,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, size.HasValue ? size.Value : -1);
+                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, 0,0,size.HasValue ? size.Value : -1);
             } else if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
                 int? size = null;
@@ -1315,7 +1318,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドには0以上の定数式を指定してください。");
                 }
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, size.HasValue ? size.Value : -1);
+                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, 0, 0, size.HasValue ? size.Value : -1);
             } else {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
@@ -2163,7 +2166,7 @@ namespace AnsiCParser {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えています。");
                     }
                     // 要素数分回す
-                    // Todo: ビットフィールド
+                    // Todo: ビットフィールドの初期化を作ること
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     it.Enter();
@@ -2175,7 +2178,7 @@ namespace AnsiCParser {
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
-                    // Todo: ビットフィールド
+                    // Todo: ビットフィールドの初期化を作ること
                     // 要素数分回す
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
@@ -2197,7 +2200,7 @@ namespace AnsiCParser {
                     if (1 < inits.Count) {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "共用体の初期化子が２つ以上指定されています。");
                     }
-                    // Todo: ビットフィールド
+                    // Todo: ビットフィールドの初期化を作ること
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
@@ -2208,7 +2211,7 @@ namespace AnsiCParser {
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
-                    // Todo: ビットフィールド
+                    // Todo: ビットフィールドの初期化を作ること
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
@@ -2423,14 +2426,12 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Statement ExpressionStatement() {
             SyntaxTree.Statement ret;
-            var start = _lexer.CurrentToken().Start;
-            if (!_lexer.PeekToken(';')) {
-                var expr = Expression();
-                var end = _lexer.CurrentToken().End;
-                ret = new SyntaxTree.Statement.ExpressionStatement(new LocationRange(start, end), expr);
+            Token tok;
+            if (_lexer.PeekToken(out tok, ';')) {
+                ret = new SyntaxTree.Statement.EmptyStatement(new LocationRange(tok.Start, tok.End));
             } else {
-                var end = _lexer.CurrentToken().End;
-                ret = new SyntaxTree.Statement.EmptyStatement(new LocationRange(start, end));
+                var expr = Expression();
+                ret = new SyntaxTree.Statement.ExpressionStatement(expr.LocationRange, expr);
             }
             _lexer.ReadToken(';');
             return ret;
@@ -2961,7 +2962,7 @@ namespace AnsiCParser {
         private SyntaxTree.Expression MultiplicitiveExpression() {
             var lhs = CastExpression();
             Token tok;
-            while (_lexer.PeekToken(out tok, '*', '/', '%')) {
+            while (_lexer.ReadTokenIf(out tok, '*', '/', '%')) {
                 SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind op;
                 switch (tok.Kind) {
                     case (Token.TokenKind)'*':
@@ -2976,7 +2977,6 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
-                _lexer.NextToken();
                 var rhs = CastExpression();
                 lhs = new SyntaxTree.Expression.MultiplicitiveExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
             }
@@ -2990,7 +2990,7 @@ namespace AnsiCParser {
         private SyntaxTree.Expression AdditiveExpression() {
             var lhs = MultiplicitiveExpression();
             Token tok;
-            while (_lexer.PeekToken(out tok, '+', '-')) {
+            while (_lexer.ReadTokenIf(out tok, '+', '-')) {
                 SyntaxTree.Expression.AdditiveExpression.OperatorKind op;
                 switch (tok.Kind) {
                     case (Token.TokenKind)'+':
@@ -3002,7 +3002,6 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
-                _lexer.NextToken();
                 var rhs = MultiplicitiveExpression();
                 lhs = new SyntaxTree.Expression.AdditiveExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
             }
@@ -3016,7 +3015,7 @@ namespace AnsiCParser {
         private SyntaxTree.Expression ShiftExpression() {
             var lhs = AdditiveExpression();
             Token tok;
-            while (_lexer.PeekToken(out tok, Token.TokenKind.LEFT_OP, Token.TokenKind.RIGHT_OP)) {
+            while (_lexer.ReadTokenIf(out tok, Token.TokenKind.LEFT_OP, Token.TokenKind.RIGHT_OP)) {
                 SyntaxTree.Expression.ShiftExpression.OperatorKind op;
                 switch (tok.Kind) {
                     case Token.TokenKind.LEFT_OP:
@@ -3029,7 +3028,6 @@ namespace AnsiCParser {
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
 
-                _lexer.NextToken();
                 var rhs = AdditiveExpression();
                 lhs = new SyntaxTree.Expression.ShiftExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
             }
@@ -3043,9 +3041,9 @@ namespace AnsiCParser {
         private SyntaxTree.Expression RelationalExpression() {
             var lhs = ShiftExpression();
             Token tok;
-            while (_lexer.PeekToken(out tok, (Token.TokenKind)'<', (Token.TokenKind)'>', Token.TokenKind.LE_OP, Token.TokenKind.GE_OP)) {
+            while (_lexer.ReadTokenIf(out tok, (Token.TokenKind)'<', (Token.TokenKind)'>', Token.TokenKind.LE_OP, Token.TokenKind.GE_OP)) {
                 SyntaxTree.Expression.RelationalExpression.OperatorKind op;
-                switch (_lexer.CurrentToken().Kind) {
+                switch (tok.Kind) {
                     case (Token.TokenKind)'<':
                         op = SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan;
                         break;
@@ -3061,7 +3059,6 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
-                _lexer.NextToken();
                 var rhs = ShiftExpression();
                 lhs = new SyntaxTree.Expression.RelationalExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
             }
@@ -3075,9 +3072,9 @@ namespace AnsiCParser {
         private SyntaxTree.Expression EqualityExpression() {
             var lhs = RelationalExpression();
             Token tok;
-            while (_lexer.PeekToken(out tok, Token.TokenKind.EQ_OP, Token.TokenKind.NE_OP)) {
+            while (_lexer.ReadTokenIf(out tok, Token.TokenKind.EQ_OP, Token.TokenKind.NE_OP)) {
                 SyntaxTree.Expression.EqualityExpression.OperatorKind op;
-                switch (_lexer.CurrentToken().Kind) {
+                switch (tok.Kind) {
                     case Token.TokenKind.EQ_OP:
                         op = SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal;
                         break;
@@ -3087,7 +3084,6 @@ namespace AnsiCParser {
                     default:
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
-                _lexer.NextToken();
                 var rhs = RelationalExpression();
                 lhs = new SyntaxTree.Expression.EqualityExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
             }

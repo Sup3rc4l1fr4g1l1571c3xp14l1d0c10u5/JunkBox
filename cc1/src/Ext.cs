@@ -102,9 +102,6 @@ namespace AnsiCParser {
             return System.Linq.Enumerable.Except<TSource>(first, second, new LambdaEqualityComparer<TSource>(comparer));
         }
 
-        public static string ToCString(this CType type) {
-            return type.Accept(new CTypeDumpVisitor2(), "");
-        }
     }
 
 

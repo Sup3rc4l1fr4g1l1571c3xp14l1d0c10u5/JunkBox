@@ -290,7 +290,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsEnumeratedType(this CType self) {
-            return self is CType.TaggedType.EnumType;
+            return self.Unwrap() is CType.TaggedType.EnumType;
         }
 
         /// <summary>
@@ -594,7 +594,7 @@ namespace AnsiCParser {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
                 if (IntegerConversionRank(expr.Type) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if (expr.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
+                    if (expr.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int でないと表現できない
                         return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
                     } else {
@@ -646,7 +646,7 @@ namespace AnsiCParser {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型?
                 if (IntegerConversionRank(self) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if (self.Unwrap().IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
+                    if (self.IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int に拡張
                         return CType.CreateUnsignedInt();
                     } else {
@@ -658,7 +658,7 @@ namespace AnsiCParser {
                     return self;
                 }
             } else if (IsRealFloatingType(self)) {
-                if (self.Unwrap().IsBasicType(CType.BasicType.TypeKind.Float)) {
+                if (self.IsBasicType(CType.BasicType.TypeKind.Float)) {
                     // double に拡張
                     return CType.CreateDouble();
                 } else {
@@ -837,9 +837,9 @@ namespace AnsiCParser {
             // 6.3.1.4 実浮動小数点型及び整数型 
             if (targetType != null) {
                 if (targetType.IsIntegerType() && !targetType.IsBoolType()) {
-                    if (targetType.Unwrap().IsBasicType(CType.BasicType.TypeKind.SignedInt,CType.BasicType.TypeKind.UnsignedInt) 
+                    if ((targetType.IsBasicType(CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt) || targetType.IsEnumeratedType()) 
                         && ((expr.Type.IntegerConversionRank() < -5)
-                          || (/*ToDo: bitfield check */ expr.Type.IsBoolType() || expr.Type.Unwrap().IsBasicType(CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt) )
+                          || (/*ToDo: bitfield check */  targetType.IsEnumeratedType() || expr.Type.IsBoolType() || expr.Type.IsBasicType(CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt) )
                            )
                     ) {
                         // 6.3.1.1 論理型，文字型及び整数型
@@ -1030,11 +1030,11 @@ namespace AnsiCParser {
                     // そうでない場合，再び型変換で元の型に戻すならば，その結果は元のポインタと比較して等しくなければならない。
                     if (IsCompatible(targetPointedType, exprPointedType) == false) {
                         if (exprPointedType.IsVoidType()) {
-                            Logger.Warning(expr.LocationRange, $"void型ポインタ を {targetPointedType.ToCString()} 型ポインタに変換します。");
+                            Logger.Warning(expr.LocationRange, $"void型ポインタ を {targetPointedType.ToString()} 型ポインタに変換します。");
                         } else if (targetPointedType.IsVoidType()) {
-                            Logger.Warning(expr.LocationRange, $"{exprPointedType.ToCString()} 型ポインタを void型ポインタに変換します。");
+                            Logger.Warning(expr.LocationRange, $"{exprPointedType.ToString()} 型ポインタを void型ポインタに変換します。");
                         } else {
-                            Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToCString()} 変換先={targetType.ToCString()} ");
+                            Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToString()} 変換先={targetType.ToString()} ");
                         }
                     }
                     return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
@@ -1053,7 +1053,7 @@ namespace AnsiCParser {
                     // さらに再び型変換で元の型に戻すことができるが，その結果は元のポインタと比較して等しくなければならない。
                     // 型変換されたポインタを関数呼出しに用い，関数の型がポインタが指すものの型と適合しない場合，その動作は未定義とする。
                     if (IsCompatible(targetPointedType, exprPointedType) == false && (targetPointedType.IsVoidType() == false && exprPointedType.IsVoidType() == false)) {
-                        Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToCString()} 変換先={targetType.ToCString()} ");
+                        Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToString()} 変換先={targetType.ToString()} ");
                     }
                     return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }

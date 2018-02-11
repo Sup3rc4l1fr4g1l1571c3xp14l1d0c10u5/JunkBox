@@ -1336,6 +1336,7 @@ namespace AnsiCParser {
                 if (st == null) {
                     throw new Exception("構造体/共用体型でない型に対してメンバの算出を試みました。");
                 }
+#if false
                 int offset = 0;
                 foreach (var m in st.Members) {
                     if (m.Ident.Raw == member) {
@@ -1346,8 +1347,15 @@ namespace AnsiCParser {
                         offset += m.Type.Sizeof();
                     }
                 }
-
                 return offset;
+#else
+                foreach (var m in st.Members) {
+                    if (m.Ident.Raw == member) {
+                        return m.Offset;
+                    }
+                }
+                throw new Exception("");
+#endif
             }
 
             public void DirectMember(CType type, string member) {
@@ -2643,7 +2651,7 @@ namespace AnsiCParser {
                 _arguments = new Dictionary<string, int>();
                 var vars = new List<string>();
                 foreach (var arg in ft.Arguments) {
-                    vars.Add($"//   name={arg.Ident.Raw}, type={arg.Type.ToCString()}, address={offset}(%ebp)");
+                    vars.Add($"//   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
                     _arguments.Add(arg.Ident.Raw, offset);
                     offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
                 }
@@ -2656,7 +2664,7 @@ namespace AnsiCParser {
                 Generator.Emit("// args: ");
                 vars.ForEach(x => Generator.Emit(x));
                 Generator.Emit("// return:");
-                Generator.Emit($"//   {ft.ResultType.ToCString()}");
+                Generator.Emit($"//   {ft.ResultType.ToString()}");
                 Generator.Emit("// location:");
                 Generator.Emit($"//   {self.LocationRange}");
                 Generator.Emit(".section .text");
@@ -3230,16 +3238,16 @@ namespace AnsiCParser {
                     if (x.StorageClass == StorageClassSpecifier.Static) {
                         // static
                         _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
-                        Generator.Emit($"// static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToCString()}");
+                        Generator.Emit($"// static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                     }
                     else {
                         _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
                         _localScope.Add(x.Ident, Tuple.Create((string) null, -_localScopeTotalSize));
-                        Generator.Emit($"// auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToCString()}");
+                        Generator.Emit($"// auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                     }
                 }
                 else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                    Generator.Emit($"// extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToCString()}");
+                    Generator.Emit($"// extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                     // externなのでスキップ
                 }
                 else {

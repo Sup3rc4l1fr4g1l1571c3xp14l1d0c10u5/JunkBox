@@ -88,7 +88,7 @@ namespace AnsiCParser {
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
             if (visited.Contains(self) == false) {
                 visited.Add(self);
-                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.BitSize.ToString())).ToArray()) : Cell.Nil);
+                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.Offset.ToString(), x.BitOffset.ToString(), x.BitSize.ToString())).ToArray()) : Cell.Nil);
             } else {
                 return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName);
             }

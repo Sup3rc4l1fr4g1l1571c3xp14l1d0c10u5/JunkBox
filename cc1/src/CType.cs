@@ -33,10 +33,8 @@ namespace AnsiCParser {
         }
 
         public override string ToString() {
-            return ToString(new HashSet<CType>());
+            return this.Accept(new CTypeDumpVisitor2(), "");
         }
-
-        protected abstract string ToString(HashSet<CType> outputed);
 
         /// <summary>
         ///     型のサイズを取得
@@ -432,58 +430,6 @@ namespace AnsiCParser {
                 return CType.Sizeof(Kind);
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                switch (Kind) {
-                    case TypeKind.KAndRImplicitInt:
-                        return "int";
-                    case TypeKind.Void:
-                        return "void";
-                    case TypeKind.Char:
-                        return "char";
-                    case TypeKind.SignedChar:
-                        return "signed char";
-                    case TypeKind.UnsignedChar:
-                        return "unsigned char";
-                    case TypeKind.SignedShortInt:
-                        return "signed short int";
-                    case TypeKind.UnsignedShortInt:
-                        return "unsigned short int";
-                    case TypeKind.SignedInt:
-                        return "signed int";
-                    case TypeKind.UnsignedInt:
-                        return "unsigned int";
-                    case TypeKind.SignedLongInt:
-                        return "signed long int";
-                    case TypeKind.UnsignedLongInt:
-                        return "unsigned long int";
-                    case TypeKind.SignedLongLongInt:
-                        return "signed long long int";
-                    case TypeKind.UnsignedLongLongInt:
-                        return "unsigned long long int";
-                    case TypeKind.Float:
-                        return "float";
-                    case TypeKind.Double:
-                        return "double";
-                    case TypeKind.LongDouble:
-                        return "long double";
-                    case TypeKind._Bool:
-                        return "_Bool";
-                    case TypeKind.Float_Complex:
-                        return "float _Complex";
-                    case TypeKind.Double_Complex:
-                        return "double _Complex";
-                    case TypeKind.LongDouble_Complex:
-                        return "long double _Complex";
-                    case TypeKind.Float_Imaginary:
-                        return "float _Imaginary";
-                    case TypeKind.Double_Imaginary:
-                        return "double _Imaginary";
-                    case TypeKind.LongDouble_Imaginary:
-                        return "long double _Imaginary";
-                    default:
-                        return $"<{Kind}>";
-                }
-            }
         }
 
         public static int Sizeof(BasicType.TypeKind kind) {
@@ -573,43 +519,72 @@ namespace AnsiCParser {
                     for (var i = 0; i < Members.Count; i++) {
                         var member = Members[i];
                         if (member.Type is StubType) {
-                            Members[i] = new MemberInfo(member.Ident, type, member.BitSize);
+                            Members[i] = new MemberInfo(member.Ident, type, 0, 0, member.BitSize);
                         }
                         else {
                             member.Type.Fixup(type);
                         }
                     }
+                    //foreach (var member in Members) {
+                    //    member.Type.Fixup(type);
+                    //}
+                }
 
-                    foreach (var member in Members) {
-                        member.Type.Fixup(type);
+                public void Build() {
+                    int offset = 0;
+                    int bitOffset = 0;
+                    int bitsizeMax = 0;
+
+                    if (Kind == StructOrUnion.Struct) {
+                        // 構造体型の場合
+                        Members = Members.Select(x => {
+                            if (x.BitSize <= 0) {
+                                // 非ビットフィールド/ビットフィールド境界
+                                offset += bitsizeMax / 8;
+                                bitOffset = 0;
+                                bitsizeMax = 0;
+                                var ret = new MemberInfo(x.Ident, x.Type, offset, 0, x.BitSize);
+                                offset += x.Type.Sizeof();
+                                return ret;
+                            } else {
+                                // ビットフィールド
+                                if (bitOffset + x.BitSize > bitsizeMax) {
+                                    // 今の空きに追加すると溢れる場合
+                                    offset += bitsizeMax / 8;
+                                    bitOffset = 0;
+                                    bitsizeMax = 0;
+                                }
+                                var ret = new MemberInfo(x.Ident, x.Type, offset, bitOffset, x.BitSize);
+                                if (bitsizeMax == 0) {
+                                    bitsizeMax = x.Type.Sizeof();
+                                }
+                                bitOffset += x.BitSize;
+                                if (bitsizeMax == bitOffset) {
+                                    offset += bitsizeMax / 8;
+                                    bitOffset = 0;
+                                    bitsizeMax = 0;
+                                }
+                                return ret;
+                            }
+                        }).ToList();
+                    } else {
+                        // 共用体型の場合は登録時のままでいい
                     }
+
                 }
 
                 public override int Sizeof() {
-                    // ビットフィールドは未実装
                     if (Kind == StructOrUnion.Struct) {
-                        return Members.Sum(x => x.Type.Sizeof());
+                        var l = Members.Last();
+                        return l.Offset + l.Type.Sizeof();
                     }
                     else {
                         return Members.Max(x => x.Type.Sizeof());
                     }
                 }
 
-                protected override string ToString(HashSet<CType> outputed) {
-                    var sb = new List<string> {Kind == StructOrUnion.Struct ? "struct" : "union", TagName};
-                    if (Members != null && outputed.Contains(this) == false) {
-                        outputed.Add(this);
-                        sb.Add("{");
-                        sb.AddRange(Members.SelectMany(x =>
-                            new[] {x.Type?.ToString(outputed), x.Ident.Raw, x.BitSize > 0 ? $":{x.BitSize}" : null, ";"}.Where(y => y != null)
-                        ));
-                        sb.Add("}");
-                    }
-                    return string.Join(" ", sb);
-                }
-
                 public class MemberInfo {
-                    public MemberInfo(Token ident, CType type, int bitSize) {
+                    public MemberInfo(Token ident, CType type, int offset, int bitOffset, int bitSize) {
                         if (bitSize >= 0) {
                             // 制約
                             // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
@@ -632,11 +607,14 @@ namespace AnsiCParser {
                             }
                             Ident = ident;
                             Type = type;
+                            Offset = offset;
+                            BitOffset = bitOffset;
                             BitSize = bitSize;
-                        }
-                        else {
+                        } else {
                             Ident = ident;
                             Type = type;
+                            Offset = offset;
+                            BitOffset = 0;
                             BitSize = -1;
                         }
                     }
@@ -645,7 +623,15 @@ namespace AnsiCParser {
 
                     public CType Type { get; }
 
-                    public int BitSize { get; }
+                    public int Offset {
+                        get;
+                    }
+                    public int BitOffset {
+                        get;
+                    }
+                    public int BitSize {
+                        get;
+                    }
                 }
             }
 
@@ -664,20 +650,6 @@ namespace AnsiCParser {
 
                 public override int Sizeof() {
                     return Sizeof(BasicType.TypeKind.SignedInt);
-                }
-
-                protected override string ToString(HashSet<CType> outputed) {
-                    var sb = new List<string> {"enum", TagName};
-                    if (Members != null && outputed.Contains(this) == false) {
-                        outputed.Add(this);
-                        sb.Add("{");
-                        sb.AddRange(Members.SelectMany(x =>
-                            new[] {x.Ident.Raw, "=", x.Value.ToString(), ","}
-                        ));
-                        sb.Add("}");
-                    }
-                    sb.Add(";");
-                    return string.Join(" ", sb);
                 }
 
                 /// <summary>
@@ -712,9 +684,6 @@ namespace AnsiCParser {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型のサイズを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                return "$";
-            }
         }
 
         /// <summary>
@@ -845,20 +814,6 @@ namespace AnsiCParser {
                 return candidate;
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                var sb = new List<string> {ResultType.ToString(outputed) };
-                if (Arguments != null) {
-                    sb.Add("(");
-                    sb.Add(string.Join(", ", Arguments.Select(x => x.Type.ToString(outputed))));
-                    if (HasVariadic) {
-                        sb.Add(", ...");
-                    }
-                    sb.Add(")");
-                }
-                sb.Add(";");
-                return string.Join(" ", sb);
-            }
-
             public class ArgumentInfo {
 
                 public ArgumentInfo(LocationRange range, Token ident, StorageClassSpecifier storageClass, CType type) {
@@ -911,9 +866,6 @@ namespace AnsiCParser {
                 return Sizeof(BasicType.TypeKind.SignedInt);
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                return "*" + BaseType.ToString(outputed);
-            }
         }
 
         /// <summary>
@@ -945,9 +897,6 @@ namespace AnsiCParser {
                 return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : BaseType.Sizeof() * Length;
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                return BaseType.ToString(outputed)+ $"[{Length}]";
-            }
         }
 
         /// <summary>
@@ -967,9 +916,6 @@ namespace AnsiCParser {
                 return Type.Sizeof();
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                return Ident.Raw;
-            }
         }
 
         /// <summary>
@@ -998,17 +944,6 @@ namespace AnsiCParser {
                 return Type.Sizeof();
             }
 
-            protected override string ToString(HashSet<CType> outputed) {
-                var sb = new List<string> {
-                    Qualifier.HasFlag(TypeQualifier.Const) ? "const" : null,
-                    Qualifier.HasFlag(TypeQualifier.Volatile) ? "volatile" : null,
-                    Qualifier.HasFlag(TypeQualifier.Restrict) ? "restrict" : null,
-                    Qualifier.HasFlag(TypeQualifier.Near) ? "near" : null,
-                    Qualifier.HasFlag(TypeQualifier.Far) ? "far" : null,
-                    Type.ToString()
-                };
-                return string.Join(" ", sb.Where(x => x != null));
-            }
         }
 
 
@@ -1083,6 +1018,12 @@ namespace AnsiCParser {
                     if (ta1.Members[i].Ident.Raw != ta2.Members[i].Ident.Raw) {
                         return null;
                     }
+                    if (ta1.Members[i].Offset != ta2.Members[i].Offset) {
+                        return null;
+                    }
+                    if (ta1.Members[i].BitOffset != ta2.Members[i].BitOffset) {
+                        return null;
+                    }
                     if (ta1.Members[i].BitSize != ta2.Members[i].BitSize) {
                         return null;
                     }
@@ -1090,7 +1031,7 @@ namespace AnsiCParser {
                     if (composited == null) {
                         return null;
                     }
-                    newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].BitSize));
+                    newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].Offset, ta1.Members[i].BitOffset, ta1.Members[i].BitSize));
                 }
                 newType.Members = newMembers;
                 return newType;

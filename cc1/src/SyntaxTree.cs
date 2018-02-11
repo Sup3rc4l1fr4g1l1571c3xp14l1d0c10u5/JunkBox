@@ -575,6 +575,9 @@ namespace AnsiCParser {
                     private CType MemberType {
                         get;
                     }
+                    public CType.TaggedType.StructUnionType.MemberInfo MemberInfo {
+                        get;
+                    }
 
                     public override bool IsLValue() {
                         return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
@@ -608,6 +611,7 @@ namespace AnsiCParser {
                         // 最初の式が修飾型をもつ場合，結果の型は，指定されたメンバの型に同じ修飾を加えた型とする。
                         Expr = expr;
                         Ident = ident;
+                        MemberInfo = memberInfo;
 
                         var qual = expr.Type.GetTypeQualifier();
                         if (qual != TypeQualifier.None) {
@@ -629,6 +633,9 @@ namespace AnsiCParser {
                         get;
                     }
                     private CType MemberType {
+                        get;
+                    }
+                    public CType.TaggedType.StructUnionType.MemberInfo MemberInfo {
                         get;
                     }
 
@@ -664,6 +671,7 @@ namespace AnsiCParser {
                         // 最初の式の型が修飾型へのポインタである場合，結果の型は，指定されたメンバの型に同じ修飾を加えた型とする。
                         Expr = expr;
                         Ident = ident;
+                        MemberInfo = memberInfo;
 
                         var qual = expr.Type.GetTypeQualifier();
                         MemberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
@@ -795,8 +803,12 @@ namespace AnsiCParser {
                     ) {
                         // ok
                     } else if (
-                        expr.IsLValue()  // オペランドは，左辺値
-                                         // ToDo: ビットフィールドでもなく，register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
+                        expr.IsLValue() &&  // オペランドは，左辺値
+                        !(  // ToDo: ビットフィールドでもない
+                            (expr is Expression.PostfixExpression.MemberDirectAccess && ((Expression.PostfixExpression.MemberDirectAccess)expr).MemberInfo.BitSize != -1) || 
+                            (expr is Expression.PostfixExpression.MemberIndirectAccess && ((Expression.PostfixExpression.MemberIndirectAccess)expr).MemberInfo.BitSize != -1)
+                        )
+                        // ToDo: register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
                     ) {
 
                     } else {
@@ -1405,6 +1417,9 @@ namespace AnsiCParser {
                 }
             }
 
+            /// <summary>
+            ///  6.5.10-12 ビット単位演算子基底クラス
+            /// </summary>
             public abstract class BitExpression : Expression {
                 public Expression Lhs {
                     get;
@@ -1421,9 +1436,6 @@ namespace AnsiCParser {
                     }
                 }
 
-                /// <summary>
-                ///  6.5.10-12 ビット単位演算子基底クラス
-                /// </summary>
                 protected BitExpression(string name, LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
                     // 制約
                     // 各オペランドの型は，整数型でなければならない。
