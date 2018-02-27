@@ -513,15 +513,19 @@ window.onload = () => {
         })
         ).then(() => {
             var layerconfig = {
-                1: { size: [12, 36], offset: [0, -24] },
                 0: { size: [12, 12], offset: [0, 0] },
+                1: { size: [12, 24], offset: [0, -12] },
+                2: { size: [12, 12], offset: [0, -24] },
             }
             var mapchip = {
-                1: {
-                    0: [72, 72, 12, 36],
-                },
                 0: {
                     1: [48, 0, 12, 12],
+                },
+                1: {
+                    0: [72, 84, 12, 24],
+                },
+                2: {
+                    0: [72, 72, 12, 12],
                 },
             };
 
@@ -542,7 +546,7 @@ window.onload = () => {
             var changed = true;
             var px = 0;
             var py = 0;
-            var pdir = 'left';
+            var pdir = 'down';
 
             var psbasex = 752;
             var psbasey = 235;
@@ -570,7 +574,7 @@ window.onload = () => {
                 }
                 changed = false;
                 Game.getDisplay().start();
-                for (var l = 0; l < 2; l++) {
+                for (var l = 0; l < 3; l++) {
                     var lw = layerconfig[l].size[0];
                     var lh = layerconfig[l].size[1];
                     var lox = layerconfig[l].offset[0];
@@ -583,7 +587,7 @@ window.onload = () => {
                             }
                         }
                     }
-                    if (l == 0) {
+                    if (l == 1) {
                         Game.getDisplay().rect({ left: 0 + px * 24, top: 0 + py * 24, width: 47, height: 47, texture: 'charactor', uv: [psprite[pdir][0][0], psprite[pdir][0][1],47,47] });
                     }
                 }
