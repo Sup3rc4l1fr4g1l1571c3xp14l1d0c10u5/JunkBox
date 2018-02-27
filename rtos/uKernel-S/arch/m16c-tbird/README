@@ -1,0 +1,13 @@
+以下の環境で動作確認しております。
+M16C Series, R8C Family C Compiler V.5.45 Release 01	(9-4-2010 23:58:23)
+M16C R8C Simulator Debugger V.1.05 Release 00	(9-5-2010 19:18:47)
+High-performance Embedded Workshop Upgrade 4.08.00	(9-5-2010 19:20:12)
+
+＊＊＊＊＊＊ 注意事項 ＊＊＊＊＊＊
+
+M16C Series, R8C Family C Compilerは#if ～ の結果が偽となる範囲の #include 指令も解析してしまうため、
+config.h に ARCH_M16C_TBIRD を指定しただけではコンパイルエラーが発生します。
+
+対処として arch.h および sample.c 内にある実行環境に応じた定義のうち、
+ARCH_M16C_TBIRD以外の環境向けの定義をすべて削除もしくはコメントアウトしてください。
+

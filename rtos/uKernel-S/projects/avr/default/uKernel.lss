@@ -1,0 +1,3883 @@
+
+uKernel.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .data         00000104  00800100  00001364  000013f8  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  1 .text         00001364  00000000  00000000  00000094  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  2 .bss          00000331  00800204  00800204  000014fc  2**0
+                  ALLOC
+  3 .debug_aranges 00000108  00000000  00000000  00001500  2**3
+                  CONTENTS, READONLY, DEBUGGING
+  4 .debug_pubnames 000005a9  00000000  00000000  00001608  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .debug_info   00002b59  00000000  00000000  00001bb1  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_abbrev 00000b31  00000000  00000000  0000470a  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_line   0000164e  00000000  00000000  0000523b  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_frame  00000500  00000000  00000000  0000688c  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_str    00000bd3  00000000  00000000  00006d8c  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_loc    00000b3e  00000000  00000000  0000795f  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 11 .debug_ranges 00000020  00000000  00000000  000084a0  2**3
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00000000 <vectors>:
+ * @date	2010/01/07 14:08:58	作成
+ */
+.global	__vectors
+.func	__vectors
+vectors:
+	jmp	RESET_vect			/* Reset */
+       0:	0c 94 34 00 	jmp	0x68	; 0x68 <__ctors_end>
+	jmp	INT0_vect			/* External Interrupt Request 0 */
+       4:	0c 94 fe 07 	jmp	0xffc	; 0xffc <__vector_1>
+	jmp	INT1_vect			/* External Interrupt Request 1 */
+       8:	0c 94 ed 08 	jmp	0x11da	; 0x11da <__vector_2>
+	jmp	PCINT0_vect			/* Pin Change Interrupt Request 0 */
+       c:	0c 94 f4 08 	jmp	0x11e8	; 0x11e8 <__vector_3>
+	jmp	PCINT1_vect			/* Pin Change Interrupt Request 0 */
+      10:	0c 94 fb 08 	jmp	0x11f6	; 0x11f6 <__vector_4>
+	jmp	PCINT2_vect			/* Pin Change Interrupt Request 1 */
+      14:	0c 94 02 09 	jmp	0x1204	; 0x1204 <__vector_5>
+	jmp	WDT_vect			/* Watchdog Time-out Interrupt */
+      18:	0c 94 09 09 	jmp	0x1212	; 0x1212 <__vector_6>
+	jmp	TIMER2_COMPA_vect	/* Timer/Counter2 Compare Match A */
+      1c:	0c 94 10 09 	jmp	0x1220	; 0x1220 <__vector_7>
+	jmp	TIMER2_COMPB_vect	/* Timer/Counter2 Compare Match A */
+      20:	0c 94 17 09 	jmp	0x122e	; 0x122e <__vector_8>
+	jmp	TIMER2_OVF_vect		/* Timer/Counter2 Overflow */
+      24:	0c 94 1e 09 	jmp	0x123c	; 0x123c <__vector_9>
+	jmp	TIMER1_CAPT_vect	/* Timer/Counter1 Capture Event */
+      28:	0c 94 25 09 	jmp	0x124a	; 0x124a <__vector_10>
+	jmp	TIMER1_COMPA_vect	/* Timer/Counter1 Compare Match A */
+      2c:	0c 94 2c 09 	jmp	0x1258	; 0x1258 <__vector_11>
+	jmp	TIMER1_COMPB_vect	/* Timer/Counter1 Compare Match B */ 
+      30:	0c 94 33 09 	jmp	0x1266	; 0x1266 <__vector_12>
+	jmp	TIMER1_OVF_vect		/* Timer/Counter1 Overflow */
+      34:	0c 94 3a 09 	jmp	0x1274	; 0x1274 <__vector_13>
+	jmp	TIMER0_COMPA_vect	/* TimerCounter0 Compare Match A */
+      38:	0c 94 31 08 	jmp	0x1062	; 0x1062 <__vector_14>
+	jmp	TIMER0_COMPB_vect	/* TimerCounter0 Compare Match B */
+      3c:	0c 94 50 00 	jmp	0xa0	; 0xa0 <addTaskToReadyQueue>
+	jmp	TIMER0_OVF_vect		/* Timer/Couner0 Overflow */
+      40:	0c 94 50 00 	jmp	0xa0	; 0xa0 <addTaskToReadyQueue>
+	jmp	SPI_STC_vect		/* SPI Serial Transfer Complete */
+      44:	0c 94 41 09 	jmp	0x1282	; 0x1282 <__vector_17>
+	jmp	USART_RX_vect		/* USART Rx Complete */
+      48:	0c 94 48 09 	jmp	0x1290	; 0x1290 <__vector_18>
+	jmp	USART_UDRE_vect		/* USART, Data Register Empty */
+      4c:	0c 94 4f 09 	jmp	0x129e	; 0x129e <__vector_19>
+	jmp	USART_TX_vect		/* USART Tx Complete */
+      50:	0c 94 56 09 	jmp	0x12ac	; 0x12ac <__vector_20>
+	jmp	ADC_vect			/* ADC Conversion Complete */
+      54:	0c 94 5d 09 	jmp	0x12ba	; 0x12ba <__vector_21>
+	jmp	EE_READY_vect		/* EEPROM Ready */
+      58:	0c 94 64 09 	jmp	0x12c8	; 0x12c8 <__vector_22>
+	jmp	ANALOG_COMP_vect	/* Analog Comparator */
+      5c:	0c 94 6b 09 	jmp	0x12d6	; 0x12d6 <__vector_23>
+	jmp	TWI_vect			/* Two-wire Serial Interface */
+      60:	0c 94 72 09 	jmp	0x12e4	; 0x12e4 <__vector_24>
+	jmp	SPM_READY_vect		/* Store Program Memory Read */
+      64:	0c 94 79 09 	jmp	0x12f2	; 0x12f2 <__vector_25>
+
+00000068 <__ctors_end>:
+	.weak	__stack
+	.weak	__heap_end
+	.set	__heap_end, 0
+
+	/* r1はゼロレジスタとして使われる（WinAVRの仕様）ので、ゼロクリアする */
+	clr		r1
+      68:	11 24       	eor	r1, r1
+
+	/* ステータスレジスタをr1(=0)でクリア */
+	out		_SFR_IO_ADDR(SREG),	r1
+      6a:	1f be       	out	0x3f, r1	; 63
+
+	/* スタック関係のレジスタにカーネルスタックを設定 */
+	ldi		r28,	lo8(__stack)
+      6c:	cf ef       	ldi	r28, 0xFF	; 255
+	ldi		r29,	hi8(__stack)
+      6e:	d8 e0       	ldi	r29, 0x08	; 8
+	out		_SFR_IO_ADDR(SPH),	r29
+      70:	de bf       	out	0x3e, r29	; 62
+	out		_SFR_IO_ADDR(SPL),	r28
+      72:	cd bf       	out	0x3d, r28	; 61
+
+00000074 <__do_copy_data>:
+__do_copy_data:
+	/*
+	 * DATA(初期値付きデータを格納しておくセクション)に初期値を設定。
+	 * DATAセクションには初期値が指定されているグローバル変数や、初期値が指定されている static 変数などが配置される。 
+	 */
+	ldi		r26, lo8(__data_start)		/* 転送先:Xレジスタ[R27:R26]の下位を設定 */
+      74:	a0 e0       	ldi	r26, 0x00	; 0
+	ldi		r27, hi8(__data_start)		/* 転送先:Xレジスタ[R27:R26]の上位を設定 */
+      76:	b1 e0       	ldi	r27, 0x01	; 1
+	ldi		r30, lo8(__data_load_start)	/* 転送元:Zレジスタ[R31:R30]の下位を設定 */
+      78:	e4 e6       	ldi	r30, 0x64	; 100
+	ldi		r31, hi8(__data_load_start)	/* 転送元:Zレジスタ[R31:R30]の上位を設定 */
+      7a:	f3 e1       	ldi	r31, 0x13	; 19
+	ldi		r17, hi8(__data_end)		/* cpc比較用の値 */
+      7c:	12 e0       	ldi	r17, 0x02	; 2
+	rjmp	.L__do_copy_data_start
+      7e:	02 c0       	rjmp	.+4      	; 0x84 <__do_copy_data+0x10>
+.L__do_copy_data_loop:
+	lpm		r0, Z+						/* RO = *Z++; */
+      80:	05 90       	lpm	r0, Z+
+	st		X+,	r0						/* *X++ = RO; */
+      82:	0d 92       	st	X+, r0
+.L__do_copy_data_start:
+	cpi		r26, lo8(__data_end)
+      84:	a4 30       	cpi	r26, 0x04	; 4
+	cpc		r27, r17
+      86:	b1 07       	cpc	r27, r17
+	brne	.L__do_copy_data_loop
+      88:	d9 f7       	brne	.-10     	; 0x80 <__do_copy_data+0xc>
+
+0000008a <__do_clear_bss>:
+	 * BSS(初期値なしデータが格納されるセクション)をゼロクリア
+	 * BSSセクションには初期値がないグローバル変数や、初期値が指定されていない static 変数などが配置される。 
+	 * 通常はゼロクリアされる。
+	 */
+__do_clear_bss:
+	ldi		r26, lo8(__bss_start)
+      8a:	a4 e0       	ldi	r26, 0x04	; 4
+	ldi		r27, hi8(__bss_start)
+      8c:	b2 e0       	ldi	r27, 0x02	; 2
+	ldi		r17, hi8(__bss_end)
+      8e:	15 e0       	ldi	r17, 0x05	; 5
+	rjmp	.L__do_clear_bss_start
+      90:	01 c0       	rjmp	.+2      	; 0x94 <__do_clear_bss+0xa>
+.L__do_clear_bss_loop:
+	st		X+, r1
+      92:	1d 92       	st	X+, r1
+.L__do_clear_bss_start:
+	cpi		r26, lo8(__bss_end)
+      94:	a5 33       	cpi	r26, 0x35	; 53
+	cpc		r27, r17
+      96:	b1 07       	cpc	r27, r17
+	brne	.L__do_clear_bss_loop
+      98:	e1 f7       	brne	.-8      	; 0x92 <__do_clear_bss+0x8>
+
+	/* カーネルスタックはRAMの末尾からスタート */
+	.set	__stack, RAMEND
+
+	/* C言語のスタートルーチンに飛ぶ */
+	call	startKernel
+      9a:	0e 94 7c 02 	call	0x4f8	; 0x4f8 <startKernel>
+
+0000009e <__halt>:
+
+	/* 万が一戻ってきてしまった場合は無限ループに入る */
+   .global	__halt
+__halt:
+	rjmp	__halt
+      9e:	ff cf       	rjmp	.-2      	; 0x9e <__halt>
+
+000000a0 <addTaskToReadyQueue>:
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ * @date			2010/09/09 12:48:22	タイムシェアリングスケジューリングを追加
+ * @date			2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリングを追加
+ */
+void addTaskToReadyQueue (tcb_t *tcb) {
+      a0:	fc 01       	movw	r30, r24
+
+	tcb_t* next_task;
+	tcb_t* pT = tcb;
+		
+	if (pT == NULL) {
+      a2:	00 97       	sbiw	r24, 0x00	; 0
+      a4:	69 f1       	breq	.+90     	; 0x100 <addTaskToReadyQueue+0x60>
+		return;
+	}
+
+	next_task = readyqueue.next_task;
+      a6:	a0 91 33 05 	lds	r26, 0x0533
+      aa:	b0 91 34 05 	lds	r27, 0x0534
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE)
+	if (next_task == NULL) {
+      ae:	10 97       	sbiw	r26, 0x00	; 0
+      b0:	19 f4       	brne	.+6      	; 0xb8 <addTaskToReadyQueue+0x18>
+		/* readyqueue に何も登録されていない場合 */
+		pT->next_task = readyqueue.next_task;
+      b2:	17 82       	std	Z+7, r1	; 0x07
+      b4:	16 82       	std	Z+6, r1	; 0x06
+      b6:	05 c0       	rjmp	.+10     	; 0xc2 <addTaskToReadyQueue+0x22>
+		readyqueue.next_task = tcb;
+	} else if (next_task > tcb) {
+      b8:	8a 17       	cp	r24, r26
+      ba:	9b 07       	cpc	r25, r27
+      bc:	40 f4       	brcc	.+16     	; 0xce <addTaskToReadyQueue+0x2e>
+		/* 最初の要素の前に挿入するケース */
+		pT->next_task = readyqueue.next_task;
+      be:	b7 83       	std	Z+7, r27	; 0x07
+      c0:	a6 83       	std	Z+6, r26	; 0x06
+		readyqueue.next_task = tcb;
+      c2:	f0 93 34 05 	sts	0x0534, r31
+      c6:	e0 93 33 05 	sts	0x0533, r30
+      ca:	08 95       	ret
+      cc:	dc 01       	movw	r26, r24
+	} else {
+		/* 次以降の要素と比較 */
+		tcb_t* beforenid;
+		for (;;) {
+			beforenid = next_task;
+			next_task = next_task->next_task;
+      ce:	16 96       	adiw	r26, 0x06	; 6
+      d0:	8d 91       	ld	r24, X+
+      d2:	9c 91       	ld	r25, X
+      d4:	17 97       	sbiw	r26, 0x07	; 7
+			
+			if (next_task == NULL) {
+      d6:	00 97       	sbiw	r24, 0x00	; 0
+      d8:	39 f4       	brne	.+14     	; 0xe8 <addTaskToReadyQueue+0x48>
+				/* 終端にに達したので、終端に追加 */
+				pT->next_task = beforenid->next_task;
+      da:	17 82       	std	Z+7, r1	; 0x07
+      dc:	16 82       	std	Z+6, r1	; 0x06
+				beforenid->next_task = tcb;
+      de:	17 96       	adiw	r26, 0x07	; 7
+      e0:	fc 93       	st	X, r31
+      e2:	ee 93       	st	-X, r30
+      e4:	16 97       	sbiw	r26, 0x06	; 6
+      e6:	08 95       	ret
+				break;
+			} else if (next_task == tcb) {
+      e8:	8e 17       	cp	r24, r30
+      ea:	9f 07       	cpc	r25, r31
+      ec:	49 f0       	breq	.+18     	; 0x100 <addTaskToReadyQueue+0x60>
+				/* 既に登録済み！！ */
+				break;
+			} else if (next_task > tcb) {
+      ee:	e8 17       	cp	r30, r24
+      f0:	f9 07       	cpc	r31, r25
+      f2:	60 f7       	brcc	.-40     	; 0xcc <addTaskToReadyQueue+0x2c>
+				/* 挿入する位置が見つかった */
+				pT->next_task = beforenid->next_task;
+      f4:	97 83       	std	Z+7, r25	; 0x07
+      f6:	86 83       	std	Z+6, r24	; 0x06
+				beforenid->next_task = tcb;
+      f8:	17 96       	adiw	r26, 0x07	; 7
+      fa:	fc 93       	st	X, r31
+      fc:	ee 93       	st	-X, r30
+      fe:	16 97       	sbiw	r26, 0x06	; 6
+     100:	08 95       	ret
+
+00000102 <removeTaskFromReadyQueue>:
+ * @retval true    タスクは readyqueue 中に存在したので取り除いた。
+ * @note           tcbの妥当性は検査しないので注意
+ * @author         Kazuya Fukuhara
+ * @date           2010/01/07 14:08:58	作成
+ */
+bool_t removeTaskFromReadyQueue(tcb_t *tcb) {
+     102:	dc 01       	movw	r26, r24
+	tcb_t *next_task;
+	tcb_t *pid;
+
+	/* 探索 */
+	pid = NULL;
+	for (next_task = readyqueue.next_task; next_task != tcb; next_task = next_task->next_task) {
+     104:	40 91 33 05 	lds	r20, 0x0533
+     108:	50 91 34 05 	lds	r21, 0x0534
+     10c:	9a 01       	movw	r18, r20
+     10e:	e0 e0       	ldi	r30, 0x00	; 0
+     110:	f0 e0       	ldi	r31, 0x00	; 0
+     112:	09 c0       	rjmp	.+18     	; 0x126 <removeTaskFromReadyQueue+0x24>
+		if (next_task == NULL) {
+     114:	21 15       	cp	r18, r1
+     116:	31 05       	cpc	r19, r1
+     118:	11 f4       	brne	.+4      	; 0x11e <removeTaskFromReadyQueue+0x1c>
+     11a:	80 e0       	ldi	r24, 0x00	; 0
+     11c:	08 95       	ret
+	tcb_t *next_task;
+	tcb_t *pid;
+
+	/* 探索 */
+	pid = NULL;
+	for (next_task = readyqueue.next_task; next_task != tcb; next_task = next_task->next_task) {
+     11e:	f9 01       	movw	r30, r18
+     120:	86 81       	ldd	r24, Z+6	; 0x06
+     122:	97 81       	ldd	r25, Z+7	; 0x07
+     124:	9c 01       	movw	r18, r24
+     126:	2a 17       	cp	r18, r26
+     128:	3b 07       	cpc	r19, r27
+     12a:	a1 f7       	brne	.-24     	; 0x114 <removeTaskFromReadyQueue+0x12>
+	}
+
+	/* ここに到達した時点で、指定されたタスク tcb はリスト中に存在していることが保証される */
+
+	/* キューから外す */
+	if (readyqueue.next_task == tcb) {
+     12c:	4a 17       	cp	r20, r26
+     12e:	5b 07       	cpc	r21, r27
+     130:	49 f4       	brne	.+18     	; 0x144 <removeTaskFromReadyQueue+0x42>
+		/* キューの先頭の場合 */
+		readyqueue.next_task = tcb->next_task;
+     132:	16 96       	adiw	r26, 0x06	; 6
+     134:	8d 91       	ld	r24, X+
+     136:	9c 91       	ld	r25, X
+     138:	17 97       	sbiw	r26, 0x07	; 7
+     13a:	90 93 34 05 	sts	0x0534, r25
+     13e:	80 93 33 05 	sts	0x0533, r24
+     142:	08 c0       	rjmp	.+16     	; 0x154 <removeTaskFromReadyQueue+0x52>
+	} else if (pid != NULL) {
+     144:	30 97       	sbiw	r30, 0x00	; 0
+     146:	31 f0       	breq	.+12     	; 0x154 <removeTaskFromReadyQueue+0x52>
+		/*
+		 * キューの先頭ではない場合、探索のループが最低１回は実行されている。
+		 * つまり、pidの値はNULL以外になっている。
+		 */
+		pid->next_task = tcb->next_task;
+     148:	16 96       	adiw	r26, 0x06	; 6
+     14a:	8d 91       	ld	r24, X+
+     14c:	9c 91       	ld	r25, X
+     14e:	17 97       	sbiw	r26, 0x07	; 7
+     150:	97 83       	std	Z+7, r25	; 0x07
+     152:	86 83       	std	Z+6, r24	; 0x06
+	}
+	tcb->next_task = NULL;
+     154:	17 96       	adiw	r26, 0x07	; 7
+     156:	1c 92       	st	X, r1
+     158:	1e 92       	st	-X, r1
+     15a:	16 97       	sbiw	r26, 0x06	; 6
+     15c:	81 e0       	ldi	r24, 0x01	; 1
+
+
+	return TRUE;
+}
+     15e:	08 95       	ret
+
+00000160 <addTaskToWaitQueue>:
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ * @date			2010/09/09 12:48:22	タイムシェアリングスケジューリングを追加
+ * @date			2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリングを追加
+ */
+void addTaskToWaitQueue(tcb_t* tcb, tick_t time) {
+     160:	cf 93       	push	r28
+     162:	df 93       	push	r29
+     164:	dc 01       	movw	r26, r24
+
+	tcb_t* next_task = waitqueue.next_task;
+     166:	c0 91 31 05 	lds	r28, 0x0531
+     16a:	d0 91 32 05 	lds	r29, 0x0532
+	tcb_t* pT = tcb;
+	
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE)
+	if (time == 0) {
+     16e:	66 23       	and	r22, r22
+     170:	09 f4       	brne	.+2      	; 0x174 <addTaskToWaitQueue+0x14>
+     172:	4a c0       	rjmp	.+148    	; 0x208 <addTaskToWaitQueue+0xa8>
+		return;
+	} else if (next_task == NULL) {
+     174:	20 97       	sbiw	r28, 0x00	; 0
+     176:	61 f4       	brne	.+24     	; 0x190 <addTaskToWaitQueue+0x30>
+		/* pauseQ_headに何も登録されていない場合 */
+		pT->next_task = waitqueue.next_task;
+     178:	17 96       	adiw	r26, 0x07	; 7
+     17a:	1c 92       	st	X, r1
+     17c:	1e 92       	st	-X, r1
+     17e:	16 97       	sbiw	r26, 0x06	; 6
+		pT->pause_count = time;
+     180:	15 96       	adiw	r26, 0x05	; 5
+     182:	6c 93       	st	X, r22
+     184:	15 97       	sbiw	r26, 0x05	; 5
+		waitqueue.next_task = tcb;
+     186:	90 93 32 05 	sts	0x0532, r25
+     18a:	80 93 31 05 	sts	0x0531, r24
+     18e:	3c c0       	rjmp	.+120    	; 0x208 <addTaskToWaitQueue+0xa8>
+	} else if ((next_task->pause_count > time) || 
+     190:	8d 81       	ldd	r24, Y+5	; 0x05
+     192:	68 17       	cp	r22, r24
+     194:	28 f0       	brcs	.+10     	; 0x1a0 <addTaskToWaitQueue+0x40>
+     196:	86 17       	cp	r24, r22
+     198:	99 f4       	brne	.+38     	; 0x1c0 <addTaskToWaitQueue+0x60>
+     19a:	ac 17       	cp	r26, r28
+     19c:	bd 07       	cpc	r27, r29
+     19e:	80 f4       	brcc	.+32     	; 0x1c0 <addTaskToWaitQueue+0x60>
+	           ((next_task->pause_count == time) && (next_task > tcb))) {
+		/* 最初の要素の前に挿入するケース */
+		pT->next_task = waitqueue.next_task;
+     1a0:	17 96       	adiw	r26, 0x07	; 7
+     1a2:	dc 93       	st	X, r29
+     1a4:	ce 93       	st	-X, r28
+     1a6:	16 97       	sbiw	r26, 0x06	; 6
+		pT->pause_count = time;
+     1a8:	15 96       	adiw	r26, 0x05	; 5
+     1aa:	6c 93       	st	X, r22
+     1ac:	15 97       	sbiw	r26, 0x05	; 5
+		waitqueue.next_task = tcb;
+     1ae:	b0 93 32 05 	sts	0x0532, r27
+     1b2:	a0 93 31 05 	sts	0x0531, r26
+		next_task->pause_count -= pT->pause_count;
+     1b6:	8d 81       	ldd	r24, Y+5	; 0x05
+     1b8:	86 1b       	sub	r24, r22
+     1ba:	8d 83       	std	Y+5, r24	; 0x05
+     1bc:	25 c0       	rjmp	.+74     	; 0x208 <addTaskToWaitQueue+0xa8>
+	} else if (next_task == NULL) {
+		/* pauseQ_headに何も登録されていない場合 */
+		pT->next_task = waitqueue.next_task;
+		pT->pause_count = time;
+		waitqueue.next_task = tcb;
+	} else if ((next_task->pause_count > time) || 
+     1be:	ef 01       	movw	r28, r30
+	} else {
+		/* 最初の要素の後ろに挿入するので、次以降の要素と比較 */
+		tcb_t* beforenid;
+		for (;;) {
+			beforenid = next_task;
+			time -= next_task->pause_count;
+     1c0:	8d 81       	ldd	r24, Y+5	; 0x05
+     1c2:	68 1b       	sub	r22, r24
+			next_task = next_task->next_task;
+     1c4:	ee 81       	ldd	r30, Y+6	; 0x06
+     1c6:	ff 81       	ldd	r31, Y+7	; 0x07
+			
+			if (next_task == NULL) {
+     1c8:	30 97       	sbiw	r30, 0x00	; 0
+     1ca:	51 f4       	brne	.+20     	; 0x1e0 <addTaskToWaitQueue+0x80>
+				/* 終端にに達したので、終端に追加 */
+				pT->next_task = beforenid->next_task;
+     1cc:	17 96       	adiw	r26, 0x07	; 7
+     1ce:	1c 92       	st	X, r1
+     1d0:	1e 92       	st	-X, r1
+     1d2:	16 97       	sbiw	r26, 0x06	; 6
+				pT->pause_count = time;
+     1d4:	15 96       	adiw	r26, 0x05	; 5
+     1d6:	6c 93       	st	X, r22
+     1d8:	15 97       	sbiw	r26, 0x05	; 5
+				beforenid->next_task = tcb;
+     1da:	bf 83       	std	Y+7, r27	; 0x07
+     1dc:	ae 83       	std	Y+6, r26	; 0x06
+     1de:	14 c0       	rjmp	.+40     	; 0x208 <addTaskToWaitQueue+0xa8>
+				break;
+			} else if ((next_task->pause_count > time) || ((next_task->pause_count == time) && (next_task > tcb))) {
+     1e0:	85 81       	ldd	r24, Z+5	; 0x05
+     1e2:	68 17       	cp	r22, r24
+     1e4:	28 f0       	brcs	.+10     	; 0x1f0 <addTaskToWaitQueue+0x90>
+     1e6:	86 17       	cp	r24, r22
+     1e8:	51 f7       	brne	.-44     	; 0x1be <addTaskToWaitQueue+0x5e>
+     1ea:	ae 17       	cp	r26, r30
+     1ec:	bf 07       	cpc	r27, r31
+     1ee:	38 f7       	brcc	.-50     	; 0x1be <addTaskToWaitQueue+0x5e>
+				/* 挿入する位置が見つかった */
+				pT->next_task = beforenid->next_task;
+     1f0:	17 96       	adiw	r26, 0x07	; 7
+     1f2:	fc 93       	st	X, r31
+     1f4:	ee 93       	st	-X, r30
+     1f6:	16 97       	sbiw	r26, 0x06	; 6
+				pT->pause_count = time;
+     1f8:	15 96       	adiw	r26, 0x05	; 5
+     1fa:	6c 93       	st	X, r22
+     1fc:	15 97       	sbiw	r26, 0x05	; 5
+				beforenid->next_task = tcb;
+     1fe:	bf 83       	std	Y+7, r27	; 0x07
+     200:	ae 83       	std	Y+6, r26	; 0x06
+				next_task->pause_count -= pT->pause_count;
+     202:	85 81       	ldd	r24, Z+5	; 0x05
+     204:	86 1b       	sub	r24, r22
+     206:	85 83       	std	Z+5, r24	; 0x05
+		}
+	}
+#else
+#error "Scheduler type is undefined."
+#endif
+}
+     208:	df 91       	pop	r29
+     20a:	cf 91       	pop	r28
+     20c:	08 95       	ret
+
+0000020e <removeTaskFromWaitQueue>:
+ * @retval TRUE		タスクは WaitQueue 中に存在したので取り除いた。
+ * @note			tcbの妥当性は検査しないので注意
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+bool_t removeTaskFromWaitQueue(tcb_t* tcb) {
+     20e:	cf 93       	push	r28
+     210:	df 93       	push	r29
+     212:	ac 01       	movw	r20, r24
+	tcb_t* next_task = NULL;
+	tcb_t* pid = NULL;
+
+	if (tcb == NULL) {
+     214:	00 97       	sbiw	r24, 0x00	; 0
+     216:	a1 f1       	breq	.+104    	; 0x280 <removeTaskFromWaitQueue+0x72>
+		return FALSE;
+	}
+
+	/* 探索 */
+	pid = NULL;
+	for (next_task = waitqueue.next_task; next_task != tcb; next_task = next_task->next_task) {
+     218:	60 91 31 05 	lds	r22, 0x0531
+     21c:	70 91 32 05 	lds	r23, 0x0532
+     220:	fb 01       	movw	r30, r22
+     222:	c0 e0       	ldi	r28, 0x00	; 0
+     224:	d0 e0       	ldi	r29, 0x00	; 0
+     226:	07 c0       	rjmp	.+14     	; 0x236 <removeTaskFromWaitQueue+0x28>
+		if (next_task == NULL) {
+     228:	30 97       	sbiw	r30, 0x00	; 0
+     22a:	51 f1       	breq	.+84     	; 0x280 <removeTaskFromWaitQueue+0x72>
+		return FALSE;
+	}
+
+	/* 探索 */
+	pid = NULL;
+	for (next_task = waitqueue.next_task; next_task != tcb; next_task = next_task->next_task) {
+     22c:	ef 01       	movw	r28, r30
+     22e:	86 81       	ldd	r24, Z+6	; 0x06
+     230:	97 81       	ldd	r25, Z+7	; 0x07
+     232:	9c 01       	movw	r18, r24
+     234:	f9 01       	movw	r30, r18
+     236:	e4 17       	cp	r30, r20
+     238:	f5 07       	cpc	r31, r21
+     23a:	b1 f7       	brne	.-20     	; 0x228 <removeTaskFromWaitQueue+0x1a>
+	}
+	
+	/* ここに到達した時点で、指定されたタスク tcb はリスト中に存在していることが保証される */
+
+	/* 自分に続くタスクがある場合、pause_countを更新 */
+	if (tcb->next_task != NULL) {
+     23c:	a6 81       	ldd	r26, Z+6	; 0x06
+     23e:	b7 81       	ldd	r27, Z+7	; 0x07
+     240:	10 97       	sbiw	r26, 0x00	; 0
+     242:	39 f0       	breq	.+14     	; 0x252 <removeTaskFromWaitQueue+0x44>
+		tcb->next_task->pause_count += tcb->pause_count;
+     244:	15 96       	adiw	r26, 0x05	; 5
+     246:	8c 91       	ld	r24, X
+     248:	15 97       	sbiw	r26, 0x05	; 5
+     24a:	95 81       	ldd	r25, Z+5	; 0x05
+     24c:	89 0f       	add	r24, r25
+     24e:	15 96       	adiw	r26, 0x05	; 5
+     250:	8c 93       	st	X, r24
+	}
+
+	/* キューから外す */
+	if (waitqueue.next_task == tcb) {
+     252:	6e 17       	cp	r22, r30
+     254:	7f 07       	cpc	r23, r31
+     256:	39 f4       	brne	.+14     	; 0x266 <removeTaskFromWaitQueue+0x58>
+		/* キューの先頭の場合 */
+		waitqueue.next_task = tcb->next_task;
+     258:	86 81       	ldd	r24, Z+6	; 0x06
+     25a:	97 81       	ldd	r25, Z+7	; 0x07
+     25c:	90 93 32 05 	sts	0x0532, r25
+     260:	80 93 31 05 	sts	0x0531, r24
+     264:	09 c0       	rjmp	.+18     	; 0x278 <removeTaskFromWaitQueue+0x6a>
+	} else if (pid != NULL) {
+     266:	20 97       	sbiw	r28, 0x00	; 0
+     268:	39 f0       	breq	.+14     	; 0x278 <removeTaskFromWaitQueue+0x6a>
+		/*
+		 * キューの先頭ではない場合、探索のループが最低１回は実行されている
+		 * つまり、pidの値はNULL以外になっている
+		 */
+		pid->next_task = tcb->next_task;
+     26a:	da 01       	movw	r26, r20
+     26c:	16 96       	adiw	r26, 0x06	; 6
+     26e:	8d 91       	ld	r24, X+
+     270:	9c 91       	ld	r25, X
+     272:	17 97       	sbiw	r26, 0x07	; 7
+     274:	9f 83       	std	Y+7, r25	; 0x07
+     276:	8e 83       	std	Y+6, r24	; 0x06
+	}
+	tcb->next_task = NULL;
+     278:	17 82       	std	Z+7, r1	; 0x07
+     27a:	16 82       	std	Z+6, r1	; 0x06
+     27c:	81 e0       	ldi	r24, 0x01	; 1
+     27e:	01 c0       	rjmp	.+2      	; 0x282 <removeTaskFromWaitQueue+0x74>
+
+	return TRUE;
+     280:	80 e0       	ldi	r24, 0x00	; 0
+}
+     282:	df 91       	pop	r29
+     284:	cf 91       	pop	r28
+     286:	08 95       	ret
+
+00000288 <getTaskID>:
+ * @param[in] tcb	IDを得たいタスクのタスクコントロールブロック
+ * @return			タスクID;
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+taskid_t getTaskID(tcb_t* tcb) {
+     288:	82 57       	subi	r24, 0x72	; 114
+     28a:	93 40       	sbci	r25, 0x03	; 3
+     28c:	95 95       	asr	r25
+     28e:	87 95       	ror	r24
+	return TCBtoTID(tcb);
+}
+     290:	2d ec       	ldi	r18, 0xCD	; 205
+     292:	3c ec       	ldi	r19, 0xCC	; 204
+     294:	82 9f       	mul	r24, r18
+     296:	80 2d       	mov	r24, r0
+     298:	11 24       	eor	r1, r1
+     29a:	08 95       	ret
+
+0000029c <updateTick>:
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ * @date	2010/09/09 12:48:22	タイムシェアリングスケジューリングを追加
+ * @date	2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリングを追加
+ */
+void updateTick(void) {
+     29c:	1f 93       	push	r17
+			currentTCB->time_sharing_tick--;
+		}
+	}
+#endif
+
+	if (waitqueue.next_task == NULL) {
+     29e:	e0 91 31 05 	lds	r30, 0x0531
+     2a2:	f0 91 32 05 	lds	r31, 0x0532
+     2a6:	30 97       	sbiw	r30, 0x00	; 0
+     2a8:	19 f1       	breq	.+70     	; 0x2f0 <updateTick+0x54>
+		rescheduling = FALSE;
+	} else {
+		waitqueue.next_task->pause_count--;
+     2aa:	85 81       	ldd	r24, Z+5	; 0x05
+     2ac:	81 50       	subi	r24, 0x01	; 1
+     2ae:	85 83       	std	Z+5, r24	; 0x05
+		if (waitqueue.next_task->pause_count == 0) {
+     2b0:	88 23       	and	r24, r24
+     2b2:	f1 f4       	brne	.+60     	; 0x2f0 <updateTick+0x54>
+			do {
+				/* 取り外す */
+				tcb_t *next_task = waitqueue.next_task;
+				next_task->status = READY;
+     2b4:	12 e0       	ldi	r17, 0x02	; 2
+	} else {
+		waitqueue.next_task->pause_count--;
+		if (waitqueue.next_task->pause_count == 0) {
+			do {
+				/* 取り外す */
+				tcb_t *next_task = waitqueue.next_task;
+     2b6:	e0 91 31 05 	lds	r30, 0x0531
+     2ba:	f0 91 32 05 	lds	r31, 0x0532
+				next_task->status = READY;
+     2be:	12 83       	std	Z+2, r17	; 0x02
+				waitqueue.next_task = next_task->next_task;
+     2c0:	86 81       	ldd	r24, Z+6	; 0x06
+     2c2:	97 81       	ldd	r25, Z+7	; 0x07
+     2c4:	90 93 32 05 	sts	0x0532, r25
+     2c8:	80 93 31 05 	sts	0x0531, r24
+				next_task->next_task = NULL;
+     2cc:	17 82       	std	Z+7, r1	; 0x07
+     2ce:	16 82       	std	Z+6, r1	; 0x06
+				/* readyQueueに入れる */
+				addTaskToReadyQueue (next_task);
+     2d0:	cf 01       	movw	r24, r30
+     2d2:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+				/* 次を見る */
+			} while ((waitqueue.next_task != NULL) && (waitqueue.next_task->pause_count == 0));
+     2d6:	e0 91 31 05 	lds	r30, 0x0531
+     2da:	f0 91 32 05 	lds	r31, 0x0532
+     2de:	30 97       	sbiw	r30, 0x00	; 0
+     2e0:	19 f0       	breq	.+6      	; 0x2e8 <updateTick+0x4c>
+     2e2:	85 81       	ldd	r24, Z+5	; 0x05
+     2e4:	88 23       	and	r24, r24
+     2e6:	39 f3       	breq	.-50     	; 0x2b6 <updateTick+0x1a>
+			rescheduling = TRUE;
+     2e8:	81 e0       	ldi	r24, 0x01	; 1
+     2ea:	80 93 30 05 	sts	0x0530, r24
+     2ee:	02 c0       	rjmp	.+4      	; 0x2f4 <updateTick+0x58>
+		} else {
+			rescheduling = FALSE;
+     2f0:	10 92 30 05 	sts	0x0530, r1
+		}
+	}
+}
+     2f4:	1f 91       	pop	r17
+     2f6:	08 95       	ret
+
+000002f8 <initScheduler>:
+ * @brief   スケジューラ初期化関数
+ * @note    スケジューラを初期化する。
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ */
+void initScheduler(void) {
+     2f8:	ff 92       	push	r15
+     2fa:	0f 93       	push	r16
+     2fc:	1f 93       	push	r17
+
+	/* readyqueue を初期化 */
+	readyqueue.next_task = NULL;
+     2fe:	10 92 34 05 	sts	0x0534, r1
+     302:	10 92 33 05 	sts	0x0533, r1
+
+	/* pausequeue を初期化 */
+	waitqueue.next_task = NULL;
+     306:	10 92 32 05 	sts	0x0532, r1
+     30a:	10 92 31 05 	sts	0x0531, r1
+
+	/* INIT タスクの起動 */
+	INITTASK.status    = READY;
+     30e:	04 e7       	ldi	r16, 0x74	; 116
+     310:	13 e0       	ldi	r17, 0x03	; 3
+     312:	32 e0       	ldi	r19, 0x02	; 2
+     314:	f3 2e       	mov	r15, r19
+     316:	f0 92 74 03 	sts	0x0374, r15
+	INITTASK.next_task = NULL;
+     31a:	10 92 79 03 	sts	0x0379, r1
+     31e:	10 92 78 03 	sts	0x0378, r1
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING)
+	INITTASK.task_priolity = 0;
+#endif
+	addTaskToReadyQueue(&INITTASK);
+     322:	c8 01       	movw	r24, r16
+     324:	02 97       	sbiw	r24, 0x02	; 2
+     326:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+
+	/* DIAG タスクの起動 */
+	DIAGTASK.status    = READY;
+     32a:	f0 92 a6 03 	sts	0x03A6, r15
+	DIAGTASK.next_task = NULL;
+     32e:	10 92 ab 03 	sts	0x03AB, r1
+     332:	10 92 aa 03 	sts	0x03AA, r1
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING)
+	DIAGTASK.task_priolity = 0xFF;
+#endif
+	addTaskToReadyQueue(&DIAGTASK);
+     336:	c8 01       	movw	r24, r16
+     338:	c0 96       	adiw	r24, 0x30	; 48
+     33a:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+
+	/* スケジューリングが必要なので rescheduling に TRUE を設定 */
+	rescheduling = TRUE;
+     33e:	81 e0       	ldi	r24, 0x01	; 1
+     340:	80 93 30 05 	sts	0x0530, r24
+
+}
+     344:	1f 91       	pop	r17
+     346:	0f 91       	pop	r16
+     348:	ff 90       	pop	r15
+     34a:	08 95       	ret
+
+0000034c <scheduler>:
+ * @date	2010/09/09 12:48:22	タイムシェアリングスケジューリングを追加
+ * @date	2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリングを追加
+ */
+void scheduler(void) {
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE)
+	if (rescheduling != FALSE) {
+     34c:	80 91 30 05 	lds	r24, 0x0530
+     350:	88 23       	and	r24, r24
+     352:	81 f0       	breq	.+32     	; 0x374 <scheduler+0x28>
+		/* readyqueue の先頭をタスクに設定 */
+		if ((readyqueue.next_task != NULL)&&(readyqueue.next_task < &tasks[TASK_NUM])) {
+     354:	80 91 33 05 	lds	r24, 0x0533
+     358:	90 91 34 05 	lds	r25, 0x0534
+     35c:	00 97       	sbiw	r24, 0x00	; 0
+     35e:	41 f0       	breq	.+16     	; 0x370 <scheduler+0x24>
+     360:	23 e0       	ldi	r18, 0x03	; 3
+     362:	8e 3a       	cpi	r24, 0xAE	; 174
+     364:	92 07       	cpc	r25, r18
+     366:	20 f4       	brcc	.+8      	; 0x370 <scheduler+0x24>
+			currentTCB = readyqueue.next_task;
+     368:	90 93 2f 05 	sts	0x052F, r25
+     36c:	80 93 2e 05 	sts	0x052E, r24
+		}
+		rescheduling = FALSE;
+     370:	10 92 30 05 	sts	0x0530, r1
+ * @date    2010/01/07 14:08:58	作成
+ * @date	2010/08/15 16:11:02	機種依存部分を分離
+ */
+static void dispatch(void) {
+	/* 次に実行するタスクのコンテキストを復帰する */
+	RESTORE_CONTEXT();
+     374:	a0 91 2e 05 	lds	r26, 0x052E
+     378:	b0 91 2f 05 	lds	r27, 0x052F
+     37c:	cd 91       	ld	r28, X+
+     37e:	cd bf       	out	0x3d, r28	; 61
+     380:	dd 91       	ld	r29, X+
+     382:	de bf       	out	0x3e, r29	; 62
+     384:	ff 91       	pop	r31
+     386:	ef 91       	pop	r30
+     388:	df 91       	pop	r29
+     38a:	cf 91       	pop	r28
+     38c:	bf 91       	pop	r27
+     38e:	af 91       	pop	r26
+     390:	9f 91       	pop	r25
+     392:	8f 91       	pop	r24
+     394:	7f 91       	pop	r23
+     396:	6f 91       	pop	r22
+     398:	5f 91       	pop	r21
+     39a:	4f 91       	pop	r20
+     39c:	3f 91       	pop	r19
+     39e:	2f 91       	pop	r18
+     3a0:	1f 91       	pop	r17
+     3a2:	0f 91       	pop	r16
+     3a4:	ff 90       	pop	r15
+     3a6:	ef 90       	pop	r14
+     3a8:	df 90       	pop	r13
+     3aa:	cf 90       	pop	r12
+     3ac:	bf 90       	pop	r11
+     3ae:	af 90       	pop	r10
+     3b0:	9f 90       	pop	r9
+     3b2:	8f 90       	pop	r8
+     3b4:	7f 90       	pop	r7
+     3b6:	6f 90       	pop	r6
+     3b8:	5f 90       	pop	r5
+     3ba:	4f 90       	pop	r4
+     3bc:	3f 90       	pop	r3
+     3be:	2f 90       	pop	r2
+     3c0:	1f 90       	pop	r1
+     3c2:	0f 90       	pop	r0
+     3c4:	0f be       	out	0x3f, r0	; 63
+     3c6:	0f 90       	pop	r0
+	RETURN_FROM_INTERRUPT();
+     3c8:	18 95       	reti
+#error "Scheduler type is undefined."
+#endif
+
+	/* ディスパッチ処理を呼び出す */
+	dispatch();
+}
+     3ca:	08 95       	ret
+
+000003cc <external_interrupt_handler>:
+/**
+ * @brief	外部割り込みに応じてタスクを起動
+ * @author	Kazuya Fukuhara
+ * @date	2010/09/11 11:01:20	作成
+ */
+void external_interrupt_handler(void) {
+     3cc:	ff 92       	push	r15
+     3ce:	0f 93       	push	r16
+     3d0:	1f 93       	push	r17
+     3d2:	df 93       	push	r29
+     3d4:	cf 93       	push	r28
+     3d6:	00 d0       	rcall	.+0      	; 0x3d8 <external_interrupt_handler+0xc>
+     3d8:	cd b7       	in	r28, 0x3d	; 61
+     3da:	de b7       	in	r29, 0x3e	; 62
+	extintid_t intid = GetExtIntId();
+     3dc:	e0 91 70 03 	lds	r30, 0x0370
+	if (intid < EXTINT_NUM) {
+     3e0:	ea 31       	cpi	r30, 0x1A	; 26
+     3e2:	98 f5       	brcc	.+102    	; 0x44a <external_interrupt_handler+0x7e>
+		taskid_t tid = int_hook_tid[intid].taskid;
+     3e4:	f0 e0       	ldi	r31, 0x00	; 0
+     3e6:	ec 5f       	subi	r30, 0xFC	; 252
+     3e8:	fd 4f       	sbci	r31, 0xFD	; 253
+     3ea:	e0 81       	ld	r30, Z
+		if ((1<=tid)&&(tid<=TASK_NUM-2)) {	/* init/diagが指定されている場合は何もしない（安全策） */
+     3ec:	8e 2f       	mov	r24, r30
+     3ee:	81 50       	subi	r24, 0x01	; 1
+     3f0:	84 30       	cpi	r24, 0x04	; 4
+     3f2:	58 f5       	brcc	.+86     	; 0x44a <external_interrupt_handler+0x7e>
+			tcb_t* task = &tasks[tid];
+     3f4:	8a e0       	ldi	r24, 0x0A	; 10
+     3f6:	e8 9f       	mul	r30, r24
+     3f8:	80 01       	movw	r16, r0
+     3fa:	11 24       	eor	r1, r1
+     3fc:	0e 58       	subi	r16, 0x8E	; 142
+     3fe:	1c 4f       	sbci	r17, 0xFC	; 252
+			if (task->status == DORMANT) {
+     400:	d8 01       	movw	r26, r16
+     402:	12 96       	adiw	r26, 0x02	; 2
+     404:	fc 90       	ld	r15, X
+     406:	b1 e0       	ldi	r27, 0x01	; 1
+     408:	fb 16       	cp	r15, r27
+     40a:	f9 f4       	brne	.+62     	; 0x44a <external_interrupt_handler+0x7e>
+
+
+				/* 起動するタスクの設定 */
+				task->status = READY;
+     40c:	82 e0       	ldi	r24, 0x02	; 2
+     40e:	f8 01       	movw	r30, r16
+     410:	82 83       	std	Z+2, r24	; 0x02
+				task->next_task = NULL;
+     412:	17 82       	std	Z+7, r1	; 0x07
+     414:	16 82       	std	Z+6, r1	; 0x06
+				task->parameter = NULL;
+     416:	14 82       	std	Z+4, r1	; 0x04
+     418:	13 82       	std	Z+3, r1	; 0x03
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+				task->task_priolity = int_hook_tid[intid].priolity;
+#endif
+
+				/* 引数を設定 */
+				SetTaskArg(GetContext(task),task->parameter);
+     41a:	01 90       	ld	r0, Z+
+     41c:	f0 81       	ld	r31, Z
+     41e:	e0 2d       	mov	r30, r0
+     420:	31 96       	adiw	r30, 0x01	; 1
+     422:	1a 82       	std	Y+2, r1	; 0x02
+     424:	19 82       	std	Y+1, r1	; 0x01
+     426:	89 81       	ldd	r24, Y+1	; 0x01
+     428:	86 83       	std	Z+6, r24	; 0x06
+     42a:	8a 81       	ldd	r24, Y+2	; 0x02
+     42c:	87 83       	std	Z+7, r24	; 0x07
+
+				/* readyキューに挿入 */
+				addTaskToReadyQueue(task);
+     42e:	c8 01       	movw	r24, r16
+     430:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+
+				/* スケジューリング要求 */
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE) 
+				rescheduling = (currentTCB > task) ? TRUE : FALSE;
+     434:	10 92 30 05 	sts	0x0530, r1
+     438:	80 91 2e 05 	lds	r24, 0x052E
+     43c:	90 91 2f 05 	lds	r25, 0x052F
+     440:	08 17       	cp	r16, r24
+     442:	19 07       	cpc	r17, r25
+     444:	10 f4       	brcc	.+4      	; 0x44a <external_interrupt_handler+0x7e>
+     446:	f0 92 30 05 	sts	0x0530, r15
+				rescheduling = (currentTCB->task_priolity > task->task_priolity) ? TRUE : FALSE;
+#endif
+			}
+		}
+	}	
+	scheduler();
+     44a:	0e 94 a6 01 	call	0x34c	; 0x34c <scheduler>
+}
+     44e:	0f 90       	pop	r0
+     450:	0f 90       	pop	r0
+     452:	cf 91       	pop	r28
+     454:	df 91       	pop	r29
+     456:	1f 91       	pop	r17
+     458:	0f 91       	pop	r16
+     45a:	ff 90       	pop	r15
+     45c:	08 95       	ret
+
+0000045e <ZeroMemory>:
+ * @brief   指定領域をゼロクリア
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ */
+void ZeroMemory(ptr_t buf, uint_t szbuf) {
+	uint8_t *p = (uint8_t*)buf;
+     45e:	fc 01       	movw	r30, r24
+     460:	03 c0       	rjmp	.+6      	; 0x468 <ZeroMemory+0xa>
+	while (szbuf--) {
+		*p = 0;
+     462:	11 92       	st	Z+, r1
+		p++;
+     464:	61 50       	subi	r22, 0x01	; 1
+     466:	70 40       	sbci	r23, 0x00	; 0
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ */
+void ZeroMemory(ptr_t buf, uint_t szbuf) {
+	uint8_t *p = (uint8_t*)buf;
+	while (szbuf--) {
+     468:	61 15       	cp	r22, r1
+     46a:	71 05       	cpc	r23, r1
+     46c:	d1 f7       	brne	.-12     	; 0x462 <ZeroMemory+0x4>
+		*p = 0;
+		p++;
+	}
+}
+     46e:	08 95       	ret
+
+00000470 <set_int_hook_tid>:
+ */
+void set_int_hook_tid(extintid_t interrupt_id, taskid_t task_id
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+, priolity_t priolity
+#endif
+) {
+     470:	0f 93       	push	r16
+     472:	1f 93       	push	r17
+     474:	18 2f       	mov	r17, r24
+     476:	06 2f       	mov	r16, r22
+	if (is_hookable_interrupt_id(interrupt_id)) {
+     478:	0e 94 98 07 	call	0xf30	; 0xf30 <is_hookable_interrupt_id>
+     47c:	88 23       	and	r24, r24
+     47e:	29 f0       	breq	.+10     	; 0x48a <set_int_hook_tid+0x1a>
+		int_hook_tid[interrupt_id].taskid = task_id;
+     480:	e1 2f       	mov	r30, r17
+     482:	f0 e0       	ldi	r31, 0x00	; 0
+     484:	ec 5f       	subi	r30, 0xFC	; 252
+     486:	fd 4f       	sbci	r31, 0xFD	; 253
+     488:	00 83       	st	Z, r16
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+		int_hook_tid[interrupt_id].priolity = priolity;
+#endif
+	}
+}
+     48a:	1f 91       	pop	r17
+     48c:	0f 91       	pop	r16
+     48e:	08 95       	ret
+
+00000490 <resetTCB>:
+ * @note                指定したタスクのスタックポインタや状態が全てリセットされ、タスクは初期状態となる。
+ * @author              Kazuya Fukuhara
+ * @date                2010/01/07 14:08:58	作成
+ * @date				2010/08/15 16:11:02	機種依存部分を分離
+ */
+void resetTCB(taskid_t taskid) {
+     490:	0f 93       	push	r16
+     492:	1f 93       	push	r17
+     494:	08 2f       	mov	r16, r24
+	/* コンテキストの初期化 */
+	resetContext(taskid);
+     496:	0e 94 b2 07 	call	0xf64	; 0xf64 <resetContext>
+
+	/* タスクの状態を設定 */
+	tasks[taskid].status = DORMANT;
+     49a:	10 e0       	ldi	r17, 0x00	; 0
+     49c:	f8 01       	movw	r30, r16
+     49e:	ee 0f       	add	r30, r30
+     4a0:	ff 1f       	adc	r31, r31
+     4a2:	ee 0f       	add	r30, r30
+     4a4:	ff 1f       	adc	r31, r31
+     4a6:	e0 0f       	add	r30, r16
+     4a8:	f1 1f       	adc	r31, r17
+     4aa:	31 96       	adiw	r30, 0x01	; 1
+     4ac:	22 e7       	ldi	r18, 0x72	; 114
+     4ae:	33 e0       	ldi	r19, 0x03	; 3
+     4b0:	ee 0f       	add	r30, r30
+     4b2:	ff 1f       	adc	r31, r31
+     4b4:	e2 0f       	add	r30, r18
+     4b6:	f3 1f       	adc	r31, r19
+     4b8:	81 e0       	ldi	r24, 0x01	; 1
+     4ba:	80 83       	st	Z, r24
+	tasks[taskid].pause_count = 0;
+     4bc:	f8 01       	movw	r30, r16
+     4be:	53 e0       	ldi	r21, 0x03	; 3
+     4c0:	ee 0f       	add	r30, r30
+     4c2:	ff 1f       	adc	r31, r31
+     4c4:	5a 95       	dec	r21
+     4c6:	e1 f7       	brne	.-8      	; 0x4c0 <resetTCB+0x30>
+     4c8:	00 0f       	add	r16, r16
+     4ca:	11 1f       	adc	r17, r17
+     4cc:	e0 0f       	add	r30, r16
+     4ce:	f1 1f       	adc	r31, r17
+     4d0:	e2 0f       	add	r30, r18
+     4d2:	f3 1f       	adc	r31, r19
+     4d4:	15 82       	std	Z+5, r1	; 0x05
+
+	/* チェインを初期化 */
+	tasks[taskid].next_task = NULL;
+     4d6:	17 82       	std	Z+7, r1	; 0x07
+     4d8:	16 82       	std	Z+6, r1	; 0x06
+
+	/* メッセージを初期化 */
+	tasks[taskid].message = NULL;
+     4da:	11 86       	std	Z+9, r1	; 0x09
+     4dc:	10 86       	std	Z+8, r1	; 0x08
+}
+     4de:	1f 91       	pop	r17
+     4e0:	0f 91       	pop	r16
+     4e2:	08 95       	ret
+
+000004e4 <initTaskControlBlocks>:
+ * @brief   すべてのタスクコントロールブロックを初期状態にリセットする
+ * @note    すべてのタスクに対してresetTCBを呼び出す
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ */
+void initTaskControlBlocks(void) {
+     4e4:	1f 93       	push	r17
+     4e6:	10 e0       	ldi	r17, 0x00	; 0
+	taskid_t i;
+	for (i=0; i<TASK_NUM; ++i) {
+		resetTCB(i);
+     4e8:	81 2f       	mov	r24, r17
+     4ea:	0e 94 48 02 	call	0x490	; 0x490 <resetTCB>
+ * @author  Kazuya Fukuhara
+ * @date    2010/01/07 14:08:58	作成
+ */
+void initTaskControlBlocks(void) {
+	taskid_t i;
+	for (i=0; i<TASK_NUM; ++i) {
+     4ee:	1f 5f       	subi	r17, 0xFF	; 255
+     4f0:	16 30       	cpi	r17, 0x06	; 6
+     4f2:	d1 f7       	brne	.-12     	; 0x4e8 <initTaskControlBlocks+0x4>
+		resetTCB(i);
+	}
+}
+     4f4:	1f 91       	pop	r17
+     4f6:	08 95       	ret
+
+000004f8 <startKernel>:
+void startKernel(void) {
+
+	/*
+	 * ハードウェアを初期化
+	 */
+	initHardware();
+     4f8:	0e 94 a1 07 	call	0xf42	; 0xf42 <initHardware>
+
+	/*
+	 * ２．タスクコントロールブロックを初期化する
+	 * タスクエントリテーブルを参照し、全タスクのタスクコントロールブロック中のタスク実行先頭アドレス、初期スタックポインタを初期値に設定する
+	 */
+	initTaskControlBlocks();
+     4fc:	0e 94 72 02 	call	0x4e4	; 0x4e4 <initTaskControlBlocks>
+
+	/*
+	 * スケジューラを初期化する
+	 */
+	initScheduler();
+     500:	0e 94 7c 01 	call	0x2f8	; 0x2f8 <initScheduler>
+
+	/*
+	 * セマフォを初期化する
+	 */
+	initSemaphoQueue();
+     504:	0e 94 ab 03 	call	0x756	; 0x756 <initSemaphoQueue>
+
+	/*
+	 * メッセージを初期化する
+	 */
+	initMessageQueue();
+     508:	0e 94 89 02 	call	0x512	; 0x512 <initMessageQueue>
+
+	/* スケジューリングを行い、次に実行するタスクを選択する */
+	scheduler();
+     50c:	0e 94 a6 01 	call	0x34c	; 0x34c <scheduler>
+}
+     510:	08 95       	ret
+
+00000512 <initMessageQueue>:
+ * @author	Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ */
+void initMessageQueue(void) {
+	int i;
+	free_message_list = &message_table[0];
+     512:	8e e1       	ldi	r24, 0x1E	; 30
+     514:	92 e0       	ldi	r25, 0x02	; 2
+     516:	90 93 6f 02 	sts	0x026F, r25
+     51a:	80 93 6e 02 	sts	0x026E, r24
+     51e:	05 96       	adiw	r24, 0x05	; 5
+	for (i=1; i<MESSAGE_NUM; i++) {
+		message_table[i-1].next = &message_table[i];
+     520:	fc 01       	movw	r30, r24
+     522:	35 97       	sbiw	r30, 0x05	; 5
+     524:	91 83       	std	Z+1, r25	; 0x01
+     526:	80 83       	st	Z, r24
+     528:	05 96       	adiw	r24, 0x05	; 5
+ * @date	2010/01/07 14:08:58	作成
+ */
+void initMessageQueue(void) {
+	int i;
+	free_message_list = &message_table[0];
+	for (i=1; i<MESSAGE_NUM; i++) {
+     52a:	22 e0       	ldi	r18, 0x02	; 2
+     52c:	8e 36       	cpi	r24, 0x6E	; 110
+     52e:	92 07       	cpc	r25, r18
+     530:	b9 f7       	brne	.-18     	; 0x520 <initMessageQueue+0xe>
+		message_table[i-1].next = &message_table[i];
+	}
+	message_table[MESSAGE_NUM-1].next = NULL;
+     532:	10 92 6a 02 	sts	0x026A, r1
+     536:	10 92 69 02 	sts	0x0269, r1
+}
+     53a:	08 95       	ret
+
+0000053c <recvMSG>:
+ * @retval ERR31	エラー：INITTASKとDIAGTASKがrecvMSGを呼び出した
+ * @retval ERR41	エラー：自分宛てのメッセージはなかった（正常終了）
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t recvMSG(taskid_t* from, ptr_t* data) {
+     53c:	cf 93       	push	r28
+     53e:	df 93       	push	r29
+     540:	ec 01       	movw	r28, r24
+	message_t *p;
+
+	if ((&INITTASK == currentTCB) || (&DIAGTASK == currentTCB)) {
+     542:	a0 91 2e 05 	lds	r26, 0x052E
+     546:	b0 91 2f 05 	lds	r27, 0x052F
+     54a:	83 e0       	ldi	r24, 0x03	; 3
+     54c:	a2 37       	cpi	r26, 0x72	; 114
+     54e:	b8 07       	cpc	r27, r24
+     550:	31 f1       	breq	.+76     	; 0x59e <recvMSG+0x62>
+     552:	83 e0       	ldi	r24, 0x03	; 3
+     554:	a4 3a       	cpi	r26, 0xA4	; 164
+     556:	b8 07       	cpc	r27, r24
+     558:	11 f1       	breq	.+68     	; 0x59e <recvMSG+0x62>
+		/* INITTASKとDIAGTASKがrecvMSGを呼び出した */
+		return ERR31;
+	}
+
+	/* 自分宛てのメッセージが存在しているか判定 */
+	if (currentTCB->message == NULL) {
+     55a:	18 96       	adiw	r26, 0x08	; 8
+     55c:	ed 91       	ld	r30, X+
+     55e:	fc 91       	ld	r31, X
+     560:	19 97       	sbiw	r26, 0x09	; 9
+     562:	30 97       	sbiw	r30, 0x00	; 0
+     564:	11 f4       	brne	.+4      	; 0x56a <recvMSG+0x2e>
+     566:	89 e2       	ldi	r24, 0x29	; 41
+     568:	1b c0       	rjmp	.+54     	; 0x5a0 <recvMSG+0x64>
+		/* 自分宛てのメッセージはなかったので正常終了 */
+		return ERR41;
+	} else {
+		/* 自分宛てのメッセージがあったので、受信処理 */
+		p = currentTCB->message;
+		currentTCB->message = p->next;
+     56a:	80 81       	ld	r24, Z
+     56c:	91 81       	ldd	r25, Z+1	; 0x01
+     56e:	19 96       	adiw	r26, 0x09	; 9
+     570:	9c 93       	st	X, r25
+     572:	8e 93       	st	-X, r24
+     574:	18 97       	sbiw	r26, 0x08	; 8
+		*from = p->from;
+     576:	82 81       	ldd	r24, Z+2	; 0x02
+     578:	88 83       	st	Y, r24
+		*data = p->data;
+     57a:	83 81       	ldd	r24, Z+3	; 0x03
+     57c:	94 81       	ldd	r25, Z+4	; 0x04
+     57e:	db 01       	movw	r26, r22
+     580:	8d 93       	st	X+, r24
+     582:	9c 93       	st	X, r25
+
+		/* 使い終わったメッセージ領域を開放する */
+		p->from = 0;
+     584:	12 82       	std	Z+2, r1	; 0x02
+		p->next = free_message_list;
+     586:	80 91 6e 02 	lds	r24, 0x026E
+     58a:	90 91 6f 02 	lds	r25, 0x026F
+     58e:	91 83       	std	Z+1, r25	; 0x01
+     590:	80 83       	st	Z, r24
+		free_message_list = p;
+     592:	f0 93 6f 02 	sts	0x026F, r31
+     596:	e0 93 6e 02 	sts	0x026E, r30
+     59a:	80 e0       	ldi	r24, 0x00	; 0
+     59c:	01 c0       	rjmp	.+2      	; 0x5a0 <recvMSG+0x64>
+
+		return SUCCESS;
+     59e:	8f e1       	ldi	r24, 0x1F	; 31
+	}
+}
+     5a0:	df 91       	pop	r29
+     5a2:	cf 91       	pop	r28
+     5a4:	08 95       	ret
+
+000005a6 <unlinkMSG>:
+ * @brief			指定したタスクのメッセージをすべて開放
+ * @param[in] tcb	タスクのタスクポインタ
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+void unlinkMSG(tcb_t *tcb) {
+     5a6:	dc 01       	movw	r26, r24
+	/* タスクのメッセージをすべて開放 */
+	if ((tcb != NULL) && (tcb->message != NULL)) {
+     5a8:	00 97       	sbiw	r24, 0x00	; 0
+     5aa:	f9 f0       	breq	.+62     	; 0x5ea <unlinkMSG+0x44>
+     5ac:	18 96       	adiw	r26, 0x08	; 8
+     5ae:	ed 91       	ld	r30, X+
+     5b0:	fc 91       	ld	r31, X
+     5b2:	19 97       	sbiw	r26, 0x09	; 9
+     5b4:	30 97       	sbiw	r30, 0x00	; 0
+     5b6:	c9 f0       	breq	.+50     	; 0x5ea <unlinkMSG+0x44>
+		message_t *p = tcb->message;
+		while (p->next) {
+     5b8:	cf 01       	movw	r24, r30
+     5ba:	01 90       	ld	r0, Z+
+     5bc:	f0 81       	ld	r31, Z
+     5be:	e0 2d       	mov	r30, r0
+     5c0:	30 97       	sbiw	r30, 0x00	; 0
+     5c2:	d1 f7       	brne	.-12     	; 0x5b8 <unlinkMSG+0x12>
+     5c4:	fc 01       	movw	r30, r24
+			p = p->next;
+		}
+		p->next = free_message_list;
+     5c6:	80 91 6e 02 	lds	r24, 0x026E
+     5ca:	90 91 6f 02 	lds	r25, 0x026F
+     5ce:	91 83       	std	Z+1, r25	; 0x01
+     5d0:	80 83       	st	Z, r24
+		free_message_list = tcb->message;
+     5d2:	18 96       	adiw	r26, 0x08	; 8
+     5d4:	8d 91       	ld	r24, X+
+     5d6:	9c 91       	ld	r25, X
+     5d8:	19 97       	sbiw	r26, 0x09	; 9
+     5da:	90 93 6f 02 	sts	0x026F, r25
+     5de:	80 93 6e 02 	sts	0x026E, r24
+		tcb->message = NULL;
+     5e2:	19 96       	adiw	r26, 0x09	; 9
+     5e4:	1c 92       	st	X, r1
+     5e6:	1e 92       	st	-X, r1
+     5e8:	18 97       	sbiw	r26, 0x08	; 8
+     5ea:	08 95       	ret
+
+000005ec <waitMSG>:
+ * @author  		Kazuya Fukuhara
+ * @retval SUCCESS	成功
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t waitMSG(void) {
+	if (currentTCB->message == NULL) {			/* メッセージを受信していない場合は待ち状態に入る */
+     5ec:	e0 91 2e 05 	lds	r30, 0x052E
+     5f0:	f0 91 2f 05 	lds	r31, 0x052F
+     5f4:	80 85       	ldd	r24, Z+8	; 0x08
+     5f6:	91 85       	ldd	r25, Z+9	; 0x09
+     5f8:	89 2b       	or	r24, r25
+     5fa:	41 f4       	brne	.+16     	; 0x60c <waitMSG+0x20>
+		currentTCB->status = WAIT_MSG;			/* タスクの状態をメッセージ待ち状態に変化させる */
+     5fc:	84 e0       	ldi	r24, 0x04	; 4
+     5fe:	82 83       	std	Z+2, r24	; 0x02
+		removeTaskFromReadyQueue(currentTCB);	/* 実行中タスクキューからタスクを取り除く */
+     600:	cf 01       	movw	r24, r30
+     602:	0e 94 81 00 	call	0x102	; 0x102 <removeTaskFromReadyQueue>
+		rescheduling = TRUE;
+     606:	81 e0       	ldi	r24, 0x01	; 1
+     608:	80 93 30 05 	sts	0x0530, r24
+	}
+	return SUCCESS;
+}
+     60c:	80 e0       	ldi	r24, 0x00	; 0
+     60e:	08 95       	ret
+
+00000610 <sendMSG>:
+ * @retval ERR40	エラー：メール送信失敗（dormant状態のタスクへのメッセージ送信）
+ * @retval ERR41	エラー：自分宛てのメッセージはなかった（正常終了）
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t sendMSG(taskid_t to, ptr_t data) {
+     610:	0f 93       	push	r16
+     612:	1f 93       	push	r17
+     614:	cf 93       	push	r28
+     616:	df 93       	push	r29
+     618:	18 2f       	mov	r17, r24
+	message_t *msg;
+	message_t *p;
+
+	if (to >= TASK_NUM) {
+     61a:	86 30       	cpi	r24, 0x06	; 6
+     61c:	10 f0       	brcs	.+4      	; 0x622 <sendMSG+0x12>
+     61e:	81 e0       	ldi	r24, 0x01	; 1
+     620:	95 c0       	rjmp	.+298    	; 0x74c <sendMSG+0x13c>
+		/* 不正なタスクIDがtoに指定されている */
+		return ERR1;
+	} else if ((to == 0)||(to == TASK_NUM-1)) {
+     622:	88 23       	and	r24, r24
+     624:	09 f4       	brne	.+2      	; 0x628 <sendMSG+0x18>
+     626:	8f c0       	rjmp	.+286    	; 0x746 <sendMSG+0x136>
+     628:	85 30       	cpi	r24, 0x05	; 5
+     62a:	09 f4       	brne	.+2      	; 0x62e <sendMSG+0x1e>
+     62c:	8c c0       	rjmp	.+280    	; 0x746 <sendMSG+0x136>
+		/* INITTASKとDIAGTASK宛てのメッセージ送信は禁止 */
+		return ERR31;
+	} else if ((&INITTASK == currentTCB) || (&DIAGTASK == currentTCB)) {
+     62e:	20 91 2e 05 	lds	r18, 0x052E
+     632:	30 91 2f 05 	lds	r19, 0x052F
+     636:	83 e0       	ldi	r24, 0x03	; 3
+     638:	22 37       	cpi	r18, 0x72	; 114
+     63a:	38 07       	cpc	r19, r24
+     63c:	09 f4       	brne	.+2      	; 0x640 <sendMSG+0x30>
+     63e:	83 c0       	rjmp	.+262    	; 0x746 <sendMSG+0x136>
+     640:	e3 e0       	ldi	r30, 0x03	; 3
+     642:	24 3a       	cpi	r18, 0xA4	; 164
+     644:	3e 07       	cpc	r19, r30
+     646:	09 f4       	brne	.+2      	; 0x64a <sendMSG+0x3a>
+     648:	7e c0       	rjmp	.+252    	; 0x746 <sendMSG+0x136>
+		/* INITTASKとDIAGTASKがsendMSGを呼び出した */
+		return ERR31;
+	}
+
+	/* dormant状態のタスクへのメッセージ送信をチェック */
+	if (tasks[to].status == DORMANT) {
+     64a:	41 2f       	mov	r20, r17
+     64c:	50 e0       	ldi	r21, 0x00	; 0
+     64e:	fa 01       	movw	r30, r20
+     650:	ee 0f       	add	r30, r30
+     652:	ff 1f       	adc	r31, r31
+     654:	ee 0f       	add	r30, r30
+     656:	ff 1f       	adc	r31, r31
+     658:	e4 0f       	add	r30, r20
+     65a:	f5 1f       	adc	r31, r21
+     65c:	ee 0f       	add	r30, r30
+     65e:	ff 1f       	adc	r31, r31
+     660:	ec 58       	subi	r30, 0x8C	; 140
+     662:	fc 4f       	sbci	r31, 0xFC	; 252
+     664:	80 81       	ld	r24, Z
+     666:	81 30       	cpi	r24, 0x01	; 1
+     668:	09 f4       	brne	.+2      	; 0x66c <sendMSG+0x5c>
+     66a:	6f c0       	rjmp	.+222    	; 0x74a <sendMSG+0x13a>
+		return ERR40;
+	}
+
+	/* メッセージスロットから空きスロットを取得 */
+	msg = free_message_list;
+     66c:	c0 91 6e 02 	lds	r28, 0x026E
+     670:	d0 91 6f 02 	lds	r29, 0x026F
+	if (msg == NULL) {
+     674:	20 97       	sbiw	r28, 0x00	; 0
+     676:	09 f4       	brne	.+2      	; 0x67a <sendMSG+0x6a>
+     678:	68 c0       	rjmp	.+208    	; 0x74a <sendMSG+0x13a>
+		return ERR40;
+	} else {
+		free_message_list = free_message_list->next;
+     67a:	88 81       	ld	r24, Y
+     67c:	99 81       	ldd	r25, Y+1	; 0x01
+     67e:	90 93 6f 02 	sts	0x026F, r25
+     682:	80 93 6e 02 	sts	0x026E, r24
+		msg->next = NULL;
+     686:	19 82       	std	Y+1, r1	; 0x01
+     688:	18 82       	st	Y, r1
+	}
+
+	/* 送信先のメッセージリストの一番後ろにメッセージを追加 */
+	p = tasks[to].message;
+     68a:	da 01       	movw	r26, r20
+     68c:	aa 0f       	add	r26, r26
+     68e:	bb 1f       	adc	r27, r27
+     690:	ca 01       	movw	r24, r20
+     692:	f3 e0       	ldi	r31, 0x03	; 3
+     694:	88 0f       	add	r24, r24
+     696:	99 1f       	adc	r25, r25
+     698:	fa 95       	dec	r31
+     69a:	e1 f7       	brne	.-8      	; 0x694 <sendMSG+0x84>
+     69c:	a8 0f       	add	r26, r24
+     69e:	b9 1f       	adc	r27, r25
+     6a0:	ae 58       	subi	r26, 0x8E	; 142
+     6a2:	bc 4f       	sbci	r27, 0xFC	; 252
+     6a4:	18 96       	adiw	r26, 0x08	; 8
+     6a6:	ed 91       	ld	r30, X+
+     6a8:	fc 91       	ld	r31, X
+     6aa:	19 97       	sbiw	r26, 0x09	; 9
+	if (p != NULL) {
+     6ac:	30 97       	sbiw	r30, 0x00	; 0
+     6ae:	51 f0       	breq	.+20     	; 0x6c4 <sendMSG+0xb4>
+		while (p->next != NULL) {
+     6b0:	cf 01       	movw	r24, r30
+     6b2:	01 90       	ld	r0, Z+
+     6b4:	f0 81       	ld	r31, Z
+     6b6:	e0 2d       	mov	r30, r0
+     6b8:	30 97       	sbiw	r30, 0x00	; 0
+     6ba:	d1 f7       	brne	.-12     	; 0x6b0 <sendMSG+0xa0>
+     6bc:	fc 01       	movw	r30, r24
+			p = p->next;
+		}
+		p->next = msg;
+     6be:	d1 83       	std	Z+1, r29	; 0x01
+     6c0:	c0 83       	st	Z, r28
+     6c2:	04 c0       	rjmp	.+8      	; 0x6cc <sendMSG+0xbc>
+	} else {
+		tasks[to].message = msg;
+     6c4:	19 96       	adiw	r26, 0x09	; 9
+     6c6:	dc 93       	st	X, r29
+     6c8:	ce 93       	st	-X, r28
+     6ca:	18 97       	sbiw	r26, 0x08	; 8
+	}
+	
+	/* メッセージ情報を構築して書き込む */
+	msg->next = NULL;
+     6cc:	19 82       	std	Y+1, r1	; 0x01
+     6ce:	18 82       	st	Y, r1
+	msg->from = TCBtoTID(currentTCB); 
+     6d0:	22 57       	subi	r18, 0x72	; 114
+     6d2:	33 40       	sbci	r19, 0x03	; 3
+     6d4:	35 95       	asr	r19
+     6d6:	27 95       	ror	r18
+     6d8:	8d ec       	ldi	r24, 0xCD	; 205
+     6da:	9c ec       	ldi	r25, 0xCC	; 204
+     6dc:	fc 01       	movw	r30, r24
+     6de:	2e 9f       	mul	r18, r30
+     6e0:	c0 01       	movw	r24, r0
+     6e2:	2f 9f       	mul	r18, r31
+     6e4:	90 0d       	add	r25, r0
+     6e6:	3e 9f       	mul	r19, r30
+     6e8:	90 0d       	add	r25, r0
+     6ea:	11 24       	eor	r1, r1
+     6ec:	8a 83       	std	Y+2, r24	; 0x02
+	msg->data = data;
+     6ee:	7c 83       	std	Y+4, r23	; 0x04
+     6f0:	6b 83       	std	Y+3, r22	; 0x03
+
+	/* もしも、送信先がメッセージ待ち状態ならばタスクを起こす */
+	if (tasks[to].status == WAIT_MSG) {
+     6f2:	fa 01       	movw	r30, r20
+     6f4:	ee 0f       	add	r30, r30
+     6f6:	ff 1f       	adc	r31, r31
+     6f8:	ee 0f       	add	r30, r30
+     6fa:	ff 1f       	adc	r31, r31
+     6fc:	e4 0f       	add	r30, r20
+     6fe:	f5 1f       	adc	r31, r21
+     700:	ee 0f       	add	r30, r30
+     702:	ff 1f       	adc	r31, r31
+     704:	ec 58       	subi	r30, 0x8C	; 140
+     706:	fc 4f       	sbci	r31, 0xFC	; 252
+     708:	80 81       	ld	r24, Z
+     70a:	84 30       	cpi	r24, 0x04	; 4
+     70c:	d1 f4       	brne	.+52     	; 0x742 <sendMSG+0x132>
+		tasks[to].status = READY;									/* タスクをready状態に設定する */
+     70e:	82 e0       	ldi	r24, 0x02	; 2
+     710:	80 83       	st	Z, r24
+		removeTaskFromReadyQueue(&tasks[to]);						/* 実行中タスクキューからタスクを取り除く */
+     712:	0a e0       	ldi	r16, 0x0A	; 10
+     714:	10 9f       	mul	r17, r16
+     716:	80 01       	movw	r16, r0
+     718:	11 24       	eor	r1, r1
+     71a:	0e 58       	subi	r16, 0x8E	; 142
+     71c:	1c 4f       	sbci	r17, 0xFC	; 252
+     71e:	c8 01       	movw	r24, r16
+     720:	0e 94 81 00 	call	0x102	; 0x102 <removeTaskFromReadyQueue>
+		addTaskToReadyQueue(&tasks[to]);							/* タスクを実行中タスクのキューに追加する */
+     724:	c8 01       	movw	r24, r16
+     726:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+		rescheduling = (&tasks[to] < currentTCB) ? TRUE : FALSE;	/* スケジューリングが必要なら実行する */
+     72a:	10 92 30 05 	sts	0x0530, r1
+     72e:	80 91 2e 05 	lds	r24, 0x052E
+     732:	90 91 2f 05 	lds	r25, 0x052F
+     736:	08 17       	cp	r16, r24
+     738:	19 07       	cpc	r17, r25
+     73a:	18 f4       	brcc	.+6      	; 0x742 <sendMSG+0x132>
+     73c:	81 e0       	ldi	r24, 0x01	; 1
+     73e:	80 93 30 05 	sts	0x0530, r24
+     742:	80 e0       	ldi	r24, 0x00	; 0
+     744:	03 c0       	rjmp	.+6      	; 0x74c <sendMSG+0x13c>
+     746:	8f e1       	ldi	r24, 0x1F	; 31
+     748:	01 c0       	rjmp	.+2      	; 0x74c <sendMSG+0x13c>
+     74a:	88 e2       	ldi	r24, 0x28	; 40
+	}
+	
+	return SUCCESS;
+}
+     74c:	df 91       	pop	r29
+     74e:	cf 91       	pop	r28
+     750:	1f 91       	pop	r17
+     752:	0f 91       	pop	r16
+     754:	08 95       	ret
+
+00000756 <initSemaphoQueue>:
+/**
+ * @brief	セマフォキューを初期化する
+ * @author  Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ */
+void initSemaphoQueue(void) {
+     756:	e0 e7       	ldi	r30, 0x70	; 112
+     758:	f2 e0       	ldi	r31, 0x02	; 2
+	int i;
+	for (i=0; i<SEMAPHO_NUM; i++) {
+		semaphoqueue[i].next_task = NULL;
+     75a:	11 82       	std	Z+1, r1	; 0x01
+     75c:	10 82       	st	Z, r1
+		semaphoqueue[i].take_task = NULL;
+     75e:	13 82       	std	Z+3, r1	; 0x03
+     760:	12 82       	std	Z+2, r1	; 0x02
+     762:	34 96       	adiw	r30, 0x04	; 4
+ * @author  Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ */
+void initSemaphoQueue(void) {
+	int i;
+	for (i=0; i<SEMAPHO_NUM; i++) {
+     764:	83 e0       	ldi	r24, 0x03	; 3
+     766:	e0 37       	cpi	r30, 0x70	; 112
+     768:	f8 07       	cpc	r31, r24
+     76a:	b9 f7       	brne	.-18     	; 0x75a <initSemaphoQueue+0x4>
+		semaphoqueue[i].next_task = NULL;
+		semaphoqueue[i].take_task = NULL;
+	}
+}
+     76c:	08 95       	ret
+
+0000076e <unlinkSEMA>:
+ * @brief			指定したタスクをセマフォキューから削除する
+ * @param[in] tcb	削除するタスクのタスクポインタ
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+void unlinkSEMA(tcb_t *tcb) {
+     76e:	cf 93       	push	r28
+     770:	df 93       	push	r29
+     772:	ec 01       	movw	r28, r24
+     774:	a0 e7       	ldi	r26, 0x70	; 112
+     776:	b2 e0       	ldi	r27, 0x02	; 2
+	int i;
+
+	for (i=0; i<SEMAPHO_NUM; i++) {
+		if (semaphoqueue[i].take_task != NULL) {
+     778:	12 96       	adiw	r26, 0x02	; 2
+     77a:	ed 91       	ld	r30, X+
+     77c:	fc 91       	ld	r31, X
+     77e:	13 97       	sbiw	r26, 0x03	; 3
+     780:	30 97       	sbiw	r30, 0x00	; 0
+     782:	11 f1       	breq	.+68     	; 0x7c8 <unlinkSEMA+0x5a>
+			if (semaphoqueue[i].take_task != tcb) {
+     784:	ec 17       	cp	r30, r28
+     786:	fd 07       	cpc	r31, r29
+     788:	61 f4       	brne	.+24     	; 0x7a2 <unlinkSEMA+0x34>
+     78a:	10 c0       	rjmp	.+32     	; 0x7ac <unlinkSEMA+0x3e>
+				/* セマフォの待ちリストからはずす */
+				tcb_t *next_task = semaphoqueue[i].take_task;
+				while (next_task->next_task != NULL) {
+					if (next_task->next_task == tcb) {
+     78c:	8c 17       	cp	r24, r28
+     78e:	9d 07       	cpc	r25, r29
+     790:	39 f4       	brne	.+14     	; 0x7a0 <unlinkSEMA+0x32>
+						next_task->next_task = tcb->next_task;
+     792:	8e 81       	ldd	r24, Y+6	; 0x06
+     794:	9f 81       	ldd	r25, Y+7	; 0x07
+     796:	97 83       	std	Z+7, r25	; 0x07
+     798:	86 83       	std	Z+6, r24	; 0x06
+						tcb->next_task = NULL;
+     79a:	1f 82       	std	Y+7, r1	; 0x07
+     79c:	1e 82       	std	Y+6, r1	; 0x06
+     79e:	14 c0       	rjmp	.+40     	; 0x7c8 <unlinkSEMA+0x5a>
+						break;
+     7a0:	fc 01       	movw	r30, r24
+	for (i=0; i<SEMAPHO_NUM; i++) {
+		if (semaphoqueue[i].take_task != NULL) {
+			if (semaphoqueue[i].take_task != tcb) {
+				/* セマフォの待ちリストからはずす */
+				tcb_t *next_task = semaphoqueue[i].take_task;
+				while (next_task->next_task != NULL) {
+     7a2:	86 81       	ldd	r24, Z+6	; 0x06
+     7a4:	97 81       	ldd	r25, Z+7	; 0x07
+     7a6:	00 97       	sbiw	r24, 0x00	; 0
+     7a8:	89 f7       	brne	.-30     	; 0x78c <unlinkSEMA+0x1e>
+     7aa:	0e c0       	rjmp	.+28     	; 0x7c8 <unlinkSEMA+0x5a>
+						next_task = next_task->next_task;
+					}
+				}
+			} else {
+				/* セマフォの権利を次のタスクに与える */
+				semaphoqueue[i].take_task = semaphoqueue[i].next_task;
+     7ac:	ed 91       	ld	r30, X+
+     7ae:	fc 91       	ld	r31, X
+     7b0:	11 97       	sbiw	r26, 0x01	; 1
+     7b2:	13 96       	adiw	r26, 0x03	; 3
+     7b4:	fc 93       	st	X, r31
+     7b6:	ee 93       	st	-X, r30
+     7b8:	12 97       	sbiw	r26, 0x02	; 2
+				if (semaphoqueue[i].next_task != NULL) {
+     7ba:	30 97       	sbiw	r30, 0x00	; 0
+     7bc:	29 f0       	breq	.+10     	; 0x7c8 <unlinkSEMA+0x5a>
+					semaphoqueue[i].next_task = semaphoqueue[i].next_task->next_task;
+     7be:	86 81       	ldd	r24, Z+6	; 0x06
+     7c0:	97 81       	ldd	r25, Z+7	; 0x07
+     7c2:	11 96       	adiw	r26, 0x01	; 1
+     7c4:	9c 93       	st	X, r25
+     7c6:	8e 93       	st	-X, r24
+     7c8:	14 96       	adiw	r26, 0x04	; 4
+ * @date			2010/01/07 14:08:58	作成
+ */
+void unlinkSEMA(tcb_t *tcb) {
+	int i;
+
+	for (i=0; i<SEMAPHO_NUM; i++) {
+     7ca:	83 e0       	ldi	r24, 0x03	; 3
+     7cc:	a0 37       	cpi	r26, 0x70	; 112
+     7ce:	b8 07       	cpc	r27, r24
+     7d0:	99 f6       	brne	.-90     	; 0x778 <unlinkSEMA+0xa>
+					semaphoqueue[i].next_task = semaphoqueue[i].next_task->next_task;
+				}
+			}
+		}
+	}
+}
+     7d2:	df 91       	pop	r29
+     7d4:	cf 91       	pop	r28
+     7d6:	08 95       	ret
+
+000007d8 <tasSEMA>:
+ * @retval ERR31	エラー：INIT, DIAGがセマフォを獲得しようとした
+ * @author  		Kazuya Fukuhara
+ * @date    		2010/01/07 14:08:58	作成
+ */
+svcresultid_t tasSEMA(semaphoid_t sid) {
+	if (sid >= SEMAPHO_NUM-1) {
+     7d8:	8f 33       	cpi	r24, 0x3F	; 63
+     7da:	10 f0       	brcs	.+4      	; 0x7e0 <tasSEMA+0x8>
+     7dc:	8a e0       	ldi	r24, 0x0A	; 10
+     7de:	08 95       	ret
+		/* 放棄したいセマフォのＩＤが範囲外 */
+		return ERR10;
+	} else if ((currentTCB == &(INITTASK))||(currentTCB == &(DIAGTASK))) {
+     7e0:	20 91 2e 05 	lds	r18, 0x052E
+     7e4:	30 91 2f 05 	lds	r19, 0x052F
+     7e8:	93 e0       	ldi	r25, 0x03	; 3
+     7ea:	22 37       	cpi	r18, 0x72	; 114
+     7ec:	39 07       	cpc	r19, r25
+     7ee:	f9 f0       	breq	.+62     	; 0x82e <tasSEMA+0x56>
+     7f0:	93 e0       	ldi	r25, 0x03	; 3
+     7f2:	24 3a       	cpi	r18, 0xA4	; 164
+     7f4:	39 07       	cpc	r19, r25
+     7f6:	d9 f0       	breq	.+54     	; 0x82e <tasSEMA+0x56>
+		/* INIT, DIAGがセマフォを獲得しようとした */
+		return ERR31;
+	} else {
+		/* 獲得 */
+		if (semaphoqueue[sid].take_task != NULL) {
+     7f8:	a8 2f       	mov	r26, r24
+     7fa:	b0 e0       	ldi	r27, 0x00	; 0
+     7fc:	fd 01       	movw	r30, r26
+     7fe:	ee 0f       	add	r30, r30
+     800:	ff 1f       	adc	r31, r31
+     802:	ee 0f       	add	r30, r30
+     804:	ff 1f       	adc	r31, r31
+     806:	ee 58       	subi	r30, 0x8E	; 142
+     808:	fd 4f       	sbci	r31, 0xFD	; 253
+     80a:	80 81       	ld	r24, Z
+     80c:	91 81       	ldd	r25, Z+1	; 0x01
+     80e:	89 2b       	or	r24, r25
+     810:	11 f0       	breq	.+4      	; 0x816 <tasSEMA+0x3e>
+     812:	8b e0       	ldi	r24, 0x0B	; 11
+     814:	08 95       	ret
+			/* すでにセマフォは別のタスクに獲得されている */
+			return ERR11;
+		} else {
+			/* セマフォを獲得 */
+			semaphoqueue[sid].take_task = currentTCB;
+     816:	31 83       	std	Z+1, r19	; 0x01
+     818:	20 83       	st	Z, r18
+			semaphoqueue[sid].next_task = NULL;
+     81a:	aa 0f       	add	r26, r26
+     81c:	bb 1f       	adc	r27, r27
+     81e:	aa 0f       	add	r26, r26
+     820:	bb 1f       	adc	r27, r27
+     822:	a0 59       	subi	r26, 0x90	; 144
+     824:	bd 4f       	sbci	r27, 0xFD	; 253
+     826:	1d 92       	st	X+, r1
+     828:	1c 92       	st	X, r1
+     82a:	80 e0       	ldi	r24, 0x00	; 0
+     82c:	08 95       	ret
+			return SUCCESS;
+     82e:	8f e1       	ldi	r24, 0x1F	; 31
+		}
+	}
+
+}
+     830:	08 95       	ret
+
+00000832 <giveSEMA>:
+ * @retval ERR10	エラー：放棄したいセマフォのＩＤが範囲外
+ * @retval ERR12	エラー：獲得していないセマフォを放棄しようとした
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t giveSEMA(semaphoid_t sid) {
+     832:	cf 93       	push	r28
+     834:	df 93       	push	r29
+	if (sid >= SEMAPHO_NUM-1) {
+     836:	8f 33       	cpi	r24, 0x3F	; 63
+     838:	20 f0       	brcs	.+8      	; 0x842 <giveSEMA+0x10>
+		/* 放棄したいセマフォのＩＤが範囲外 */
+		rescheduling = FALSE;
+     83a:	10 92 30 05 	sts	0x0530, r1
+     83e:	8a e0       	ldi	r24, 0x0A	; 10
+     840:	34 c0       	rjmp	.+104    	; 0x8aa <giveSEMA+0x78>
+		return ERR10;
+	} else {
+		if (semaphoqueue[sid].take_task != currentTCB) {
+     842:	48 2f       	mov	r20, r24
+     844:	50 e0       	ldi	r21, 0x00	; 0
+     846:	ea 01       	movw	r28, r20
+     848:	cc 0f       	add	r28, r28
+     84a:	dd 1f       	adc	r29, r29
+     84c:	cc 0f       	add	r28, r28
+     84e:	dd 1f       	adc	r29, r29
+     850:	ce 58       	subi	r28, 0x8E	; 142
+     852:	dd 4f       	sbci	r29, 0xFD	; 253
+     854:	28 81       	ld	r18, Y
+     856:	39 81       	ldd	r19, Y+1	; 0x01
+     858:	80 91 2e 05 	lds	r24, 0x052E
+     85c:	90 91 2f 05 	lds	r25, 0x052F
+     860:	28 17       	cp	r18, r24
+     862:	39 07       	cpc	r19, r25
+     864:	21 f0       	breq	.+8      	; 0x86e <giveSEMA+0x3c>
+			/* 獲得していないセマフォを放棄しようとした */
+			rescheduling = FALSE;
+     866:	10 92 30 05 	sts	0x0530, r1
+     86a:	8c e0       	ldi	r24, 0x0C	; 12
+     86c:	1e c0       	rjmp	.+60     	; 0x8aa <giveSEMA+0x78>
+			return ERR12;
+		} else {
+			if (semaphoqueue[sid].next_task != NULL) {
+     86e:	da 01       	movw	r26, r20
+     870:	aa 0f       	add	r26, r26
+     872:	bb 1f       	adc	r27, r27
+     874:	aa 0f       	add	r26, r26
+     876:	bb 1f       	adc	r27, r27
+     878:	a0 59       	subi	r26, 0x90	; 144
+     87a:	bd 4f       	sbci	r27, 0xFD	; 253
+     87c:	ed 91       	ld	r30, X+
+     87e:	fc 91       	ld	r31, X
+     880:	11 97       	sbiw	r26, 0x01	; 1
+     882:	30 97       	sbiw	r30, 0x00	; 0
+     884:	79 f0       	breq	.+30     	; 0x8a4 <giveSEMA+0x72>
+				/* セマフォ待ちキューから次のタスクを得る */
+				tcb_t* next_task = semaphoqueue[sid].next_task;
+				/* セマフォを次のタスクが獲得中にする */
+				semaphoqueue[sid].take_task = next_task;
+     886:	f9 83       	std	Y+1, r31	; 0x01
+     888:	e8 83       	st	Y, r30
+				semaphoqueue[sid].next_task = next_task->next_task;
+     88a:	86 81       	ldd	r24, Z+6	; 0x06
+     88c:	97 81       	ldd	r25, Z+7	; 0x07
+     88e:	8d 93       	st	X+, r24
+     890:	9c 93       	st	X, r25
+				/* 次のタスクの状態をreadyにして、readyキューに挿入する */
+				next_task->status = READY;
+     892:	82 e0       	ldi	r24, 0x02	; 2
+     894:	82 83       	std	Z+2, r24	; 0x02
+				addTaskToReadyQueue(next_task);
+     896:	cf 01       	movw	r24, r30
+     898:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+				rescheduling = TRUE;
+     89c:	81 e0       	ldi	r24, 0x01	; 1
+     89e:	80 93 30 05 	sts	0x0530, r24
+     8a2:	02 c0       	rjmp	.+4      	; 0x8a8 <giveSEMA+0x76>
+				return SUCCESS;
+			} else {
+				/* 次のタスクがないので、セマフォはだれも獲得していないことにする */
+				semaphoqueue[sid].take_task = NULL;
+     8a4:	19 82       	std	Y+1, r1	; 0x01
+     8a6:	18 82       	st	Y, r1
+     8a8:	80 e0       	ldi	r24, 0x00	; 0
+				return SUCCESS;
+			}
+		}
+	}
+}
+     8aa:	df 91       	pop	r29
+     8ac:	cf 91       	pop	r28
+     8ae:	08 95       	ret
+
+000008b0 <takeSEMA>:
+ * @retval ERR10	エラー：獲得したいセマフォのＩＤが範囲外
+ * @retval ERR31	エラー：INIT, DIAGがセマフォを獲得しようとした
+ * @author  		Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t takeSEMA(semaphoid_t sid) {
+     8b0:	cf 93       	push	r28
+     8b2:	df 93       	push	r29
+     8b4:	e8 2f       	mov	r30, r24
+
+	/* 検証 */
+	if (sid >= SEMAPHO_NUM-1) {
+     8b6:	8f 33       	cpi	r24, 0x3F	; 63
+     8b8:	10 f0       	brcs	.+4      	; 0x8be <takeSEMA+0xe>
+     8ba:	8a e0       	ldi	r24, 0x0A	; 10
+     8bc:	6d c0       	rjmp	.+218    	; 0x998 <__stack+0x99>
+		/* 獲得したいセマフォのＩＤが範囲外 */
+		return ERR10;
+	} else if ((currentTCB == &(INITTASK))||(currentTCB == &(DIAGTASK))) {
+     8be:	80 91 2e 05 	lds	r24, 0x052E
+     8c2:	90 91 2f 05 	lds	r25, 0x052F
+     8c6:	23 e0       	ldi	r18, 0x03	; 3
+     8c8:	82 37       	cpi	r24, 0x72	; 114
+     8ca:	92 07       	cpc	r25, r18
+     8cc:	09 f4       	brne	.+2      	; 0x8d0 <takeSEMA+0x20>
+     8ce:	63 c0       	rjmp	.+198    	; 0x996 <__stack+0x97>
+     8d0:	23 e0       	ldi	r18, 0x03	; 3
+     8d2:	84 3a       	cpi	r24, 0xA4	; 164
+     8d4:	92 07       	cpc	r25, r18
+     8d6:	09 f4       	brne	.+2      	; 0x8da <takeSEMA+0x2a>
+     8d8:	5e c0       	rjmp	.+188    	; 0x996 <__stack+0x97>
+		/* INIT,DIAGがセマフォを獲得しようとした */
+		return ERR31;
+	}
+
+	/* 獲得 */
+	if ((&(tasks[1]) <= semaphoqueue[sid].take_task) && (semaphoqueue[sid].take_task <= &(tasks[TASK_NUM-2]))) {
+     8da:	ce 2f       	mov	r28, r30
+     8dc:	d0 e0       	ldi	r29, 0x00	; 0
+     8de:	fe 01       	movw	r30, r28
+     8e0:	ee 0f       	add	r30, r30
+     8e2:	ff 1f       	adc	r31, r31
+     8e4:	ee 0f       	add	r30, r30
+     8e6:	ff 1f       	adc	r31, r31
+     8e8:	ee 58       	subi	r30, 0x8E	; 142
+     8ea:	fd 4f       	sbci	r31, 0xFD	; 253
+     8ec:	01 90       	ld	r0, Z+
+     8ee:	f0 81       	ld	r31, Z
+     8f0:	e0 2d       	mov	r30, r0
+     8f2:	23 e0       	ldi	r18, 0x03	; 3
+     8f4:	ec 37       	cpi	r30, 0x7C	; 124
+     8f6:	f2 07       	cpc	r31, r18
+     8f8:	08 f4       	brcc	.+2      	; 0x8fc <takeSEMA+0x4c>
+     8fa:	41 c0       	rjmp	.+130    	; 0x97e <__stack+0x7f>
+     8fc:	ea 59       	subi	r30, 0x9A	; 154
+     8fe:	f3 40       	sbci	r31, 0x03	; 3
+     900:	09 f0       	breq	.+2      	; 0x904 <__stack+0x5>
+     902:	e8 f5       	brcc	.+122    	; 0x97e <__stack+0x7f>
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE)
+		/* セマフォはだれかが獲得済みなので、待ちキューに優先度順序で並ぶ */
+		removeTaskFromReadyQueue(currentTCB);
+     904:	0e 94 81 00 	call	0x102	; 0x102 <removeTaskFromReadyQueue>
+		if ((semaphoqueue[sid].next_task == NULL)||(semaphoqueue[sid].next_task > currentTCB)) {
+     908:	fe 01       	movw	r30, r28
+     90a:	ee 0f       	add	r30, r30
+     90c:	ff 1f       	adc	r31, r31
+     90e:	ee 0f       	add	r30, r30
+     910:	ff 1f       	adc	r31, r31
+     912:	e0 59       	subi	r30, 0x90	; 144
+     914:	fd 4f       	sbci	r31, 0xFD	; 253
+     916:	a0 81       	ld	r26, Z
+     918:	b1 81       	ldd	r27, Z+1	; 0x01
+     91a:	10 97       	sbiw	r26, 0x00	; 0
+     91c:	39 f0       	breq	.+14     	; 0x92c <__stack+0x2d>
+     91e:	e0 91 2e 05 	lds	r30, 0x052E
+     922:	f0 91 2f 05 	lds	r31, 0x052F
+     926:	ea 17       	cp	r30, r26
+     928:	fb 07       	cpc	r31, r27
+     92a:	80 f4       	brcc	.+32     	; 0x94c <__stack+0x4d>
+			/* 待ちキューへの挿入位置が先頭の場合 */
+			currentTCB->next_task = semaphoqueue[sid].next_task;
+     92c:	e0 91 2e 05 	lds	r30, 0x052E
+     930:	f0 91 2f 05 	lds	r31, 0x052F
+     934:	b7 83       	std	Z+7, r27	; 0x07
+     936:	a6 83       	std	Z+6, r26	; 0x06
+			semaphoqueue[sid].next_task = currentTCB;
+     938:	cc 0f       	add	r28, r28
+     93a:	dd 1f       	adc	r29, r29
+     93c:	cc 0f       	add	r28, r28
+     93e:	dd 1f       	adc	r29, r29
+     940:	c0 59       	subi	r28, 0x90	; 144
+     942:	dd 4f       	sbci	r29, 0xFD	; 253
+     944:	f9 83       	std	Y+1, r31	; 0x01
+     946:	e8 83       	st	Y, r30
+     948:	10 c0       	rjmp	.+32     	; 0x96a <__stack+0x6b>
+	/* 獲得 */
+	if ((&(tasks[1]) <= semaphoqueue[sid].take_task) && (semaphoqueue[sid].take_task <= &(tasks[TASK_NUM-2]))) {
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE)
+		/* セマフォはだれかが獲得済みなので、待ちキューに優先度順序で並ぶ */
+		removeTaskFromReadyQueue(currentTCB);
+		if ((semaphoqueue[sid].next_task == NULL)||(semaphoqueue[sid].next_task > currentTCB)) {
+     94a:	dc 01       	movw	r26, r24
+			currentTCB->next_task = semaphoqueue[sid].next_task;
+			semaphoqueue[sid].next_task = currentTCB;
+		} else {
+			/* 待ちキューへの挿入位置が２番目以降の場合 */
+			tcb_t* next_task = semaphoqueue[sid].next_task;
+			while ((next_task->next_task != NULL) && (next_task->next_task < currentTCB)) {
+     94c:	16 96       	adiw	r26, 0x06	; 6
+     94e:	8d 91       	ld	r24, X+
+     950:	9c 91       	ld	r25, X
+     952:	17 97       	sbiw	r26, 0x07	; 7
+     954:	00 97       	sbiw	r24, 0x00	; 0
+     956:	19 f0       	breq	.+6      	; 0x95e <__stack+0x5f>
+     958:	8e 17       	cp	r24, r30
+     95a:	9f 07       	cpc	r25, r31
+     95c:	b0 f3       	brcs	.-20     	; 0x94a <__stack+0x4b>
+				next_task = next_task->next_task;
+			}
+			currentTCB->next_task = next_task->next_task;
+     95e:	97 83       	std	Z+7, r25	; 0x07
+     960:	86 83       	std	Z+6, r24	; 0x06
+			next_task->next_task = currentTCB;
+     962:	17 96       	adiw	r26, 0x07	; 7
+     964:	fc 93       	st	X, r31
+     966:	ee 93       	st	-X, r30
+     968:	16 97       	sbiw	r26, 0x06	; 6
+			next_task->next_task = currentTCB;
+		}
+#else
+#error "Scheduler type is undefined."
+#endif
+		currentTCB->status = WAIT_SEMA;
+     96a:	e0 91 2e 05 	lds	r30, 0x052E
+     96e:	f0 91 2f 05 	lds	r31, 0x052F
+     972:	85 e0       	ldi	r24, 0x05	; 5
+     974:	82 83       	std	Z+2, r24	; 0x02
+		rescheduling = TRUE;
+     976:	81 e0       	ldi	r24, 0x01	; 1
+     978:	80 93 30 05 	sts	0x0530, r24
+     97c:	0a c0       	rjmp	.+20     	; 0x992 <__stack+0x93>
+		return SUCCESS;
+	} else {
+		/* セマフォの獲得成功 */
+		semaphoqueue[sid].take_task = currentTCB;
+     97e:	cc 0f       	add	r28, r28
+     980:	dd 1f       	adc	r29, r29
+     982:	cc 0f       	add	r28, r28
+     984:	dd 1f       	adc	r29, r29
+     986:	ce 58       	subi	r28, 0x8E	; 142
+     988:	dd 4f       	sbci	r29, 0xFD	; 253
+     98a:	99 83       	std	Y+1, r25	; 0x01
+     98c:	88 83       	st	Y, r24
+		rescheduling = FALSE;
+     98e:	10 92 30 05 	sts	0x0530, r1
+     992:	80 e0       	ldi	r24, 0x00	; 0
+     994:	01 c0       	rjmp	.+2      	; 0x998 <__stack+0x99>
+		return SUCCESS;
+     996:	8f e1       	ldi	r24, 0x1F	; 31
+	}
+}
+     998:	df 91       	pop	r29
+     99a:	cf 91       	pop	r28
+     99c:	08 95       	ret
+
+0000099e <API_hookInterrupt>:
+ */
+svcresultid_t API_hookInterrupt(extintid_t interrupt_id, taskid_t task_id
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+, priolity_t priolity
+#endif
+) {
+     99e:	df 93       	push	r29
+     9a0:	cf 93       	push	r28
+     9a2:	00 d0       	rcall	.+0      	; 0x9a4 <API_hookInterrupt+0x6>
+     9a4:	00 d0       	rcall	.+0      	; 0x9a6 <API_hookInterrupt+0x8>
+     9a6:	cd b7       	in	r28, 0x3d	; 61
+     9a8:	de b7       	in	r29, 0x3e	; 62
+	PAR_hookInterrupt par;
+	par.syscall.id		= SVCID_hookInterrupt;
+     9aa:	9f e0       	ldi	r25, 0x0F	; 15
+     9ac:	99 83       	std	Y+1, r25	; 0x01
+	par.interrupt_id	= interrupt_id;
+     9ae:	8b 83       	std	Y+3, r24	; 0x03
+	par.task_id			= task_id;
+     9b0:	6c 83       	std	Y+4, r22	; 0x04
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+	par.priolity        = priolity;
+#endif
+	syscall( (ptr_t)&par );
+     9b2:	ce 01       	movw	r24, r28
+     9b4:	01 96       	adiw	r24, 0x01	; 1
+     9b6:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     9ba:	8a 81       	ldd	r24, Y+2	; 0x02
+     9bc:	0f 90       	pop	r0
+     9be:	0f 90       	pop	r0
+     9c0:	0f 90       	pop	r0
+     9c2:	0f 90       	pop	r0
+     9c4:	cf 91       	pop	r28
+     9c6:	df 91       	pop	r29
+     9c8:	08 95       	ret
+
+000009ca <API_waitMSG>:
+ * @brief	waitMSGを呼び出すアダプタ関数
+ * @return	システムコールの成否情報
+ * @author	Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_waitMSG(void) {
+     9ca:	df 93       	push	r29
+     9cc:	cf 93       	push	r28
+     9ce:	00 d0       	rcall	.+0      	; 0x9d0 <API_waitMSG+0x6>
+     9d0:	cd b7       	in	r28, 0x3d	; 61
+     9d2:	de b7       	in	r29, 0x3e	; 62
+	PAR_waitMSG par;
+	par.syscall.id = SVCID_waitMSG;
+     9d4:	8e e0       	ldi	r24, 0x0E	; 14
+     9d6:	89 83       	std	Y+1, r24	; 0x01
+	syscall( (ptr_t)&par );
+     9d8:	ce 01       	movw	r24, r28
+     9da:	01 96       	adiw	r24, 0x01	; 1
+     9dc:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     9e0:	8a 81       	ldd	r24, Y+2	; 0x02
+     9e2:	0f 90       	pop	r0
+     9e4:	0f 90       	pop	r0
+     9e6:	cf 91       	pop	r28
+     9e8:	df 91       	pop	r29
+     9ea:	08 95       	ret
+
+000009ec <API_sendMSG>:
+ * @param[in] data		送信するメッセージの本文
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_sendMSG(taskid_t to, ptr_t data) {
+     9ec:	df 93       	push	r29
+     9ee:	cf 93       	push	r28
+     9f0:	00 d0       	rcall	.+0      	; 0x9f2 <API_sendMSG+0x6>
+     9f2:	00 d0       	rcall	.+0      	; 0x9f4 <API_sendMSG+0x8>
+     9f4:	0f 92       	push	r0
+     9f6:	cd b7       	in	r28, 0x3d	; 61
+     9f8:	de b7       	in	r29, 0x3e	; 62
+	PAR_sendMSG par;
+	par.syscall.id = SVCID_sendMSG;
+     9fa:	9c e0       	ldi	r25, 0x0C	; 12
+     9fc:	99 83       	std	Y+1, r25	; 0x01
+	par.to = to;
+     9fe:	8b 83       	std	Y+3, r24	; 0x03
+	par.data = data;
+     a00:	7d 83       	std	Y+5, r23	; 0x05
+     a02:	6c 83       	std	Y+4, r22	; 0x04
+	syscall( (ptr_t)&par );
+     a04:	ce 01       	movw	r24, r28
+     a06:	01 96       	adiw	r24, 0x01	; 1
+     a08:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     a0c:	8a 81       	ldd	r24, Y+2	; 0x02
+     a0e:	0f 90       	pop	r0
+     a10:	0f 90       	pop	r0
+     a12:	0f 90       	pop	r0
+     a14:	0f 90       	pop	r0
+     a16:	0f 90       	pop	r0
+     a18:	cf 91       	pop	r28
+     a1a:	df 91       	pop	r29
+     a1c:	08 95       	ret
+
+00000a1e <API_recvMSG>:
+ * @param[out] data		メッセージを格納する領域のポインタ
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_recvMSG(taskid_t* from, ptr_t* data) {
+     a1e:	ef 92       	push	r14
+     a20:	ff 92       	push	r15
+     a22:	0f 93       	push	r16
+     a24:	1f 93       	push	r17
+     a26:	df 93       	push	r29
+     a28:	cf 93       	push	r28
+     a2a:	00 d0       	rcall	.+0      	; 0xa2c <API_recvMSG+0xe>
+     a2c:	00 d0       	rcall	.+0      	; 0xa2e <API_recvMSG+0x10>
+     a2e:	0f 92       	push	r0
+     a30:	cd b7       	in	r28, 0x3d	; 61
+     a32:	de b7       	in	r29, 0x3e	; 62
+     a34:	8c 01       	movw	r16, r24
+     a36:	7b 01       	movw	r14, r22
+	PAR_recvMSG par;
+	par.syscall.id = SVCID_recvMSG;
+     a38:	8d e0       	ldi	r24, 0x0D	; 13
+     a3a:	89 83       	std	Y+1, r24	; 0x01
+	syscall( (ptr_t)&par );
+     a3c:	ce 01       	movw	r24, r28
+     a3e:	01 96       	adiw	r24, 0x01	; 1
+     a40:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	*from = par.from;
+     a44:	8b 81       	ldd	r24, Y+3	; 0x03
+     a46:	f8 01       	movw	r30, r16
+     a48:	80 83       	st	Z, r24
+	*data = par.data;
+     a4a:	8c 81       	ldd	r24, Y+4	; 0x04
+     a4c:	9d 81       	ldd	r25, Y+5	; 0x05
+     a4e:	f7 01       	movw	r30, r14
+     a50:	91 83       	std	Z+1, r25	; 0x01
+     a52:	80 83       	st	Z, r24
+	return par.syscall.result;
+}
+     a54:	8a 81       	ldd	r24, Y+2	; 0x02
+     a56:	0f 90       	pop	r0
+     a58:	0f 90       	pop	r0
+     a5a:	0f 90       	pop	r0
+     a5c:	0f 90       	pop	r0
+     a5e:	0f 90       	pop	r0
+     a60:	cf 91       	pop	r28
+     a62:	df 91       	pop	r29
+     a64:	1f 91       	pop	r17
+     a66:	0f 91       	pop	r16
+     a68:	ff 90       	pop	r15
+     a6a:	ef 90       	pop	r14
+     a6c:	08 95       	ret
+
+00000a6e <API_tasSEMA>:
+ * @param[in] sid		獲得を試みるセマフォのＩＤ
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_tasSEMA(semaphoid_t sid) {
+     a6e:	df 93       	push	r29
+     a70:	cf 93       	push	r28
+     a72:	00 d0       	rcall	.+0      	; 0xa74 <API_tasSEMA+0x6>
+     a74:	0f 92       	push	r0
+     a76:	cd b7       	in	r28, 0x3d	; 61
+     a78:	de b7       	in	r29, 0x3e	; 62
+	PAR_tasSEMA par;
+	par.syscall.id = SVCID_tasSEMA;
+     a7a:	99 e0       	ldi	r25, 0x09	; 9
+     a7c:	99 83       	std	Y+1, r25	; 0x01
+	par.sid = sid;
+     a7e:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     a80:	ce 01       	movw	r24, r28
+     a82:	01 96       	adiw	r24, 0x01	; 1
+     a84:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     a88:	8a 81       	ldd	r24, Y+2	; 0x02
+     a8a:	0f 90       	pop	r0
+     a8c:	0f 90       	pop	r0
+     a8e:	0f 90       	pop	r0
+     a90:	cf 91       	pop	r28
+     a92:	df 91       	pop	r29
+     a94:	08 95       	ret
+
+00000a96 <API_giveSEMA>:
+ * @param[in] sid		放棄するセマフォのＩＤ
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_giveSEMA(semaphoid_t sid) {
+     a96:	df 93       	push	r29
+     a98:	cf 93       	push	r28
+     a9a:	00 d0       	rcall	.+0      	; 0xa9c <API_giveSEMA+0x6>
+     a9c:	0f 92       	push	r0
+     a9e:	cd b7       	in	r28, 0x3d	; 61
+     aa0:	de b7       	in	r29, 0x3e	; 62
+	PAR_giveSEMA par;
+	par.syscall.id = SVCID_giveSEMA;
+     aa2:	98 e0       	ldi	r25, 0x08	; 8
+     aa4:	99 83       	std	Y+1, r25	; 0x01
+	par.sid = sid;
+     aa6:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     aa8:	ce 01       	movw	r24, r28
+     aaa:	01 96       	adiw	r24, 0x01	; 1
+     aac:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     ab0:	8a 81       	ldd	r24, Y+2	; 0x02
+     ab2:	0f 90       	pop	r0
+     ab4:	0f 90       	pop	r0
+     ab6:	0f 90       	pop	r0
+     ab8:	cf 91       	pop	r28
+     aba:	df 91       	pop	r29
+     abc:	08 95       	ret
+
+00000abe <API_takeSEMA>:
+ * @param[in] sid		獲得するセマフォのＩＤ
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_takeSEMA(semaphoid_t sid) {
+     abe:	df 93       	push	r29
+     ac0:	cf 93       	push	r28
+     ac2:	00 d0       	rcall	.+0      	; 0xac4 <API_takeSEMA+0x6>
+     ac4:	0f 92       	push	r0
+     ac6:	cd b7       	in	r28, 0x3d	; 61
+     ac8:	de b7       	in	r29, 0x3e	; 62
+	PAR_takeSEMA par;
+	par.syscall.id = SVCID_takeSEMA;
+     aca:	97 e0       	ldi	r25, 0x07	; 7
+     acc:	99 83       	std	Y+1, r25	; 0x01
+	par.sid = sid;
+     ace:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     ad0:	ce 01       	movw	r24, r28
+     ad2:	01 96       	adiw	r24, 0x01	; 1
+     ad4:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     ad8:	8a 81       	ldd	r24, Y+2	; 0x02
+     ada:	0f 90       	pop	r0
+     adc:	0f 90       	pop	r0
+     ade:	0f 90       	pop	r0
+     ae0:	cf 91       	pop	r28
+     ae2:	df 91       	pop	r29
+     ae4:	08 95       	ret
+
+00000ae6 <API_getTID>:
+ * @param[out] pTaskID	自タスクのタスクＩＤが格納される領域
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_getTID(taskid_t *pTaskID) {
+     ae6:	0f 93       	push	r16
+     ae8:	1f 93       	push	r17
+     aea:	df 93       	push	r29
+     aec:	cf 93       	push	r28
+     aee:	00 d0       	rcall	.+0      	; 0xaf0 <API_getTID+0xa>
+     af0:	0f 92       	push	r0
+     af2:	cd b7       	in	r28, 0x3d	; 61
+     af4:	de b7       	in	r29, 0x3e	; 62
+     af6:	8c 01       	movw	r16, r24
+	PAR_getTID par;
+	par.syscall.id = SVCID_getTID;
+     af8:	86 e0       	ldi	r24, 0x06	; 6
+     afa:	89 83       	std	Y+1, r24	; 0x01
+	syscall( (ptr_t)&par );
+     afc:	ce 01       	movw	r24, r28
+     afe:	01 96       	adiw	r24, 0x01	; 1
+     b00:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	*pTaskID = par.taskId;
+     b04:	8b 81       	ldd	r24, Y+3	; 0x03
+     b06:	f8 01       	movw	r30, r16
+     b08:	80 83       	st	Z, r24
+	return par.syscall.result;
+}
+     b0a:	8a 81       	ldd	r24, Y+2	; 0x02
+     b0c:	0f 90       	pop	r0
+     b0e:	0f 90       	pop	r0
+     b10:	0f 90       	pop	r0
+     b12:	cf 91       	pop	r28
+     b14:	df 91       	pop	r29
+     b16:	1f 91       	pop	r17
+     b18:	0f 91       	pop	r16
+     b1a:	08 95       	ret
+
+00000b1c <API_restartTASK>:
+ * @note            countを0に設定すると、resumeTASKシステムコールで再開させるまで無限に休眠する。
+ * @note            長期間休眠(count > 255)には割り込みなど別の要素を使うこと。
+ * @author          Kazuya Fukuhara
+ * @date            2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_restartTASK(tick_t count) {
+     b1c:	df 93       	push	r29
+     b1e:	cf 93       	push	r28
+     b20:	00 d0       	rcall	.+0      	; 0xb22 <API_restartTASK+0x6>
+     b22:	0f 92       	push	r0
+     b24:	cd b7       	in	r28, 0x3d	; 61
+     b26:	de b7       	in	r29, 0x3e	; 62
+	PAR_restartTASK par;
+	par.syscall.id = SVCID_restartTASK;
+     b28:	95 e0       	ldi	r25, 0x05	; 5
+     b2a:	99 83       	std	Y+1, r25	; 0x01
+	par.count = count;
+     b2c:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     b2e:	ce 01       	movw	r24, r28
+     b30:	01 96       	adiw	r24, 0x01	; 1
+     b32:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     b36:	8a 81       	ldd	r24, Y+2	; 0x02
+     b38:	0f 90       	pop	r0
+     b3a:	0f 90       	pop	r0
+     b3c:	0f 90       	pop	r0
+     b3e:	cf 91       	pop	r28
+     b40:	df 91       	pop	r29
+     b42:	08 95       	ret
+
+00000b44 <API_resumeTASK>:
+ * @param[in] taskId	再開するタスクのタスクＩＤ
+ * @return				システムコールの成否情報
+ * @author			    Kazuya Fukuhara
+ * @date			    2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_resumeTASK(taskid_t taskId) {
+     b44:	df 93       	push	r29
+     b46:	cf 93       	push	r28
+     b48:	00 d0       	rcall	.+0      	; 0xb4a <API_resumeTASK+0x6>
+     b4a:	0f 92       	push	r0
+     b4c:	cd b7       	in	r28, 0x3d	; 61
+     b4e:	de b7       	in	r29, 0x3e	; 62
+	PAR_resumeTASK par;
+	par.syscall.id = SVCID_resumeTASK;
+     b50:	93 e0       	ldi	r25, 0x03	; 3
+     b52:	99 83       	std	Y+1, r25	; 0x01
+	par.taskId = taskId;
+     b54:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     b56:	ce 01       	movw	r24, r28
+     b58:	01 96       	adiw	r24, 0x01	; 1
+     b5a:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     b5e:	8a 81       	ldd	r24, Y+2	; 0x02
+     b60:	0f 90       	pop	r0
+     b62:	0f 90       	pop	r0
+     b64:	0f 90       	pop	r0
+     b66:	cf 91       	pop	r28
+     b68:	df 91       	pop	r29
+     b6a:	08 95       	ret
+
+00000b6c <API_pauseTASK>:
+ * @note            countを0に設定すると、resumeTASKシステムコールで再開させるまで無限に休眠する。
+ * @note            長期間休眠(count > 255)には割り込みなど別の要素を使うこと。
+ * @author          Kazuya Fukuhara
+ * @date            2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_pauseTASK(tick_t count) {
+     b6c:	df 93       	push	r29
+     b6e:	cf 93       	push	r28
+     b70:	00 d0       	rcall	.+0      	; 0xb72 <API_pauseTASK+0x6>
+     b72:	0f 92       	push	r0
+     b74:	cd b7       	in	r28, 0x3d	; 61
+     b76:	de b7       	in	r29, 0x3e	; 62
+	PAR_pauseTASK par;
+	par.syscall.id = SVCID_pauseTASK;
+     b78:	92 e0       	ldi	r25, 0x02	; 2
+     b7a:	99 83       	std	Y+1, r25	; 0x01
+	par.count = count;
+     b7c:	8b 83       	std	Y+3, r24	; 0x03
+	syscall( (ptr_t)&par );
+     b7e:	ce 01       	movw	r24, r28
+     b80:	01 96       	adiw	r24, 0x01	; 1
+     b82:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     b86:	8a 81       	ldd	r24, Y+2	; 0x02
+     b88:	0f 90       	pop	r0
+     b8a:	0f 90       	pop	r0
+     b8c:	0f 90       	pop	r0
+     b8e:	cf 91       	pop	r28
+     b90:	df 91       	pop	r29
+     b92:	08 95       	ret
+
+00000b94 <API_exitTASK>:
+ * @return			システムコールの成否情報
+ * @note			タスクのリセット処理も行われる。
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+svcresultid_t API_exitTASK(void) {
+     b94:	df 93       	push	r29
+     b96:	cf 93       	push	r28
+     b98:	00 d0       	rcall	.+0      	; 0xb9a <API_exitTASK+0x6>
+     b9a:	cd b7       	in	r28, 0x3d	; 61
+     b9c:	de b7       	in	r29, 0x3e	; 62
+	PAR_exitTASK par;
+	par.syscall.id = SVCID_exitTASK;
+     b9e:	81 e0       	ldi	r24, 0x01	; 1
+     ba0:	89 83       	std	Y+1, r24	; 0x01
+	syscall( (ptr_t)&par );
+     ba2:	ce 01       	movw	r24, r28
+     ba4:	01 96       	adiw	r24, 0x01	; 1
+     ba6:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     baa:	8a 81       	ldd	r24, Y+2	; 0x02
+     bac:	0f 90       	pop	r0
+     bae:	0f 90       	pop	r0
+     bb0:	cf 91       	pop	r28
+     bb2:	df 91       	pop	r29
+     bb4:	08 95       	ret
+
+00000bb6 <API_startTASK>:
+ */
+extern svcresultid_t API_startTASK(taskid_t taskId, ptr_t param
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+, priolity_t priolity
+#endif
+) {
+     bb6:	df 93       	push	r29
+     bb8:	cf 93       	push	r28
+     bba:	00 d0       	rcall	.+0      	; 0xbbc <API_startTASK+0x6>
+     bbc:	00 d0       	rcall	.+0      	; 0xbbe <API_startTASK+0x8>
+     bbe:	0f 92       	push	r0
+     bc0:	cd b7       	in	r28, 0x3d	; 61
+     bc2:	de b7       	in	r29, 0x3e	; 62
+	PAR_startTASK par;
+	par.syscall.id = SVCID_startTASK;
+     bc4:	19 82       	std	Y+1, r1	; 0x01
+	par.taskId = taskId;
+     bc6:	8b 83       	std	Y+3, r24	; 0x03
+	par.param = param;
+     bc8:	7d 83       	std	Y+5, r23	; 0x05
+     bca:	6c 83       	std	Y+4, r22	; 0x04
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+	par.priolity = priolity;
+#endif
+	syscall( (ptr_t)&par);
+     bcc:	ce 01       	movw	r24, r28
+     bce:	01 96       	adiw	r24, 0x01	; 1
+     bd0:	0e 94 95 07 	call	0xf2a	; 0xf2a <syscall>
+	return par.syscall.result;
+}
+     bd4:	8a 81       	ldd	r24, Y+2	; 0x02
+     bd6:	0f 90       	pop	r0
+     bd8:	0f 90       	pop	r0
+     bda:	0f 90       	pop	r0
+     bdc:	0f 90       	pop	r0
+     bde:	0f 90       	pop	r0
+     be0:	cf 91       	pop	r28
+     be2:	df 91       	pop	r29
+     be4:	08 95       	ret
+
+00000be6 <SVC_exitTASK>:
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_exitTASK(PAR_exitTASK *param) {
+	(void)param;
+	if (&DIAGTASK == currentTCB) {
+     be6:	80 91 2e 05 	lds	r24, 0x052E
+     bea:	90 91 2f 05 	lds	r25, 0x052F
+     bee:	23 e0       	ldi	r18, 0x03	; 3
+     bf0:	84 3a       	cpi	r24, 0xA4	; 164
+     bf2:	92 07       	cpc	r25, r18
+     bf4:	11 f4       	brne	.+4      	; 0xbfa <SVC_exitTASK+0x14>
+     bf6:	81 e0       	ldi	r24, 0x01	; 1
+     bf8:	08 95       	ret
+		/* DIAGTASKは終了できない */
+		return ERR1;
+	} else {
+		/* 現在のタスクと関連付けられているセマフォをすべて開放 */
+		unlinkSEMA(currentTCB);
+     bfa:	0e 94 b7 03 	call	0x76e	; 0x76e <unlinkSEMA>
+
+		/* 現在のタスクと関連付けられているメッセージをすべて開放 */
+		unlinkMSG(currentTCB);
+     bfe:	80 91 2e 05 	lds	r24, 0x052E
+     c02:	90 91 2f 05 	lds	r25, 0x052F
+     c06:	0e 94 d3 02 	call	0x5a6	; 0x5a6 <unlinkMSG>
+
+		/* ReadyQueueから現在のタスクを取り外す */
+		removeTaskFromReadyQueue(currentTCB);
+     c0a:	80 91 2e 05 	lds	r24, 0x052E
+     c0e:	90 91 2f 05 	lds	r25, 0x052F
+     c12:	0e 94 81 00 	call	0x102	; 0x102 <removeTaskFromReadyQueue>
+
+		/* TCBをリセット */
+		resetTCB( getTaskID(currentTCB) );
+     c16:	80 91 2e 05 	lds	r24, 0x052E
+     c1a:	90 91 2f 05 	lds	r25, 0x052F
+     c1e:	0e 94 44 01 	call	0x288	; 0x288 <getTaskID>
+     c22:	0e 94 48 02 	call	0x490	; 0x490 <resetTCB>
+
+		/* スケジューリング要求を設定 */
+		rescheduling = TRUE;
+     c26:	81 e0       	ldi	r24, 0x01	; 1
+     c28:	80 93 30 05 	sts	0x0530, r24
+     c2c:	80 e0       	ldi	r24, 0x00	; 0
+
+		/* 成功 */
+		return SUCCESS;
+	}
+}
+     c2e:	08 95       	ret
+
+00000c30 <syscall_entry>:
+ * @author	Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ * @date	2010/08/15 16:11:02	機種依存部分を分離
+ * @date	2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリング用のシステムコール呼び出しを追加
+ */
+void syscall_entry(void) {
+     c30:	cf 92       	push	r12
+     c32:	df 92       	push	r13
+     c34:	ef 92       	push	r14
+     c36:	ff 92       	push	r15
+     c38:	0f 93       	push	r16
+     c3a:	1f 93       	push	r17
+     c3c:	df 93       	push	r29
+     c3e:	cf 93       	push	r28
+     c40:	00 d0       	rcall	.+0      	; 0xc42 <syscall_entry+0x12>
+     c42:	00 d0       	rcall	.+0      	; 0xc44 <syscall_entry+0x14>
+     c44:	cd b7       	in	r28, 0x3d	; 61
+     c46:	de b7       	in	r29, 0x3e	; 62
+
+	context_t* context;
+	PAR_syscall *par;
+
+	/* 呼び出し元のコンテキストからシステムコールの引数を得る */
+	context = GetContext(currentTCB);
+     c48:	c0 90 2e 05 	lds	r12, 0x052E
+     c4c:	d0 90 2f 05 	lds	r13, 0x052F
+     c50:	d6 01       	movw	r26, r12
+     c52:	ed 91       	ld	r30, X+
+     c54:	fc 91       	ld	r31, X
+     c56:	31 96       	adiw	r30, 0x01	; 1
+	par = (PAR_syscall*)GetArgPtr(context);
+     c58:	96 81       	ldd	r25, Z+6	; 0x06
+     c5a:	80 e0       	ldi	r24, 0x00	; 0
+     c5c:	27 81       	ldd	r18, Z+7	; 0x07
+     c5e:	e2 2e       	mov	r14, r18
+     c60:	ff 24       	eor	r15, r15
+     c62:	e8 2a       	or	r14, r24
+     c64:	f9 2a       	or	r15, r25
+
+	/* システムコールのIDに応じた処理 */
+	switch (par->id) {
+     c66:	f7 01       	movw	r30, r14
+     c68:	80 81       	ld	r24, Z
+     c6a:	87 30       	cpi	r24, 0x07	; 7
+     c6c:	09 f4       	brne	.+2      	; 0xc70 <syscall_entry+0x40>
+     c6e:	fd c0       	rjmp	.+506    	; 0xe6a <syscall_entry+0x23a>
+     c70:	88 30       	cpi	r24, 0x08	; 8
+     c72:	a8 f4       	brcc	.+42     	; 0xc9e <syscall_entry+0x6e>
+     c74:	82 30       	cpi	r24, 0x02	; 2
+     c76:	09 f4       	brne	.+2      	; 0xc7a <syscall_entry+0x4a>
+     c78:	6f c0       	rjmp	.+222    	; 0xd58 <syscall_entry+0x128>
+     c7a:	83 30       	cpi	r24, 0x03	; 3
+     c7c:	30 f4       	brcc	.+12     	; 0xc8a <syscall_entry+0x5a>
+     c7e:	88 23       	and	r24, r24
+     c80:	21 f1       	breq	.+72     	; 0xcca <syscall_entry+0x9a>
+     c82:	81 30       	cpi	r24, 0x01	; 1
+     c84:	09 f0       	breq	.+2      	; 0xc88 <syscall_entry+0x58>
+     c86:	3f c1       	rjmp	.+638    	; 0xf06 <syscall_entry+0x2d6>
+     c88:	63 c0       	rjmp	.+198    	; 0xd50 <syscall_entry+0x120>
+     c8a:	85 30       	cpi	r24, 0x05	; 5
+     c8c:	09 f4       	brne	.+2      	; 0xc90 <syscall_entry+0x60>
+     c8e:	cd c0       	rjmp	.+410    	; 0xe2a <syscall_entry+0x1fa>
+     c90:	86 30       	cpi	r24, 0x06	; 6
+     c92:	08 f0       	brcs	.+2      	; 0xc96 <syscall_entry+0x66>
+     c94:	14 c1       	rjmp	.+552    	; 0xebe <syscall_entry+0x28e>
+     c96:	83 30       	cpi	r24, 0x03	; 3
+     c98:	09 f0       	breq	.+2      	; 0xc9c <syscall_entry+0x6c>
+     c9a:	35 c1       	rjmp	.+618    	; 0xf06 <syscall_entry+0x2d6>
+     c9c:	80 c0       	rjmp	.+256    	; 0xd9e <syscall_entry+0x16e>
+     c9e:	8c 30       	cpi	r24, 0x0C	; 12
+     ca0:	09 f4       	brne	.+2      	; 0xca4 <syscall_entry+0x74>
+     ca2:	f5 c0       	rjmp	.+490    	; 0xe8e <syscall_entry+0x25e>
+     ca4:	8d 30       	cpi	r24, 0x0D	; 13
+     ca6:	38 f4       	brcc	.+14     	; 0xcb6 <syscall_entry+0x86>
+     ca8:	88 30       	cpi	r24, 0x08	; 8
+     caa:	09 f4       	brne	.+2      	; 0xcae <syscall_entry+0x7e>
+     cac:	e4 c0       	rjmp	.+456    	; 0xe76 <syscall_entry+0x246>
+     cae:	89 30       	cpi	r24, 0x09	; 9
+     cb0:	09 f0       	breq	.+2      	; 0xcb4 <syscall_entry+0x84>
+     cb2:	29 c1       	rjmp	.+594    	; 0xf06 <syscall_entry+0x2d6>
+     cb4:	e6 c0       	rjmp	.+460    	; 0xe82 <syscall_entry+0x252>
+     cb6:	8e 30       	cpi	r24, 0x0E	; 14
+     cb8:	09 f4       	brne	.+2      	; 0xcbc <syscall_entry+0x8c>
+     cba:	fe c0       	rjmp	.+508    	; 0xeb8 <syscall_entry+0x288>
+     cbc:	8e 30       	cpi	r24, 0x0E	; 14
+     cbe:	08 f4       	brcc	.+2      	; 0xcc2 <syscall_entry+0x92>
+     cc0:	f0 c0       	rjmp	.+480    	; 0xea2 <syscall_entry+0x272>
+     cc2:	8f 30       	cpi	r24, 0x0F	; 15
+     cc4:	09 f0       	breq	.+2      	; 0xcc8 <syscall_entry+0x98>
+     cc6:	1f c1       	rjmp	.+574    	; 0xf06 <syscall_entry+0x2d6>
+     cc8:	04 c1       	rjmp	.+520    	; 0xed2 <syscall_entry+0x2a2>
+ * @date			2010/09/10 10:57:13	優先度付きタイムシェアリングスケジューリングの追加
+ */
+static svcresultid_t SVC_startTASK(PAR_startTASK *param) {
+	tcb_t *ptcb;
+
+	if ((param->taskId == 0) || (param->taskId >= TASK_NUM-1)) {
+     cca:	d7 01       	movw	r26, r14
+     ccc:	12 96       	adiw	r26, 0x02	; 2
+     cce:	ec 91       	ld	r30, X
+     cd0:	8e 2f       	mov	r24, r30
+     cd2:	81 50       	subi	r24, 0x01	; 1
+     cd4:	84 30       	cpi	r24, 0x04	; 4
+     cd6:	10 f0       	brcs	.+4      	; 0xcdc <syscall_entry+0xac>
+     cd8:	81 e0       	ldi	r24, 0x01	; 1
+     cda:	ea c0       	rjmp	.+468    	; 0xeb0 <syscall_entry+0x280>
+		/* INITTASKとDIAGTASKは起動できない */
+		return ERR1;
+	} else {
+		ptcb = &(tasks[param->taskId]);
+     cdc:	8a e0       	ldi	r24, 0x0A	; 10
+     cde:	e8 9f       	mul	r30, r24
+     ce0:	80 01       	movw	r16, r0
+     ce2:	11 24       	eor	r1, r1
+     ce4:	0e 58       	subi	r16, 0x8E	; 142
+     ce6:	1c 4f       	sbci	r17, 0xFC	; 252
+	}
+
+	/* 起動できるタスクは自分以外のDORMANT状態のもの */
+	if ((ptcb != currentTCB) && (ptcb->status == DORMANT)) {
+     ce8:	0c 15       	cp	r16, r12
+     cea:	1d 05       	cpc	r17, r13
+     cec:	79 f1       	breq	.+94     	; 0xd4c <syscall_entry+0x11c>
+     cee:	f8 01       	movw	r30, r16
+     cf0:	d2 80       	ldd	r13, Z+2	; 0x02
+     cf2:	f1 e0       	ldi	r31, 0x01	; 1
+     cf4:	df 16       	cp	r13, r31
+     cf6:	51 f5       	brne	.+84     	; 0xd4c <syscall_entry+0x11c>
+
+		/* 起動するタスクの設定 */
+		ptcb->status = READY;
+     cf8:	82 e0       	ldi	r24, 0x02	; 2
+     cfa:	d8 01       	movw	r26, r16
+     cfc:	12 96       	adiw	r26, 0x02	; 2
+     cfe:	8c 93       	st	X, r24
+     d00:	12 97       	sbiw	r26, 0x02	; 2
+		ptcb->next_task = NULL;
+     d02:	17 96       	adiw	r26, 0x07	; 7
+     d04:	1c 92       	st	X, r1
+     d06:	1e 92       	st	-X, r1
+     d08:	16 97       	sbiw	r26, 0x06	; 6
+		ptcb->parameter = param->param;
+     d0a:	f7 01       	movw	r30, r14
+     d0c:	83 81       	ldd	r24, Z+3	; 0x03
+     d0e:	94 81       	ldd	r25, Z+4	; 0x04
+     d10:	13 96       	adiw	r26, 0x03	; 3
+     d12:	8c 93       	st	X, r24
+     d14:	13 97       	sbiw	r26, 0x03	; 3
+     d16:	14 96       	adiw	r26, 0x04	; 4
+     d18:	9c 93       	st	X, r25
+     d1a:	14 97       	sbiw	r26, 0x04	; 4
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+		ptcb->task_priolity = param->priolity;
+#endif
+
+		/* 引数を設定 */
+		SetTaskArg(GetContext(ptcb),ptcb->parameter);
+     d1c:	ed 91       	ld	r30, X+
+     d1e:	fc 91       	ld	r31, X
+     d20:	31 96       	adiw	r30, 0x01	; 1
+     d22:	89 83       	std	Y+1, r24	; 0x01
+     d24:	9a 83       	std	Y+2, r25	; 0x02
+     d26:	86 83       	std	Z+6, r24	; 0x06
+     d28:	8a 81       	ldd	r24, Y+2	; 0x02
+     d2a:	87 83       	std	Z+7, r24	; 0x07
+
+		/* readyキューに挿入 */
+		addTaskToReadyQueue(ptcb);
+     d2c:	c8 01       	movw	r24, r16
+     d2e:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+
+		/* スケジューリング要求 */
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE) 
+		rescheduling = (currentTCB > ptcb) ? TRUE : FALSE;
+     d32:	10 92 30 05 	sts	0x0530, r1
+     d36:	80 91 2e 05 	lds	r24, 0x052E
+     d3a:	90 91 2f 05 	lds	r25, 0x052F
+     d3e:	08 17       	cp	r16, r24
+     d40:	19 07       	cpc	r17, r25
+     d42:	08 f0       	brcs	.+2      	; 0xd46 <syscall_entry+0x116>
+     d44:	de c0       	rjmp	.+444    	; 0xf02 <syscall_entry+0x2d2>
+     d46:	d0 92 30 05 	sts	0x0530, r13
+     d4a:	db c0       	rjmp	.+438    	; 0xf02 <syscall_entry+0x2d2>
+     d4c:	82 e0       	ldi	r24, 0x02	; 2
+     d4e:	b0 c0       	rjmp	.+352    	; 0xeb0 <syscall_entry+0x280>
+	par = (PAR_syscall*)GetArgPtr(context);
+
+	/* システムコールのIDに応じた処理 */
+	switch (par->id) {
+		case SVCID_startTASK	: par->result = SVC_startTASK((PAR_startTASK*)par); break;
+		case SVCID_exitTASK		: /* par->result = */ SVC_exitTASK((PAR_exitTASK*)par); break;
+     d50:	c7 01       	movw	r24, r14
+     d52:	0e 94 f3 05 	call	0xbe6	; 0xbe6 <SVC_exitTASK>
+     d56:	da c0       	rjmp	.+436    	; 0xf0c <syscall_entry+0x2dc>
+ * @warning			長期間休眠(count > 255)には割り込みなど別の要素を使うこと。
+ * @author          Kazuya Fukuhara
+ * @date            2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_pauseTASK(PAR_pauseTASK *param) {
+	if ((&INITTASK == currentTCB) || (&DIAGTASK == currentTCB)) {
+     d58:	b2 e7       	ldi	r27, 0x72	; 114
+     d5a:	cb 16       	cp	r12, r27
+     d5c:	b3 e0       	ldi	r27, 0x03	; 3
+     d5e:	db 06       	cpc	r13, r27
+     d60:	19 f1       	breq	.+70     	; 0xda8 <syscall_entry+0x178>
+     d62:	e4 ea       	ldi	r30, 0xA4	; 164
+     d64:	ce 16       	cp	r12, r30
+     d66:	e3 e0       	ldi	r30, 0x03	; 3
+     d68:	de 06       	cpc	r13, r30
+     d6a:	f1 f0       	breq	.+60     	; 0xda8 <syscall_entry+0x178>
+		return ERR1;
+	} else {
+		currentTCB->status = PAUSE;
+     d6c:	83 e0       	ldi	r24, 0x03	; 3
+     d6e:	d6 01       	movw	r26, r12
+     d70:	12 96       	adiw	r26, 0x02	; 2
+     d72:	8c 93       	st	X, r24
+     d74:	12 97       	sbiw	r26, 0x02	; 2
+		currentTCB->pause_count = param->count;
+     d76:	f7 01       	movw	r30, r14
+     d78:	82 81       	ldd	r24, Z+2	; 0x02
+     d7a:	15 96       	adiw	r26, 0x05	; 5
+     d7c:	8c 93       	st	X, r24
+		removeTaskFromReadyQueue(currentTCB);
+     d7e:	c6 01       	movw	r24, r12
+     d80:	0e 94 81 00 	call	0x102	; 0x102 <removeTaskFromReadyQueue>
+		if (param->count != 0 ) {
+     d84:	d7 01       	movw	r26, r14
+     d86:	12 96       	adiw	r26, 0x02	; 2
+     d88:	6c 91       	ld	r22, X
+     d8a:	66 23       	and	r22, r22
+     d8c:	09 f4       	brne	.+2      	; 0xd90 <syscall_entry+0x160>
+     d8e:	48 c0       	rjmp	.+144    	; 0xe20 <syscall_entry+0x1f0>
+			/* 無期限休止ではない場合、WaitQueueに追加する */
+			addTaskToWaitQueue(currentTCB, param->count);
+     d90:	80 91 2e 05 	lds	r24, 0x052E
+     d94:	90 91 2f 05 	lds	r25, 0x052F
+     d98:	0e 94 b0 00 	call	0x160	; 0x160 <addTaskToWaitQueue>
+     d9c:	41 c0       	rjmp	.+130    	; 0xe20 <syscall_entry+0x1f0>
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_resumeTASK(PAR_resumeTASK *param) {
+	tcb_t* tcb;
+
+	if (param->taskId >= TASK_NUM) {
+     d9e:	d7 01       	movw	r26, r14
+     da0:	12 96       	adiw	r26, 0x02	; 2
+     da2:	ec 91       	ld	r30, X
+     da4:	e6 30       	cpi	r30, 0x06	; 6
+     da6:	10 f0       	brcs	.+4      	; 0xdac <syscall_entry+0x17c>
+     da8:	81 e0       	ldi	r24, 0x01	; 1
+     daa:	ae c0       	rjmp	.+348    	; 0xf08 <syscall_entry+0x2d8>
+		/* 不正なタスクIDがtaskIdに指定されている */
+		return ERR1;
+	} else if (param->taskId == TASK_NUM-1) {
+     dac:	e5 30       	cpi	r30, 0x05	; 5
+     dae:	11 f4       	brne	.+4      	; 0xdb4 <syscall_entry+0x184>
+     db0:	8f e1       	ldi	r24, 0x1F	; 31
+     db2:	aa c0       	rjmp	.+340    	; 0xf08 <syscall_entry+0x2d8>
+		/* DIAGTASKはresumeできない */
+		return ERR31;
+	} else {
+		tcb = &tasks[param->taskId];
+     db4:	8a e0       	ldi	r24, 0x0A	; 10
+     db6:	e8 9f       	mul	r30, r24
+     db8:	80 01       	movw	r16, r0
+     dba:	11 24       	eor	r1, r1
+     dbc:	0e 58       	subi	r16, 0x8E	; 142
+     dbe:	1c 4f       	sbci	r17, 0xFC	; 252
+	}
+
+	/* 休止中のタスクか確認 */
+	if (tcb->status != PAUSE) {
+     dc0:	f8 01       	movw	r30, r16
+     dc2:	82 81       	ldd	r24, Z+2	; 0x02
+     dc4:	83 30       	cpi	r24, 0x03	; 3
+     dc6:	21 f0       	breq	.+8      	; 0xdd0 <syscall_entry+0x1a0>
+		/* セマフォ待ちなど、PAUSE状態ではないタスクをresumeさせた */
+		rescheduling = FALSE;
+     dc8:	10 92 30 05 	sts	0x0530, r1
+     dcc:	85 e0       	ldi	r24, 0x05	; 5
+     dce:	9c c0       	rjmp	.+312    	; 0xf08 <syscall_entry+0x2d8>
+	}
+	
+	/* 有限休眠の場合はタスクがWaitQueueに登録されているので取り除く
+	 * 無限休眠の場合は登録されていない
+	 */
+	(void)removeTaskFromWaitQueue(tcb);
+     dd0:	c8 01       	movw	r24, r16
+     dd2:	0e 94 07 01 	call	0x20e	; 0x20e <removeTaskFromWaitQueue>
+
+
+	/* タスクを再び稼動させる */
+	tcb->status = READY;
+     dd6:	82 e0       	ldi	r24, 0x02	; 2
+     dd8:	d8 01       	movw	r26, r16
+     dda:	12 96       	adiw	r26, 0x02	; 2
+     ddc:	8c 93       	st	X, r24
+     dde:	12 97       	sbiw	r26, 0x02	; 2
+	tcb->pause_count = 0;
+     de0:	15 96       	adiw	r26, 0x05	; 5
+     de2:	1c 92       	st	X, r1
+     de4:	15 97       	sbiw	r26, 0x05	; 5
+	
+	/* 引数を設定 */
+	SetTaskArg(GetContext(tcb),tcb->parameter);
+     de6:	ed 91       	ld	r30, X+
+     de8:	fc 91       	ld	r31, X
+     dea:	11 97       	sbiw	r26, 0x01	; 1
+     dec:	31 96       	adiw	r30, 0x01	; 1
+     dee:	13 96       	adiw	r26, 0x03	; 3
+     df0:	9c 91       	ld	r25, X
+     df2:	13 97       	sbiw	r26, 0x03	; 3
+     df4:	14 96       	adiw	r26, 0x04	; 4
+     df6:	8c 91       	ld	r24, X
+     df8:	99 83       	std	Y+1, r25	; 0x01
+     dfa:	8a 83       	std	Y+2, r24	; 0x02
+     dfc:	96 83       	std	Z+6, r25	; 0x06
+     dfe:	8a 81       	ldd	r24, Y+2	; 0x02
+     e00:	87 83       	std	Z+7, r24	; 0x07
+
+	addTaskToReadyQueue(currentTCB);
+     e02:	80 91 2e 05 	lds	r24, 0x052E
+     e06:	90 91 2f 05 	lds	r25, 0x052F
+     e0a:	0e 94 50 00 	call	0xa0	; 0xa0 <addTaskToReadyQueue>
+
+	/* スケジューリング要求 */
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE) 
+	rescheduling = (currentTCB > tcb) ? TRUE : FALSE;
+     e0e:	10 92 30 05 	sts	0x0530, r1
+     e12:	80 91 2e 05 	lds	r24, 0x052E
+     e16:	90 91 2f 05 	lds	r25, 0x052F
+     e1a:	08 17       	cp	r16, r24
+     e1c:	19 07       	cpc	r17, r25
+     e1e:	18 f4       	brcc	.+6      	; 0xe26 <syscall_entry+0x1f6>
+     e20:	81 e0       	ldi	r24, 0x01	; 1
+     e22:	80 93 30 05 	sts	0x0530, r24
+     e26:	80 e0       	ldi	r24, 0x00	; 0
+     e28:	6f c0       	rjmp	.+222    	; 0xf08 <syscall_entry+0x2d8>
+ */
+static svcresultid_t SVC_restartTASK(PAR_restartTASK *param) {
+	tcb_t* tcb = currentTCB;
+	PAR_exitTASK dummy;
+	message_t *message;
+	if (param->count == 0 ) {
+     e2a:	d7 01       	movw	r26, r14
+     e2c:	12 96       	adiw	r26, 0x02	; 2
+     e2e:	8c 91       	ld	r24, X
+     e30:	88 23       	and	r24, r24
+     e32:	09 f4       	brne	.+2      	; 0xe36 <syscall_entry+0x206>
+     e34:	6b c0       	rjmp	.+214    	; 0xf0c <syscall_entry+0x2dc>
+	 * 一端messageを退避した後に、タスクをexitTASK()で終了させ、その後リスタート待ちに遷移させてから
+	 * 再度messageを設定することでリスタート時もメッセージを保持することを可能とする
+	 */
+
+	/* messageを退避 */
+	message = tcb->message;
+     e36:	f6 01       	movw	r30, r12
+     e38:	00 85       	ldd	r16, Z+8	; 0x08
+     e3a:	11 85       	ldd	r17, Z+9	; 0x09
+	tcb->message = NULL;
+     e3c:	11 86       	std	Z+9, r1	; 0x09
+     e3e:	10 86       	std	Z+8, r1	; 0x08
+
+	/* タスクをexitTASK()で終了する。 */
+	SVC_exitTASK(&dummy);
+     e40:	ce 01       	movw	r24, r28
+     e42:	03 96       	adiw	r24, 0x03	; 3
+     e44:	0e 94 f3 05 	call	0xbe6	; 0xbe6 <SVC_exitTASK>
+
+	/* 再度messageを設定 */
+	tcb->message = message;
+     e48:	d6 01       	movw	r26, r12
+     e4a:	19 96       	adiw	r26, 0x09	; 9
+     e4c:	1c 93       	st	X, r17
+     e4e:	0e 93       	st	-X, r16
+     e50:	18 97       	sbiw	r26, 0x08	; 8
+	
+	/* この時点でタスクは DORMANT 状態になっているので、WAIT_RESTART状態へ遷移させた後、WaitQueueに投入する */
+	tcb->status = WAIT_RESTART;
+     e52:	86 e0       	ldi	r24, 0x06	; 6
+     e54:	12 96       	adiw	r26, 0x02	; 2
+     e56:	8c 93       	st	X, r24
+	addTaskToWaitQueue(tcb, param->count);
+     e58:	c6 01       	movw	r24, r12
+     e5a:	f7 01       	movw	r30, r14
+     e5c:	62 81       	ldd	r22, Z+2	; 0x02
+     e5e:	0e 94 b0 00 	call	0x160	; 0x160 <addTaskToWaitQueue>
+
+	rescheduling = TRUE;
+     e62:	81 e0       	ldi	r24, 0x01	; 1
+     e64:	80 93 30 05 	sts	0x0530, r24
+     e68:	51 c0       	rjmp	.+162    	; 0xf0c <syscall_entry+0x2dc>
+ * @return			システムコールの成否情報
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_takeSEMA(PAR_takeSEMA *param) {
+	return takeSEMA(param->sid);
+     e6a:	d7 01       	movw	r26, r14
+     e6c:	12 96       	adiw	r26, 0x02	; 2
+     e6e:	8c 91       	ld	r24, X
+     e70:	0e 94 58 04 	call	0x8b0	; 0x8b0 <takeSEMA>
+     e74:	49 c0       	rjmp	.+146    	; 0xf08 <syscall_entry+0x2d8>
+ * @return			システムコールの成否情報
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_giveSEMA(PAR_giveSEMA *param) {
+	return giveSEMA(param->sid);
+     e76:	d7 01       	movw	r26, r14
+     e78:	12 96       	adiw	r26, 0x02	; 2
+     e7a:	8c 91       	ld	r24, X
+     e7c:	0e 94 19 04 	call	0x832	; 0x832 <giveSEMA>
+     e80:	43 c0       	rjmp	.+134    	; 0xf08 <syscall_entry+0x2d8>
+ * @return			システムコールの成否情報
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_tasSEMA(PAR_tasSEMA *param) {
+	return tasSEMA(param->sid);
+     e82:	d7 01       	movw	r26, r14
+     e84:	12 96       	adiw	r26, 0x02	; 2
+     e86:	8c 91       	ld	r24, X
+     e88:	0e 94 ec 03 	call	0x7d8	; 0x7d8 <tasSEMA>
+     e8c:	3d c0       	rjmp	.+122    	; 0xf08 <syscall_entry+0x2d8>
+ * @return			システムコールの成否情報
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_sendMSG(PAR_sendMSG *param) {
+	return sendMSG(param->to, param->data);
+     e8e:	d7 01       	movw	r26, r14
+     e90:	13 96       	adiw	r26, 0x03	; 3
+     e92:	6d 91       	ld	r22, X+
+     e94:	7c 91       	ld	r23, X
+     e96:	14 97       	sbiw	r26, 0x04	; 4
+     e98:	12 96       	adiw	r26, 0x02	; 2
+     e9a:	8c 91       	ld	r24, X
+     e9c:	0e 94 08 03 	call	0x610	; 0x610 <sendMSG>
+     ea0:	33 c0       	rjmp	.+102    	; 0xf08 <syscall_entry+0x2d8>
+ * @return			システムコールの成否情報
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_recvMSG(PAR_recvMSG *param) {
+	return recvMSG(&param->from, &param->data);
+     ea2:	b7 01       	movw	r22, r14
+     ea4:	6d 5f       	subi	r22, 0xFD	; 253
+     ea6:	7f 4f       	sbci	r23, 0xFF	; 255
+     ea8:	c7 01       	movw	r24, r14
+     eaa:	02 96       	adiw	r24, 0x02	; 2
+     eac:	0e 94 9e 02 	call	0x53c	; 0x53c <recvMSG>
+		case SVCID_takeSEMA	 	: par->result = SVC_takeSEMA((PAR_takeSEMA*)par); break;
+		case SVCID_giveSEMA	 	: par->result = SVC_giveSEMA((PAR_giveSEMA*)par); break;
+		case SVCID_tasSEMA	 	: par->result = SVC_tasSEMA((PAR_tasSEMA*)par); break;
+
+		case SVCID_sendMSG	 	: par->result = SVC_sendMSG((PAR_sendMSG*)par); break;
+		case SVCID_recvMSG	 	: par->result = SVC_recvMSG((PAR_recvMSG*)par); break;
+     eb0:	d7 01       	movw	r26, r14
+     eb2:	11 96       	adiw	r26, 0x01	; 1
+     eb4:	8c 93       	st	X, r24
+     eb6:	2a c0       	rjmp	.+84     	; 0xf0c <syscall_entry+0x2dc>
+ * @author			Kazuya Fukuhara
+ * @date			2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_waitMSG(PAR_waitMSG *param) {
+	(void)param;
+	return waitMSG();
+     eb8:	0e 94 f6 02 	call	0x5ec	; 0x5ec <waitMSG>
+     ebc:	25 c0       	rjmp	.+74     	; 0xf08 <syscall_entry+0x2d8>
+ * @return				システムコールの成否情報
+ * @author				Kazuya Fukuhara
+ * @date				2010/01/07 14:08:58	作成
+ */
+static svcresultid_t SVC_getTID(PAR_getTID *param) {
+	param->taskId = getTaskID(currentTCB);
+     ebe:	c6 01       	movw	r24, r12
+     ec0:	0e 94 44 01 	call	0x288	; 0x288 <getTaskID>
+     ec4:	d7 01       	movw	r26, r14
+     ec6:	12 96       	adiw	r26, 0x02	; 2
+     ec8:	8c 93       	st	X, r24
+     eca:	12 97       	sbiw	r26, 0x02	; 2
+
+		case SVCID_sendMSG	 	: par->result = SVC_sendMSG((PAR_sendMSG*)par); break;
+		case SVCID_recvMSG	 	: par->result = SVC_recvMSG((PAR_recvMSG*)par); break;
+		case SVCID_waitMSG	 	: par->result = SVC_waitMSG((PAR_waitMSG*)par); break;
+
+		case SVCID_getTID		: par->result = SVC_getTID((PAR_getTID*)par); break;
+     ecc:	11 96       	adiw	r26, 0x01	; 1
+     ece:	1c 92       	st	X, r1
+     ed0:	1d c0       	rjmp	.+58     	; 0xf0c <syscall_entry+0x2dc>
+ * @author			Kazuya Fukuhara
+ * @date			2010/09/11 11:01:20	作成
+ */
+static svcresultid_t SVC_hookInterrupt(PAR_hookInterrupt *param) {
+	/* 割り込み番号の有効範囲はシステムごとに違うので妥当性を検査 */
+	if (is_hookable_interrupt_id(param->interrupt_id) == FALSE) {
+     ed2:	f7 01       	movw	r30, r14
+     ed4:	82 81       	ldd	r24, Z+2	; 0x02
+     ed6:	0e 94 98 07 	call	0xf30	; 0xf30 <is_hookable_interrupt_id>
+     eda:	88 23       	and	r24, r24
+     edc:	11 f4       	brne	.+4      	; 0xee2 <syscall_entry+0x2b2>
+     ede:	8b e1       	ldi	r24, 0x1B	; 27
+     ee0:	e7 cf       	rjmp	.-50     	; 0xeb0 <syscall_entry+0x280>
+		return ERR27;
+	}
+
+	if ((1<=param->task_id)&&(param->task_id<=TASK_NUM-2)) {
+     ee2:	d7 01       	movw	r26, r14
+     ee4:	13 96       	adiw	r26, 0x03	; 3
+     ee6:	6c 91       	ld	r22, X
+     ee8:	13 97       	sbiw	r26, 0x03	; 3
+     eea:	86 2f       	mov	r24, r22
+     eec:	81 50       	subi	r24, 0x01	; 1
+     eee:	84 30       	cpi	r24, 0x04	; 4
+     ef0:	18 f4       	brcc	.+6      	; 0xef8 <syscall_entry+0x2c8>
+		set_int_hook_tid(param->interrupt_id, param->task_id
+     ef2:	12 96       	adiw	r26, 0x02	; 2
+     ef4:	8c 91       	ld	r24, X
+     ef6:	03 c0       	rjmp	.+6      	; 0xefe <syscall_entry+0x2ce>
+			,param->priolity
+#endif
+		);
+		EnableExtInterrupt(param->interrupt_id);
+	} else {
+		set_int_hook_tid(param->interrupt_id, (taskid_t)-1
+     ef8:	f7 01       	movw	r30, r14
+     efa:	82 81       	ldd	r24, Z+2	; 0x02
+     efc:	6f ef       	ldi	r22, 0xFF	; 255
+     efe:	0e 94 38 02 	call	0x470	; 0x470 <set_int_hook_tid>
+     f02:	80 e0       	ldi	r24, 0x00	; 0
+     f04:	d5 cf       	rjmp	.-86     	; 0xeb0 <syscall_entry+0x280>
+#if (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+		case SVCID_setPriolity	: par->result = SVC_setPriolity((PAR_setPriolity*)par); break;
+		case SVCID_getPriolity	: par->result = SVC_getPriolity((PAR_getPriolity*)par); break;
+#endif
+
+		default					: par->result = ERR30; break;
+     f06:	8e e1       	ldi	r24, 0x1E	; 30
+     f08:	f7 01       	movw	r30, r14
+     f0a:	81 83       	std	Z+1, r24	; 0x01
+	}
+
+	/* スケジューリングを行い、次に実行するタスクを選択する */
+	scheduler();
+     f0c:	0e 94 a6 01 	call	0x34c	; 0x34c <scheduler>
+}
+     f10:	0f 90       	pop	r0
+     f12:	0f 90       	pop	r0
+     f14:	0f 90       	pop	r0
+     f16:	0f 90       	pop	r0
+     f18:	cf 91       	pop	r28
+     f1a:	df 91       	pop	r29
+     f1c:	1f 91       	pop	r17
+     f1e:	0f 91       	pop	r16
+     f20:	ff 90       	pop	r15
+     f22:	ef 90       	pop	r14
+     f24:	df 90       	pop	r13
+     f26:	cf 90       	pop	r12
+     f28:	08 95       	ret
+
+00000f2a <syscall>:
+ * WinAVRではregister修飾子が有効であり、第１引数はレジスタ渡しで渡される。
+ * また、AVRにはソフトウェア割り込みがないため、INT0割り込みをソフトウェア割り込みとして利用している。
+ */
+svcresultid_t NAKED syscall(register ptr_t param) {
+	(void)param;
+	asm volatile(
+     f2a:	5a 9a       	sbi	0x0b, 2	; 11
+     f2c:	08 95       	ret
+		"	sbi	0x0B,	2		\n\t"
+		"	ret					\n\t"
+	);
+	return 0;	// dummy
+}
+     f2e:	80 e0       	ldi	r24, 0x00	; 0
+
+00000f30 <is_hookable_interrupt_id>:
+ * @retval FALSE	フック不可能な外部割り込み番号
+ * @author			Kazuya Fukuhara
+ * @date			2010/09/11 11:01:20	作成
+ */
+bool_t is_hookable_interrupt_id(extintid_t int_id) {
+	switch (int_id) {
+     f30:	82 30       	cpi	r24, 0x02	; 2
+     f32:	28 f0       	brcs	.+10     	; 0xf3e <is_hookable_interrupt_id+0xe>
+     f34:	8e 50       	subi	r24, 0x0E	; 14
+     f36:	83 30       	cpi	r24, 0x03	; 3
+     f38:	10 f0       	brcs	.+4      	; 0xf3e <is_hookable_interrupt_id+0xe>
+     f3a:	81 e0       	ldi	r24, 0x01	; 1
+     f3c:	08 95       	ret
+     f3e:	80 e0       	ldi	r24, 0x00	; 0
+			return FALSE;
+		default:
+			break;
+	}
+	return TRUE;
+}
+     f40:	08 95       	ret
+
+00000f42 <initHardware>:
+ */
+void initHardware(void) {
+	/*
+	 * 割り込み禁止状態に設定
+	 */
+	cli();
+     f42:	f8 94       	cli
+	 * プログラムから INT0(PD2) に出力することで、外部割り込みを発生させることができる。
+	 * これを利用して、外部割り込み INT0(PD2) をソフトウェア割り込みの代用とする。
+	 */
+
+	/* 外部割り込み INT0(PD2) は出力モード */
+	DDRD  |=  _BV(PORTD2);
+     f44:	52 9a       	sbi	0x0a, 2	; 10
+	PORTD &= ~_BV(PORTD2);
+     f46:	5a 98       	cbi	0x0b, 2	; 11
+
+	/* 外部割り込み条件: INT0(PD2) の立ち上がりで発生 */
+	EICRA |= (_BV(ISC01)|_BV(ISC00));
+     f48:	e9 e6       	ldi	r30, 0x69	; 105
+     f4a:	f0 e0       	ldi	r31, 0x00	; 0
+     f4c:	80 81       	ld	r24, Z
+     f4e:	83 60       	ori	r24, 0x03	; 3
+     f50:	80 83       	st	Z, r24
+
+	/* 外部割り込みマスクレジスタ: INT0(PD2) の割り込みを許可 */
+	EIMSK |= _BV(INT0);
+     f52:	e8 9a       	sbi	0x1d, 0	; 29
+	 *     ||||||
+	 *     ||||++-----  WGM01: WGM00  0b10  CTC動作
+	 *     ||++------- COM0B1:COM0B0  0b00  標準動作(OC0B切断)
+	 *     ++--------- COM0A1:COM0A0  0b00  標準動作(OC0A切断)
+	 */
+	TCCR0A = 0b00000010;
+     f54:	92 e0       	ldi	r25, 0x02	; 2
+     f56:	94 bd       	out	0x24, r25	; 36
+	 * タイマカウンタ1制御レジスタBを設定
+	 * FOC0A:FOC0B		 00
+	 * WGM02			  0	CTC動作
+	 * CS02:CS01:CS00	010	分周比を8分周に設定
+	 */
+	TCCR0B = 0b00000010;
+     f58:	95 bd       	out	0x25, r25	; 37
+	 * 分周比は8分周に設定しているので、20Mhz/8 = 2.5Mhz のカウンタとなる。
+	 * 8bitタイマを使い250カウントに１回の割り込みの設定にすると
+	 * 2.5Mhz/250 = 2500Khz/250 = 10Khzとなり、
+	 * 0.1ms間隔でスケジューラが実行されることになる
+	 */
+	OCR0A = 250;
+     f5a:	8a ef       	ldi	r24, 0xFA	; 250
+     f5c:	87 bd       	out	0x27, r24	; 39
+	 * ICIE0  0
+	 * OCIE0B 0
+	 * OCIE0A 1 タイマカウンタ0比較A割り込み許可
+	 * TOIE0  0
+	 */
+	TIMSK0 = 0b00000010;
+     f5e:	90 93 6e 00 	sts	0x006E, r25
+
+	/**
+	 * カーネルタイマを初期化
+	 */
+	initKernelTimer();
+}
+     f62:	08 95       	ret
+
+00000f64 <resetContext>:
+ * @brief			コンテキストの初期化
+ * @param[in] tid	タスク番号
+ * @author			Kazuya Fukuhara
+ * @date			2010/08/15 16:11:02	作成
+ */
+void resetContext(taskid_t tid) {
+     f64:	af 92       	push	r10
+     f66:	bf 92       	push	r11
+     f68:	cf 92       	push	r12
+     f6a:	df 92       	push	r13
+     f6c:	ef 92       	push	r14
+     f6e:	ff 92       	push	r15
+     f70:	0f 93       	push	r16
+     f72:	1f 93       	push	r17
+	context_t* context;
+	
+	/* スタックポインタの初期値を設定 */
+	tasks[tid].stack_pointer = &task_stack[tid][TASK_STACK_SIZE-sizeof(context_t)-3];
+     f74:	e8 2f       	mov	r30, r24
+     f76:	f0 e0       	ldi	r31, 0x00	; 0
+     f78:	8f 01       	movw	r16, r30
+     f7a:	56 e0       	ldi	r21, 0x06	; 6
+     f7c:	00 0f       	add	r16, r16
+     f7e:	11 1f       	adc	r17, r17
+     f80:	5a 95       	dec	r21
+     f82:	e1 f7       	brne	.-8      	; 0xf7c <resetContext+0x18>
+     f84:	5f 01       	movw	r10, r30
+     f86:	aa 0c       	add	r10, r10
+     f88:	bb 1c       	adc	r11, r11
+     f8a:	33 e0       	ldi	r19, 0x03	; 3
+     f8c:	ee 0f       	add	r30, r30
+     f8e:	ff 1f       	adc	r31, r31
+     f90:	3a 95       	dec	r19
+     f92:	e1 f7       	brne	.-8      	; 0xf8c <resetContext+0x28>
+     f94:	ea 0d       	add	r30, r10
+     f96:	fb 1d       	adc	r31, r11
+     f98:	ee 58       	subi	r30, 0x8E	; 142
+     f9a:	fc 4f       	sbci	r31, 0xFC	; 252
+     f9c:	c8 01       	movw	r24, r16
+     f9e:	4a 96       	adiw	r24, 0x1a	; 26
+     fa0:	2e ea       	ldi	r18, 0xAE	; 174
+     fa2:	c2 2e       	mov	r12, r18
+     fa4:	23 e0       	ldi	r18, 0x03	; 3
+     fa6:	d2 2e       	mov	r13, r18
+     fa8:	8c 0d       	add	r24, r12
+     faa:	9d 1d       	adc	r25, r13
+     fac:	91 83       	std	Z+1, r25	; 0x01
+     fae:	80 83       	st	Z, r24
+
+	/* 初期化用コンテキストを取得し、ゼロクリア */
+	context = (context_t*)&task_stack[tid][TASK_STACK_SIZE-sizeof(context_t)];
+     fb0:	03 5e       	subi	r16, 0xE3	; 227
+     fb2:	1f 4f       	sbci	r17, 0xFF	; 255
+     fb4:	76 01       	movw	r14, r12
+     fb6:	e0 0e       	add	r14, r16
+     fb8:	f1 1e       	adc	r15, r17
+	ZeroMemory(context, sizeof(context_t));
+     fba:	c7 01       	movw	r24, r14
+     fbc:	63 e2       	ldi	r22, 0x23	; 35
+     fbe:	70 e0       	ldi	r23, 0x00	; 0
+     fc0:	0e 94 2f 02 	call	0x45e	; 0x45e <ZeroMemory>
+
+	/* exitアドレスの設定 */
+	SetReturnAddressToContext(context, API_exitTASK);
+     fc4:	8a ec       	ldi	r24, 0xCA	; 202
+     fc6:	95 e0       	ldi	r25, 0x05	; 5
+     fc8:	f7 01       	movw	r30, r14
+     fca:	91 a3       	std	Z+33, r25	; 0x21
+     fcc:	82 a3       	std	Z+34, r24	; 0x22
+
+	/* コンテキストの設定 */
+	context = ((context_t*)&task_stack[tid][TASK_STACK_SIZE-sizeof(context_t)-2]);
+     fce:	02 50       	subi	r16, 0x02	; 2
+     fd0:	10 40       	sbci	r17, 0x00	; 0
+     fd2:	0c 0d       	add	r16, r12
+     fd4:	1d 1d       	adc	r17, r13
+
+	/* 開始アドレス値の設定 */
+	SetReturnAddressToContext(context, TaskTable[tid]);
+     fd6:	87 ef       	ldi	r24, 0xF7	; 247
+     fd8:	91 e0       	ldi	r25, 0x01	; 1
+     fda:	a8 0e       	add	r10, r24
+     fdc:	b9 1e       	adc	r11, r25
+     fde:	f5 01       	movw	r30, r10
+     fe0:	90 81       	ld	r25, Z
+     fe2:	81 81       	ldd	r24, Z+1	; 0x01
+     fe4:	f8 01       	movw	r30, r16
+     fe6:	81 a3       	std	Z+33, r24	; 0x21
+     fe8:	92 a3       	std	Z+34, r25	; 0x22
+}
+     fea:	1f 91       	pop	r17
+     fec:	0f 91       	pop	r16
+     fee:	ff 90       	pop	r15
+     ff0:	ef 90       	pop	r14
+     ff2:	df 90       	pop	r13
+     ff4:	cf 90       	pop	r12
+     ff6:	bf 90       	pop	r11
+     ff8:	af 90       	pop	r10
+     ffa:	08 95       	ret
+
+00000ffc <__vector_1>:
+ * @author	Kazuya Fukuhara
+ * @date	2010/01/07 14:08:58	作成
+ */
+void INT0_vect(void) {
+	/* コンテキストを保存 */
+	SAVE_CONTEXT();
+     ffc:	0f 92       	push	r0
+     ffe:	0f b6       	in	r0, 0x3f	; 63
+    1000:	f8 94       	cli
+    1002:	0f 92       	push	r0
+    1004:	1f 92       	push	r1
+    1006:	11 24       	eor	r1, r1
+    1008:	2f 92       	push	r2
+    100a:	3f 92       	push	r3
+    100c:	4f 92       	push	r4
+    100e:	5f 92       	push	r5
+    1010:	6f 92       	push	r6
+    1012:	7f 92       	push	r7
+    1014:	8f 92       	push	r8
+    1016:	9f 92       	push	r9
+    1018:	af 92       	push	r10
+    101a:	bf 92       	push	r11
+    101c:	cf 92       	push	r12
+    101e:	df 92       	push	r13
+    1020:	ef 92       	push	r14
+    1022:	ff 92       	push	r15
+    1024:	0f 93       	push	r16
+    1026:	1f 93       	push	r17
+    1028:	2f 93       	push	r18
+    102a:	3f 93       	push	r19
+    102c:	4f 93       	push	r20
+    102e:	5f 93       	push	r21
+    1030:	6f 93       	push	r22
+    1032:	7f 93       	push	r23
+    1034:	8f 93       	push	r24
+    1036:	9f 93       	push	r25
+    1038:	af 93       	push	r26
+    103a:	bf 93       	push	r27
+    103c:	cf 93       	push	r28
+    103e:	df 93       	push	r29
+    1040:	ef 93       	push	r30
+    1042:	ff 93       	push	r31
+    1044:	a0 91 2e 05 	lds	r26, 0x052E
+    1048:	b0 91 2f 05 	lds	r27, 0x052F
+    104c:	0d b6       	in	r0, 0x3d	; 61
+    104e:	0d 92       	st	X+, r0
+    1050:	0e b6       	in	r0, 0x3e	; 62
+    1052:	0d 92       	st	X+, r0
+
+	/* カーネルスタックに切り替え */
+	SET_KERNEL_STACKPOINTER();
+    1054:	cf ef       	ldi	r28, 0xFF	; 255
+    1056:	d8 e0       	ldi	r29, 0x08	; 8
+    1058:	de bf       	out	0x3e, r29	; 62
+    105a:	cd bf       	out	0x3d, r28	; 61
+
+	/* EXT0割り込みをリセット */
+	PORTD &= ~_BV(PORTD2);
+    105c:	5a 98       	cbi	0x0b, 2	; 11
+
+	/* システムコール呼び出し処理に移動 */
+	syscall_entry();
+    105e:	0e 94 18 06 	call	0xc30	; 0xc30 <syscall_entry>
+
+00001062 <__vector_14>:
+ */
+void TIMER0_COMPA_vect(void) {
+	/* この時点ではどのコンテキストを使っているか不明なのでスタックを使えない */
+
+	/* 現在のタスクのコンテキストを保存 */
+	SAVE_CONTEXT();
+    1062:	0f 92       	push	r0
+    1064:	0f b6       	in	r0, 0x3f	; 63
+    1066:	f8 94       	cli
+    1068:	0f 92       	push	r0
+    106a:	1f 92       	push	r1
+    106c:	11 24       	eor	r1, r1
+    106e:	2f 92       	push	r2
+    1070:	3f 92       	push	r3
+    1072:	4f 92       	push	r4
+    1074:	5f 92       	push	r5
+    1076:	6f 92       	push	r6
+    1078:	7f 92       	push	r7
+    107a:	8f 92       	push	r8
+    107c:	9f 92       	push	r9
+    107e:	af 92       	push	r10
+    1080:	bf 92       	push	r11
+    1082:	cf 92       	push	r12
+    1084:	df 92       	push	r13
+    1086:	ef 92       	push	r14
+    1088:	ff 92       	push	r15
+    108a:	0f 93       	push	r16
+    108c:	1f 93       	push	r17
+    108e:	2f 93       	push	r18
+    1090:	3f 93       	push	r19
+    1092:	4f 93       	push	r20
+    1094:	5f 93       	push	r21
+    1096:	6f 93       	push	r22
+    1098:	7f 93       	push	r23
+    109a:	8f 93       	push	r24
+    109c:	9f 93       	push	r25
+    109e:	af 93       	push	r26
+    10a0:	bf 93       	push	r27
+    10a2:	cf 93       	push	r28
+    10a4:	df 93       	push	r29
+    10a6:	ef 93       	push	r30
+    10a8:	ff 93       	push	r31
+    10aa:	a0 91 2e 05 	lds	r26, 0x052E
+    10ae:	b0 91 2f 05 	lds	r27, 0x052F
+    10b2:	0d b6       	in	r0, 0x3d	; 61
+    10b4:	0d 92       	st	X+, r0
+    10b6:	0e b6       	in	r0, 0x3e	; 62
+    10b8:	0d 92       	st	X+, r0
+
+	/* カーネルスタックに切り替え */
+	SET_KERNEL_STACKPOINTER();
+    10ba:	cf ef       	ldi	r28, 0xFF	; 255
+    10bc:	d8 e0       	ldi	r29, 0x08	; 8
+    10be:	de bf       	out	0x3e, r29	; 62
+    10c0:	cd bf       	out	0x3d, r28	; 61
+
+	/* 以降はカーネルスタックの利用が可能になったので、関数呼び出しなどが可能となる */
+
+	/* スリープ状態タスクの待ち時間を更新する */
+	updateTick();
+    10c2:	0e 94 4e 01 	call	0x29c	; 0x29c <updateTick>
+
+	/* スケジューリングを行い、次に実行するタスクを選択する */
+	scheduler();
+    10c6:	0e 94 a6 01 	call	0x34c	; 0x34c <scheduler>
+
+000010ca <task4>:
+//	int i;
+	(void)arg;
+//	for (i=0; i<10; i++) {
+//		if (x != 3) {
+//			x = 3;
+	flag = TRUE;
+    10ca:	81 e0       	ldi	r24, 0x01	; 1
+    10cc:	80 93 71 03 	sts	0x0371, r24
+			couts("\tダブルクリック");
+    10d0:	f8 94       	cli
+    10d2:	e0 e0       	ldi	r30, 0x00	; 0
+    10d4:	f1 e0       	ldi	r31, 0x01	; 1
+    10d6:	02 c0       	rjmp	.+4      	; 0x10dc <task4+0x12>
+    10d8:	85 b9       	out	0x05, r24	; 5
+    10da:	31 96       	adiw	r30, 0x01	; 1
+    10dc:	80 81       	ld	r24, Z
+    10de:	88 23       	and	r24, r24
+    10e0:	d9 f7       	brne	.-10     	; 0x10d8 <task4+0xe>
+    10e2:	78 94       	sei
+//		}
+//	}
+//	Sleep(500);
+}
+    10e4:	08 95       	ret
+
+000010e6 <diag_task>:
+
+void TASKPROC diag_task(ptr_t arg) {
+    10e6:	ff cf       	rjmp	.-2      	; 0x10e6 <diag_task>
+
+000010e8 <task3>:
+//	int i;
+	(void)arg;
+//	for (i=0; i<10; i++) {
+//		if (x != 3) {
+//			x = 3;
+			flag = FALSE;
+    10e8:	10 92 71 03 	sts	0x0371, r1
+			API_hookInterrupt(1,4);
+    10ec:	81 e0       	ldi	r24, 0x01	; 1
+    10ee:	64 e0       	ldi	r22, 0x04	; 4
+    10f0:	0e 94 cf 04 	call	0x99e	; 0x99e <API_hookInterrupt>
+			API_pauseTASK(20);
+    10f4:	84 e1       	ldi	r24, 0x14	; 20
+    10f6:	0e 94 b6 05 	call	0xb6c	; 0xb6c <API_pauseTASK>
+			API_hookInterrupt(1,3);
+    10fa:	81 e0       	ldi	r24, 0x01	; 1
+    10fc:	63 e0       	ldi	r22, 0x03	; 3
+    10fe:	0e 94 cf 04 	call	0x99e	; 0x99e <API_hookInterrupt>
+			if (flag == FALSE) {
+    1102:	80 91 71 03 	lds	r24, 0x0371
+    1106:	88 23       	and	r24, r24
+    1108:	51 f4       	brne	.+20     	; 0x111e <task3+0x36>
+				couts("\tクリック");
+    110a:	f8 94       	cli
+    110c:	e0 e1       	ldi	r30, 0x10	; 16
+    110e:	f1 e0       	ldi	r31, 0x01	; 1
+    1110:	02 c0       	rjmp	.+4      	; 0x1116 <task3+0x2e>
+    1112:	85 b9       	out	0x05, r24	; 5
+    1114:	31 96       	adiw	r30, 0x01	; 1
+    1116:	80 81       	ld	r24, Z
+    1118:	88 23       	and	r24, r24
+    111a:	d9 f7       	brne	.-10     	; 0x1112 <task3+0x2a>
+    111c:	78 94       	sei
+    111e:	08 95       	ret
+
+00001120 <task2>:
+
+void TASKPROC task2(ptr_t arg) {
+	(void)arg;
+	for (;;) {
+//		if (x != 2) {
+			couts("タスクＢが実行中です");
+    1120:	f8 94       	cli
+    1122:	ea e1       	ldi	r30, 0x1A	; 26
+    1124:	f1 e0       	ldi	r31, 0x01	; 1
+    1126:	02 c0       	rjmp	.+4      	; 0x112c <task2+0xc>
+    1128:	85 b9       	out	0x05, r24	; 5
+    112a:	31 96       	adiw	r30, 0x01	; 1
+    112c:	80 81       	ld	r24, Z
+    112e:	88 23       	and	r24, r24
+    1130:	d9 f7       	brne	.-10     	; 0x1128 <task2+0x8>
+    1132:	78 94       	sei
+//			x = 2;
+//		}
+//		Sleep(500);
+		API_pauseTASK(50);
+    1134:	82 e3       	ldi	r24, 0x32	; 50
+    1136:	0e 94 b6 05 	call	0xb6c	; 0xb6c <API_pauseTASK>
+    113a:	f2 cf       	rjmp	.-28     	; 0x1120 <task2>
+
+0000113c <task1>:
+
+void TASKPROC task1(ptr_t arg) {
+	(void)arg;
+	for (;;) {
+//		if (x != 1) {
+			couts("タスクＡが実行中です");
+    113c:	f8 94       	cli
+    113e:	ef e2       	ldi	r30, 0x2F	; 47
+    1140:	f1 e0       	ldi	r31, 0x01	; 1
+    1142:	02 c0       	rjmp	.+4      	; 0x1148 <task1+0xc>
+    1144:	85 b9       	out	0x05, r24	; 5
+    1146:	31 96       	adiw	r30, 0x01	; 1
+    1148:	80 81       	ld	r24, Z
+    114a:	88 23       	and	r24, r24
+    114c:	d9 f7       	brne	.-10     	; 0x1144 <task1+0x8>
+    114e:	78 94       	sei
+//			x = 1;
+//		}
+//		Sleep(1000);
+		API_pauseTASK(150);
+    1150:	86 e9       	ldi	r24, 0x96	; 150
+    1152:	0e 94 b6 05 	call	0xb6c	; 0xb6c <API_pauseTASK>
+    1156:	f2 cf       	rjmp	.-28     	; 0x113c <task1>
+
+00001158 <init_task>:
+/**
+ * @brief 最高優先度の初期化タスク
+ */
+void TASKPROC init_task(ptr_t arg) {
+	(void)arg;
+	couts("初期化タスク：初期化開始");
+    1158:	f8 94       	cli
+    115a:	e4 e4       	ldi	r30, 0x44	; 68
+    115c:	f1 e0       	ldi	r31, 0x01	; 1
+    115e:	02 c0       	rjmp	.+4      	; 0x1164 <init_task+0xc>
+    1160:	85 b9       	out	0x05, r24	; 5
+    1162:	31 96       	adiw	r30, 0x01	; 1
+    1164:	80 81       	ld	r24, Z
+    1166:	88 23       	and	r24, r24
+    1168:	d9 f7       	brne	.-10     	; 0x1160 <init_task+0x8>
+    116a:	78 94       	sei
+	couts("初期化タスク：タスクＡを生成");
+    116c:	f8 94       	cli
+    116e:	ed e5       	ldi	r30, 0x5D	; 93
+    1170:	f1 e0       	ldi	r31, 0x01	; 1
+    1172:	02 c0       	rjmp	.+4      	; 0x1178 <init_task+0x20>
+    1174:	85 b9       	out	0x05, r24	; 5
+    1176:	31 96       	adiw	r30, 0x01	; 1
+    1178:	80 81       	ld	r24, Z
+    117a:	88 23       	and	r24, r24
+    117c:	d9 f7       	brne	.-10     	; 0x1174 <init_task+0x1c>
+    117e:	78 94       	sei
+#if (SCHEDULER_TYPE == SCHEDULING_TIME_SHARING) || (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+	API_startTASK((taskid_t)1,(ptr_t)0x1234, 2);
+#else
+	API_startTASK((taskid_t)1,(ptr_t)0x1234);
+    1180:	81 e0       	ldi	r24, 0x01	; 1
+    1182:	64 e3       	ldi	r22, 0x34	; 52
+    1184:	72 e1       	ldi	r23, 0x12	; 18
+    1186:	0e 94 db 05 	call	0xbb6	; 0xbb6 <API_startTASK>
+#endif
+	couts("初期化タスク：タスクＢを生成");
+    118a:	f8 94       	cli
+    118c:	ea e7       	ldi	r30, 0x7A	; 122
+    118e:	f1 e0       	ldi	r31, 0x01	; 1
+    1190:	02 c0       	rjmp	.+4      	; 0x1196 <init_task+0x3e>
+    1192:	85 b9       	out	0x05, r24	; 5
+    1194:	31 96       	adiw	r30, 0x01	; 1
+    1196:	80 81       	ld	r24, Z
+    1198:	88 23       	and	r24, r24
+    119a:	d9 f7       	brne	.-10     	; 0x1192 <init_task+0x3a>
+    119c:	78 94       	sei
+#if (SCHEDULER_TYPE == SCHEDULING_TIME_SHARING) || (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+	API_startTASK((taskid_t)2,(ptr_t)NULL, 2);
+#else
+	API_startTASK((taskid_t)2,(ptr_t)NULL);
+    119e:	82 e0       	ldi	r24, 0x02	; 2
+    11a0:	60 e0       	ldi	r22, 0x00	; 0
+    11a2:	70 e0       	ldi	r23, 0x00	; 0
+    11a4:	0e 94 db 05 	call	0xbb6	; 0xbb6 <API_startTASK>
+#endif
+	couts("初期化タスク：ボタン押下割り込みに対応してタスクＣを起動するように設定");
+    11a8:	f8 94       	cli
+    11aa:	e7 e9       	ldi	r30, 0x97	; 151
+    11ac:	f1 e0       	ldi	r31, 0x01	; 1
+    11ae:	02 c0       	rjmp	.+4      	; 0x11b4 <init_task+0x5c>
+    11b0:	85 b9       	out	0x05, r24	; 5
+    11b2:	31 96       	adiw	r30, 0x01	; 1
+    11b4:	80 81       	ld	r24, Z
+    11b6:	88 23       	and	r24, r24
+    11b8:	d9 f7       	brne	.-10     	; 0x11b0 <init_task+0x58>
+    11ba:	78 94       	sei
+#if (SCHEDULER_TYPE == SCHEDULING_TIME_SHARING) || (SCHEDULER_TYPE == SCHEDULING_PRIORITY_BASE_TIME_SHARING) 
+	API_hookInterrupt(1,3);
+#else
+	API_hookInterrupt(1,3);
+    11bc:	81 e0       	ldi	r24, 0x01	; 1
+    11be:	63 e0       	ldi	r22, 0x03	; 3
+    11c0:	0e 94 cf 04 	call	0x99e	; 0x99e <API_hookInterrupt>
+#endif
+	couts("初期化タスク：初期化終了");
+    11c4:	f8 94       	cli
+    11c6:	ee ed       	ldi	r30, 0xDE	; 222
+    11c8:	f1 e0       	ldi	r31, 0x01	; 1
+    11ca:	02 c0       	rjmp	.+4      	; 0x11d0 <init_task+0x78>
+    11cc:	85 b9       	out	0x05, r24	; 5
+    11ce:	31 96       	adiw	r30, 0x01	; 1
+    11d0:	80 81       	ld	r24, Z
+    11d2:	88 23       	and	r24, r24
+    11d4:	d9 f7       	brne	.-10     	; 0x11cc <init_task+0x74>
+    11d6:	78 94       	sei
+}
+    11d8:	08 95       	ret
+
+000011da <__vector_2>:
+
+/* 各外部割り込みを捕捉するためのコードを生成 */
+
+/* EXTINT_CAPTURE(RESET) は利用禁止 */
+/* EXTINT_CAPTURE(INT0) はソフトウェア割り込みで利用済み */
+EXTINT_CAPTURE(INT1)
+    11da:	8f 93       	push	r24
+    11dc:	82 e0       	ldi	r24, 0x02	; 2
+    11de:	80 93 70 03 	sts	0x0370, r24
+    11e2:	8f 91       	pop	r24
+    11e4:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000011e8 <__vector_3>:
+EXTINT_CAPTURE(PCINT0)
+    11e8:	8f 93       	push	r24
+    11ea:	83 e0       	ldi	r24, 0x03	; 3
+    11ec:	80 93 70 03 	sts	0x0370, r24
+    11f0:	8f 91       	pop	r24
+    11f2:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000011f6 <__vector_4>:
+EXTINT_CAPTURE(PCINT1)
+    11f6:	8f 93       	push	r24
+    11f8:	84 e0       	ldi	r24, 0x04	; 4
+    11fa:	80 93 70 03 	sts	0x0370, r24
+    11fe:	8f 91       	pop	r24
+    1200:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001204 <__vector_5>:
+EXTINT_CAPTURE(PCINT2)
+    1204:	8f 93       	push	r24
+    1206:	85 e0       	ldi	r24, 0x05	; 5
+    1208:	80 93 70 03 	sts	0x0370, r24
+    120c:	8f 91       	pop	r24
+    120e:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001212 <__vector_6>:
+EXTINT_CAPTURE(WDT)
+    1212:	8f 93       	push	r24
+    1214:	86 e0       	ldi	r24, 0x06	; 6
+    1216:	80 93 70 03 	sts	0x0370, r24
+    121a:	8f 91       	pop	r24
+    121c:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001220 <__vector_7>:
+EXTINT_CAPTURE(TIMER2_COMPA)
+    1220:	8f 93       	push	r24
+    1222:	87 e0       	ldi	r24, 0x07	; 7
+    1224:	80 93 70 03 	sts	0x0370, r24
+    1228:	8f 91       	pop	r24
+    122a:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+0000122e <__vector_8>:
+EXTINT_CAPTURE(TIMER2_COMPB)
+    122e:	8f 93       	push	r24
+    1230:	88 e0       	ldi	r24, 0x08	; 8
+    1232:	80 93 70 03 	sts	0x0370, r24
+    1236:	8f 91       	pop	r24
+    1238:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+0000123c <__vector_9>:
+EXTINT_CAPTURE(TIMER2_OVF)
+    123c:	8f 93       	push	r24
+    123e:	89 e0       	ldi	r24, 0x09	; 9
+    1240:	80 93 70 03 	sts	0x0370, r24
+    1244:	8f 91       	pop	r24
+    1246:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+0000124a <__vector_10>:
+EXTINT_CAPTURE(TIMER1_CAPT)
+    124a:	8f 93       	push	r24
+    124c:	8a e0       	ldi	r24, 0x0A	; 10
+    124e:	80 93 70 03 	sts	0x0370, r24
+    1252:	8f 91       	pop	r24
+    1254:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001258 <__vector_11>:
+EXTINT_CAPTURE(TIMER1_COMPA)
+    1258:	8f 93       	push	r24
+    125a:	8b e0       	ldi	r24, 0x0B	; 11
+    125c:	80 93 70 03 	sts	0x0370, r24
+    1260:	8f 91       	pop	r24
+    1262:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001266 <__vector_12>:
+EXTINT_CAPTURE(TIMER1_COMPB)
+    1266:	8f 93       	push	r24
+    1268:	8c e0       	ldi	r24, 0x0C	; 12
+    126a:	80 93 70 03 	sts	0x0370, r24
+    126e:	8f 91       	pop	r24
+    1270:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001274 <__vector_13>:
+EXTINT_CAPTURE(TIMER1_OVF)
+    1274:	8f 93       	push	r24
+    1276:	8d e0       	ldi	r24, 0x0D	; 13
+    1278:	80 93 70 03 	sts	0x0370, r24
+    127c:	8f 91       	pop	r24
+    127e:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001282 <__vector_17>:
+/* EXTINT_CAPTURE(TIMER0_COMPA) はカーネルタイマ割り込みとして利用済み */
+/* EXTINT_CAPTURE(TIMER0_COMPB) はTIMER0がカーネルタイマとして利用されているので利用禁止 */
+/* EXTINT_CAPTURE(TIMER0_OVF) はTIMER0がカーネルタイマとして利用されているので利用禁止 */
+EXTINT_CAPTURE(SPI_STC)
+    1282:	8f 93       	push	r24
+    1284:	81 e1       	ldi	r24, 0x11	; 17
+    1286:	80 93 70 03 	sts	0x0370, r24
+    128a:	8f 91       	pop	r24
+    128c:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001290 <__vector_18>:
+EXTINT_CAPTURE(USART_RX)
+    1290:	8f 93       	push	r24
+    1292:	82 e1       	ldi	r24, 0x12	; 18
+    1294:	80 93 70 03 	sts	0x0370, r24
+    1298:	8f 91       	pop	r24
+    129a:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+0000129e <__vector_19>:
+EXTINT_CAPTURE(USART_UDRE)
+    129e:	8f 93       	push	r24
+    12a0:	83 e1       	ldi	r24, 0x13	; 19
+    12a2:	80 93 70 03 	sts	0x0370, r24
+    12a6:	8f 91       	pop	r24
+    12a8:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012ac <__vector_20>:
+EXTINT_CAPTURE(USART_TX)
+    12ac:	8f 93       	push	r24
+    12ae:	84 e1       	ldi	r24, 0x14	; 20
+    12b0:	80 93 70 03 	sts	0x0370, r24
+    12b4:	8f 91       	pop	r24
+    12b6:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012ba <__vector_21>:
+EXTINT_CAPTURE(ADC)
+    12ba:	8f 93       	push	r24
+    12bc:	85 e1       	ldi	r24, 0x15	; 21
+    12be:	80 93 70 03 	sts	0x0370, r24
+    12c2:	8f 91       	pop	r24
+    12c4:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012c8 <__vector_22>:
+EXTINT_CAPTURE(EE_READY)
+    12c8:	8f 93       	push	r24
+    12ca:	86 e1       	ldi	r24, 0x16	; 22
+    12cc:	80 93 70 03 	sts	0x0370, r24
+    12d0:	8f 91       	pop	r24
+    12d2:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012d6 <__vector_23>:
+EXTINT_CAPTURE(ANALOG_COMP)
+    12d6:	8f 93       	push	r24
+    12d8:	87 e1       	ldi	r24, 0x17	; 23
+    12da:	80 93 70 03 	sts	0x0370, r24
+    12de:	8f 91       	pop	r24
+    12e0:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012e4 <__vector_24>:
+EXTINT_CAPTURE(TWI)
+    12e4:	8f 93       	push	r24
+    12e6:	88 e1       	ldi	r24, 0x18	; 24
+    12e8:	80 93 70 03 	sts	0x0370, r24
+    12ec:	8f 91       	pop	r24
+    12ee:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+000012f2 <__vector_25>:
+EXTINT_CAPTURE(SPM_READY)
+    12f2:	8f 93       	push	r24
+    12f4:	89 e1       	ldi	r24, 0x19	; 25
+    12f6:	80 93 70 03 	sts	0x0370, r24
+    12fa:	8f 91       	pop	r24
+    12fc:	0c 94 80 09 	jmp	0x1300	; 0x1300 <notice_interrupt_to_kernel>
+
+00001300 <notice_interrupt_to_kernel>:
+ * @author	Kazuya Fukuhara
+ * @date	2010/09/11 11:01:20	作成
+ */
+void NAKED notice_interrupt_to_kernel(void) {
+	/* 現在のタスクのコンテキストを保存 */
+	SAVE_CONTEXT();
+    1300:	0f 92       	push	r0
+    1302:	0f b6       	in	r0, 0x3f	; 63
+    1304:	f8 94       	cli
+    1306:	0f 92       	push	r0
+    1308:	1f 92       	push	r1
+    130a:	11 24       	eor	r1, r1
+    130c:	2f 92       	push	r2
+    130e:	3f 92       	push	r3
+    1310:	4f 92       	push	r4
+    1312:	5f 92       	push	r5
+    1314:	6f 92       	push	r6
+    1316:	7f 92       	push	r7
+    1318:	8f 92       	push	r8
+    131a:	9f 92       	push	r9
+    131c:	af 92       	push	r10
+    131e:	bf 92       	push	r11
+    1320:	cf 92       	push	r12
+    1322:	df 92       	push	r13
+    1324:	ef 92       	push	r14
+    1326:	ff 92       	push	r15
+    1328:	0f 93       	push	r16
+    132a:	1f 93       	push	r17
+    132c:	2f 93       	push	r18
+    132e:	3f 93       	push	r19
+    1330:	4f 93       	push	r20
+    1332:	5f 93       	push	r21
+    1334:	6f 93       	push	r22
+    1336:	7f 93       	push	r23
+    1338:	8f 93       	push	r24
+    133a:	9f 93       	push	r25
+    133c:	af 93       	push	r26
+    133e:	bf 93       	push	r27
+    1340:	cf 93       	push	r28
+    1342:	df 93       	push	r29
+    1344:	ef 93       	push	r30
+    1346:	ff 93       	push	r31
+    1348:	a0 91 2e 05 	lds	r26, 0x052E
+    134c:	b0 91 2f 05 	lds	r27, 0x052F
+    1350:	0d b6       	in	r0, 0x3d	; 61
+    1352:	0d 92       	st	X+, r0
+    1354:	0e b6       	in	r0, 0x3e	; 62
+    1356:	0d 92       	st	X+, r0
+
+	/* カーネルスタックに切り替え */
+	SET_KERNEL_STACKPOINTER();
+    1358:	cf ef       	ldi	r28, 0xFF	; 255
+    135a:	d8 e0       	ldi	r29, 0x08	; 8
+    135c:	de bf       	out	0x3e, r29	; 62
+    135e:	cd bf       	out	0x3d, r28	; 61
+
+	/* 以降はカーネルスタックの利用が可能になったので、関数呼び出しなどが可能となる */
+
+	/* カーネルの外部割込み処理ハンドラを呼び出す（戻ってこない） */
+	external_interrupt_handler();
+    1360:	0e 94 e6 01 	call	0x3cc	; 0x3cc <external_interrupt_handler>
