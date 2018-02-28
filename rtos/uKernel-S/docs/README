@@ -1,8 +1,0 @@
-doxygenのドキュメントを生成するための設定ファイルです。
-doxygenだけではなく、graphviz も必要になります。
-
-Doxyfile.Kernel : カーネル(./src)のドキュメントを生成します。
-Doxyfile.AVR : AVR向け環境定義(./arch/avr)のドキュメントを生成します。
-Doxyfile.M16C_T-Bird : M16Cマイコン搭載T-Birdボード向け環境定義(./arch/m16c-tbird)のドキュメントを生成します。
-Doxyfile.Win32 : Win32環境向け定義(./arch/win32)のドキュメントを生成します。
-
