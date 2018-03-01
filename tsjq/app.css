@@ -1,5 +1,53 @@
-﻿html, body {
+﻿* {
     margin: 0;
-    width: 100vw;
-    height: 100vh;
+    padding: 0;
+    border: 0;
+    line-height: 1rem;
 }
+
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+#container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+    #container > #sheet > #prefix {
+        font-size: 2rem;
+        font-weight: 600;
+        text-align: center;
+        line-height: 2rem;
+        vertical-align: middle;
+    }
+
+    #container > #sheet > #title {
+        background-color: black;
+        color: white;
+        text-align: center;
+        padding: 4px;
+        margin-top: 3px;
+        margin-bottom: 3px;
+        font-weight: 400;
+        font-size: 1.4rem;
+        line-height: 1.4rem;
+        vertical-align: middle;
+        border: 1px black solid;
+    }
+
+    #container > #sheet > #postfix {
+        text-align: right;
+        vertical-align: middle;
+        font-size: 0.8rem;
+        line-height: 0.8rem;
+    }
+
+    #container > #sheet > #glcanvas {
+        background-color: black;
+        border: 1px black solid;
+    }

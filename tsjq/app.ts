@@ -1,9 +1,153 @@
-﻿module Game {
+﻿var consolere: any;
+
+module m3 {
+    export function projection(width, height) {
+        // Note: This matrix flips the Y axis so that 0 is at the top.
+        return [
+            2 / width, 0, 0,
+            0, -2 / height, 0,
+            -1, 1, 1
+        ];
+    }
+
+    export function identity() {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1,
+        ];
+    }
+
+    export function translation(tx, ty) {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            tx, ty, 1,
+        ];
+    }
+
+    export function rotation(angleInRadians) {
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+        return [
+            c, -s, 0,
+            s, c, 0,
+            0, 0, 1,
+        ];
+    }
+
+    export function scaling(sx, sy) {
+        return [
+            sx, 0, 0,
+            0, sy, 0,
+            0, 0, 1,
+        ];
+    }
+
+    export function multiply(a, b) {
+        var a00 = a[0 * 3 + 0];
+        var a01 = a[0 * 3 + 1];
+        var a02 = a[0 * 3 + 2];
+        var a10 = a[1 * 3 + 0];
+        var a11 = a[1 * 3 + 1];
+        var a12 = a[1 * 3 + 2];
+        var a20 = a[2 * 3 + 0];
+        var a21 = a[2 * 3 + 1];
+        var a22 = a[2 * 3 + 2];
+        var b00 = b[0 * 3 + 0];
+        var b01 = b[0 * 3 + 1];
+        var b02 = b[0 * 3 + 2];
+        var b10 = b[1 * 3 + 0];
+        var b11 = b[1 * 3 + 1];
+        var b12 = b[1 * 3 + 2];
+        var b20 = b[2 * 3 + 0];
+        var b21 = b[2 * 3 + 1];
+        var b22 = b[2 * 3 + 2];
+        return [
+            b00 * a00 + b01 * a10 + b02 * a20,
+            b00 * a01 + b01 * a11 + b02 * a21,
+            b00 * a02 + b01 * a12 + b02 * a22,
+            b10 * a00 + b11 * a10 + b12 * a20,
+            b10 * a01 + b11 * a11 + b12 * a21,
+            b10 * a02 + b11 * a12 + b12 * a22,
+            b20 * a00 + b21 * a10 + b22 * a20,
+            b20 * a01 + b21 * a11 + b22 * a21,
+            b20 * a02 + b21 * a12 + b22 * a22,
+        ];
+    }
+}
+
+module Game {
+    consolere.log('remote log start');
 
     // Global Variables
     var canvas: HTMLCanvasElement;
     var gl: WebGLRenderingContext;
     var textures: { [key: string]: Texture } = {}
+
+    class EventDispatcher {
+        _listeners: {};
+        constructor() {
+            this._listeners = {};
+        }
+        on(type, listener) {
+            if (this._listeners[type] === undefined) {
+                this._listeners[type] = [];
+            }
+
+            this._listeners[type].push(listener);
+            return this;
+        }
+        off(type, listener) {
+            var listeners = this._listeners[type];
+            var index = listeners.indexOf(listener);
+            if (index != -1) {
+                listeners.splice(index, 1);
+            }
+            return this;
+        }
+        fire(eventName, param) {
+            var listeners = this._listeners[eventName];
+            if (listeners) {
+                var temp = listeners.slice();
+                for (var i = 0, len = temp.length; i < len; ++i) {
+                    temp[i].call(this, param);
+                }
+            }
+
+            return this;
+        }
+        one(type, listener) {
+            var func = () => {
+                var result = listener.apply(this, arguments);
+                this.off(type, func);
+                return result;
+            };
+
+            this.on(type, func);
+
+            return this;
+        }
+
+        hasEventListener(type) {
+            if (this._listeners[type] === undefined && !this["on" + type]) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        clearEventListener(type) {
+            var oldEventName = 'on' + type;
+            if (this[oldEventName]) {
+                delete this[oldEventName];
+            }
+
+            this._listeners[type] = [];
+            return this;
+        }
+    }
+
 
     module Shader {
         export class ShaderBase {
@@ -88,27 +232,20 @@ attribute vec2 a_position;
 attribute vec4 a_color;
 attribute vec3 a_texCoord;
 
-uniform vec2 u_resolution;
+uniform mat3 u_matrix;
 
 varying vec3 v_texCoord;
 varying vec4 v_color;
 
 void main() {
-// convert the rectangle from pixels to 0.0 to 1.0
-vec2 zeroToOne = a_position / u_resolution;
 
-// convert from 0->1 to 0->2
-vec2 zeroToTwo = zeroToOne * 2.0;
+    // Multiply the position by the matrix.
+    gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
 
-// convert from 0->2 to -1->+1 (clipspace)
-vec2 clipSpace = zeroToTwo - 1.0;
-
-gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-
-// pass the texCoord to the fragment shader
-// The GPU will interpolate this value between points.
-v_texCoord = a_texCoord;
-v_color = a_color;
+    // pass the texCoord to the fragment shader
+    // The GPU will interpolate this value between points.
+    v_texCoord = a_texCoord;
+    v_color = a_color;
 
 }
 `;
@@ -156,7 +293,7 @@ void main() {
             var texCoordAttributeLocation = this.program.getAttribLocation("a_texCoord");
 
             // look up uniform locations
-            var resolutionUniformLocation = this.program.getUniformLocation("u_resolution");
+            var matrixUniformLocation = this.program.getUniformLocation("u_matrix");
 
             // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
             gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
@@ -181,20 +318,29 @@ void main() {
 
             // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
             gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 9 * 4, 0 * 4);
-            gl.vertexAttribPointer(   colorAttributeLocation, 4, gl.FLOAT, false, 9 * 4, 2 * 4);
+            gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 9 * 4, 2 * 4);
             gl.vertexAttribPointer(texCoordAttributeLocation, 3, gl.FLOAT, false, 9 * 4, 6 * 4);
 
-            // set the resolution
-            gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+            var projectionMatrix = m3.projection(gl.canvas.clientWidth, gl.canvas.clientHeight);
+
+            // set the matrix
+            gl.uniformMatrix3fv(matrixUniformLocation, false, projectionMatrix);
 
             // enable alpha blend
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
         }
         end(): void {
-
         }
 
+        width() {
+            return gl.canvas.width;
+        }
+
+        height() {
+            return gl.canvas.height;
+        }
 
         setTexture(id: string): boolean {
             var texture = textures[id];
@@ -252,8 +398,7 @@ void main() {
             var y1 = 0;
 
             var vertexBuffer = [];
-            for (var ii = 0; ii < num_segments; ii++) 
-            {
+            for (var ii = 0; ii < num_segments; ii++) {
                 //apply the rotation matrix
                 var x2 = c * x1 - s * y1;
                 var y2 = s * x1 + c * y1;
@@ -264,15 +409,19 @@ void main() {
                 ]);
                 x1 = x2;
                 y1 = y2;
-            } 
+            }
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexBuffer), gl.STREAM_DRAW);
-            gl.drawArrays(gl.TRIANGLES, 0, num_segments*3);
+            gl.drawArrays(gl.TRIANGLES, 0, num_segments * 3);
 
         }
 
         toDisplayPos(x: number, y: number): number[] {
             var cr = canvas.getBoundingClientRect();
-            return [x - cr.left, y - cr.top];
+            var scaleScreen = window.innerWidth / document.body.clientWidth;
+            var scaleCanvas = canvas.width * 1.0 / cr.width;
+            var sx = (x - (cr.left + window.pageXOffset));
+            var sy = (y - (cr.top + window.pageYOffset));
+            return [sx, sy];
         }
     }
 
@@ -336,240 +485,108 @@ void main() {
 
     var timer = new AnimationTimer();
 
-
-    class Input {
-        listenerId: number;
-        listeners: { [event: string]: { [id: number]: ((ev: Event, evtype: string, id: number) => void) } };
-
-        constructor() {
-            this.listenerId = 0;
-            this.listeners = {};
-            this.setup();
-            canvas.addEventListener('pointerdown', (ev) => this._dispatch(ev));
-            canvas.addEventListener('pointermove', (ev) => this._dispatch(ev));
-            canvas.addEventListener('pointerup', (ev) => this._dispatch(ev));
-            canvas.addEventListener('pointerleave', (ev) => this._dispatch(ev));
-        }
-        setup() {
-            var body = document.body;
-
-            var isScrolling = false;
-            var timeout = 0;
-            var sDistX = 0;
-            var sDistY = 0;
-
-            window.addEventListener('scroll', function () {
-                if (!isScrolling) {
-                    sDistX = window.pageXOffset;
-                    sDistY = window.pageYOffset;
-                }
-                isScrolling = true;
-                clearTimeout(timeout);
-                timeout = setTimeout(function () {
-                    isScrolling = false;
-                    sDistX = 0;
-                    sDistY = 0;
-                }, 100);
-            });
-
-            body.addEventListener('mousedown', pointerDown);
-            body.addEventListener('touchstart', pointerDown);
-            body.addEventListener('mouseup', pointerUp);
-            body.addEventListener('touchend', pointerUp);
-            body.addEventListener('mousemove', pointerMove);
-            body.addEventListener('touchmove', pointerMove);
-            body.addEventListener('mouseout', pointerLeave);
-            body.addEventListener('touchcancel', pointerLeave);
-
-            // 'pointerdown' event, triggered by mousedown/touchstart.
-            function pointerDown(e) {
-                var evt = makePointerEvent('down', e);
-                // don't maybeClick if more than one touch is active.
-                var singleFinger = evt['mouse'] || (evt['touch'] && e.touches.length === 1);
-                if (!isScrolling && singleFinger) {
-                    e.target.maybeClick = true;
-                    e.target.maybeClickX = evt['x'];
-                    e.target.maybeClickY = evt['y'];
-                }
-                e.preventDefault();
-
-            }
-
-            // 'pointerdown' event, triggered by mouseout/touchleave.
-            function pointerLeave(e) {
-                e.target.maybeClick = false;
-                makePointerEvent('leave', e);
-            }
-
-            // 'pointermove' event, triggered by mousemove/touchmove.
-            function pointerMove(e) {
-                var evt = makePointerEvent('move', e);
-            }
-
-            // 'pointerup' event, triggered by mouseup/touchend.
-            function pointerUp(e) {
-                var evt = makePointerEvent('up', e);
-                // Does our target have maybeClick set by pointerdown?
-                if (e.target.maybeClick) {
-                    // Have we moved too much?
-                    if (Math.abs(e.target.maybeClickX - evt['x']) < 5 &&
-                        Math.abs(e.target.maybeClickY - evt['y']) < 5) {
-                        // Have we scrolled too much?
-                        if (!isScrolling ||
-                            (Math.abs(sDistX - window.pageXOffset) < 5 &&
-                                Math.abs(sDistY - window.pageYOffset) < 5)) {
-                            makePointerEvent('click', e);
-                        }
-                    }
-                }
-                e.target.maybeClick = false;
-            }
-
-            function makePointerEvent(type, e) {
-                var tgt = e.target;
-                var evt = document.createEvent('CustomEvent');
-                evt.initCustomEvent('pointer' + type, true, true, {});
-                evt['touch'] = e.type.indexOf('touch') === 0;
-                evt['mouse'] = e.type.indexOf('mouse') === 0;
-                if (evt['touch']) {
-                    evt['x'] = e.changedTouches[0].pageX;
-                    evt['y'] = e.changedTouches[0].pageY;
-                    console.log(["makePointerEvent::touch", evt['x'], evt['y']]);
-                }
-                if (evt['mouse']) {
-                    evt['x'] = e.clientX + window.pageXOffset;
-                    evt['y'] = e.clientY + window.pageYOffset;
-                    console.log(["makePointerEvent::mouse", evt['x'], evt['y']]);
-                }
-                evt['maskedEvent'] = e;
-                console.log(["makePointerEvent",type,evt]);
-                tgt.dispatchEvent(evt);
-                return evt;
-            }
-        }
-        _dispatch(ev: PointerEvent) {
-            for (var key in this.listeners[ev.type]) {
-                if (this.listeners[ev.type].hasOwnProperty(key)) {
-                    console.log(["dispatch", ev.type, key, ev]);
-                    this.listeners[ev.type][key](ev, ev.type, ~~key);
-                    if (ev.defaultPrevented) {
-                        return;
-                    }
-                }
-            }
-            ev.preventDefault();
-        }
-        on(event: string, listener: ((ev: Event, evtype: string, id: number) => void)): number {
-            var id = this.listenerId;
-            if (this.listeners[event] == null) {
-                this.listeners[event] = {};
-            }
-            while (this.listeners[event][id] != null) {
-                id++;
-            }
-            this.listenerId = id + 1;
-            this.listeners[event][id] = listener;
-            return id;
-        }
-        off(event: string, id: number): boolean {
-            if (this.listeners[event] != null && this.listeners[event][id] != null) {
-                delete this.listeners[event][id];
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-    }
-
     type SceneConfigParam = {
-        enter?: (data:any) => void;
-        update?: (delta:number, now:number) => void;
+        enter?: (data: any) => void;
+        update?: (delta: number, now: number) => void;
         leave?: () => void;
         suspend?: () => void;
         resume?: () => void;
     };
 
+    export function dup(data) {
+        function getDataType(data) { return Object.prototype.toString.call(data).slice(8, -1); }
+        function isCyclic(data) {
+            let seenObjects = [];
+            function detect(data) {
+                if (data && getDataType(data) === "Object") {
+                    if (seenObjects.indexOf(data) !== -1) { return true; }
+                    seenObjects.push(data);
+                    return Object.keys(data).some((key) => data.hasOwnProperty(key) === true && detect(data[key]));
+                }
+                return false;
+            }
+            return detect(data);
+        }
+
+        if (data === null || data === undefined) { return undefined; }
+
+        const dataType = getDataType(data);
+
+        if (dataType === "Date") {
+            let clonedDate = new Date();
+            clonedDate.setTime(data.getTime());
+            return clonedDate;
+        } else if (dataType === "Object") {
+            if (isCyclic(data) === true) { return data; }
+            return Object.keys(data).reduce((s, key) => { s[key] = dup(data[key]); return s; }, {});
+        } else if (dataType === "Array") {
+            return data.map(dup);
+        } else {
+            return data;
+        }
+    }
+
+
     class Scene {
-
-        name: string;
-
-        update: () => void;
-        enter: (any) => void;
-        leave: () => void;
-        suspend: () => void;
-        resume: () => void;
-
-        parentScene: Scene;
-
-        constructor(name: string, config: SceneConfigParam = {}) {
-            this.name = name;
-            this.update = config.update == null ? () => { } : config.update.bind(this);
-            this.enter = config.enter == null ? () => { } : config.enter.bind(this);
-            this.leave = config.leave == null ? () => { } : config.leave.bind(this);
-            this.suspend = config.suspend == null ? () => { } : config.suspend.bind(this);
-            this.resume = config.resume == null ? () => { } : config.resume.bind(this);
-            this.parentScene = null;
+        manager: SceneManager;
+        constructor(manager: SceneManager, obj = {}) {
+            Object.assign(this, dup(obj));
+            this.manager = manager;
         }
+        // virtual methods
+        enter(param: any) { }
+        leave() { }
+        suspend() { }
+        resume() { }
+        update() { consolere.log("original"); }
+        push(id: string, param: any = {}) { this.manager.push(id, param); }
+        pop() { this.manager.pop(); }
     }
+
     class SceneManager {
-        scenes: { [name: string]: (() => Scene) };
-        currentScene: Scene;
-        constructor(config) {
-            this.scenes = {};
-            this.currentScene = null;
-            Object.keys(config).forEach((key) => {
-                this.scenes[key] = () => new Scene(key, config[key]);
-            })
+        sceneStack: Scene[];
+        scenes: {};
+        constructor(scenes = {}) {
+            this.scenes = dup(scenes);
+            this.sceneStack = [];
         }
-        pushScene(name: string, data: any) {
-            var newScene = this.scenes[name]();
-            newScene.parentScene = this.currentScene;
-            if (this.currentScene != null) {
-                this.currentScene.suspend();
+        push(id, param = {}) {
+            var sceneDef = this.scenes[id];
+            if (sceneDef === undefined) { throw new Error("scene " + id + " is not defined."); }
+            if (this.peek() != null) { this.peek().suspend(); }
+            this.sceneStack.push(new Scene(this, sceneDef));
+            this.peek().enter(param);
+            return this;
+        }
+        pop() {
+            if (this.sceneStack.length == 0) { throw new Error("there is no scene."); }
+            this.sceneStack.pop().leave();
+            if (this.peek() != null) { this.peek().resume(); }
+            return this;
+        }
+        peek() {
+            if (this.sceneStack.length > 0) {
+                return this.sceneStack[this.sceneStack.length - 1];
+            } else {
+                return null;
             }
-            this.currentScene = newScene;
-            newScene.enter(data);
         }
-        popScene() {
-            var oldScene = this.currentScene;
-            this.currentScene = oldScene.parentScene;
-            oldScene.leave();
-            if (this.currentScene != null) {
-                this.currentScene.resume();
-            }
-        }
-        update(delta, ms) {
-            this.currentScene.update.call(this.currentScene, delta, ms);
+        update(...args: any[]) {
+            if (this.sceneStack.length == 0) { throw new Error("there is no scene."); }
+            this.peek().update.apply(this.peek(), args);
+            return this;
         }
     }
 
-    var input: Input = null;
     var sceneManager: SceneManager = null;
 
-    export function Create(config: { display: { width: number; height: number; }, scene: { [name in string]: SceneConfigParam }}) {
+    export function Create(config: { display: { id: string; }, scene: {[name in string]: SceneConfigParam } }) {
         return new Promise<void>((resolve, reject) => {
 
-            var container = document.createElement('div');
-            container.style.width = '100vw';
-            container.style.height = '100vh';
-            container.style.display = 'flex';
-            container.style.justifyContent = 'center';
-            container.style.alignItems = 'center';
-            container.style.padding = '0';
-            if (!container) {
-                throw new Error("your browser is not support div.");
-            }
-            document.body.appendChild(container);
-
-            canvas = document.createElement('canvas');
+            canvas = <HTMLCanvasElement>document.getElementById(config.display.id);
             if (!canvas) {
                 throw new Error("your browser is not support canvas.");
             }
-            canvas.width = config.display.width || 256;
-            canvas.height = config.display.height || 256;
-            container.appendChild(canvas);
-
 
             gl = canvas.getContext("webgl");
             if (!gl) {
@@ -585,8 +602,10 @@ void main() {
 
             display = new Display(program);
 
-            input = new Input();
             sceneManager = new SceneManager(config.scene);
+
+
+            hookInputEvent();
             resolve();
         });
     };
@@ -597,12 +616,162 @@ void main() {
     export function getTimer(): AnimationTimer {
         return timer;
     }
-    export function getInput(): Input {
-        return input;
-    }
     export function getSceneManager(): SceneManager {
         return sceneManager;
     }
+    function hookInputEvent() {
+        if (document.body['pointermove']) {
+            consolere.log('pointer event is implemented');
+            document.body.addEventListener('touchmove', function (evt) { evt.preventDefault(); }, false);
+            document.body.addEventListener('touchdown', function (evt) { evt.preventDefault(); }, false);
+            document.body.addEventListener('touchup', function (evt) { evt.preventDefault(); }, false);
+            document.body.addEventListener('mousemove', function (evt) { evt.preventDefault(); }, false);
+            document.body.addEventListener('mousedown', function (evt) { evt.preventDefault(); }, false);
+            document.body.addEventListener('mouseup', function (evt) { evt.preventDefault(); }, false);
+        } else {
+            consolere.log('pointer event is not implemented');
+            class Input {
+                _isScrolling: boolean;
+                _timeout: number;
+                _sDistX: number;
+                _sDistY: number;
+                _maybeClick: boolean;
+                _maybeClickX: number;
+                _maybeClickY: number;
+                _prevTimeStamp: number;
+                _prevInputType: string;
+                constructor() {
+
+                    this._isScrolling = false;
+                    this._timeout = 0;
+                    this._sDistX = 0;
+                    this._sDistY = 0;
+                    this._maybeClick = false;
+                    this._maybeClickX = 0;
+                    this._maybeClickY = 0;
+                    this._prevTimeStamp = 0;
+                    this._prevInputType = "none";
+
+                    window.addEventListener('scroll', () => {
+                        if (!this._isScrolling) {
+                            this._sDistX = window.pageXOffset;
+                            this._sDistY = window.pageYOffset;
+                        }
+                        this._isScrolling = true;
+                        clearTimeout(this._timeout);
+                        this._timeout = setTimeout(() => {
+                            this._isScrolling = false;
+                            this._sDistX = 0;
+                            this._sDistY = 0;
+                        }, 100);
+                    });
+
+                    // add event listener to body
+                    var body = document.body;
+                    body.addEventListener('mousedown', this._pointerDown.bind(this));
+                    body.addEventListener('touchstart', this._pointerDown.bind(this));
+                    body.addEventListener('mouseup', this._pointerUp.bind(this));
+                    body.addEventListener('touchend', this._pointerUp.bind(this));
+                    body.addEventListener('mousemove', this._pointerMove.bind(this));
+                    body.addEventListener('touchmove', this._pointerMove.bind(this));
+                    body.addEventListener('mouseout', this._pointerLeave.bind(this));
+                    body.addEventListener('touchcancel', this._pointerLeave.bind(this));
+                }
+                _checkEvent(e) {
+                    e.preventDefault();
+                    var istouch = e.type.indexOf('touch') === 0;
+                    var ismouse = e.type.indexOf('mouse') === 0;
+                    if (istouch && this._prevInputType != 'touch') {
+                        if (e.timeStamp - this._prevTimeStamp >= 500) {
+                            this._prevInputType = 'touch';
+                            this._prevTimeStamp = e.timeStamp;
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    } else if (ismouse && this._prevInputType != 'mouse') {
+                        if (e.timeStamp - this._prevTimeStamp >= 500) {
+                            this._prevInputType = 'mouse';
+                            this._prevTimeStamp = e.timeStamp;
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        this._prevInputType = istouch ? 'touch' : ismouse ? 'mouse' : 'none';
+                        this._prevTimeStamp = e.timeStamp;
+                        return istouch || ismouse;
+                    }
+                }
+                // 'pointerdown' event, triggered by mousedown/touchstart.
+                _pointerDown(e) {
+                    if (this._checkEvent(e)) {
+                        var evt = this._makePointerEvent('down', e);
+                        // don't maybeClick if more than one touch is active.
+                        var singleFinger = evt['mouse'] || (evt['touch'] && e.touches.length === 1);
+                        if (!this._isScrolling && singleFinger) {
+                            this._maybeClick = true;
+                            this._maybeClickX = evt.pageX;
+                            this._maybeClickY = evt.pageY;
+                        }
+                    }
+                    return false;
+                }
+                // 'pointerdown' event, triggered by mouseout/touchleave.
+                _pointerLeave(e) {
+                    if (this._checkEvent(e)) {
+                        this._maybeClick = false;
+                        this._makePointerEvent('leave', e);
+                    }
+                    return false;
+                }
+                // 'pointermove' event, triggered by mousemove/touchmove.
+                _pointerMove(e) {
+                    if (this._checkEvent(e)) {
+                        var evt = this._makePointerEvent('move', e);
+                    }
+                    return false;
+                }
+                // 'pointerup' event, triggered by mouseup/touchend.
+                _pointerUp(e) {
+                    if (this._checkEvent(e)) {
+                        var evt = this._makePointerEvent('up', e);
+                        // Does our target have maybeClick set by pointerdown?
+                        if (this._maybeClick) {
+                            // Have we moved too much?
+                            if (Math.abs(this._maybeClickX - evt.pageX) < 5 && Math.abs(this._maybeClickY - evt.pageY) < 5) {
+                                // Have we scrolled too much?
+                                if (!this._isScrolling || (Math.abs(this._sDistX - window.pageXOffset) < 5 && Math.abs(this._sDistY - window.pageYOffset) < 5)) {
+                                    this._makePointerEvent('click', e);
+                                }
+                            }
+                        }
+                        this._maybeClick = false;
+                    }
+                    return false;
+                }
+                _makePointerEvent(type, e) {
+                    var evt: any = document.createEvent('CustomEvent');
+                    evt.initCustomEvent('pointer' + type, true, true, {});
+                    evt.touch = e.type.indexOf('touch') === 0;
+                    evt.mouse = e.type.indexOf('mouse') === 0;
+                    if (evt.touch) {
+                        evt.pageX = e.changedTouches[0].pageX;
+                        evt.pageY = e.changedTouches[0].pageY;
+                    }
+                    if (evt.mouse) {
+                        evt.pageX = e.clientX + window.pageXOffset;
+                        evt.pageY = e.clientY + window.pageYOffset;
+                    }
+                    evt.maskedEvent = e;
+                    document.body.dispatchEvent(evt);
+                    return evt;
+                }
+            }
+            new Input();
+        }
+    }
+
 }
 
 class Pad {
@@ -611,111 +780,741 @@ class Pad {
     y: number;
     cx: number;
     cy: number;
-    innerColor: number[];
-    outerColor: number[];
-    innerRadius: number;
-    outerRadius: number;
+    radius: number;
     distance: number;
     angle: number;
 
-    constructor(x: number = 120, y: number = 120) {
+    constructor(x = 120, y = 120, radius = 40) {
         this.isTouching = false;
         this.x = x;
         this.y = y;
         this.cx = 0;
         this.cy = 0;
-        this.innerColor = [1, 1, 1, 0.75];
-        this.outerColor = [0.2, 0.2, 0.2, 0.75];
-        this.innerRadius = 40;
-        this.outerRadius = 60;
+        this.radius = radius;
         this.distance = 0;
         this.angle = 0;
     }
-
-    onpointingstart(ev) {
+    isHit(x, y) {
+        var dx = x - this.x;
+        var dy = y - this.y;
+        return ((dx * dx) + (dy * dy)) <= this.radius * this.radius;
+    }
+    onpointingstart() {
         this.isTouching = true;
         this.cx = 0;
         this.cy = 0;
         this.angle = 0;
         this.distance = 0;
-        console.log(["onpointingstart", ev]);
     }
-
-    onpointingend(ev) {
+    onpointingend() {
         this.isTouching = false;
         this.cx = 0;
         this.cy = 0;
         this.angle = 0;
         this.distance = 0;
-        console.log(["onpointingend", ev]);
     }
-
-    onpointingmove(ev,x:number, y:number) {
+    onpointingmove(x, y) {
         if (this.isTouching == false) {
             return;
         }
         var dx = x - this.x;
         var dy = y - this.y;
-        console.log(["onpointingmove", ev, dx, dy]);
+
         var len = Math.sqrt((dx * dx) + (dy * dy));
         if (len > 0) {
             dx /= len;
             dy /= len;
-            if (len > 40) { len = 40; }
-
+            if (len > this.radius) {
+                len = this.radius;
+            }
             this.angle = Math.atan2(dy, dx) * 180 / Math.PI;
-            this.distance = len / 40.0;
+            this.distance = len * 1.0 / this.radius;
             this.cx = dx * len;
             this.cy = dy * len;
-        } else {
+        }
+        else {
             this.cx = 0;
             this.cy = 0;
             this.angle = 0;
             this.distance = 0;
         }
     }
+}
+
+type LayerConfig = {
+    chipsize: { width: number, height: number },
+    renderoffset: { x: number, y: number },
+    texture: string,
+    chip: { [key: number]: { x: number, y: number } },
+}
+
+type MapConfig = {
+    width: number,
+    height: number,
+    gridsize: { width: number, height: number },
+    layer: { [key: number]: LayerConfig },
+    chips: number[][];
+
+}
+
+class MapData {
+    config: MapConfig;
+    constructor(config: MapConfig) {
+        this.config = config;
+    }
+}
+
+module DungeonGenerator {
+
+    class Feature {
+        isValid(isWallCallback, canBeDugCallback) { };
+        create(digCallback) { };
+        debug() { };
+        static createRandomAt(x, y, dx, dy, options) { };
+    }
+
+    function getUniform() {
+        return Math.random();
+    }
+    function getUniformInt(lowerBound, upperBound) {
+        var max = Math.max(lowerBound, upperBound);
+        var min = Math.min(lowerBound, upperBound);
+        return Math.floor(getUniform() * (max - min + 1)) + min;
+    }
+    function getWeightedValue(data) {
+        var total = 0;
+
+        for (var id in data) {
+            total += data[id];
+        }
+        var random = getUniform() * total;
+
+        var part = 0;
+        for (var id in data) {
+            part += data[id];
+            if (random < part) { return id; }
+        }
+
+        return id;
+    }
+
+    class Room extends Feature {
+        _x1: number;
+        _y1: number;
+        _x2: number;
+        _y2: number;
+        _doors: { [key: string]: number }; // key = corrd
+
+        constructor(x1: number, y1: number, x2: number, y2: number, doorX?: number, doorY?: number) {
+            super();
+            this._x1 = x1;
+            this._y1 = y1;
+            this._x2 = x2;
+            this._y2 = y2;
+            this._doors = {};
+            if (arguments.length > 4) { this.addDoor(doorX, doorY); }
+        }
+        static createRandomAt(x, y, dx, dy, options) {
+            var min = options.roomWidth[0];
+            var max = options.roomWidth[1];
+            var width = getUniformInt(min, max);
+
+            var min = options.roomHeight[0];
+            var max = options.roomHeight[1];
+            var height = getUniformInt(min, max);
+
+            if (dx == 1) { /* to the right */
+                var y2 = y - Math.floor(getUniform() * height);
+                return new Room(x + 1, y2, x + width, y2 + height - 1, x, y);
+            }
+
+            if (dx == -1) { /* to the left */
+                var y2 = y - Math.floor(getUniform() * height);
+                return new Room(x - width, y2, x - 1, y2 + height - 1, x, y);
+            }
+
+            if (dy == 1) { /* to the bottom */
+                var x2 = x - Math.floor(getUniform() * width);
+                return new Room(x2, y + 1, x2 + width - 1, y + height, x, y);
+            }
+
+            if (dy == -1) { /* to the top */
+                var x2 = x - Math.floor(getUniform() * width);
+                return new Room(x2, y - height, x2 + width - 1, y - 1, x, y);
+            }
+
+            throw new Error("dx or dy must be 1 or -1");
+
+        };
+        static createRandomCenter(cx, cy, options) {
+            var min = options.roomWidth[0];
+            var max = options.roomWidth[1];
+            var width = getUniformInt(min, max);
+
+            var min = options.roomHeight[0];
+            var max = options.roomHeight[1];
+            var height = getUniformInt(min, max);
+
+            var x1 = cx - Math.floor(getUniform() * width);
+            var y1 = cy - Math.floor(getUniform() * height);
+            var x2 = x1 + width - 1;
+            var y2 = y1 + height - 1;
+
+            return new Room(x1, y1, x2, y2);
+        };
+        static createRandom(availWidth, availHeight, options) {
+            var min = options.roomWidth[0];
+            var max = options.roomWidth[1];
+            var width = getUniformInt(min, max);
+
+            var min = options.roomHeight[0];
+            var max = options.roomHeight[1];
+            var height = getUniformInt(min, max);
+
+            var left = availWidth - width - 1;
+            var top = availHeight - height - 1;
+
+            var x1 = 1 + Math.floor(getUniform() * left);
+            var y1 = 1 + Math.floor(getUniform() * top);
+            var x2 = x1 + width - 1;
+            var y2 = y1 + height - 1;
+
+            return new Room(x1, y1, x2, y2);
+        };
+        addDoor(x, y) {
+            this._doors[x + "," + y] = 1;
+            return this;
+        };
+
+        getDoors(callback) {
+            for (var key in this._doors) {
+                var parts = key.split(",");
+                callback(parseInt(parts[0]), parseInt(parts[1]));
+            }
+            return this;
+        };
+
+        clearDoors() {
+            this._doors = {};
+            return this;
+        };
+
+        addDoors(isWallCallback) {
+            var left = this._x1 - 1;
+            var right = this._x2 + 1;
+            var top = this._y1 - 1;
+            var bottom = this._y2 + 1;
+
+            for (var x = left; x <= right; x++) {
+                for (var y = top; y <= bottom; y++) {
+                    if (x != left && x != right && y != top && y != bottom) { continue; }
+                    if (isWallCallback(x, y)) { continue; }
+
+                    this.addDoor(x, y);
+                }
+            }
+
+            return this;
+        };
+
+        debug() {
+            console.log("room", this._x1, this._y1, this._x2, this._y2);
+        };
+
+        isValid(isWallCallback, canBeDugCallback) {
+            var left = this._x1 - 1;
+            var right = this._x2 + 1;
+            var top = this._y1 - 1;
+            var bottom = this._y2 + 1;
+
+            for (var x = left; x <= right; x++) {
+                for (var y = top; y <= bottom; y++) {
+                    if (x == left || x == right || y == top || y == bottom) {
+                        if (!isWallCallback(x, y)) { return false; }
+                    } else {
+                        if (!canBeDugCallback(x, y)) { return false; }
+                    }
+                }
+            }
+
+            return true;
+        };
+
+        /**
+         * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
+         */
+        create(digCallback) {
+            var left = this._x1 - 1;
+            var right = this._x2 + 1;
+            var top = this._y1 - 1;
+            var bottom = this._y2 + 1;
+
+            var value = 0;
+            for (var x = left; x <= right; x++) {
+                for (var y = top; y <= bottom; y++) {
+                    if (x + "," + y in this._doors) {
+                        value = 2;
+                    } else if (x == left || x == right || y == top || y == bottom) {
+                        value = 1;
+                    } else {
+                        value = 0;
+                    }
+                    digCallback(x, y, value);
+                }
+            }
+        };
+
+        getCenter() {
+            return [Math.round((this._x1 + this._x2) / 2), Math.round((this._y1 + this._y2) / 2)];
+        };
+
+        getLeft() {
+            return this._x1;
+        };
+
+        getRight() {
+            return this._x2;
+        };
+
+        getTop() {
+            return this._y1;
+        };
+
+        getBottom() {
+            return this._y2;
+        };
+
+    };
+
+    class Corridor extends Feature {
+        _startX: number;
+        _startY: number;
+        _endX: number;
+        _endY: number;
+        _endsWithAWall: boolean;
+
+        constructor(startX: number, startY: number, endX: number, endY: number) {
+            super();
+            this._startX = startX;
+            this._startY = startY;
+            this._endX = endX;
+            this._endY = endY;
+            this._endsWithAWall = true;
+        };
+
+        static createRandomAt(x, y, dx, dy, options) {
+            var min = options.corridorLength[0];
+            var max = options.corridorLength[1];
+            var length = getUniformInt(min, max);
+
+            return new Corridor(x, y, x + dx * length, y + dy * length);
+        };
+
+        debug() {
+            console.log("corridor", this._startX, this._startY, this._endX, this._endY);
+        };
+
+        isValid(isWallCallback, canBeDugCallback) {
+            var sx = this._startX;
+            var sy = this._startY;
+            var dx = this._endX - sx;
+            var dy = this._endY - sy;
+            var length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+
+            if (dx) { dx = dx / Math.abs(dx); }
+            if (dy) { dy = dy / Math.abs(dy); }
+            var nx = dy;
+            var ny = -dx;
+
+            var ok = true;
+            for (var i = 0; i < length; i++) {
+                var x = sx + i * dx;
+                var y = sy + i * dy;
+
+                if (!canBeDugCallback(x, y)) { ok = false; }
+                if (!isWallCallback(x + nx, y + ny)) { ok = false; }
+                if (!isWallCallback(x - nx, y - ny)) { ok = false; }
+
+                if (!ok) {
+                    length = i;
+                    this._endX = x - dx;
+                    this._endY = y - dy;
+                    break;
+                }
+            }
+
+            /**
+             * If the length degenerated, this corridor might be invalid
+             */
+
+            /* not supported */
+            if (length == 0) { return false; }
+
+            /* length 1 allowed only if the next space is empty */
+            if (length == 1 && isWallCallback(this._endX + dx, this._endY + dy)) { return false; }
+
+            /**
+             * We do not want the corridor to crash into a corner of a room;
+             * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
+             * 
+             * Situation:
+             * #######1
+             * .......?
+             * #######2
+             * 
+             * The corridor was dug from left to right.
+             * 1, 2 - problematic corners, ? = N+1th cell (not dug)
+             */
+            var firstCornerBad = !isWallCallback(this._endX + dx + nx, this._endY + dy + ny);
+            var secondCornerBad = !isWallCallback(this._endX + dx - nx, this._endY + dy - ny);
+            this._endsWithAWall = isWallCallback(this._endX + dx, this._endY + dy);
+            if ((firstCornerBad || secondCornerBad) && this._endsWithAWall) { return false; }
+
+            return true;
+        };
+
+        create(digCallback) {
+            var sx = this._startX;
+            var sy = this._startY;
+            var dx = this._endX - sx;
+            var dy = this._endY - sy;
+            var length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+
+            if (dx) { dx = dx / Math.abs(dx); }
+            if (dy) { dy = dy / Math.abs(dy); }
+            var nx = dy;
+            var ny = -dx;
+
+            for (var i = 0; i < length; i++) {
+                var x = sx + i * dx;
+                var y = sy + i * dy;
+                digCallback(x, y, 0);
+            }
+
+            return true;
+        };
+
+        createPriorityWalls(priorityWallCallback) {
+            if (!this._endsWithAWall) { return; }
+
+            var sx = this._startX;
+            var sy = this._startY;
+
+            var dx = this._endX - sx;
+            var dy = this._endY - sy;
+            if (dx) { dx = dx / Math.abs(dx); }
+            if (dy) { dy = dy / Math.abs(dy); }
+            var nx = dy;
+            var ny = -dx;
+
+            priorityWallCallback(this._endX + dx, this._endY + dy);
+            priorityWallCallback(this._endX + nx, this._endY + ny);
+            priorityWallCallback(this._endX - nx, this._endY - ny);
+        };
+    }
+
+    type MapOption = { roomWidth?: number[]; roomHeight?: number[]; corridorLength?: number[]; dugPercentage?: number; timeLimit?: number; };
+    class Map {
+        _dug: number;
+        _map: any[];
+        _digCallback: any;
+        _options: MapOption;
+        _width: number;
+        _height: number;
+        _rooms: any[];
+        _corridors: any[];
+        _features: { Room: number; Corridor: number; };
+        _featureAttempts: number;
+        _walls: {};
+        constructor(width: number, height: number, option: MapOption) {
+            this._width = width;
+            this._height = height;
+            this._rooms = []; /* list of all rooms */
+            this._corridors = [];
+            this._options = {
+                roomWidth: [3, 9], /* room minimum and maximum width */
+                roomHeight: [3, 5], /* room minimum and maximum height */
+                corridorLength: [3, 10], /* corridor minimum and maximum length */
+                dugPercentage: 0.2, /* we stop after this percentage of level area has been dug out */
+                timeLimit: 1000 /* we stop after this much time has passed (msec) */
+            };
+            Object.assign(this._options, option);
+
+            this._features = {
+                Room: 4,
+                Corridor: 4
+            };
+            this._featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
+            this._walls = {}; /* these are available for digging */
+
+            this._digCallback = this._digCallback.bind(this);
+            this._canBeDugCallback = this._canBeDugCallback.bind(this);
+            this._isWallCallback = this._isWallCallback.bind(this);
+            this._priorityWallCallback = this._priorityWallCallback.bind(this);
+        };
+        create(callback) {
+            this._rooms = [];
+            this._corridors = [];
+            this._map = this._fillMap(1);
+            this._walls = {};
+            this._dug = 0;
+            var area = (this._width - 2) * (this._height - 2);
+
+            this._firstRoom();
+
+            var t1 = Date.now();
+
+            do {
+                var t2 = Date.now();
+                if (t2 - t1 > this._options.timeLimit) { break; }
+
+                /* find a good wall */
+                var wall = this._findWall();
+                if (!wall) { break; } /* no more walls */
+
+                var parts = wall.split(",");
+                var x = parseInt(parts[0]);
+                var y = parseInt(parts[1]);
+                var dir = this._getDiggingDirection(x, y);
+                if (!dir) { continue; } /* this wall is not suitable */
+
+                //		console.log("wall", x, y);
+
+                /* try adding a feature */
+                var featureAttempts = 0;
+                do {
+                    featureAttempts++;
+                    if (this._tryFeature(x, y, dir[0], dir[1])) { /* feature added */
+                        //if (this._rooms.length + this._corridors.length == 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
+                        this._removeSurroundingWalls(x, y);
+                        this._removeSurroundingWalls(x - dir[0], y - dir[1]);
+                        break;
+                    }
+                } while (featureAttempts < this._featureAttempts);
+
+                var priorityWalls = 0;
+                for (var id in this._walls) {
+                    if (this._walls[id] > 1) { priorityWalls++; }
+                }
+
+            } while (this._dug / area < this._options.dugPercentage || priorityWalls); /* fixme number of priority walls */
+
+            this._addDoors();
+
+            if (callback) {
+                for (var i = 0; i < this._width; i++) {
+                    for (var j = 0; j < this._height; j++) {
+                        callback(i, j, this._map[i][j]);
+                    }
+                }
+            }
+
+            this._walls = {};
+            this._map = null;
+
+            return this;
+        };
+        digCallback(x, y, value) {
+            if (value == 0 || value == 2) { /* empty */
+                this._map[x][y] = 0;
+                this._dug++;
+            } else { /* wall */
+                this._walls[x + "," + y] = 1;
+            }
+        };
+        _isWallCallback(x, y) {
+            if (x < 0 || y < 0 || x >= this._width || y >= this._height) { return false; }
+            return (this._map[x][y] == 1);
+        };
+        _canBeDugCallback(x, y) {
+            if (x < 1 || y < 1 || x + 1 >= this._width || y + 1 >= this._height) { return false; }
+            return (this._map[x][y] == 1);
+        };
+
+        _priorityWallCallback(x, y) {
+            this._walls[x + "," + y] = 2;
+        };
+
+        _findWall() {
+            var prio1 = [];
+            var prio2 = [];
+            for (var id in this._walls) {
+                var prio = this._walls[id];
+                if (prio == 2) {
+                    prio2.push(id);
+                } else {
+                    prio1.push(id);
+                }
+            }
+
+            var arr = (prio2.length ? prio2 : prio1);
+            if (!arr.length) { return null; } /* no walls :/ */
+
+            var id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
+            delete this._walls[id2];
+
+            return id2;
+        };
+
+        _firstRoom() {
+            var cx = Math.floor(this._width / 2);
+            var cy = Math.floor(this._height / 2);
+            var room = Room.createRandomCenter(cx, cy, this._options);
+            this._rooms.push(room);
+            room.create(this._digCallback);
+        };
+        _fillMap(value) {
+            var map = [];
+            for (var i = 0; i < this._width; i++) {
+                map.push([]);
+                for (var j = 0; j < this._height; j++) { map[i].push(value); }
+            }
+            return map;
+        };
+        _tryFeature(x, y, dx, dy) {
+            var featureType = getWeightedValue(this._features);
+            var feature = Feature[featureType].createRandomAt(x, y, dx, dy, this._options);
+
+            if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
+                //		console.log("not valid");
+                //		feature.debug();
+                return false;
+            }
+
+            feature.create(this._digCallback);
+            //	feature.debug();
+
+            if (feature instanceof Room) { this._rooms.push(feature); }
+            if (feature instanceof Corridor) {
+                feature.createPriorityWalls(this._priorityWallCallback);
+                this._corridors.push(feature);
+            }
+
+            return true;
+        };
+        _removeSurroundingWalls(cx, cy) {
+            var deltas = this._ROTDIRS4;
+
+            for (var i = 0; i < deltas.length; i++) {
+                var delta = deltas[i];
+                var x = cx + delta[0];
+                var y = cy + delta[1];
+                delete this._walls[x + "," + y];
+                var x = cx + 2 * delta[0];
+                var y = cy + 2 * delta[1];
+                delete this._walls[x + "," + y];
+            }
+        };
+        _ROTDIRS4 = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [-1, 0]
+        ]
+        _getDiggingDirection = function (cx, cy) {
+            if (cx <= 0 || cy <= 0 || cx >= this._width - 1 || cy >= this._height - 1) { return null; }
+
+            var result = null;
+            var deltas = this._ROTDIRS4[4];
+
+            for (var i = 0; i < deltas.length; i++) {
+                var delta = deltas[i];
+                var x = cx + delta[0];
+                var y = cy + delta[1];
+
+                if (!this._map[x][y]) { /* there already is another empty neighbor! */
+                    if (result) { return null; }
+                    result = delta;
+                }
+            }
+
+            /* no empty neighbor */
+            if (!result) { return null; }
+
+            return [-result[0], -result[1]];
+        };
+        _addDoors = function () {
+            var data = this._map;
+            var isWallCallback = function (x, y) {
+                return (data[x][y] == 1);
+            };
+            for (var i = 0; i < this._rooms.length; i++) {
+                var room = this._rooms[i];
+                room.clearDoors();
+                room.addDoors(isWallCallback);
+            }
+        };
+
+
+        getRooms = function () {
+            return this._rooms;
+        };
+        getCorridors = function () {
+            return this._corridors;
+        };
+    }
+
+
 
 }
 
 window.onload = () => {
+
     Game.Create({
         display: {
-            width: 512,
-            height: 512,
+            id: 'glcanvas',
         },
         scene: {
             dungeon: {
                 enter: function (data) {
-                    this.layerconfig = {
-                        0: { size: [24, 24], offset: [0, 0] },
-                        1: { size: [24, 36], offset: [0, -12] },
-                        2: { size: [24, 24], offset: [0, -36] },
-                    }
-                    this.mapchip = {
-                        0: {
-                            1: [48, 0, 24, 24],
-                        },
-                        1: {
-                            0: [96, 96, 24, 36],
-                        },
-                        2: {
-                            0: [96, 72, 24, 24],
-                        },
-                    };
 
-                    this.map = [];
-                    for (var y = 0; y < ~~(512 / 24); y++) {
-                        this.map[y] = []
-                        for (var x = 0; x < ~~(512 / 24); x++) {
-                            this.map[y][x] = 0;
+                    var mapchips = [];
+                    for (var y = 0; y < 60; y++) {
+                        mapchips[y] = []
+                        for (var x = 0; x < 60; x++) {
+                            mapchips[y][x] = 0;
                         }
                     }
 
-                    for (var y = ~~(512 / 24 / 2) - 5; y <= ~~(512 / 24 / 2) + 5; y++) {
-                        for (var x = ~~(512 / 24 / 2) - 5; x <= ~~(512 / 24 / 2) + 5; x++) {
-                            this.map[y][x] = 1;
+                    for (var y = 60 / 2 - 5; y <= 60 / 2 + 5; y++) {
+                        for (var x = ~~(60 / 2) - 5; x <= ~~(60 / 2) + 5; x++) {
+                            mapchips[y][x] = 1;
                         }
                     }
+
+
+                    this.map = new MapData({
+                        width: 60,
+                        height: 60,
+                        gridsize: { width: 24, height: 24 },
+                        layer: {
+                            0: {
+                                chipsize: { width: 24, height: 24 },
+                                renderoffset: { x: 0, y: 0 },
+                                texture: "mapchip",
+                                chip: {
+                                    1: { x: 48, y: 0 },
+                                }
+                            },
+                            1: {
+                                chipsize: { width: 24, height: 36 },
+                                renderoffset: { x: 0, y: -12 },
+                                texture: "mapchip",
+                                chip: {
+                                    0: { x: 96, y: 96 },
+                                }
+                            },
+                            2: {
+                                chipsize: { width: 24, height: 24 },
+                                renderoffset: { x: 0, y: -36 },
+                                texture: "mapchip",
+                                chip: {
+                                    0: { x: 96, y: 72 },
+                                }
+                            },
+                        },
+                        chips: mapchips
+                    });
 
                     var charactor = ~~(Math.random() * 30);
                     var psbasex = (charactor % 2) * 752;
@@ -738,28 +1537,22 @@ window.onload = () => {
                     this.anim = 0;
 
                     this.pad = new Pad();
-                    this.inputId1 = Game.getInput().on("pointerdown", (ev, evtype, id) => {
-                        var pos = Game.getDisplay().toDisplayPos(ev['x'], ev['y']);
-                        console.log(pos);
+                    this.inputId1 = document.addEventListener("pointerdown", (ev: PointerEvent) => {
+                        var pos = Game.getDisplay().toDisplayPos(ev.pageX, ev.pageY);
                         this.pad.x = pos[0];
                         this.pad.y = pos[1];
-                        this.pad.onpointingstart(ev);
+                        this.pad.onpointingstart();
                         this.changed = true;
-                    })
-                    this.inputId2 = Game.getInput().on("pointermove", (ev, evtype, id) => {
-                        var pos = Game.getDisplay().toDisplayPos(ev['x'], ev['y']);
-                        console.log(pos);
-                        this.pad.onpointingmove(ev,pos[0], pos[1]);
+                    });
+                    this.inputId2 = document.addEventListener("pointermove", (ev: PointerEvent) => {
+                        var pos = Game.getDisplay().toDisplayPos(ev.pageX, ev.pageY);
+                        this.pad.onpointingmove(pos[0], pos[1]);
                         this.changed = true;
-                    })
-                    this.inputId3 = Game.getInput().on("pointerup", (ev, evtype, id) => {
-                        this.pad.onpointingend(ev);
+                    });
+                    this.inputId3 = document.addEventListener("pointerup", (ev: PointerEvent) => {
+                        this.pad.onpointingend();
                         this.changed = true;
-                    })
-                    this.inputId4 = Game.getInput().on("pointerleave", (ev, evtype, id) => {
-                        this.pad.onpointingend(ev);
-                        this.changed = true;
-                    })
+                    });
 
                 },
                 update: function (delta, ms) {
@@ -786,7 +1579,7 @@ window.onload = () => {
                             this.changed = false;
                         }
                     } else if (this.movemode == "move-right") {
-                        
+
                         this.movems -= delta;
                         this.anim += delta;
                         if (this.movems <= 0) {
@@ -828,32 +1621,40 @@ window.onload = () => {
                     }
 
                     Game.getDisplay().start();
+
+                    // 
+
                     for (var l = 0; l < 3; l++) {
-                        var lw = this.layerconfig[l].size[0];
-                        var lh = this.layerconfig[l].size[1];
-                        var lox = this.layerconfig[l].offset[0];
-                        var loy = this.layerconfig[l].offset[1];
-                        for (var y = 0; y < ~~(512 / 24); y++) {
-                            for (var x = 0; x < ~~(512 / 24); x++) {
-                                var chipid = this.map[y][x];
-                                if (this.mapchip[l][chipid]) {
-                                    Game.getDisplay().rect({ left: 0 + x * 24 + lox, top: 0 + y * 24 + loy, width: lw, height: lh, texture: 'mapchip', uv: this.mapchip[l][chipid] });
+                        var gridw = this.map.config.gridsize.width;
+                        var gridh = this.map.config.gridsize.height;
+                        var lw = this.map.config.layer[l].chipsize.width;
+                        var lh = this.map.config.layer[l].chipsize.height;
+                        var lox = this.map.config.layer[l].renderoffset.x;
+                        var loy = this.map.config.layer[l].renderoffset.y;
+                        for (var y = 0; y < ~~(Game.getDisplay().height() / gridh); y++) {
+                            for (var x = 0; x < ~~(Game.getDisplay().width() / gridw); x++) {
+                                var chipid = this.map.config.chips[y][x];
+                                if (this.map.config.layer[l].chip[chipid]) {
+                                    var uv = [this.map.config.layer[l].chip[chipid].x, this.map.config.layer[l].chip[chipid].y, lw, lh];
+                                    Game.getDisplay().rect({ left: 0 + x * gridw + lox, top: 0 + y * gridh + loy, width: lw, height: lh, texture: 'mapchip', uv: uv });
                                 }
                             }
                         }
                         if (l == 2) {
-                            var animf = ~~(((~~this.anim) + animstep-1) / animstep) % 4;
+                            var animf = ~~(((~~this.anim) + animstep - 1) / animstep) % 4;
                             Game.getDisplay().rect({ left: 0 + this.px * 12 + this.offx, top: 0 + this.py * 12 + this.offy, width: 47, height: 47, texture: 'charactor', uv: [this.psprite[this.pdir][animf][0], this.psprite[this.pdir][animf][1], 47, 47] });
                         }
                     }
-                    
-                    Game.getDisplay().circle({ x: this.pad.x, y: this.pad.y, radius: this.pad.outerRadius, color: this.pad.outerColor });
-                    Game.getDisplay().circle({ x: this.pad.x + this.pad.cx, y: this.pad.y+this.pad.cy, radius: this.pad.innerRadius, color: this.pad.innerColor });
+
+                    Game.getDisplay().circle({ x: this.pad.x, y: this.pad.y, radius: this.pad.radius * 1.2, color: [1, 1, 1, 0.25] });
+                    Game.getDisplay().circle({ x: this.pad.x + this.pad.cx, y: this.pad.y + this.pad.cy, radius: this.pad.radius, color: [1, 1, 1, 0.25] });
 
                     Game.getDisplay().end();
                 },
                 leave: function () {
-                    Game.getInput().off("pointerup", this.inputId);
+                    document.removeEventListener("pointrwdown", this.inputId1);
+                    document.removeEventListener("pointermove", this.inputId2);
+                    document.removeEventListener("pointerup", this.inputId3);
                 }
             }
         },
@@ -861,7 +1662,7 @@ window.onload = () => {
         mapchip: './assets/mapchip.png',
         charactor: './assets/charactor.png'
     })).then(() => {
-        Game.getSceneManager().pushScene("dungeon", null);
+        Game.getSceneManager().push("dungeon");
         Game.getTimer().on((delta, now, id) => {
             Game.getSceneManager().update(delta, now);
         });
