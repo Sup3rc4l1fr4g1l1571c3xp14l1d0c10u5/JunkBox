@@ -2,52 +2,62 @@
     margin: 0;
     padding: 0;
     border: 0;
-    line-height: 1rem;
 }
 
 html, body {
     width: 100%;
     height: 100%;
+    overflow: hidden;
 }
 
-#container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-    #container > #sheet > #prefix {
-        font-size: 2rem;
-        font-weight: 600;
-        text-align: center;
-        line-height: 2rem;
-        vertical-align: middle;
+    body > section {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 
-    #container > #sheet > #title {
-        background-color: black;
-        color: white;
-        text-align: center;
-        padding: 4px;
-        margin-top: 3px;
-        margin-bottom: 3px;
-        font-weight: 400;
-        font-size: 1.4rem;
-        line-height: 1.4rem;
-        vertical-align: middle;
-        border: 1px black solid;
-    }
 
-    #container > #sheet > #postfix {
-        text-align: right;
-        vertical-align: middle;
-        font-size: 0.8rem;
-        line-height: 0.8rem;
-    }
+            body > section > article > header:before {
+                display: block;
+                font-size: 2rem;
+                font-weight: 600;
+                text-align: center;
+                line-height: 2rem;
+                vertical-align: middle;
+                content: "とりあえず作りなさい";
+            }
 
-    #container > #sheet > #glcanvas {
-        background-color: black;
-        border: 1px black solid;
-    }
+            body > section > article > header:after {
+                display: block;
+                background-color: black;
+                color: white;
+                text-align: center;
+                padding: 4px;
+                margin-top: 3px;
+                margin-bottom: 3px;
+                font-weight: 400;
+                font-size: 1.4rem;
+                line-height: 1.4rem;
+                vertical-align: middle;
+                border: 1px black solid;
+                content: "TSJK in ゲーム";
+            }
+
+        body > section > article > footer:after {
+            display: block;
+            text-align: right;
+            vertical-align: middle;
+            margin-top: 3px;
+            font-size: 0.8rem;
+            line-height: 0.8rem;
+            content: "クリアできなくても委員会";
+        }
+
+        body > section > article > section {
+            display: block;
+            background-color: black;
+            border: 1px black solid;
+            line-height: 0rem;
+        }
