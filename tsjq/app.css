@@ -1,4 +1,4 @@
-﻿* {
+﻿html, body, section, article, header, footer, canvas {
     margin: 0;
     padding: 0;
     border: 0;
@@ -25,7 +25,6 @@ html, body {
                 font-weight: 600;
                 text-align: center;
                 line-height: 2rem;
-                vertical-align: middle;
                 content: "とりあえず作りなさい";
             }
 
@@ -40,7 +39,6 @@ html, body {
                 font-weight: 400;
                 font-size: 1.4rem;
                 line-height: 1.4rem;
-                vertical-align: middle;
                 border: 1px black solid;
                 content: "TSJK in ゲーム";
             }
@@ -48,7 +46,6 @@ html, body {
         body > section > article > footer:after {
             display: block;
             text-align: right;
-            vertical-align: middle;
             margin-top: 3px;
             font-size: 0.8rem;
             line-height: 0.8rem;
@@ -59,5 +56,5 @@ html, body {
             display: block;
             background-color: black;
             border: 1px black solid;
-            line-height: 0rem;
+            line-height: 0;
         }
