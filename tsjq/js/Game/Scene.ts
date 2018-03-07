@@ -11,15 +11,15 @@ module Game {
                 this.manager = manager;
                 this.state = null;
                 this.init = init;
-                this.update = null;
-                this.draw = null;
-                this.leave = null;
-                this.suspend = null;
-                this.resume = null;
+                this.update = () => { };
+                this.draw = () => {};
+                this.leave = () => { };
+                this.suspend = () => { };
+                this.resume = () => { };
             }
 
-            next(...data: any[]): any {
-                return this.state.next.apply(this.state, data);
+            next(...args:any[]): any {
+                this.update = this.state.next.apply(this.state, args).value;
             }
 
             push(id: string, param: any = {}): void { this.manager.push(id, param); }
@@ -29,7 +29,7 @@ module Game {
             // virtual methods
             enter(...data: any[]): void {
                 this.state = this.init.apply(this, data);
-                this.next(null);
+                this.next();
             }
 
             update: (delta: number, now: number) => void;
@@ -47,14 +47,16 @@ module Game {
         export class SceneManager {
             private sceneStack: Scene[];
             private scenes: Map<string, (data: any) => IterableIterator<any>>;
+            private requestQueue: (() => void)[];
 
             constructor(scenes: { [name: string]: (data: any) => IterableIterator<any> }) {
                 this.scenes = new Map<string, (data: any) => IterableIterator<any>>();
                 this.sceneStack = [];
+                this.requestQueue = [];
                 Object.keys(scenes).forEach((key) => this.scenes.set(key, scenes[key]));
             }
 
-            public push(id: string, ...param: any[]): SceneManager {
+            public push(id: string, ...param: any[]): void {
                 const sceneDef: (data: any) => IterableIterator<any> = this.scenes.get(id);
                 if (this.scenes.has(id) === false) {
                     throw new Error(`scene ${id} is not defined.`);
@@ -64,10 +66,15 @@ module Game {
                 }
                 this.sceneStack.push(new Scene(this, sceneDef));
                 this.peek().enter.apply(this.peek(), param);
-                return this;
             }
 
-            public pop(): SceneManager {
+            //public push(id: string, ...param: any[]): SceneManager {
+            //    this.requestQueue.push(() => this._push.apply(this, arguments));
+            //    return this;
+            //}
+
+
+            public pop(): void {
                 if (this.sceneStack.length === 0) {
                     throw new Error("there is no scene.");
                 }
@@ -81,8 +88,12 @@ module Game {
                 if (this.peek() != null && this.peek().resume != null) {
                     this.peek().resume();
                 }
-                return this;
             }
+
+            //public pop(): SceneManager {
+            //    this.requestQueue.push(() => this._pop());
+            //    return this;
+            //}
 
             public peek(): Scene {
                 if (this.sceneStack.length > 0) {
@@ -93,6 +104,9 @@ module Game {
             }
 
             public update(...args: any[]): SceneManager {
+                //var tmp = this.requestQueue;
+                //this.requestQueue = [];
+                //tmp.forEach((x) => x());
                 if (this.sceneStack.length === 0) {
                     throw new Error("there is no scene.");
                 }

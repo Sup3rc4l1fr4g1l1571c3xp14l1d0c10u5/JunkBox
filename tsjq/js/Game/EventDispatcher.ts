@@ -4,7 +4,7 @@ module Dispatcher {
     type EventHandler = (...args: any[]) => void;
 
     export class SingleDispatcher {
-        private readonly listeners: EventHandler[];
+        private /*@readonly@*/ listeners: EventHandler[];
 
         constructor() {
             this.listeners = [];
@@ -53,7 +53,7 @@ module Dispatcher {
 
     export class EventDispatcher {
 
-        private readonly listeners: Map<string, SingleDispatcher>;
+        private /*@readonly@*/ listeners: Map<string, SingleDispatcher>;
 
         constructor() {
             this.listeners = new Map<string, SingleDispatcher>();

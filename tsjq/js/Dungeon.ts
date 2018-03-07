@@ -4,12 +4,12 @@ module Dungeon {
 
 
     type LayerConfig = {
-        texture: string;    // ƒ}ƒbƒvƒ`ƒbƒvƒeƒNƒXƒ`ƒƒ
-        chip: { [key: number]: { x: number; y: number } };  // ƒ}ƒbƒvƒ`ƒbƒv
-        chips: Matrix;      // ƒ}ƒbƒvƒf[ƒ^
+        texture: string;    // ãƒãƒƒãƒ—ãƒãƒƒãƒ—ãƒ†ã‚¯ã‚¹ãƒãƒ£
+        chip: { [key: number]: { x: number; y: number } };  // ãƒãƒƒãƒ—ãƒãƒƒãƒ—
+        chips: Array2D;      // ãƒãƒƒãƒ—ãƒ‡ãƒ¼ã‚¿
     }
 
-    // ƒ}ƒbƒv•`‰æ‚Ì‹“_E‹–ìî•ñ
+    // ãƒãƒƒãƒ—æç”»æ™‚ã®è¦–ç‚¹ãƒ»è¦–é‡æƒ…å ±
     export class Camera {
         width: number;
         height: number;
@@ -25,358 +25,14 @@ module Dungeon {
         chipOffY: number;
     }
 
-    // Œo˜H’Tõ
-    type PathFindObj = {
-        x: number;
-        y: number;
-        prev: PathFindObj;
-        g: number;
-        distance: number;
-    }
-
-    // ƒ}ƒX–Ú
-    export class Matrix {
-        private readonly matrixWidth: number;
-        private readonly matrixHeight: number;
-        private matrixBuffer: number[];
-
-        public get width(): number {
-            return this.matrixWidth;
-        }
-
-        public get height(): number {
-            return this.matrixHeight;
-        }
-
-        public value(x: number, y: number, value?: number): number {
-            if (0 > x || x >= this.matrixWidth || 0 > y || y >= this.matrixHeight) {
-                return 0;
-            }
-            if (value != undefined) {
-                this.matrixBuffer[y * this.matrixWidth + x] = value;
-            }
-            return this.matrixBuffer[y * this.matrixWidth + x];
-        }
-
-        constructor(width: number, height: number, fill?: number) {
-            this.matrixWidth = width;
-            this.matrixHeight = height;
-            if (fill == undefined) {
-                this.matrixBuffer = new Array<number>(width * height);
-            } else {
-                this.matrixBuffer = new Array<number>(width * height).fill(fill);
-            }
-        }
-
-        public fill(value: number): this {
-            this.matrixBuffer.fill(value);
-            return this;
-        }
-
-        public dup(): Matrix {
-            const m = new Matrix(this.width, this.height);
-            m.matrixBuffer = this.matrixBuffer.slice();
-            return m;
-        }
-
-        public static createFromArray(array: number[][], fill?: number): Matrix {
-            const h = array.length;
-            const w = Math.max.apply(Math, array.map(x => x.length));
-            var matrix = new Matrix(w, h, fill);
-            array.forEach((vy, y) => vy.forEach((vx, x) => matrix.value(x, y, vx)));
-            return matrix;
-        }
-
-        public toString(): string {
-            const lines: string[] = [];
-            for (let y = 0; y < this.height; y++) {
-                lines[y] = `|${this.matrixBuffer.slice((y + 0) * this.matrixWidth, (y + 1) * this.matrixWidth).join(", ")}|`;
-            }
-            return lines.join("\r\n");
-        }
-
-        private static dir4 = [
-            [0, -1],
-            [1, 0],
-            [0, 1],
-            [-1, 0]
-        ];
-
-        private static dir8 = [
-            [0, -1],
-            [1, 0],
-            [0, 1],
-            [-1, 0]
-        ];
-
-        // Šî“_‚©‚ç‚Ìd‚İ‹——£Zo
-        public propagation(
-            sx: number,
-            sy: number,
-            value: number,
-            costs: (value: number) => number,
-            opts: { left: number, top: number, right: number, bottom: number, timeout: number, topology: number }
-        ) {
-            opts = Object.assign({ left: 0, top: 0, right: this.width, bottom: this.height, timeout: 1000, topology: 8 },
-                opts);
-            const temp = new Matrix(this.width, this.height, 0);
-            const topology = opts.topology;
-            var dirs: number[][];
-            if (topology === 4) {
-                dirs = Matrix.dir4;
-            } else if (topology === 8) {
-                dirs = Matrix.dir8;
-            } else {
-                throw new Error("Illegal topology");
-            }
-
-            temp.value(sx, sy, value);
-            const request = dirs.map(([ox, oy]) => [sx + ox, sy + oy, value]);
-
-            var start = Date.now();
-            while (request.length !== 0 && (Date.now() - start) < opts.timeout) {
-                var [x, y, currentValue] = request.shift();
-                if (opts.top > y || y >= opts.bottom || opts.left > x || x >= opts.right) {
-                    continue;
-                }
-
-                const cost = costs(this.value(x, y));
-                if (cost < 0 || currentValue < cost) {
-                    continue;
-                }
-
-                currentValue -= cost;
-
-                const targetPower = temp.value(x, y);
-                if (currentValue <= targetPower) {
-                    continue;
-                }
-
-                temp.value(x, y, currentValue);
-
-                Array.prototype.push.apply(request, dirs.map(([ox, oy]) => [x + ox, y + oy, currentValue]));
-            }
-            return temp;
-        }
-
-        // A*‚Å‚ÌŒo˜H’Tõ
-        public pathfind(
-            fromX: number,
-            fromY: number,
-            toX: number,
-            toY: number,
-            costs: number[],
-            opts: { topology: number }
-        ): number[][] {
-            opts = Object.assign({ topology: 8 }, opts);
-            var topology = opts.topology;
-            var dirs: number[][];
-            if (topology === 4) {
-                dirs = Matrix.dir4;
-            } else if (topology === 8) {
-                dirs = Matrix.dir8;
-            } else {
-                throw new Error("Illegal topology");
-            }
-
-
-            var todo: PathFindObj[] = [];
-            const add = ((x: number, y: number, prev: PathFindObj): void => {
-
-                // distance
-                var distance: number;
-                switch (topology) {
-                    case 4:
-                        distance = (Math.abs(x - fromX) + Math.abs(y - fromY));
-                        break;
-                    case 8:
-                        distance = Math.min(Math.abs(x - fromX), Math.abs(y - fromY));
-                        break;
-                    default:
-                        throw new Error("Illegal topology");
-                }
-
-                var obj: PathFindObj = {
-                    x: x,
-                    y: y,
-                    prev: prev,
-                    g: (prev ? prev.g + 1 : 0),
-                    distance: distance
-                };
-
-                /* insert into priority queue */
-
-                var f = obj.g + obj.distance;
-                for (let i = 0; i < todo.length; i++) {
-                    const item = todo[i];
-                    const itemF = item.g + item.distance;
-                    if (f < itemF || (f === itemF && distance < item.distance)) {
-                        todo.splice(i, 0, obj);
-                        return;
-                    }
-                }
-
-                todo.push(obj);
-            });
-
-            // set start position 
-            add(toX, toY, null);
-
-            const done: Map<string, PathFindObj> = new Map<string, PathFindObj>();
-            while (todo.length) {
-                let item = todo.shift();
-                {
-                    const id = item.x + "," + item.y;
-
-                    if (done.has(id)) {
-                        /* ’TõÏ‚İ‚È‚Ì‚Å’Tõ‚µ‚È‚¢ */
-                        continue;
-                    }
-                    done.set(id, item);
-                }
-
-                if (item.x === fromX && item.y === fromY) {
-                    /* n“_‚É“’B‚µ‚½‚Ì‚ÅŒo˜H‚ğ¶¬‚µ‚Ä•Ô‚· */
-                    const result: number[][] = [];
-                    while (item) {
-                        result.push([item.x, item.y]);
-                        item = item.prev;
-                    }
-                    return result;
-                } else {
-
-                    /* —×Ú’n“_‚©‚çˆÚ“®‰Â”\’n“_‚ğ’T‚· */
-                    for (let i = 0; i < dirs.length; i++) {
-                        const dir = dirs[i];
-                        const x = item.x + dir[0];
-                        const y = item.y + dir[1];
-                        const cost = costs[this.value(x, y)];
-
-                        if (cost < 0) {
-                            /* N“ü•s‰Â”\ */
-                            continue;
-                        } else {
-                            /* ˆÚ“®‰Â”\’n“_‚ª’TõÏ‚İ‚Å‚È‚¢‚È‚ç’TõƒLƒ…[‚É’Ç‰Á */
-                            const id = x + "," + y;
-                            if (done.has(id)) {
-                                continue;
-                            }
-                            add(x, y, item);
-                        }
-                    }
-                }
-            }
-
-            /* n“_‚É“’B‚µ‚È‚©‚Á‚½‚Ì‚Å‹ó‚ÌŒo˜H‚ğ•Ô‚· */
-            return [];
-        }
-
-        // d‚İ‹——£‚ğg‚Á‚½A*
-        pathfindByPropergation(fromX: number,
-            fromY: number,
-            toX: number,
-            toY: number,
-            propagation: Matrix,
-            opts: { topology: number }): number[][] {
-            opts = Object.assign({ topology: 8 }, opts);
-            const topology = opts.topology;
-            let dirs: number[][];
-            if (topology === 4) {
-                dirs = Matrix.dir4;
-            } else if (topology === 8) {
-                dirs = Matrix.dir8;
-            } else {
-                throw new Error("Illegal topology");
-            }
-
-            var todo: PathFindObj[] = [];
-            const add = ((x: number, y: number, prev: PathFindObj): void => {
-
-                // distance
-                var distance = Math.abs(propagation.value(x, y) - propagation.value(fromX, fromY));
-                var obj: PathFindObj = {
-                    x: x,
-                    y: y,
-                    prev: prev,
-                    g: (prev ? prev.g + 1 : 0),
-                    distance: distance
-                };
-
-                /* insert into priority queue */
-
-                var f = obj.g + obj.distance;
-                for (let i = 0; i < todo.length; i++) {
-                    const item = todo[i];
-                    const itemF = item.g + item.distance;
-                    if (f < itemF || (f === itemF && distance < item.distance)) {
-                        todo.splice(i, 0, obj);
-                        return;
-                    }
-                }
-
-                todo.push(obj);
-            });
-
-            // set start position 
-            add(toX, toY, null);
-
-            const done: Map<string, PathFindObj> = new Map<string, PathFindObj>();
-            while (todo.length) {
-                let item = todo.shift();
-                {
-                    const id = item.x + "," + item.y;
-                    if (done.has(id)) {
-                        /* ’TõÏ‚İ‚È‚Ì‚Å’Tõ‚µ‚È‚¢ */
-                        continue;
-                    }
-                    done.set(id, item);
-                }
-
-                if (item.x === fromX && item.y === fromY) {
-                    /* n“_‚É“’B‚µ‚½‚Ì‚ÅŒo˜H‚ğ¶¬‚µ‚Ä•Ô‚· */
-                    const result: number[][] = [];
-                    while (item) {
-                        result.push([item.x, item.y]);
-                        item = item.prev;
-                    }
-                    return result;
-                } else {
-
-                    /* —×Ú’n“_‚©‚çˆÚ“®‰Â”\’n“_‚ğ’T‚· */
-                    dirs.forEach((dir) => {
-                        const x = item.x + dir[0];
-                        const y = item.y + dir[1];
-                        const pow = propagation.value(x, y);
-
-                        if (pow === 0) {
-                            /* N“ü•s‰Â”\ */
-                            return;
-                        } else {
-                            /* ˆÚ“®‰Â”\’n“_‚ª’TõÏ‚İ‚Å‚È‚¢‚È‚ç’TõƒLƒ…[‚É’Ç‰Á */
-                            var id = x + "," + y;
-                            if (done.has(id)) {
-                                return;
-                            } else {
-                                add(x, y, item);
-                            }
-                        }
-                    });
-                }
-            }
-
-            /* n“_‚É“’B‚µ‚È‚©‚Á‚½‚Ì‚Å‹ó‚ÌŒo˜H‚ğ•Ô‚· */
-            return [];
-        }
-    }
-
-    // ƒ_ƒ“ƒWƒ‡ƒ“ƒf[ƒ^
+    // ãƒ€ãƒ³ã‚¸ãƒ§ãƒ³ãƒ‡ãƒ¼ã‚¿
     export class DungeonData {
         width: number;
         height: number;
         gridsize: { width: number; height: number };
         layer: { [key: number]: LayerConfig };
-        lighting: Matrix;
-        visibled: Matrix;
+        lighting: Array2D;
+        visibled: Array2D;
 
         camera: Camera;
 
@@ -392,8 +48,8 @@ module Dungeon {
             this.gridsize = config.gridsize;
             this.layer = config.layer;
             this.camera = new Camera();
-            this.lighting = new Matrix(this.width, this.height, 0);
-            this.visibled = new Matrix(this.width, this.height, 0);
+            this.lighting = new Array2D(this.width, this.height, 0);
+            this.visibled = new Array2D(this.width, this.height, 0);
         }
 
         clearLighting(): DungeonData {
@@ -410,21 +66,21 @@ module Dungeon {
             var mapWidth = this.width * this.gridsize.width;
             var mapHeight = this.height * this.gridsize.height;
 
-            // ƒ}ƒbƒvã‚Å‚ÌƒJƒƒ‰‚Ì’‹“_
+            // ãƒãƒƒãƒ—ä¸Šã§ã®ã‚«ãƒ¡ãƒ©ã®æ³¨è¦–ç‚¹
             var mapPx = param.viewpoint.x;
             var mapPy = param.viewpoint.y;
 
-            // ƒJƒƒ‰‚Ì‹–ì‚Ì•E‚‚³
+            // ã‚«ãƒ¡ãƒ©ã®è¦–é‡ã®å¹…ãƒ»é«˜ã•
             this.camera.width = param.viewwidth;
             this.camera.height = param.viewheight;
 
-            // ƒJƒƒ‰‚Ì’‹“_‚ª’†S‚Æ‚È‚é‚æ‚¤‚ÈƒJƒƒ‰‚Ì‹–ì
+            // ã‚«ãƒ¡ãƒ©ã®æ³¨è¦–ç‚¹ãŒä¸­å¿ƒã¨ãªã‚‹ã‚ˆã†ãªã‚«ãƒ¡ãƒ©ã®è¦–é‡
             this.camera.left = ~~(mapPx - this.camera.width / 2);
             this.camera.top = ~~(mapPy - this.camera.height / 2);
             this.camera.right = this.camera.left + this.camera.width;
             this.camera.bottom = this.camera.top + this.camera.height;
 
-            // ‹–ì‚ğƒ}ƒbƒv“à‚É•â³
+            // è¦–é‡ã‚’ãƒãƒƒãƒ—å†…ã«è£œæ­£
             if ((this.camera.left < 0) && (this.camera.right - this.camera.left < mapWidth)) {
                 this.camera.right -= this.camera.left;
                 this.camera.left = 0;
@@ -440,22 +96,22 @@ module Dungeon {
                 this.camera.bottom = mapHeight - 1;
             }
 
-            // ‹–ì‚Ì¶ãˆÊ’u‚ğŒ´“_‚Æ‚µ‚½’‹“_‚ğZo
+            // è¦–é‡ã®å·¦ä¸Šä½ç½®ã‚’åŸç‚¹ã¨ã—ãŸæ³¨è¦–ç‚¹ã‚’ç®—å‡º
             this.camera.localPx = mapPx - this.camera.left;
             this.camera.localPy = mapPy - this.camera.top;
 
-            // ‹–ì‚Ì¶ãˆÊ’u‚É‘Î‰‚·‚éƒ}ƒbƒvƒ`ƒbƒvÀ•W‚ğZo
+            // è¦–é‡ã®å·¦ä¸Šä½ç½®ã«å¯¾å¿œã™ã‚‹ãƒãƒƒãƒ—ãƒãƒƒãƒ—åº§æ¨™ã‚’ç®—å‡º
             this.camera.chipX = ~~(this.camera.left / this.gridsize.width);
             this.camera.chipY = ~~(this.camera.top / this.gridsize.height);
 
-            // ‹–ì‚Ì¶ãˆÊ’u‚ğ‚Éƒ}ƒbƒvƒ`ƒbƒv‚ğ‚¨‚¢‚½ê‡‚ÌƒXƒNƒ[ƒ‹‚É‚æ‚éƒYƒŒ—Ê‚ğZo
+            // è¦–é‡ã®å·¦ä¸Šä½ç½®ã‚’ã«ãƒãƒƒãƒ—ãƒãƒƒãƒ—ã‚’ãŠã„ãŸå ´åˆã®ã‚¹ã‚¯ãƒ­ãƒ¼ãƒ«ã«ã‚ˆã‚‹ã‚ºãƒ¬é‡ã‚’ç®—å‡º
             this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
             this.camera.chipOffY = -(this.camera.top % this.gridsize.height);
 
         }
 
         draw(layerDrawHook) {
-            // •`‰æŠJn
+            // æç”»é–‹å§‹
             var gridw = this.gridsize.width;
             var gridh = this.gridsize.height;
             var yy = ~~(this.camera.height / gridh + 1);
@@ -482,11 +138,11 @@ module Dungeon {
                     }
                 }
 
-                // ƒŒƒCƒ„[•`‰æƒtƒbƒN
+                // ãƒ¬ã‚¤ãƒ¤ãƒ¼æç”»ãƒ•ãƒƒã‚¯
                 layerDrawHook(l, this.camera.localPx, this.camera.localPy);
             });
 
-            // Æ–¾•`‰æ
+            // ç…§æ˜æç”»
             for (let y = -1; y < yy; y++) {
                 for (let x = -1; x < xx; x++) {
                     let light = this.lighting.value(x + this.camera.chipX, y + this.camera.chipY) / 100;
@@ -508,8 +164,8 @@ module Dungeon {
         }
     }
 
-    //ƒ_ƒ“ƒWƒ‡ƒ“©“®¶¬
-    export module Generator@ {
+    //ãƒ€ãƒ³ã‚¸ãƒ§ãƒ³è‡ªå‹•ç”Ÿæˆ
+    export module Generatorã€€ {
 
         abstract class Feature {
             isValid(isWallCallback, canBeDugCallback) { };

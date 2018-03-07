@@ -228,7 +228,7 @@ module Game {
             offsetY: number,
             sprite: number[][],
             spritesize: number[],
-            tile: Matrix): void {
+            tile: Dungeon.Array2D): void {
             for (var y = 0; y < tile.height; y++) {
                 for (var x = 0; x < tile.width; x++) {
                     var chip = tile.value(x, y);
@@ -266,7 +266,7 @@ module Game {
                         resolve();
                     };
                     img.onerror = () => {
-                        var msg = `ファイル ${asserts[x]}のロードに失敗。`;
+                        var msg = `繝輔ぃ繧､繝ｫ ${asserts[x]}縺ｮ繝ｭ繝ｼ繝峨↓螟ｱ謨励Ａ;
                         consolere.error(msg);
                         reject(msg);
                     };

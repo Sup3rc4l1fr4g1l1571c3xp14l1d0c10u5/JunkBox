@@ -10,8 +10,11 @@ module Game {
             public pageY: number;
             public maskedEvent: TouchEvent | MouseEvent;
         }
+        enum PointerChangeStatus {
+            Down,  Up, Leave
+        }
 
-        export class InputDispatcher extends Dispatcher.EventDispatcher {
+        export class InputManager extends Dispatcher.EventDispatcher {
             private isScrolling: boolean;
             private timeout: number;
             private sDistX: number;
@@ -22,8 +25,91 @@ module Game {
             private prevTimeStamp: number;
             private prevInputType: string;
 
+            private capture: boolean;
+            private lastPageX: number;
+            private lastPageY: number;
+            private downup: number;
+            private clicked: boolean;
+            private lastDownPageX : number;
+            private lastDownPageY: number;
+            private draglen: number;
+
+            private status: PointerChangeStatus;
+
+            public get pageX(): number {
+                return this.lastPageX;
+            }
+            public get pageY(): number {
+                return this.lastPageY;
+            }
+            public isDown(): boolean {
+                return this.downup == 1;
+            }
+            public isPush(): boolean {
+                return this.downup > 1;
+            }
+            public isUp(): boolean {
+                return this.downup == -1;
+            }
+            public isClick(): boolean {
+                return this.clicked;
+            }
+            public isRelease(): boolean {
+                return this.downup < -1;
+            }
+            public startCapture(): void {
+                this.capture = true;
+            }
+            public endCapture(): void {
+                this.capture = false;
+                if (this.status == PointerChangeStatus.Down) {
+                    if (this.downup < 1) { this.downup = 1; } else { this.downup += 1; }
+                } else if (this.status == PointerChangeStatus.Up) {
+                    if (this.downup > -1) { this.downup = -1; } else { this.downup -= 1; }
+                } else {
+                    this.downup = 0;
+                }
+
+                this.clicked = false;
+                if (this.downup == -1) {
+                    if (this.draglen < 5) {
+                        this.clicked = true;
+                    }
+                } else if (this.downup == 1) {
+                    this.lastDownPageX = this.lastPageX;
+                    this.lastDownPageY = this.lastPageY;
+                    this.draglen = 0;
+                } else if (this.downup > 1) {
+                    this.draglen = Math.max(this.draglen, Math.sqrt((this.lastDownPageX - this.lastPageX) * (this.lastDownPageX - this.lastPageX) +(this.lastDownPageY - this.lastPageY) * (this.lastDownPageY - this.lastPageY)));
+                }
+
+
+            }
+
+            private captureHandler(e: CustomPointerEvent): void {
+                if (this.capture == false) {
+                    return;
+                }
+                switch (e.type) {
+                    case "pointerdown":
+                        this.status = PointerChangeStatus.Down;
+                        break;
+                    case "pointerup":
+                        this.status = PointerChangeStatus.Up;
+                        break;
+                    case "pointerleave":
+                        this.status = PointerChangeStatus.Leave;
+                        break;
+                    case "pointermove":
+                        break;
+                }
+                this.lastPageX = e.pageX;
+                this.lastPageY = e.pageY;
+            }
+
             constructor() {
                 super();
+
 
                 this.isScrolling = false;
                 this.timeout = 0;
@@ -84,6 +170,23 @@ module Game {
 
                 }
 
+
+                this.capture = false;
+                this.lastPageX = 0;
+                this.lastPageY = 0;
+                this.downup = 0;
+                this.status = PointerChangeStatus.Leave;
+                this.clicked = false;
+                this.lastDownPageX = 0;
+                this.lastDownPageY = 0;
+                this.draglen = 0;
+
+                this.captureHandler = this.captureHandler.bind(this);
+                this.on('pointerdown', this.captureHandler);
+                this.on('pointermove', this.captureHandler);
+                this.on('pointerup', this.captureHandler);
+                this.on('pointerleave', this.captureHandler);
+
             }
 
             private checkEvent(e): boolean {
@@ -116,7 +219,7 @@ module Game {
             private pointerDown(e) {
                 if (this.checkEvent(e)) {
                     const evt = this.makePointerEvent("down", e);
-                    const singleFinger = evt["mouse"] || (evt["touch"] && e.touches.length === 1);
+                    const singleFinger = e["mouse"] || (e["touch"] && e.touches.length === 1);
                     if (!this.isScrolling && singleFinger) {
                         this.maybeClick = true;
                         this.maybeClickX = evt.pageX;
@@ -158,7 +261,7 @@ module Game {
                 return false;
             }
 
-            private makePointerEvent(type: string, e: TouchEvent | MouseEvent) {
+            private makePointerEvent(type: string, e: TouchEvent | MouseEvent): CustomPointerEvent {
                 const evt: CustomPointerEvent = <CustomPointerEvent>document.createEvent("CustomEvent");
                 const eventType = `pointer${type}`;
                 evt.initCustomEvent(eventType, true, true, {});
@@ -193,6 +296,31 @@ module Game {
             distance: number;
             angle: number;
             id: number;
+
+            get dir4(): number {
+                switch (~~((this.angle + 180 + 45) / 90) % 4) {
+                    case 0: return 4;   // left
+                    case 1: return 8;   // up
+                    case 2: return 6;   // right
+                    case 3: return 2;   // down
+                }
+                return 5;   // neutral
+            }
+
+            get dir8(): number {
+                switch (~~((this.angle + 180 + 45) / 90) % 8) {
+                    case 0: return 4;   // left
+                    case 1: return 7;   // left-up
+                    case 2: return 8;   // up
+                    case 3: return 9;   // right-up
+                    case 4: return 6;   // right
+                    case 5: return 3;   // right-down
+                    case 6: return 6;   // down
+                    case 7: return 1;   // left-down
+                }
+                return 5;   // neutral
+            }
+
 
             constructor(x: number = 120, y: number = 120, radius: number = 40) {
                 this.isTouching = false;

@@ -1,6 +1,19 @@
 "use strict";
 
+interface webkitAudioContext extends AudioContext {
+    suspend(): Promise<void>;
+}
+
+declare var webkitAudioContext: {
+    prototype: AudioContext;
+    new(): AudioContext;
+};
+
 module Game {
+    if (AudioContext == null && webkitAudioContext != null) {
+        AudioContext = webkitAudioContext;
+    }
+
     export module Sound {
         class ManagedSoundChannel {
             public audioBufferNode: AudioBuffer = null;
@@ -19,8 +32,8 @@ module Game {
         class UnmanagedSoundChannel {
             private isEnded: boolean = true;
             private bufferSource: AudioBufferSourceNode = null;
-            private readonly buffer: AudioBuffer = null;
-            private readonly sound: SoundManager = null;
+            private /*@readonly@*/ buffer: AudioBuffer = null;
+            private /*@readonly@*/ sound: SoundManager = null;
 
             constructor(sound: SoundManager, buffer: AudioBuffer) {
                 this.buffer = buffer;
@@ -61,7 +74,7 @@ module Game {
         }
 
         export class SoundManager {
-            private static readonly soundChannelMax: number = 36 * 36;
+            private static /*@readonly@*/ soundChannelMax: number = 36 * 36;
 
             private audioContext: AudioContext;
 
@@ -90,7 +103,7 @@ module Game {
                         xhr.responseType = "arraybuffer";
                         xhr.open("GET", file, true);
                         xhr.onerror = () => {
-                            var msg = `ファイル ${file}のロードに失敗。`;
+                            var msg = `繝輔ぃ繧､繝ｫ ${file}縺ｮ繝ｭ繝ｼ繝峨↓螟ｱ謨励Ａ;
                             consolere.error(msg);
                             reject(msg);
                         };
@@ -107,7 +120,7 @@ module Game {
                                     resolve(audioBufferNode);
                                 },
                                 (): void => {
-                                    var msg = `ファイル ${file}のdecodeAudioDataに失敗。`;
+                                    var msg = `繝輔ぃ繧､繝ｫ ${file}縺ｮdecodeAudioData縺ｫ螟ｱ謨励Ａ;
                                     reject(msg);
                                 }
                             );
@@ -170,7 +183,7 @@ module Game {
                         }
                         var src = this.audioContext.createBufferSource();
                         if (src == null) {
-                            throw new Error("createBufferSourceに失敗。");
+                            throw new Error("createBufferSource縺ｫ螟ｱ謨励�");
                         }
                         var bufferid = this.bufferSourceIdCount++;
                         this.playingBufferSources.set(bufferid, { id: i, buffer: src });

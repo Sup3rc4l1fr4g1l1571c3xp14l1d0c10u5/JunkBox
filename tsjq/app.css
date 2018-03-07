@@ -1,4 +1,4 @@
-﻿html, body, section, article, header, footer, canvas {
+html, body, section, article, header, footer, canvas {
     margin: 0;
     padding: 0;
     border: 0;
@@ -21,10 +21,10 @@ html, body {
 
             body > section > article > header:before {
                 display: block;
-                font-size: 2rem;
+                font-size: 1.2rem;
                 font-weight: 600;
                 text-align: center;
-                line-height: 2rem;
+                line-height: 1.2rem;
                 content: "とりあえず作りなさい";
             }
 
@@ -37,8 +37,8 @@ html, body {
                 margin-top: 3px;
                 margin-bottom: 3px;
                 font-weight: 400;
-                font-size: 1.4rem;
-                line-height: 1.4rem;
+                font-size: 1.3rem;
+                line-height: 1.3rem;
                 border: 1px black solid;
                 content: "TSJK in ゲーム";
             }

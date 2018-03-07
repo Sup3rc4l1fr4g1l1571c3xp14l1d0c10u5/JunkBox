@@ -27,7 +27,7 @@ module Game {
                 }
             }
 
-            public tick(ts: number): void {
+            private tick(ts: number): void {
                 requestAnimationFrame(this.tick.bind(this));
                 if (!isNaN(this.prevTime)) {
                     const delta = ts - this.prevTime;
