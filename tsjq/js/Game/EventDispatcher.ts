@@ -1,10 +1,10 @@
 "use strict";
 
-module Dispatcher {
+namespace Dispatcher {
     type EventHandler = (...args: any[]) => void;
 
     export class SingleDispatcher {
-        private /*@readonly@*/ listeners: EventHandler[];
+        private /*@readonly@*/ listeners: Array<EventHandler>;
 
         constructor() {
             this.listeners = [];
@@ -30,10 +30,7 @@ module Dispatcher {
 
         public fire(...args: any[]): SingleDispatcher {
             const temp = this.listeners.slice();
-            for (var i = 0, len = temp.length; i < len; ++i) {
-                temp[i].apply(this, args);
-            }
-
+            temp.forEach((dispatcher) => dispatcher.apply(this, args));
             return this;
         }
 

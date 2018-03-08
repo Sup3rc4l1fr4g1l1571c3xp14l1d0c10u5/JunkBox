@@ -25,7 +25,6 @@ html, body {
                 font-weight: 600;
                 text-align: center;
                 line-height: 1.2rem;
-                content: "とりあえず作りなさい";
             }
 
             body > section > article > header:after {
@@ -40,7 +39,6 @@ html, body {
                 font-size: 1.3rem;
                 line-height: 1.3rem;
                 border: 1px black solid;
-                content: "TSJK in ゲーム";
             }
 
         body > section > article > footer:after {
@@ -49,7 +47,6 @@ html, body {
             margin-top: 3px;
             font-size: 0.8rem;
             line-height: 0.8rem;
-            content: "クリアできなくても委員会";
         }
 
         body > section > article > section {

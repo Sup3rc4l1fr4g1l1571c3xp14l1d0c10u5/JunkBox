@@ -1,13 +1,13 @@
 "use strict";
 
-module Game {
-    export module Scene {
+namespace Game {
+    export namespace Scene {
         class Scene {
             private manager: SceneManager;
-            private state: Generator;
-            private init: (data: any) => Generator;
+            private state: Iterator<any>;
+            private init: (data: any) => Iterator<any>;
 
-            constructor(manager: SceneManager, init: (data: any) => Generator) {
+            constructor(manager: SceneManager, init: (data: any) => Iterator<any>) {
                 this.manager = manager;
                 this.state = null;
                 this.init = init;
@@ -26,7 +26,6 @@ module Game {
 
             pop(): void { this.manager.pop(); }
 
-            // virtual methods
             enter(...data: any[]): void {
                 this.state = this.init.apply(this, data);
                 this.next();
@@ -47,12 +46,10 @@ module Game {
         export class SceneManager {
             private sceneStack: Scene[];
             private scenes: Map<string, (data: any) => IterableIterator<any>>;
-            private requestQueue: (() => void)[];
 
             constructor(scenes: { [name: string]: (data: any) => IterableIterator<any> }) {
                 this.scenes = new Map<string, (data: any) => IterableIterator<any>>();
                 this.sceneStack = [];
-                this.requestQueue = [];
                 Object.keys(scenes).forEach((key) => this.scenes.set(key, scenes[key]));
             }
 
@@ -67,12 +64,6 @@ module Game {
                 this.sceneStack.push(new Scene(this, sceneDef));
                 this.peek().enter.apply(this.peek(), param);
             }
-
-            //public push(id: string, ...param: any[]): SceneManager {
-            //    this.requestQueue.push(() => this._push.apply(this, arguments));
-            //    return this;
-            //}
-
 
             public pop(): void {
                 if (this.sceneStack.length === 0) {
@@ -90,11 +81,6 @@ module Game {
                 }
             }
 
-            //public pop(): SceneManager {
-            //    this.requestQueue.push(() => this._pop());
-            //    return this;
-            //}
-
             public peek(): Scene {
                 if (this.sceneStack.length > 0) {
                     return this.sceneStack[this.sceneStack.length - 1];
@@ -104,21 +90,16 @@ module Game {
             }
 
             public update(...args: any[]): SceneManager {
-                //var tmp = this.requestQueue;
-                //this.requestQueue = [];
-                //tmp.forEach((x) => x());
-                if (this.sceneStack.length === 0) {
-                    throw new Error("there is no scene.");
+                if (this.sceneStack.length !== 0) {
+                    this.peek().update.apply(this.peek(), args);
                 }
-                this.peek().update.apply(this.peek(), args);
                 return this;
             }
 
             public draw(): SceneManager {
-                if (this.sceneStack.length === 0) {
-                    throw new Error("there is no scene.");
+                if (this.sceneStack.length !== 0) {
+                    this.peek().draw.apply(this.peek());
                 }
-                this.peek().draw.apply(this.peek());
                 return this;
             }
         }

@@ -1,7 +1,7 @@
 "use strict";
 
-module Game {
-    export module Timer {
+namespace Game {
+    export namespace Timer {
         export class AnimationTimer extends Dispatcher.SingleDispatcher {
             private animationFrameId: number;
             private prevTime: number;

@@ -1,48 +1,48 @@
 "use strict";
 
-module Dungeon {
+namespace Dungeon {
 
-
-    type LayerConfig = {
-        texture: string;    // マップチップテクスチャ
-        chip: { [key: number]: { x: number; y: number } };  // マップチップ
-        chips: Array2D;      // マップデータ
+    interface ILayerConfig {
+        texture: string; // マップチップテクスチャ
+        chip: { [key: number]: { x: number; y: number } }; // マップチップ
+        chips: Array2D; // マップデータ
     }
 
     // マップ描画時の視点・視野情報
     export class Camera {
-        width: number;
-        height: number;
-        left: number;
-        top: number;
-        right: number;
-        bottom: number;
-        localPx: number;
-        localPy: number;
-        chipX: number;
-        chipY: number;
-        chipOffX: number;
-        chipOffY: number;
+        public width: number;
+        public height: number;
+        public left: number;
+        public top: number;
+        public right: number;
+        public bottom: number;
+        public localPx: number;
+        public localPy: number;
+        public chipLeft: number;
+        public chipTop: number;
+        public chipRight: number;
+        public chipBottom: number;
+        public chipOffX: number;
+        public chipOffY: number;
     }
 
     // ダンジョンデータ
     export class DungeonData {
-        width: number;
-        height: number;
-        gridsize: { width: number; height: number };
-        layer: { [key: number]: LayerConfig };
-        lighting: Array2D;
-        visibled: Array2D;
+        public width: number;
+        public height: number;
+        public gridsize: { width: number; height: number };
+        public layer: { [key: number]: ILayerConfig };
+        public lighting: Array2D;
+        public visibled: Array2D;
 
-        camera: Camera;
+        public camera: Camera;
 
         constructor(config: {
             width: number;
             height: number;
             gridsize: { width: number; height: number };
-            layer: { [key: number]: LayerConfig };
-        }
-        ) {
+            layer: { [key: number]: ILayerConfig };
+        }) {
             this.width = config.width;
             this.height = config.height;
             this.gridsize = config.gridsize;
@@ -52,23 +52,23 @@ module Dungeon {
             this.visibled = new Array2D(this.width, this.height, 0);
         }
 
-        clearLighting(): DungeonData {
+        public clearLighting(): DungeonData {
             this.lighting.fill(0);
             return this;
         }
 
         // update camera
-        update(param: {
+        public update(param: {
             viewpoint: { x: number; y: number };
             viewwidth: number;
             viewheight: number;
-        }) {
-            var mapWidth = this.width * this.gridsize.width;
-            var mapHeight = this.height * this.gridsize.height;
+        }) : void {
+            const mapWidth = this.width * this.gridsize.width;
+            const mapHeight = this.height * this.gridsize.height;
 
             // マップ上でのカメラの注視点
-            var mapPx = param.viewpoint.x;
-            var mapPy = param.viewpoint.y;
+            const mapPx = param.viewpoint.x;
+            const mapPy = param.viewpoint.y;
 
             // カメラの視野の幅・高さ
             this.camera.width = param.viewwidth;
@@ -100,9 +100,11 @@ module Dungeon {
             this.camera.localPx = mapPx - this.camera.left;
             this.camera.localPy = mapPy - this.camera.top;
 
-            // 視野の左上位置に対応するマップチップ座標を算出
-            this.camera.chipX = ~~(this.camera.left / this.gridsize.width);
-            this.camera.chipY = ~~(this.camera.top / this.gridsize.height);
+            // 視野の四隅位置に対応するマップチップ座標を算出
+            this.camera.chipLeft = ~~(this.camera.left / this.gridsize.width);
+            this.camera.chipTop = ~~(this.camera.top / this.gridsize.height);
+            this.camera.chipRight = ~~((this.camera.right + (this.gridsize.width - 1)) / this.gridsize.width);
+            this.camera.chipBottom = ~~((this.camera.bottom + (this.gridsize.height - 1)) / this.gridsize.height);
 
             // 視野の左上位置をにマップチップをおいた場合のスクロールによるズレ量を算出
             this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
@@ -110,30 +112,48 @@ module Dungeon {
 
         }
 
-        draw(layerDrawHook) {
+        public draw(layerDrawHook: (layerId: number, offsetX: number, offsetY: number) => void) : void {
             // 描画開始
-            var gridw = this.gridsize.width;
-            var gridh = this.gridsize.height;
-            var yy = ~~(this.camera.height / gridh + 1);
-            var xx = ~~(this.camera.width / gridw + 1);
+            const gridw = this.gridsize.width;
+            const gridh = this.gridsize.height;
 
             Object.keys(this.layer).forEach((key) => {
-                var l = ~~key;
-                for (let y = -1; y < yy; y++) {
-                    for (let x = -1; x < xx; x++) {
-                        const chipid = this.layer[l].chips.value(x + this.camera.chipX, y + this.camera.chipY) || 0;
-                        if (this.layer[l].chip[chipid]) {
-                            Game.getScreen().drawImage(
-                                Game.getScreen().texture(this.layer[l].texture),
-                                this.layer[l].chip[chipid].x,
-                                this.layer[l].chip[chipid].y,
-                                gridw,
-                                gridh,
-                                0 + x * gridw + this.camera.chipOffX + gridw / 2,
-                                0 + y * gridh + this.camera.chipOffY + gridh / 2,
-                                gridw,
-                                gridh
-                            );
+                const  l = ~~key;
+                for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                    for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                        const chipid = this.layer[l].chips.value(x, y) || 0;
+                        if ((chipid === 1 || chipid === 10) && this.layer[l].chip[chipid]) {
+                            const xx = (x - this.camera.chipLeft) * gridw;
+                            const yy = (y - this.camera.chipTop) * gridh;
+                            if (!Game.pmode) {
+                                Game.getScreen().drawImage(
+                                    Game.getScreen().texture(this.layer[l].texture),
+                                    this.layer[l].chip[chipid].x,
+                                    this.layer[l].chip[chipid].y,
+                                    gridw,
+                                    gridh,
+                                    0 + xx + this.camera.chipOffX,
+                                    0 + yy + this.camera.chipOffY,
+                                    gridw,
+                                    gridh
+                                );
+
+                            } else {
+                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
+                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
+                                Game.getScreen().fillRect(
+                                    0 + xx + this.camera.chipOffX,
+                                    0 + yy + this.camera.chipOffY,
+                                    gridw,
+                                    gridh
+                                );
+                                Game.getScreen().strokeRect(
+                                    0 + xx + this.camera.chipOffX,
+                                    0 + yy + this.camera.chipOffY,
+                                    gridw,
+                                    gridh
+                                );
+                            }
                         }
                     }
                 }
@@ -141,20 +161,21 @@ module Dungeon {
                 // レイヤー描画フック
                 layerDrawHook(l, this.camera.localPx, this.camera.localPy);
             });
-
             // 照明描画
-            for (let y = -1; y < yy; y++) {
-                for (let x = -1; x < xx; x++) {
-                    let light = this.lighting.value(x + this.camera.chipX, y + this.camera.chipY) / 100;
+            for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                    let light = this.lighting.value(x, y) / 100;
                     if (light > 1) {
                         light = 1;
                     } else if (light < 0) {
                         light = 0;
                     }
+                    const xx = (x - this.camera.chipLeft) * gridw;
+                    const yy = (y - this.camera.chipTop) * gridh;
                     Game.getScreen().fillStyle = `rgba(0,0,0,${1 - light})`;
                     Game.getScreen().fillRect(
-                        0 + x * gridw + this.camera.chipOffX + gridw / 2,
-                        0 + y * gridh + this.camera.chipOffY + gridh / 2,
+                        0 + xx + this.camera.chipOffX,
+                        0 + yy + this.camera.chipOffY,
                         gridw,
                         gridh
                     );
@@ -164,684 +185,684 @@ module Dungeon {
         }
     }
 
-    //ダンジョン自動生成
-    export module Generator　 {
+    // ダンジョン構成要素基底クラス
+    abstract class Feature {
+        public abstract isValid(isWallCallback: (x: number, y: number) => boolean, canBeDugCallback: (x: number, y: number) => boolean): boolean;
+        public abstract create(digCallback: (x: number, y: number, value: number) => void): void;
+        public abstract debug(): void;
+        // public static createRandomAt(x: number, y: number, dx: number, dy: number, options: {}): Feature {}
+    }
 
-        abstract class Feature {
-            isValid(isWallCallback, canBeDugCallback) { };
-            create(digCallback) { };
-            debug() { };
-            static createRandomAt(x, y, dx, dy, options) { };
+    function getUniformInt(lowerBound: number, upperBound: number): number {
+        const max = Math.max(lowerBound, upperBound);
+        const min = Math.min(lowerBound, upperBound);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function getWeightedValue(data: { [key: string]: number }): string {
+        const keys = Object.keys(data);
+        const total = keys.reduce((s, x) => s + data[x], 0);
+        const random = Math.random() * total;
+
+        let part = 0;
+        for (const id of keys) {
+            part += data[id];
+            if (random < part) {
+                return id;
+            }
         }
 
-        function getUniformInt(lowerBound, upperBound) {
-            const max = Math.max(lowerBound, upperBound);
-            const min = Math.min(lowerBound, upperBound);
-            return Math.floor(Math.random() * (max - min + 1)) + min;
+        return keys[keys.length - 1];
+    }
+
+    // 部屋
+    class Room extends Feature {
+        private left: number;
+        private top: number;
+        private right: number;
+        private bottom: number;
+        private doors: { [key: string]: number }; // key = corrd
+
+        constructor(left: number, top: number, right: number, bottom: number, door?: [number, number]) {
+            super();
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+            this.doors = {};
+            if (door !== undefined) {
+                this.addDoor(door);
+            }
         }
 
-        function getWeightedValue(data) {
-            let total = 0;
+        public static createRandomAt(x: number, y: number, dx: number, dy: number, options: { roomWidth: [number, number], roomHeight: [number, number] }): Room {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
 
-            for (var id in data) {
-                total += data[id];
-            }
-            const random = Math.random() * total;
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
 
-            let part = 0;
-            for (var id in data) {
-                part += data[id];
-                if (random < part) {
-                    return id;
-                }
+            if (dx === 1) { /* to the right */
+                const y2 = y - Math.floor(Math.random() * height);
+                return new Room(x + 1, y2, x + width, y2 + height - 1, [x, y]);
             }
 
-            return id;
+            if (dx === -1) { /* to the left */
+                const y2 = y - Math.floor(Math.random() * height);
+                return new Room(x - width, y2, x - 1, y2 + height - 1, [x, y]);
+            }
+
+            if (dy === 1) { /* to the bottom */
+                const x2 = x - Math.floor(Math.random() * width);
+                return new Room(x2, y + 1, x2 + width - 1, y + height, [x, y]);
+            }
+
+            if (dy === -1) { /* to the top */
+                const x2 = x - Math.floor(Math.random() * width);
+                return new Room(x2, y - height, x2 + width - 1, y - 1, [x, y]);
+            }
+
+            throw new Error("dx or dy must be 1 or -1");
+
         }
 
-        class Room extends Feature {
-            _x1: number;
-            _y1: number;
-            _x2: number;
-            _y2: number;
-            _doors: { [key: string]: number }; // key = corrd
+        public static createRandomCenter(cx: number, cy: number, options: ICreateRoomOption): Room {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
 
-            constructor(x1: number, y1: number, x2: number, y2: number, doorX?: number, doorY?: number) {
-                super();
-                this._x1 = x1;
-                this._y1 = y1;
-                this._x2 = x2;
-                this._y2 = y2;
-                this._doors = {};
-                if (arguments.length > 4) {
-                    this.addDoor(doorX, doorY);
-                }
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
+
+            const x1 = cx - Math.floor(Math.random() * width);
+            const y1 = cy - Math.floor(Math.random() * height);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+
+            return new Room(x1, y1, x2, y2);
+        }
+
+        public static createRandom(availWidth: number, availHeight: number, options: ICreateRoomOption): Room {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
+
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
+
+            const left = availWidth - width - 1;
+            const top = availHeight - height - 1;
+
+            const x1 = 1 + Math.floor(Math.random() * left);
+            const y1 = 1 + Math.floor(Math.random() * top);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+
+            return new Room(x1, y1, x2, y2);
+        }
+
+        public addDoor([x, y]: [number, number]): Room {
+            this.doors[x + "," + y] = 1;
+            return this;
+        }
+
+        public getDoors(callback: (coord: [number, number]) => void): Room {
+            for (const key of Object.keys(this.doors)) {
+                const parts = key.split(",");
+                callback([parseInt(parts[0], 10), parseInt(parts[1], 10)]);
             }
+            return this;
+        }
 
-            static createRandomAt(x, y, dx, dy, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
+        public clearDoors(): Room {
+            this.doors = {};
+            return this;
+        }
 
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
+        public addDoors(isWallCallback: (coord: [number, number]) => boolean): Room {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
 
-                if (dx === 1) { /* to the right */
-                    let y2 = y - Math.floor(Math.random() * height);
-                    return new Room(x + 1, y2, x + width, y2 + height - 1, x, y);
-                }
-
-                if (dx === -1) { /* to the left */
-                    let y2 = y - Math.floor(Math.random() * height);
-                    return new Room(x - width, y2, x - 1, y2 + height - 1, x, y);
-                }
-
-                if (dy === 1) { /* to the bottom */
-                    let x2 = x - Math.floor(Math.random() * width);
-                    return new Room(x2, y + 1, x2 + width - 1, y + height, x, y);
-                }
-
-                if (dy === -1) { /* to the top */
-                    let x2 = x - Math.floor(Math.random() * width);
-                    return new Room(x2, y - height, x2 + width - 1, y - 1, x, y);
-                }
-
-                throw new Error("dx or dy must be 1 or -1");
-
-            };
-
-            static createRandomCenter(cx, cy, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
-
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
-
-                const x1 = cx - Math.floor(Math.random() * width);
-                const y1 = cy - Math.floor(Math.random() * height);
-                const x2 = x1 + width - 1;
-                const y2 = y1 + height - 1;
-
-                return new Room(x1, y1, x2, y2);
-            };
-
-            static createRandom(availWidth, availHeight, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
-
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
-
-                const left = availWidth - width - 1;
-                const top = availHeight - height - 1;
-
-                const x1 = 1 + Math.floor(Math.random() * left);
-                const y1 = 1 + Math.floor(Math.random() * top);
-                const x2 = x1 + width - 1;
-                const y2 = y1 + height - 1;
-
-                return new Room(x1, y1, x2, y2);
-            };
-
-            addDoor(x, y) {
-                this._doors[x + "," + y] = 1;
-                return this;
-            };
-
-            getDoors(callback) {
-                for (let key in this._doors) {
-                    const parts = key.split(",");
-                    callback(parseInt(parts[0]), parseInt(parts[1]));
-                }
-                return this;
-            };
-
-            clearDoors() {
-                this._doors = {};
-                return this;
-            };
-
-            addDoors(isWallCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
-
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x != left && x != right && y != top && y != bottom) {
-                            continue;
-                        }
-                        if (isWallCallback(x, y)) {
-                            continue;
-                        }
-
-                        this.addDoor(x, y);
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x !== left && x !== right && y !== top && y !== bottom) {
+                        continue;
                     }
+                    if (isWallCallback([x, y])) {
+                        continue;
+                    }
+
+                    this.addDoor([x, y]);
                 }
+            }
 
-                return this;
-            };
+            return this;
+        }
 
-            debug() {
-                consolere.log("room", this._x1, this._y1, this._x2, this._y2);
-            };
+        public debug() {
+            consolere.log("room", this.left, this.top, this.right, this.bottom);
+        }
 
-            isValid(isWallCallback, canBeDugCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
+        public isValid(isWallCallback: (x: number, y: number) => boolean, canBeDugCallback: (x: number, y: number) => boolean): boolean {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
 
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x === left || x === right || y === top || y === bottom) {
-                            if (!isWallCallback(x, y)) {
-                                return false;
-                            }
-                        } else {
-                            if (!canBeDugCallback(x, y)) {
-                                return false;
-                            }
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x === left || x === right || y === top || y === bottom) {
+                        if (!isWallCallback(x, y)) {
+                            return false;
+                        }
+                    } else {
+                        if (!canBeDugCallback(x, y)) {
+                            return false;
                         }
                     }
                 }
+            }
 
-                return true;
-            };
+            return true;
+        }
+
+        /**
+         * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
+         */
+        public create(digCallback: (x: number, y: number, value: number) => void): void {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    let value = 0;
+                    if (x + "," + y in this.doors) {
+                        value = 2;
+                    } else if (x === left || x === right || y === top || y === bottom) {
+                        value = 1;
+                    } else {
+                        value = 0;
+                    }
+                    digCallback(x, y, value);
+                }
+            }
+        }
+
+        public getCenter(): [number, number] {
+            return [Math.round((this.left + this.right) / 2), Math.round((this.top + this.bottom) / 2)];
+        }
+
+        public getLeft(): number {
+            return this.left;
+        }
+
+        public getRight(): number {
+            return this.right;
+        }
+
+        public getTop(): number {
+            return this.top;
+        }
+
+        public getBottom(): number {
+            return this.bottom;
+        }
+
+    }
+
+    // 通路
+    class Corridor extends Feature {
+        private startX: number;
+        private startY: number;
+        private endX: number;
+        private endY: number;
+        private endsWithAWall: boolean;
+
+        constructor(startX: number, startY: number, endX: number, endY: number) {
+            super();
+            this.startX = startX;
+            this.startY = startY;
+            this.endX = endX;
+            this.endY = endY;
+            this.endsWithAWall = true;
+        }
+
+        public static createRandomAt(x: number, y: number, dx: number, dy: number, options: ICreateCorridorOption): Corridor {
+            const min = options.corridorLength[0];
+            const max = options.corridorLength[1];
+            const length = getUniformInt(min, max);
+
+            return new Corridor(x, y, x + dx * length, y + dy * length);
+        }
+
+        public debug(): void {
+            consolere.log("corridor", this.startX, this.startY, this.endX, this.endY);
+        }
+
+        public isValid(
+            isWallCallback: (x: number, y: number) => boolean,
+            canBeDugCallback: (x: number, y: number) => boolean
+        ): boolean {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+
+            let ok = true;
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+
+                if (!canBeDugCallback(x, y)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x + nx, y + ny)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x - nx, y - ny)) {
+                    ok = false;
+                }
+
+                if (!ok) {
+                    length = i;
+                    this.endX = x - dx;
+                    this.endY = y - dy;
+                    break;
+                }
+            }
 
             /**
-             * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
+             * If the length degenerated, this corridor might be invalid
              */
-            create(digCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
 
-                let value = 0;
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x + "," + y in this._doors) {
-                            value = 2;
-                        } else if (x === left || x === right || y === top || y === bottom) {
-                            value = 1;
-                        } else {
-                            value = 0;
-                        }
-                        digCallback(x, y, value);
-                    }
-                }
-            };
-
-            getCenter() {
-                return [Math.round((this._x1 + this._x2) / 2), Math.round((this._y1 + this._y2) / 2)];
-            };
-
-            getLeft() {
-                return this._x1;
-            };
-
-            getRight() {
-                return this._x2;
-            };
-
-            getTop() {
-                return this._y1;
-            };
-
-            getBottom() {
-                return this._y2;
-            };
-
-        };
-
-        class Corridor extends Feature {
-            _startX: number;
-            _startY: number;
-            _endX: number;
-            _endY: number;
-            _endsWithAWall: boolean;
-
-            constructor(startX: number, startY: number, endX: number, endY: number) {
-                super();
-                this._startX = startX;
-                this._startY = startY;
-                this._endX = endX;
-                this._endY = endY;
-                this._endsWithAWall = true;
+            /* not supported */
+            if (length === 0) {
+                return false;
             }
 
-            static createRandomAt(x, y, dx, dy, options) {
-                const min = options.corridorLength[0];
-                const max = options.corridorLength[1];
-                const length = getUniformInt(min, max);
+            /* length 1 allowed only if the next space is empty */
+            if (length === 1 && isWallCallback(this.endX + dx, this.endY + dy)) {
+                return false;
+            }
 
-                return new Corridor(x, y, x + dx * length, y + dy * length);
-            };
+            /**
+             * We do not want the corridor to crash into a corner of a room;
+             * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
+             *
+             * Situation:
+             * #######1
+             * .......?
+             * #######2
+             *
+             * The corridor was dug from left to right.
+             * 1, 2 - problematic corners, ? = N+1th cell (not dug)
+             */
+            const firstCornerBad = !isWallCallback(this.endX + dx + nx, this.endY + dy + ny);
+            const secondCornerBad = !isWallCallback(this.endX + dx - nx, this.endY + dy - ny);
+            this.endsWithAWall = isWallCallback(this.endX + dx, this.endY + dy);
+            if ((firstCornerBad || secondCornerBad) && this.endsWithAWall) {
+                return false;
+            }
 
-            debug() {
-                consolere.log("corridor", this._startX, this._startY, this._endX, this._endY);
-            };
-
-            isValid(isWallCallback, canBeDugCallback) {
-                const sx = this._startX;
-                const sy = this._startY;
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                const nx = dy;
-                const ny = -dx;
-
-                let ok = true;
-                for (let i = 0; i < length; i++) {
-                    const x = sx + i * dx;
-                    const y = sy + i * dy;
-
-                    if (!canBeDugCallback(x, y)) {
-                        ok = false;
-                    }
-                    if (!isWallCallback(x + nx, y + ny)) {
-                        ok = false;
-                    }
-                    if (!isWallCallback(x - nx, y - ny)) {
-                        ok = false;
-                    }
-
-                    if (!ok) {
-                        length = i;
-                        this._endX = x - dx;
-                        this._endY = y - dy;
-                        break;
-                    }
-                }
-
-                /**
-                 * If the length degenerated, this corridor might be invalid
-                 */
-
-                /* not supported */
-                if (length === 0) {
-                    return false;
-                }
-
-                /* length 1 allowed only if the next space is empty */
-                if (length === 1 && isWallCallback(this._endX + dx, this._endY + dy)) {
-                    return false;
-                }
-
-                /**
-                 * We do not want the corridor to crash into a corner of a room;
-                 * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
-                 * 
-                 * Situation:
-                 * #######1
-                 * .......?
-                 * #######2
-                 * 
-                 * The corridor was dug from left to right.
-                 * 1, 2 - problematic corners, ? = N+1th cell (not dug)
-                 */
-                const firstCornerBad = !isWallCallback(this._endX + dx + nx, this._endY + dy + ny);
-                const secondCornerBad = !isWallCallback(this._endX + dx - nx, this._endY + dy - ny);
-                this._endsWithAWall = isWallCallback(this._endX + dx, this._endY + dy);
-                if ((firstCornerBad || secondCornerBad) && this._endsWithAWall) {
-                    return false;
-                }
-
-                return true;
-            };
-
-            create(digCallback) {
-                const sx = this._startX;
-                const sy = this._startY;
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                //const nx = dy;
-                //const ny = -dx;
-
-                for (let i = 0; i < length; i++) {
-                    const x = sx + i * dx;
-                    const y = sy + i * dy;
-                    digCallback(x, y, 0);
-                }
-
-                return true;
-            };
-
-            createPriorityWalls(priorityWallCallback) {
-                if (!this._endsWithAWall) {
-                    return;
-                }
-
-                const sx = this._startX;
-                const sy = this._startY;
-
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                const nx = dy;
-                const ny = -dx;
-
-                priorityWallCallback(this._endX + dx, this._endY + dy);
-                priorityWallCallback(this._endX + nx, this._endY + ny);
-                priorityWallCallback(this._endX - nx, this._endY - ny);
-            };
+            return true;
         }
 
-        type MapOption = {
-            roomWidth?: number[];
-            roomHeight?: number[];
-            corridorLength?: number[];
-            dugPercentage?: number;
-            timeLimit?: number;
-        };
+        public create(digCallback: (x: number, y: number, value: number) => void): boolean {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
 
-        class Map {
-            _dug: number;
-            _map: any[];
-
-            _options: MapOption;
-            _width: number;
-            _height: number;
-            _rooms: any[];
-            _corridors: any[];
-            _features: { Room: number; Corridor: number; };
-            _featureAttempts: number;
-            _walls: {};
-
-            constructor(width: number, height: number, option: MapOption) {
-                this._width = width;
-                this._height = height;
-                this._rooms = []; /* list of all rooms */
-                this._corridors = [];
-                this._options = {
-                    roomWidth: [3, 9], /* room minimum and maximum width */
-                    roomHeight: [3, 5], /* room minimum and maximum height */
-                    corridorLength: [3, 10], /* corridor minimum and maximum length */
-                    dugPercentage: 0.2, /* we stop after this percentage of level area has been dug out */
-                    timeLimit: 1000 /* we stop after this much time has passed (msec) */
-                };
-                Object.assign(this._options, option);
-
-                this._features = {
-                    Room: 4,
-                    Corridor: 4
-                };
-                this._featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
-                this._walls = {}; /* these are available for digging */
-
-                this._digCallback = this._digCallback.bind(this);
-                this._canBeDugCallback = this._canBeDugCallback.bind(this);
-                this._isWallCallback = this._isWallCallback.bind(this);
-                this._priorityWallCallback = this._priorityWallCallback.bind(this);
+            if (dx) {
+                dx = dx / Math.abs(dx);
             }
-            create(callback) {
-                this._rooms = [];
-                this._corridors = [];
-                this._map = this._fillMap(1);
-                this._walls = {};
-                this._dug = 0;
-                const area = (this._width - 2) * (this._height - 2);
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
 
-                this._firstRoom();
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+                digCallback(x, y, 0);
+            }
 
-                const t1 = Date.now();
+            return true;
+        }
 
+        public createPriorityWalls(priorityWallCallback: (x: number, y: number) => void): void {
+            if (!this.endsWithAWall) {
+                return;
+            }
+
+            const sx = this.startX;
+            const sy = this.startY;
+
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+
+            priorityWallCallback(this.endX + dx, this.endY + dy);
+            priorityWallCallback(this.endX + nx, this.endY + ny);
+            priorityWallCallback(this.endX - nx, this.endY - ny);
+        }
+    }
+
+    interface ICreateRoomOption {
+        roomWidth: [number, number];
+        roomHeight: [number, number];
+    }
+    interface ICreateCorridorOption {
+         corridorLength: [number, number];
+    }
+
+    interface IMapOption extends ICreateRoomOption, ICreateCorridorOption {
+        roomWidth: [number, number];
+            roomHeight: [number, number];
+        corridorLength: [number, number];
+        dugPercentage: number;
+        timeLimit: number;
+    }
+
+    class Generator {
+        private dug: number;
+        private map: number[][];
+
+        private options: IMapOption;
+        private width: number;
+        private height: number;
+        public rooms: Room[];
+        private corridors: Corridor[];
+        private features: { [key: string]: number; };
+        private featureAttempts: number;
+        private walls: { [key: string]: number };
+
+        constructor(
+            width: number,
+            height: number,
+            option: IMapOption = {
+            roomWidth: [3, 9], /* room minimum and maximum width */
+            roomHeight: [3, 5], /* room minimum and maximum height */
+            corridorLength: [3, 10], /* corridor minimum and maximum length */
+            dugPercentage: 0.2, /* we stop after this percentage of level area has been dug out */
+            timeLimit: 1000, /* we stop after this much time has passed (msec) */
+        }) {
+            this.width = width;
+            this.height = height;
+            this.rooms = []; /* list of all rooms */
+            this.corridors = [];
+            this.options = option;
+
+            this.features = {
+                Room: 4,
+                Corridor: 4,
+            };
+            this.featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
+            this.walls = {}; /* these are available for digging */
+
+            this._digCallback = this._digCallback.bind(this);
+            this._canBeDugCallback = this._canBeDugCallback.bind(this);
+            this._isWallCallback = this._isWallCallback.bind(this);
+            this._priorityWallCallback = this._priorityWallCallback.bind(this);
+        }
+        /*@*/public create(callback: (x: number, y: number, value: number) => void): Generator {
+            this.rooms = [];
+            this.corridors = [];
+            this.map = this._fillMap(1);
+            this.walls = {};
+            this.dug = 0;
+            const area = (this.width - 2) * (this.height - 2);
+
+            this._firstRoom();
+
+            const t1 = Date.now();
+
+            let priorityWalls = 0;
+            do {
+                const t2 = Date.now();
+                if (t2 - t1 > this.options.timeLimit) {
+                    break;
+                }
+
+                /* find a good wall */
+                const wall = this._findWall();
+                if (!wall) {
+                    break;
+                } /* no more walls */
+
+                const parts = wall.split(",");
+                const x = parseInt(parts[0]);
+                const y = parseInt(parts[1]);
+                const dir = this._getDiggingDirection(x, y);
+                if (!dir) {
+                    continue;
+                } /* this wall is not suitable */
+
+                // consolere.log("wall", x, y);
+
+                /* try adding a feature */
+                let featureAttempts = 0;
                 do {
-                    const t2 = Date.now();
-                    if (t2 - t1 > this._options.timeLimit) {
+                    featureAttempts++;
+                    if (this._tryFeature(x, y, dir[0], dir[1])) { /* feature added */
+                        // if (this._rooms.length + this._corridors.length === 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
+                        this._removeSurroundingWalls(x, y);
+                        this._removeSurroundingWalls(x - dir[0], y - dir[1]);
                         break;
                     }
+                } while (featureAttempts < this.featureAttempts);
 
-                    /* find a good wall */
-                    const wall = this._findWall();
-                    if (!wall) {
-                        break;
-                    } /* no more walls */
-
-                    const parts = wall.split(",");
-                    const x = parseInt(parts[0]);
-                    const y = parseInt(parts[1]);
-                    const dir = this._getDiggingDirection(x, y);
-                    if (!dir) {
-                        continue;
-                    } /* this wall is not suitable */
-
-                    //		consolere.log("wall", x, y);
-
-                    /* try adding a feature */
-                    let featureAttempts = 0;
-                    do {
-                        featureAttempts++;
-                        if (this._tryFeature(x, y, dir[0], dir[1])) { /* feature added */
-                            //if (this._rooms.length + this._corridors.length == 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
-                            this._removeSurroundingWalls(x, y);
-                            this._removeSurroundingWalls(x - dir[0], y - dir[1]);
-                            break;
-                        }
-                    } while (featureAttempts < this._featureAttempts);
-
-                    var priorityWalls = 0;
-                    for (let id in this._walls) {
-                        if (this._walls[id] > 1) {
-                            priorityWalls++;
-                        }
-                    }
-
-                } while (this._dug / area < this._options.dugPercentage || priorityWalls
-                ); /* fixme number of priority walls */
-
-                this._addDoors();
-
-                if (callback) {
-                    for (let i = 0; i < this._width; i++) {
-                        for (let j = 0; j < this._height; j++) {
-                            callback(i, j, this._map[i][j]);
-                        }
+                for (const id in this.walls) {
+                    if (this.walls[id] > 1) {
+                        priorityWalls++;
                     }
                 }
 
-                this._walls = {};
-                this._map = null;
+            } while (this.dug / area < this.options.dugPercentage || priorityWalls); /* fixme number of priority walls */
 
-                return this;
-            };
+            this._addDoors();
 
-            _digCallback(x, y, value) {
-                if (value == 0 || value == 2) { /* empty */
-                    this._map[x][y] = 0;
-                    this._dug++;
-                } else { /* wall */
-                    this._walls[x + "," + y] = 1;
-                }
-            };
-
-            _isWallCallback(x, y) {
-                if (x < 0 || y < 0 || x >= this._width || y >= this._height) {
-                    return false;
-                }
-                return (this._map[x][y] == 1);
-            };
-
-            _canBeDugCallback(x, y) {
-                if (x < 1 || y < 1 || x + 1 >= this._width || y + 1 >= this._height) {
-                    return false;
-                }
-                return (this._map[x][y] == 1);
-            };
-
-            _priorityWallCallback(x, y) {
-                this._walls[x + "," + y] = 2;
-            };
-
-            _findWall() {
-                const prio1: string[] = [];
-                const prio2: string[] = [];
-                for (let id in this._walls) {
-                    const prio = this._walls[id];
-                    if (prio === 2) {
-                        prio2.push(id);
-                    } else {
-                        prio1.push(id);
+            if (callback) {
+                for (let i = 0; i < this.width; i++) {
+                    for (let j = 0; j < this.height; j++) {
+                        callback(i, j, this.map[i][j]);
                     }
                 }
+            }
 
-                const arr = (prio2.length ? prio2 : prio1);
-                if (!arr.length) {
-                    return null;
-                } /* no walls :/ */
+            this.walls = {};
+            this.map = null;
 
-                const id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
-                delete this._walls[id2];
-
-                return id2;
-            };
-
-            _firstRoom() {
-                const cx = Math.floor(this._width / 2);
-                const cy = Math.floor(this._height / 2);
-                const room = Room.createRandomCenter(cx, cy, this._options);
-                this._rooms.push(room);
-                room.create(this._digCallback);
-            };
-
-            _fillMap(value: number) {
-                const map: number[][] = [];
-                for (let i = 0; i < this._width; i++) {
-                    map.push([]);
-                    for (let j = 0; j < this._height; j++) {
-                        map[i].push(value);
-                    }
-                }
-                return map;
-            };
-
-            FeatureClass = { Room: Room, Corridor: Corridor };
-
-            _tryFeature(x, y, dx, dy) {
-                const featureType = getWeightedValue(this._features);
-                const feature = this.FeatureClass[featureType].createRandomAt(x, y, dx, dy, this._options);
-
-                if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
-                    //		consolere.log("not valid");
-                    //		feature.debug();
-                    return false;
-                }
-
-                feature.create(this._digCallback);
-                //	feature.debug();
-
-                if (feature instanceof Room) {
-                    this._rooms.push(feature);
-                }
-                if (feature instanceof Corridor) {
-                    feature.createPriorityWalls(this._priorityWallCallback);
-                    this._corridors.push(feature);
-                }
-
-                return true;
-            };
-
-            _removeSurroundingWalls(cx, cy) {
-                const deltas = this._ROTDIRS4;
-
-                for (let i = 0; i < deltas.length; i++) {
-                    const delta = deltas[i];
-                    var x = cx + delta[0];
-                    var y = cy + delta[1];
-                    delete this._walls[x + "," + y];
-                    var x = cx + 2 * delta[0];
-                    var y = cy + 2 * delta[1];
-                    delete this._walls[x + "," + y];
-                }
-            };
-
-            _ROTDIRS4 = [
-                [0, -1],
-                [1, 0],
-                [0, 1],
-                [-1, 0]
-            ];
-
-            _getDiggingDirection(cx, cy) {
-                if (cx <= 0 || cy <= 0 || cx >= this._width - 1 || cy >= this._height - 1) {
-                    return null;
-                }
-
-                let result = null;
-                const deltas = this._ROTDIRS4;
-
-                for (let i = 0; i < deltas.length; i++) {
-                    const delta = deltas[i];
-                    const x = cx + delta[0];
-                    const y = cy + delta[1];
-
-                    if (!this._map[x][y]) { /* there already is another empty neighbor! */
-                        if (result) {
-                            return null;
-                        }
-                        result = delta;
-                    }
-                }
-
-                /* no empty neighbor */
-                if (!result) {
-                    return null;
-                }
-
-                return [-result[0], -result[1]];
-            };
-
-            _addDoors() {
-                var data = this._map;
-                const isWallCallback = (x, y) => {
-                    return (data[x][y] == 1);
-                };
-                for (let i = 0; i < this._rooms.length; i++) {
-                    const room = this._rooms[i];
-                    room.clearDoors();
-                    room.addDoors(isWallCallback);
-                }
-            };
-
-            getRooms() {
-                return this._rooms;
-            };
-
-            getCorridors() {
-                return this._corridors;
-            };
+            return this;
         }
 
-        export function create(w: number, h: number, callback: (x: number, y: number, value: number) => void): Map {
-            return new Map(w, h, {}).create(callback);
+        private _digCallback(x: number, y: number, value: number): void {
+            if (value === 0 || value === 2) { /* empty */
+                this.map[x][y] = 0;
+                this.dug++;
+            } else { /* wall */
+                this.walls[x + "," + y] = 1;
+            }
         }
+
+        private _isWallCallback(x: number, y: number): boolean {
+            if (x < 0 || y < 0 || x >= this.width || y >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+
+        private _canBeDugCallback(x: number, y: number): boolean {
+            if (x < 1 || y < 1 || x + 1 >= this.width || y + 1 >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+
+        private _priorityWallCallback(x: number, y: number): void {
+            this.walls[x + "," + y] = 2;
+        }
+
+        private _findWall(): string {
+            const prio1: string[] = [];
+            const prio2: string[] = [];
+            for (const id in this.walls) {
+                const prio = this.walls[id];
+                if (prio === 2) {
+                    prio2.push(id);
+                } else {
+                    prio1.push(id);
+                }
+            }
+
+            const arr = (prio2.length ? prio2 : prio1);
+            if (!arr.length) {
+                return null;
+            } /* no walls :/ */
+
+            const id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
+            delete this.walls[id2];
+
+            return id2;
+        }
+
+        private _firstRoom() {
+            const cx = Math.floor(this.width / 2);
+            const cy = Math.floor(this.height / 2);
+            const room = Room.createRandomCenter(cx, cy, this.options as ICreateRoomOption);
+            this.rooms.push(room);
+            room.create(this._digCallback);
+        }
+
+        private _fillMap(value: number): number[][] {
+            const map: number[][] = [];
+            for (let i = 0; i < this.width; i++) {
+                map.push([]);
+                for (let j = 0; j < this.height; j++) {
+                    map[i].push(value);
+                }
+            }
+            return map;
+        }
+
+        private static FeatureCreateMethod: { [key: string]: (x: number, y: number, dx: number, dy: number, options: IMapOption) => Feature } = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
+
+        private _tryFeature(x: number, y: number, dx: number, dy: number): boolean {
+            const featureType: string = getWeightedValue(this.features);
+            const feature = Generator.FeatureCreateMethod[featureType](x, y, dx, dy, this.options);
+
+            if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
+                return false;
+            }
+
+            feature.create(this._digCallback);
+
+            if (feature instanceof Room) {
+                this.rooms.push(feature);
+            }
+            if (feature instanceof Corridor) {
+                feature.createPriorityWalls(this._priorityWallCallback);
+                this.corridors.push(feature);
+            }
+
+            return true;
+        }
+
+        private _removeSurroundingWalls(cx: number, cy: number): void {
+            const deltas = Generator._ROTDIRS4;
+
+            for (const delta of deltas) {
+                const x1 = cx + delta[0];
+                const y1 = cy + delta[1];
+                delete this.walls[x1 + "," + y1];
+                const x2 = cx + 2 * delta[0];
+                const y2 = cy + 2 * delta[1];
+                delete this.walls[x2 + "," + y2];
+            }
+        }
+
+        private static _ROTDIRS4: [number, number][] = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [-1, 0],
+        ];
+
+        private _getDiggingDirection(cx: number, cy: number): [number, number] {
+            if (cx <= 0 || cy <= 0 || cx >= this.width - 1 || cy >= this.height - 1) {
+                return null;
+            }
+
+            let result: [number, number] = null;
+            const deltas = Generator._ROTDIRS4;
+
+            for (const delta of deltas) {
+                const x = cx + delta[0];
+                const y = cy + delta[1];
+
+                if (!this.map[x][y]) { /* there already is another empty neighbor! */
+                    if (result) {
+                        return null;
+                    }
+                    result = delta;
+                }
+            }
+
+            /* no empty neighbor */
+            if (!result) {
+                return null;
+            }
+
+            return [-result[0], -result[1]];
+        }
+
+        private _addDoors(): void {
+            const data = this.map;
+            const isWallCallback = ([x, y]: [number, number]): boolean => {
+                return (data[x][y] === 1);
+            };
+            for (const room of this.rooms) {
+                room.clearDoors();
+                room.addDoors(isWallCallback);
+            }
+        }
+
+        public getRooms(): Room[] {
+            return this.rooms;
+        }
+
+        public getCorridors(): Corridor[] {
+            return this.corridors;
+        }
+    }
+
+    export function generate(w: number, h: number, callback: (x: number, y: number, value: number) => void): Generator {
+        return new Generator(w, h).create(callback);
     }
 
 }

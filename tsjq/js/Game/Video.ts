@@ -1,6 +1,13 @@
 "use strict";
 
-module Game {
+interface CanvasRenderingContext2D {
+    mozImageSmoothingEnabled: boolean;
+    imageSmoothingEnabled: boolean;
+    webkitImageSmoothingEnabled: boolean;
+    ellipse: (x: number, y: number, radiusX: number, radiusY: number, rotation: number, startAngle: number, endAngle: number, anticlockwise?: boolean) => void;
+}
+
+namespace Game {
     export class Video {
         private canvasElement: HTMLCanvasElement;
         private canvasRenderingContext2D: CanvasRenderingContext2D;
@@ -59,76 +66,76 @@ module Game {
         }
 
         //
-        get canvas(): HTMLCanvasElement { return this.canvasRenderingContext2D.canvas; }
+        public get canvas(): HTMLCanvasElement { return this.canvasRenderingContext2D.canvas; }
 
-        get fillStyle(): string | CanvasGradient | CanvasPattern { return this.canvasRenderingContext2D.fillStyle; }
+        public get fillStyle(): string | CanvasGradient | CanvasPattern { return this.canvasRenderingContext2D.fillStyle; }
 
-        set fillStyle(value: string | CanvasGradient | CanvasPattern) { this.canvasRenderingContext2D.fillStyle = value; }
+        public set fillStyle(value: string | CanvasGradient | CanvasPattern) { this.canvasRenderingContext2D.fillStyle = value; }
 
-        get font(): string { return this.canvasRenderingContext2D.font; }
+        public get font(): string { return this.canvasRenderingContext2D.font; }
 
-        set font(value: string) { this.canvasRenderingContext2D.font = value; }
+        public set font(value: string) { this.canvasRenderingContext2D.font = value; }
 
-        get globalAlpha(): number { return this.canvasRenderingContext2D.globalAlpha; }
+        public get globalAlpha(): number { return this.canvasRenderingContext2D.globalAlpha; }
 
-        set globalAlpha(value: number) { this.canvasRenderingContext2D.globalAlpha = value; }
+        public set globalAlpha(value: number) { this.canvasRenderingContext2D.globalAlpha = value; }
 
-        get globalCompositeOperation(): string { return this.canvasRenderingContext2D.globalCompositeOperation; }
+        public get globalCompositeOperation(): string { return this.canvasRenderingContext2D.globalCompositeOperation; }
 
-        set globalCompositeOperation(value: string) { this.canvasRenderingContext2D.globalCompositeOperation = value; }
+        public set globalCompositeOperation(value: string) { this.canvasRenderingContext2D.globalCompositeOperation = value; }
 
-        get lineCap(): string { return this.canvasRenderingContext2D.lineCap; }
+        public get lineCap(): string { return this.canvasRenderingContext2D.lineCap; }
 
-        set lineCap(value: string) { this.canvasRenderingContext2D.lineCap = value; }
+        public set lineCap(value: string) { this.canvasRenderingContext2D.lineCap = value; }
 
-        get lineDashOffset(): number { return this.canvasRenderingContext2D.lineDashOffset; }
+        public get lineDashOffset(): number { return this.canvasRenderingContext2D.lineDashOffset; }
 
-        set lineDashOffset(value: number) { this.canvasRenderingContext2D.lineDashOffset = value; }
+        public set lineDashOffset(value: number) { this.canvasRenderingContext2D.lineDashOffset = value; }
 
-        get lineJoin(): string { return this.canvasRenderingContext2D.lineJoin; }
+        public get lineJoin(): string { return this.canvasRenderingContext2D.lineJoin; }
 
-        set lineJoin(value: string) { this.canvasRenderingContext2D.lineJoin = value; }
+        public set lineJoin(value: string) { this.canvasRenderingContext2D.lineJoin = value; }
 
-        get lineWidth(): number { return this.canvasRenderingContext2D.lineWidth; }
+        public get lineWidth(): number { return this.canvasRenderingContext2D.lineWidth; }
 
-        set lineWidth(value: number) { this.canvasRenderingContext2D.lineWidth = value; }
+        public set lineWidth(value: number) { this.canvasRenderingContext2D.lineWidth = value; }
 
-        get miterLimit(): number { return this.canvasRenderingContext2D.miterLimit; }
+        public get miterLimit(): number { return this.canvasRenderingContext2D.miterLimit; }
 
-        set miterLimit(value: number) { this.canvasRenderingContext2D.miterLimit = value; }
+        public set miterLimit(value: number) { this.canvasRenderingContext2D.miterLimit = value; }
 
         //get msFillRule(): string { return this.context.msFillRule; }
         //set msFillRule(value: string) { this.context.msFillRule = value; }
 
-        get shadowBlur(): number { return this.canvasRenderingContext2D.shadowBlur; }
+        public get shadowBlur(): number { return this.canvasRenderingContext2D.shadowBlur; }
 
-        set shadowBlur(value: number) { this.canvasRenderingContext2D.shadowBlur = value; }
+        public set shadowBlur(value: number) { this.canvasRenderingContext2D.shadowBlur = value; }
 
-        get shadowColor(): string { return this.canvasRenderingContext2D.shadowColor; }
+        public get shadowColor(): string { return this.canvasRenderingContext2D.shadowColor; }
 
-        set shadowColor(value: string) { this.canvasRenderingContext2D.shadowColor = value; }
+        public set shadowColor(value: string) { this.canvasRenderingContext2D.shadowColor = value; }
 
-        get shadowOffsetX(): number { return this.canvasRenderingContext2D.shadowOffsetX; }
+        public get shadowOffsetX(): number { return this.canvasRenderingContext2D.shadowOffsetX; }
 
-        set shadowOffsetX(value: number) { this.canvasRenderingContext2D.shadowOffsetX = value; }
+        public set shadowOffsetX(value: number) { this.canvasRenderingContext2D.shadowOffsetX = value; }
 
-        get shadowOffsetY(): number { return this.canvasRenderingContext2D.shadowOffsetY; }
+        public get shadowOffsetY(): number { return this.canvasRenderingContext2D.shadowOffsetY; }
 
-        set shadowOffsetY(value: number) { this.canvasRenderingContext2D.shadowOffsetY = value; }
+        public set shadowOffsetY(value: number) { this.canvasRenderingContext2D.shadowOffsetY = value; }
 
-        get strokeStyle(): string | CanvasGradient | CanvasPattern { return this.canvasRenderingContext2D.strokeStyle; }
+        public get strokeStyle(): string | CanvasGradient | CanvasPattern { return this.canvasRenderingContext2D.strokeStyle; }
 
-        set strokeStyle(value: string | CanvasGradient | CanvasPattern) { this.canvasRenderingContext2D.strokeStyle = value; }
+        public set strokeStyle(value: string | CanvasGradient | CanvasPattern) { this.canvasRenderingContext2D.strokeStyle = value; }
 
-        get textAlign(): string { return this.canvasRenderingContext2D.textAlign; }
+        public get textAlign(): string { return this.canvasRenderingContext2D.textAlign; }
 
-        set textAlign(value: string) { this.canvasRenderingContext2D.textAlign = value; }
+        public set textAlign(value: string) { this.canvasRenderingContext2D.textAlign = value; }
 
-        get textBaseline(): string { return this.canvasRenderingContext2D.textBaseline; }
+        public get textBaseline(): string { return this.canvasRenderingContext2D.textBaseline; }
 
-        set textBaseline(value: string) { this.canvasRenderingContext2D.textBaseline = value; }
+        public set textBaseline(value: string) { this.canvasRenderingContext2D.textBaseline = value; }
 
-        get imageSmoothingEnabled(): boolean {
+        public get imageSmoothingEnabled(): boolean {
             if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
                 return this.canvasRenderingContext2D.imageSmoothingEnabled;
             }
@@ -141,7 +148,7 @@ module Game {
             return false;
         }
 
-        set imageSmoothingEnabled(value: boolean) {
+        public set imageSmoothingEnabled(value: boolean) {
             if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
                 this.canvasRenderingContext2D.imageSmoothingEnabled = value;
                 return;
@@ -156,25 +163,25 @@ module Game {
             }
         }
 
-        arc: (x: number,
+        public arc: (x: number,
             y: number,
             radius: number,
             startAngle: number,
             endAngle: number,
             anticlockwise?: boolean) => void;
-        arcTo: (x1: number, y1: number, x2: number, y2: number, radius: number) => void;
-        beginPath: () => void;
-        bezierCurveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => void;
-        clearRect: (x: number, y: number, w: number, h: number) => void;
-        clip: (fillRule?: string) => void;
-        closePath: () => void;
-        createImageData: (imageDataOrSw: number | ImageData, sh?: number) => ImageData;
-        createLinearGradient: (x0: number, y0: number, x1: number, y1: number) => CanvasGradient;
-        createPattern: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, repetition: string) =>
+        public arcTo: (x1: number, y1: number, x2: number, y2: number, radius: number) => void;
+        public beginPath: () => void;
+        public bezierCurveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => void;
+        public clearRect: (x: number, y: number, w: number, h: number) => void;
+        public clip: (fillRule?: string) => void;
+        public closePath: () => void;
+        public createImageData: (imageDataOrSw: number | ImageData, sh?: number) => ImageData;
+        public createLinearGradient: (x0: number, y0: number, x1: number, y1: number) => CanvasGradient;
+        public createPattern: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, repetition: string) =>
             CanvasPattern;
-        createRadialGradient: (x0: number, y0: number, r0: number, x1: number, y1: number, r1: number) =>
+        public createRadialGradient: (x0: number, y0: number, r0: number, x1: number, y1: number, r1: number) =>
             CanvasGradient;
-        drawImage: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
+        public drawImage: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,
             offsetY: number,
             width?: number,
@@ -183,37 +190,37 @@ module Game {
             canvasOffsetY?: number,
             canvasImageWidth?: number,
             canvasImageHeight?: number) => void;
-        fill: (fillRule?: string) => void;
-        fillRect: (x: number, y: number, w: number, h: number) => void;
-        fillText: (text: string, x: number, y: number, maxWidth?: number) => void;
-        getImageData: (sx: number, sy: number, sw: number, sh: number) => ImageData;
-        getLineDash: () => number[];
-        isPointInPath: (x: number, y: number, fillRule?: string) => boolean;
-        lineTo: (x: number, y: number) => void;
-        measureText: (text: string) => TextMetrics;
-        moveTo: (x: number, y: number) => void;
-        putImageData: (imagedata: ImageData,
+        public fill: (fillRule?: string) => void;
+        public fillRect: (x: number, y: number, w: number, h: number) => void;
+        public fillText: (text: string, x: number, y: number, maxWidth?: number) => void;
+        public getImageData: (sx: number, sy: number, sw: number, sh: number) => ImageData;
+        public getLineDash: () => number[];
+        public isPointInPath: (x: number, y: number, fillRule?: string) => boolean;
+        public lineTo: (x: number, y: number) => void;
+        public measureText: (text: string) => TextMetrics;
+        public moveTo: (x: number, y: number) => void;
+        public putImageData: (imagedata: ImageData,
             dx: number,
             dy: number,
             dirtyX?: number,
             dirtyY?: number,
             dirtyWidth?: number,
             dirtyHeight?: number) => void;
-        quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => void;
-        rect: (x: number, y: number, w: number, h: number) => void;
-        restore: () => void;
-        rotate: (angle: number) => void;
-        save: () => void;
-        scale: (x: number, y: number) => void;
-        setLineDash: (segments: number[]) => void;
-        setTransform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
-        stroke: () => void;
-        strokeRect: (x: number, y: number, w: number, h: number) => void;
-        strokeText: (text: string, x: number, y: number, maxWidth?: number) => void;
-        transform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
-        translate: (x: number, y: number) => void;
+        public quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => void;
+        public rect: (x: number, y: number, w: number, h: number) => void;
+        public restore: () => void;
+        public rotate: (angle: number) => void;
+        public save: () => void;
+        public scale: (x: number, y: number) => void;
+        public setLineDash: (segments: number[]) => void;
+        public setTransform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
+        public stroke: () => void;
+        public strokeRect: (x: number, y: number, w: number, h: number) => void;
+        public strokeText: (text: string, x: number, y: number, maxWidth?: number) => void;
+        public transform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
+        public translate: (x: number, y: number) => void;
         // 
-        ellipse: (x: number,
+        public ellipse: (x: number,
             y: number,
             radiusX: number,
             radiusY: number,
@@ -223,12 +230,12 @@ module Game {
             anticlockwise?: boolean) => void;
 
         //
-        drawTile(image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
+        public drawTile(image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,
             offsetY: number,
             sprite: number[][],
             spritesize: number[],
-            tile: Dungeon.Array2D): void {
+            tile: Array2D): void {
             for (var y = 0; y < tile.height; y++) {
                 for (var x = 0; x < tile.width; x++) {
                     var chip = tile.value(x, y);
@@ -248,16 +255,16 @@ module Game {
         }
 
         //
-        get width(): number {
+        public get width(): number {
             return this.canvasRenderingContext2D.canvas.width;
         }
 
-        get height(): number {
+        public get height(): number {
             return this.canvasRenderingContext2D.canvas.height;
         }
 
 
-        loadImage(asserts: { [id: string]: string }): Promise<boolean> {
+        public loadImage(asserts: { [id: string]: string }): Promise<boolean> {
             return Promise.all(
                 Object.keys(asserts).map((x) => new Promise<void>((resolve, reject) => {
                     const img = new Image();
@@ -277,18 +284,18 @@ module Game {
             });
         }
 
-        texture(id: string) {
+        public texture(id: string) {
             return this.images.get(id);
         }
 
-        pagePointToScreenPoint(x: number, y: number): number[] {
+        public pagePointToScreenPoint(x: number, y: number): number[] {
             const cr = this.canvasRenderingContext2D.canvas.getBoundingClientRect();
             const sx = (x - (cr.left + window.pageXOffset));
             const sy = (y - (cr.top + window.pageYOffset));
             return [sx, sy];
         }
 
-        pagePointContainScreen(x: number, y: number): boolean {
+        public pagePointContainScreen(x: number, y: number): boolean {
             const pos = this.pagePointToScreenPoint(x, y);
             return 0 <= pos[0] && pos[0] < this.width && 0 <= pos[1] && pos[1] < this.height;
         }

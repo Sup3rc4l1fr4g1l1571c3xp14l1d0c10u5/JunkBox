@@ -16,6 +16,17 @@ Object.defineProperties(Array.prototype, {
         }
     }
 });
+Object.defineProperties(Number.prototype, {
+    "times": {
+        enumerable: false,
+        configurable: false,
+        writable: false,
+        value: function () {
+            for (var i = 0; i < this; i++) {
+            }
+        }
+    }
+});
 var Dispatcher;
 (function (Dispatcher) {
     class SingleDispatcher {
@@ -39,9 +50,7 @@ var Dispatcher;
         }
         fire(...args) {
             const temp = this.listeners.slice();
-            for (var i = 0, len = temp.length; i < len; ++i) {
-                temp[i].apply(this, args);
-            }
+            temp.forEach((dispatcher) => dispatcher.apply(this, args));
             return this;
         }
         one(listener) {
@@ -259,9 +268,6 @@ var Game;
 })(Game || (Game = {}));
 var Game;
 (function (Game) {
-    if (AudioContext == null && webkitAudioContext != null) {
-        AudioContext = webkitAudioContext;
-    }
     let Sound;
     (function (Sound) {
         class ManagedSoundChannel {
@@ -324,6 +330,18 @@ var Game;
                 this.bufferSourceIdCount = 0;
                 this.playingBufferSources = new Map();
                 this.reset();
+                let touchEventHooker = () => {
+                    // A small hack to unlock AudioContext on mobile safari.
+                    const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
+                    const channel = buffer.getChannelData(0);
+                    channel.fill(0);
+                    const src = this.audioContext.createBufferSource();
+                    src.buffer = buffer;
+                    src.connect(this.audioContext.destination);
+                    src.start(this.audioContext.currentTime);
+                    document.body.removeEventListener('touchstart', touchEventHooker);
+                };
+                document.body.addEventListener('touchstart', touchEventHooker);
             }
             createBufferSource(buffer) {
                 var bufferSource = this.audioContext.createBufferSource();
@@ -485,8 +503,7 @@ var Game;
                 });
                 // add event listener to body
                 document.onselectstart = () => false;
-                if (document.body["pointermove"]) {
-                    consolere.log("pointer event is implemented");
+                if (document.body["pointermove"] !== undefined) {
                     document.body.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
                     document.body.addEventListener('touchdown', evt => { evt.preventDefault(); }, false);
                     document.body.addEventListener('touchup', evt => { evt.preventDefault(); }, false);
@@ -607,8 +624,8 @@ var Game;
             }
             checkEvent(e) {
                 e.preventDefault();
-                const istouch = e.type.indexOf("touch") === 0;
-                const ismouse = e.type.indexOf("mouse") === 0;
+                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && e.pointerType == "touch");
+                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && (e.pointerType == "mouse" || e.pointerType == "pen")));
                 if (istouch && this.prevInputType !== "touch") {
                     if (e.timeStamp - this.prevTimeStamp >= 500) {
                         this.prevInputType = "touch";
@@ -638,7 +655,7 @@ var Game;
             pointerDown(e) {
                 if (this.checkEvent(e)) {
                     const evt = this.makePointerEvent("down", e);
-                    const singleFinger = e["mouse"] || (e["touch"] && e.touches.length === 1);
+                    const singleFinger = (e instanceof MouseEvent) || (e instanceof TouchEvent && e.touches.length === 1);
                     if (!this.isScrolling && singleFinger) {
                         this.maybeClick = true;
                         this.maybeClickX = evt.pageX;
@@ -713,24 +730,25 @@ var Game;
                 this.id = -1;
             }
             get dir4() {
-                switch (~~((this.angle + 180 + 45) / 90) % 4) {
-                    case 0: return 4; // left
-                    case 1: return 8; // up
-                    case 2: return 6; // right
-                    case 3: return 2; // down
+                switch (~~((this.angle + 360 + 45) / 90) % 4) {
+                    case 0: return 6; // left
+                    case 1: return 2; // up
+                    case 2: return 4; // right
+                    case 3: return 8; // down
                 }
                 return 5; // neutral
             }
             get dir8() {
-                switch (~~((this.angle + 180 + 45) / 90) % 8) {
-                    case 0: return 4; // left
-                    case 1: return 7; // left-up
-                    case 2: return 8; // up
-                    case 3: return 9; // right-up
-                    case 4: return 6; // right
-                    case 5: return 3; // right-down
-                    case 6: return 6; // down
-                    case 7: return 1; // left-down
+                var d = ~~((this.angle + 360 + 22.5) / 45) % 8;
+                switch (d) {
+                    case 0: return 6; // right
+                    case 1: return 3; // right-down
+                    case 2: return 2; // down
+                    case 3: return 1; // left-down
+                    case 4: return 4; // left
+                    case 5: return 7; // left-up
+                    case 6: return 8; // up
+                    case 7: return 9; // right-up
                 }
                 return 5; // neutral
             }
@@ -851,7 +869,6 @@ var Game;
             }
             push(id, param = {}) { this.manager.push(id, param); }
             pop() { this.manager.pop(); }
-            // virtual methods
             enter(...data) {
                 this.state = this.init.apply(this, data);
                 this.next();
@@ -861,7 +878,6 @@ var Game;
             constructor(scenes) {
                 this.scenes = new Map();
                 this.sceneStack = [];
-                this.requestQueue = [];
                 Object.keys(scenes).forEach((key) => this.scenes.set(key, scenes[key]));
             }
             push(id, ...param) {
@@ -875,10 +891,6 @@ var Game;
                 this.sceneStack.push(new Scene(this, sceneDef));
                 this.peek().enter.apply(this.peek(), param);
             }
-            //public push(id: string, ...param: any[]): SceneManager {
-            //    this.requestQueue.push(() => this._push.apply(this, arguments));
-            //    return this;
-            //}
             pop() {
                 if (this.sceneStack.length === 0) {
                     throw new Error("there is no scene.");
@@ -893,10 +905,6 @@ var Game;
                     this.peek().resume();
                 }
             }
-            //public pop(): SceneManager {
-            //    this.requestQueue.push(() => this._pop());
-            //    return this;
-            //}
             peek() {
                 if (this.sceneStack.length > 0) {
                     return this.sceneStack[this.sceneStack.length - 1];
@@ -906,20 +914,15 @@ var Game;
                 }
             }
             update(...args) {
-                //var tmp = this.requestQueue;
-                //this.requestQueue = [];
-                //tmp.forEach((x) => x());
-                if (this.sceneStack.length === 0) {
-                    throw new Error("there is no scene.");
+                if (this.sceneStack.length !== 0) {
+                    this.peek().update.apply(this.peek(), args);
                 }
-                this.peek().update.apply(this.peek(), args);
                 return this;
             }
             draw() {
-                if (this.sceneStack.length === 0) {
-                    throw new Error("there is no scene.");
+                if (this.sceneStack.length !== 0) {
+                    this.peek().draw.apply(this.peek());
                 }
-                this.peek().draw.apply(this.peek());
                 return this;
             }
         }
@@ -927,6 +930,16 @@ var Game;
     })(Scene = Game.Scene || (Game.Scene = {}));
 })(Game || (Game = {}));
 class Array2D {
+    constructor(width, height, fill) {
+        this.arrayWidth = width;
+        this.arrayHeight = height;
+        if (fill == undefined) {
+            this.matrixBuffer = new Array(width * height);
+        }
+        else {
+            this.matrixBuffer = new Array(width * height).fill(fill);
+        }
+    }
     get width() {
         return this.arrayWidth;
     }
@@ -941,16 +954,6 @@ class Array2D {
             this.matrixBuffer[y * this.arrayWidth + x] = value;
         }
         return this.matrixBuffer[y * this.arrayWidth + x];
-    }
-    constructor(width, height, fill) {
-        this.arrayWidth = width;
-        this.arrayHeight = height;
-        if (fill == undefined) {
-            this.matrixBuffer = new Array(width * height);
-        }
-        else {
-            this.matrixBuffer = new Array(width * height).fill(fill);
-        }
     }
     fill(value) {
         this.matrixBuffer.fill(value);
@@ -976,6 +979,18 @@ class Array2D {
         return lines.join("\r\n");
     }
 }
+Array2D.DIR8 = [
+    [+Number.MAX_SAFE_INTEGER, +Number.MAX_SAFE_INTEGER],
+    [-1, +1],
+    [+0, +1],
+    [+1, +1],
+    [-1, +0],
+    [+0, +0],
+    [+1, +0],
+    [-1, -1],
+    [+0, -1],
+    [+1, -1]
+];
 var PathFinder;
 (function (PathFinder) {
     const dir4 = [
@@ -995,41 +1010,44 @@ var PathFinder;
         [-1, -1]
     ];
     // 基点からの重み距離算出
-    function propagation(array2D, sx, sy, value, costs, opts) {
-        opts = Object.assign({ left: 0, top: 0, right: this.width, bottom: this.height, timeout: 1000, topology: 8 }, opts);
-        const temp = new Array2D(this.width, this.height, 0);
-        const topology = opts.topology;
-        var dirs;
-        if (topology === 4) {
-            dirs = dir4;
+    function propagation({ array2D = null, sx = null, sy = null, value = null, costs = null, left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = null }) {
+        if (left === undefined || left < 0) {
+            right == 0;
         }
-        else if (topology === 8) {
-            dirs = dir8;
+        if (top === undefined || top < 0) {
+            bottom == 0;
         }
-        else {
-            throw new Error("Illegal topology");
+        if (right === undefined || right > array2D.width) {
+            right == array2D.width;
         }
-        temp.value(sx, sy, value);
+        if (bottom === undefined || bottom > array2D.height) {
+            bottom == array2D.height;
+        }
+        if (output === null) {
+            output = new Array2D(array2D.width, array2D.height);
+        }
+        const dirs = (topology === 8) ? dir8 : dir4;
+        output.value(sx, sy, value);
         const request = dirs.map(([ox, oy]) => [sx + ox, sy + oy, value]);
         var start = Date.now();
-        while (request.length !== 0 && (Date.now() - start) < opts.timeout) {
+        while (request.length !== 0 && (Date.now() - start) < timeout) {
             var [x, y, currentValue] = request.shift();
-            if (opts.top > y || y >= opts.bottom || opts.left > x || x >= opts.right) {
+            if (top > y || y >= bottom || left > x || x >= right) {
                 continue;
             }
-            const cost = costs(this.value(x, y));
+            const cost = costs(array2D.value(x, y));
             if (cost < 0 || currentValue < cost) {
                 continue;
             }
             currentValue -= cost;
-            const targetPower = temp.value(x, y);
+            const targetPower = output.value(x, y);
             if (currentValue <= targetPower) {
                 continue;
             }
-            temp.value(x, y, currentValue);
+            output.value(x, y, currentValue);
             Array.prototype.push.apply(request, dirs.map(([ox, oy]) => [x + ox, y + oy, currentValue]));
         }
-        return temp;
+        return output;
     }
     PathFinder.propagation = propagation;
     // A*での経路探索
@@ -1128,9 +1146,7 @@ var PathFinder;
     }
     PathFinder.pathfind = pathfind;
     // 重み距離を使ったA*
-    function pathfindByPropergation(array2D, fromX, fromY, toX, toY, propagation, opts) {
-        opts = Object.assign({ topology: 8 }, opts);
-        const topology = opts.topology;
+    function pathfindByPropergation(array2D, fromX, fromY, toX, toY, propagation, { topology = 8 }) {
         let dirs;
         if (topology === 4) {
             dirs = dir4;
@@ -1237,11 +1253,11 @@ var Dungeon;
         }
         // update camera
         update(param) {
-            var mapWidth = this.width * this.gridsize.width;
-            var mapHeight = this.height * this.gridsize.height;
+            const mapWidth = this.width * this.gridsize.width;
+            const mapHeight = this.height * this.gridsize.height;
             // マップ上でのカメラの注視点
-            var mapPx = param.viewpoint.x;
-            var mapPy = param.viewpoint.y;
+            const mapPx = param.viewpoint.x;
+            const mapPy = param.viewpoint.y;
             // カメラの視野の幅・高さ
             this.camera.width = param.viewwidth;
             this.camera.height = param.viewheight;
@@ -1270,26 +1286,36 @@ var Dungeon;
             // 視野の左上位置を原点とした注視点を算出
             this.camera.localPx = mapPx - this.camera.left;
             this.camera.localPy = mapPy - this.camera.top;
-            // 視野の左上位置に対応するマップチップ座標を算出
-            this.camera.chipX = ~~(this.camera.left / this.gridsize.width);
-            this.camera.chipY = ~~(this.camera.top / this.gridsize.height);
+            // 視野の四隅位置に対応するマップチップ座標を算出
+            this.camera.chipLeft = ~~(this.camera.left / this.gridsize.width);
+            this.camera.chipTop = ~~(this.camera.top / this.gridsize.height);
+            this.camera.chipRight = ~~((this.camera.right + (this.gridsize.width - 1)) / this.gridsize.width);
+            this.camera.chipBottom = ~~((this.camera.bottom + (this.gridsize.height - 1)) / this.gridsize.height);
             // 視野の左上位置をにマップチップをおいた場合のスクロールによるズレ量を算出
             this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
             this.camera.chipOffY = -(this.camera.top % this.gridsize.height);
         }
         draw(layerDrawHook) {
             // 描画開始
-            var gridw = this.gridsize.width;
-            var gridh = this.gridsize.height;
-            var yy = ~~(this.camera.height / gridh + 1);
-            var xx = ~~(this.camera.width / gridw + 1);
+            const gridw = this.gridsize.width;
+            const gridh = this.gridsize.height;
             Object.keys(this.layer).forEach((key) => {
-                var l = ~~key;
-                for (let y = -1; y < yy; y++) {
-                    for (let x = -1; x < xx; x++) {
-                        const chipid = this.layer[l].chips.value(x + this.camera.chipX, y + this.camera.chipY) || 0;
-                        if (this.layer[l].chip[chipid]) {
-                            Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + x * gridw + this.camera.chipOffX + gridw / 2, 0 + y * gridh + this.camera.chipOffY + gridh / 2, gridw, gridh);
+                const l = ~~key;
+                for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                    for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                        const chipid = this.layer[l].chips.value(x, y) || 0;
+                        if ((chipid === 1 || chipid === 10) && this.layer[l].chip[chipid]) {
+                            const xx = (x - this.camera.chipLeft) * gridw;
+                            const yy = (y - this.camera.chipTop) * gridh;
+                            if (!Game.pmode) {
+                                Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                            }
+                            else {
+                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
+                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
+                                Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                                Game.getScreen().strokeRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                            }
                         }
                     }
                 }
@@ -1297,604 +1323,551 @@ var Dungeon;
                 layerDrawHook(l, this.camera.localPx, this.camera.localPy);
             });
             // 照明描画
-            for (let y = -1; y < yy; y++) {
-                for (let x = -1; x < xx; x++) {
-                    let light = this.lighting.value(x + this.camera.chipX, y + this.camera.chipY) / 100;
+            for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                    let light = this.lighting.value(x, y) / 100;
                     if (light > 1) {
                         light = 1;
                     }
                     else if (light < 0) {
                         light = 0;
                     }
+                    const xx = (x - this.camera.chipLeft) * gridw;
+                    const yy = (y - this.camera.chipTop) * gridh;
                     Game.getScreen().fillStyle = `rgba(0,0,0,${1 - light})`;
-                    Game.getScreen().fillRect(0 + x * gridw + this.camera.chipOffX + gridw / 2, 0 + y * gridh + this.camera.chipOffY + gridh / 2, gridw, gridh);
+                    Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
                 }
             }
         }
     }
     Dungeon.DungeonData = DungeonData;
-    //ダンジョン自動生成
-    let Generator;
-    (function (Generator) {
-        class Feature {
-            isValid(isWallCallback, canBeDugCallback) { }
-            ;
-            create(digCallback) { }
-            ;
-            debug() { }
-            ;
-            static createRandomAt(x, y, dx, dy, options) { }
-            ;
+    // ダンジョン構成要素基底クラス
+    class Feature {
+    }
+    function getUniformInt(lowerBound, upperBound) {
+        const max = Math.max(lowerBound, upperBound);
+        const min = Math.min(lowerBound, upperBound);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    function getWeightedValue(data) {
+        const keys = Object.keys(data);
+        const total = keys.reduce((s, x) => s + data[x], 0);
+        const random = Math.random() * total;
+        let part = 0;
+        for (const id of keys) {
+            part += data[id];
+            if (random < part) {
+                return id;
+            }
         }
-        function getUniformInt(lowerBound, upperBound) {
-            const max = Math.max(lowerBound, upperBound);
-            const min = Math.min(lowerBound, upperBound);
-            return Math.floor(Math.random() * (max - min + 1)) + min;
+        return keys[keys.length - 1];
+    }
+    // 部屋
+    class Room extends Feature {
+        constructor(left, top, right, bottom, door) {
+            super();
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+            this.doors = {};
+            if (door !== undefined) {
+                this.addDoor(door);
+            }
         }
-        function getWeightedValue(data) {
-            let total = 0;
-            for (var id in data) {
-                total += data[id];
+        static createRandomAt(x, y, dx, dy, options) {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
+            if (dx === 1) {
+                const y2 = y - Math.floor(Math.random() * height);
+                return new Room(x + 1, y2, x + width, y2 + height - 1, [x, y]);
             }
-            const random = Math.random() * total;
-            let part = 0;
-            for (var id in data) {
-                part += data[id];
-                if (random < part) {
-                    return id;
-                }
+            if (dx === -1) {
+                const y2 = y - Math.floor(Math.random() * height);
+                return new Room(x - width, y2, x - 1, y2 + height - 1, [x, y]);
             }
-            return id;
+            if (dy === 1) {
+                const x2 = x - Math.floor(Math.random() * width);
+                return new Room(x2, y + 1, x2 + width - 1, y + height, [x, y]);
+            }
+            if (dy === -1) {
+                const x2 = x - Math.floor(Math.random() * width);
+                return new Room(x2, y - height, x2 + width - 1, y - 1, [x, y]);
+            }
+            throw new Error("dx or dy must be 1 or -1");
         }
-        class Room extends Feature {
-            constructor(x1, y1, x2, y2, doorX, doorY) {
-                super();
-                this._x1 = x1;
-                this._y1 = y1;
-                this._x2 = x2;
-                this._y2 = y2;
-                this._doors = {};
-                if (arguments.length > 4) {
-                    this.addDoor(doorX, doorY);
-                }
-            }
-            static createRandomAt(x, y, dx, dy, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
-                if (dx === 1) {
-                    let y2 = y - Math.floor(Math.random() * height);
-                    return new Room(x + 1, y2, x + width, y2 + height - 1, x, y);
-                }
-                if (dx === -1) {
-                    let y2 = y - Math.floor(Math.random() * height);
-                    return new Room(x - width, y2, x - 1, y2 + height - 1, x, y);
-                }
-                if (dy === 1) {
-                    let x2 = x - Math.floor(Math.random() * width);
-                    return new Room(x2, y + 1, x2 + width - 1, y + height, x, y);
-                }
-                if (dy === -1) {
-                    let x2 = x - Math.floor(Math.random() * width);
-                    return new Room(x2, y - height, x2 + width - 1, y - 1, x, y);
-                }
-                throw new Error("dx or dy must be 1 or -1");
-            }
-            ;
-            static createRandomCenter(cx, cy, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
-                const x1 = cx - Math.floor(Math.random() * width);
-                const y1 = cy - Math.floor(Math.random() * height);
-                const x2 = x1 + width - 1;
-                const y2 = y1 + height - 1;
-                return new Room(x1, y1, x2, y2);
-            }
-            ;
-            static createRandom(availWidth, availHeight, options) {
-                const minw = options.roomWidth[0];
-                const maxw = options.roomWidth[1];
-                const width = getUniformInt(minw, maxw);
-                const minh = options.roomHeight[0];
-                const maxh = options.roomHeight[1];
-                const height = getUniformInt(minh, maxh);
-                const left = availWidth - width - 1;
-                const top = availHeight - height - 1;
-                const x1 = 1 + Math.floor(Math.random() * left);
-                const y1 = 1 + Math.floor(Math.random() * top);
-                const x2 = x1 + width - 1;
-                const y2 = y1 + height - 1;
-                return new Room(x1, y1, x2, y2);
-            }
-            ;
-            addDoor(x, y) {
-                this._doors[x + "," + y] = 1;
-                return this;
-            }
-            ;
-            getDoors(callback) {
-                for (let key in this._doors) {
-                    const parts = key.split(",");
-                    callback(parseInt(parts[0]), parseInt(parts[1]));
-                }
-                return this;
-            }
-            ;
-            clearDoors() {
-                this._doors = {};
-                return this;
-            }
-            ;
-            addDoors(isWallCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x != left && x != right && y != top && y != bottom) {
-                            continue;
-                        }
-                        if (isWallCallback(x, y)) {
-                            continue;
-                        }
-                        this.addDoor(x, y);
-                    }
-                }
-                return this;
-            }
-            ;
-            debug() {
-                consolere.log("room", this._x1, this._y1, this._x2, this._y2);
-            }
-            ;
-            isValid(isWallCallback, canBeDugCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x === left || x === right || y === top || y === bottom) {
-                            if (!isWallCallback(x, y)) {
-                                return false;
-                            }
-                        }
-                        else {
-                            if (!canBeDugCallback(x, y)) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return true;
-            }
-            ;
-            /**
-             * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
-             */
-            create(digCallback) {
-                const left = this._x1 - 1;
-                const right = this._x2 + 1;
-                const top = this._y1 - 1;
-                const bottom = this._y2 + 1;
-                let value = 0;
-                for (let x = left; x <= right; x++) {
-                    for (let y = top; y <= bottom; y++) {
-                        if (x + "," + y in this._doors) {
-                            value = 2;
-                        }
-                        else if (x === left || x === right || y === top || y === bottom) {
-                            value = 1;
-                        }
-                        else {
-                            value = 0;
-                        }
-                        digCallback(x, y, value);
-                    }
-                }
-            }
-            ;
-            getCenter() {
-                return [Math.round((this._x1 + this._x2) / 2), Math.round((this._y1 + this._y2) / 2)];
-            }
-            ;
-            getLeft() {
-                return this._x1;
-            }
-            ;
-            getRight() {
-                return this._x2;
-            }
-            ;
-            getTop() {
-                return this._y1;
-            }
-            ;
-            getBottom() {
-                return this._y2;
-            }
-            ;
+        static createRandomCenter(cx, cy, options) {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
+            const x1 = cx - Math.floor(Math.random() * width);
+            const y1 = cy - Math.floor(Math.random() * height);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+            return new Room(x1, y1, x2, y2);
         }
-        ;
-        class Corridor extends Feature {
-            constructor(startX, startY, endX, endY) {
-                super();
-                this._startX = startX;
-                this._startY = startY;
-                this._endX = endX;
-                this._endY = endY;
-                this._endsWithAWall = true;
-            }
-            static createRandomAt(x, y, dx, dy, options) {
-                const min = options.corridorLength[0];
-                const max = options.corridorLength[1];
-                const length = getUniformInt(min, max);
-                return new Corridor(x, y, x + dx * length, y + dy * length);
-            }
-            ;
-            debug() {
-                consolere.log("corridor", this._startX, this._startY, this._endX, this._endY);
-            }
-            ;
-            isValid(isWallCallback, canBeDugCallback) {
-                const sx = this._startX;
-                const sy = this._startY;
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                const nx = dy;
-                const ny = -dx;
-                let ok = true;
-                for (let i = 0; i < length; i++) {
-                    const x = sx + i * dx;
-                    const y = sy + i * dy;
-                    if (!canBeDugCallback(x, y)) {
-                        ok = false;
-                    }
-                    if (!isWallCallback(x + nx, y + ny)) {
-                        ok = false;
-                    }
-                    if (!isWallCallback(x - nx, y - ny)) {
-                        ok = false;
-                    }
-                    if (!ok) {
-                        length = i;
-                        this._endX = x - dx;
-                        this._endY = y - dy;
-                        break;
-                    }
-                }
-                /**
-                 * If the length degenerated, this corridor might be invalid
-                 */
-                /* not supported */
-                if (length === 0) {
-                    return false;
-                }
-                /* length 1 allowed only if the next space is empty */
-                if (length === 1 && isWallCallback(this._endX + dx, this._endY + dy)) {
-                    return false;
-                }
-                /**
-                 * We do not want the corridor to crash into a corner of a room;
-                 * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
-                 *
-                 * Situation:
-                 * #######1
-                 * .......?
-                 * #######2
-                 *
-                 * The corridor was dug from left to right.
-                 * 1, 2 - problematic corners, ? = N+1th cell (not dug)
-                 */
-                const firstCornerBad = !isWallCallback(this._endX + dx + nx, this._endY + dy + ny);
-                const secondCornerBad = !isWallCallback(this._endX + dx - nx, this._endY + dy - ny);
-                this._endsWithAWall = isWallCallback(this._endX + dx, this._endY + dy);
-                if ((firstCornerBad || secondCornerBad) && this._endsWithAWall) {
-                    return false;
-                }
-                return true;
-            }
-            ;
-            create(digCallback) {
-                const sx = this._startX;
-                const sy = this._startY;
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                //const nx = dy;
-                //const ny = -dx;
-                for (let i = 0; i < length; i++) {
-                    const x = sx + i * dx;
-                    const y = sy + i * dy;
-                    digCallback(x, y, 0);
-                }
-                return true;
-            }
-            ;
-            createPriorityWalls(priorityWallCallback) {
-                if (!this._endsWithAWall) {
-                    return;
-                }
-                const sx = this._startX;
-                const sy = this._startY;
-                let dx = this._endX - sx;
-                let dy = this._endY - sy;
-                if (dx) {
-                    dx = dx / Math.abs(dx);
-                }
-                if (dy) {
-                    dy = dy / Math.abs(dy);
-                }
-                const nx = dy;
-                const ny = -dx;
-                priorityWallCallback(this._endX + dx, this._endY + dy);
-                priorityWallCallback(this._endX + nx, this._endY + ny);
-                priorityWallCallback(this._endX - nx, this._endY - ny);
-            }
-            ;
+        static createRandom(availWidth, availHeight, options) {
+            const minw = options.roomWidth[0];
+            const maxw = options.roomWidth[1];
+            const width = getUniformInt(minw, maxw);
+            const minh = options.roomHeight[0];
+            const maxh = options.roomHeight[1];
+            const height = getUniformInt(minh, maxh);
+            const left = availWidth - width - 1;
+            const top = availHeight - height - 1;
+            const x1 = 1 + Math.floor(Math.random() * left);
+            const y1 = 1 + Math.floor(Math.random() * top);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+            return new Room(x1, y1, x2, y2);
         }
-        class Map {
-            constructor(width, height, option) {
-                this.FeatureClass = { Room: Room, Corridor: Corridor };
-                this._ROTDIRS4 = [
-                    [0, -1],
-                    [1, 0],
-                    [0, 1],
-                    [-1, 0]
-                ];
-                this._width = width;
-                this._height = height;
-                this._rooms = []; /* list of all rooms */
-                this._corridors = [];
-                this._options = {
-                    roomWidth: [3, 9],
-                    roomHeight: [3, 5],
-                    corridorLength: [3, 10],
-                    dugPercentage: 0.2,
-                    timeLimit: 1000 /* we stop after this much time has passed (msec) */
-                };
-                Object.assign(this._options, option);
-                this._features = {
-                    Room: 4,
-                    Corridor: 4
-                };
-                this._featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
-                this._walls = {}; /* these are available for digging */
-                this._digCallback = this._digCallback.bind(this);
-                this._canBeDugCallback = this._canBeDugCallback.bind(this);
-                this._isWallCallback = this._isWallCallback.bind(this);
-                this._priorityWallCallback = this._priorityWallCallback.bind(this);
+        addDoor([x, y]) {
+            this.doors[x + "," + y] = 1;
+            return this;
+        }
+        getDoors(callback) {
+            for (const key of Object.keys(this.doors)) {
+                const parts = key.split(",");
+                callback([parseInt(parts[0], 10), parseInt(parts[1], 10)]);
             }
-            create(callback) {
-                this._rooms = [];
-                this._corridors = [];
-                this._map = this._fillMap(1);
-                this._walls = {};
-                this._dug = 0;
-                const area = (this._width - 2) * (this._height - 2);
-                this._firstRoom();
-                const t1 = Date.now();
-                do {
-                    const t2 = Date.now();
-                    if (t2 - t1 > this._options.timeLimit) {
-                        break;
-                    }
-                    /* find a good wall */
-                    const wall = this._findWall();
-                    if (!wall) {
-                        break;
-                    } /* no more walls */
-                    const parts = wall.split(",");
-                    const x = parseInt(parts[0]);
-                    const y = parseInt(parts[1]);
-                    const dir = this._getDiggingDirection(x, y);
-                    if (!dir) {
+            return this;
+        }
+        clearDoors() {
+            this.doors = {};
+            return this;
+        }
+        addDoors(isWallCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x !== left && x !== right && y !== top && y !== bottom) {
                         continue;
-                    } /* this wall is not suitable */
-                    //		consolere.log("wall", x, y);
-                    /* try adding a feature */
-                    let featureAttempts = 0;
-                    do {
-                        featureAttempts++;
-                        if (this._tryFeature(x, y, dir[0], dir[1])) {
-                            //if (this._rooms.length + this._corridors.length == 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
-                            this._removeSurroundingWalls(x, y);
-                            this._removeSurroundingWalls(x - dir[0], y - dir[1]);
-                            break;
-                        }
-                    } while (featureAttempts < this._featureAttempts);
-                    var priorityWalls = 0;
-                    for (let id in this._walls) {
-                        if (this._walls[id] > 1) {
-                            priorityWalls++;
-                        }
                     }
-                } while (this._dug / area < this._options.dugPercentage || priorityWalls); /* fixme number of priority walls */
-                this._addDoors();
-                if (callback) {
-                    for (let i = 0; i < this._width; i++) {
-                        for (let j = 0; j < this._height; j++) {
-                            callback(i, j, this._map[i][j]);
-                        }
+                    if (isWallCallback([x, y])) {
+                        continue;
                     }
-                }
-                this._walls = {};
-                this._map = null;
-                return this;
-            }
-            ;
-            _digCallback(x, y, value) {
-                if (value == 0 || value == 2) {
-                    this._map[x][y] = 0;
-                    this._dug++;
-                }
-                else {
-                    this._walls[x + "," + y] = 1;
+                    this.addDoor([x, y]);
                 }
             }
-            ;
-            _isWallCallback(x, y) {
-                if (x < 0 || y < 0 || x >= this._width || y >= this._height) {
-                    return false;
-                }
-                return (this._map[x][y] == 1);
-            }
-            ;
-            _canBeDugCallback(x, y) {
-                if (x < 1 || y < 1 || x + 1 >= this._width || y + 1 >= this._height) {
-                    return false;
-                }
-                return (this._map[x][y] == 1);
-            }
-            ;
-            _priorityWallCallback(x, y) {
-                this._walls[x + "," + y] = 2;
-            }
-            ;
-            _findWall() {
-                const prio1 = [];
-                const prio2 = [];
-                for (let id in this._walls) {
-                    const prio = this._walls[id];
-                    if (prio === 2) {
-                        prio2.push(id);
+            return this;
+        }
+        debug() {
+            consolere.log("room", this.left, this.top, this.right, this.bottom);
+        }
+        isValid(isWallCallback, canBeDugCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x === left || x === right || y === top || y === bottom) {
+                        if (!isWallCallback(x, y)) {
+                            return false;
+                        }
                     }
                     else {
-                        prio1.push(id);
-                    }
-                }
-                const arr = (prio2.length ? prio2 : prio1);
-                if (!arr.length) {
-                    return null;
-                } /* no walls :/ */
-                const id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
-                delete this._walls[id2];
-                return id2;
-            }
-            ;
-            _firstRoom() {
-                const cx = Math.floor(this._width / 2);
-                const cy = Math.floor(this._height / 2);
-                const room = Room.createRandomCenter(cx, cy, this._options);
-                this._rooms.push(room);
-                room.create(this._digCallback);
-            }
-            ;
-            _fillMap(value) {
-                const map = [];
-                for (let i = 0; i < this._width; i++) {
-                    map.push([]);
-                    for (let j = 0; j < this._height; j++) {
-                        map[i].push(value);
-                    }
-                }
-                return map;
-            }
-            ;
-            _tryFeature(x, y, dx, dy) {
-                const featureType = getWeightedValue(this._features);
-                const feature = this.FeatureClass[featureType].createRandomAt(x, y, dx, dy, this._options);
-                if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
-                    //		consolere.log("not valid");
-                    //		feature.debug();
-                    return false;
-                }
-                feature.create(this._digCallback);
-                //	feature.debug();
-                if (feature instanceof Room) {
-                    this._rooms.push(feature);
-                }
-                if (feature instanceof Corridor) {
-                    feature.createPriorityWalls(this._priorityWallCallback);
-                    this._corridors.push(feature);
-                }
-                return true;
-            }
-            ;
-            _removeSurroundingWalls(cx, cy) {
-                const deltas = this._ROTDIRS4;
-                for (let i = 0; i < deltas.length; i++) {
-                    const delta = deltas[i];
-                    var x = cx + delta[0];
-                    var y = cy + delta[1];
-                    delete this._walls[x + "," + y];
-                    var x = cx + 2 * delta[0];
-                    var y = cy + 2 * delta[1];
-                    delete this._walls[x + "," + y];
-                }
-            }
-            ;
-            _getDiggingDirection(cx, cy) {
-                if (cx <= 0 || cy <= 0 || cx >= this._width - 1 || cy >= this._height - 1) {
-                    return null;
-                }
-                let result = null;
-                const deltas = this._ROTDIRS4;
-                for (let i = 0; i < deltas.length; i++) {
-                    const delta = deltas[i];
-                    const x = cx + delta[0];
-                    const y = cy + delta[1];
-                    if (!this._map[x][y]) {
-                        if (result) {
-                            return null;
+                        if (!canBeDugCallback(x, y)) {
+                            return false;
                         }
-                        result = delta;
                     }
                 }
-                /* no empty neighbor */
-                if (!result) {
-                    return null;
-                }
-                return [-result[0], -result[1]];
             }
-            ;
-            _addDoors() {
-                var data = this._map;
-                const isWallCallback = (x, y) => {
-                    return (data[x][y] == 1);
-                };
-                for (let i = 0; i < this._rooms.length; i++) {
-                    const room = this._rooms[i];
-                    room.clearDoors();
-                    room.addDoors(isWallCallback);
-                }
-            }
-            ;
-            getRooms() {
-                return this._rooms;
-            }
-            ;
-            getCorridors() {
-                return this._corridors;
-            }
-            ;
+            return true;
         }
-        function create(w, h, callback) {
-            return new Map(w, h, {}).create(callback);
+        /**
+         * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
+         */
+        create(digCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    let value = 0;
+                    if (x + "," + y in this.doors) {
+                        value = 2;
+                    }
+                    else if (x === left || x === right || y === top || y === bottom) {
+                        value = 1;
+                    }
+                    else {
+                        value = 0;
+                    }
+                    digCallback(x, y, value);
+                }
+            }
         }
-        Generator.create = create;
-    })(Generator = Dungeon.Generator || (Dungeon.Generator = {}));
+        getCenter() {
+            return [Math.round((this.left + this.right) / 2), Math.round((this.top + this.bottom) / 2)];
+        }
+        getLeft() {
+            return this.left;
+        }
+        getRight() {
+            return this.right;
+        }
+        getTop() {
+            return this.top;
+        }
+        getBottom() {
+            return this.bottom;
+        }
+    }
+    // 通路
+    class Corridor extends Feature {
+        constructor(startX, startY, endX, endY) {
+            super();
+            this.startX = startX;
+            this.startY = startY;
+            this.endX = endX;
+            this.endY = endY;
+            this.endsWithAWall = true;
+        }
+        static createRandomAt(x, y, dx, dy, options) {
+            const min = options.corridorLength[0];
+            const max = options.corridorLength[1];
+            const length = getUniformInt(min, max);
+            return new Corridor(x, y, x + dx * length, y + dy * length);
+        }
+        debug() {
+            consolere.log("corridor", this.startX, this.startY, this.endX, this.endY);
+        }
+        isValid(isWallCallback, canBeDugCallback) {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+            let ok = true;
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+                if (!canBeDugCallback(x, y)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x + nx, y + ny)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x - nx, y - ny)) {
+                    ok = false;
+                }
+                if (!ok) {
+                    length = i;
+                    this.endX = x - dx;
+                    this.endY = y - dy;
+                    break;
+                }
+            }
+            /**
+             * If the length degenerated, this corridor might be invalid
+             */
+            /* not supported */
+            if (length === 0) {
+                return false;
+            }
+            /* length 1 allowed only if the next space is empty */
+            if (length === 1 && isWallCallback(this.endX + dx, this.endY + dy)) {
+                return false;
+            }
+            /**
+             * We do not want the corridor to crash into a corner of a room;
+             * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
+             *
+             * Situation:
+             * #######1
+             * .......?
+             * #######2
+             *
+             * The corridor was dug from left to right.
+             * 1, 2 - problematic corners, ? = N+1th cell (not dug)
+             */
+            const firstCornerBad = !isWallCallback(this.endX + dx + nx, this.endY + dy + ny);
+            const secondCornerBad = !isWallCallback(this.endX + dx - nx, this.endY + dy - ny);
+            this.endsWithAWall = isWallCallback(this.endX + dx, this.endY + dy);
+            if ((firstCornerBad || secondCornerBad) && this.endsWithAWall) {
+                return false;
+            }
+            return true;
+        }
+        create(digCallback) {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+                digCallback(x, y, 0);
+            }
+            return true;
+        }
+        createPriorityWalls(priorityWallCallback) {
+            if (!this.endsWithAWall) {
+                return;
+            }
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+            priorityWallCallback(this.endX + dx, this.endY + dy);
+            priorityWallCallback(this.endX + nx, this.endY + ny);
+            priorityWallCallback(this.endX - nx, this.endY - ny);
+        }
+    }
+    class Generator {
+        constructor(width, height, option = {
+                roomWidth: [3, 9],
+                roomHeight: [3, 5],
+                corridorLength: [3, 10],
+                dugPercentage: 0.2,
+                timeLimit: 1000,
+            }) {
+            this.width = width;
+            this.height = height;
+            this.rooms = []; /* list of all rooms */
+            this.corridors = [];
+            this.options = option;
+            this.features = {
+                Room: 4,
+                Corridor: 4,
+            };
+            this.featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
+            this.walls = {}; /* these are available for digging */
+            this._digCallback = this._digCallback.bind(this);
+            this._canBeDugCallback = this._canBeDugCallback.bind(this);
+            this._isWallCallback = this._isWallCallback.bind(this);
+            this._priorityWallCallback = this._priorityWallCallback.bind(this);
+        }
+        /*@*/ create(callback) {
+            this.rooms = [];
+            this.corridors = [];
+            this.map = this._fillMap(1);
+            this.walls = {};
+            this.dug = 0;
+            const area = (this.width - 2) * (this.height - 2);
+            this._firstRoom();
+            const t1 = Date.now();
+            let priorityWalls = 0;
+            do {
+                const t2 = Date.now();
+                if (t2 - t1 > this.options.timeLimit) {
+                    break;
+                }
+                /* find a good wall */
+                const wall = this._findWall();
+                if (!wall) {
+                    break;
+                } /* no more walls */
+                const parts = wall.split(",");
+                const x = parseInt(parts[0]);
+                const y = parseInt(parts[1]);
+                const dir = this._getDiggingDirection(x, y);
+                if (!dir) {
+                    continue;
+                } /* this wall is not suitable */
+                // consolere.log("wall", x, y);
+                /* try adding a feature */
+                let featureAttempts = 0;
+                do {
+                    featureAttempts++;
+                    if (this._tryFeature(x, y, dir[0], dir[1])) {
+                        // if (this._rooms.length + this._corridors.length === 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
+                        this._removeSurroundingWalls(x, y);
+                        this._removeSurroundingWalls(x - dir[0], y - dir[1]);
+                        break;
+                    }
+                } while (featureAttempts < this.featureAttempts);
+                for (const id in this.walls) {
+                    if (this.walls[id] > 1) {
+                        priorityWalls++;
+                    }
+                }
+            } while (this.dug / area < this.options.dugPercentage || priorityWalls); /* fixme number of priority walls */
+            this._addDoors();
+            if (callback) {
+                for (let i = 0; i < this.width; i++) {
+                    for (let j = 0; j < this.height; j++) {
+                        callback(i, j, this.map[i][j]);
+                    }
+                }
+            }
+            this.walls = {};
+            this.map = null;
+            return this;
+        }
+        _digCallback(x, y, value) {
+            if (value === 0 || value === 2) {
+                this.map[x][y] = 0;
+                this.dug++;
+            }
+            else {
+                this.walls[x + "," + y] = 1;
+            }
+        }
+        _isWallCallback(x, y) {
+            if (x < 0 || y < 0 || x >= this.width || y >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+        _canBeDugCallback(x, y) {
+            if (x < 1 || y < 1 || x + 1 >= this.width || y + 1 >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+        _priorityWallCallback(x, y) {
+            this.walls[x + "," + y] = 2;
+        }
+        _findWall() {
+            const prio1 = [];
+            const prio2 = [];
+            for (const id in this.walls) {
+                const prio = this.walls[id];
+                if (prio === 2) {
+                    prio2.push(id);
+                }
+                else {
+                    prio1.push(id);
+                }
+            }
+            const arr = (prio2.length ? prio2 : prio1);
+            if (!arr.length) {
+                return null;
+            } /* no walls :/ */
+            const id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
+            delete this.walls[id2];
+            return id2;
+        }
+        _firstRoom() {
+            const cx = Math.floor(this.width / 2);
+            const cy = Math.floor(this.height / 2);
+            const room = Room.createRandomCenter(cx, cy, this.options);
+            this.rooms.push(room);
+            room.create(this._digCallback);
+        }
+        _fillMap(value) {
+            const map = [];
+            for (let i = 0; i < this.width; i++) {
+                map.push([]);
+                for (let j = 0; j < this.height; j++) {
+                    map[i].push(value);
+                }
+            }
+            return map;
+        }
+        _tryFeature(x, y, dx, dy) {
+            const featureType = getWeightedValue(this.features);
+            const feature = Generator.FeatureCreateMethod[featureType](x, y, dx, dy, this.options);
+            if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
+                return false;
+            }
+            feature.create(this._digCallback);
+            if (feature instanceof Room) {
+                this.rooms.push(feature);
+            }
+            if (feature instanceof Corridor) {
+                feature.createPriorityWalls(this._priorityWallCallback);
+                this.corridors.push(feature);
+            }
+            return true;
+        }
+        _removeSurroundingWalls(cx, cy) {
+            const deltas = Generator._ROTDIRS4;
+            for (const delta of deltas) {
+                const x1 = cx + delta[0];
+                const y1 = cy + delta[1];
+                delete this.walls[x1 + "," + y1];
+                const x2 = cx + 2 * delta[0];
+                const y2 = cy + 2 * delta[1];
+                delete this.walls[x2 + "," + y2];
+            }
+        }
+        _getDiggingDirection(cx, cy) {
+            if (cx <= 0 || cy <= 0 || cx >= this.width - 1 || cy >= this.height - 1) {
+                return null;
+            }
+            let result = null;
+            const deltas = Generator._ROTDIRS4;
+            for (const delta of deltas) {
+                const x = cx + delta[0];
+                const y = cy + delta[1];
+                if (!this.map[x][y]) {
+                    if (result) {
+                        return null;
+                    }
+                    result = delta;
+                }
+            }
+            /* no empty neighbor */
+            if (!result) {
+                return null;
+            }
+            return [-result[0], -result[1]];
+        }
+        _addDoors() {
+            const data = this.map;
+            const isWallCallback = ([x, y]) => {
+                return (data[x][y] === 1);
+            };
+            for (const room of this.rooms) {
+                room.clearDoors();
+                room.addDoors(isWallCallback);
+            }
+        }
+        getRooms() {
+            return this.rooms;
+        }
+        getCorridors() {
+            return this.corridors;
+        }
+    }
+    Generator.FeatureCreateMethod = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
+    Generator._ROTDIRS4 = [
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+    ];
+    function generate(w, h, callback) {
+        return new Generator(w, h).create(callback);
+    }
+    Dungeon.generate = generate;
 })(Dungeon || (Dungeon = {}));
 // <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 var TurnState;
@@ -1912,13 +1885,14 @@ var TurnState;
 var consolere;
 var Game;
 (function (Game) {
+    Game.pmode = false;
     consolere.log("remote log start");
     // Global Variables
-    var video = null;
-    var sceneManager = null;
-    var inputDispacher = null;
-    var timer = null;
-    var soundManager = null;
+    let video = null;
+    let sceneManager = null;
+    let inputDispacher = null;
+    let timer = null;
+    let soundManager = null;
     //
     function create(config) {
         return new Promise((resolve, reject) => {
@@ -1938,7 +1912,6 @@ var Game;
         });
     }
     Game.create = create;
-    ;
     function getScreen() {
         return video;
     }
@@ -1960,157 +1933,160 @@ var Game;
     }
     Game.getSound = getSound;
 })(Game || (Game = {}));
-class Player {
+class Animator {
+    constructor(sprite, spriteWidth, spriteHeight) {
+        this.sprite = sprite;
+        this.spriteWidth = spriteWidth;
+        this.spriteHeight = spriteHeight;
+        this.offx = 0;
+        this.offy = 0;
+        this.dir = 5;
+        this.animDir = 2;
+        this.animFrame = 0;
+    }
+    setDir(dir) {
+        if (dir === 0) {
+            return;
+        }
+        this.dir = dir;
+        switch (dir) {
+            case 1: {
+                if (this.animDir === 4) {
+                    this.animDir = 4;
+                }
+                else if (this.animDir === 2) {
+                    this.animDir = 2;
+                }
+                else if (this.animDir === 8) {
+                    this.animDir = 2;
+                }
+                else if (this.animDir === 6) {
+                    this.animDir = 4;
+                }
+                break;
+            }
+            case 3: {
+                if (this.animDir === 4) {
+                    this.animDir = 6;
+                }
+                else if (this.animDir === 2) {
+                    this.animDir = 2;
+                }
+                else if (this.animDir === 8) {
+                    this.animDir = 2;
+                }
+                else if (this.animDir === 6) {
+                    this.animDir = 2;
+                }
+                break;
+            }
+            case 9: {
+                if (this.animDir === 4) {
+                    this.animDir = 6;
+                }
+                else if (this.animDir === 2) {
+                    this.animDir = 8;
+                }
+                else if (this.animDir === 8) {
+                    this.animDir = 8;
+                }
+                else if (this.animDir === 6) {
+                    this.animDir = 6;
+                }
+                break;
+            }
+            case 7: {
+                if (this.animDir === 4) {
+                    this.animDir = 4;
+                }
+                else if (this.animDir === 2) {
+                    this.animDir = 8;
+                }
+                else if (this.animDir === 8) {
+                    this.animDir = 8;
+                }
+                else if (this.animDir === 6) {
+                    this.animDir = 4;
+                }
+                break;
+            }
+            case 5: {
+                break;
+            }
+            default: {
+                this.animDir = dir;
+                break;
+            }
+        }
+    }
+    setAnimation(type, rate) {
+        if (rate > 1) {
+            rate = 1;
+        }
+        if (rate < 0) {
+            rate = 0;
+        }
+        if (type === "move") {
+            this.offx = ~~(Array2D.DIR8[this.dir][0] * 24 * rate);
+            this.offy = ~~(Array2D.DIR8[this.dir][1] * 24 * rate);
+        }
+        else if (type === "action") {
+            this.offx = ~~(Array2D.DIR8[this.dir][0] * 12 * Math.sin(rate * Math.PI));
+            this.offy = ~~(Array2D.DIR8[this.dir][1] * 12 * Math.sin(rate * Math.PI));
+        }
+        this.animFrame = ~~(rate * this.sprite[this.animDir].length) % this.sprite[this.animDir].length;
+    }
+}
+class Player extends Animator {
     constructor(config) {
+        if (!Game.pmode) {
+            super([], 47, 47);
+        }
+        else {
+            super([], 24, 24);
+        }
         this.charactor = config.charactor;
         this.x = config.x;
         this.y = config.y;
-        this.offx = 0;
-        this.offy = 0;
-        this.dir = "down";
-        this.movemode = "idle";
-        this.movems = 0;
-        this.anim = 0;
-        // 移動時間とアニメーション時間(どちらもms単位)
-        // ダッシュ相当の設定
-        //this.movestep = 150;
-        //this.animstep = 150;
-        // 通常の設定
-        this.movestep = 250;
-        this.animstep = 250;
         this.changeCharactor(this.charactor);
     }
     changeCharactor(charactor) {
         this.charactor = charactor;
-        var psbasex = (this.charactor % 2) * 752;
-        var psbasey = ~~(this.charactor / 2) * 47;
-        this._sprite_width = 47;
-        this._sprite_height = 47;
-        this._sprite = {
-            down: [[0, 0], [1, 0], [2, 0], [3, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            left: [[4, 0], [5, 0], [6, 0], [7, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            up: [[8, 0], [9, 0], [10, 0], [11, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            right: [[12, 0], [13, 0], [14, 0], [15, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-        };
-    }
-    update(delta, ms, opts) {
-        if (this.movemode == "idle") {
-            switch (opts.moveDir) {
-                case "left":
-                    this.dir = "left";
-                    if (opts.moveCheckCallback(this, this.x - 1, this.y)) {
-                        this.movemode = "move-left";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    }
-                    else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "up":
-                    this.dir = "up";
-                    if (opts.moveCheckCallback(this, this.x, this.y - 1)) {
-                        this.movemode = "move-up";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    }
-                    else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "right":
-                    this.dir = "right";
-                    if (opts.moveCheckCallback(this, this.x + 1, this.y)) {
-                        this.movemode = "move-right";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    }
-                    else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "down":
-                    this.dir = "down";
-                    if (opts.moveCheckCallback(this, this.x, this.y + 1)) {
-                        this.movemode = "move-down";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    }
-                    else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                default:
-                    this.movemode = "idle";
-                    this.anim = 0;
-                    this.movems = 0;
-                    return true;
+        if (!Game.pmode) {
+            const psbasex = (this.charactor % 2) * 752;
+            const psbasey = ~~(this.charactor / 2) * 47;
+            this.sprite[2] = [[0, 0], [1, 0], [2, 0], [3, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ]);
+            this.sprite[4] = [[4, 0], [5, 0], [6, 0], [7, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ]);
+            this.sprite[8] = [[8, 0], [9, 0], [10, 0], [11, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ]);
+            this.sprite[6] = [[12, 0], [13, 0], [14, 0], [15, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ]);
+        }
+        else {
+            const animdir = [4, 8, 6, 2];
+            const sprites = [];
+            for (let i = 0; i < 4; i++) {
+                const spr = [];
+                for (let j = 0; j < 4; j++) {
+                    spr[j] = [j * 24, i * 24];
+                }
+                sprites[animdir[i]] = spr;
             }
+            this.sprite = sprites;
         }
-        else if (this.movemode == "move-right") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.x += 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offx = 24 * (1 - this.movems / this.movestep);
-        }
-        else if (this.movemode == "move-left") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.x -= 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offx = -24 * (1 - this.movems / this.movestep);
-        }
-        else if (this.movemode == "move-down") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.y += 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offy = 24 * (1 - this.movems / this.movestep);
-        }
-        else if (this.movemode == "move-up") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.y -= 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offy = -24 * (1 - this.movems / this.movestep);
-        }
-        if (this.anim >= this.animstep * 4) {
-            this.anim -= this.animstep * 4;
-        }
-    }
-    getAnimFrame() {
-        return ~~(((~~this.anim) + this.animstep - 1) / this.animstep) % 4;
     }
 }
-class Monster {
+class Monster extends Animator {
     constructor(config) {
+        super(config._sprite, config._sprite_width, config._sprite_height);
         this.x = config.x;
         this.y = config.y;
-        this.anim = config.anim;
-        this.startms = config.startms;
-        this.draw = config.draw.bind(this);
-        this.update = config.update.bind(this);
     }
 }
 class Fade {
@@ -2138,7 +2114,7 @@ class Fade {
         this.startTime = -1;
     }
     update(ms) {
-        if (this.started == false) {
+        if (this.started === false) {
             return;
         }
         if (this.startTime === -1) {
@@ -2164,7 +2140,7 @@ class Fade {
 }
 window.onload = () => {
     function waitTimeout({ timeout, init = () => { }, start = () => { }, update = () => { }, end = () => { } }) {
-        var startTime = -1;
+        let startTime = -1;
         init();
         return (delta, ms) => {
             if (startTime === -1) {
@@ -2180,22 +2156,21 @@ window.onload = () => {
             }
         };
     }
-    ;
     function waitClick({ update = () => { }, start = () => { }, check = () => true, end = () => { } }) {
-        var startTime = -1;
+        let startTime = -1;
         return (delta, ms) => {
             if (startTime === -1) {
                 startTime = ms;
                 start(0, ms);
             }
-            var elapsed = ms - startTime;
+            const elapsed = ms - startTime;
             if (Game.getInput().isClick()) {
-                var pX = Game.getInput().pageX;
-                var pY = Game.getInput().pageY;
+                const pX = Game.getInput().pageX;
+                const pY = Game.getInput().pageY;
                 if (Game.getScreen().pagePointContainScreen(pX, pY)) {
                     const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
-                    var xx = pos[0];
-                    var yy = pos[1];
+                    const xx = pos[0];
+                    const yy = pos[1];
                     if (check(xx, yy, elapsed, ms)) {
                         end(xx, yy, elapsed, ms);
                         return;
@@ -2205,7 +2180,6 @@ window.onload = () => {
             update(elapsed, ms);
         };
     }
-    ;
     Game.create({
         title: "TSJQ",
         screen: {
@@ -2213,10 +2187,9 @@ window.onload = () => {
         },
         scene: {
             title: function* (data) {
-                console.log("state start", data);
-                // setup 
-                var show_click_or_tap = false;
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+                // setup
+                let showClickOrTap = false;
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
                 this.draw = () => {
                     const w = Game.getScreen().width;
                     const h = Game.getScreen().height;
@@ -2225,14 +2198,14 @@ window.onload = () => {
                     Game.getScreen().fillStyle = "rgb(255,255,255)";
                     Game.getScreen().fillRect(0, 0, w, h);
                     Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 0, 192, 72, w / 2 - 192 / 2, 50, 192, 72);
-                    if (show_click_or_tap) {
+                    if (showClickOrTap) {
                         Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 72, 168, 24, w / 2 - 168 / 2, h - 50, 168, 24);
                     }
                     fade.draw();
                     Game.getScreen().restore();
                 };
                 yield waitClick({
-                    update: (e, ms) => { show_click_or_tap = (~~(ms / 500) % 2) === 0; },
+                    update: (e, ms) => { showClickOrTap = (~~(ms / 500) % 2) === 0; },
                     check: () => true,
                     end: () => {
                         Game.getSound().reqPlayChannel(0);
@@ -2241,13 +2214,13 @@ window.onload = () => {
                 });
                 yield waitTimeout({
                     timeout: 1000,
-                    update: (e, ms) => { show_click_or_tap = (~~(ms / 50) % 2) === 0; },
+                    update: (e, ms) => { showClickOrTap = (~~(ms / 50) % 2) === 0; },
                     end: () => this.next()
                 });
                 yield waitTimeout({
                     timeout: 500,
                     init: () => { fade.startFadeOut(); },
-                    update: (e, ms) => { fade.update(e); show_click_or_tap = (~~(ms / 50) % 2) === 0; },
+                    update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
                     end: () => {
                         Game.getSceneManager().push("classroom");
                         this.next();
@@ -2255,13 +2228,13 @@ window.onload = () => {
                 });
             },
             classroom: function* () {
-                var selectedCharactor = -1;
-                var selectedCharactorDir = 0;
-                var selectedCharactorOffY = 0;
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+                let selectedCharactor = -1;
+                let selectedCharactorDir = 0;
+                let selectedCharactorOffY = 0;
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
                 this.draw = () => {
-                    var w = Game.getScreen().width;
-                    var h = Game.getScreen().height;
+                    const w = Game.getScreen().width;
+                    const h = Game.getScreen().height;
                     Game.getScreen().save();
                     Game.getScreen().clearRect(0, 0, w, h);
                     Game.getScreen().fillStyle = "rgb(255,255,255)";
@@ -2281,11 +2254,11 @@ window.onload = () => {
                     // 黒板
                     Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 204, 72, 36, 90, -12, 72, 36);
                     // 各キャラと机
-                    for (var y = 0; y < 5; y++) {
-                        for (var x = 0; x < 6; x++) {
-                            var id = y * 6 + x;
+                    for (let y = 0; y < 5; y++) {
+                        for (let x = 0; x < 6; x++) {
+                            const id = y * 6 + x;
                             Game.getScreen().drawImage(Game.getScreen().texture("charactor"), 752 * (id % 2) +
-                                ((selectedCharactor !== id) ? 0 : (188 * (selectedCharactorDir % 4))), 47 * ~~(id / 2), 47, 47, 12 + x * 36, 24 + y * (48 - 7) - ((selectedCharactor != id) ? 0 : (selectedCharactorOffY)), 47, 47);
+                                ((selectedCharactor !== id) ? 0 : (188 * (selectedCharactorDir % 4))), 47 * ~~(id / 2), 47, 47, 12 + x * 36, 24 + y * (48 - 7) - ((selectedCharactor !== id) ? 0 : (selectedCharactorOffY)), 47, 47);
                             Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 72, 180, 24, 24, 24 + x * 36, 48 + y * (48 - 7), 24, 24);
                         }
                     }
@@ -2352,15 +2325,14 @@ window.onload = () => {
                 Game.getSound().reqStopChannel(2);
                 Game.getSceneManager().pop();
                 Game.getSceneManager().push("dungeon", { player: player, floor: 1 });
-                console.log("dungeon");
             },
-            dungeon: function* (param) {
+            dungeon: function* ({ player = null, floor = 0 }) {
                 // マップサイズ算出
-                const mapChipW = 30 + param.floor * 3;
-                const mapChipH = 30 + param.floor * 3;
+                const mapChipW = 30 + floor * 3;
+                const mapChipH = 30 + floor * 3;
                 // マップ自動生成
                 const mapchipsL1 = new Array2D(mapChipW, mapChipH);
-                const dungeon = Dungeon.Generator.create(mapChipW, mapChipH, (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
+                const dungeon = Dungeon.generate(mapChipW, mapChipH, (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
                 // 装飾
                 for (let y = 1; y < mapChipH; y++) {
                     for (let x = 0; x < mapChipW; x++) {
@@ -2376,40 +2348,48 @@ window.onload = () => {
                     }
                 }
                 // 部屋シャッフル
-                var rooms = dungeon._rooms.shuffle();
+                const rooms = dungeon.rooms.shuffle();
                 // 開始位置
-                var startPos = rooms[0].getCenter();
-                param.player.x = startPos[0];
-                param.player.y = startPos[1];
+                const startPos = rooms[0].getCenter();
+                player.x = startPos[0];
+                player.y = startPos[1];
                 // 階段位置
-                var stairsPos = rooms[1].getCenter();
+                const stairsPos = rooms[1].getCenter();
                 mapchipsL1.value(stairsPos[0], stairsPos[1], 10);
                 // モンスター配置
-                var monsters = rooms.splice(2).map(x => {
+                const monsters = rooms.splice(2).map(x => {
+                    const sprites = [];
+                    if (!Game.pmode) {
+                        const animdir = [2, 4, 8, 6];
+                        for (let i = 0; i < 4; i++) {
+                            const spr = [];
+                            for (let j = 0; j < 4; j++) {
+                                spr[j] = [((i + 1) * 4 + j) * 24, 0];
+                            }
+                            sprites[animdir[i]] = spr;
+                        }
+                        this._sprite = sprites;
+                    }
+                    else {
+                        const animdir = [4, 8, 6, 2];
+                        for (let i = 0; i < 4; i++) {
+                            const spr = [];
+                            for (let j = 0; j < 4; j++) {
+                                spr[j] = [j * 24, i * 24];
+                            }
+                            sprites[animdir[i]] = spr;
+                        }
+                        this._sprite = sprites;
+                    }
                     return new Monster({
+                        _sprite: sprites,
+                        _sprite_width: 24,
+                        _sprite_height: 24,
                         x: x.getLeft(),
                         y: x.getTop(),
-                        anim: 0,
-                        startms: -1,
-                        update(delta, ms) {
-                            if (this.startms == -1) {
-                                this.startms = ms;
-                            }
-                            this.anim = ~~((ms - this.startms) / 160) % 4;
-                        },
-                        draw(x, y, offx, offy) {
-                            const xx = this.x - x;
-                            const yy = this.y - y;
-                            if (0 <= xx &&
-                                xx < Game.getScreen().width / 24 &&
-                                0 <= yy &&
-                                yy < Game.getScreen().height / 24) {
-                                Game.getScreen().drawImage(Game.getScreen().texture("monster"), this.anim * 24, 0, 24, 24, xx * 24 + offx + 12 + this.dx, yy * 24 + offy + 12 + this.dy, 24, 24);
-                            }
-                        }
                     });
                 });
-                var map = new Dungeon.DungeonData({
+                const map = new Dungeon.DungeonData({
                     width: mapChipW,
                     height: mapChipW,
                     gridsize: { width: 24, height: 24 },
@@ -2435,36 +2415,36 @@ window.onload = () => {
                 // カメラを更新
                 map.update({
                     viewpoint: {
-                        x: (param.player.x * 24 + param.player.offx) + param.player._sprite_width / 2,
-                        y: (param.player.y * 24 + param.player.offy) + param.player._sprite_height / 2
+                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
                     },
                     viewwidth: Game.getScreen().width,
                     viewheight: Game.getScreen().height,
                 });
                 Game.getSound().reqPlayChannel(1, true);
                 // assign virtual pad
-                var pad = new Game.Input.VirtualStick();
-                var pointerdown = (ev) => {
+                const pad = new Game.Input.VirtualStick();
+                const pointerdown = (ev) => {
                     if (pad.onpointingstart(ev.pointerId)) {
                         const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
                         pad.x = pos[0];
                         pad.y = pos[1];
                     }
                 };
-                var pointermove = (ev) => {
+                const pointermove = (ev) => {
                     const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
                     pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
                 };
-                var pointerup = (ev) => {
+                const pointerup = (ev) => {
                     pad.onpointingend(ev.pointerId);
                 };
-                var onPointerHook = () => {
+                const onPointerHook = () => {
                     Game.getInput().on("pointerdown", pointerdown);
                     Game.getInput().on("pointermove", pointermove);
                     Game.getInput().on("pointerup", pointerup);
                     Game.getInput().on("pointerleave", pointerup);
                 };
-                var offPointerHook = () => {
+                const offPointerHook = () => {
                     Game.getInput().off("pointerdown", pointerdown);
                     Game.getInput().off("pointermove", pointermove);
                     Game.getInput().off("pointerup", pointerup);
@@ -2482,53 +2462,48 @@ window.onload = () => {
                     offPointerHook();
                     Game.getSound().reqStopChannel(1);
                 };
-                var update_lighting = (iswalkable) => {
-                    var calc_lighting = (x, y, power, dec, dec2, setted) => {
-                        if (0 > x || x >= map.width) {
-                            return;
-                        }
-                        if (0 > y || y >= map.height) {
-                            return;
-                        }
-                        if (power <= map.lighting.value(x, y)) {
-                            return;
-                        }
-                        setted[x + "," + y] = true;
-                        map.lighting.value(x, y, Math.max(map.lighting.value(x, y), power));
-                        map.visibled.value(x, y, Math.max(map.lighting.value(x, y), map.visibled.value(x, y)));
-                        if (!iswalkable(x, y)) {
-                            power -= dec2;
-                        }
-                        else {
-                            power -= dec;
-                        }
-                        calc_lighting(x + 0, y - 1, power, dec, dec2, setted);
-                        calc_lighting(x - 1, y + 0, power, dec, dec2, setted);
-                        calc_lighting(x + 1, y + 0, power, dec, dec2, setted);
-                        calc_lighting(x + 0, y + 1, power, dec, dec2, setted);
-                    };
+                const updateLighting = (iswalkable) => {
                     map.clearLighting();
-                    calc_lighting(param.player.x, param.player.y, 140, 20, 50, {});
+                    PathFinder.propagation({
+                        array2D: map.layer[0].chips,
+                        sx: player.x,
+                        sy: player.y,
+                        value: 140,
+                        costs: (v) => iswalkable(v) ? 20 : 50,
+                        output: map.lighting
+                    });
                 };
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
                 this.draw = () => {
                     Game.getScreen().save();
                     Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
                     Game.getScreen().fillStyle = "rgb(255,255,255)";
                     Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
                     map.draw((l, cameraLocalPx, cameraLocalPy) => {
-                        if (l == 0) {
-                            const animf = param.player.getAnimFrame();
+                        if (l === 0) {
                             // 影
                             Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
                             Game.getScreen().beginPath();
                             Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
                             Game.getScreen().fill();
                             // モンスター
-                            var camera = map.camera;
-                            monsters.forEach((x) => x.draw(camera.chipX, camera.chipY, camera.chipOffX, camera.chipOffY));
+                            const camera = map.camera;
+                            monsters.forEach((monster) => {
+                                const xx = monster.x - camera.chipLeft;
+                                const yy = monster.y - camera.chipTop;
+                                if (0 <= xx &&
+                                    xx < Game.getScreen().width / 24 &&
+                                    0 <= yy &&
+                                    yy < Game.getScreen().height / 24) {
+                                    const adir = monster.animDir;
+                                    const af = monster.animFrame;
+                                    Game.getScreen().drawImage(Game.getScreen().texture("monster"), monster.sprite[adir][af][0], monster.sprite[adir][af][1], monster.spriteWidth, monster.spriteHeight, xx * monster.spriteWidth + camera.chipOffX + monster.offx, yy * monster.spriteWidth + camera.chipOffY + monster.offy, monster.spriteWidth, monster.spriteHeight);
+                                }
+                            });
+                            const animf = player.animFrame;
+                            const playersprite = player.sprite[player.animDir];
                             // キャラクター
-                            Game.getScreen().drawImage(Game.getScreen().texture("charactor"), param.player._sprite[param.player.dir][animf][0], param.player._sprite[param.player.dir][animf][1], param.player._sprite_width, param.player._sprite_height, cameraLocalPx - param.player._sprite_width / 2, cameraLocalPy - param.player._sprite_height / 2 - 12, param.player._sprite_width, param.player._sprite_height);
+                            Game.getScreen().drawImage(Game.getScreen().texture("charactor"), playersprite[animf][0], playersprite[animf][1], player.spriteWidth, player.spriteHeight, cameraLocalPx - player.spriteWidth / 2, cameraLocalPy - player.spriteHeight / 2 - 12, player.spriteWidth, player.spriteHeight);
                         }
                     });
                     // フェード
@@ -2548,54 +2523,42 @@ window.onload = () => {
                 yield waitTimeout({
                     timeout: 500,
                     init: () => { fade.startFadeIn(); },
-                    update: (e) => { fade.update(e); update_lighting((x, y) => ((map.layer[0].chips.value(x, y) === 1) || (map.layer[0].chips.value(x, y) === 10))); },
+                    update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
                     end: (e) => { this.next(); }
                 });
                 onPointerHook();
                 // ターンの状態（フェーズ）
-                var turnStateStack = [[TurnState.WaitInput, null]];
-                const moveOffsetTable = [
-                    [0, 0],
-                    [-1, -1],
-                    [-1, 0],
-                    [-1, +1],
-                    [0, -1],
-                    [0, 0],
-                    [0, +1],
-                    [+1, -1],
-                    [+1, 0],
-                    [+1, +1],
-                ];
-                var playerTactics = {};
-                var monstersTactics = [];
+                const turnStateStack = [[TurnState.WaitInput, null]];
+                let playerTactics = {};
+                let monstersTactics = [];
                 yield (delta, ms) => {
                     switch (turnStateStack[0][0]) {
                         case TurnState.WaitInput:
                             {
                                 // キー入力待ち
                                 if (pad.isTouching === false || pad.distance <= 0.4) {
-                                    this.player.setAnimation('idle', 0);
+                                    player.setAnimation('idle', 0);
                                     break;
                                 }
                                 // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
-                                var playerMoveDir = pad.dir4;
+                                const playerMoveDir = pad.dir8;
                                 // 「行動(Action)」と「移動(Move)」の識別を行う
-                                // 移動先が侵入不可能の場合は移動処理キャンセル
-                                var [ox, oy] = moveOffsetTable[playerMoveDir];
-                                if (map.layer[0].chips.value(this.player.x + ox, this.player.y + oy) === 0) {
-                                    this.player.setDir(playerMoveDir);
+                                // 移動先が侵入不可能の場合は待機とする
+                                const [ox, oy] = Array2D.DIR8[playerMoveDir];
+                                if (map.layer[0].chips.value(player.x + ox, player.y + oy) !== 1 && map.layer[0].chips.value(player.x + ox, player.y + oy) !== 10) {
+                                    player.setDir(playerMoveDir);
                                     break;
                                 }
                                 // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
-                                const targetMonster = monsters.findIndex((monster) => (monster.x === this.player.x + ox) &&
-                                    (monster.y === this.player.y + ox));
+                                const targetMonster = monsters.findIndex((monster) => (monster.x === player.x + ox) &&
+                                    (monster.y === player.y + oy));
                                 if (targetMonster !== -1) {
                                     // 移動先に敵がいる＝「行動(Action)」
                                     playerTactics = {
                                         type: "action",
                                         moveDir: playerMoveDir,
                                         targetMonster: playerMoveDir,
-                                        startTime: 0,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
                                     // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
@@ -2607,7 +2570,7 @@ window.onload = () => {
                                     playerTactics = {
                                         type: "move",
                                         moveDir: playerMoveDir,
-                                        startTime: 0,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
                                     // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
@@ -2618,14 +2581,14 @@ window.onload = () => {
                         case TurnState.PlayerAction: {
                             // プレイヤーの行動開始
                             turnStateStack[0][0] = TurnState.PlayerActionRunning;
-                            this.player.setDir(playerTactics.moveDir);
-                            this.player.setAnimation('atack', 0);
+                            player.setDir(playerTactics.moveDir);
+                            player.setAnimation('action', 0);
                             break;
                         }
                         case TurnState.PlayerActionRunning: {
                             // プレイヤーの行動中
-                            let rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                            this.player.setAnimation('atack', rate);
+                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                            player.setAnimation('action', rate);
                             if (rate >= 1) {
                                 // プレイヤーの行動終了
                                 turnStateStack.shift();
@@ -2635,19 +2598,19 @@ window.onload = () => {
                         case TurnState.EnemyAI: {
                             // 敵の行動の決定
                             // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
-                            let px = this.player.x;
-                            let py = this.player.y;
+                            let px = player.x;
+                            let py = player.y;
                             if (playerTactics.type === "move") {
-                                let off = moveOffsetTable[playerTactics.moveDir];
+                                const off = Array2D.DIR8[playerTactics.moveDir];
                                 px += off[0];
                                 py += off[1];
                             }
                             monstersTactics = monsters.map((monster) => {
-                                let dx = px - monster.x;
-                                let dy = py - monster.y;
+                                const dx = px - monster.x;
+                                const dy = py - monster.y;
                                 if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
                                     // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
-                                    let dir = moveOffsetTable.findIndex((x) => x[0] === dx && x[1] === dy);
+                                    const dir = Array2D.DIR8.findIndex((x) => x[0] === dx && x[1] === dy);
                                     return {
                                         type: "action",
                                         moveDir: dir,
@@ -2658,21 +2621,27 @@ window.onload = () => {
                                 else {
                                     // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
                                     // とりあえず軸合わせで動く
-                                    if (Math.abs(dx) < Math.abs(dy)) {
-                                        if (dx !== 0) {
-                                            dx = Math.sign(dx);
+                                    const cands = [
+                                        [Math.sign(dx), Math.sign(dy)],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
+                                    ];
+                                    for (let i = 0; i < 3; i++) {
+                                        const [cx, cy] = cands[i];
+                                        if (map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 1 || map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 10) {
+                                            const dir = Array2D.DIR8.findIndex((x) => x[0] === cx && x[1] === cy);
+                                            return {
+                                                type: "move",
+                                                moveDir: dir,
+                                                startTime: ms,
+                                                actionTime: 250
+                                            };
                                         }
                                     }
-                                    else if (Math.abs(dy) < Math.abs(dx)) {
-                                        if (dy !== 0) {
-                                            dy = Math.sign(dy);
-                                        }
-                                    }
-                                    let dir = moveOffsetTable.findIndex((x) => x[0] === dx && x[1] === dy);
                                     return {
-                                        type: "move",
-                                        moveDir: dir,
-                                        startTime: 0,
+                                        type: "idle",
+                                        moveDir: 5,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
                                 }
@@ -2693,8 +2662,9 @@ window.onload = () => {
                                 }
                             }
                             if (enemyId < monstersTactics.length) {
+                                monstersTactics[enemyId].startTime = ms;
                                 monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
-                                monsters[enemyId].setAnimation('atack', 0);
+                                monsters[enemyId].setAnimation('action', 0);
                                 turnStateStack[0][0] = TurnState.EnemyActionRunning;
                                 turnStateStack[0][1] = enemyId;
                             }
@@ -2706,14 +2676,13 @@ window.onload = () => {
                         }
                         case TurnState.EnemyActionRunning: {
                             // 敵の行動中
-                            let enemyId = turnStateStack[0][1];
-                            let rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
-                            monsters[enemyId].setAnimation('atack', rate);
+                            const enemyId = turnStateStack[0][1];
+                            const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
+                            monsters[enemyId].setAnimation('action', rate);
                             if (rate >= 1) {
                                 // 行動終了。次の敵へ
                                 turnStateStack[0][0] = TurnState.EnemyAction;
                                 turnStateStack[0][1] = enemyId + 1;
-                                turnStateStack.shift();
                             }
                             break;
                         }
@@ -2724,20 +2693,22 @@ window.onload = () => {
                                 if (monsterTactic.type === "move") {
                                     monsters[i].setDir(monsterTactic.moveDir);
                                     monsters[i].setAnimation('move', 0);
+                                    monstersTactics[i].startTime = ms;
                                 }
                             });
                             if (playerTactics.type === "move") {
-                                this.player.setDir(playerTactics.moveDir);
-                                this.player.setAnimation('move', 0);
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation('move', 0);
+                                playerTactics.startTime = ms;
                             }
                             break;
                         }
                         case TurnState.MoveRunning: {
-                            // 移動実行  
-                            let finish = false;
+                            // 移動実行
+                            let finish = true;
                             monstersTactics.forEach((monsterTactic, i) => {
                                 if (monsterTactic.type === "move") {
-                                    let rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
+                                    const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
                                     monsters[i].setDir(monsterTactic.moveDir);
                                     monsters[i].setAnimation('move', rate);
                                     if (rate < 1) {
@@ -2746,9 +2717,9 @@ window.onload = () => {
                                 }
                             });
                             if (playerTactics.type === "move") {
-                                let rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                                this.player.setDir(playerTactics.moveDir);
-                                this.player.setAnimation('move', rate);
+                                const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation('move', rate);
                                 if (rate < 1) {
                                     finish = false; // 行動終了していないフラグをセット
                                 }
@@ -2756,8 +2727,22 @@ window.onload = () => {
                             if (finish) {
                                 // 行動終了
                                 turnStateStack.shift();
+                                monstersTactics.forEach((monsterTactic, i) => {
+                                    if (monsterTactic.type === "move") {
+                                        monsters[i].x += Array2D.DIR8[monsterTactic.moveDir][0];
+                                        monsters[i].y += Array2D.DIR8[monsterTactic.moveDir][1];
+                                        monsters[i].offx = 0;
+                                        monsters[i].offy = 0;
+                                    }
+                                });
+                                if (playerTactics.type === "move") {
+                                    player.x += Array2D.DIR8[playerTactics.moveDir][0];
+                                    player.y += Array2D.DIR8[playerTactics.moveDir][1];
+                                    player.offx = 0;
+                                    player.offy = 0;
+                                }
                                 // 現在位置のマップチップを取得
-                                const chip = map.layer[0].chips.value(~~param.player.x, ~~param.player.y);
+                                const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
                                 if (chip === 10) {
                                     // 階段なので次の階層に移動させる。
                                     this.next("nextfloor");
@@ -2771,37 +2756,33 @@ window.onload = () => {
                             break;
                         }
                     }
-                    ;
                     // カメラを更新
                     map.update({
                         viewpoint: {
-                            x: (param.player.x * 24 + param.player.offx) +
-                                param.player._sprite_width / 2,
-                            y: (param.player.y * 24 + param.player.offy) +
-                                param.player._sprite_height / 2
+                            x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                            y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
                         },
                         viewwidth: Game.getScreen().width,
                         viewheight: Game.getScreen().height,
                     });
-                    update_lighting((x, y) => (map.layer[0].chips.value(x, y) === 1) ||
-                        (map.layer[0].chips.value(x, y) === 10));
+                    updateLighting((v) => v === 1 || v === 10);
                     if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                        Game.getSceneManager().push("mapview", { map: map, player: param.player });
+                        Game.getSceneManager().push("mapview", { map: map, player: player });
                     }
                 };
                 Game.getSound().reqPlayChannel(3);
                 yield waitTimeout({
                     timeout: 500,
                     init: () => { fade.startFadeOut(); },
-                    update: (e) => { fade.update(e); update_lighting((x, y) => (map.layer[0].chips.value(x, y) === 1) || (map.layer[0].chips.value(x, y) === 10)); },
+                    update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
                     end: (e) => { this.next(); }
                 });
                 yield waitTimeout({
                     timeout: 500,
-                    end: (e) => { param.floor++; this.next(); }
+                    end: (e) => { floor++; this.next(); }
                 });
                 Game.getSceneManager().pop();
-                Game.getSceneManager().push("dungeon", param);
+                Game.getSceneManager().push("dungeon", { player: player, floor: floor });
             },
             mapview: function* (data) {
                 this.draw = () => {
@@ -2809,13 +2790,13 @@ window.onload = () => {
                     Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
                     Game.getScreen().fillStyle = "rgb(0,0,0)";
                     Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                    var offx = ~~((Game.getScreen().width - data.map.width * 5) / 2);
-                    var offy = ~~((Game.getScreen().height - data.map.height * 5) / 2);
+                    const offx = ~~((Game.getScreen().width - data.map.width * 5) / 2);
+                    const offy = ~~((Game.getScreen().height - data.map.height * 5) / 2);
                     // ミニマップを描画
-                    for (var y = 0; y < data.map.height; y++) {
-                        for (var x = 0; x < data.map.width; x++) {
-                            var chip = data.map.layer[0].chips.value(x, y);
-                            var color = "rgb(52,12,0)";
+                    for (let y = 0; y < data.map.height; y++) {
+                        for (let x = 0; x < data.map.width; x++) {
+                            const chip = data.map.layer[0].chips.value(x, y);
+                            let color = "rgb(52,12,0)";
                             switch (chip) {
                                 case 1:
                                     color = "rgb(179,116,39)";
@@ -2826,7 +2807,7 @@ window.onload = () => {
                             }
                             Game.getScreen().fillStyle = color;
                             Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                            var light = 1 - data.map.visibled.value(x, y) / 100;
+                            let light = 1 - data.map.visibled.value(x, y) / 100;
                             if (light > 1) {
                                 light = 1;
                             }
@@ -2846,13 +2827,13 @@ window.onload = () => {
             },
         }
     }).then(() => {
-        var anim = 0;
-        var update = (ms) => {
+        let anim = 0;
+        const update = (ms) => {
             Game.getScreen().save();
             Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-            var n = ~(ms / 50);
+            const n = ~(ms / 50);
             Game.getScreen().translate(Game.getScreen().width / 2, Game.getScreen().height / 2);
             Game.getScreen().rotate(n * Math.PI / 4);
             for (let i = 0; i < 8; i++) {

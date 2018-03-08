@@ -1,6 +1,20 @@
 "use strict";
 
 class Array2D {
+
+    public static DIR8 = [
+        [+Number.MAX_SAFE_INTEGER, +Number.MAX_SAFE_INTEGER],   // 0
+        [-1, +1],
+        [+0, +1],
+        [+1, +1],
+        [-1, +0],
+        [+0, +0],
+        [+1, +0],
+        [-1, -1],
+        [+0, -1],
+        [+1, -1]
+    ];
+
     private /*@readonly@*/ arrayWidth: number;
     private /*@readonly@*/ arrayHeight: number;
     private matrixBuffer: number[];
@@ -62,16 +76,24 @@ class Array2D {
 
 }
 
-module PathFinder {
+namespace PathFinder {
+    // 経路探索
+    type PathFindObj = {
+        x: number;
+        y: number;
+        prev: PathFindObj;
+        g: number;
+        distance: number;
+    }
 
-    const dir4 = [
+    const dir4: [number, number][] = [
         [0, -1],
         [1, 0],
         [0, 1],
         [-1, 0]
     ];
 
-    const dir8 = [
+    const dir8: [number, number][] = [
         [0, -1],
         [1, 0],
         [0, 1],
@@ -82,65 +104,63 @@ module PathFinder {
         [-1, -1]
     ];
 
-    // 経路探索
-    type PathFindObj = {
-        x: number;
-        y: number;
-        prev: PathFindObj;
-        g: number;
-        distance: number;
-    }
-
-
     // 基点からの重み距離算出
-    export function propagation(
-        array2D: Array2D,
-        sx: number,
-        sy: number,
-        value: number,
-        costs: (value: number) => number,
-        opts: { left: number, top: number, right: number, bottom: number, timeout: number, topology: number }
-    ) {
-        opts = Object.assign({ left: 0, top: 0, right: this.width, bottom: this.height, timeout: 1000, topology: 8 },
-            opts);
-        const temp = new Array2D(this.width, this.height, 0);
-        const topology = opts.topology;
-        var dirs: number[][];
-        if (topology === 4) {
-            dirs = dir4;
-        } else if (topology === 8) {
-            dirs = dir8;
-        } else {
-            throw new Error("Illegal topology");
-        }
+    export function propagation({
+        array2D = null,
+        sx = null,
+        sy = null,
+        value = null,
+        costs = null,
+        left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = null
+    }: {
+            array2D: Array2D;
+            sx: number;
+            sy: number;
+            value: number;
+            costs: (value: number) => number;
+            left?: number;
+            top?: number;
+            right?: number;
+            bottom?: number;
+            timeout?: number;
+            topology?: number;
+            output?: Array2D;
+        }) {
+        if (left === undefined || left < 0) { right == 0; }
+        if (top === undefined || top < 0) { bottom == 0; }
+        if (right === undefined || right > array2D.width) { right == array2D.width; }
+        if (bottom === undefined || bottom > array2D.height) { bottom == array2D.height; }
+        if (output === null) { output = new Array2D(array2D.width, array2D.height); }
 
-        temp.value(sx, sy, value);
+        const dirs = (topology === 8) ? dir8 : dir4;
+
+        output.value(sx, sy, value);
         const request = dirs.map(([ox, oy]) => [sx + ox, sy + oy, value]);
 
         var start = Date.now();
-        while (request.length !== 0 && (Date.now() - start) < opts.timeout) {
+        while (request.length !== 0 && (Date.now() - start) < timeout) {
             var [x, y, currentValue] = request.shift();
-            if (opts.top > y || y >= opts.bottom || opts.left > x || x >= opts.right) {
+            if (top > y || y >= bottom || left > x || x >= right) {
                 continue;
             }
 
-            const cost = costs(this.value(x, y));
+            const cost = costs(array2D.value(x, y));
             if (cost < 0 || currentValue < cost) {
                 continue;
             }
 
             currentValue -= cost;
 
-            const targetPower = temp.value(x, y);
+            const targetPower = output.value(x, y);
             if (currentValue <= targetPower) {
                 continue;
             }
 
-            temp.value(x, y, currentValue);
+            output.value(x, y, currentValue);
 
             Array.prototype.push.apply(request, dirs.map(([ox, oy]) => [x + ox, y + oy, currentValue]));
         }
-        return temp;
+        return output;
     }
 
     // A*での経路探索
@@ -222,7 +242,7 @@ module PathFinder {
 
             if (item.x === fromX && item.y === fromY) {
                 /* 始点に到達したので経路を生成して返す */
-                const result: [number,number][] = [];
+                const result: [number, number][] = [];
                 while (item) {
                     result.push([item.x, item.y]);
                     item = item.prev;
@@ -264,10 +284,9 @@ module PathFinder {
         toX: number,
         toY: number,
         propagation: Array2D,
-        opts: { topology: number }): number[][] {
-        opts = Object.assign({ topology: 8 }, opts);
-        const topology = opts.topology;
-        let dirs: number[][];
+        { topology = 8 }: { topology?: number }
+    ): [number, number][] {
+        let dirs: [number,number][];
         if (topology === 4) {
             dirs = dir4;
         } else if (topology === 8) {
@@ -321,7 +340,7 @@ module PathFinder {
 
             if (item.x === fromX && item.y === fromY) {
                 /* 始点に到達したので経路を生成して返す */
-                const result: number[][] = [];
+                const result: [number, number][] = [];
                 while (item) {
                     result.push([item.x, item.y]);
                     item = item.prev;

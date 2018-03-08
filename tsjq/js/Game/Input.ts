@@ -1,14 +1,18 @@
 "use strict";
 
-module Game {
-    export module Input {
+interface HTMLElement {
+    [key: string]: any;
+}
+
+namespace Game {
+    export namespace Input {
         class CustomPointerEvent extends CustomEvent {
             public touch: boolean;
             public mouse: boolean;
             public pointerId: number;
             public pageX: number;
             public pageY: number;
-            public maskedEvent: TouchEvent | MouseEvent;
+            public maskedEvent: UIEvent;
         }
         enum PointerChangeStatus {
             Down,  Up, Leave
@@ -139,9 +143,7 @@ module Game {
 
                 // add event listener to body
                 document.onselectstart = () => false;
-
-                if (document.body["pointermove"]) {
-                    consolere.log("pointer event is implemented");
+                if (document.body["pointermove"] !== undefined) {
 
                     document.body.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
                     document.body.addEventListener('touchdown', evt => { evt.preventDefault(); }, false);
@@ -189,10 +191,10 @@ module Game {
 
             }
 
-            private checkEvent(e): boolean {
+            private checkEvent(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 e.preventDefault();
-                const istouch = e.type.indexOf("touch") === 0;
-                const ismouse = e.type.indexOf("mouse") === 0;
+                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && (e as PointerEvent).pointerType == "touch");
+                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && ((e as PointerEvent).pointerType == "mouse" || (e as PointerEvent).pointerType == "pen")));
                 if (istouch && this.prevInputType !== "touch") {
                     if (e.timeStamp - this.prevTimeStamp >= 500) {
                         this.prevInputType = "touch";
@@ -216,10 +218,10 @@ module Game {
                 }
             }
 
-            private pointerDown(e) {
+            private pointerDown(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent) : boolean {
                 if (this.checkEvent(e)) {
                     const evt = this.makePointerEvent("down", e);
-                    const singleFinger = e["mouse"] || (e["touch"] && e.touches.length === 1);
+                    const singleFinger: boolean = (e instanceof MouseEvent) || (e instanceof TouchEvent && (e as TouchEvent).touches.length === 1);
                     if (!this.isScrolling && singleFinger) {
                         this.maybeClick = true;
                         this.maybeClickX = evt.pageX;
@@ -229,7 +231,7 @@ module Game {
                 return false;
             }
 
-            private pointerLeave(e) {
+            private pointerLeave(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 if (this.checkEvent(e)) {
                     this.maybeClick = false;
                     this.makePointerEvent("leave", e);
@@ -237,14 +239,14 @@ module Game {
                 return false;
             }
 
-            private pointerMove(e) {
+            private pointerMove(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 if (this.checkEvent(e)) {
                     this.makePointerEvent("move", e);
                 }
                 return false;
             }
 
-            private pointerUp(e) {
+            private pointerUp(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 if (this.checkEvent(e)) {
                     const evt = this.makePointerEvent("up", e);
                     if (this.maybeClick) {
@@ -261,7 +263,7 @@ module Game {
                 return false;
             }
 
-            private makePointerEvent(type: string, e: TouchEvent | MouseEvent): CustomPointerEvent {
+            private makePointerEvent(type: string, e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): CustomPointerEvent {
                 const evt: CustomPointerEvent = <CustomPointerEvent>document.createEvent("CustomEvent");
                 const eventType = `pointer${type}`;
                 evt.initCustomEvent(eventType, true, true, {});
@@ -298,25 +300,26 @@ module Game {
             id: number;
 
             get dir4(): number {
-                switch (~~((this.angle + 180 + 45) / 90) % 4) {
-                    case 0: return 4;   // left
-                    case 1: return 8;   // up
-                    case 2: return 6;   // right
-                    case 3: return 2;   // down
+                switch (~~((this.angle + 360 + 45) / 90) % 4) {
+                    case 0: return 6;   // left
+                    case 1: return 2;   // up
+                    case 2: return 4;   // right
+                    case 3: return 8;   // down
                 }
                 return 5;   // neutral
             }
 
             get dir8(): number {
-                switch (~~((this.angle + 180 + 45) / 90) % 8) {
-                    case 0: return 4;   // left
-                    case 1: return 7;   // left-up
-                    case 2: return 8;   // up
-                    case 3: return 9;   // right-up
-                    case 4: return 6;   // right
-                    case 5: return 3;   // right-down
-                    case 6: return 6;   // down
-                    case 7: return 1;   // left-down
+                var d = ~~((this.angle + 360 + 22.5) / 45) % 8;
+                switch (d) {
+                    case 0: return 6;   // right
+                    case 1: return 3;   // right-down
+                    case 2: return 2;   // down
+                    case 3: return 1;   // left-down
+                    case 4: return 4;   // left
+                    case 5: return 7;   // left-up
+                    case 6: return 8;   // up
+                    case 7: return 9;   // right-up
                 }
                 return 5;   // neutral
             }

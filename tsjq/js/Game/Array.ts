@@ -24,3 +24,22 @@ Object.defineProperties(
         }
     }
 );
+
+interface Number {
+    times<T>(pred : (i: number) => T) : IterableIterator<T>;
+}
+
+Object.defineProperties(
+    Number.prototype,
+    {
+        "times": {
+            enumerable: false,
+            configurable: false,
+            writable: false,
+            value: function () {
+                for (var i = 0; i < this; i++) {
+                }
+            }
+        }
+    }
+);

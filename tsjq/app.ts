@@ -27,15 +27,16 @@ enum TurnState {
 
 var consolere: Console;
 
-module Game {
+namespace Game {
+    export const pmode: boolean = false;
     consolere.log("remote log start");
 
     // Global Variables
-    var video: Video = null;
-    var sceneManager: Scene.SceneManager = null;
-    var inputDispacher: Input.InputManager = null;
-    var timer: Timer.AnimationTimer = null;
-    var soundManager: Sound.SoundManager = null;
+    let video: Video = null;
+    let sceneManager: Scene.SceneManager = null;
+    let inputDispacher: Input.InputManager = null;
+    let timer: Timer.AnimationTimer = null;
+    let soundManager: Sound.SoundManager = null;
 
     //
 
@@ -59,7 +60,7 @@ module Game {
                 reject(e);
             }
         });
-    };
+    }
 
     export function getScreen(): Video {
         return video;
@@ -83,212 +84,163 @@ module Game {
 
 }
 
-class Player {
-    _sprite: {
-        down: number[][];
-        left: number[][];
-        up: number[][];
-        right: number[][];
-    };
-    _sprite_width: number;
-    _sprite_height: number;
+abstract class Animator {
+
+    public dir: number;
+    public animDir: number;
+    public animFrame: number;
+    public offx: number;
+    public offy: number;
+
+    constructor(public sprite: [number, number][][], public spriteWidth: number, public spriteHeight: number) {
+        this.offx = 0;
+        this.offy = 0;
+        this.dir = 5;
+        this.animDir = 2;
+        this.animFrame = 0;
+    }
+
+    public setDir(dir: number) {
+        if (dir === 0) {
+            return;
+        }
+
+        this.dir = dir;
+        switch (dir) {
+            case 1: {
+                if (this.animDir === 4) { this.animDir = 4; }
+                else if (this.animDir === 2) { this.animDir = 2; }
+                else if (this.animDir === 8) { this.animDir = 2; }
+                else if (this.animDir === 6) { this.animDir = 4; }
+                break;
+            }
+            case 3: {
+                if (this.animDir === 4) { this.animDir = 6; }
+                else if (this.animDir === 2) { this.animDir = 2; }
+                else if (this.animDir === 8) { this.animDir = 2; }
+                else if (this.animDir === 6) { this.animDir = 2; }
+                break;
+            }
+            case 9: {
+                if (this.animDir === 4) { this.animDir = 6; }
+                else if (this.animDir === 2) { this.animDir = 8; }
+                else if (this.animDir === 8) { this.animDir = 8; }
+                else if (this.animDir === 6) { this.animDir = 6; }
+                break;
+            }
+            case 7: {
+                if (this.animDir === 4) { this.animDir = 4; }
+                else if (this.animDir === 2) { this.animDir = 8; }
+                else if (this.animDir === 8) { this.animDir = 8; }
+                else if (this.animDir === 6) { this.animDir = 4; }
+                break;
+            }
+            case 5: {
+                break;
+            }
+            default: {
+                this.animDir = dir;
+                break;
+            }
+        }
+    }
+    public setAnimation(type: string, rate: number) {
+        if (rate > 1) {
+            rate = 1;
+        }
+        if (rate < 0) {
+            rate = 0;
+        }
+        if (type === "move") {
+            this.offx = ~~(Array2D.DIR8[this.dir][0] * 24 * rate);
+            this.offy = ~~(Array2D.DIR8[this.dir][1] * 24 * rate);
+        } else if (type === "action") {
+            this.offx = ~~(Array2D.DIR8[this.dir][0] * 12 * Math.sin(rate * Math.PI));
+            this.offy = ~~(Array2D.DIR8[this.dir][1] * 12 * Math.sin(rate * Math.PI));
+        }
+        this.animFrame = ~~(rate * this.sprite[this.animDir].length) % this.sprite[this.animDir].length;
+    }
+}
+
+class Player extends Animator {
 
     public charactor: number;
     public x: number;
     public y: number;
-    offx: number;
-    offy: number;
-    dir: string;
-    movemode: string;
-    movems: number;
-    anim: number;
-    animstep: number;
-    movestep: number;
 
     constructor(config: {
         charactor: number;
         x: number;
         y: number;
     }) {
+        if (!Game.pmode) {
+            super([], 47, 47);
+        } else {
+            super([], 24, 24);
+        }
         this.charactor = config.charactor;
         this.x = config.x;
         this.y = config.y;
-        this.offx = 0;
-        this.offy = 0;
-        this.dir = "down";
-        this.movemode = "idle";
-        this.movems = 0;
-        this.anim = 0;
-
-        // 移動時間とアニメーション時間(どちらもms単位)
-        // ダッシュ相当の設定
-        //this.movestep = 150;
-        //this.animstep = 150;
-        // 通常の設定
-        this.movestep = 250;
-        this.animstep = 250;
 
         this.changeCharactor(this.charactor);
     }
 
-    changeCharactor(charactor: number) {
+    private changeCharactor(charactor: number) {
         this.charactor = charactor;
-
-        var psbasex = (this.charactor % 2) * 752;
-        var psbasey = ~~(this.charactor / 2) * 47;
-        this._sprite_width = 47;
-        this._sprite_height = 47;
-        this._sprite = {
-            down: [[0, 0], [1, 0], [2, 0], [3, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            left: [[4, 0], [5, 0], [6, 0], [7, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            up: [[8, 0], [9, 0], [10, 0], [11, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-            right: [[12, 0], [13, 0], [14, 0], [15, 0]].map(xy => [
-                psbasex + this._sprite_width * xy[0], psbasey + this._sprite_height * xy[1]
-            ]),
-        };
-    }
-
-    update(delta: number,
-        ms: number,
-        opts: { moveDir: string; moveCheckCallback: (player: Player, x: number, y: number) => boolean }) {
-
-        if (this.movemode == "idle") {
-            switch (opts.moveDir) {
-                case "left":
-                    this.dir = "left";
-                    if (opts.moveCheckCallback(this, this.x - 1, this.y)) {
-                        this.movemode = "move-left";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    } else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "up":
-                    this.dir = "up";
-                    if (opts.moveCheckCallback(this, this.x, this.y - 1)) {
-                        this.movemode = "move-up";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    } else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "right":
-                    this.dir = "right";
-                    if (opts.moveCheckCallback(this, this.x + 1, this.y)) {
-                        this.movemode = "move-right";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    } else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                case "down":
-                    this.dir = "down";
-                    if (opts.moveCheckCallback(this, this.x, this.y + 1)) {
-                        this.movemode = "move-down";
-                        this.movems = this.movems == 0 ? this.movestep : this.movems;
-                    } else {
-                        this.anim = 0;
-                        this.movems = 0;
-                    }
-                    break;
-                default:
-                    this.movemode = "idle";
-                    this.anim = 0;
-                    this.movems = 0;
-                    return true;
+        if (!Game.pmode) {
+            const psbasex = (this.charactor % 2) * 752;
+            const psbasey = ~~(this.charactor / 2) * 47;
+            this.sprite[2] = [[0, 0], [1, 0], [2, 0], [3, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ] as [number, number]);
+            this.sprite[4] = [[4, 0], [5, 0], [6, 0], [7, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ] as [number, number]);
+            this.sprite[8] = [[8, 0], [9, 0], [10, 0], [11, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ] as [number, number]);
+            this.sprite[6] = [[12, 0], [13, 0], [14, 0], [15, 0]].map(xy => [
+                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
+            ] as [number, number]);
+        } else {
+            const animdir: number[] = [4, 8, 6, 2];
+            const sprites: [number, number][][] = [];
+            for (let i = 0; i < 4; i++) {
+                const spr: [number, number][] = [];
+                for (let j = 0; j < 4; j++) {
+                    spr[j] = [j * 24, i * 24];
+                }
+                sprites[animdir[i]] = spr;
             }
-        } else if (this.movemode == "move-right") {
-
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.x += 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offx = 24 * (1 - this.movems / this.movestep);
-        } else if (this.movemode == "move-left") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.x -= 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offx = -24 * (1 - this.movems / this.movestep);
-        } else if (this.movemode == "move-down") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.y += 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offy = 24 * (1 - this.movems / this.movestep);
-        } else if (this.movemode == "move-up") {
-            this.movems -= delta;
-            this.anim += delta;
-            if (this.movems <= 0) {
-                this.y -= 1;
-                this.movemode = "idle";
-                this.movems += this.movestep;
-            }
-            this.offy = -24 * (1 - this.movems / this.movestep);
+            this.sprite = sprites;
         }
-        if (this.anim >= this.animstep * 4) {
-            this.anim -= this.animstep * 4;
-        }
-
-    }
-
-    getAnimFrame() {
-        return ~~(((~~this.anim) + this.animstep - 1) / this.animstep) % 4;
     }
 }
 
-class Monster {
+class Monster extends Animator {
     public x: number;
     public y: number;
-    public dx: number;
-    public dy: number;
-    public anim: number;
-    public startms: number;
-    public draw: (x: number, y: number, offx: number, offy: number) => void;
-    public update: (delta: number, ms: number) => void;
 
     constructor(config: {
+        _sprite: [number, number][][],
+        _sprite_width: number,
+        _sprite_height: number,
         x: number,
-        y: number,
-        anim: number,
-        startms: number,
-        draw: (x: number, y: number, offx: number, offy: number) => void,
-        update: (delta: number, ms: number) => void
+        y: number
     }) {
+        super(config._sprite, config._sprite_width, config._sprite_height);
         this.x = config.x;
         this.y = config.y;
-        this.anim = config.anim;
-        this.startms = config.startms;
-        this.draw = config.draw.bind(this);
-        this.update = config.update.bind(this);
     }
 }
 
 class Fade {
-    started: boolean;
-    startTime: number;
-    rate: number;
-    w: number;
-    h: number;
-    mode: string;
+    private started: boolean;
+    private startTime: number;
+    private rate: number;
+    private w: number;
+    private h: number;
+    private mode: string;
 
     constructor(w: number, h: number) {
         this.startTime = -1;
@@ -297,24 +249,24 @@ class Fade {
         this.h = h;
         this.mode = "";
     }
-    startFadeOut() {
+    public startFadeOut() {
         this.started = true;
         this.startTime = -1;
         this.rate = 0;
         this.mode = "fadeout";
     }
-    startFadeIn() {
+    public startFadeIn() {
         this.started = true;
         this.startTime = -1;
         this.rate = 1;
         this.mode = "fadein";
     }
-    stop() {
+    public stop() {
         this.started = false;
         this.startTime = -1;
     }
-    update(ms: number) {
-        if (this.started == false) {
+    public update(ms: number) {
+        if (this.started === false) {
             return;
         }
         if (this.startTime === -1) {
@@ -330,7 +282,7 @@ class Fade {
             this.rate = 1 - this.rate;
         }
     }
-    draw() {
+    public draw() {
         if (this.started) {
             Game.getScreen().fillStyle = `rgba(0,0,0,${this.rate})`;
             Game.getScreen().fillRect(0, 0, this.w, this.h);
@@ -353,7 +305,7 @@ window.onload = () => {
             update?: (elapsed: number, ms: number) => void;
             end?: (elapsed: number, ms: number) => void;
         }) {
-        var startTime = -1;
+        let startTime = -1;
         init();
         return (delta: number, ms: number) => {
             if (startTime === -1) {
@@ -367,7 +319,7 @@ window.onload = () => {
                 update(elapsed, ms);
             }
         };
-    };
+    }
 
     function waitClick({
             update = () => { },
@@ -380,20 +332,20 @@ window.onload = () => {
             check?: (x: number, y: number, elapsed: number, ms: number) => boolean;
             end?: (x: number, y: number, elapsed: number, ms: number) => void;
         }) {
-        var startTime = -1;
+        let startTime = -1;
         return (delta: number, ms: number) => {
             if (startTime === -1) {
                 startTime = ms;
                 start(0, ms);
             }
-            var elapsed = ms - startTime;
+            const elapsed = ms - startTime;
             if (Game.getInput().isClick()) {
-                var pX = Game.getInput().pageX;
-                var pY = Game.getInput().pageY;
+                const pX = Game.getInput().pageX;
+                const pY = Game.getInput().pageY;
                 if (Game.getScreen().pagePointContainScreen(pX, pY)) {
                     const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
-                    var xx = pos[0];
-                    var yy = pos[1];
+                    const xx = pos[0];
+                    const yy = pos[1];
                     if (check(xx, yy, elapsed, ms)) {
                         end(xx, yy, elapsed, ms);
                         return;
@@ -402,8 +354,7 @@ window.onload = () => {
             }
             update(elapsed, ms);
         };
-    };
-
+    }
 
     Game.create({
         title: "TSJQ",
@@ -411,12 +362,11 @@ window.onload = () => {
             id: "glcanvas",
         },
         scene: {
-            title: function* (data) {
-                console.log("state start", data);
-                // setup 
-                var show_click_or_tap = false;
+            title: function* (data): IterableIterator<any> {
+                // setup
+                let showClickOrTap = false;
 
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
 
                 this.draw = () => {
                     const w = Game.getScreen().width;
@@ -430,7 +380,7 @@ window.onload = () => {
                         0, 0, 192, 72,
                         w / 2 - 192 / 2, 50, 192, 72
                     );
-                    if (show_click_or_tap) {
+                    if (showClickOrTap) {
                         Game.getScreen().drawImage(
                             Game.getScreen().texture("title"),
                             0, 72, 168, 24,
@@ -443,7 +393,7 @@ window.onload = () => {
 
 
                 yield waitClick({
-                    update: (e, ms) => { show_click_or_tap = (~~(ms / 500) % 2) === 0; },
+                    update: (e, ms) => { showClickOrTap = (~~(ms / 500) % 2) === 0; },
                     check: () => true,
                     end: () => {
                         Game.getSound().reqPlayChannel(0);
@@ -453,14 +403,14 @@ window.onload = () => {
 
                 yield waitTimeout({
                     timeout: 1000,
-                    update: (e, ms) => { show_click_or_tap = (~~(ms / 50) % 2) === 0; },
+                    update: (e, ms) => { showClickOrTap = (~~(ms / 50) % 2) === 0; },
                     end: () => this.next()
                 });
 
                 yield waitTimeout({
                     timeout: 500,
                     init: () => { fade.startFadeOut(); },
-                    update: (e, ms) => { fade.update(e); show_click_or_tap = (~~(ms / 50) % 2) === 0; },
+                    update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
                     end: () => {
                         Game.getSceneManager().push("classroom");
                         this.next();
@@ -468,15 +418,15 @@ window.onload = () => {
                 });
 
             },
-            classroom: function* () {
-                var selectedCharactor = -1;
-                var selectedCharactorDir = 0;
-                var selectedCharactorOffY = 0;
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+            classroom: function* (): IterableIterator<any> {
+                let selectedCharactor = -1;
+                let selectedCharactorDir = 0;
+                let selectedCharactorOffY = 0;
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
 
                 this.draw = () => {
-                    var w = Game.getScreen().width;
-                    var h = Game.getScreen().height;
+                    const w = Game.getScreen().width;
+                    const h = Game.getScreen().height;
                     Game.getScreen().save();
                     Game.getScreen().clearRect(0, 0, w, h);
                     Game.getScreen().fillStyle = "rgb(255,255,255)";
@@ -522,9 +472,9 @@ window.onload = () => {
                     );
 
                     // 各キャラと机
-                    for (var y = 0; y < 5; y++) {
-                        for (var x = 0; x < 6; x++) {
-                            var id = y * 6 + x;
+                    for (let y = 0; y < 5; y++) {
+                        for (let x = 0; x < 6; x++) {
+                            const id = y * 6 + x;
                             Game.getScreen().drawImage(
                                 Game.getScreen().texture("charactor"),
                                 752 * (id % 2) +
@@ -533,7 +483,7 @@ window.onload = () => {
                                 47,
                                 47,
                                 12 + x * 36,
-                                24 + y * (48 - 7) - ((selectedCharactor != id) ? 0 : (selectedCharactorOffY)),
+                                24 + y * (48 - 7) - ((selectedCharactor !== id) ? 0 : (selectedCharactorOffY)),
                                 47,
                                 47
                             );
@@ -621,18 +571,17 @@ window.onload = () => {
                 Game.getSound().reqStopChannel(2);
                 Game.getSceneManager().pop();
                 Game.getSceneManager().push("dungeon", { player: player, floor: 1 });
-                console.log("dungeon");
             },
-            dungeon: function* (param) {
+            dungeon: function* ({ player = null, floor = 0 }: { player: Player, floor: number }): IterableIterator<any> {
 
 
                 // マップサイズ算出
-                const mapChipW = 30 + param.floor * 3;
-                const mapChipH = 30 + param.floor * 3;
+                const mapChipW = 30 + floor * 3;
+                const mapChipH = 30 + floor * 3;
 
                 // マップ自動生成
                 const mapchipsL1 = new Array2D(mapChipW, mapChipH);
-                const dungeon = Dungeon.Generator.create(
+                const dungeon = Dungeon.generate(
                     mapChipW,
                     mapChipH,
                     (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
@@ -656,55 +605,51 @@ window.onload = () => {
                 }
 
                 // 部屋シャッフル
-                var rooms = dungeon._rooms.shuffle();
+                const rooms = dungeon.rooms.shuffle();
 
                 // 開始位置
-                var startPos = rooms[0].getCenter();
-                param.player.x = startPos[0];
-                param.player.y = startPos[1];
+                const startPos = rooms[0].getCenter();
+                player.x = startPos[0];
+                player.y = startPos[1];
 
                 // 階段位置
-                var stairsPos = rooms[1].getCenter();
+                const stairsPos = rooms[1].getCenter();
                 mapchipsL1.value(stairsPos[0], stairsPos[1], 10);
 
                 // モンスター配置
-                var monsters = rooms.splice(2).map(x => {
+                const monsters = rooms.splice(2).map(x => {
+                    const sprites: [number, number][][] = [];
+                    if (!Game.pmode) {
+                        const animdir: number[] = [2, 4, 8, 6];
+                        for (let i = 0; i < 4; i++) {
+                            const spr: [number, number][] = [];
+                            for (let j = 0; j < 4; j++) {
+                                spr[j] = [((i + 1) * 4 + j) * 24, 0];
+                            }
+                            sprites[animdir[i]] = spr;
+                        }
+                        this._sprite = sprites;
+                    } else {
+                        const animdir: number[] = [4, 8, 6, 2];
+                        for (let i = 0; i < 4; i++) {
+                            const spr: [number, number][] = [];
+                            for (let j = 0; j < 4; j++) {
+                                spr[j] = [j * 24, i * 24];
+                            }
+                            sprites[animdir[i]] = spr;
+                        }
+                        this._sprite = sprites;
+                    }
                     return new Monster({
+                        _sprite: sprites,
+                        _sprite_width: 24,
+                        _sprite_height: 24,
                         x: x.getLeft(), //pos[0],
                         y: x.getTop(), //pos[1],
-                        anim: 0,
-                        startms: -1,
-                        update(delta, ms) {
-                            if (this.startms == -1) {
-                                this.startms = ms;
-                            }
-                            this.anim = ~~((ms - this.startms) / 160) % 4;
-                        },
-                        draw(x: number, y: number, offx: number, offy: number) {
-                            const xx = this.x - x;
-                            const yy = this.y - y;
-                            if (0 <= xx &&
-                                xx < Game.getScreen().width / 24 &&
-                                0 <= yy &&
-                                yy < Game.getScreen().height / 24) {
-                                Game.getScreen().drawImage(
-                                    Game.getScreen().texture("monster"),
-                                    this.anim * 24,
-                                    0,
-                                    24,
-                                    24,
-                                    xx * 24 + offx + 12 + this.dx,
-                                    yy * 24 + offy + 12 + this.dy,
-                                    24,
-                                    24
-                                );
-                            }
-
-                        }
                     });
                 });
 
-                var map = new Dungeon.DungeonData({
+                const map: Dungeon.DungeonData = new Dungeon.DungeonData({
                     width: mapChipW,
                     height: mapChipW,
                     gridsize: { width: 24, height: 24 },
@@ -731,8 +676,8 @@ window.onload = () => {
                 // カメラを更新
                 map.update({
                     viewpoint: {
-                        x: (param.player.x * 24 + param.player.offx) + param.player._sprite_width / 2,
-                        y: (param.player.y * 24 + param.player.offy) + param.player._sprite_height / 2
+                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
                     },
                     viewwidth: Game.getScreen().width,
                     viewheight: Game.getScreen().height,
@@ -741,30 +686,30 @@ window.onload = () => {
                 Game.getSound().reqPlayChannel(1, true);
 
                 // assign virtual pad
-                var pad = new Game.Input.VirtualStick();
+                const pad = new Game.Input.VirtualStick();
 
-                var pointerdown = (ev: PointerEvent): void => {
+                const pointerdown = (ev: PointerEvent): void => {
                     if (pad.onpointingstart(ev.pointerId)) {
                         const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
                         pad.x = pos[0];
                         pad.y = pos[1];
                     }
                 };
-                var pointermove = (ev: PointerEvent): void => {
+                const pointermove = (ev: PointerEvent): void => {
                     const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
                     pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
                 };
-                var pointerup = (ev: PointerEvent): void => {
+                const pointerup = (ev: PointerEvent): void => {
                     pad.onpointingend(ev.pointerId);
                 };
 
-                var onPointerHook = () => {
+                const onPointerHook = () => {
                     Game.getInput().on("pointerdown", pointerdown);
                     Game.getInput().on("pointermove", pointermove);
                     Game.getInput().on("pointerup", pointerup);
                     Game.getInput().on("pointerleave", pointerup);
                 };
-                var offPointerHook = () => {
+                const offPointerHook = () => {
                     Game.getInput().off("pointerdown", pointerdown);
                     Game.getInput().off("pointermove", pointermove);
                     Game.getInput().off("pointerup", pointerup);
@@ -784,40 +729,19 @@ window.onload = () => {
                     Game.getSound().reqStopChannel(1);
                 };
 
-                var update_lighting = (iswalkable) => {
-                    var calc_lighting = (x, y, power, dec, dec2, setted) => {
-                        if (0 > x || x >= map.width) {
-                            return;
-                        }
-                        if (0 > y || y >= map.height) {
-                            return;
-                        }
-                        if (power <= map.lighting.value(x, y)) {
-                            return;
-                        }
-
-                        setted[x + "," + y] = true;
-                        map.lighting.value(x, y, Math.max(map.lighting.value(x, y), power));
-                        map.visibled.value(x,
-                            y,
-                            Math.max(map.lighting.value(x, y), map.visibled.value(x, y)));
-                        if (!iswalkable(x, y)) {
-                            power -= dec2;
-                        } else {
-                            power -= dec;
-                        }
-
-                        calc_lighting(x + 0, y - 1, power, dec, dec2, setted);
-                        calc_lighting(x - 1, y + 0, power, dec, dec2, setted);
-                        calc_lighting(x + 1, y + 0, power, dec, dec2, setted);
-                        calc_lighting(x + 0, y + 1, power, dec, dec2, setted);
-
-                    };
+                const updateLighting = (iswalkable: (x: number) => boolean) => {
                     map.clearLighting();
-                    calc_lighting(param.player.x, param.player.y, 140, 20, 50, {});
+                    PathFinder.propagation({
+                        array2D: map.layer[0].chips,
+                        sx: player.x,
+                        sy: player.y,
+                        value: 140,
+                        costs: (v) => iswalkable(v) ? 20 : 50,
+                        output: map.lighting
+                    });
                 };
 
-                var fade = new Fade(Game.getScreen().width, Game.getScreen().height);
+                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
 
                 this.draw = () => {
 
@@ -826,9 +750,8 @@ window.onload = () => {
                     Game.getScreen().fillStyle = "rgb(255,255,255)";
                     Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
 
-                    map.draw((l, cameraLocalPx, cameraLocalPy) => {
-                        if (l == 0) {
-                            const animf = param.player.getAnimFrame();
+                    map.draw((l: number, cameraLocalPx: number, cameraLocalPy: number) => {
+                        if (l === 0) {
                             // 影
                             Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
 
@@ -845,23 +768,44 @@ window.onload = () => {
                             Game.getScreen().fill();
 
                             // モンスター
-                            var camera: Dungeon.Camera = map.camera;
-                            monsters.forEach((x) => x.draw(camera.chipX,
-                                camera.chipY,
-                                camera.chipOffX,
-                                camera.chipOffY));
+                            const camera: Dungeon.Camera = map.camera;
+                            monsters.forEach((monster) => {
+                                const xx = monster.x - camera.chipLeft;
+                                const yy = monster.y - camera.chipTop;
+                                if (0 <= xx &&
+                                    xx < Game.getScreen().width / 24 &&
+                                    0 <= yy &&
+                                    yy < Game.getScreen().height / 24) {
+                                    const adir = monster.animDir;
+                                    const af = monster.animFrame;
+                                    Game.getScreen().drawImage(
+                                        Game.getScreen().texture("monster"),
+                                        monster.sprite[adir][af][0],
+                                        monster.sprite[adir][af][1],
+                                        monster.spriteWidth,
+                                        monster.spriteHeight,
+                                        xx * monster.spriteWidth + camera.chipOffX + monster.offx,
+                                        yy * monster.spriteWidth + camera.chipOffY + monster.offy,
+                                        monster.spriteWidth,
+                                        monster.spriteHeight
+                                    );
+                                }
+                            });
+
+                            const animf: number = player.animFrame;
+                            const playersprite: [number, number][] = player.sprite[player.animDir];
 
                             // キャラクター
                             Game.getScreen().drawImage(
                                 Game.getScreen().texture("charactor"),
-                                param.player._sprite[param.player.dir][animf][0],
-                                param.player._sprite[param.player.dir][animf][1],
-                                param.player._sprite_width,
-                                param.player._sprite_height,
-                                cameraLocalPx - param.player._sprite_width / 2,
-                                cameraLocalPy - param.player._sprite_height / 2 - 12,
-                                param.player._sprite_width,
-                                param.player._sprite_height
+                                playersprite[animf][0],
+                                playersprite[animf][1],
+                                player.spriteWidth,
+                                player.spriteHeight,
+                                cameraLocalPx - player.spriteWidth / 2,
+                                cameraLocalPy - player.spriteHeight / 2 - 12,
+                                player.spriteWidth,
+                                player.spriteHeight
                             );
 
                         }
@@ -904,7 +848,7 @@ window.onload = () => {
                 yield waitTimeout({
                     timeout: 500,
                     init: () => { fade.startFadeIn(); },
-                    update: (e) => { fade.update(e); update_lighting((x, y) => ((map.layer[0].chips.value(x, y) === 1) || (map.layer[0].chips.value(x, y) === 10))) },
+                    update: (e) => { fade.update(e); updateLighting((v: number) => v === 1 || v === 10); },
                     end: (e) => { this.next(); }
                 });
 
@@ -912,50 +856,37 @@ window.onload = () => {
 
 
                 // ターンの状態（フェーズ）
-                var turnStateStack: [TurnState, any][] = [[TurnState.WaitInput, null]];
-                const moveOffsetTable: [number, number][] = [
-                    [0, 0],
-                    [-1, -1],
-                    [-1, 0],
-                    [-1, +1],
-                    [0, -1],
-                    [0, 0],
-                    [0, +1],
-                    [+1, -1],
-                    [+1, 0],
-                    [+1, +1],
-                ];
+                const turnStateStack: [TurnState, any][] = [[TurnState.WaitInput, null]];
 
-
-                var playerTactics: any = {};
-                var monstersTactics: any[] = [];
+                let playerTactics: any = {};
+                let monstersTactics: any[] = [];
                 yield (delta: number, ms: number) => {
                     switch (turnStateStack[0][0]) {
                         case TurnState.WaitInput:
                             {
                                 // キー入力待ち
                                 if (pad.isTouching === false || pad.distance <= 0.4) {
-                                    this.player.setAnimation('idle', 0);
+                                    player.setAnimation('idle', 0);
                                     break;
                                 }
 
                                 // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
 
-                                var playerMoveDir = pad.dir4;
+                                const playerMoveDir = pad.dir8;
 
                                 // 「行動(Action)」と「移動(Move)」の識別を行う
 
-                                // 移動先が侵入不可能の場合は移動処理キャンセル
-                                var [ox, oy] = moveOffsetTable[playerMoveDir];
-                                if (map.layer[0].chips.value(this.player.x + ox, this.player.y + oy) === 0) {
-                                    this.player.setDir(playerMoveDir);
+                                // 移動先が侵入不可能の場合は待機とする
+                                const [ox, oy] = Array2D.DIR8[playerMoveDir];
+                                if (map.layer[0].chips.value(player.x + ox, player.y + oy) !== 1 && map.layer[0].chips.value(player.x + ox, player.y + oy) !== 10) {
+                                    player.setDir(playerMoveDir);
                                     break;
                                 }
 
                                 // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
                                 const targetMonster =
-                                    monsters.findIndex((monster) => (monster.x === this.player.x + ox) &&
-                                        (monster.y === this.player.y + ox));
+                                    monsters.findIndex((monster) => (monster.x === player.x + ox) &&
+                                        (monster.y === player.y + oy));
                                 if (targetMonster !== -1) {
                                     // 移動先に敵がいる＝「行動(Action)」
 
@@ -963,7 +894,7 @@ window.onload = () => {
                                         type: "action",
                                         moveDir: playerMoveDir,
                                         targetMonster: playerMoveDir,
-                                        startTime: 0,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
 
@@ -982,7 +913,7 @@ window.onload = () => {
                                     playerTactics = {
                                         type: "move",
                                         moveDir: playerMoveDir,
-                                        startTime: 0,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
 
@@ -1001,14 +932,14 @@ window.onload = () => {
                         case TurnState.PlayerAction: {
                             // プレイヤーの行動開始
                             turnStateStack[0][0] = TurnState.PlayerActionRunning;
-                            this.player.setDir(playerTactics.moveDir);
-                            this.player.setAnimation('atack', 0);
+                            player.setDir(playerTactics.moveDir);
+                            player.setAnimation('action', 0);
                             break;
                         }
                         case TurnState.PlayerActionRunning: {
                             // プレイヤーの行動中
-                            let rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                            this.player.setAnimation('atack', rate);
+                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                            player.setAnimation('action', rate);
                             if (rate >= 1) {
                                 // プレイヤーの行動終了
                                 turnStateStack.shift();
@@ -1019,20 +950,20 @@ window.onload = () => {
                             // 敵の行動の決定
 
                             // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
-                            let px = this.player.x;
-                            let py = this.player.y;
+                            let px = player.x;
+                            let py = player.y;
                             if (playerTactics.type === "move") {
-                                let off = moveOffsetTable[playerTactics.moveDir];
+                                const off = Array2D.DIR8[playerTactics.moveDir];
                                 px += off[0];
                                 py += off[1];
                             }
 
                             monstersTactics = monsters.map((monster) => {
-                                let dx = px - monster.x;
-                                let dy = py - monster.y;
+                                const dx = px - monster.x;
+                                const dy = py - monster.y;
                                 if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
                                     // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
-                                    let dir = moveOffsetTable.findIndex((x) => x[0] === dx && x[1] === dy);
+                                    const dir = Array2D.DIR8.findIndex((x) => x[0] === dx && x[1] === dy);
                                     return {
                                         type: "action",
                                         moveDir: dir,
@@ -1042,23 +973,32 @@ window.onload = () => {
                                 } else {
                                     // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
                                     // とりあえず軸合わせで動く
-                                    if (Math.abs(dx) < Math.abs(dy)) {
-                                        if (dx !== 0) {
-                                            dx = Math.sign(dx);
-                                        }
-                                    } else if (Math.abs(dy) < Math.abs(dx)) {
-                                        if (dy !== 0) {
-                                            dy = Math.sign(dy);
+
+                                    const cands = [
+                                        [Math.sign(dx), Math.sign(dy)],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
+                                    ];
+
+                                    for (let i = 0; i < 3; i++) {
+                                        const [cx, cy] = cands[i];
+                                        if (map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 1 || map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 10) {
+                                            const dir = Array2D.DIR8.findIndex((x) => x[0] === cx && x[1] === cy);
+                                            return {
+                                                type: "move",
+                                                moveDir: dir,
+                                                startTime: ms,
+                                                actionTime: 250
+                                            };
                                         }
                                     }
-
-                                    let dir = moveOffsetTable.findIndex((x) => x[0] === dx && x[1] === dy);
                                     return {
-                                        type: "move",
-                                        moveDir: dir,
-                                        startTime: 0,
+                                        type: "idle",
+                                        moveDir: 5,
+                                        startTime: ms,
                                         actionTime: 250
                                     };
+
 
                                 }
                             });
@@ -1077,8 +1017,9 @@ window.onload = () => {
                                 }
                             }
                             if (enemyId < monstersTactics.length) {
+                                monstersTactics[enemyId].startTime = ms;
                                 monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
-                                monsters[enemyId].setAnimation('atack', 0);
+                                monsters[enemyId].setAnimation('action', 0);
                                 turnStateStack[0][0] = TurnState.EnemyActionRunning;
                                 turnStateStack[0][1] = enemyId;
                             } else {
@@ -1090,15 +1031,14 @@ window.onload = () => {
                         }
                         case TurnState.EnemyActionRunning: {
                             // 敵の行動中
-                            let enemyId = turnStateStack[0][1];
+                            const enemyId = turnStateStack[0][1];
 
-                            let rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
-                            monsters[enemyId].setAnimation('atack', rate);
+                            const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
+                            monsters[enemyId].setAnimation('action', rate);
                             if (rate >= 1) {
                                 // 行動終了。次の敵へ
                                 turnStateStack[0][0] = TurnState.EnemyAction;
                                 turnStateStack[0][1] = enemyId + 1;
-                                turnStateStack.shift();
                             }
                             break;
                         }
@@ -1109,20 +1049,22 @@ window.onload = () => {
                                 if (monsterTactic.type === "move") {
                                     monsters[i].setDir(monsterTactic.moveDir);
                                     monsters[i].setAnimation('move', 0);
+                                    monstersTactics[i].startTime = ms;
                                 }
                             });
                             if (playerTactics.type === "move") {
-                                this.player.setDir(playerTactics.moveDir);
-                                this.player.setAnimation('move', 0);
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation('move', 0);
+                                playerTactics.startTime = ms;
                             }
                             break;
                         }
                         case TurnState.MoveRunning: {
-                            // 移動実行  
-                            let finish = false;
+                            // 移動実行
+                            let finish = true;
                             monstersTactics.forEach((monsterTactic, i) => {
                                 if (monsterTactic.type === "move") {
-                                    let rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
+                                    const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
                                     monsters[i].setDir(monsterTactic.moveDir);
                                     monsters[i].setAnimation('move', rate);
                                     if (rate < 1) {
@@ -1131,9 +1073,9 @@ window.onload = () => {
                                 }
                             });
                             if (playerTactics.type === "move") {
-                                let rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                                this.player.setDir(playerTactics.moveDir);
-                                this.player.setAnimation('move', rate);
+                                const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation('move', rate);
                                 if (rate < 1) {
                                     finish = false; // 行動終了していないフラグをセット
                                 }
@@ -1142,8 +1084,23 @@ window.onload = () => {
                                 // 行動終了
                                 turnStateStack.shift();
 
+                                monstersTactics.forEach((monsterTactic, i) => {
+                                    if (monsterTactic.type === "move") {
+                                        monsters[i].x += Array2D.DIR8[monsterTactic.moveDir][0];
+                                        monsters[i].y += Array2D.DIR8[monsterTactic.moveDir][1];
+                                        monsters[i].offx = 0;
+                                        monsters[i].offy = 0;
+                                    }
+                                });
+                                if (playerTactics.type === "move") {
+                                    player.x += Array2D.DIR8[playerTactics.moveDir][0];
+                                    player.y += Array2D.DIR8[playerTactics.moveDir][1];
+                                    player.offx = 0;
+                                    player.offy = 0;
+                                }
+
                                 // 現在位置のマップチップを取得
-                                const chip = map.layer[0].chips.value(~~param.player.x, ~~param.player.y);
+                                const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
                                 if (chip === 10) {
                                     // 階段なので次の階層に移動させる。
                                     this.next("nextfloor");
@@ -1157,103 +1114,99 @@ window.onload = () => {
                             turnStateStack.shift();
                             break;
                         }
-                    };
+                    }
 
 
+                    // カメラを更新
+                    map.update({
+                        viewpoint: {
+                            x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                            y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
+                        },
+                        viewwidth: Game.getScreen().width,
+                        viewheight: Game.getScreen().height,
+                    }
+                    );
 
-                        // カメラを更新
-                        map.update({
-                            viewpoint: {
-                                x: (param.player.x * 24 + param.player.offx) +
-                                param.player._sprite_width / 2,
-                                y: (param.player.y * 24 + param.player.offy) +
-                                param.player._sprite_height / 2
-                            },
-                            viewwidth: Game.getScreen().width,
-                            viewheight: Game.getScreen().height,
-                        }
-                        );
+                    updateLighting((v: number) => v === 1 || v === 10);
 
-                        update_lighting((x, y) => (map.layer[0].chips.value(x, y) === 1) ||
-                            (map.layer[0].chips.value(x, y) === 10));
+                    if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+                        Game.getSceneManager().push("mapview", { map: map, player: player });
+                    }
 
-                        if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                            Game.getSceneManager().push("mapview", { map: map, player: param.player });
-                        }
+                };
+                Game.getSound().reqPlayChannel(3);
 
-                    };
-                    Game.getSound().reqPlayChannel(3);
+                yield waitTimeout({
+                    timeout: 500,
+                    init: () => { fade.startFadeOut(); },
+                    update: (e) => { fade.update(e); updateLighting((v: number) => v === 1 || v === 10); },
+                    end: (e) => { this.next(); }
+                });
 
-                    yield waitTimeout({
-                        timeout: 500,
-                        init: () => { fade.startFadeOut(); },
-                        update: (e) => { fade.update(e); update_lighting((x, y) => (map.layer[0].chips.value(x, y) === 1) || (map.layer[0].chips.value(x, y) === 10)) },
-                        end: (e) => { this.next(); }
-                    });
+                yield waitTimeout({
+                    timeout: 500,
+                    end: (e) => { floor++; this.next(); }
+                });
 
-                    yield waitTimeout({
-                        timeout: 500,
-                        end: (e) => { param.floor++; this.next(); }
-                    });
+                Game.getSceneManager().pop();
+                Game.getSceneManager().push("dungeon", { player: player, floor: floor });
 
-                    Game.getSceneManager().pop();
-                    Game.getSceneManager().push("dungeon", param);
+            },
+            mapview: function* (data) {
+                this.draw = () => {
+                    Game.getScreen().save();
+                    Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
+                    Game.getScreen().fillStyle = "rgb(0,0,0)";
+                    Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
 
-                },
-                    mapview: function* (data) {
-                        this.draw = () => {
-                            Game.getScreen().save();
-                            Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                            Game.getScreen().fillStyle = "rgb(0,0,0)";
-                            Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
+                    const offx = ~~((Game.getScreen().width - data.map.width * 5) / 2);
+                    const offy = ~~((Game.getScreen().height - data.map.height * 5) / 2);
 
-                            var offx = ~~((Game.getScreen().width - data.map.width * 5) / 2);
-                            var offy = ~~((Game.getScreen().height - data.map.height * 5) / 2);
-
-                            // ミニマップを描画
-                            for (var y = 0; y < data.map.height; y++) {
-                                for (var x = 0; x < data.map.width; x++) {
-                                    var chip = data.map.layer[0].chips.value(x, y);
-                                    var color = "rgb(52,12,0)";
-                                    switch (chip) {
-                                        case 1:
-                                            color = "rgb(179,116,39)";
-                                            break;
-                                        case 10:
-                                            color = "rgb(255,0,0)";
-                                            break;
-                                    }
-                                    Game.getScreen().fillStyle = color;
-                                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-
-                                    var light = 1 - data.map.visibled.value(x, y) / 100;
-                                    if (light > 1) {
-                                        light = 1;
-                                    } else if (light < 0) {
-                                        light = 0;
-                                    }
-                                    Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
-                                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                                }
+                    // ミニマップを描画
+                    for (let y = 0; y < data.map.height; y++) {
+                        for (let x = 0; x < data.map.width; x++) {
+                            const chip = data.map.layer[0].chips.value(x, y);
+                            let color = "rgb(52,12,0)";
+                            switch (chip) {
+                                case 1:
+                                    color = "rgb(179,116,39)";
+                                    break;
+                                case 10:
+                                    color = "rgb(255,0,0)";
+                                    break;
                             }
+                            Game.getScreen().fillStyle = color;
+                            Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
 
-                            Game.getScreen().fillStyle = "rgb(0,255,0)";
-                            Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
-                            Game.getScreen().restore();
-                        };
-                        yield waitClick({ end: () => this.next() });
-                        Game.getSceneManager().pop();
-                    },
+                            let light = 1 - data.map.visibled.value(x, y) / 100;
+                            if (light > 1) {
+                                light = 1;
+                            } else if (light < 0) {
+                                light = 0;
+                            }
+                            Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
+                            Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
+                        }
+                    }
+
+                    Game.getScreen().fillStyle = "rgb(0,255,0)";
+                    Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
+                    Game.getScreen().restore();
+                };
+                yield waitClick({ end: () => this.next() });
+                Game.getSceneManager().pop();
+            },
         }
     }).then(() => {
-        var anim = 0;
-        var update = (ms) => {
+        let anim = 0;
+        const update = (ms: number) => {
             Game.getScreen().save();
             Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
 
-            var n = ~(ms / 50);
+            const n = ~(ms / 50);
             Game.getScreen().translate(Game.getScreen().width / 2, Game.getScreen().height / 2);
             Game.getScreen().rotate(n * Math.PI / 4);
             for (let i = 0; i < 8; i++) {

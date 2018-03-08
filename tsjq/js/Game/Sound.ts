@@ -1,20 +1,7 @@
 "use strict";
 
-interface webkitAudioContext extends AudioContext {
-    suspend(): Promise<void>;
-}
-
-declare var webkitAudioContext: {
-    prototype: AudioContext;
-    new(): AudioContext;
-};
-
-module Game {
-    if (AudioContext == null && webkitAudioContext != null) {
-        AudioContext = webkitAudioContext;
-    }
-
-    export module Sound {
+namespace Game {
+    export namespace Sound {
         class ManagedSoundChannel {
             public audioBufferNode: AudioBuffer = null;
             public playRequest: boolean = false;
@@ -88,6 +75,20 @@ module Game {
                 this.bufferSourceIdCount = 0;
                 this.playingBufferSources = new Map<number, { id: number; buffer: AudioBufferSourceNode }>();
                 this.reset();
+
+                let touchEventHooker = () => {
+                    // A small hack to unlock AudioContext on mobile safari.
+                    const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
+                    const channel = buffer.getChannelData(0);
+                    channel.fill(0);
+                    const src = this.audioContext.createBufferSource();
+                    src.buffer = buffer;
+                    src.connect(this.audioContext.destination);
+                    src.start(this.audioContext.currentTime);
+                    document.body.removeEventListener('touchstart', touchEventHooker);
+                };
+                document.body.addEventListener('touchstart', touchEventHooker);
+
             }
 
             public createBufferSource(buffer: AudioBuffer): AudioBufferSourceNode {
