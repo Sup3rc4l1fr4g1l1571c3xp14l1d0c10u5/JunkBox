@@ -7,6 +7,7 @@ interface HTMLElement {
 namespace Game {
     export namespace Input {
         class CustomPointerEvent extends CustomEvent {
+            public detail: any;    // no use
             public touch: boolean;
             public mouse: boolean;
             public pointerId: number;
@@ -15,7 +16,7 @@ namespace Game {
             public maskedEvent: UIEvent;
         }
         enum PointerChangeStatus {
-            Down,  Up, Leave
+            Down, Up, Leave
         }
 
         export class InputManager extends Dispatcher.EventDispatcher {
@@ -34,7 +35,7 @@ namespace Game {
             private lastPageY: number;
             private downup: number;
             private clicked: boolean;
-            private lastDownPageX : number;
+            private lastDownPageX: number;
             private lastDownPageY: number;
             private draglen: number;
 
@@ -47,13 +48,13 @@ namespace Game {
                 return this.lastPageY;
             }
             public isDown(): boolean {
-                return this.downup == 1;
+                return this.downup === 1;
             }
             public isPush(): boolean {
                 return this.downup > 1;
             }
             public isUp(): boolean {
-                return this.downup == -1;
+                return this.downup === -1;
             }
             public isClick(): boolean {
                 return this.clicked;
@@ -66,32 +67,30 @@ namespace Game {
             }
             public endCapture(): void {
                 this.capture = false;
-                if (this.status == PointerChangeStatus.Down) {
+                if (this.status === PointerChangeStatus.Down) {
                     if (this.downup < 1) { this.downup = 1; } else { this.downup += 1; }
-                } else if (this.status == PointerChangeStatus.Up) {
+                } else if (this.status === PointerChangeStatus.Up) {
                     if (this.downup > -1) { this.downup = -1; } else { this.downup -= 1; }
                 } else {
                     this.downup = 0;
                 }
 
                 this.clicked = false;
-                if (this.downup == -1) {
+                if (this.downup === -1) {
                     if (this.draglen < 5) {
                         this.clicked = true;
                     }
-                } else if (this.downup == 1) {
+                } else if (this.downup === 1) {
                     this.lastDownPageX = this.lastPageX;
                     this.lastDownPageY = this.lastPageY;
                     this.draglen = 0;
                 } else if (this.downup > 1) {
-                    this.draglen = Math.max(this.draglen, Math.sqrt((this.lastDownPageX - this.lastPageX) * (this.lastDownPageX - this.lastPageX) +(this.lastDownPageY - this.lastPageY) * (this.lastDownPageY - this.lastPageY)));
+                    this.draglen = Math.max(this.draglen, Math.sqrt((this.lastDownPageX - this.lastPageX) * (this.lastDownPageX - this.lastPageX) + (this.lastDownPageY - this.lastPageY) * (this.lastDownPageY - this.lastPageY)));
                 }
-
-
             }
 
             private captureHandler(e: CustomPointerEvent): void {
-                if (this.capture == false) {
+                if (this.capture === false) {
                     return;
                 }
                 switch (e.type) {
@@ -114,6 +113,14 @@ namespace Game {
             constructor() {
                 super();
 
+                if (!(window as any).TouchEvent) {
+                    console.log("TouchEvent is not supported by your browser.");
+                    (window as any).TouchEvent = function () { /* this is dummy event class */ };
+                }
+                if (!(window as any).PointerEvent) {
+                    console.log("PointerEvent is not supported by your browser.");
+                    (window as any).PointerEvent = function () { /* this is dummy event class */ };
+                }
 
                 this.isScrolling = false;
                 this.timeout = 0;
@@ -134,15 +141,16 @@ namespace Game {
                         this.isScrolling = true;
                         clearTimeout(this.timeout);
                         this.timeout = setTimeout(() => {
-                                this.isScrolling = false;
-                                this.sDistX = 0;
-                                this.sDistY = 0;
-                            },
+                            this.isScrolling = false;
+                            this.sDistX = 0;
+                            this.sDistY = 0;
+                        },
                             100);
                     });
 
                 // add event listener to body
                 document.onselectstart = () => false;
+                document.oncontextmenu = () => false;
                 if (document.body["pointermove"] !== undefined) {
 
                     document.body.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
@@ -158,8 +166,6 @@ namespace Game {
                     document.body.addEventListener('pointerleave', (ev: PointerEvent) => this.fire('pointerleave', ev));
 
                 } else {
-                    consolere.log('pointer event is not implemented');
-
                     document.body.addEventListener('mousedown', this.pointerDown.bind(this), false);
                     document.body.addEventListener('touchstart', this.pointerDown.bind(this), false);
                     document.body.addEventListener('mouseup', this.pointerUp.bind(this), false);
@@ -169,9 +175,7 @@ namespace Game {
                     document.body.addEventListener('mouseleave', this.pointerLeave.bind(this), false);
                     document.body.addEventListener('touchleave', this.pointerLeave.bind(this), false);
                     document.body.addEventListener('touchcancel', this.pointerUp.bind(this), false);
-
                 }
-
 
                 this.capture = false;
                 this.lastPageX = 0;
@@ -193,8 +197,8 @@ namespace Game {
 
             private checkEvent(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 e.preventDefault();
-                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && (e as PointerEvent).pointerType == "touch");
-                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && ((e as PointerEvent).pointerType == "mouse" || (e as PointerEvent).pointerType == "pen")));
+                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && (e as PointerEvent).pointerType === "touch");
+                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && ((e as PointerEvent).pointerType === "mouse" || (e as PointerEvent).pointerType === "pen")));
                 if (istouch && this.prevInputType !== "touch") {
                     if (e.timeStamp - this.prevTimeStamp >= 500) {
                         this.prevInputType = "touch";
@@ -218,7 +222,7 @@ namespace Game {
                 }
             }
 
-            private pointerDown(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent) : boolean {
+            private pointerDown(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
                 if (this.checkEvent(e)) {
                     const evt = this.makePointerEvent("down", e);
                     const singleFinger: boolean = (e instanceof MouseEvent) || (e instanceof TouchEvent && (e as TouchEvent).touches.length === 1);
@@ -252,8 +256,8 @@ namespace Game {
                     if (this.maybeClick) {
                         if (Math.abs(this.maybeClickX - evt.pageX) < 5 && Math.abs(this.maybeClickY - evt.pageY) < 5) {
                             if (!this.isScrolling ||
-                            (Math.abs(this.sDistX - window.pageXOffset) < 5 &&
-                                Math.abs(this.sDistY - window.pageYOffset) < 5)) {
+                                (Math.abs(this.sDistX - window.pageXOffset) < 5 &&
+                                    Math.abs(this.sDistY - window.pageYOffset) < 5)) {
                                 this.makePointerEvent("click", e);
                             }
                         }
@@ -264,19 +268,19 @@ namespace Game {
             }
 
             private makePointerEvent(type: string, e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): CustomPointerEvent {
-                const evt: CustomPointerEvent = <CustomPointerEvent>document.createEvent("CustomEvent");
+                const evt: CustomPointerEvent = document.createEvent("CustomEvent") as CustomPointerEvent;
                 const eventType = `pointer${type}`;
                 evt.initCustomEvent(eventType, true, true, {});
                 evt.touch = e.type.indexOf("touch") === 0;
                 evt.mouse = e.type.indexOf("mouse") === 0;
                 if (evt.touch) {
-                    const touchEvent: TouchEvent = <TouchEvent>e;
+                    const touchEvent: TouchEvent = e as TouchEvent;
                     evt.pointerId = touchEvent.changedTouches[0].identifier;
                     evt.pageX = touchEvent.changedTouches[0].pageX;
                     evt.pageY = touchEvent.changedTouches[0].pageY;
                 }
                 if (evt.mouse) {
-                    const mouseEvent: MouseEvent = <MouseEvent>e;
+                    const mouseEvent: MouseEvent = e as MouseEvent;
                     evt.pointerId = 0;
                     evt.pageX = mouseEvent.clientX + window.pageXOffset;
                     evt.pageY = mouseEvent.clientY + window.pageYOffset;
@@ -287,19 +291,18 @@ namespace Game {
             }
         }
 
-
         export class VirtualStick {
-            isTouching: boolean;
-            x: number;
-            y: number;
-            cx: number;
-            cy: number;
-            radius: number;
-            distance: number;
-            angle: number;
-            id: number;
+            public isTouching: boolean;
+            public x: number;
+            public y: number;
+            public cx: number;
+            public cy: number;
+            public radius: number;
+            public distance: number;
+            public angle: number;
+            public id: number;
 
-            get dir4(): number {
+            public get dir4(): number {
                 switch (~~((this.angle + 360 + 45) / 90) % 4) {
                     case 0: return 6;   // left
                     case 1: return 2;   // up
@@ -309,8 +312,8 @@ namespace Game {
                 return 5;   // neutral
             }
 
-            get dir8(): number {
-                var d = ~~((this.angle + 360 + 22.5) / 45) % 8;
+            public get dir8(): number {
+                const d = ~~((this.angle + 360 + 22.5) / 45) % 8;
                 switch (d) {
                     case 0: return 6;   // right
                     case 1: return 3;   // right-down
@@ -324,7 +327,6 @@ namespace Game {
                 return 5;   // neutral
             }
 
-
             constructor(x: number = 120, y: number = 120, radius: number = 40) {
                 this.isTouching = false;
                 this.x = x;
@@ -337,13 +339,13 @@ namespace Game {
                 this.id = -1;
             }
 
-            isHit(x: number, y: number): boolean {
+            public isHit(x: number, y: number): boolean {
                 const dx = x - this.x;
                 const dy = y - this.y;
                 return ((dx * dx) + (dy * dy)) <= this.radius * this.radius;
             }
 
-            onpointingstart(id: number): boolean {
+            public onpointingstart(id: number): boolean {
                 if (this.id !== -1) {
                     return false;
                 }
@@ -356,7 +358,7 @@ namespace Game {
                 return true;
             }
 
-            onpointingend(id: number): boolean {
+            public onpointingend(id: number): boolean {
                 if (this.id !== id) {
                     return false;
                 }
@@ -369,7 +371,7 @@ namespace Game {
                 return true;
             }
 
-            onpointingmove(id: number, x: number, y: number): boolean {
+            public onpointingmove(id: number, x: number, y: number): boolean {
                 if (this.isTouching === false) {
                     return false;
                 }

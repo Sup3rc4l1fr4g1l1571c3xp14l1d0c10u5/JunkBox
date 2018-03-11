@@ -58,10 +58,10 @@
     <TypeScriptTarget>ES2016</TypeScriptTarget>
     <TypeScriptJSXEmit>None</TypeScriptJSXEmit>
     <TypeScriptCompileOnSaveEnabled>True</TypeScriptCompileOnSaveEnabled>
-    <TypeScriptNoImplicitAny>False</TypeScriptNoImplicitAny>
-    <TypeScriptModuleKind>CommonJS</TypeScriptModuleKind>
+    <TypeScriptNoImplicitAny>True</TypeScriptNoImplicitAny>
+    <TypeScriptModuleKind>AMD</TypeScriptModuleKind>
     <TypeScriptRemoveComments>True</TypeScriptRemoveComments>
-    <TypeScriptOutFile />
+    <TypeScriptOutFile>tsjq.js</TypeScriptOutFile>
     <TypeScriptOutDir />
     <TypeScriptGeneratesDeclarations>False</TypeScriptGeneratesDeclarations>
     <TypeScriptNoEmitOnError>True</TypeScriptNoEmitOnError>
@@ -79,27 +79,42 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="app.css" />
+    <Content Include="tsjq.css" />
     <Content Include="index.html" />
+    <Content Include="tsjq.js" />
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="app.ts" />
+    <TypeScriptCompile Include="tsjq.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Ajax.ts" />
     <TypeScriptCompile Include="js\Array2D.ts" />
+    <TypeScriptCompile Include="js\Charactor.ts" />
     <TypeScriptCompile Include="js\Dungeon.ts" />
-    <TypeScriptCompile Include="js\Game\Array.ts" />
-    <TypeScriptCompile Include="js\Game\EventDispatcher.ts" />
-    <TypeScriptCompile Include="js\Game\Input.ts" />
-    <TypeScriptCompile Include="js\Game\Scene.ts" />
-    <TypeScriptCompile Include="js\Game\Sound.ts" />
-    <TypeScriptCompile Include="js\Game\Timer.ts" />
-    <TypeScriptCompile Include="js\Game\Video.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Console.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\EventDispatcher.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Game.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Input.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Path.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Scene.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Sound.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Timer.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\Video.ts" />
+    <TypeScriptCompile Include="js\Lib\Random.ts" />
+    <TypeScriptCompile Include="js\PathFinder.ts" />
+    <TypeScriptCompile Include="js\Scene\MapView.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon.ts" />
+    <TypeScriptCompile Include="js\Scene\Title.ts" />
+    <TypeScriptCompile Include="js\Scene\Boot.ts" />
+    <TypeScriptCompile Include="js\Scene\ClassRoom.ts" />
+    <TypeScriptCompile Include="js\Scene\Helper.ts" />
+    <TypeScriptCompile Include="js\Sprite.ts" />
+    <TypeScriptCompile Include="js\SpriteAnimation.ts" />
+    <TypeScriptCompile Include="js\Lib\Type.ts" />
   </ItemGroup>
   <ItemGroup>
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="js\Lib\" />
     <Folder Include="Properties\" />
   </ItemGroup>
   <PropertyGroup>

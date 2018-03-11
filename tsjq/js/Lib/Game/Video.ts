@@ -8,16 +8,36 @@ interface CanvasRenderingContext2D {
 }
 
 namespace Game {
-    export class Video {
+    export interface VideoConfig {
+        id: string;
+        offscreenWidth: number;
+        offscreenHeight: number;
+        scaleX: number;
+        scaleY: number;
+    }
+    export class Video implements VideoConfig {
         private canvasElement: HTMLCanvasElement;
         private canvasRenderingContext2D: CanvasRenderingContext2D;
         private images: Map<string, HTMLImageElement>;
+        public id: string;
+        public offscreenWidth: number;
+        public offscreenHeight: number;
+        public scaleX: number;
+        public scaleY: number;
 
-        constructor(id : string ) {
-            this.canvasElement = (document.getElementById(id) as HTMLCanvasElement);
+        constructor(config: VideoConfig) {
+            this.canvasElement = (document.getElementById(config.id) as HTMLCanvasElement);
             if (!this.canvasElement) {
                 throw new Error("your browser is not support canvas.");
             }
+            this.id = config.id;
+            this.offscreenWidth = config.offscreenWidth;
+            this.offscreenHeight = config.offscreenHeight;
+            this.scaleX = config.scaleX;
+            this.scaleY = config.scaleY;
+
+            this.canvasElement.width = this.offscreenWidth * this.scaleX;
+            this.canvasElement.height = this.offscreenHeight * this.scaleY;
 
             this.canvasRenderingContext2D = this.canvasElement.getContext("2d");
             if (!this.canvasRenderingContext2D) {
@@ -104,8 +124,8 @@ namespace Game {
 
         public set miterLimit(value: number) { this.canvasRenderingContext2D.miterLimit = value; }
 
-        //get msFillRule(): string { return this.context.msFillRule; }
-        //set msFillRule(value: string) { this.context.msFillRule = value; }
+        // get msFillRule(): string { return this.context.msFillRule; }
+        // set msFillRule(value: string) { this.context.msFillRule = value; }
 
         public get shadowBlur(): number { return this.canvasRenderingContext2D.shadowBlur; }
 
@@ -163,12 +183,14 @@ namespace Game {
             }
         }
 
-        public arc: (x: number,
+        public arc: (
+            x: number,
             y: number,
             radius: number,
             startAngle: number,
             endAngle: number,
-            anticlockwise?: boolean) => void;
+            anticlockwise?: boolean
+        ) => void;
         public arcTo: (x1: number, y1: number, x2: number, y2: number, radius: number) => void;
         public beginPath: () => void;
         public bezierCurveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => void;
@@ -177,11 +199,20 @@ namespace Game {
         public closePath: () => void;
         public createImageData: (imageDataOrSw: number | ImageData, sh?: number) => ImageData;
         public createLinearGradient: (x0: number, y0: number, x1: number, y1: number) => CanvasGradient;
-        public createPattern: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, repetition: string) =>
-            CanvasPattern;
-        public createRadialGradient: (x0: number, y0: number, r0: number, x1: number, y1: number, r1: number) =>
-            CanvasGradient;
-        public drawImage: (image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
+        public createPattern: (
+            image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
+            repetition: string
+        ) => CanvasPattern;
+        public createRadialGradient: (
+            x0: number,
+            y0: number,
+            r0: number,
+            x1: number,
+            y1: number,
+            r1: number
+        ) => CanvasGradient;
+        public drawImage: (
+            image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,
             offsetY: number,
             width?: number,
@@ -199,13 +230,15 @@ namespace Game {
         public lineTo: (x: number, y: number) => void;
         public measureText: (text: string) => TextMetrics;
         public moveTo: (x: number, y: number) => void;
-        public putImageData: (imagedata: ImageData,
+        public putImageData: (
+            imagedata: ImageData,
             dx: number,
             dy: number,
             dirtyX?: number,
             dirtyY?: number,
             dirtyWidth?: number,
-            dirtyHeight?: number) => void;
+            dirtyHeight?: number
+        ) => void;
         public quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => void;
         public rect: (x: number, y: number, w: number, h: number) => void;
         public restore: () => void;
@@ -219,8 +252,9 @@ namespace Game {
         public strokeText: (text: string, x: number, y: number, maxWidth?: number) => void;
         public transform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
         public translate: (x: number, y: number) => void;
-        // 
-        public ellipse: (x: number,
+
+        public ellipse: (
+            x: number,
             y: number,
             radiusX: number,
             radiusY: number,
@@ -229,16 +263,16 @@ namespace Game {
             endAngle: number,
             anticlockwise?: boolean) => void;
 
-        //
-        public drawTile(image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
+        public drawTile(
+            image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,
             offsetY: number,
             sprite: number[][],
             spritesize: number[],
             tile: Array2D): void {
-            for (var y = 0; y < tile.height; y++) {
-                for (var x = 0; x < tile.width; x++) {
-                    var chip = tile.value(x, y);
+            for (let y = 0; y < tile.height; y++) {
+                for (let x = 0; x < tile.width; x++) {
+                    const chip = tile.value(x, y);
                     this.drawImage(
                         image,
                         sprite[chip][0] * spritesize[0],
@@ -254,7 +288,6 @@ namespace Game {
             }
         }
 
-        //
         public get width(): number {
             return this.canvasRenderingContext2D.canvas.width;
         }
@@ -263,18 +296,19 @@ namespace Game {
             return this.canvasRenderingContext2D.canvas.height;
         }
 
-
-        public loadImage(asserts: { [id: string]: string }): Promise<boolean> {
+        public loadImage(asserts: { [id: string]: string }, startCallback: (id: string) => void = () => { }, endCallback: (id: string) => void = () => { }): Promise<boolean> {
             return Promise.all(
                 Object.keys(asserts).map((x) => new Promise<void>((resolve, reject) => {
+                    startCallback(x);
                     const img = new Image();
                     img.onload = () => {
                         this.images.set(x, img);
+                        endCallback(x);
                         resolve();
                     };
                     img.onerror = () => {
-                        var msg = `ファイル ${asserts[x]}のロードに失敗。`;
-                        consolere.error(msg);
+                        const msg = `ファイル ${asserts[x]}のロードに失敗。`;
+                        console.error(msg);
                         reject(msg);
                     };
                     img.src = asserts[x];
@@ -288,16 +322,30 @@ namespace Game {
             return this.images.get(id);
         }
 
+        //
+
+        public begin() {
+            Game.getScreen().save();
+            Game.getScreen().clearRect(0, 0, this.width, this.height);
+            Game.getScreen().scale(this.scaleX, this.scaleY);
+            Game.getScreen().save();
+
+        }
+        public end() {
+            Game.getScreen().restore();
+            Game.getScreen().restore();
+        }
+
         public pagePointToScreenPoint(x: number, y: number): number[] {
             const cr = this.canvasRenderingContext2D.canvas.getBoundingClientRect();
             const sx = (x - (cr.left + window.pageXOffset));
             const sy = (y - (cr.top + window.pageYOffset));
-            return [sx, sy];
+            return [sx / this.scaleX, sy / this.scaleY];
         }
 
         public pagePointContainScreen(x: number, y: number): boolean {
             const pos = this.pagePointToScreenPoint(x, y);
-            return 0 <= pos[0] && pos[0] < this.width && 0 <= pos[1] && pos[1] < this.height;
+            return 0 <= pos[0] && pos[0] < this.offscreenWidth && 0 <= pos[1] && pos[1] < this.offscreenHeight;
         }
     }
 }

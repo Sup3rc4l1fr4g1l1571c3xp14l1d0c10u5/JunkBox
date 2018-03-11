@@ -28,13 +28,13 @@ namespace Game {
                 this.reset();
             }
 
-            reset(): void {
+            public reset(): void {
                 this.stop();
                 this.bufferSource = this.sound.createBufferSource(this.buffer);
                 this.bufferSource.onended = () => this.isEnded = true;
             }
 
-            loopplay(): void {
+            public loopplay(): void {
                 if (this.isEnded) {
                     this.bufferSource.loop = true;
                     this.bufferSource.start(0);
@@ -42,7 +42,7 @@ namespace Game {
                 }
             }
 
-            play(): void {
+            public play(): void {
                 if (this.isEnded) {
                     this.bufferSource.loop = false;
                     this.bufferSource.start(0);
@@ -50,33 +50,39 @@ namespace Game {
                 }
             }
 
-            stop(): void {
+            public stop(): void {
                 if (!this.isEnded) {
                     this.bufferSource.stop(0);
                     this.bufferSource.disconnect();
                     this.isEnded = true;
                 }
             }
-
         }
 
         export class SoundManager {
-            private static /*@readonly@*/ soundChannelMax: number = 36 * 36;
-
             private audioContext: AudioContext;
 
-            private channels: ManagedSoundChannel[] = new Array(SoundManager.soundChannelMax);
+            private channels: Map<string, ManagedSoundChannel>;
             private bufferSourceIdCount: number = 0;
-            private playingBufferSources: Map<number, { id: number; buffer: AudioBufferSourceNode }>;
+            private playingBufferSources: Map<number, { id: string; buffer: AudioBufferSourceNode }>;
 
             constructor() {
-                this.audioContext = new AudioContext();
-                this.channels = new Array(SoundManager.soundChannelMax);
+                if ((window as any).AudioContext) {
+                    console.log("Use AudioContext.");
+                    this.audioContext = new (window as any).AudioContext();
+                } else if ((window as any).webkitAudioContext) {
+                    console.log("Use webkitAudioContext.");
+                    this.audioContext = new (window as any).webkitAudioContext();
+                } else {
+                    console.error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                    throw new Error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                }
+                this.channels = new Map<string, ManagedSoundChannel>();
                 this.bufferSourceIdCount = 0;
-                this.playingBufferSources = new Map<number, { id: number; buffer: AudioBufferSourceNode }>();
+                this.playingBufferSources = new Map<number, { id: string; buffer: AudioBufferSourceNode }>();
                 this.reset();
 
-                let touchEventHooker = () => {
+                const touchEventHooker = () => {
                     // A small hack to unlock AudioContext on mobile safari.
                     const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
                     const channel = buffer.getChannelData(0);
@@ -92,72 +98,75 @@ namespace Game {
             }
 
             public createBufferSource(buffer: AudioBuffer): AudioBufferSourceNode {
-                var bufferSource = this.audioContext.createBufferSource();
+                const bufferSource = this.audioContext.createBufferSource();
                 bufferSource.buffer = buffer;
                 bufferSource.connect(this.audioContext.destination);
                 return bufferSource;
             }
 
-            private loadSound(file: string): Promise<AudioBuffer> {
-                return new Promise<XMLHttpRequest>((resolve, reject) => {
-                        var xhr = new XMLHttpRequest();
-                        xhr.responseType = "arraybuffer";
-                        xhr.open("GET", file, true);
-                        xhr.onerror = () => {
-                            var msg = `ファイル ${file}のロードに失敗。`;
-                            consolere.error(msg);
-                            reject(msg);
-                        };
-                        xhr.onload = () => {
-                            resolve(xhr);
-                        };
-
-                        xhr.send();
-                    })
-                    .then((xhr) => new Promise<AudioBuffer>((resolve, reject) => {
-                            this.audioContext.decodeAudioData(
-                                xhr.response,
-                                (audioBufferNode: AudioBuffer): void => {
-                                    resolve(audioBufferNode);
-                                },
-                                (): void => {
-                                    var msg = `ファイル ${file}のdecodeAudioDataに失敗。`;
-                                    reject(msg);
-                                }
-                            );
-                        })
-                    );
-            }
-
-            public loadSoundToChannel(file: string, channel: number): Promise<void> {
-                return this.loadSound(file).then((audioBufferNode: AudioBuffer) => {
-                    this.channels[channel].audioBufferNode = audioBufferNode;
+            public loadSound(file: string): Promise<AudioBuffer> {
+                return ajax(file, "arraybuffer").then(xhr => {
+                    return new Promise<AudioBuffer>((resolve, reject) => {
+                        this.audioContext.decodeAudioData(
+                            xhr.response,
+                            (audioBufferNode) => {
+                                resolve(audioBufferNode);
+                            },
+                            (ev) => {
+                                reject(ev);
+                            }
+                        );
+                    });
                 });
+                //
+                // decodeAudioData dose not return 'Promise Object 'on mobile safari :-(
+                // Therefore, these codes will not work ...
+                //
+                // const xhr: XMLHttpRequest = await ajax(file, "arraybuffer");
+                // var audioBufferNode = await this.audioContext.decodeAudioData(xhr.response);
+                // return audioBufferNode;
             }
 
-            public loadSoundsToChannel(config: { [channel: number]: string }): Promise<void> {
+            public async loadSoundToChannel(file: string, channelId: string): Promise<void> {
+                const audioBufferNode: AudioBuffer = await this.loadSound(file);
+                const channel = new ManagedSoundChannel();
+                channel.audioBufferNode = audioBufferNode;
+                this.channels.set(channelId, channel);
+                return;
+            }
+
+            public loadSoundsToChannel(
+                config: { [channelId: string]: string },
+                startCallback: (id: string) => void = () => { },
+                endCallback: (id: string) => void = () => { }
+            ): Promise<void> {
                 return Promise.all(
-                    Object.keys(config)
-                    .map((x) => ~~x)
-                    .map((channel) => this.loadSound(config[channel]).then((audioBufferNode: AudioBuffer) => {
-                        this.channels[channel].audioBufferNode = audioBufferNode;
-                    }))
-                ).then(() => {});
+                    Object.keys(config).map((channelId) => {
+                        startCallback(channelId);
+                        const ret = this.loadSoundToChannel(config[channelId], channelId).then(() => endCallback(channelId));
+                        return ret;
+                    })
+                ).then(() => { });
             }
-
 
             public createUnmanagedSoundChannel(file: string): Promise<UnmanagedSoundChannel> {
                 return this.loadSound(file)
                     .then((audioBufferNode: AudioBuffer) => new UnmanagedSoundChannel(this, audioBufferNode));
             }
 
-            public reqPlayChannel(channel: number, loop: boolean = false): void {
-                this.channels[channel].playRequest = true;
-                this.channels[channel].loopPlay = loop;
+            public reqPlayChannel(channelId: string, loop: boolean = false): void {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.playRequest = true;
+                    channel.loopPlay = loop;
+                }
             }
 
-            public reqStopChannel(channel: number): void {
-                this.channels[channel].stopRequest = true;
+            public reqStopChannel(channelId: string): void {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.stopRequest = true;
+                }
             }
 
             public playChannel(): void {
@@ -182,17 +191,17 @@ namespace Game {
                         if (c.audioBufferNode == null) {
                             return;
                         }
-                        var src = this.audioContext.createBufferSource();
+                        const src = this.audioContext.createBufferSource();
                         if (src == null) {
                             throw new Error("createBufferSourceに失敗。");
                         }
-                        var bufferid = this.bufferSourceIdCount++;
+                        const bufferid = this.bufferSourceIdCount++;
                         this.playingBufferSources.set(bufferid, { id: i, buffer: src });
                         src.buffer = c.audioBufferNode;
                         src.loop = c.loopPlay;
                         src.connect(this.audioContext.destination);
                         src.onended = ((): void => {
-                            var srcNode = src;
+                            const srcNode = src;
                             srcNode.stop(0);
                             srcNode.disconnect();
                             this.playingBufferSources.set(bufferid, null);
@@ -204,9 +213,9 @@ namespace Game {
             }
 
             public stop(): void {
-                const oldPlayingBufferSources: Map<number, { id: number; buffer: AudioBufferSourceNode }> =
+                const oldPlayingBufferSources: Map<number, { id: string; buffer: AudioBufferSourceNode }> =
                     this.playingBufferSources;
-                this.playingBufferSources = new Map<number, { id: number; buffer: AudioBufferSourceNode }>();
+                this.playingBufferSources = new Map<number, { id: string; buffer: AudioBufferSourceNode }>();
                 oldPlayingBufferSources.forEach((value, key) => {
                     const s: AudioBufferSourceNode = value.buffer;
                     if (s != null) {
@@ -219,12 +228,8 @@ namespace Game {
             }
 
             public reset(): void {
-                for (let i: number = 0; i < SoundManager.soundChannelMax; i++) {
-                    this.channels[i] = this.channels[i] || (new ManagedSoundChannel());
-                    this.channels[i].reset();
-                    this.bufferSourceIdCount = 0;
-                }
-                this.playingBufferSources = new Map<number, { id: number; buffer: AudioBufferSourceNode }>();
+                this.channels.clear();
+                this.playingBufferSources.clear();
             }
         }
     }

@@ -5,35 +5,19 @@
     <meta name="description" content="" />
     <meta content="noindex, nofollow, noarchive" name="robots" />
     <title></title>
-    <link rel="stylesheet" href="app.css" type="text/css" />
+    <link rel="stylesheet" href="./tsjq.css" type="text/css" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script>
-        if (console !== undefined && console.re !== undefined) {
-            var consolere = console.re;
-        } else {
-            var consolere = console;
-        }
-        if (window.AudioContext === undefined) {
-            console.log("use webkitAudioContext");
-            window.AudioContext = window.webkitAudioContext;
-        }
-        if (window.PointerEvent === undefined) {
-            console.log("PointerEvent is not supported.");
-            window.AudioContext = window.webkitAudioContext;
-        }
-        window.PointerEvent = window.PointerEvent || function() {};
-    </script>
-    <script src="tsjq.js"></script>
+    <script src="./tsjq.js"></script>
 </head>
     <body>
         <section>
             <article>
                 <header></header>
                 <section>
-                    <canvas id="glcanvas" width="252" height="252"></canvas>
+                    <canvas id="glcanvas"></canvas>
                 </section>
                 <footer></footer>
-            </article>
+            </article>  
         </section>
     </body>
 </html>

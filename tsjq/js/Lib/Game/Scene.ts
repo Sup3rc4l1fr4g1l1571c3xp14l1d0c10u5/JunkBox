@@ -12,57 +12,48 @@ namespace Game {
                 this.state = null;
                 this.init = init;
                 this.update = () => { };
-                this.draw = () => {};
+                this.draw = () => { };
                 this.leave = () => { };
                 this.suspend = () => { };
                 this.resume = () => { };
             }
 
-            next(...args:any[]): any {
+            public next(...args: any[]): any {
                 this.update = this.state.next.apply(this.state, args).value;
             }
 
-            push(id: string, param: any = {}): void { this.manager.push(id, param); }
-
-            pop(): void { this.manager.pop(); }
-
-            enter(...data: any[]): void {
+            public enter(...data: any[]): void {
                 this.state = this.init.apply(this, data);
                 this.next();
             }
 
-            update: (delta: number, now: number) => void;
+            public update: (delta: number, now: number) => void;
 
-            draw: () => void;
+            public draw: () => void;
 
-            leave: () => void;
+            public leave: () => void;
 
-            suspend: () => void;
+            public suspend: () => void;
 
-            resume: () => void;
+            public resume: () => void;
 
         }
 
         export class SceneManager {
             private sceneStack: Scene[];
-            private scenes: Map<string, (data: any) => IterableIterator<any>>;
 
-            constructor(scenes: { [name: string]: (data: any) => IterableIterator<any> }) {
-                this.scenes = new Map<string, (data: any) => IterableIterator<any>>();
+            constructor() {
                 this.sceneStack = [];
-                Object.keys(scenes).forEach((key) => this.scenes.set(key, scenes[key]));
             }
 
-            public push(id: string, ...param: any[]): void {
-                const sceneDef: (data: any) => IterableIterator<any> = this.scenes.get(id);
-                if (this.scenes.has(id) === false) {
-                    throw new Error(`scene ${id} is not defined.`);
-                }
+            public push<T>(sceneDef: (data?: T) => IterableIterator<any>, arg? : T): void {
                 if (this.peek() != null && this.peek().suspend != null) {
                     this.peek().suspend();
                 }
                 this.sceneStack.push(new Scene(this, sceneDef));
-                this.peek().enter.apply(this.peek(), param);
+                if (this.peek() != null && this.peek().enter != null) {
+                    this.peek().enter.call(this.peek(), arg);
+                }
             }
 
             public pop(): void {
@@ -70,7 +61,7 @@ namespace Game {
                     throw new Error("there is no scene.");
                 }
                 if (this.peek() != null) {
-                    var p = this.sceneStack.pop();
+                    const p = this.sceneStack.pop();
                     if (p.leave != null) {
                         p.leave();
                     }
@@ -90,14 +81,14 @@ namespace Game {
             }
 
             public update(...args: any[]): SceneManager {
-                if (this.sceneStack.length !== 0) {
+                if (this.peek() != null && this.peek().update != null) {
                     this.peek().update.apply(this.peek(), args);
                 }
                 return this;
             }
 
             public draw(): SceneManager {
-                if (this.sceneStack.length !== 0) {
+                if (this.peek() != null && this.peek().draw != null) {
                     this.peek().draw.apply(this.peek());
                 }
                 return this;

@@ -1,32 +1,118 @@
 "use strict";
-Object.defineProperties(Array.prototype, {
-    "shuffle": {
-        enumerable: false,
-        configurable: false,
-        writable: false,
-        value: function () {
-            const self = this.slice();
-            for (let i = self.length - 1; i > 0; i--) {
-                const r = Math.floor(Math.random() * (i + 1));
-                const tmp = self[i];
-                self[i] = self[r];
-                self[r] = tmp;
-            }
-            return self;
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+class XorShift {
+    constructor(w = 0 | Date.now(), x, y, z) {
+        if (x === undefined) {
+            x = (0 | (w << 13));
+        }
+        if (y === undefined) {
+            y = (0 | ((w >>> 9) ^ (x << 6)));
+        }
+        if (z === undefined) {
+            z = (0 | (y >>> 7));
+        }
+        this.seeds = { x: x >>> 0, y: y >>> 0, z: z >>> 0, w: w >>> 0 };
+        this.randCount = 0;
+        this.generator = this.randGen(w, x, y, z);
+    }
+    *randGen(w, x, y, z) {
+        let t;
+        for (;;) {
+            t = x ^ (x << 11);
+            x = y;
+            y = z;
+            z = w;
+            yield w = ((w ^ (w >>> 19)) ^ (t ^ (t >>> 8))) >>> 0;
         }
     }
-});
-Object.defineProperties(Number.prototype, {
-    "times": {
-        enumerable: false,
-        configurable: false,
-        writable: false,
-        value: function () {
-            for (var i = 0; i < this; i++) {
+    rand() {
+        this.randCount = 0 | this.randCount + 1;
+        return this.generator.next().value;
+    }
+    randInt(min = 0, max = 0x7FFFFFFF) {
+        return 0 | this.rand() % (max + 1 - min) + min;
+    }
+    randFloat(min = 0, max = 1) {
+        return Math.fround(this.rand() % 0xFFFF / 0xFFFF) * (max - min) + min;
+    }
+    shuffle(target) {
+        const arr = target.concat();
+        for (let i = 0; i <= arr.length - 2; i = 0 | i + 1) {
+            const r = this.randInt(i, arr.length - 1);
+            const tmp = arr[i];
+            arr[i] = arr[r];
+            arr[r] = tmp;
+        }
+        return arr;
+    }
+    getWeightedValue(data) {
+        const keys = Object.keys(data);
+        const total = keys.reduce((s, x) => s + data[x], 0);
+        const random = this.randInt(0, total);
+        let part = 0;
+        for (const id of keys) {
+            part += data[id];
+            if (random < part) {
+                return id;
             }
         }
+        return keys[keys.length - 1];
     }
-});
+    static default() {
+        return new XorShift(XorShift.defaults.w, XorShift.defaults.x, XorShift.defaults.y, XorShift.defaults.z);
+    }
+}
+XorShift.defaults = {
+    x: 123456789,
+    y: 362436069,
+    z: 521288629,
+    w: 88675123
+};
+function ajax(uri, type) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.responseType = type;
+        xhr.open("GET", uri, true);
+        xhr.onerror = (ev) => {
+            reject(ev);
+        };
+        xhr.onload = () => {
+            resolve(xhr);
+        };
+        xhr.send();
+    });
+}
+function getDirectory(path) {
+    return path.substring(0, path.lastIndexOf("/"));
+}
+function normalizePath(path) {
+    return path.split("/").reduce((s, x) => {
+        if (x === "..") {
+            if (s.length > 1) {
+                s.pop();
+            }
+            else {
+                throw new Error("bad path");
+            }
+        }
+        else if (x === ".") {
+            if (s.length === 0) {
+                s.push(x);
+            }
+        }
+        else {
+            s.push(x);
+        }
+        return s;
+    }, new Array()).join("/");
+}
 var Dispatcher;
 (function (Dispatcher) {
     class SingleDispatcher {
@@ -108,11 +194,18 @@ var Dispatcher;
 var Game;
 (function (Game) {
     class Video {
-        constructor(id) {
-            this.canvasElement = document.getElementById(id);
+        constructor(config) {
+            this.canvasElement = document.getElementById(config.id);
             if (!this.canvasElement) {
                 throw new Error("your browser is not support canvas.");
             }
+            this.id = config.id;
+            this.offscreenWidth = config.offscreenWidth;
+            this.offscreenHeight = config.offscreenHeight;
+            this.scaleX = config.scaleX;
+            this.scaleY = config.scaleY;
+            this.canvasElement.width = this.offscreenWidth * this.scaleX;
+            this.canvasElement.height = this.offscreenHeight * this.scaleY;
             this.canvasRenderingContext2D = this.canvasElement.getContext("2d");
             if (!this.canvasRenderingContext2D) {
                 throw new Error("your browser is not support CanvasRenderingContext2D.");
@@ -155,7 +248,6 @@ var Game;
             this.translate = this.canvasRenderingContext2D.translate.bind(this.canvasRenderingContext2D);
             this.ellipse = this.canvasRenderingContext2D.ellipse.bind(this.canvasRenderingContext2D);
         }
-        //
         get canvas() { return this.canvasRenderingContext2D.canvas; }
         get fillStyle() { return this.canvasRenderingContext2D.fillStyle; }
         set fillStyle(value) { this.canvasRenderingContext2D.fillStyle = value; }
@@ -175,8 +267,6 @@ var Game;
         set lineWidth(value) { this.canvasRenderingContext2D.lineWidth = value; }
         get miterLimit() { return this.canvasRenderingContext2D.miterLimit; }
         set miterLimit(value) { this.canvasRenderingContext2D.miterLimit = value; }
-        //get msFillRule(): string { return this.context.msFillRule; }
-        //set msFillRule(value: string) { this.context.msFillRule = value; }
         get shadowBlur() { return this.canvasRenderingContext2D.shadowBlur; }
         set shadowBlur(value) { this.canvasRenderingContext2D.shadowBlur = value; }
         get shadowColor() { return this.canvasRenderingContext2D.shadowColor; }
@@ -217,32 +307,32 @@ var Game;
                 return;
             }
         }
-        //
         drawTile(image, offsetX, offsetY, sprite, spritesize, tile) {
-            for (var y = 0; y < tile.height; y++) {
-                for (var x = 0; x < tile.width; x++) {
-                    var chip = tile.value(x, y);
+            for (let y = 0; y < tile.height; y++) {
+                for (let x = 0; x < tile.width; x++) {
+                    const chip = tile.value(x, y);
                     this.drawImage(image, sprite[chip][0] * spritesize[0], sprite[chip][1] * spritesize[1], spritesize[0], spritesize[1], offsetX + x * spritesize[0], offsetY + y * spritesize[1], spritesize[0], spritesize[1]);
                 }
             }
         }
-        //
         get width() {
             return this.canvasRenderingContext2D.canvas.width;
         }
         get height() {
             return this.canvasRenderingContext2D.canvas.height;
         }
-        loadImage(asserts) {
+        loadImage(asserts, startCallback = () => { }, endCallback = () => { }) {
             return Promise.all(Object.keys(asserts).map((x) => new Promise((resolve, reject) => {
+                startCallback(x);
                 const img = new Image();
                 img.onload = () => {
                     this.images.set(x, img);
+                    endCallback(x);
                     resolve();
                 };
                 img.onerror = () => {
-                    var msg = `ファイル ${asserts[x]}のロードに失敗。`;
-                    consolere.error(msg);
+                    const msg = `ファイル ${asserts[x]}のロードに失敗。`;
+                    console.error(msg);
                     reject(msg);
                 };
                 img.src = asserts[x];
@@ -253,15 +343,25 @@ var Game;
         texture(id) {
             return this.images.get(id);
         }
+        begin() {
+            Game.getScreen().save();
+            Game.getScreen().clearRect(0, 0, this.width, this.height);
+            Game.getScreen().scale(this.scaleX, this.scaleY);
+            Game.getScreen().save();
+        }
+        end() {
+            Game.getScreen().restore();
+            Game.getScreen().restore();
+        }
         pagePointToScreenPoint(x, y) {
             const cr = this.canvasRenderingContext2D.canvas.getBoundingClientRect();
             const sx = (x - (cr.left + window.pageXOffset));
             const sy = (y - (cr.top + window.pageYOffset));
-            return [sx, sy];
+            return [sx / this.scaleX, sy / this.scaleY];
         }
         pagePointContainScreen(x, y) {
             const pos = this.pagePointToScreenPoint(x, y);
-            return 0 <= pos[0] && pos[0] < this.width && 0 <= pos[1] && pos[1] < this.height;
+            return 0 <= pos[0] && pos[0] < this.offscreenWidth && 0 <= pos[1] && pos[1] < this.offscreenHeight;
         }
     }
     Game.Video = Video;
@@ -323,15 +423,24 @@ var Game;
         }
         class SoundManager {
             constructor() {
-                this.channels = new Array(SoundManager.soundChannelMax);
                 this.bufferSourceIdCount = 0;
-                this.audioContext = new AudioContext();
-                this.channels = new Array(SoundManager.soundChannelMax);
+                if (window.AudioContext) {
+                    console.log("Use AudioContext.");
+                    this.audioContext = new window.AudioContext();
+                }
+                else if (window.webkitAudioContext) {
+                    console.log("Use webkitAudioContext.");
+                    this.audioContext = new window.webkitAudioContext();
+                }
+                else {
+                    console.error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                    throw new Error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                }
+                this.channels = new Map();
                 this.bufferSourceIdCount = 0;
                 this.playingBufferSources = new Map();
                 this.reset();
-                let touchEventHooker = () => {
-                    // A small hack to unlock AudioContext on mobile safari.
+                const touchEventHooker = () => {
                     const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
                     const channel = buffer.getChannelData(0);
                     channel.fill(0);
@@ -344,57 +453,54 @@ var Game;
                 document.body.addEventListener('touchstart', touchEventHooker);
             }
             createBufferSource(buffer) {
-                var bufferSource = this.audioContext.createBufferSource();
+                const bufferSource = this.audioContext.createBufferSource();
                 bufferSource.buffer = buffer;
                 bufferSource.connect(this.audioContext.destination);
                 return bufferSource;
             }
             loadSound(file) {
-                return new Promise((resolve, reject) => {
-                    var xhr = new XMLHttpRequest();
-                    xhr.responseType = "arraybuffer";
-                    xhr.open("GET", file, true);
-                    xhr.onerror = () => {
-                        var msg = `ファイル ${file}のロードに失敗。`;
-                        consolere.error(msg);
-                        reject(msg);
-                    };
-                    xhr.onload = () => {
-                        resolve(xhr);
-                    };
-                    xhr.send();
-                })
-                    .then((xhr) => new Promise((resolve, reject) => {
-                    this.audioContext.decodeAudioData(xhr.response, (audioBufferNode) => {
-                        resolve(audioBufferNode);
-                    }, () => {
-                        var msg = `ファイル ${file}のdecodeAudioDataに失敗。`;
-                        reject(msg);
+                return ajax(file, "arraybuffer").then(xhr => {
+                    return new Promise((resolve, reject) => {
+                        this.audioContext.decodeAudioData(xhr.response, (audioBufferNode) => {
+                            resolve(audioBufferNode);
+                        }, (ev) => {
+                            reject(ev);
+                        });
                     });
-                }));
-            }
-            loadSoundToChannel(file, channel) {
-                return this.loadSound(file).then((audioBufferNode) => {
-                    this.channels[channel].audioBufferNode = audioBufferNode;
                 });
             }
-            loadSoundsToChannel(config) {
-                return Promise.all(Object.keys(config)
-                    .map((x) => ~~x)
-                    .map((channel) => this.loadSound(config[channel]).then((audioBufferNode) => {
-                    this.channels[channel].audioBufferNode = audioBufferNode;
-                }))).then(() => { });
+            loadSoundToChannel(file, channelId) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    const audioBufferNode = yield this.loadSound(file);
+                    const channel = new ManagedSoundChannel();
+                    channel.audioBufferNode = audioBufferNode;
+                    this.channels.set(channelId, channel);
+                    return;
+                });
+            }
+            loadSoundsToChannel(config, startCallback = () => { }, endCallback = () => { }) {
+                return Promise.all(Object.keys(config).map((channelId) => {
+                    startCallback(channelId);
+                    const ret = this.loadSoundToChannel(config[channelId], channelId).then(() => endCallback(channelId));
+                    return ret;
+                })).then(() => { });
             }
             createUnmanagedSoundChannel(file) {
                 return this.loadSound(file)
                     .then((audioBufferNode) => new UnmanagedSoundChannel(this, audioBufferNode));
             }
-            reqPlayChannel(channel, loop = false) {
-                this.channels[channel].playRequest = true;
-                this.channels[channel].loopPlay = loop;
+            reqPlayChannel(channelId, loop = false) {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.playRequest = true;
+                    channel.loopPlay = loop;
+                }
             }
-            reqStopChannel(channel) {
-                this.channels[channel].stopRequest = true;
+            reqStopChannel(channelId) {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.stopRequest = true;
+                }
             }
             playChannel() {
                 this.channels.forEach((c, i) => {
@@ -418,17 +524,17 @@ var Game;
                         if (c.audioBufferNode == null) {
                             return;
                         }
-                        var src = this.audioContext.createBufferSource();
+                        const src = this.audioContext.createBufferSource();
                         if (src == null) {
                             throw new Error("createBufferSourceに失敗。");
                         }
-                        var bufferid = this.bufferSourceIdCount++;
+                        const bufferid = this.bufferSourceIdCount++;
                         this.playingBufferSources.set(bufferid, { id: i, buffer: src });
                         src.buffer = c.audioBufferNode;
                         src.loop = c.loopPlay;
                         src.connect(this.audioContext.destination);
                         src.onended = (() => {
-                            var srcNode = src;
+                            const srcNode = src;
                             srcNode.stop(0);
                             srcNode.disconnect();
                             this.playingBufferSources.set(bufferid, null);
@@ -452,15 +558,10 @@ var Game;
                 });
             }
             reset() {
-                for (let i = 0; i < SoundManager.soundChannelMax; i++) {
-                    this.channels[i] = this.channels[i] || (new ManagedSoundChannel());
-                    this.channels[i].reset();
-                    this.bufferSourceIdCount = 0;
-                }
-                this.playingBufferSources = new Map();
+                this.channels.clear();
+                this.playingBufferSources.clear();
             }
         }
-        SoundManager.soundChannelMax = 36 * 36;
         Sound.SoundManager = SoundManager;
     })(Sound = Game.Sound || (Game.Sound = {}));
 })(Game || (Game = {}));
@@ -479,6 +580,14 @@ var Game;
         class InputManager extends Dispatcher.EventDispatcher {
             constructor() {
                 super();
+                if (!window.TouchEvent) {
+                    console.log("TouchEvent is not supported by your browser.");
+                    window.TouchEvent = function () { };
+                }
+                if (!window.PointerEvent) {
+                    console.log("PointerEvent is not supported by your browser.");
+                    window.PointerEvent = function () { };
+                }
                 this.isScrolling = false;
                 this.timeout = 0;
                 this.sDistX = 0;
@@ -501,8 +610,8 @@ var Game;
                         this.sDistY = 0;
                     }, 100);
                 });
-                // add event listener to body
                 document.onselectstart = () => false;
+                document.oncontextmenu = () => false;
                 if (document.body["pointermove"] !== undefined) {
                     document.body.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
                     document.body.addEventListener('touchdown', evt => { evt.preventDefault(); }, false);
@@ -516,7 +625,6 @@ var Game;
                     document.body.addEventListener('pointerleave', (ev) => this.fire('pointerleave', ev));
                 }
                 else {
-                    consolere.log('pointer event is not implemented');
                     document.body.addEventListener('mousedown', this.pointerDown.bind(this), false);
                     document.body.addEventListener('touchstart', this.pointerDown.bind(this), false);
                     document.body.addEventListener('mouseup', this.pointerUp.bind(this), false);
@@ -549,13 +657,13 @@ var Game;
                 return this.lastPageY;
             }
             isDown() {
-                return this.downup == 1;
+                return this.downup === 1;
             }
             isPush() {
                 return this.downup > 1;
             }
             isUp() {
-                return this.downup == -1;
+                return this.downup === -1;
             }
             isClick() {
                 return this.clicked;
@@ -568,7 +676,7 @@ var Game;
             }
             endCapture() {
                 this.capture = false;
-                if (this.status == PointerChangeStatus.Down) {
+                if (this.status === PointerChangeStatus.Down) {
                     if (this.downup < 1) {
                         this.downup = 1;
                     }
@@ -576,7 +684,7 @@ var Game;
                         this.downup += 1;
                     }
                 }
-                else if (this.status == PointerChangeStatus.Up) {
+                else if (this.status === PointerChangeStatus.Up) {
                     if (this.downup > -1) {
                         this.downup = -1;
                     }
@@ -588,12 +696,12 @@ var Game;
                     this.downup = 0;
                 }
                 this.clicked = false;
-                if (this.downup == -1) {
+                if (this.downup === -1) {
                     if (this.draglen < 5) {
                         this.clicked = true;
                     }
                 }
-                else if (this.downup == 1) {
+                else if (this.downup === 1) {
                     this.lastDownPageX = this.lastPageX;
                     this.lastDownPageY = this.lastPageY;
                     this.draglen = 0;
@@ -603,7 +711,7 @@ var Game;
                 }
             }
             captureHandler(e) {
-                if (this.capture == false) {
+                if (this.capture === false) {
                     return;
                 }
                 switch (e.type) {
@@ -624,8 +732,8 @@ var Game;
             }
             checkEvent(e) {
                 e.preventDefault();
-                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && e.pointerType == "touch");
-                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && (e.pointerType == "mouse" || e.pointerType == "pen")));
+                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && e.pointerType === "touch");
+                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && (e.pointerType === "mouse" || e.pointerType === "pen")));
                 if (istouch && this.prevInputType !== "touch") {
                     if (e.timeStamp - this.prevTimeStamp >= 500) {
                         this.prevInputType = "touch";
@@ -731,26 +839,26 @@ var Game;
             }
             get dir4() {
                 switch (~~((this.angle + 360 + 45) / 90) % 4) {
-                    case 0: return 6; // left
-                    case 1: return 2; // up
-                    case 2: return 4; // right
-                    case 3: return 8; // down
+                    case 0: return 6;
+                    case 1: return 2;
+                    case 2: return 4;
+                    case 3: return 8;
                 }
-                return 5; // neutral
+                return 5;
             }
             get dir8() {
-                var d = ~~((this.angle + 360 + 22.5) / 45) % 8;
+                const d = ~~((this.angle + 360 + 22.5) / 45) % 8;
                 switch (d) {
-                    case 0: return 6; // right
-                    case 1: return 3; // right-down
-                    case 2: return 2; // down
-                    case 3: return 1; // left-down
-                    case 4: return 4; // left
-                    case 5: return 7; // left-up
-                    case 6: return 8; // up
-                    case 7: return 9; // right-up
+                    case 0: return 6;
+                    case 1: return 3;
+                    case 2: return 2;
+                    case 3: return 1;
+                    case 4: return 4;
+                    case 5: return 7;
+                    case 6: return 8;
+                    case 7: return 9;
                 }
-                return 5; // neutral
+                return 5;
             }
             isHit(x, y) {
                 const dx = x - this.x;
@@ -867,36 +975,30 @@ var Game;
             next(...args) {
                 this.update = this.state.next.apply(this.state, args).value;
             }
-            push(id, param = {}) { this.manager.push(id, param); }
-            pop() { this.manager.pop(); }
             enter(...data) {
                 this.state = this.init.apply(this, data);
                 this.next();
             }
         }
         class SceneManager {
-            constructor(scenes) {
-                this.scenes = new Map();
+            constructor() {
                 this.sceneStack = [];
-                Object.keys(scenes).forEach((key) => this.scenes.set(key, scenes[key]));
             }
-            push(id, ...param) {
-                const sceneDef = this.scenes.get(id);
-                if (this.scenes.has(id) === false) {
-                    throw new Error(`scene ${id} is not defined.`);
-                }
+            push(sceneDef, arg) {
                 if (this.peek() != null && this.peek().suspend != null) {
                     this.peek().suspend();
                 }
                 this.sceneStack.push(new Scene(this, sceneDef));
-                this.peek().enter.apply(this.peek(), param);
+                if (this.peek() != null && this.peek().enter != null) {
+                    this.peek().enter.call(this.peek(), arg);
+                }
             }
             pop() {
                 if (this.sceneStack.length === 0) {
                     throw new Error("there is no scene.");
                 }
                 if (this.peek() != null) {
-                    var p = this.sceneStack.pop();
+                    const p = this.sceneStack.pop();
                     if (p.leave != null) {
                         p.leave();
                     }
@@ -914,13 +1016,13 @@ var Game;
                 }
             }
             update(...args) {
-                if (this.sceneStack.length !== 0) {
+                if (this.peek() != null && this.peek().update != null) {
                     this.peek().update.apply(this.peek(), args);
                 }
                 return this;
             }
             draw() {
-                if (this.sceneStack.length !== 0) {
+                if (this.peek() != null && this.peek().draw != null) {
                     this.peek().draw.apply(this.peek());
                 }
                 return this;
@@ -929,11 +1031,155 @@ var Game;
         Scene_1.SceneManager = SceneManager;
     })(Scene = Game.Scene || (Game.Scene = {}));
 })(Game || (Game = {}));
+var Game;
+(function (Game) {
+    class ConsoleView {
+        constructor() {
+            const log = console.log.bind(console);
+            const error = console.error.bind(console);
+            const warn = console.warn.bind(console);
+            const table = console.table ? console.table.bind(console) : null;
+            const toString = (x) => (x instanceof Error) ? x.message : (typeof x === 'string' ? x : JSON.stringify(x));
+            const outer = document.createElement('div');
+            outer.id = 'console';
+            const div = document.createElement('div');
+            outer.appendChild(div);
+            const printToDiv = (stackTraceObject, ...args) => {
+                const msg = Array.prototype.slice.call(args, 0)
+                    .map(toString)
+                    .join(' ');
+                const text = div.textContent;
+                const trace = stackTraceObject ? stackTraceObject.stack.split(/\n/)[1] : "";
+                div.textContent = text + trace + ": " + msg + '\n';
+                while (div.clientHeight > document.body.clientHeight) {
+                    const lines = div.textContent.split(/\n/);
+                    lines.shift();
+                    div.textContent = lines.join('\n');
+                }
+            };
+            console.log = (...args) => {
+                log.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.error = (...args) => {
+                error.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift('ERROR:');
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.warn = (...args) => {
+                warn.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift('WARNING:');
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.table = (...args) => {
+                if (typeof table === 'function') {
+                    table.apply(null, args);
+                }
+                const objArr = args[0];
+                const keys = (typeof objArr[0] !== 'undefined') ? Object.keys(objArr[0]) : [];
+                const numCols = keys.length;
+                const len = objArr.length;
+                const $table = document.createElement('table');
+                const $head = document.createElement('thead');
+                let $tdata = document.createElement('td');
+                $tdata.innerHTML = 'Index';
+                $head.appendChild($tdata);
+                for (let k = 0; k < numCols; k++) {
+                    $tdata = document.createElement('td');
+                    $tdata.innerHTML = keys[k];
+                    $head.appendChild($tdata);
+                }
+                $table.appendChild($head);
+                for (let i = 0; i < len; i++) {
+                    const $line = document.createElement('tr');
+                    $tdata = document.createElement('td');
+                    $tdata.innerHTML = "" + i;
+                    $line.appendChild($tdata);
+                    for (let j = 0; j < numCols; j++) {
+                        $tdata = document.createElement('td');
+                        $tdata.innerHTML = objArr[i][keys[j]];
+                        $line.appendChild($tdata);
+                    }
+                    $table.appendChild($line);
+                }
+                div.appendChild($table);
+            };
+            window.addEventListener('error', (err) => {
+                printToDiv(null, 'EXCEPTION:', err.message + '\n  ' + err.filename, err.lineno + ':' + err.colno);
+            });
+            document.body.appendChild(outer);
+        }
+        static install() {
+            if (!this.instance) {
+                this.instance = new ConsoleView();
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+    }
+    Game.ConsoleView = ConsoleView;
+})(Game || (Game = {}));
+var Game;
+(function (Game) {
+    Game.pmode = false;
+    let video = null;
+    let sceneManager = null;
+    let inputDispacher = null;
+    let timer = null;
+    let soundManager = null;
+    function create(config) {
+        return new Promise((resolve, reject) => {
+            try {
+                Game.ConsoleView.install();
+                document.title = config.title;
+                video = new Game.Video(config.video);
+                video.imageSmoothingEnabled = false;
+                sceneManager = new Game.Scene.SceneManager();
+                timer = new Game.Timer.AnimationTimer();
+                inputDispacher = new Game.Input.InputManager();
+                soundManager = new Game.Sound.SoundManager();
+                resolve();
+            }
+            catch (e) {
+                reject(e);
+            }
+        });
+    }
+    Game.create = create;
+    function getScreen() {
+        return video;
+    }
+    Game.getScreen = getScreen;
+    function getTimer() {
+        return timer;
+    }
+    Game.getTimer = getTimer;
+    function getSceneManager() {
+        return sceneManager;
+    }
+    Game.getSceneManager = getSceneManager;
+    function getInput() {
+        return inputDispacher;
+    }
+    Game.getInput = getInput;
+    function getSound() {
+        return soundManager;
+    }
+    Game.getSound = getSound;
+})(Game || (Game = {}));
 class Array2D {
     constructor(width, height, fill) {
         this.arrayWidth = width;
         this.arrayHeight = height;
-        if (fill == undefined) {
+        if (fill === undefined) {
             this.matrixBuffer = new Array(width * height);
         }
         else {
@@ -950,7 +1196,7 @@ class Array2D {
         if (0 > x || x >= this.arrayWidth || 0 > y || y >= this.arrayHeight) {
             return 0;
         }
-        if (value != undefined) {
+        if (value !== undefined) {
             this.matrixBuffer[y * this.arrayWidth + x] = value;
         }
         return this.matrixBuffer[y * this.arrayWidth + x];
@@ -967,7 +1213,7 @@ class Array2D {
     static createFromArray(array, fill) {
         const h = array.length;
         const w = Math.max.apply(Math, array.map(x => x.length));
-        var matrix = new Array2D(w, h, fill);
+        const matrix = new Array2D(w, h, fill);
         array.forEach((vy, y) => vy.forEach((vx, x) => matrix.value(x, y, vx)));
         return matrix;
     }
@@ -980,81 +1226,81 @@ class Array2D {
     }
 }
 Array2D.DIR8 = [
-    [+Number.MAX_SAFE_INTEGER, +Number.MAX_SAFE_INTEGER],
-    [-1, +1],
-    [+0, +1],
-    [+1, +1],
-    [-1, +0],
-    [+0, +0],
-    [+1, +0],
-    [-1, -1],
-    [+0, -1],
-    [+1, -1]
+    { x: +Number.MAX_SAFE_INTEGER, y: +Number.MAX_SAFE_INTEGER },
+    { x: -1, y: +1 },
+    { x: +0, y: +1 },
+    { x: +1, y: +1 },
+    { x: -1, y: +0 },
+    { x: +0, y: +0 },
+    { x: +1, y: +0 },
+    { x: -1, y: -1 },
+    { x: +0, y: -1 },
+    { x: +1, y: -1 }
 ];
 var PathFinder;
 (function (PathFinder) {
     const dir4 = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0]
+        { x: 0, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 }
     ];
     const dir8 = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0],
-        [1, -1],
-        [1, 1],
-        [-1, 1],
-        [-1, -1]
+        { x: 0, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 },
+        { x: 1, y: -1 },
+        { x: 1, y: 1 },
+        { x: -1, y: 1 },
+        { x: -1, y: -1 }
     ];
-    // 基点からの重み距離算出
-    function propagation({ array2D = null, sx = null, sy = null, value = null, costs = null, left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = null }) {
+    function calcDistanceByDijkstra({ array2D = null, sx = null, sy = null, value = null, costs = null, left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = undefined }) {
         if (left === undefined || left < 0) {
-            right == 0;
+            right = 0;
         }
         if (top === undefined || top < 0) {
-            bottom == 0;
+            bottom = 0;
         }
         if (right === undefined || right > array2D.width) {
-            right == array2D.width;
+            right = array2D.width;
         }
         if (bottom === undefined || bottom > array2D.height) {
-            bottom == array2D.height;
+            bottom = array2D.height;
         }
-        if (output === null) {
-            output = new Array2D(array2D.width, array2D.height);
+        if (output === undefined) {
+            output = () => { };
         }
         const dirs = (topology === 8) ? dir8 : dir4;
-        output.value(sx, sy, value);
-        const request = dirs.map(([ox, oy]) => [sx + ox, sy + oy, value]);
-        var start = Date.now();
+        const work = new Array2D(array2D.width, array2D.height);
+        work.value(sx, sy, value);
+        output(sx, sy, value);
+        const request = dirs.map(({ x, y }) => [sx + x, sy + y, value]);
+        const start = Date.now();
         while (request.length !== 0 && (Date.now() - start) < timeout) {
-            var [x, y, currentValue] = request.shift();
-            if (top > y || y >= bottom || left > x || x >= right) {
+            const [px, py, currentValue] = request.shift();
+            if (top > py || py >= bottom || left > px || px >= right) {
                 continue;
             }
-            const cost = costs(array2D.value(x, y));
+            const cost = costs(array2D.value(px, py));
             if (cost < 0 || currentValue < cost) {
                 continue;
             }
-            currentValue -= cost;
-            const targetPower = output.value(x, y);
-            if (currentValue <= targetPower) {
+            const nextValue = currentValue - cost;
+            const targetPower = work.value(px, py);
+            if (nextValue <= targetPower) {
                 continue;
             }
-            output.value(x, y, currentValue);
-            Array.prototype.push.apply(request, dirs.map(([ox, oy]) => [x + ox, y + oy, currentValue]));
+            work.value(px, py, nextValue);
+            output(px, py, nextValue);
+            Array.prototype.push.apply(request, dirs.map(({ x, y }) => [px + x, py + y, nextValue]));
         }
-        return output;
     }
-    PathFinder.propagation = propagation;
-    // A*での経路探索
+    PathFinder.calcDistanceByDijkstra = calcDistanceByDijkstra;
     function pathfind(array2D, fromX, fromY, toX, toY, costs, opts) {
         opts = Object.assign({ topology: 8 }, opts);
-        var topology = opts.topology;
-        var dirs;
+        const topology = opts.topology;
+        let dirs;
         if (topology === 4) {
             dirs = dir4;
         }
@@ -1064,10 +1310,9 @@ var PathFinder;
         else {
             throw new Error("Illegal topology");
         }
-        var todo = [];
+        const todo = [];
         const add = ((x, y, prev) => {
-            // distance
-            var distance;
+            let distance;
             switch (topology) {
                 case 4:
                     distance = (Math.abs(x - fromX) + Math.abs(y - fromY));
@@ -1078,15 +1323,14 @@ var PathFinder;
                 default:
                     throw new Error("Illegal topology");
             }
-            var obj = {
+            const obj = {
                 x: x,
                 y: y,
                 prev: prev,
                 g: (prev ? prev.g + 1 : 0),
                 distance: distance
             };
-            /* insert into priority queue */
-            var f = obj.g + obj.distance;
+            const f = obj.g + obj.distance;
             for (let i = 0; i < todo.length; i++) {
                 const item = todo[i];
                 const itemF = item.g + item.distance;
@@ -1097,7 +1341,6 @@ var PathFinder;
             }
             todo.push(obj);
         });
-        // set start position 
         add(toX, toY, null);
         const done = new Map();
         while (todo.length) {
@@ -1105,33 +1348,28 @@ var PathFinder;
             {
                 const id = item.x + "," + item.y;
                 if (done.has(id)) {
-                    /* 探索済みなので探索しない */
                     continue;
                 }
                 done.set(id, item);
             }
             if (item.x === fromX && item.y === fromY) {
-                /* 始点に到達したので経路を生成して返す */
                 const result = [];
                 while (item) {
-                    result.push([item.x, item.y]);
+                    result.push(item);
                     item = item.prev;
                 }
                 return result;
             }
             else {
-                /* 隣接地点から移動可能地点を探す */
                 for (let i = 0; i < dirs.length; i++) {
                     const dir = dirs[i];
-                    const x = item.x + dir[0];
-                    const y = item.y + dir[1];
+                    const x = item.x + dir.x;
+                    const y = item.y + dir.y;
                     const cost = costs[this.value(x, y)];
                     if (cost < 0) {
-                        /* 侵入不可能 */
                         continue;
                     }
                     else {
-                        /* 移動可能地点が探索済みでないなら探索キューに追加 */
                         const id = x + "," + y;
                         if (done.has(id)) {
                             continue;
@@ -1141,11 +1379,9 @@ var PathFinder;
                 }
             }
         }
-        /* 始点に到達しなかったので空の経路を返す */
         return [];
     }
     PathFinder.pathfind = pathfind;
-    // 重み距離を使ったA*
     function pathfindByPropergation(array2D, fromX, fromY, toX, toY, propagation, { topology = 8 }) {
         let dirs;
         if (topology === 4) {
@@ -1157,19 +1393,17 @@ var PathFinder;
         else {
             throw new Error("Illegal topology");
         }
-        var todo = [];
+        const todo = [];
         const add = ((x, y, prev) => {
-            // distance
-            var distance = Math.abs(propagation.value(x, y) - propagation.value(fromX, fromY));
-            var obj = {
+            const distance = Math.abs(propagation.value(x, y) - propagation.value(fromX, fromY));
+            const obj = {
                 x: x,
                 y: y,
                 prev: prev,
                 g: (prev ? prev.g + 1 : 0),
                 distance: distance
             };
-            /* insert into priority queue */
-            var f = obj.g + obj.distance;
+            const f = obj.g + obj.distance;
             for (let i = 0; i < todo.length; i++) {
                 const item = todo[i];
                 const itemF = item.g + item.distance;
@@ -1180,7 +1414,6 @@ var PathFinder;
             }
             todo.push(obj);
         });
-        // set start position 
         add(toX, toY, null);
         const done = new Map();
         while (todo.length) {
@@ -1188,33 +1421,28 @@ var PathFinder;
             {
                 const id = item.x + "," + item.y;
                 if (done.has(id)) {
-                    /* 探索済みなので探索しない */
                     continue;
                 }
                 done.set(id, item);
             }
             if (item.x === fromX && item.y === fromY) {
-                /* 始点に到達したので経路を生成して返す */
                 const result = [];
                 while (item) {
-                    result.push([item.x, item.y]);
+                    result.push(item);
                     item = item.prev;
                 }
                 return result;
             }
             else {
-                /* 隣接地点から移動可能地点を探す */
                 dirs.forEach((dir) => {
-                    const x = item.x + dir[0];
-                    const y = item.y + dir[1];
+                    const x = item.x + dir.x;
+                    const y = item.y + dir.y;
                     const pow = propagation.value(x, y);
                     if (pow === 0) {
-                        /* 侵入不可能 */
                         return;
                     }
                     else {
-                        /* 移動可能地点が探索済みでないなら探索キューに追加 */
-                        var id = x + "," + y;
+                        const id = x + "," + y;
                         if (done.has(id)) {
                             return;
                         }
@@ -1225,18 +1453,16 @@ var PathFinder;
                 });
             }
         }
-        /* 始点に到達しなかったので空の経路を返す */
         return [];
     }
     PathFinder.pathfindByPropergation = pathfindByPropergation;
 })(PathFinder || (PathFinder = {}));
 var Dungeon;
 (function (Dungeon) {
-    // マップ描画時の視点・視野情報
+    const rand = XorShift.default();
     class Camera {
     }
     Dungeon.Camera = Camera;
-    // ダンジョンデータ
     class DungeonData {
         constructor(config) {
             this.width = config.width;
@@ -1251,22 +1477,17 @@ var Dungeon;
             this.lighting.fill(0);
             return this;
         }
-        // update camera
         update(param) {
             const mapWidth = this.width * this.gridsize.width;
             const mapHeight = this.height * this.gridsize.height;
-            // マップ上でのカメラの注視点
             const mapPx = param.viewpoint.x;
             const mapPy = param.viewpoint.y;
-            // カメラの視野の幅・高さ
             this.camera.width = param.viewwidth;
             this.camera.height = param.viewheight;
-            // カメラの注視点が中心となるようなカメラの視野
             this.camera.left = ~~(mapPx - this.camera.width / 2);
             this.camera.top = ~~(mapPy - this.camera.height / 2);
             this.camera.right = this.camera.left + this.camera.width;
             this.camera.bottom = this.camera.top + this.camera.height;
-            // 視野をマップ内に補正
             if ((this.camera.left < 0) && (this.camera.right - this.camera.left < mapWidth)) {
                 this.camera.right -= this.camera.left;
                 this.camera.left = 0;
@@ -1283,20 +1504,16 @@ var Dungeon;
                 this.camera.top -= (this.camera.bottom - mapHeight);
                 this.camera.bottom = mapHeight - 1;
             }
-            // 視野の左上位置を原点とした注視点を算出
             this.camera.localPx = mapPx - this.camera.left;
             this.camera.localPy = mapPy - this.camera.top;
-            // 視野の四隅位置に対応するマップチップ座標を算出
             this.camera.chipLeft = ~~(this.camera.left / this.gridsize.width);
             this.camera.chipTop = ~~(this.camera.top / this.gridsize.height);
             this.camera.chipRight = ~~((this.camera.right + (this.gridsize.width - 1)) / this.gridsize.width);
             this.camera.chipBottom = ~~((this.camera.bottom + (this.gridsize.height - 1)) / this.gridsize.height);
-            // 視野の左上位置をにマップチップをおいた場合のスクロールによるズレ量を算出
             this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
             this.camera.chipOffY = -(this.camera.top % this.gridsize.height);
         }
         draw(layerDrawHook) {
-            // 描画開始
             const gridw = this.gridsize.width;
             const gridh = this.gridsize.height;
             Object.keys(this.layer).forEach((key) => {
@@ -1304,7 +1521,7 @@ var Dungeon;
                 for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
                     for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
                         const chipid = this.layer[l].chips.value(x, y) || 0;
-                        if ((chipid === 1 || chipid === 10) && this.layer[l].chip[chipid]) {
+                        if (this.layer[l].chip[chipid]) {
                             const xx = (x - this.camera.chipLeft) * gridw;
                             const yy = (y - this.camera.chipTop) * gridh;
                             if (!Game.pmode) {
@@ -1319,10 +1536,8 @@ var Dungeon;
                         }
                     }
                 }
-                // レイヤー描画フック
                 layerDrawHook(l, this.camera.localPx, this.camera.localPy);
             });
-            // 照明描画
             for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
                 for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
                     let light = this.lighting.value(x, y) / 100;
@@ -1341,28 +1556,8 @@ var Dungeon;
         }
     }
     Dungeon.DungeonData = DungeonData;
-    // ダンジョン構成要素基底クラス
     class Feature {
     }
-    function getUniformInt(lowerBound, upperBound) {
-        const max = Math.max(lowerBound, upperBound);
-        const min = Math.min(lowerBound, upperBound);
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-    function getWeightedValue(data) {
-        const keys = Object.keys(data);
-        const total = keys.reduce((s, x) => s + data[x], 0);
-        const random = Math.random() * total;
-        let part = 0;
-        for (const id of keys) {
-            part += data[id];
-            if (random < part) {
-                return id;
-            }
-        }
-        return keys[keys.length - 1];
-    }
-    // 部屋
     class Room extends Feature {
         constructor(left, top, right, bottom, door) {
             super();
@@ -1370,77 +1565,77 @@ var Dungeon;
             this.top = top;
             this.right = right;
             this.bottom = bottom;
-            this.doors = {};
+            this.doors = new Map();
             if (door !== undefined) {
-                this.addDoor(door);
+                this.addDoor(door.x, door.y);
             }
         }
         static createRandomAt(x, y, dx, dy, options) {
-            const minw = options.roomWidth[0];
-            const maxw = options.roomWidth[1];
-            const width = getUniformInt(minw, maxw);
-            const minh = options.roomHeight[0];
-            const maxh = options.roomHeight[1];
-            const height = getUniformInt(minh, maxh);
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
             if (dx === 1) {
-                const y2 = y - Math.floor(Math.random() * height);
-                return new Room(x + 1, y2, x + width, y2 + height - 1, [x, y]);
+                const y2 = y - options.random.randInt(0, height - 1);
+                return new Room(x + 1, y2, x + width, y2 + height - 1, { x: x, y: y });
             }
             if (dx === -1) {
-                const y2 = y - Math.floor(Math.random() * height);
-                return new Room(x - width, y2, x - 1, y2 + height - 1, [x, y]);
+                const y2 = y - options.random.randInt(0, height - 1);
+                return new Room(x - width, y2, x - 1, y2 + height - 1, { x: x, y: y });
             }
             if (dy === 1) {
-                const x2 = x - Math.floor(Math.random() * width);
-                return new Room(x2, y + 1, x2 + width - 1, y + height, [x, y]);
+                const x2 = x - options.random.randInt(0, width - 1);
+                return new Room(x2, y + 1, x2 + width - 1, y + height, { x: x, y: y });
             }
             if (dy === -1) {
-                const x2 = x - Math.floor(Math.random() * width);
-                return new Room(x2, y - height, x2 + width - 1, y - 1, [x, y]);
+                const x2 = x - options.random.randInt(0, width - 1);
+                return new Room(x2, y - height, x2 + width - 1, y - 1, { x: x, y: y });
             }
             throw new Error("dx or dy must be 1 or -1");
         }
         static createRandomCenter(cx, cy, options) {
-            const minw = options.roomWidth[0];
-            const maxw = options.roomWidth[1];
-            const width = getUniformInt(minw, maxw);
-            const minh = options.roomHeight[0];
-            const maxh = options.roomHeight[1];
-            const height = getUniformInt(minh, maxh);
-            const x1 = cx - Math.floor(Math.random() * width);
-            const y1 = cy - Math.floor(Math.random() * height);
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
+            const x1 = cx - options.random.randInt(0, width - 1);
+            const y1 = cy - options.random.randInt(0, height - 1);
             const x2 = x1 + width - 1;
             const y2 = y1 + height - 1;
             return new Room(x1, y1, x2, y2);
         }
         static createRandom(availWidth, availHeight, options) {
-            const minw = options.roomWidth[0];
-            const maxw = options.roomWidth[1];
-            const width = getUniformInt(minw, maxw);
-            const minh = options.roomHeight[0];
-            const maxh = options.roomHeight[1];
-            const height = getUniformInt(minh, maxh);
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
             const left = availWidth - width - 1;
             const top = availHeight - height - 1;
-            const x1 = 1 + Math.floor(Math.random() * left);
-            const y1 = 1 + Math.floor(Math.random() * top);
+            const x1 = 1 + options.random.randInt(0, left - 1);
+            const y1 = 1 + options.random.randInt(0, top - 1);
             const x2 = x1 + width - 1;
             const y2 = y1 + height - 1;
             return new Room(x1, y1, x2, y2);
         }
-        addDoor([x, y]) {
-            this.doors[x + "," + y] = 1;
+        addDoor(x, y) {
+            this.doors.set(x + "," + y, 1);
             return this;
         }
         getDoors(callback) {
             for (const key of Object.keys(this.doors)) {
                 const parts = key.split(",");
-                callback([parseInt(parts[0], 10), parseInt(parts[1], 10)]);
+                callback({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10) });
             }
             return this;
         }
         clearDoors() {
-            this.doors = {};
+            this.doors.clear();
             return this;
         }
         addDoors(isWallCallback) {
@@ -1453,16 +1648,16 @@ var Dungeon;
                     if (x !== left && x !== right && y !== top && y !== bottom) {
                         continue;
                     }
-                    if (isWallCallback([x, y])) {
+                    if (isWallCallback(x, y)) {
                         continue;
                     }
-                    this.addDoor([x, y]);
+                    this.addDoor(x, y);
                 }
             }
             return this;
         }
         debug() {
-            consolere.log("room", this.left, this.top, this.right, this.bottom);
+            console.log("room", this.left, this.top, this.right, this.bottom);
         }
         isValid(isWallCallback, canBeDugCallback) {
             const left = this.left - 1;
@@ -1485,9 +1680,6 @@ var Dungeon;
             }
             return true;
         }
-        /**
-         * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
-         */
         create(digCallback) {
             const left = this.left - 1;
             const right = this.right + 1;
@@ -1495,8 +1687,8 @@ var Dungeon;
             const bottom = this.bottom + 1;
             for (let x = left; x <= right; x++) {
                 for (let y = top; y <= bottom; y++) {
-                    let value = 0;
-                    if (x + "," + y in this.doors) {
+                    let value;
+                    if (this.doors.has(x + "," + y)) {
                         value = 2;
                     }
                     else if (x === left || x === right || y === top || y === bottom) {
@@ -1510,7 +1702,7 @@ var Dungeon;
             }
         }
         getCenter() {
-            return [Math.round((this.left + this.right) / 2), Math.round((this.top + this.bottom) / 2)];
+            return { x: Math.round((this.left + this.right) / 2), y: Math.round((this.top + this.bottom) / 2) };
         }
         getLeft() {
             return this.left;
@@ -1525,7 +1717,6 @@ var Dungeon;
             return this.bottom;
         }
     }
-    // 通路
     class Corridor extends Feature {
         constructor(startX, startY, endX, endY) {
             super();
@@ -1536,13 +1727,13 @@ var Dungeon;
             this.endsWithAWall = true;
         }
         static createRandomAt(x, y, dx, dy, options) {
-            const min = options.corridorLength[0];
-            const max = options.corridorLength[1];
-            const length = getUniformInt(min, max);
+            const min = options.corridorLength.min;
+            const max = options.corridorLength.max;
+            const length = options.random.randInt(min, max);
             return new Corridor(x, y, x + dx * length, y + dy * length);
         }
         debug() {
-            consolere.log("corridor", this.startX, this.startY, this.endX, this.endY);
+            console.log("corridor", this.startX, this.startY, this.endX, this.endY);
         }
         isValid(isWallCallback, canBeDugCallback) {
             const sx = this.startX;
@@ -1578,29 +1769,12 @@ var Dungeon;
                     break;
                 }
             }
-            /**
-             * If the length degenerated, this corridor might be invalid
-             */
-            /* not supported */
             if (length === 0) {
                 return false;
             }
-            /* length 1 allowed only if the next space is empty */
             if (length === 1 && isWallCallback(this.endX + dx, this.endY + dy)) {
                 return false;
             }
-            /**
-             * We do not want the corridor to crash into a corner of a room;
-             * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
-             *
-             * Situation:
-             * #######1
-             * .......?
-             * #######2
-             *
-             * The corridor was dug from left to right.
-             * 1, 2 - problematic corners, ? = N+1th cell (not dug)
-             */
             const firstCornerBad = !isWallCallback(this.endX + dx + nx, this.endY + dy + ny);
             const secondCornerBad = !isWallCallback(this.endX + dx - nx, this.endY + dy - ny);
             this.endsWithAWall = isWallCallback(this.endX + dx, this.endY + dy);
@@ -1650,75 +1824,72 @@ var Dungeon;
         }
     }
     class Generator {
-        constructor(width, height, option = {
-                roomWidth: [3, 9],
-                roomHeight: [3, 5],
-                corridorLength: [3, 10],
-                dugPercentage: 0.2,
-                timeLimit: 1000,
-            }) {
+        constructor(width, height, { random = new XorShift(), roomWidth = { min: 3, max: 9 }, roomHeight = { min: 3, max: 5 }, corridorLength = { min: 3, max: 10 }, dugPercentage = 0.2, loopLimit = 100000, }) {
             this.width = width;
             this.height = height;
-            this.rooms = []; /* list of all rooms */
+            this.rooms = [];
             this.corridors = [];
-            this.options = option;
+            this.options = {
+                random: random,
+                roomWidth: roomWidth,
+                roomHeight: roomHeight,
+                corridorLength: corridorLength,
+                dugPercentage: dugPercentage,
+                loopLimit: loopLimit,
+            };
             this.features = {
                 Room: 4,
                 Corridor: 4,
             };
-            this.featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
-            this.walls = {}; /* these are available for digging */
-            this._digCallback = this._digCallback.bind(this);
-            this._canBeDugCallback = this._canBeDugCallback.bind(this);
-            this._isWallCallback = this._isWallCallback.bind(this);
-            this._priorityWallCallback = this._priorityWallCallback.bind(this);
+            this.featureAttempts = 20;
+            this.walls = new Map();
+            this.digCallback = this.digCallback.bind(this);
+            this.canBeDugCallback = this.canBeDugCallback.bind(this);
+            this.isWallCallback = this.isWallCallback.bind(this);
+            this.priorityWallCallback = this.priorityWallCallback.bind(this);
         }
-        /*@*/ create(callback) {
+        create(callback) {
             this.rooms = [];
             this.corridors = [];
-            this.map = this._fillMap(1);
-            this.walls = {};
+            this.map = this.fillMap(1);
+            this.walls.clear();
             this.dug = 0;
             const area = (this.width - 2) * (this.height - 2);
-            this._firstRoom();
-            const t1 = Date.now();
+            this.firstRoom();
+            let t1 = 0;
             let priorityWalls = 0;
             do {
-                const t2 = Date.now();
-                if (t2 - t1 > this.options.timeLimit) {
+                if (t1++ > this.options.loopLimit) {
                     break;
                 }
-                /* find a good wall */
-                const wall = this._findWall();
+                const wall = this.findWall();
                 if (!wall) {
                     break;
-                } /* no more walls */
+                }
                 const parts = wall.split(",");
                 const x = parseInt(parts[0]);
                 const y = parseInt(parts[1]);
-                const dir = this._getDiggingDirection(x, y);
+                const dir = this.getDiggingDirection(x, y);
                 if (!dir) {
                     continue;
-                } /* this wall is not suitable */
-                // consolere.log("wall", x, y);
-                /* try adding a feature */
+                }
                 let featureAttempts = 0;
                 do {
                     featureAttempts++;
-                    if (this._tryFeature(x, y, dir[0], dir[1])) {
-                        // if (this._rooms.length + this._corridors.length === 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
-                        this._removeSurroundingWalls(x, y);
-                        this._removeSurroundingWalls(x - dir[0], y - dir[1]);
+                    if (this.tryFeature(x, y, dir.x, dir.y)) {
+                        this.removeSurroundingWalls(x, y);
+                        this.removeSurroundingWalls(x - dir.x, y - dir.y);
                         break;
                     }
                 } while (featureAttempts < this.featureAttempts);
-                for (const id in this.walls) {
-                    if (this.walls[id] > 1) {
+                priorityWalls = 0;
+                for (const [, value] of this.walls) {
+                    if (value > 1) {
                         priorityWalls++;
                     }
                 }
-            } while (this.dug / area < this.options.dugPercentage || priorityWalls); /* fixme number of priority walls */
-            this._addDoors();
+            } while ((this.dug / area) < this.options.dugPercentage || priorityWalls);
+            this.addDoors();
             if (callback) {
                 for (let i = 0; i < this.width; i++) {
                     for (let j = 0; j < this.height; j++) {
@@ -1726,39 +1897,39 @@ var Dungeon;
                     }
                 }
             }
-            this.walls = {};
+            this.walls.clear();
             this.map = null;
+            this.rooms = this.options.random.shuffle(this.rooms);
             return this;
         }
-        _digCallback(x, y, value) {
+        digCallback(x, y, value) {
             if (value === 0 || value === 2) {
                 this.map[x][y] = 0;
                 this.dug++;
             }
             else {
-                this.walls[x + "," + y] = 1;
+                this.walls.set(x + "," + y, 1);
             }
         }
-        _isWallCallback(x, y) {
+        isWallCallback(x, y) {
             if (x < 0 || y < 0 || x >= this.width || y >= this.height) {
                 return false;
             }
             return (this.map[x][y] === 1);
         }
-        _canBeDugCallback(x, y) {
+        canBeDugCallback(x, y) {
             if (x < 1 || y < 1 || x + 1 >= this.width || y + 1 >= this.height) {
                 return false;
             }
             return (this.map[x][y] === 1);
         }
-        _priorityWallCallback(x, y) {
-            this.walls[x + "," + y] = 2;
+        priorityWallCallback(x, y) {
+            this.walls.set(x + "," + y, 2);
         }
-        _findWall() {
+        findWall() {
             const prio1 = [];
             const prio2 = [];
-            for (const id in this.walls) {
-                const prio = this.walls[id];
+            for (const [id, prio] of this.walls) {
                 if (prio === 2) {
                     prio2.push(id);
                 }
@@ -1769,19 +1940,19 @@ var Dungeon;
             const arr = (prio2.length ? prio2 : prio1);
             if (!arr.length) {
                 return null;
-            } /* no walls :/ */
-            const id2 = arr.sort()[Math.floor(Math.random() * arr.length)]; // sort to make the order deterministic
-            delete this.walls[id2];
+            }
+            const id2 = arr.sort()[this.options.random.randInt(0, arr.length - 1)];
+            this.walls.delete(id2);
             return id2;
         }
-        _firstRoom() {
+        firstRoom() {
             const cx = Math.floor(this.width / 2);
             const cy = Math.floor(this.height / 2);
             const room = Room.createRandomCenter(cx, cy, this.options);
             this.rooms.push(room);
-            room.create(this._digCallback);
+            room.create(this.digCallback);
         }
-        _fillMap(value) {
+        fillMap(value) {
             const map = [];
             for (let i = 0; i < this.width; i++) {
                 map.push([]);
@@ -1791,42 +1962,42 @@ var Dungeon;
             }
             return map;
         }
-        _tryFeature(x, y, dx, dy) {
-            const featureType = getWeightedValue(this.features);
-            const feature = Generator.FeatureCreateMethod[featureType](x, y, dx, dy, this.options);
-            if (!feature.isValid(this._isWallCallback, this._canBeDugCallback)) {
+        tryFeature(x, y, dx, dy) {
+            const featureType = this.options.random.getWeightedValue(this.features);
+            const feature = Generator.featureCreateMethodTable[featureType](x, y, dx, dy, this.options);
+            if (!feature.isValid(this.isWallCallback, this.canBeDugCallback)) {
                 return false;
             }
-            feature.create(this._digCallback);
+            feature.create(this.digCallback);
             if (feature instanceof Room) {
                 this.rooms.push(feature);
             }
             if (feature instanceof Corridor) {
-                feature.createPriorityWalls(this._priorityWallCallback);
+                feature.createPriorityWalls(this.priorityWallCallback);
                 this.corridors.push(feature);
             }
             return true;
         }
-        _removeSurroundingWalls(cx, cy) {
-            const deltas = Generator._ROTDIRS4;
+        removeSurroundingWalls(cx, cy) {
+            const deltas = Generator.rotdirs4;
             for (const delta of deltas) {
-                const x1 = cx + delta[0];
-                const y1 = cy + delta[1];
-                delete this.walls[x1 + "," + y1];
-                const x2 = cx + 2 * delta[0];
-                const y2 = cy + 2 * delta[1];
-                delete this.walls[x2 + "," + y2];
+                const x1 = cx + delta.x;
+                const y1 = cy + delta.y;
+                this.walls.delete(x1 + "," + y1);
+                const x2 = cx + 2 * delta.x;
+                const y2 = cy + 2 * delta.y;
+                this.walls.delete(x2 + "," + y2);
             }
         }
-        _getDiggingDirection(cx, cy) {
+        getDiggingDirection(cx, cy) {
             if (cx <= 0 || cy <= 0 || cx >= this.width - 1 || cy >= this.height - 1) {
                 return null;
             }
             let result = null;
-            const deltas = Generator._ROTDIRS4;
+            const deltas = Generator.rotdirs4;
             for (const delta of deltas) {
-                const x = cx + delta[0];
-                const y = cy + delta[1];
+                const x = cx + delta.x;
+                const y = cy + delta.y;
                 if (!this.map[x][y]) {
                     if (result) {
                         return null;
@@ -1834,15 +2005,14 @@ var Dungeon;
                     result = delta;
                 }
             }
-            /* no empty neighbor */
             if (!result) {
                 return null;
             }
-            return [-result[0], -result[1]];
+            return { x: -result.x, y: -result.y };
         }
-        _addDoors() {
+        addDoors() {
             const data = this.map;
-            const isWallCallback = ([x, y]) => {
+            const isWallCallback = (x, y) => {
                 return (data[x][y] === 1);
             };
             for (const room of this.rooms) {
@@ -1857,289 +2027,1047 @@ var Dungeon;
             return this.corridors;
         }
     }
-    Generator.FeatureCreateMethod = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
-    Generator._ROTDIRS4 = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0],
+    Generator.featureCreateMethodTable = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
+    Generator.rotdirs4 = [
+        { x: 0, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 }
     ];
     function generate(w, h, callback) {
-        return new Generator(w, h).create(callback);
+        return new Generator(w, h, { random: rand }).create(callback);
     }
     Dungeon.generate = generate;
 })(Dungeon || (Dungeon = {}));
-// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
-var TurnState;
-(function (TurnState) {
-    TurnState[TurnState["WaitInput"] = 0] = "WaitInput";
-    TurnState[TurnState["PlayerAction"] = 1] = "PlayerAction";
-    TurnState[TurnState["PlayerActionRunning"] = 2] = "PlayerActionRunning";
-    TurnState[TurnState["EnemyAI"] = 3] = "EnemyAI";
-    TurnState[TurnState["EnemyAction"] = 4] = "EnemyAction";
-    TurnState[TurnState["EnemyActionRunning"] = 5] = "EnemyActionRunning";
-    TurnState[TurnState["Move"] = 6] = "Move";
-    TurnState[TurnState["MoveRunning"] = 7] = "MoveRunning";
-    TurnState[TurnState["TurnEnd"] = 8] = "TurnEnd";
-})(TurnState || (TurnState = {}));
-var consolere;
-var Game;
-(function (Game) {
-    Game.pmode = false;
-    consolere.log("remote log start");
-    // Global Variables
-    let video = null;
-    let sceneManager = null;
-    let inputDispacher = null;
-    let timer = null;
-    let soundManager = null;
-    //
-    function create(config) {
-        return new Promise((resolve, reject) => {
-            try {
-                document.title = config.title;
-                video = new Game.Video(config.screen.id);
-                video.imageSmoothingEnabled = false;
-                sceneManager = new Game.Scene.SceneManager(config.scene);
-                timer = new Game.Timer.AnimationTimer();
-                inputDispacher = new Game.Input.InputManager();
-                soundManager = new Game.Sound.SoundManager();
-                resolve();
+var SpriteAnimation;
+(function (SpriteAnimation) {
+    class Animator {
+        constructor(spriteSheet) {
+            this.spriteSheet = spriteSheet;
+            this.offx = 0;
+            this.offy = 0;
+            this.dir = 5;
+            this.animDir = 2;
+            this.animFrame = 0;
+            this.animName = "idle";
+        }
+        setDir(dir) {
+            if (dir === 0) {
+                return;
             }
-            catch (e) {
-                reject(e);
+            this.dir = dir;
+            switch (dir) {
+                case 1: {
+                    if (this.animDir === 4) {
+                        this.animDir = 4;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 4;
+                    }
+                    break;
+                }
+                case 3: {
+                    if (this.animDir === 4) {
+                        this.animDir = 6;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 2;
+                    }
+                    break;
+                }
+                case 9: {
+                    if (this.animDir === 4) {
+                        this.animDir = 6;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 6;
+                    }
+                    break;
+                }
+                case 7: {
+                    if (this.animDir === 4) {
+                        this.animDir = 4;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 4;
+                    }
+                    break;
+                }
+                case 5: {
+                    break;
+                }
+                default: {
+                    this.animDir = dir;
+                    break;
+                }
             }
+        }
+        setAnimation(type, rate) {
+            if (rate > 1) {
+                rate = 1;
+            }
+            if (rate < 0) {
+                rate = 0;
+            }
+            if (type === "move" || type === "action") {
+                if (type === "move") {
+                    this.offx = ~~(Array2D.DIR8[this.dir].x * 24 * rate);
+                    this.offy = ~~(Array2D.DIR8[this.dir].y * 24 * rate);
+                }
+                else if (type === "action") {
+                    this.offx = ~~(Array2D.DIR8[this.dir].x * 12 * Math.sin(rate * Math.PI));
+                    this.offy = ~~(Array2D.DIR8[this.dir].y * 12 * Math.sin(rate * Math.PI));
+                }
+                this.animName = Animator.animationName[this.animDir];
+            }
+            else if (type === "dead") {
+                this.animName = "dead";
+                this.offx = 0;
+                this.offy = 0;
+            }
+            else {
+                return;
+            }
+            const animDefs = this.spriteSheet.getAnimation(this.animName);
+            const totalWeight = animDefs.reduce((s, x) => s + x.time, 0);
+            const targetRate = rate * totalWeight;
+            let sum = 0;
+            for (let i = 0; i < animDefs.length; i++) {
+                const next = sum + animDefs[i].time;
+                if (sum <= targetRate && targetRate < next) {
+                    this.animFrame = i;
+                    return;
+                }
+                sum = next;
+            }
+            this.animFrame = animDefs.length - 1;
+        }
+    }
+    Animator.animationName = {
+        2: "move_down",
+        4: "move_left",
+        5: "idle",
+        6: "move_right",
+        8: "move_up",
+    };
+    SpriteAnimation.Animator = Animator;
+    class SpriteSheet {
+        constructor({ source = null, sprite = null, animation = null }) {
+            this.source = source;
+            this.sprite = sprite;
+            this.animation = animation;
+        }
+        getAnimation(animName) {
+            return this.animation.get(animName);
+        }
+        getAnimationFrame(animName, animFrame) {
+            return this.animation.get(animName)[animFrame];
+        }
+        gtetSprite(spriteName) {
+            return this.sprite.get(spriteName);
+        }
+        getSpriteImage(sprite) {
+            return this.source.get(sprite.source);
+        }
+    }
+    SpriteAnimation.SpriteSheet = SpriteSheet;
+    class Sprite {
+        constructor(sprite) {
+            this.source = sprite.source;
+            this.left = sprite.left;
+            this.top = sprite.top;
+            this.width = sprite.width;
+            this.height = sprite.height;
+            this.offsetX = sprite.offsetX;
+            this.offsetY = sprite.offsetY;
+        }
+    }
+    class Animation {
+        constructor(animation) {
+            this.sprite = animation.sprite;
+            this.time = animation.time;
+            this.offsetX = animation.offsetX;
+            this.offsetY = animation.offsetY;
+        }
+    }
+    function loadImage(imageSrc) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = imageSrc;
+                img.onload = () => {
+                    resolve(img);
+                };
+                img.onerror = () => { reject(imageSrc + "�̃��[�h�Ɏ��s���܂����B"); };
+            });
         });
     }
-    Game.create = create;
-    function getScreen() {
-        return video;
+    function loadSpriteSheet(spriteSheetPath, { loadStartCallback = () => { }, loadEndCallback = () => { } }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            loadStartCallback();
+            const spriteSheetDir = getDirectory(spriteSheetPath);
+            const spriteSheetJson = yield ajax(spriteSheetPath, "json").then(y => y.response);
+            if (spriteSheetJson == null) {
+                throw new Error(spriteSheetPath + " is invalid json.");
+            }
+            const source = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.source);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    const imageSrc = spriteSheetDir + '/' + spriteSheetJson.source[key];
+                    const image = yield loadImage(imageSrc);
+                    source.set(key, image);
+                }
+            }
+            const sprite = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.sprite);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    sprite.set(key, new Sprite(spriteSheetJson.sprite[key]));
+                }
+            }
+            const animation = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.animation);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    const value = spriteSheetJson.animation[key].map(x => new Animation(x));
+                    animation.set(key, value);
+                }
+            }
+            const spriteSheet = new SpriteSheet({
+                source: source,
+                sprite: sprite,
+                animation: animation,
+            });
+            return spriteSheet;
+        });
     }
-    Game.getScreen = getScreen;
-    function getTimer() {
-        return timer;
+    SpriteAnimation.loadSpriteSheet = loadSpriteSheet;
+})(SpriteAnimation || (SpriteAnimation = {}));
+var Charactor;
+(function (Charactor) {
+    function loadCharactorConfigFromFile(path) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const configDirectory = path.substring(0, path.lastIndexOf("/"));
+            const charactorConfigJson = yield ajax(path, "json").then(x => x.response);
+            const spriteSheetPath = configDirectory + "/" + charactorConfigJson.sprite;
+            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, {});
+            return new CharactorConfig({
+                id: charactorConfigJson.id,
+                name: charactorConfigJson.name,
+                sprite: sprite,
+                configDirectory: configDirectory
+            });
+        });
     }
-    Game.getTimer = getTimer;
-    function getSceneManager() {
-        return sceneManager;
-    }
-    Game.getSceneManager = getSceneManager;
-    function getInput() {
-        return inputDispacher;
-    }
-    Game.getInput = getInput;
-    function getSound() {
-        return soundManager;
-    }
-    Game.getSound = getSound;
-})(Game || (Game = {}));
-class Animator {
-    constructor(sprite, spriteWidth, spriteHeight) {
-        this.sprite = sprite;
-        this.spriteWidth = spriteWidth;
-        this.spriteHeight = spriteHeight;
-        this.offx = 0;
-        this.offy = 0;
-        this.dir = 5;
-        this.animDir = 2;
-        this.animFrame = 0;
-    }
-    setDir(dir) {
-        if (dir === 0) {
-            return;
+    Charactor.loadCharactorConfigFromFile = loadCharactorConfigFromFile;
+    class CharactorConfig {
+        constructor({ id = "", name = "", sprite = null, configDirectory = "", }) {
+            this.id = id;
+            this.name = name;
+            this.sprite = sprite;
+            this.configDirectory = configDirectory;
         }
-        this.dir = dir;
-        switch (dir) {
-            case 1: {
-                if (this.animDir === 4) {
-                    this.animDir = 4;
+    }
+    Charactor.CharactorConfig = CharactorConfig;
+    class CharactorBase extends SpriteAnimation.Animator {
+        constructor(x, y, spriteSheet) {
+            super(spriteSheet);
+            this.x = x;
+            this.y = y;
+        }
+    }
+    Charactor.CharactorBase = CharactorBase;
+    class Player extends CharactorBase {
+        constructor(config) {
+            const charactorConfig = Player.playerConfigs.get(config.charactorId);
+            super(config.x, config.y, charactorConfig.sprite);
+            this.charactorConfig = charactorConfig;
+        }
+        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const configPaths = yield ajax(Player.configFilePath, "json").then((x) => x.response);
+                const rootDirectory = getDirectory(Player.configFilePath);
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+                Player.playerConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
+                return;
+            });
+        }
+    }
+    Player.configFilePath = "./assets/charactor/charactor.json";
+    Player.playerConfigs = new Map();
+    Charactor.Player = Player;
+    class Monster extends CharactorBase {
+        constructor(config) {
+            const charactorConfig = Monster.monsterConfigs.get(config.charactorId);
+            super(config.x, config.y, charactorConfig.sprite);
+            this.charactorConfig = charactorConfig;
+            this.life = config.life;
+        }
+        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const configPaths = yield ajax(Monster.configFilePath, "json").then((x) => x.response);
+                const rootDirectory = getDirectory(Monster.configFilePath);
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+                Monster.monsterConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
+                return;
+            });
+        }
+    }
+    Monster.configFilePath = "./assets/monster/monster.json";
+    Monster.monsterConfigs = new Map();
+    Charactor.Monster = Monster;
+})(Charactor || (Charactor = {}));
+var Scene;
+(function (Scene) {
+    function* boot() {
+        let n = 0;
+        let reqResource = 0;
+        let loadedResource = 0;
+        this.draw = () => {
+            Game.getScreen().fillStyle = "rgb(255,255,255)";
+            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().save();
+            Game.getScreen().translate(Game.getScreen().offscreenWidth / 2, Game.getScreen().offscreenHeight / 2);
+            Game.getScreen().rotate(n * Math.PI / 4);
+            for (let i = 0; i < 8; i++) {
+                const g = (i * 32);
+                Game.getScreen().save();
+                Game.getScreen().rotate(i * Math.PI / 4);
+                Game.getScreen().fillStyle = `rgb(${g},${g},${g})`;
+                Game.getScreen().fillRect(-5, -50, 10, 25);
+                Game.getScreen().restore();
+            }
+            Game.getScreen().restore();
+            Game.getScreen().fillStyle = "rgb(0,0,0)";
+            const text = `loading ${loadedResource}/${reqResource}`;
+            const size = Game.getScreen().measureText(text);
+            Game.getScreen().fillText(text, Game.getScreen().offscreenWidth / 2 - size.width / 2, Game.getScreen().offscreenHeight - 20);
+        };
+        Promise.all([
+            Game.getScreen().loadImage({
+                title: "./assets/title.png",
+                mapchip: "./assets/mapchip.png",
+                charactor: "./assets/charactor.png",
+                font7px: "./assets/font7px.png",
+            }, () => { reqResource++; }, () => { loadedResource++; }),
+            Game.getSound().loadSoundsToChannel({
+                title: "./assets/sound/title.mp3",
+                dungeon: "./assets/sound/dungeon.mp3",
+                classroom: "./assets/sound/classroom.mp3",
+                kaidan: "./assets/sound/kaidan.mp3",
+                atack: "./assets/sound/se_attacksword_1.mp3",
+                explosion: "./assets/sound/explosion03.mp3",
+            }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
+            Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; })
+        ]).then(() => {
+            Game.getSceneManager().push(Scene.title, null);
+            this.next();
+        });
+        yield (delta, ms) => {
+            n = ~(ms / 50);
+        };
+    }
+    Scene.boot = boot;
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    function* classroom() {
+        let selectedCharactor = -1;
+        let selectedCharactorDir = 0;
+        let selectedCharactorOffY = 0;
+        const fade = new Scene.Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
+        this.draw = () => {
+            const w = Game.getScreen().offscreenWidth;
+            const h = Game.getScreen().offscreenHeight;
+            Game.getScreen().save();
+            Game.getScreen().fillStyle = "rgb(255,255,255)";
+            Game.getScreen().fillRect(0, 0, w, h);
+            for (let y = 0; y < ~~((w + 23) / 24); y++) {
+                for (let x = 0; x < ~~((w + 23) / 24); x++) {
+                    Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 0, 24, 24, x * 24, y * 24, 24, 24);
                 }
-                else if (this.animDir === 2) {
-                    this.animDir = 2;
+            }
+            for (let y = 0; y < 2; y++) {
+                for (let x = 0; x < ~~((w + 23) / 24); x++) {
+                    Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 120, 96, 24, 24, x * 24, y * 24 - 23, 24, 24);
                 }
-                else if (this.animDir === 8) {
-                    this.animDir = 2;
+            }
+            Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 204, 72, 36, 90, -12, 72, 36);
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 6; x++) {
+                    const id = y * 6 + x;
+                    Game.getScreen().drawImage(Game.getScreen().texture("charactor"), 752 * (id % 2) +
+                        ((selectedCharactor !== id) ? 0 : (188 * (selectedCharactorDir % 4))), 47 * ~~(id / 2), 47, 47, 12 + x * 36, 24 + y * (48 - 7) - ((selectedCharactor !== id) ? 0 : (selectedCharactorOffY)), 47, 47);
+                    Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 72, 180, 24, 24, 24 + x * 36, 48 + y * (48 - 7), 24, 24);
                 }
-                else if (this.animDir === 6) {
-                    this.animDir = 4;
+            }
+            fade.draw();
+            Game.getScreen().restore();
+        };
+        {
+            Game.getSound().reqPlayChannel("classroom", true);
+            yield Scene.waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeIn(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
+        }
+        yield Scene.waitClick({
+            check: (x, y) => {
+                const xx = ~~((x - 12) / 36);
+                const yy = ~~((y - 24) / (48 - 7));
+                return (0 <= xx && xx < 6 && 0 <= yy && yy < 5);
+            },
+            end: (x, y) => {
+                Game.getSound().reqPlayChannel("title");
+                const xx = ~~((x - 12) / 36);
+                const yy = ~~((y - 24) / (48 - 7));
+                selectedCharactor = yy * 6 + xx;
+                this.next();
+            },
+        });
+        yield Scene.waitTimeout({
+            timeout: 1800,
+            init: () => {
+                selectedCharactorDir = 0;
+                selectedCharactorOffY = 0;
+            },
+            update: (e) => {
+                if (0 <= e && e < 1600) {
+                    selectedCharactorDir = ~~(e / 100);
+                    selectedCharactorOffY = 0;
+                }
+                else if (1600 <= e && e < 1800) {
+                    selectedCharactorDir = 0;
+                    selectedCharactorOffY = Math.sin((e - 1600) * Math.PI / 200) * 20;
+                }
+            },
+            end: () => { this.next(); },
+        });
+        yield Scene.waitTimeout({
+            timeout: 500,
+            init: () => { fade.startFadeOut(); },
+            update: (e) => { fade.update(e); },
+            end: () => { this.next(); },
+        });
+        const player = new Charactor.Player({
+            charactorId: Charactor.Player.playerConfigs.get("_u" + ("0" + (selectedCharactor + 1)).substr(-2)).id,
+            x: 0,
+            y: 0,
+        });
+        Game.getSound().reqStopChannel("classroom");
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(Scene.dungeon, { player: player, floor: 1 });
+    }
+    Scene.classroom = classroom;
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    let TurnState;
+    (function (TurnState) {
+        TurnState[TurnState["WaitInput"] = 0] = "WaitInput";
+        TurnState[TurnState["PlayerAction"] = 1] = "PlayerAction";
+        TurnState[TurnState["PlayerActionRunning"] = 2] = "PlayerActionRunning";
+        TurnState[TurnState["EnemyAI"] = 3] = "EnemyAI";
+        TurnState[TurnState["EnemyAction"] = 4] = "EnemyAction";
+        TurnState[TurnState["EnemyActionRunning"] = 5] = "EnemyActionRunning";
+        TurnState[TurnState["EnemyDead"] = 6] = "EnemyDead";
+        TurnState[TurnState["EnemyDeadRunning"] = 7] = "EnemyDeadRunning";
+        TurnState[TurnState["Move"] = 8] = "Move";
+        TurnState[TurnState["MoveRunning"] = 9] = "MoveRunning";
+        TurnState[TurnState["TurnEnd"] = 10] = "TurnEnd";
+    })(TurnState || (TurnState = {}));
+    function* dungeon(param) {
+        const player = param.player;
+        const floor = param.floor;
+        const mapChipW = 30 + floor * 3;
+        const mapChipH = 30 + floor * 3;
+        const mapchipsL1 = new Array2D(mapChipW, mapChipH);
+        const layout = Dungeon.generate(mapChipW, mapChipH, (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
+        for (let y = 1; y < mapChipH; y++) {
+            for (let x = 0; x < mapChipW; x++) {
+                mapchipsL1.value(x, y - 1, mapchipsL1.value(x, y) === 1 && mapchipsL1.value(x, y - 1) === 0
+                    ? 2
+                    : mapchipsL1.value(x, y - 1));
+            }
+        }
+        const mapchipsL2 = new Array2D(mapChipW, mapChipH);
+        for (let y = 0; y < mapChipH; y++) {
+            for (let x = 0; x < mapChipW; x++) {
+                mapchipsL2.value(x, y, (mapchipsL1.value(x, y) === 0) ? 0 : 1);
+            }
+        }
+        const rooms = layout.rooms.slice();
+        const startPos = rooms[0].getCenter();
+        player.x = startPos.x;
+        player.y = startPos.y;
+        const stairsPos = rooms[1].getCenter();
+        mapchipsL1.value(stairsPos.x, stairsPos.y, 10);
+        let monsters = rooms.splice(2).map((x) => {
+            return new Charactor.Monster({
+                charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
+                x: x.getLeft(),
+                y: x.getTop(),
+                life: 10
+            });
+        });
+        const map = new Dungeon.DungeonData({
+            width: mapChipW,
+            height: mapChipW,
+            gridsize: { width: 24, height: 24 },
+            layer: {
+                0: {
+                    texture: "mapchip",
+                    chip: {
+                        1: { x: 48, y: 0 },
+                        2: { x: 96, y: 96 },
+                        10: { x: 96, y: 0 },
+                    },
+                    chips: mapchipsL1,
+                },
+                1: {
+                    texture: "mapchip",
+                    chip: {
+                        0: { x: 96, y: 72 },
+                    },
+                    chips: mapchipsL2,
+                },
+            },
+        });
+        map.update({
+            viewpoint: {
+                x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+            },
+            viewwidth: Game.getScreen().offscreenWidth,
+            viewheight: Game.getScreen().offscreenHeight,
+        });
+        Game.getSound().reqPlayChannel("dungeon", true);
+        const pad = new Game.Input.VirtualStick();
+        const pointerdown = (ev) => {
+            if (pad.onpointingstart(ev.pointerId)) {
+                const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+                pad.x = pos[0];
+                pad.y = pos[1];
+            }
+        };
+        const pointermove = (ev) => {
+            const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+            pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
+        };
+        const pointerup = (ev) => {
+            pad.onpointingend(ev.pointerId);
+        };
+        const onPointerHook = () => {
+            Game.getInput().on("pointerdown", pointerdown);
+            Game.getInput().on("pointermove", pointermove);
+            Game.getInput().on("pointerup", pointerup);
+            Game.getInput().on("pointerleave", pointerup);
+        };
+        const offPointerHook = () => {
+            Game.getInput().off("pointerdown", pointerdown);
+            Game.getInput().off("pointermove", pointermove);
+            Game.getInput().off("pointerup", pointerup);
+            Game.getInput().off("pointerleave", pointerup);
+        };
+        this.suspend = () => {
+            offPointerHook();
+            Game.getSound().reqStopChannel("dungeon");
+        };
+        this.resume = () => {
+            onPointerHook();
+            Game.getSound().reqPlayChannel("dungeon", true);
+        };
+        this.leave = () => {
+            offPointerHook();
+            Game.getSound().reqStopChannel("dungeon");
+        };
+        const updateLighting = (iswalkable) => {
+            map.clearLighting();
+            PathFinder.calcDistanceByDijkstra({
+                array2D: map.layer[0].chips,
+                sx: player.x,
+                sy: player.y,
+                value: 140,
+                costs: (v) => iswalkable(v) ? 20 : 50,
+                output: (x, y, v) => {
+                    map.lighting.value(x, y, v);
+                    if (map.visibled.value(x, y) < v) {
+                        map.visibled.value(x, y, v);
+                    }
+                },
+            });
+        };
+        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        let sprites = [];
+        this.draw = () => {
+            Game.getScreen().save();
+            Game.getScreen().fillStyle = "rgb(255,255,255)";
+            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            map.draw((l, cameraLocalPx, cameraLocalPy) => {
+                if (l === 0) {
+                    Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
+                    Game.getScreen().beginPath();
+                    Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
+                    Game.getScreen().fill();
+                    const camera = map.camera;
+                    monsters.forEach((monster) => {
+                        const xx = monster.x - camera.chipLeft;
+                        const yy = monster.y - camera.chipTop;
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) && (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                            const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
+                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
+                            Game.getScreen().drawImage(monster.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, dx, dy, sprite.width, sprite.height);
+                        }
+                    });
+                    {
+                        const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                        const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+                        Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY, sprite.width, sprite.height);
+                    }
+                }
+            });
+            sprites.forEach((x) => x.draw(map.camera));
+            fade.draw();
+            Game.getScreen().restore();
+            if (pad.isTouching) {
+                Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
+                Game.getScreen().beginPath();
+                Game.getScreen().ellipse(pad.x, pad.y, pad.radius * 1.2, pad.radius * 1.2, 0, 0, Math.PI * 2);
+                Game.getScreen().fill();
+                Game.getScreen().beginPath();
+                Game.getScreen().ellipse(pad.x + pad.cx, pad.y + pad.cy, pad.radius, pad.radius, 0, 0, Math.PI * 2);
+                Game.getScreen().fill();
+            }
+        };
+        yield Scene.waitTimeout({
+            timeout: 500,
+            init: () => { fade.startFadeIn(); },
+            update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
+            end: () => { this.next(); },
+        });
+        onPointerHook();
+        const turnStateStack = [[TurnState.WaitInput, null]];
+        let playerTactics = {};
+        const monstersTactics = [];
+        yield (delta, ms) => {
+            stateloop: for (;;) {
+                switch (turnStateStack[0][0]) {
+                    case TurnState.WaitInput:
+                        {
+                            if (pad.isTouching === false || pad.distance <= 0.4) {
+                                player.setAnimation("move", 0);
+                                break stateloop;
+                            }
+                            const playerMoveDir = pad.dir8;
+                            const { x, y } = Array2D.DIR8[playerMoveDir];
+                            if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 && map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
+                                player.setDir(playerMoveDir);
+                                break stateloop;
+                            }
+                            const targetMonster = monsters.findIndex((monster) => (monster.x === player.x + x) &&
+                                (monster.y === player.y + y));
+                            if (targetMonster !== -1) {
+                                playerTactics = {
+                                    type: "action",
+                                    moveDir: playerMoveDir,
+                                    targetMonster: targetMonster,
+                                    startTime: ms,
+                                    actionTime: 250,
+                                };
+                                turnStateStack.unshift([TurnState.PlayerAction, null], [TurnState.EnemyAI, null], [TurnState.EnemyAction, 0], [TurnState.Move, null], [TurnState.TurnEnd, null]);
+                                continue stateloop;
+                            }
+                            else {
+                                playerTactics = {
+                                    type: "move",
+                                    moveDir: playerMoveDir,
+                                    startTime: ms,
+                                    actionTime: 250,
+                                };
+                                turnStateStack.unshift([TurnState.EnemyAI, null], [TurnState.Move, null], [TurnState.EnemyAction, 0], [TurnState.TurnEnd, null]);
+                                continue stateloop;
+                            }
+                        }
+                    case TurnState.PlayerAction: {
+                        turnStateStack[0][0] = TurnState.PlayerActionRunning;
+                        turnStateStack[0][1] = 0;
+                        player.setDir(playerTactics.moveDir);
+                        player.setAnimation("action", 0);
+                    }
+                    case TurnState.PlayerActionRunning: {
+                        const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                        player.setAnimation("action", rate);
+                        if (rate > 0.5 && turnStateStack[0][1] === 0) {
+                            const targetMonster = monsters[playerTactics.targetMonster];
+                            turnStateStack[0][1] = 1;
+                            Game.getSound().reqPlayChannel("atack");
+                            sprites.push(createShowDamageSprite(ms, 5, () => {
+                                return {
+                                    x: targetMonster.offx + targetMonster.x * map.gridsize.width + map.gridsize.width / 2,
+                                    y: targetMonster.offy + targetMonster.y * map.gridsize.height + map.gridsize.height / 2
+                                };
+                            }));
+                            if (targetMonster.life > 0) {
+                                targetMonster.life -= 5;
+                                if (targetMonster.life <= 0) {
+                                    targetMonster.life = 0;
+                                    Game.getSound().reqPlayChannel("explosion");
+                                    turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
+                                }
+                            }
+                        }
+                        if (rate >= 1) {
+                            turnStateStack.shift();
+                            player.setAnimation("move", 0);
+                        }
+                        break stateloop;
+                    }
+                    case TurnState.EnemyAI: {
+                        let px = player.x;
+                        let py = player.y;
+                        if (playerTactics.type === "move") {
+                            const off = Array2D.DIR8[playerTactics.moveDir];
+                            px += off.x;
+                            py += off.y;
+                        }
+                        const cannotMoveMap = new Array2D(map.width, map.height, 0);
+                        monstersTactics.length = monsters.length;
+                        monstersTactics.fill(null);
+                        monsters.forEach((monster, i) => {
+                            if (monster.life <= 0) {
+                                monstersTactics[i] = {
+                                    type: "dead",
+                                    moveDir: 5,
+                                    startTime: 0,
+                                    actionTime: 250,
+                                };
+                                return;
+                            }
+                            const dx = px - monster.x;
+                            const dy = py - monster.y;
+                            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                                const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
+                                cannotMoveMap.value(monster.x, monster.y, 1);
+                                monstersTactics[i] = {
+                                    type: "action",
+                                    moveDir: dir,
+                                    startTime: 0,
+                                    actionTime: 250,
+                                };
+                                return;
+                            }
+                            else {
+                                return;
+                            }
+                        });
+                        let changed = true;
+                        while (changed) {
+                            changed = false;
+                            monsters.forEach((monster, i) => {
+                                const dx = px - monster.x;
+                                const dy = py - monster.y;
+                                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                                    if (monstersTactics[i] == null) {
+                                        console.error("Action���ׂ��G�̓��삪���肵�Ă��Ȃ�");
+                                    }
+                                    return;
+                                }
+                                else if (monstersTactics[i] == null) {
+                                    const cands = [
+                                        [Math.sign(dx), Math.sign(dy)],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
+                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
+                                    ];
+                                    for (let j = 0; j < 3; j++) {
+                                        const [cx, cy] = cands[j];
+                                        const tx = monster.x + cx;
+                                        const ty = monster.y + cy;
+                                        if ((cannotMoveMap.value(tx, ty) === 0) &&
+                                            (map.layer[0].chips.value(tx, ty) === 1 ||
+                                                map.layer[0].chips.value(tx, ty) === 10)) {
+                                            const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
+                                            cannotMoveMap.value(tx, ty, 1);
+                                            monstersTactics[i] = {
+                                                type: "move",
+                                                moveDir: dir,
+                                                startTime: ms,
+                                                actionTime: 250,
+                                            };
+                                            changed = true;
+                                            return;
+                                        }
+                                    }
+                                    cannotMoveMap.value(monster.x, monster.y, 1);
+                                    monstersTactics[i] = {
+                                        type: "idle",
+                                        moveDir: 5,
+                                        startTime: ms,
+                                        actionTime: 250,
+                                    };
+                                    changed = true;
+                                    return;
+                                }
+                            });
+                        }
+                        turnStateStack.shift();
+                        continue stateloop;
+                    }
+                    case TurnState.EnemyAction: {
+                        let enemyId = turnStateStack[0][1];
+                        while (enemyId < monstersTactics.length) {
+                            if (monstersTactics[enemyId].type !== "action") {
+                                enemyId++;
+                            }
+                            else {
+                                break;
+                            }
+                        }
+                        if (enemyId < monstersTactics.length) {
+                            monstersTactics[enemyId].startTime = ms;
+                            monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
+                            monsters[enemyId].setAnimation("action", 0);
+                            turnStateStack[0][0] = TurnState.EnemyActionRunning;
+                            turnStateStack[0][1] = enemyId;
+                            turnStateStack[0][2] = 0;
+                            continue stateloop;
+                        }
+                        else {
+                            turnStateStack.shift();
+                            continue stateloop;
+                        }
+                    }
+                    case TurnState.EnemyActionRunning: {
+                        const enemyId = turnStateStack[0][1];
+                        const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
+                        monsters[enemyId].setAnimation("action", rate);
+                        if (rate > 0.5 && turnStateStack[0][2] === 0) {
+                            turnStateStack[0][2] = 1;
+                            Game.getSound().reqPlayChannel("atack");
+                            sprites.push(createShowDamageSprite(ms, ~~(Math.random() * 10 + 5), () => {
+                                return {
+                                    x: player.offx + player.x * map.gridsize.width + map.gridsize.width / 2,
+                                    y: player.offy + player.y * map.gridsize.height + map.gridsize.height / 2
+                                };
+                            }));
+                        }
+                        if (rate >= 1) {
+                            monsters[enemyId].setAnimation("move", 0);
+                            turnStateStack[0][0] = TurnState.EnemyAction;
+                            turnStateStack[0][1] = enemyId + 1;
+                        }
+                        break stateloop;
+                    }
+                    case TurnState.EnemyDead:
+                        {
+                            turnStateStack[0][0] = TurnState.EnemyDeadRunning;
+                            const enemyId = turnStateStack[0][1];
+                            turnStateStack[0][2] = ms;
+                            Game.getSound().reqPlayChannel("explosion");
+                            monsters[enemyId].setAnimation("dead", 0);
+                        }
+                    case TurnState.EnemyDeadRunning:
+                        {
+                            turnStateStack[0][0] = TurnState.EnemyDeadRunning;
+                            const enemyId = turnStateStack[0][1];
+                            const diff = ms - turnStateStack[0][2];
+                            monsters[enemyId].setAnimation("dead", diff / 250);
+                            if (diff >= 250) {
+                                turnStateStack.shift();
+                            }
+                            break stateloop;
+                        }
+                    case TurnState.Move: {
+                        turnStateStack[0][0] = TurnState.MoveRunning;
+                        monstersTactics.forEach((monsterTactic, i) => {
+                            if (monsterTactic.type === "move") {
+                                monsters[i].setDir(monsterTactic.moveDir);
+                                monsters[i].setAnimation("move", 0);
+                                monstersTactics[i].startTime = ms;
+                            }
+                        });
+                        if (playerTactics.type === "move") {
+                            player.setDir(playerTactics.moveDir);
+                            player.setAnimation("move", 0);
+                            playerTactics.startTime = ms;
+                        }
+                    }
+                    case TurnState.MoveRunning: {
+                        let finish = true;
+                        monstersTactics.forEach((monsterTactic, i) => {
+                            if (monsterTactic == null) {
+                                return;
+                            }
+                            if (monsterTactic.type === "move") {
+                                const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
+                                monsters[i].setDir(monsterTactic.moveDir);
+                                monsters[i].setAnimation("move", rate);
+                                if (rate < 1) {
+                                    finish = false;
+                                }
+                            }
+                        });
+                        if (playerTactics.type === "move") {
+                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                            player.setDir(playerTactics.moveDir);
+                            player.setAnimation("move", rate);
+                            if (rate < 1) {
+                                finish = false;
+                            }
+                        }
+                        if (finish) {
+                            turnStateStack.shift();
+                            monstersTactics.forEach((monsterTactic, i) => {
+                                if (monsterTactic.type === "move") {
+                                    monsters[i].x += Array2D.DIR8[monsterTactic.moveDir].x;
+                                    monsters[i].y += Array2D.DIR8[monsterTactic.moveDir].y;
+                                    monsters[i].offx = 0;
+                                    monsters[i].offy = 0;
+                                    monsters[i].setAnimation("move", 0);
+                                }
+                            });
+                            if (playerTactics.type === "move") {
+                                player.x += Array2D.DIR8[playerTactics.moveDir].x;
+                                player.y += Array2D.DIR8[playerTactics.moveDir].y;
+                                player.offx = 0;
+                                player.offy = 0;
+                                player.setAnimation("move", 0);
+                            }
+                            const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
+                            if (chip === 10) {
+                                this.next("nextfloor");
+                            }
+                        }
+                        break stateloop;
+                    }
+                    case TurnState.TurnEnd: {
+                        turnStateStack.shift();
+                        monsters = monsters.filter(x => x.life > 0);
+                        break stateloop;
+                    }
                 }
                 break;
             }
-            case 3: {
-                if (this.animDir === 4) {
-                    this.animDir = 6;
-                }
-                else if (this.animDir === 2) {
-                    this.animDir = 2;
-                }
-                else if (this.animDir === 8) {
-                    this.animDir = 2;
-                }
-                else if (this.animDir === 6) {
-                    this.animDir = 2;
-                }
-                break;
+            map.update({
+                viewpoint: {
+                    x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                    y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                },
+                viewwidth: Game.getScreen().offscreenWidth,
+                viewheight: Game.getScreen().offscreenHeight,
+            });
+            sprites = sprites.filter((x) => {
+                return !x.update(delta, ms);
+            });
+            updateLighting((v) => v === 1 || v === 10);
+            if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+                Game.getSceneManager().push(Scene.mapview, { map: map, player: player });
             }
-            case 9: {
-                if (this.animDir === 4) {
-                    this.animDir = 6;
-                }
-                else if (this.animDir === 2) {
-                    this.animDir = 8;
-                }
-                else if (this.animDir === 8) {
-                    this.animDir = 8;
-                }
-                else if (this.animDir === 6) {
-                    this.animDir = 6;
-                }
-                break;
-            }
-            case 7: {
-                if (this.animDir === 4) {
-                    this.animDir = 4;
-                }
-                else if (this.animDir === 2) {
-                    this.animDir = 8;
-                }
-                else if (this.animDir === 8) {
-                    this.animDir = 8;
-                }
-                else if (this.animDir === 6) {
-                    this.animDir = 4;
-                }
-                break;
-            }
-            case 5: {
-                break;
-            }
-            default: {
-                this.animDir = dir;
-                break;
-            }
-        }
+        };
+        Game.getSound().reqPlayChannel("kaidan");
+        yield Scene.waitTimeout({
+            timeout: 500,
+            init: () => { fade.startFadeOut(); },
+            update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
+            end: () => { this.next(); },
+        });
+        yield Scene.waitTimeout({
+            timeout: 500,
+            end: () => { this.next(); },
+        });
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(dungeon, { player, floor: floor + 1 });
     }
-    setAnimation(type, rate) {
-        if (rate > 1) {
-            rate = 1;
+    Scene.dungeon = dungeon;
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    class Fade {
+        constructor(w, h) {
+            this.startTime = -1;
+            this.started = false;
+            this.w = w;
+            this.h = h;
+            this.mode = "";
         }
-        if (rate < 0) {
-            rate = 0;
-        }
-        if (type === "move") {
-            this.offx = ~~(Array2D.DIR8[this.dir][0] * 24 * rate);
-            this.offy = ~~(Array2D.DIR8[this.dir][1] * 24 * rate);
-        }
-        else if (type === "action") {
-            this.offx = ~~(Array2D.DIR8[this.dir][0] * 12 * Math.sin(rate * Math.PI));
-            this.offy = ~~(Array2D.DIR8[this.dir][1] * 12 * Math.sin(rate * Math.PI));
-        }
-        this.animFrame = ~~(rate * this.sprite[this.animDir].length) % this.sprite[this.animDir].length;
-    }
-}
-class Player extends Animator {
-    constructor(config) {
-        if (!Game.pmode) {
-            super([], 47, 47);
-        }
-        else {
-            super([], 24, 24);
-        }
-        this.charactor = config.charactor;
-        this.x = config.x;
-        this.y = config.y;
-        this.changeCharactor(this.charactor);
-    }
-    changeCharactor(charactor) {
-        this.charactor = charactor;
-        if (!Game.pmode) {
-            const psbasex = (this.charactor % 2) * 752;
-            const psbasey = ~~(this.charactor / 2) * 47;
-            this.sprite[2] = [[0, 0], [1, 0], [2, 0], [3, 0]].map(xy => [
-                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
-            ]);
-            this.sprite[4] = [[4, 0], [5, 0], [6, 0], [7, 0]].map(xy => [
-                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
-            ]);
-            this.sprite[8] = [[8, 0], [9, 0], [10, 0], [11, 0]].map(xy => [
-                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
-            ]);
-            this.sprite[6] = [[12, 0], [13, 0], [14, 0], [15, 0]].map(xy => [
-                psbasex + this.spriteWidth * xy[0], psbasey + this.spriteHeight * xy[1]
-            ]);
-        }
-        else {
-            const animdir = [4, 8, 6, 2];
-            const sprites = [];
-            for (let i = 0; i < 4; i++) {
-                const spr = [];
-                for (let j = 0; j < 4; j++) {
-                    spr[j] = [j * 24, i * 24];
-                }
-                sprites[animdir[i]] = spr;
-            }
-            this.sprite = sprites;
-        }
-    }
-}
-class Monster extends Animator {
-    constructor(config) {
-        super(config._sprite, config._sprite_width, config._sprite_height);
-        this.x = config.x;
-        this.y = config.y;
-    }
-}
-class Fade {
-    constructor(w, h) {
-        this.startTime = -1;
-        this.started = false;
-        this.w = w;
-        this.h = h;
-        this.mode = "";
-    }
-    startFadeOut() {
-        this.started = true;
-        this.startTime = -1;
-        this.rate = 0;
-        this.mode = "fadeout";
-    }
-    startFadeIn() {
-        this.started = true;
-        this.startTime = -1;
-        this.rate = 1;
-        this.mode = "fadein";
-    }
-    stop() {
-        this.started = false;
-        this.startTime = -1;
-    }
-    update(ms) {
-        if (this.started === false) {
-            return;
-        }
-        if (this.startTime === -1) {
-            this.startTime = ms;
-        }
-        this.rate = (ms - this.startTime) / 500;
-        if (this.rate < 0) {
+        startFadeOut() {
+            this.started = true;
+            this.startTime = -1;
             this.rate = 0;
+            this.mode = "fadeout";
         }
-        else if (this.rate > 1) {
+        startFadeIn() {
+            this.started = true;
+            this.startTime = -1;
             this.rate = 1;
+            this.mode = "fadein";
         }
-        if (this.mode === "fadein") {
-            this.rate = 1 - this.rate;
+        stop() {
+            this.started = false;
+            this.startTime = -1;
+        }
+        update(ms) {
+            if (this.started === false) {
+                return;
+            }
+            if (this.startTime === -1) {
+                this.startTime = ms;
+            }
+            this.rate = (ms - this.startTime) / 500;
+            if (this.rate < 0) {
+                this.rate = 0;
+            }
+            else if (this.rate > 1) {
+                this.rate = 1;
+            }
+            if (this.mode === "fadein") {
+                this.rate = 1 - this.rate;
+            }
+        }
+        draw() {
+            if (this.started) {
+                Game.getScreen().fillStyle = `rgba(0,0,0,${this.rate})`;
+                Game.getScreen().fillRect(0, 0, this.w, this.h);
+            }
         }
     }
-    draw() {
-        if (this.started) {
-            Game.getScreen().fillStyle = `rgba(0,0,0,${this.rate})`;
-            Game.getScreen().fillRect(0, 0, this.w, this.h);
-        }
-    }
-}
-window.onload = () => {
-    function waitTimeout({ timeout, init = () => { }, start = () => { }, update = () => { }, end = () => { } }) {
+    Scene.Fade = Fade;
+    function waitTimeout({ timeout, init = () => { }, start = () => { }, update = () => { }, end = () => { }, }) {
         let startTime = -1;
         init();
         return (delta, ms) => {
@@ -2156,7 +3084,8 @@ window.onload = () => {
             }
         };
     }
-    function waitClick({ update = () => { }, start = () => { }, check = () => true, end = () => { } }) {
+    Scene.waitTimeout = waitTimeout;
+    function waitClick({ update = () => { }, start = () => { }, check = () => true, end = () => { }, }) {
         let startTime = -1;
         return (delta, ms) => {
             if (startTime === -1) {
@@ -2180,701 +3109,146 @@ window.onload = () => {
             update(elapsed, ms);
         };
     }
+    Scene.waitClick = waitClick;
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    function* mapview(data) {
+        this.draw = () => {
+            Game.getScreen().save();
+            Game.getScreen().fillStyle = "rgb(0,0,0)";
+            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            const offx = ~~((Game.getScreen().offscreenWidth - data.map.width * 5) / 2);
+            const offy = ~~((Game.getScreen().offscreenHeight - data.map.height * 5) / 2);
+            for (let y = 0; y < data.map.height; y++) {
+                for (let x = 0; x < data.map.width; x++) {
+                    const chip = data.map.layer[0].chips.value(x, y);
+                    let color = "rgb(52,12,0)";
+                    switch (chip) {
+                        case 1:
+                            color = "rgb(179,116,39)";
+                            break;
+                        case 10:
+                            color = "rgb(255,0,0)";
+                            break;
+                    }
+                    Game.getScreen().fillStyle = color;
+                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
+                    let light = 1 - data.map.visibled.value(x, y) / 100;
+                    if (light > 1) {
+                        light = 1;
+                    }
+                    else if (light < 0) {
+                        light = 0;
+                    }
+                    Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
+                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
+                }
+            }
+            Game.getScreen().fillStyle = "rgb(0,255,0)";
+            Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
+            Game.getScreen().restore();
+        };
+        yield Scene.waitClick({ end: () => this.next() });
+        Game.getSceneManager().pop();
+    }
+    Scene.mapview = mapview;
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    function* title() {
+        let showClickOrTap = false;
+        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        this.draw = () => {
+            const w = Game.getScreen().offscreenWidth;
+            const h = Game.getScreen().offscreenHeight;
+            Game.getScreen().save();
+            Game.getScreen().fillStyle = "rgb(255,255,255)";
+            Game.getScreen().fillRect(0, 0, w, h);
+            Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 0, 192, 72, w / 2 - 192 / 2, 50, 192, 72);
+            if (showClickOrTap) {
+                Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 72, 168, 24, w / 2 - 168 / 2, h - 50, 168, 24);
+            }
+            fade.draw();
+            Game.getScreen().restore();
+        };
+        yield Scene.waitClick({
+            update: (e, ms) => { showClickOrTap = (~~(ms / 500) % 2) === 0; },
+            check: () => true,
+            end: () => {
+                Game.getSound().reqPlayChannel("title");
+                this.next();
+            },
+        });
+        yield Scene.waitTimeout({
+            timeout: 1000,
+            update: (e, ms) => { showClickOrTap = (~~(ms / 50) % 2) === 0; },
+            end: () => this.next(),
+        });
+        yield Scene.waitTimeout({
+            timeout: 500,
+            init: () => { fade.startFadeOut(); },
+            update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
+            end: () => {
+                Game.getSceneManager().push(Scene.classroom, null);
+                this.next();
+            },
+        });
+    }
+    Scene.title = title;
+})(Scene || (Scene = {}));
+function createShowDamageSprite(start, dmg, getpos) {
+    const damage = "" + ~~dmg;
+    let elapse = 0;
+    const fontWidth = 5;
+    const fontHeight = 7;
+    return {
+        update: (delta, ms) => {
+            elapse = ms - start;
+            return (elapse > 500);
+        },
+        draw: (camera) => {
+            const { x: sx, y: sy } = getpos();
+            const xx = sx - camera.left;
+            const yy = sy - camera.top;
+            const len = damage.length;
+            const offx = -(len) * (fontWidth - 1) / 2;
+            const offy = 0;
+            for (let i = 0; i < damage.length; i++) {
+                const rad = Math.min(elapse - i * 20, 200);
+                if (rad < 0) {
+                    continue;
+                }
+                const dy = Math.sin(rad * Math.PI / 200) * -7;
+                if (0 <= xx + (i + 1) * fontWidth && xx + (i + 0) * fontWidth < Game.getScreen().offscreenWidth &&
+                    0 <= yy + (1 * fontHeight) && yy + (0 * fontHeight) < Game.getScreen().offscreenHeight) {
+                    Game.getScreen().drawImage(Game.getScreen().texture("font7px"), ~~damage[i] * fontWidth, 0, fontWidth, fontHeight, (xx + (i + 0) * (fontWidth - 1)) + offx, (yy + (0) * fontHeight) + offy + dy, fontWidth, fontHeight);
+                }
+            }
+        },
+    };
+}
+window.onload = () => {
     Game.create({
         title: "TSJQ",
-        screen: {
+        video: {
             id: "glcanvas",
-        },
-        scene: {
-            title: function* (data) {
-                // setup
-                let showClickOrTap = false;
-                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
-                this.draw = () => {
-                    const w = Game.getScreen().width;
-                    const h = Game.getScreen().height;
-                    Game.getScreen().save();
-                    Game.getScreen().clearRect(0, 0, w, h);
-                    Game.getScreen().fillStyle = "rgb(255,255,255)";
-                    Game.getScreen().fillRect(0, 0, w, h);
-                    Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 0, 192, 72, w / 2 - 192 / 2, 50, 192, 72);
-                    if (showClickOrTap) {
-                        Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 72, 168, 24, w / 2 - 168 / 2, h - 50, 168, 24);
-                    }
-                    fade.draw();
-                    Game.getScreen().restore();
-                };
-                yield waitClick({
-                    update: (e, ms) => { showClickOrTap = (~~(ms / 500) % 2) === 0; },
-                    check: () => true,
-                    end: () => {
-                        Game.getSound().reqPlayChannel(0);
-                        this.next();
-                    }
-                });
-                yield waitTimeout({
-                    timeout: 1000,
-                    update: (e, ms) => { showClickOrTap = (~~(ms / 50) % 2) === 0; },
-                    end: () => this.next()
-                });
-                yield waitTimeout({
-                    timeout: 500,
-                    init: () => { fade.startFadeOut(); },
-                    update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
-                    end: () => {
-                        Game.getSceneManager().push("classroom");
-                        this.next();
-                    }
-                });
-            },
-            classroom: function* () {
-                let selectedCharactor = -1;
-                let selectedCharactorDir = 0;
-                let selectedCharactorOffY = 0;
-                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
-                this.draw = () => {
-                    const w = Game.getScreen().width;
-                    const h = Game.getScreen().height;
-                    Game.getScreen().save();
-                    Game.getScreen().clearRect(0, 0, w, h);
-                    Game.getScreen().fillStyle = "rgb(255,255,255)";
-                    Game.getScreen().fillRect(0, 0, w, h);
-                    // 床
-                    for (let y = 0; y < ~~((w + 23) / 24); y++) {
-                        for (let x = 0; x < ~~((w + 23) / 24); x++) {
-                            Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 0, 24, 24, x * 24, y * 24, 24, 24);
-                        }
-                    }
-                    // 壁
-                    for (let y = 0; y < 2; y++) {
-                        for (let x = 0; x < ~~((w + 23) / 24); x++) {
-                            Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 120, 96, 24, 24, x * 24, y * 24 - 23, 24, 24);
-                        }
-                    }
-                    // 黒板
-                    Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 204, 72, 36, 90, -12, 72, 36);
-                    // 各キャラと机
-                    for (let y = 0; y < 5; y++) {
-                        for (let x = 0; x < 6; x++) {
-                            const id = y * 6 + x;
-                            Game.getScreen().drawImage(Game.getScreen().texture("charactor"), 752 * (id % 2) +
-                                ((selectedCharactor !== id) ? 0 : (188 * (selectedCharactorDir % 4))), 47 * ~~(id / 2), 47, 47, 12 + x * 36, 24 + y * (48 - 7) - ((selectedCharactor !== id) ? 0 : (selectedCharactorOffY)), 47, 47);
-                            Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 72, 180, 24, 24, 24 + x * 36, 48 + y * (48 - 7), 24, 24);
-                        }
-                    }
-                    fade.draw();
-                    Game.getScreen().restore();
-                };
-                {
-                    Game.getSound().reqPlayChannel(2, true);
-                    yield waitTimeout({
-                        timeout: 500,
-                        init: () => { fade.startFadeIn(); },
-                        update: (e) => { fade.update(e); },
-                        end: () => {
-                            fade.stop();
-                            this.next();
-                        }
-                    });
-                }
-                yield waitClick({
-                    check: (x, y) => {
-                        const xx = ~~((x - 12) / 36);
-                        const yy = ~~((y - 24) / (48 - 7));
-                        return (0 <= xx && xx < 6 && 0 <= yy && yy < 5);
-                    },
-                    end: (x, y) => {
-                        Game.getSound().reqPlayChannel(0);
-                        const xx = ~~((x - 12) / 36);
-                        const yy = ~~((y - 24) / (48 - 7));
-                        selectedCharactor = yy * 6 + xx;
-                        this.next();
-                    }
-                });
-                yield waitTimeout({
-                    timeout: 1800,
-                    init: () => {
-                        selectedCharactorDir = 0;
-                        selectedCharactorOffY = 0;
-                    },
-                    update: (e) => {
-                        if (0 <= e && e < 1600) {
-                            // くるくる
-                            selectedCharactorDir = ~~(e / 100);
-                            selectedCharactorOffY = 0;
-                        }
-                        else if (1600 <= e && e < 1800) {
-                            // ぴょん
-                            selectedCharactorDir = 0;
-                            selectedCharactorOffY = Math.sin((e - 1600) * Math.PI / 200) * 20;
-                        }
-                    },
-                    end: (e) => { this.next(); }
-                });
-                yield waitTimeout({
-                    timeout: 500,
-                    init: () => { fade.startFadeOut(); },
-                    update: (e) => { fade.update(e); },
-                    end: (e) => { this.next(); }
-                });
-                const player = new Player({
-                    charactor: selectedCharactor,
-                    x: 0,
-                    y: 0,
-                });
-                Game.getSound().reqStopChannel(2);
-                Game.getSceneManager().pop();
-                Game.getSceneManager().push("dungeon", { player: player, floor: 1 });
-            },
-            dungeon: function* ({ player = null, floor = 0 }) {
-                // マップサイズ算出
-                const mapChipW = 30 + floor * 3;
-                const mapChipH = 30 + floor * 3;
-                // マップ自動生成
-                const mapchipsL1 = new Array2D(mapChipW, mapChipH);
-                const dungeon = Dungeon.generate(mapChipW, mapChipH, (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
-                // 装飾
-                for (let y = 1; y < mapChipH; y++) {
-                    for (let x = 0; x < mapChipW; x++) {
-                        mapchipsL1.value(x, y - 1, mapchipsL1.value(x, y) === 1 && mapchipsL1.value(x, y - 1) === 0
-                            ? 2
-                            : mapchipsL1.value(x, y - 1));
-                    }
-                }
-                const mapchipsL2 = new Array2D(mapChipW, mapChipH);
-                for (let y = 0; y < mapChipH; y++) {
-                    for (let x = 0; x < mapChipW; x++) {
-                        mapchipsL2.value(x, y, (mapchipsL1.value(x, y) === 0) ? 0 : 1);
-                    }
-                }
-                // 部屋シャッフル
-                const rooms = dungeon.rooms.shuffle();
-                // 開始位置
-                const startPos = rooms[0].getCenter();
-                player.x = startPos[0];
-                player.y = startPos[1];
-                // 階段位置
-                const stairsPos = rooms[1].getCenter();
-                mapchipsL1.value(stairsPos[0], stairsPos[1], 10);
-                // モンスター配置
-                const monsters = rooms.splice(2).map(x => {
-                    const sprites = [];
-                    if (!Game.pmode) {
-                        const animdir = [2, 4, 8, 6];
-                        for (let i = 0; i < 4; i++) {
-                            const spr = [];
-                            for (let j = 0; j < 4; j++) {
-                                spr[j] = [((i + 1) * 4 + j) * 24, 0];
-                            }
-                            sprites[animdir[i]] = spr;
-                        }
-                        this._sprite = sprites;
-                    }
-                    else {
-                        const animdir = [4, 8, 6, 2];
-                        for (let i = 0; i < 4; i++) {
-                            const spr = [];
-                            for (let j = 0; j < 4; j++) {
-                                spr[j] = [j * 24, i * 24];
-                            }
-                            sprites[animdir[i]] = spr;
-                        }
-                        this._sprite = sprites;
-                    }
-                    return new Monster({
-                        _sprite: sprites,
-                        _sprite_width: 24,
-                        _sprite_height: 24,
-                        x: x.getLeft(),
-                        y: x.getTop(),
-                    });
-                });
-                const map = new Dungeon.DungeonData({
-                    width: mapChipW,
-                    height: mapChipW,
-                    gridsize: { width: 24, height: 24 },
-                    layer: {
-                        0: {
-                            texture: "mapchip",
-                            chip: {
-                                1: { x: 48, y: 0 },
-                                2: { x: 96, y: 96 },
-                                10: { x: 96, y: 0 },
-                            },
-                            chips: mapchipsL1
-                        },
-                        1: {
-                            texture: "mapchip",
-                            chip: {
-                                0: { x: 96, y: 72 },
-                            },
-                            chips: mapchipsL2
-                        },
-                    },
-                });
-                // カメラを更新
-                map.update({
-                    viewpoint: {
-                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
-                    },
-                    viewwidth: Game.getScreen().width,
-                    viewheight: Game.getScreen().height,
-                });
-                Game.getSound().reqPlayChannel(1, true);
-                // assign virtual pad
-                const pad = new Game.Input.VirtualStick();
-                const pointerdown = (ev) => {
-                    if (pad.onpointingstart(ev.pointerId)) {
-                        const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-                        pad.x = pos[0];
-                        pad.y = pos[1];
-                    }
-                };
-                const pointermove = (ev) => {
-                    const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-                    pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
-                };
-                const pointerup = (ev) => {
-                    pad.onpointingend(ev.pointerId);
-                };
-                const onPointerHook = () => {
-                    Game.getInput().on("pointerdown", pointerdown);
-                    Game.getInput().on("pointermove", pointermove);
-                    Game.getInput().on("pointerup", pointerup);
-                    Game.getInput().on("pointerleave", pointerup);
-                };
-                const offPointerHook = () => {
-                    Game.getInput().off("pointerdown", pointerdown);
-                    Game.getInput().off("pointermove", pointermove);
-                    Game.getInput().off("pointerup", pointerup);
-                    Game.getInput().off("pointerleave", pointerup);
-                };
-                this.suspend = () => {
-                    offPointerHook();
-                    Game.getSound().reqStopChannel(1);
-                };
-                this.resume = () => {
-                    onPointerHook();
-                    Game.getSound().reqPlayChannel(1, true);
-                };
-                this.leave = () => {
-                    offPointerHook();
-                    Game.getSound().reqStopChannel(1);
-                };
-                const updateLighting = (iswalkable) => {
-                    map.clearLighting();
-                    PathFinder.propagation({
-                        array2D: map.layer[0].chips,
-                        sx: player.x,
-                        sy: player.y,
-                        value: 140,
-                        costs: (v) => iswalkable(v) ? 20 : 50,
-                        output: map.lighting
-                    });
-                };
-                const fade = new Fade(Game.getScreen().width, Game.getScreen().height);
-                this.draw = () => {
-                    Game.getScreen().save();
-                    Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                    Game.getScreen().fillStyle = "rgb(255,255,255)";
-                    Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                    map.draw((l, cameraLocalPx, cameraLocalPy) => {
-                        if (l === 0) {
-                            // 影
-                            Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
-                            Game.getScreen().beginPath();
-                            Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
-                            Game.getScreen().fill();
-                            // モンスター
-                            const camera = map.camera;
-                            monsters.forEach((monster) => {
-                                const xx = monster.x - camera.chipLeft;
-                                const yy = monster.y - camera.chipTop;
-                                if (0 <= xx &&
-                                    xx < Game.getScreen().width / 24 &&
-                                    0 <= yy &&
-                                    yy < Game.getScreen().height / 24) {
-                                    const adir = monster.animDir;
-                                    const af = monster.animFrame;
-                                    Game.getScreen().drawImage(Game.getScreen().texture("monster"), monster.sprite[adir][af][0], monster.sprite[adir][af][1], monster.spriteWidth, monster.spriteHeight, xx * monster.spriteWidth + camera.chipOffX + monster.offx, yy * monster.spriteWidth + camera.chipOffY + monster.offy, monster.spriteWidth, monster.spriteHeight);
-                                }
-                            });
-                            const animf = player.animFrame;
-                            const playersprite = player.sprite[player.animDir];
-                            // キャラクター
-                            Game.getScreen().drawImage(Game.getScreen().texture("charactor"), playersprite[animf][0], playersprite[animf][1], player.spriteWidth, player.spriteHeight, cameraLocalPx - player.spriteWidth / 2, cameraLocalPy - player.spriteHeight / 2 - 12, player.spriteWidth, player.spriteHeight);
-                        }
-                    });
-                    // フェード
-                    fade.draw();
-                    Game.getScreen().restore();
-                    // バーチャルジョイスティックの描画
-                    if (pad.isTouching) {
-                        Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
-                        Game.getScreen().beginPath();
-                        Game.getScreen().ellipse(pad.x, pad.y, pad.radius * 1.2, pad.radius * 1.2, 0, 0, Math.PI * 2);
-                        Game.getScreen().fill();
-                        Game.getScreen().beginPath();
-                        Game.getScreen().ellipse(pad.x + pad.cx, pad.y + pad.cy, pad.radius, pad.radius, 0, 0, Math.PI * 2);
-                        Game.getScreen().fill();
-                    }
-                };
-                yield waitTimeout({
-                    timeout: 500,
-                    init: () => { fade.startFadeIn(); },
-                    update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
-                    end: (e) => { this.next(); }
-                });
-                onPointerHook();
-                // ターンの状態（フェーズ）
-                const turnStateStack = [[TurnState.WaitInput, null]];
-                let playerTactics = {};
-                let monstersTactics = [];
-                yield (delta, ms) => {
-                    switch (turnStateStack[0][0]) {
-                        case TurnState.WaitInput:
-                            {
-                                // キー入力待ち
-                                if (pad.isTouching === false || pad.distance <= 0.4) {
-                                    player.setAnimation('idle', 0);
-                                    break;
-                                }
-                                // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
-                                const playerMoveDir = pad.dir8;
-                                // 「行動(Action)」と「移動(Move)」の識別を行う
-                                // 移動先が侵入不可能の場合は待機とする
-                                const [ox, oy] = Array2D.DIR8[playerMoveDir];
-                                if (map.layer[0].chips.value(player.x + ox, player.y + oy) !== 1 && map.layer[0].chips.value(player.x + ox, player.y + oy) !== 10) {
-                                    player.setDir(playerMoveDir);
-                                    break;
-                                }
-                                // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
-                                const targetMonster = monsters.findIndex((monster) => (monster.x === player.x + ox) &&
-                                    (monster.y === player.y + oy));
-                                if (targetMonster !== -1) {
-                                    // 移動先に敵がいる＝「行動(Action)」
-                                    playerTactics = {
-                                        type: "action",
-                                        moveDir: playerMoveDir,
-                                        targetMonster: playerMoveDir,
-                                        startTime: ms,
-                                        actionTime: 250
-                                    };
-                                    // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
-                                    turnStateStack.unshift([TurnState.PlayerAction, null], [TurnState.EnemyAI, null], [TurnState.EnemyAction, 0], [TurnState.Move, null], [TurnState.TurnEnd, null]);
-                                    break;
-                                }
-                                else {
-                                    // 移動先に敵はいない＝「移動(Move)」
-                                    playerTactics = {
-                                        type: "move",
-                                        moveDir: playerMoveDir,
-                                        startTime: ms,
-                                        actionTime: 250
-                                    };
-                                    // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
-                                    turnStateStack.unshift([TurnState.EnemyAI, null], [TurnState.Move, null], [TurnState.EnemyAction, 0], [TurnState.TurnEnd, null]);
-                                    break;
-                                }
-                            }
-                        case TurnState.PlayerAction: {
-                            // プレイヤーの行動開始
-                            turnStateStack[0][0] = TurnState.PlayerActionRunning;
-                            player.setDir(playerTactics.moveDir);
-                            player.setAnimation('action', 0);
-                            break;
-                        }
-                        case TurnState.PlayerActionRunning: {
-                            // プレイヤーの行動中
-                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                            player.setAnimation('action', rate);
-                            if (rate >= 1) {
-                                // プレイヤーの行動終了
-                                turnStateStack.shift();
-                            }
-                            break;
-                        }
-                        case TurnState.EnemyAI: {
-                            // 敵の行動の決定
-                            // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
-                            let px = player.x;
-                            let py = player.y;
-                            if (playerTactics.type === "move") {
-                                const off = Array2D.DIR8[playerTactics.moveDir];
-                                px += off[0];
-                                py += off[1];
-                            }
-                            monstersTactics = monsters.map((monster) => {
-                                const dx = px - monster.x;
-                                const dy = py - monster.y;
-                                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                    // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
-                                    const dir = Array2D.DIR8.findIndex((x) => x[0] === dx && x[1] === dy);
-                                    return {
-                                        type: "action",
-                                        moveDir: dir,
-                                        startTime: 0,
-                                        actionTime: 250
-                                    };
-                                }
-                                else {
-                                    // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
-                                    // とりあえず軸合わせで動く
-                                    const cands = [
-                                        [Math.sign(dx), Math.sign(dy)],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
-                                    ];
-                                    for (let i = 0; i < 3; i++) {
-                                        const [cx, cy] = cands[i];
-                                        if (map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 1 || map.layer[0].chips.value(monster.x + cx, monster.y + cy) === 10) {
-                                            const dir = Array2D.DIR8.findIndex((x) => x[0] === cx && x[1] === cy);
-                                            return {
-                                                type: "move",
-                                                moveDir: dir,
-                                                startTime: ms,
-                                                actionTime: 250
-                                            };
-                                        }
-                                    }
-                                    return {
-                                        type: "idle",
-                                        moveDir: 5,
-                                        startTime: ms,
-                                        actionTime: 250
-                                    };
-                                }
-                            });
-                            // 敵の行動の決定の終了
-                            turnStateStack.shift();
-                            break;
-                        }
-                        case TurnState.EnemyAction: {
-                            // 敵の行動開始
-                            let enemyId = turnStateStack[0][1];
-                            while (enemyId < monstersTactics.length) {
-                                if (monstersTactics[enemyId].type !== "action") {
-                                    enemyId++;
-                                }
-                                else {
-                                    break;
-                                }
-                            }
-                            if (enemyId < monstersTactics.length) {
-                                monstersTactics[enemyId].startTime = ms;
-                                monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
-                                monsters[enemyId].setAnimation('action', 0);
-                                turnStateStack[0][0] = TurnState.EnemyActionRunning;
-                                turnStateStack[0][1] = enemyId;
-                            }
-                            else {
-                                // もう動かす敵がいない
-                                turnStateStack.shift();
-                            }
-                            break;
-                        }
-                        case TurnState.EnemyActionRunning: {
-                            // 敵の行動中
-                            const enemyId = turnStateStack[0][1];
-                            const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
-                            monsters[enemyId].setAnimation('action', rate);
-                            if (rate >= 1) {
-                                // 行動終了。次の敵へ
-                                turnStateStack[0][0] = TurnState.EnemyAction;
-                                turnStateStack[0][1] = enemyId + 1;
-                            }
-                            break;
-                        }
-                        case TurnState.Move: {
-                            // 移動開始
-                            turnStateStack[0][0] = TurnState.MoveRunning;
-                            monstersTactics.forEach((monsterTactic, i) => {
-                                if (monsterTactic.type === "move") {
-                                    monsters[i].setDir(monsterTactic.moveDir);
-                                    monsters[i].setAnimation('move', 0);
-                                    monstersTactics[i].startTime = ms;
-                                }
-                            });
-                            if (playerTactics.type === "move") {
-                                player.setDir(playerTactics.moveDir);
-                                player.setAnimation('move', 0);
-                                playerTactics.startTime = ms;
-                            }
-                            break;
-                        }
-                        case TurnState.MoveRunning: {
-                            // 移動実行
-                            let finish = true;
-                            monstersTactics.forEach((monsterTactic, i) => {
-                                if (monsterTactic.type === "move") {
-                                    const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
-                                    monsters[i].setDir(monsterTactic.moveDir);
-                                    monsters[i].setAnimation('move', rate);
-                                    if (rate < 1) {
-                                        finish = false; // 行動終了していないフラグをセット
-                                    }
-                                }
-                            });
-                            if (playerTactics.type === "move") {
-                                const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                                player.setDir(playerTactics.moveDir);
-                                player.setAnimation('move', rate);
-                                if (rate < 1) {
-                                    finish = false; // 行動終了していないフラグをセット
-                                }
-                            }
-                            if (finish) {
-                                // 行動終了
-                                turnStateStack.shift();
-                                monstersTactics.forEach((monsterTactic, i) => {
-                                    if (monsterTactic.type === "move") {
-                                        monsters[i].x += Array2D.DIR8[monsterTactic.moveDir][0];
-                                        monsters[i].y += Array2D.DIR8[monsterTactic.moveDir][1];
-                                        monsters[i].offx = 0;
-                                        monsters[i].offy = 0;
-                                    }
-                                });
-                                if (playerTactics.type === "move") {
-                                    player.x += Array2D.DIR8[playerTactics.moveDir][0];
-                                    player.y += Array2D.DIR8[playerTactics.moveDir][1];
-                                    player.offx = 0;
-                                    player.offy = 0;
-                                }
-                                // 現在位置のマップチップを取得
-                                const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
-                                if (chip === 10) {
-                                    // 階段なので次の階層に移動させる。
-                                    this.next("nextfloor");
-                                }
-                            }
-                            break;
-                        }
-                        case TurnState.TurnEnd: {
-                            // ターン終了
-                            turnStateStack.shift();
-                            break;
-                        }
-                    }
-                    // カメラを更新
-                    map.update({
-                        viewpoint: {
-                            x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                            y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2
-                        },
-                        viewwidth: Game.getScreen().width,
-                        viewheight: Game.getScreen().height,
-                    });
-                    updateLighting((v) => v === 1 || v === 10);
-                    if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                        Game.getSceneManager().push("mapview", { map: map, player: player });
-                    }
-                };
-                Game.getSound().reqPlayChannel(3);
-                yield waitTimeout({
-                    timeout: 500,
-                    init: () => { fade.startFadeOut(); },
-                    update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
-                    end: (e) => { this.next(); }
-                });
-                yield waitTimeout({
-                    timeout: 500,
-                    end: (e) => { floor++; this.next(); }
-                });
-                Game.getSceneManager().pop();
-                Game.getSceneManager().push("dungeon", { player: player, floor: floor });
-            },
-            mapview: function* (data) {
-                this.draw = () => {
-                    Game.getScreen().save();
-                    Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                    Game.getScreen().fillStyle = "rgb(0,0,0)";
-                    Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-                    const offx = ~~((Game.getScreen().width - data.map.width * 5) / 2);
-                    const offy = ~~((Game.getScreen().height - data.map.height * 5) / 2);
-                    // ミニマップを描画
-                    for (let y = 0; y < data.map.height; y++) {
-                        for (let x = 0; x < data.map.width; x++) {
-                            const chip = data.map.layer[0].chips.value(x, y);
-                            let color = "rgb(52,12,0)";
-                            switch (chip) {
-                                case 1:
-                                    color = "rgb(179,116,39)";
-                                    break;
-                                case 10:
-                                    color = "rgb(255,0,0)";
-                                    break;
-                            }
-                            Game.getScreen().fillStyle = color;
-                            Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                            let light = 1 - data.map.visibled.value(x, y) / 100;
-                            if (light > 1) {
-                                light = 1;
-                            }
-                            else if (light < 0) {
-                                light = 0;
-                            }
-                            Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
-                            Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                        }
-                    }
-                    Game.getScreen().fillStyle = "rgb(0,255,0)";
-                    Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
-                    Game.getScreen().restore();
-                };
-                yield waitClick({ end: () => this.next() });
-                Game.getSceneManager().pop();
-            },
+            offscreenWidth: 252,
+            offscreenHeight: 252,
+            scaleX: 2,
+            scaleY: 2,
         }
     }).then(() => {
-        let anim = 0;
-        const update = (ms) => {
-            Game.getScreen().save();
-            Game.getScreen().clearRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-            Game.getScreen().fillStyle = "rgb(255,255,255)";
-            Game.getScreen().fillRect(0, 0, Game.getScreen().width, Game.getScreen().height);
-            const n = ~(ms / 50);
-            Game.getScreen().translate(Game.getScreen().width / 2, Game.getScreen().height / 2);
-            Game.getScreen().rotate(n * Math.PI / 4);
-            for (let i = 0; i < 8; i++) {
-                const g = (i * 32);
-                Game.getScreen().save();
-                Game.getScreen().rotate(i * Math.PI / 4);
-                Game.getScreen().fillStyle = `rgb(${g},${g},${g})`;
-                Game.getScreen().fillRect(-5, -50, 10, 25);
-                Game.getScreen().restore();
-            }
-            Game.getScreen().restore();
-            anim = requestAnimationFrame(update.bind(this));
-        };
-        anim = requestAnimationFrame(update.bind(this));
-        return Promise.all([
-            Game.getScreen().loadImage({
-                title: "./assets/title.png",
-                mapchip: "./assets/mapchip.png",
-                charactor: "./assets/charactor.png",
-                monster: "./assets/monster.png"
-            }),
-            Game.getSound().loadSoundsToChannel({
-                0: "./assets/title.mp3",
-                1: "./assets/dungeon.mp3",
-                2: "./assets/classroom.mp3",
-                3: "./assets/kaidan.mp3"
-            }),
-            new Promise((resolve, reject) => setTimeout(() => resolve(), 5000))
-        ]).then(() => {
-            cancelAnimationFrame(anim);
-        });
-    }).then(() => {
-        Game.getSceneManager().push("title");
+        Game.getSceneManager().push(Scene.boot, null);
         Game.getTimer().on((delta, now, id) => {
             Game.getInput().endCapture();
             Game.getSceneManager().update(delta, now);
             Game.getInput().startCapture();
             Game.getSound().playChannel();
+            Game.getScreen().begin();
             Game.getSceneManager().draw();
+            Game.getScreen().end();
         });
         Game.getTimer().start();
     });
 };
-//# sourceMappingURL=tsjq.js.map
