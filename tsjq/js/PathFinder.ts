@@ -1,7 +1,7 @@
 "use strict";
 
 namespace PathFinder {
-    // Œo˜H’Tõ
+    // çµŒè·¯æ¢ç´¢
     type PathFindObj = {
         x: number;
         y: number;
@@ -28,13 +28,13 @@ namespace PathFinder {
         { x: -1, y: -1 }
     ];
 
-    // ƒ_ƒCƒNƒXƒgƒ‰–@‚ğ—p‚¢‚½‹——£Zo
+    // ãƒ€ã‚¤ã‚¯ã‚¹ãƒˆãƒ©æ³•ã‚’ç”¨ã„ãŸè·é›¢ç®—å‡º
     export function calcDistanceByDijkstra({
         array2D = null,
-        sx = null,      // ’Tõn“_XÀ•W
-        sy = null,      // ’Tõn“_YÀ•W
-        value = null,   // ’Tõ‘Å‚¿Ø‚è‚Ìè‡’l
-        costs = null,   // ƒm[ƒh‚Ìd‚İ
+        sx = null,      // æ¢ç´¢å§‹ç‚¹Xåº§æ¨™
+        sy = null,      // æ¢ç´¢å§‹ç‚¹Yåº§æ¨™
+        value = null,   // æ¢ç´¢æ‰“ã¡åˆ‡ã‚Šã®é–¾å€¤
+        costs = null,   // ãƒãƒ¼ãƒ‰ã®é‡ã¿
         left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = undefined
     }: {
             array2D: Array2D;
@@ -90,7 +90,7 @@ namespace PathFinder {
         }
     }
 
-    // A*‚Å‚ÌŒo˜H’Tõ
+    // A*ã§ã®çµŒè·¯æ¢ç´¢
     export function pathfind(
         array2D: Array2D,
         fromX: number,
@@ -160,14 +160,14 @@ namespace PathFinder {
                 const id = item.x + "," + item.y;
 
                 if (done.has(id)) {
-                    /* ’TõÏ‚İ‚È‚Ì‚Å’Tõ‚µ‚È‚¢ */
+                    /* æ¢ç´¢æ¸ˆã¿ãªã®ã§æ¢ç´¢ã—ãªã„ */
                     continue;
                 }
                 done.set(id, item);
             }
 
             if (item.x === fromX && item.y === fromY) {
-                /* n“_‚É“’B‚µ‚½‚Ì‚ÅŒo˜H‚ğ¶¬‚µ‚Ä•Ô‚· */
+                /* å§‹ç‚¹ã«åˆ°é”ã—ãŸã®ã§çµŒè·¯ã‚’ç”Ÿæˆã—ã¦è¿”ã™ */
                 const result: IPoint[] = [];
                 while (item) {
                     result.push(item);
@@ -176,7 +176,7 @@ namespace PathFinder {
                 return result;
             } else {
 
-                /* —×Ú’n“_‚©‚çˆÚ“®‰Â”\’n“_‚ğ’T‚· */
+                /* éš£æ¥åœ°ç‚¹ã‹ã‚‰ç§»å‹•å¯èƒ½åœ°ç‚¹ã‚’æ¢ã™ */
                 for (let i = 0; i < dirs.length; i++) {
                     const dir = dirs[i];
                     const x = item.x + dir.x;
@@ -184,10 +184,10 @@ namespace PathFinder {
                     const cost = costs[this.value(x, y)];
 
                     if (cost < 0) {
-                        /* N“ü•s‰Â”\ */
+                        /* ä¾µå…¥ä¸å¯èƒ½ */
                         continue;
                     } else {
-                        /* ˆÚ“®‰Â”\’n“_‚ª’TõÏ‚İ‚Å‚È‚¢‚È‚ç’TõƒLƒ…[‚É’Ç‰Á */
+                        /* ç§»å‹•å¯èƒ½åœ°ç‚¹ãŒæ¢ç´¢æ¸ˆã¿ã§ãªã„ãªã‚‰æ¢ç´¢ã‚­ãƒ¥ãƒ¼ã«è¿½åŠ  */
                         const id = x + "," + y;
                         if (done.has(id)) {
                             continue;
@@ -198,11 +198,11 @@ namespace PathFinder {
             }
         }
 
-        /* n“_‚É“’B‚µ‚È‚©‚Á‚½‚Ì‚Å‹ó‚ÌŒo˜H‚ğ•Ô‚· */
+        /* å§‹ç‚¹ã«åˆ°é”ã—ãªã‹ã£ãŸã®ã§ç©ºã®çµŒè·¯ã‚’è¿”ã™ */
         return [];
     }
 
-    // d‚İ‹——£‚ğg‚Á‚½A*
+    // é‡ã¿è·é›¢ã‚’ä½¿ã£ãŸA*
     export function pathfindByPropergation(
         array2D: Array2D,
         fromX: number,
@@ -258,14 +258,14 @@ namespace PathFinder {
             {
                 const id = item.x + "," + item.y;
                 if (done.has(id)) {
-                    /* ’TõÏ‚İ‚È‚Ì‚Å’Tõ‚µ‚È‚¢ */
+                    /* æ¢ç´¢æ¸ˆã¿ãªã®ã§æ¢ç´¢ã—ãªã„ */
                     continue;
                 }
                 done.set(id, item);
             }
 
             if (item.x === fromX && item.y === fromY) {
-                /* n“_‚É“’B‚µ‚½‚Ì‚ÅŒo˜H‚ğ¶¬‚µ‚Ä•Ô‚· */
+                /* å§‹ç‚¹ã«åˆ°é”ã—ãŸã®ã§çµŒè·¯ã‚’ç”Ÿæˆã—ã¦è¿”ã™ */
                 const result: IPoint[] = [];
                 while (item) {
                     result.push(item);
@@ -274,17 +274,17 @@ namespace PathFinder {
                 return result;
             } else {
 
-                /* —×Ú’n“_‚©‚çˆÚ“®‰Â”\’n“_‚ğ’T‚· */
+                /* éš£æ¥åœ°ç‚¹ã‹ã‚‰ç§»å‹•å¯èƒ½åœ°ç‚¹ã‚’æ¢ã™ */
                 dirs.forEach((dir) => {
                     const x = item.x + dir.x;
                     const y = item.y + dir.y;
                     const pow = propagation.value(x, y);
 
                     if (pow === 0) {
-                        /* N“ü•s‰Â”\ */
+                        /* ä¾µå…¥ä¸å¯èƒ½ */
                         return;
                     } else {
-                        /* ˆÚ“®‰Â”\’n“_‚ª’TõÏ‚İ‚Å‚È‚¢‚È‚ç’TõƒLƒ…[‚É’Ç‰Á */
+                        /* ç§»å‹•å¯èƒ½åœ°ç‚¹ãŒæ¢ç´¢æ¸ˆã¿ã§ãªã„ãªã‚‰æ¢ç´¢ã‚­ãƒ¥ãƒ¼ã«è¿½åŠ  */
                         const id = x + "," + y;
                         if (done.has(id)) {
                             return;
@@ -296,7 +296,7 @@ namespace PathFinder {
             }
         }
 
-        /* n“_‚É“’B‚µ‚È‚©‚Á‚½‚Ì‚Å‹ó‚ÌŒo˜H‚ğ•Ô‚· */
+        /* å§‹ç‚¹ã«åˆ°é”ã—ãªã‹ã£ãŸã®ã§ç©ºã®çµŒè·¯ã‚’è¿”ã™ */
         return [];
     }
 

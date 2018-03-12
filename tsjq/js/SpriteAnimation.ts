@@ -102,14 +102,14 @@ namespace SpriteAnimation {
     }
 
     namespace Json {
-        // ƒXƒvƒ‰ƒCƒgƒV[ƒg
+        // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã‚·ãƒ¼ãƒˆ
         export interface ISpriteSheet {
             source: { [id: string]: string };
             sprite: { [id: string]: ISprite };
             animation: { [id: string]: IAnimation[] };
         }
 
-        // ƒXƒvƒ‰ƒCƒg’è‹`
+        // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆå®šç¾©
         export interface ISprite {
             source: string;
             left: number;
@@ -120,7 +120,7 @@ namespace SpriteAnimation {
             offsetY: number;
         }
 
-        // ƒAƒjƒ[ƒVƒ‡ƒ“’è‹`
+        // ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å®šç¾©
         export interface IAnimation {
             sprite: string;
             time: number;
@@ -129,7 +129,7 @@ namespace SpriteAnimation {
         }
     }
 
-    // ƒXƒvƒ‰ƒCƒgƒV[ƒg
+    // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã‚·ãƒ¼ãƒˆ
     export class SpriteSheet {
         public source: Map<string, HTMLImageElement>;
         public sprite: Map<string, Sprite>;
@@ -157,7 +157,7 @@ namespace SpriteAnimation {
         }
     }
 
-    // ƒXƒvƒ‰ƒCƒg’è‹`
+    // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆå®šç¾©
     class Sprite {
         public source: string;
         public left: number;
@@ -179,7 +179,7 @@ namespace SpriteAnimation {
 
     }
 
-    // ƒAƒjƒ[ƒVƒ‡ƒ“’è‹`
+    // ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å®šç¾©
     class Animation {
         public sprite: string;
         public time: number;
@@ -201,25 +201,20 @@ namespace SpriteAnimation {
             img.onload = () => {
                 resolve(img);
             };
-            img.onerror = () => { reject(imageSrc + "‚Ìƒ[ƒh‚É¸”s‚µ‚Ü‚µ‚½B"); };
+            img.onerror = () => { reject(imageSrc + "ã®ãƒ­ãƒ¼ãƒ‰ã«å¤±æ•—ã—ã¾ã—ãŸã€‚"); };
         });
     }
 
     export async function loadSpriteSheet(
         spriteSheetPath: string,
-        {
-            loadStartCallback = () => { },
-            loadEndCallback = () => { }
-        }: {
-            loadStartCallback?: () => void;
-            loadEndCallback?: () => void;
-        }
+        loadStartCallback: () => void,
+        loadEndCallback: () => void
     ): Promise<SpriteSheet> {
-        loadStartCallback();
 
         const spriteSheetDir: string = getDirectory(spriteSheetPath);
-        const spriteSheetJson: Json.ISpriteSheet =
-            await ajax(spriteSheetPath, "json").then(y => y.response as Json.ISpriteSheet);
+        loadStartCallback();
+        const spriteSheetJson: Json.ISpriteSheet = await ajax(spriteSheetPath, "json").then(y => y.response as Json.ISpriteSheet);
+        loadEndCallback();
         if (spriteSheetJson == null) {
             throw new Error(spriteSheetPath + " is invalid json.");
         }
@@ -230,7 +225,9 @@ namespace SpriteAnimation {
             for (let i = 0; i < keys.length; i++) {
                 const key = keys[i];
                 const imageSrc: string = spriteSheetDir + '/' + spriteSheetJson.source[key];
+                loadStartCallback();
                 const image: HTMLImageElement = await loadImage(imageSrc);
+                loadEndCallback();
                 source.set(key, image);
             }
         }

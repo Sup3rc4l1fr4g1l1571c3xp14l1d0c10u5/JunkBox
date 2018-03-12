@@ -12,7 +12,7 @@ namespace Scene {
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, w, h);
 
-            // è∞
+            // Â∫ä
             for (let y = 0; y < ~~((w + 23) / 24); y++) {
                 for (let x = 0; x < ~~((w + 23) / 24); x++) {
                     Game.getScreen().drawImage(
@@ -22,7 +22,7 @@ namespace Scene {
                     );
                 }
             }
-            // ï«
+            // Â£Å
             for (let y = 0; y < 2; y++) {
                 for (let x = 0; x < ~~((w + 23) / 24); x++) {
                     Game.getScreen().drawImage(
@@ -38,7 +38,7 @@ namespace Scene {
                     );
                 }
             }
-            // çïî¬
+            // ÈªíÊùø
             Game.getScreen().drawImage(
                 Game.getScreen().texture("mapchip"),
                 0,
@@ -51,7 +51,7 @@ namespace Scene {
                 36,
             );
 
-            // äeÉLÉÉÉâÇ∆ä˜
+            // ÂêÑ„Ç≠„É£„É©„Å®Êú∫
             for (let y = 0; y < 5; y++) {
                 for (let x = 0; x < 6; x++) {
                     const id = y * 6 + x;
@@ -123,11 +123,11 @@ namespace Scene {
             },
             update: (e) => {
                 if (0 <= e && e < 1600) {
-                    // Ç≠ÇÈÇ≠ÇÈ
+                    // „Åè„Çã„Åè„Çã
                     selectedCharactorDir = ~~(e / 100);
                     selectedCharactorOffY = 0;
                 } else if (1600 <= e && e < 1800) {
-                    // Ç“ÇÂÇÒ
+                    // „Å¥„Çá„Çì
                     selectedCharactorDir = 0;
                     selectedCharactorOffY = Math.sin((e - 1600) * Math.PI / 200) * 20;
                 }

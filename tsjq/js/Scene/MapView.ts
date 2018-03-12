@@ -8,7 +8,7 @@ namespace Scene {
             const offx = ~~((Game.getScreen().offscreenWidth - data.map.width * 5) / 2);
             const offy = ~~((Game.getScreen().offscreenHeight - data.map.height * 5) / 2);
 
-            // ミニマップを描画
+            // 繝溘ル繝槭ャ繝励ｒ謠冗判
             for (let y = 0; y < data.map.height; y++) {
                 for (let x = 0; x < data.map.width; x++) {
                     const chip = data.map.layer[0].chips.value(x, y);

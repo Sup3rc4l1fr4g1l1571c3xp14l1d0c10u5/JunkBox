@@ -1,34 +1,34 @@
 namespace Scene {
     enum TurnState {
-        WaitInput,      // ƒvƒŒƒCƒ„[‚Ìs“®Œˆ’è(“ü—Í‘Ò‚¿)
-        PlayerAction,   // ƒvƒŒƒCƒ„[‚Ìs“®Às
+        WaitInput,      // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•æ±ºå®š(å…¥åŠ›å¾…ã¡)
+        PlayerAction,   // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•å®Ÿè¡Œ
         PlayerActionRunning,
-        EnemyAI,        // “G‚Ìs“®Œˆ’è
-        EnemyAction,    // “G‚Ìs“®Às
+        EnemyAI,        // æ•µã®è¡Œå‹•æ±ºå®š
+        EnemyAction,    // æ•µã®è¡Œå‹•å®Ÿè¡Œ
         EnemyActionRunning,
-        EnemyDead,          // “G‚Ì€–S
-        EnemyDeadRunning,   // €–SÀs
-        Move,           // ˆÚ“®Àsi“G–¡•û“¯‚És‚¤j
-        MoveRunning,    // ˆÚ“®Àsi“G–¡•û“¯‚És‚¤j
-        TurnEnd,   // ƒ^[ƒ“I—¹
+        EnemyDead,          // æ•µã®æ­»äº¡
+        EnemyDeadRunning,   // æ­»äº¡å®Ÿè¡Œ
+        Move,           // ç§»å‹•å®Ÿè¡Œï¼ˆæ•µå‘³æ–¹åŒæ™‚ã«è¡Œã†ï¼‰
+        MoveRunning,    // ç§»å‹•å®Ÿè¡Œï¼ˆæ•µå‘³æ–¹åŒæ™‚ã«è¡Œã†ï¼‰
+        TurnEnd,   // ã‚¿ãƒ¼ãƒ³çµ‚äº†
     }
 
     export function* dungeon(param: { player: Charactor.Player, floor: number }): IterableIterator<any> {
         const player = param.player;
         const floor = param.floor;
 
-        // ƒ}ƒbƒvƒTƒCƒYZo
+        // ãƒãƒƒãƒ—ã‚µã‚¤ã‚ºç®—å‡º
         const mapChipW = 30 + floor * 3;
         const mapChipH = 30 + floor * 3;
 
-        // ƒ}ƒbƒv©“®¶¬
+        // ãƒãƒƒãƒ—è‡ªå‹•ç”Ÿæˆ
         const mapchipsL1 = new Array2D(mapChipW, mapChipH);
         const layout = Dungeon.generate(
             mapChipW,
             mapChipH,
             (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
 
-        // ‘•ü
+        // è£…é£¾
         for (let y = 1; y < mapChipH; y++) {
             for (let x = 0; x < mapChipW; x++) {
                 mapchipsL1.value(x,
@@ -46,26 +46,27 @@ namespace Scene {
             }
         }
 
-        // •”‰®‚Í¶¬Œã‚ÉƒVƒƒƒbƒtƒ‹‚µ‚Ä‚¢‚é‚Ì‚Å‚»‚Ì‚Ü‚Üæ‚èo‚·
+        // éƒ¨å±‹ã¯ç”Ÿæˆå¾Œã«ã‚·ãƒ£ãƒƒãƒ•ãƒ«ã—ã¦ã„ã‚‹ã®ã§ãã®ã¾ã¾å–ã‚Šå‡ºã™
 
         const rooms = layout.rooms.slice();
 
-        // ŠJnˆÊ’u
+        // é–‹å§‹ä½ç½®
         const startPos = rooms[0].getCenter();
         player.x = startPos.x;
         player.y = startPos.y;
 
-        // ŠK’iˆÊ’u
+        // éšæ®µä½ç½®
         const stairsPos = rooms[1].getCenter();
         mapchipsL1.value(stairsPos.x, stairsPos.y, 10);
 
-        // ƒ‚ƒ“ƒXƒ^[”z’u
+        // ãƒ¢ãƒ³ã‚¹ã‚¿ãƒ¼é…ç½®
         let monsters = rooms.splice(2).map((x) => {
             return new Charactor.Monster({
                 charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
                 x: x.getLeft(),
                 y: x.getTop(),
-                life: 10
+                life: 10,
+                maxLife: 10
             });
         });
 
@@ -93,7 +94,7 @@ namespace Scene {
             },
         });
 
-        // ƒJƒƒ‰‚ğXV
+        // ã‚«ãƒ¡ãƒ©ã‚’æ›´æ–°
         map.update({
             viewpoint: {
                 x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
@@ -178,7 +179,7 @@ namespace Scene {
 
             map.draw((l: number, cameraLocalPx: number, cameraLocalPy: number) => {
                 if (l === 0) {
-                    // ‰e
+                    // å½±
                     Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
 
                     Game.getScreen().beginPath();
@@ -193,7 +194,7 @@ namespace Scene {
                     );
                     Game.getScreen().fill();
 
-                    // ƒ‚ƒ“ƒXƒ^[
+                    // ãƒ¢ãƒ³ã‚¹ã‚¿ãƒ¼
                     const camera: Dungeon.Camera = map.camera;
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
@@ -222,7 +223,7 @@ namespace Scene {
                         const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
                         const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
 
-                        // ƒLƒƒƒ‰ƒNƒ^[
+                        // ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼
                         Game.getScreen().drawImage(
                             player.spriteSheet.getSpriteImage(sprite),
                             sprite.left,
@@ -236,16 +237,70 @@ namespace Scene {
                         );
                     }
                 }
+                if (l === 1) {
+                    // ã‚¤ãƒ³ãƒ•ã‚©ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®æç”»
+
+                    // ãƒ¢ãƒ³ã‚¹ã‚¿ãƒ¼ä½“åŠ›
+                    const camera: Dungeon.Camera = map.camera;
+                    monsters.forEach((monster) => {
+                        const xx = monster.x - camera.chipLeft;
+                        const yy = monster.y - camera.chipTop;
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) && (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                            const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
+                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
+
+                            Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                            Game.getScreen().fillRect(
+                                dx,
+                                dy + sprite.height - 1,
+                                sprite.width,
+                                1
+                            );
+                            Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                            Game.getScreen().fillRect(
+                                dx,
+                                dy + sprite.height - 1,
+                                ~~(sprite.width * monster.life / monster.maxLife),
+                                1
+                            );
+                        }
+                    });
+
+                    {
+                        const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                        const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+
+                        // ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ä½“åŠ›
+                        Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                        Game.getScreen().fillRect(
+                            cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
+                            cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
+                            sprite.width,
+                            1
+                        );
+                        Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                        Game.getScreen().fillRect(
+                            cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
+                            cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
+                            ~~(sprite.width * 1 / 1),
+                            1
+                        );
+                    }
+                }
             });
 
-            // ƒXƒvƒ‰ƒCƒg
+            // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆ
             sprites.forEach((x) => x.draw(map.camera));
 
-            // ƒtƒF[ƒh
+            draw7pxFont("12F | LV:99 | HP:100 | MP:100 | GOLD:200", 0, 0);
+
+            // ãƒ•ã‚§ãƒ¼ãƒ‰
             fade.draw();
             Game.getScreen().restore();
 
-            // ƒo[ƒ`ƒƒƒ‹ƒWƒ‡ƒCƒXƒeƒBƒbƒN‚Ì•`‰æ
+            // ãƒãƒ¼ãƒãƒ£ãƒ«ã‚¸ãƒ§ã‚¤ã‚¹ãƒ†ã‚£ãƒƒã‚¯ã®æç”»
             if (pad.isTouching) {
                 Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
                 Game.getScreen().beginPath();
@@ -283,7 +338,7 @@ namespace Scene {
 
         onPointerHook();
 
-        // ƒ^[ƒ“‚Ìó‘ÔiƒtƒF[ƒYj
+        // ã‚¿ãƒ¼ãƒ³ã®çŠ¶æ…‹ï¼ˆãƒ•ã‚§ãƒ¼ã‚ºï¼‰
         const turnStateStack: Array<[TurnState, any]> = [[TurnState.WaitInput, null]];
 
         let playerTactics: any = {};
@@ -293,31 +348,31 @@ namespace Scene {
                 switch (turnStateStack[0][0]) {
                     case TurnState.WaitInput:
                         {
-                            // ƒL[“ü—Í‘Ò‚¿
+                            // ã‚­ãƒ¼å…¥åŠ›å¾…ã¡
                             if (pad.isTouching === false || pad.distance <= 0.4) {
                                 player.setAnimation("move", 0);
                                 break stateloop;
                             }
 
-                            // ƒL[“ü—Í‚³‚ê‚½‚Ì‚ÅƒvƒŒƒCƒ„[‚ÌˆÚ“®•ûŒü(5)‚ÍˆÚ“®‚µ‚È‚¢B
+                            // ã‚­ãƒ¼å…¥åŠ›ã•ã‚ŒãŸã®ã§ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®ç§»å‹•æ–¹å‘(5)ã¯ç§»å‹•ã—ãªã„ã€‚
 
                             const playerMoveDir = pad.dir8;
 
-                            // us“®(Action)v‚ÆuˆÚ“®(Move)v‚Ì¯•Ê‚ğs‚¤
+                            // ã€Œè¡Œå‹•(Action)ã€ã¨ã€Œç§»å‹•(Move)ã€ã®è­˜åˆ¥ã‚’è¡Œã†
 
-                            // ˆÚ“®æ‚ªN“ü•s‰Â”\‚Ìê‡‚Í‘Ò‹@‚Æ‚·‚é
+                            // ç§»å‹•å…ˆãŒä¾µå…¥ä¸å¯èƒ½ã®å ´åˆã¯å¾…æ©Ÿã¨ã™ã‚‹
                             const { x, y } = Array2D.DIR8[playerMoveDir];
                             if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 && map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
                                 player.setDir(playerMoveDir);
                                 break stateloop;
                             }
 
-                            // ˆÚ“®æ‚É“G‚ª‚¢‚éê‡‚Íus“®(Action)vA‚¢‚È‚¢ê‡‚ÍuˆÚ“®(Move)v
+                            // ç§»å‹•å…ˆã«æ•µãŒã„ã‚‹å ´åˆã¯ã€Œè¡Œå‹•(Action)ã€ã€ã„ãªã„å ´åˆã¯ã€Œç§»å‹•(Move)ã€
                             const targetMonster =
                                 monsters.findIndex((monster) => (monster.x === player.x + x) &&
                                     (monster.y === player.y + y));
                             if (targetMonster !== -1) {
-                                // ˆÚ“®æ‚É“G‚ª‚¢‚éus“®(Action)v
+                                // ç§»å‹•å…ˆã«æ•µãŒã„ã‚‹ï¼ã€Œè¡Œå‹•(Action)ã€
 
                                 playerTactics = {
                                     type: "action",
@@ -327,7 +382,7 @@ namespace Scene {
                                     actionTime: 250,
                                 };
 
-                                // ƒvƒŒƒCƒ„[‚Ìs“®A“G‚Ìs“®‚ÌŒˆ’èA“G‚Ìs“®ˆ—AˆÚ“®Às‚Ì‡‚Ås‚¤
+                                // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•ã€æ•µã®è¡Œå‹•ã®æ±ºå®šã€æ•µã®è¡Œå‹•å‡¦ç†ã€ç§»å‹•å®Ÿè¡Œã®é †ã§è¡Œã†
                                 turnStateStack.unshift(
                                     [TurnState.PlayerAction, null],
                                     [TurnState.EnemyAI, null],
@@ -337,7 +392,7 @@ namespace Scene {
                                 );
                                 continue stateloop;
                             } else {
-                                // ˆÚ“®æ‚É“G‚Í‚¢‚È‚¢uˆÚ“®(Move)v
+                                // ç§»å‹•å…ˆã«æ•µã¯ã„ãªã„ï¼ã€Œç§»å‹•(Move)ã€
 
                                 playerTactics = {
                                     type: "move",
@@ -346,7 +401,7 @@ namespace Scene {
                                     actionTime: 250,
                                 };
 
-                                // “G‚Ìs“®‚ÌŒˆ’èAˆÚ“®ÀsA“G‚Ìs“®ˆ—A‚Ì‡‚Ås‚¤B
+                                // æ•µã®è¡Œå‹•ã®æ±ºå®šã€ç§»å‹•å®Ÿè¡Œã€æ•µã®è¡Œå‹•å‡¦ç†ã€ã®é †ã§è¡Œã†ã€‚
                                 turnStateStack.unshift(
                                     [TurnState.EnemyAI, null],
                                     [TurnState.Move, null],
@@ -359,7 +414,7 @@ namespace Scene {
                         }
 
                     case TurnState.PlayerAction: {
-                        // ƒvƒŒƒCƒ„[‚Ìs“®ŠJn
+                        // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•é–‹å§‹
                         turnStateStack[0][0] = TurnState.PlayerActionRunning;
                         turnStateStack[0][1] = 0;
                         player.setDir(playerTactics.moveDir);
@@ -367,7 +422,7 @@ namespace Scene {
                         // fallthrough
                     }
                     case TurnState.PlayerActionRunning: {
-                        // ƒvƒŒƒCƒ„[‚Ìs“®’†
+                        // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•ä¸­
                         const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
                         player.setAnimation("action", rate);
                         if (rate > 0.5 && turnStateStack[0][1] === 0) {
@@ -388,25 +443,25 @@ namespace Scene {
                                 targetMonster.life -= 5;
                                 if (targetMonster.life <= 0) {
                                     targetMonster.life = 0;
-                                    // “G‚ğ€–Só‘Ô‚É‚·‚é
+                                    // æ•µã‚’æ­»äº¡çŠ¶æ…‹ã«ã™ã‚‹
                                     // explosion
                                     Game.getSound().reqPlayChannel("explosion");
-                                    // €–Sˆ—‚ğŠ„‚è‚İ‚Ås‚í‚¹‚é
+                                    // æ­»äº¡å‡¦ç†ã‚’å‰²ã‚Šè¾¼ã¿ã§è¡Œã‚ã›ã‚‹
                                     turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
                                 }
                             }
                         }
                         if (rate >= 1) {
-                            // ƒvƒŒƒCƒ„[‚Ìs“®I—¹
+                            // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¡Œå‹•çµ‚äº†
                             turnStateStack.shift();
                             player.setAnimation("move", 0);
                         }
                         break stateloop;
                     }
                     case TurnState.EnemyAI: {
-                        // “G‚Ìs“®‚ÌŒˆ’è
+                        // æ•µã®è¡Œå‹•ã®æ±ºå®š
 
-                        // ƒvƒŒƒCƒ„[‚ªˆÚ“®‚·‚éê‡AˆÚ“®æ‚É‚¢‚é‚Æ‘z’è‚µ‚Ä“G‚Ìs“®‚ğŒˆ’è‚·‚é
+                        // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãŒç§»å‹•ã™ã‚‹å ´åˆã€ç§»å‹•å…ˆã«ã„ã‚‹ã¨æƒ³å®šã—ã¦æ•µã®è¡Œå‹•ã‚’æ±ºå®šã™ã‚‹
                         let px = player.x;
                         let py = player.y;
                         if (playerTactics.type === "move") {
@@ -419,12 +474,12 @@ namespace Scene {
                         monstersTactics.length = monsters.length;
                         monstersTactics.fill(null);
 
-                        // s“®(Action)‚ÆˆÚ“®(Move)‚Í•ª—£‚µ‚È‚¢‚ÆˆÚ“®‚Å“G‚ªd‚È‚é
+                        // è¡Œå‹•(Action)ã¨ç§»å‹•(Move)ã¯åˆ†é›¢ã—ãªã„ã¨ç§»å‹•ã§æ•µãŒé‡ãªã‚‹
 
-                        // s“®(Action)‚·‚é“G‚ğŒˆ’è
+                        // è¡Œå‹•(Action)ã™ã‚‹æ•µã‚’æ±ºå®š
                         monsters.forEach((monster, i) => {
                             if (monster.life <= 0) {
-                                // €–Só‘Ô‚È‚Ì‚Å‰½‚à‚µ‚È‚¢
+                                // æ­»äº¡çŠ¶æ…‹ãªã®ã§ä½•ã‚‚ã—ãªã„
                                 monstersTactics[i] = {
                                     type: "dead",
                                     moveDir: 5,
@@ -436,9 +491,9 @@ namespace Scene {
                             const dx = px - monster.x;
                             const dy = py - monster.y;
                             if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                // ˆÚ“®æ‚ÌƒvƒŒƒCƒ„[ˆÊ’u‚ÍŒ»İˆÊ’u‚É—×Ú‚µ‚Ä‚¢‚é‚Ì‚ÅAs“®(Action)‚ğ‘I‘ğ
+                                // ç§»å‹•å…ˆã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ä½ç½®ã¯ç¾åœ¨ä½ç½®ã«éš£æ¥ã—ã¦ã„ã‚‹ã®ã§ã€è¡Œå‹•(Action)ã‚’é¸æŠ
                                 const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
-                                // “G‘S‘Ì‚ÌˆÚ“®•s”\À•W‚É©•ª‚ğİ’è
+                                // æ•µå…¨ä½“ã®ç§»å‹•ä¸èƒ½åº§æ¨™ã«è‡ªåˆ†ã‚’è¨­å®š
                                 cannotMoveMap.value(monster.x, monster.y, 1);
                                 monstersTactics[i] = {
                                     type: "action",
@@ -452,8 +507,8 @@ namespace Scene {
                             }
                         });
 
-                        // ˆÚ“®(Move)‚·‚é“G‚ÌˆÚ“®æ‚ğŒˆ’è‚·‚é
-                        // Å—Ç‚ÌˆÚ“®æ‚ÉˆÚ“®‘O‚ÌƒLƒƒƒ‰ƒNƒ^[‚ª‘¶İ‚·‚é‚±‚Æ‚ğl—¶‚µ‚ÄˆÚ“®ˆ—‚ª”­¶‚µ‚È‚­‚È‚é‚Ü‚ÅŒvZ‚ğŒJ‚è•Ô‚·B
+                        // ç§»å‹•(Move)ã™ã‚‹æ•µã®ç§»å‹•å…ˆã‚’æ±ºå®šã™ã‚‹
+                        // æœ€è‰¯ã®ç§»å‹•å…ˆã«ç§»å‹•å‰ã®ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ãŒå­˜åœ¨ã™ã‚‹ã“ã¨ã‚’è€ƒæ…®ã—ã¦ç§»å‹•å‡¦ç†ãŒç™ºç”Ÿã—ãªããªã‚‹ã¾ã§è¨ˆç®—ã‚’ç¹°ã‚Šè¿”ã™ã€‚
                         let changed = true;
                         while (changed) {
                             changed = false;
@@ -462,14 +517,14 @@ namespace Scene {
                                 const dy = py - monster.y;
                                 if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
                                     if (monstersTactics[i] == null) {
-                                        console.error("Action‚·‚×‚«“G‚Ì“®ì‚ªŒˆ’è‚µ‚Ä‚¢‚È‚¢");
+                                        console.error("Actionã™ã¹ãæ•µã®å‹•ä½œãŒæ±ºå®šã—ã¦ã„ãªã„");
                                     }
                                     return;
                                 } else if (monstersTactics[i] == null) {
-                                    // ˆÚ“®æ‚ÌƒvƒŒƒCƒ„[ˆÊ’u‚ÍŒ»İˆÊ’u‚É—×Ú‚µ‚Ä‚¢‚È‚¢‚Ì‚ÅAˆÚ“®(Move)‚ğ‘I‘ğ
-                                    // ‚Æ‚è‚ ‚¦‚¸²‡‚í‚¹í—ª‚Å“®‚­
+                                    // ç§»å‹•å…ˆã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ä½ç½®ã¯ç¾åœ¨ä½ç½®ã«éš£æ¥ã—ã¦ã„ãªã„ã®ã§ã€ç§»å‹•(Move)ã‚’é¸æŠ
+                                    // ã¨ã‚Šã‚ãˆãšè»¸åˆã‚ã›æˆ¦ç•¥ã§å‹•ã
 
-                                    // ˆÚ“®æ‚ÌŒó•â•\‚©‚çÅ—Ç‚ÌˆÚ“®æ‚ğ‘I‚Ô
+                                    // ç§»å‹•å…ˆã®å€™è£œè¡¨ã‹ã‚‰æœ€è‰¯ã®ç§»å‹•å…ˆã‚’é¸ã¶
                                     const cands = [
                                         [Math.sign(dx), Math.sign(dy)],
                                         (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
@@ -484,7 +539,7 @@ namespace Scene {
                                             (map.layer[0].chips.value(tx, ty) === 1 ||
                                                 map.layer[0].chips.value(tx, ty) === 10)) {
                                             const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
-                                            // “G‘S‘Ì‚ÌˆÚ“®•s”\À•W‚É©•ª‚ğİ’è
+                                            // æ•µå…¨ä½“ã®ç§»å‹•ä¸èƒ½åº§æ¨™ã«è‡ªåˆ†ã‚’è¨­å®š
                                             cannotMoveMap.value(tx, ty, 1);
                                             monstersTactics[i] = {
                                                 type: "move",
@@ -496,8 +551,8 @@ namespace Scene {
                                             return;
                                         }
                                     }
-                                    // ˆÚ“®æ‚ª‘S•”ˆÚ“®•s”\‚¾‚Á‚½‚Ì‚Å‘Ò‹@‚ğ‘I‘ğ
-                                    // “G‘S‘Ì‚ÌˆÚ“®•s”\À•W‚É©•ª‚ğİ’è
+                                    // ç§»å‹•å…ˆãŒå…¨éƒ¨ç§»å‹•ä¸èƒ½ã ã£ãŸã®ã§å¾…æ©Ÿã‚’é¸æŠ
+                                    // æ•µå…¨ä½“ã®ç§»å‹•ä¸èƒ½åº§æ¨™ã«è‡ªåˆ†ã‚’è¨­å®š
                                     cannotMoveMap.value(monster.x, monster.y, 1);
                                     monstersTactics[i] = {
                                         type: "idle",
@@ -510,12 +565,12 @@ namespace Scene {
                                 }
                             });
                         }
-                        // “G‚Ìs“®‚ÌŒˆ’è‚ÌI—¹
+                        // æ•µã®è¡Œå‹•ã®æ±ºå®šã®çµ‚äº†
                         turnStateStack.shift();
                         continue stateloop;
                     }
                     case TurnState.EnemyAction: {
-                        // “G‚Ìs“®ŠJn
+                        // æ•µã®è¡Œå‹•é–‹å§‹
                         let enemyId = turnStateStack[0][1];
                         while (enemyId < monstersTactics.length) {
                             if (monstersTactics[enemyId].type !== "action") {
@@ -524,7 +579,7 @@ namespace Scene {
                                 break;
                             }
                         }
-                        // ˆÚ“®‚Æˆá‚¢As“®‚Ìê‡‚Í‚PƒLƒƒƒ‰‚Ã‚Âs“®‚ğs‚¤B
+                        // ç§»å‹•ã¨é•ã„ã€è¡Œå‹•ã®å ´åˆã¯ï¼‘ã‚­ãƒ£ãƒ©ã¥ã¤è¡Œå‹•ã‚’è¡Œã†ã€‚
                         if (enemyId < monstersTactics.length) {
                             monstersTactics[enemyId].startTime = ms;
                             monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
@@ -534,13 +589,13 @@ namespace Scene {
                             turnStateStack[0][2] = 0;
                             continue stateloop;
                         } else {
-                            // ‚à‚¤“®‚©‚·“G‚ª‚¢‚È‚¢
+                            // ã‚‚ã†å‹•ã‹ã™æ•µãŒã„ãªã„
                             turnStateStack.shift();
                             continue stateloop;
                         }
                     }
                     case TurnState.EnemyActionRunning: {
-                        // “G‚Ìs“®’†
+                        // æ•µã®è¡Œå‹•ä¸­
                         const enemyId = turnStateStack[0][1];
 
                         const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
@@ -560,7 +615,7 @@ namespace Scene {
                             ));
                         }
                         if (rate >= 1) {
-                            // s“®I—¹BŸ‚Ì“G‚Ö
+                            // è¡Œå‹•çµ‚äº†ã€‚æ¬¡ã®æ•µã¸
                             monsters[enemyId].setAnimation("move", 0);
                             turnStateStack[0][0] = TurnState.EnemyAction;
                             turnStateStack[0][1] = enemyId + 1;
@@ -569,7 +624,7 @@ namespace Scene {
                     }
                     case TurnState.EnemyDead:
                         {
-                            // “G‚Ì€–SŠJn
+                            // æ•µã®æ­»äº¡é–‹å§‹
                             turnStateStack[0][0] = TurnState.EnemyDeadRunning;
                             const enemyId = turnStateStack[0][1];
                             turnStateStack[0][2] = ms;
@@ -579,7 +634,7 @@ namespace Scene {
                         }
                     case TurnState.EnemyDeadRunning:
                         {
-                            // “G‚Ì€–S
+                            // æ•µã®æ­»äº¡
                             turnStateStack[0][0] = TurnState.EnemyDeadRunning;
                             const enemyId = turnStateStack[0][1];
                             const diff = ms - turnStateStack[0][2];
@@ -590,7 +645,7 @@ namespace Scene {
                             break stateloop;
                         }
                     case TurnState.Move: {
-                        // ˆÚ“®ŠJn
+                        // ç§»å‹•é–‹å§‹
                         turnStateStack[0][0] = TurnState.MoveRunning;
                         monstersTactics.forEach((monsterTactic, i: number) => {
                             if (monsterTactic.type === "move") {
@@ -607,7 +662,7 @@ namespace Scene {
                         // fallthrough
                     }
                     case TurnState.MoveRunning: {
-                        // ˆÚ“®Às
+                        // ç§»å‹•å®Ÿè¡Œ
                         let finish = true;
                         monstersTactics.forEach((monsterTactic, i: number) => {
                             if (monsterTactic == null) {
@@ -618,7 +673,7 @@ namespace Scene {
                                 monsters[i].setDir(monsterTactic.moveDir);
                                 monsters[i].setAnimation("move", rate);
                                 if (rate < 1) {
-                                    finish = false; // s“®I—¹‚µ‚Ä‚¢‚È‚¢ƒtƒ‰ƒO‚ğƒZƒbƒg
+                                    finish = false; // è¡Œå‹•çµ‚äº†ã—ã¦ã„ãªã„ãƒ•ãƒ©ã‚°ã‚’ã‚»ãƒƒãƒˆ
                                 }
                             }
                         });
@@ -627,11 +682,11 @@ namespace Scene {
                             player.setDir(playerTactics.moveDir);
                             player.setAnimation("move", rate);
                             if (rate < 1) {
-                                finish = false; // s“®I—¹‚µ‚Ä‚¢‚È‚¢ƒtƒ‰ƒO‚ğƒZƒbƒg
+                                finish = false; // è¡Œå‹•çµ‚äº†ã—ã¦ã„ãªã„ãƒ•ãƒ©ã‚°ã‚’ã‚»ãƒƒãƒˆ
                             }
                         }
                         if (finish) {
-                            // s“®I—¹
+                            // è¡Œå‹•çµ‚äº†
                             turnStateStack.shift();
 
                             monstersTactics.forEach((monsterTactic, i) => {
@@ -651,10 +706,10 @@ namespace Scene {
                                 player.setAnimation("move", 0);
                             }
 
-                            // Œ»İˆÊ’u‚Ìƒ}ƒbƒvƒ`ƒbƒv‚ğæ“¾
+                            // ç¾åœ¨ä½ç½®ã®ãƒãƒƒãƒ—ãƒãƒƒãƒ—ã‚’å–å¾—
                             const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
                             if (chip === 10) {
-                                // ŠK’i‚È‚Ì‚ÅŸ‚ÌŠK‘w‚ÉˆÚ“®‚³‚¹‚éB
+                                // éšæ®µãªã®ã§æ¬¡ã®éšå±¤ã«ç§»å‹•ã•ã›ã‚‹ã€‚
                                 this.next("nextfloor");
                             }
 
@@ -662,7 +717,7 @@ namespace Scene {
                         break stateloop;
                     }
                     case TurnState.TurnEnd: {
-                        // ƒ^[ƒ“I—¹
+                        // ã‚¿ãƒ¼ãƒ³çµ‚äº†
                         turnStateStack.shift();
                         monsters = monsters.filter(x => x.life > 0);
                         break stateloop;
@@ -671,7 +726,7 @@ namespace Scene {
                 break;
             }
 
-            // ƒJƒƒ‰‚ğXV
+            // ã‚«ãƒ¡ãƒ©ã‚’æ›´æ–°
             map.update({
                 viewpoint: {
                     x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
@@ -682,7 +737,7 @@ namespace Scene {
             },
             );
 
-            // ƒXƒvƒ‰ƒCƒg‚ğXV
+            // ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã‚’æ›´æ–°
             sprites = sprites.filter((x) => {
                 return !x.update(delta, ms);
             });
@@ -690,7 +745,8 @@ namespace Scene {
             updateLighting((v: number) => v === 1 || v === 10);
 
             if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                Game.getSceneManager().push(mapview, { map: map, player: player });
+                //Game.getSceneManager().push(mapview, { map: map, player: player });
+                Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
             }
 
         };
@@ -709,8 +765,66 @@ namespace Scene {
         });
 
         Game.getSceneManager().pop();
-        Game.getSceneManager().push(dungeon, { player, floor: floor + 1 });
+        Game.getSceneManager().push(dungeon, { player: player, floor: floor + 1 });
 
     }
 
+
+    function* statusView(opt: { player: Charactor.Player, floor: number, upperdraw: () => void }) {
+        var closeButton = {
+            x: Game.getScreen().offscreenWidth - 20,
+            y: 20,
+            radius: 10
+        };
+
+        this.draw = () => {
+            opt.upperdraw();
+            Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
+            Game.getScreen().fillRect(20, 20, Game.getScreen().offscreenWidth - 40, Game.getScreen().offscreenHeight - 40);
+
+            // é–‰ã˜ã‚‹ãƒœã‚¿ãƒ³
+            Game.getScreen().save();
+            Game.getScreen().beginPath();
+            Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
+            Game.getScreen().lineWidth = 6;
+            Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().stroke();
+            Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
+            Game.getScreen().lineWidth = 3;
+            Game.getScreen().stroke();
+            Game.getScreen().restore();
+
+            // ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ï¼ˆãƒ€ãƒŸãƒ¼ï¼‰
+            Game.getScreen().fillStyle = 'rgb(0,0,0)';
+            Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+            Game.getScreen().fillText('ï¼¬ï¼¶ï¼šï¼™ï¼™', 30, 30 + 11*0);
+            Game.getScreen().fillText('ï¼¨ï¼°ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 1);
+            Game.getScreen().fillText('ï¼­ï¼°ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 2);
+            Game.getScreen().fillText('ç­‹åŠ›ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 3);
+            Game.getScreen().fillText('ä½“åŠ›ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 4);
+            Game.getScreen().fillText('çŸ¥æ€§ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 5);
+            Game.getScreen().fillText('ç²¾ç¥ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 6);
+            Game.getScreen().fillText('å™¨ç”¨ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 7);
+            Game.getScreen().fillText('æ•æ·ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 8);
+            Game.getScreen().fillText('å¹¸é‹ï¼šï¼™ï¼™ï¼™', 30, 30 + 11 * 9);
+
+            Game.getScreen().fillText('ã‚¢ã‚¤ã‚¹ã‚½ãƒ¼ãƒ‰', 30, 30 + 11 * 12);
+            Game.getScreen().fillText('ã‚¢ã‚¤ã‚¢ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆ', 30, 30 + 11 * 13);
+            Game.getScreen().fillText('æ˜Ÿã®è…•è¼ª', 30, 30 + 11 * 14);
+            Game.getScreen().fillText('éŸ‹é§„å¤©ã®é´', 30, 30 + 11 * 15);
+            
+        }
+        yield waitClick({
+            end: (x, y) => {
+                this.next();
+            }
+        });
+        Game.getSceneManager().pop();
+    }
+
 }
+

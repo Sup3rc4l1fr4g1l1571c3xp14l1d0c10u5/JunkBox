@@ -14,14 +14,16 @@ namespace Charactor {
         sprite: SpriteAnimation.SpriteSheet;
     }
 
-    export async function loadCharactorConfigFromFile(path: string): Promise<CharactorConfig> {
+    export async function loadCharactorConfigFromFile(path: string, loadStartCallback: () => void, loadEndCallback: () => void): Promise<CharactorConfig> {
         const configDirectory = path.substring(0, path.lastIndexOf("/"));
 
-        // キャラクタの設定ファイルを読み取る
+        // 繧ｭ繝｣繝ｩ繧ｯ繧ｿ縺ｮ險ｭ螳壹ヵ繧｡繧､繝ｫ繧定ｪｭ縺ｿ蜿悶ｋ
+        loadStartCallback();
         const charactorConfigJson: ICharactorConfigJson = await ajax(path, "json").then(x => x.response as ICharactorConfigJson);
+        loadEndCallback();
 
         const spriteSheetPath: string = configDirectory + "/" + charactorConfigJson.sprite;
-        const sprite: SpriteAnimation.SpriteSheet = await SpriteAnimation.loadSpriteSheet(spriteSheetPath, {});
+        const sprite: SpriteAnimation.SpriteSheet = await SpriteAnimation.loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback);
 
         return new CharactorConfig({
             id: charactorConfigJson.id,
@@ -71,9 +73,11 @@ namespace Charactor {
 
         public static playerConfigs: Map<string, CharactorConfig> = new Map<string, CharactorConfig>();
         public static async loadCharactorConfigs(loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
+            loadStartCallback();
             const configPaths: string[] = await ajax(Player.configFilePath, "json").then((x) => x.response as string[]);
+            loadStartCallback();
             const rootDirectory = getDirectory(Player.configFilePath);
-            const configs = await Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+            const configs = await Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback) ));
             Player.playerConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map<string, CharactorConfig>());
             return;
         }
@@ -95,6 +99,7 @@ namespace Charactor {
         public x: number;
         public y: number;
         public life: number;
+        public maxLife: number;
 
         private static configFilePath: string = "./assets/monster/monster.json";
 
@@ -102,7 +107,9 @@ namespace Charactor {
         public static async loadCharactorConfigs(loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
             const configPaths: string[] = await ajax(Monster.configFilePath, "json").then((x) => x.response as string[]);
             const rootDirectory = getDirectory(Monster.configFilePath);
-            const configs = await Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+            loadStartCallback();
+            const configs = await Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
+            loadEndCallback();
             Monster.monsterConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map<string, CharactorConfig>());
             return;
         }
@@ -114,11 +121,13 @@ namespace Charactor {
             x: number,
             y: number,
             life: number;
+            maxLife: number;
         }) {
             const charactorConfig = Monster.monsterConfigs.get(config.charactorId);
             super(config.x, config.y, charactorConfig.sprite);
             this.charactorConfig = charactorConfig;
             this.life = config.life;
+            this.maxLife = config.maxLife;
         }
     }
 
