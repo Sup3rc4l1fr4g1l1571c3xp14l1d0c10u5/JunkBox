@@ -1,47 +1,3 @@
-interface FontFace {
-    family: string;
-    style: string;
-    weight: string;
-    stretch: string;
-    unicodeRange: string;
-    variant: string;
-    featureSettings: string;
-
-    status: string;
-
-    load(): Promise<FontFace>;
-
-    loaded: Promise<FontFace>;
-}
-
-declare class FontFace {
-    constructor(fontname: string, css: string, option: any);
-}
-
-interface FontFaceSet extends Set<FontFace> {
-    onloading: (ev: Event) => any;
-    onloadingdone: (ev: Event) => any;
-    onloadingerror: (ev: Event) => any;
-
-    // check and start loads if appropriate
-    // and fulfill promise when all loads complete
-    load(font: string, text?: string): Promise<ArrayLike<FontFace>>;
-
-    // return whether all fonts in the fontlist are loaded
-    // (does not initiate load if not available)
-    check(font: string, text?: string): boolean;
-
-    // async notification that font loading and layout operations are done
-    ready: Promise<FontFaceSet>;
-
-    // loading state, "loading" while one or more fonts loading, "loaded" otherwise
-    status: string;
-}
-
-interface Document {
-    fonts: FontFaceSet;
-}
-
 namespace Scene {
     export function* boot(): IterableIterator<any> {
         let n: number = 0;
@@ -75,6 +31,8 @@ namespace Scene {
                 mapchip: "./assets/mapchip.png",
                 charactor: "./assets/charactor.png",
                 font7px: "./assets/font7px.png",
+                "shop/bg": "./assets/shop/bg.png",
+                "shop/J11": "./assets/shop/J11.png",
             },
                 () => { reqResource++; },
                 () => { loadedResource++; },
@@ -86,12 +44,13 @@ namespace Scene {
                 kaidan: "./assets/sound/kaidan.mp3",
                 atack: "./assets/sound/se_attacksword_1.mp3",
                 explosion: "./assets/sound/explosion03.mp3",
+                cursor: "./assets/sound/cursor.mp3",
             },
                 () => { reqResource++; },
                 () => { loadedResource++; },
             ).catch((ev) => console.log("failed2", ev)),
-            Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
-            Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            //Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            //Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
                 reqResource++;
                 return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
@@ -100,7 +59,8 @@ namespace Scene {
                 loadedResource++;
             })
         ]).then(() => {
-            Game.getSceneManager().push(title, null);
+            //Game.getSceneManager().push(title, null);
+            Game.getSceneManager().push(shop, null);
             this.next();
         });
         yield (delta: number, ms: number) => {

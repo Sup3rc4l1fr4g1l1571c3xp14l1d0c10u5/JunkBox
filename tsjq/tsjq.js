@@ -7,6 +7,601 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var Dispatcher;
+(function (Dispatcher) {
+    class SingleDispatcher {
+        constructor() {
+            this.listeners = [];
+        }
+        clear() {
+            this.listeners.length = 0;
+            return this;
+        }
+        on(listener) {
+            this.listeners.push(listener);
+            return this;
+        }
+        off(listener) {
+            const index = this.listeners.indexOf(listener);
+            if (index !== -1) {
+                this.listeners.splice(index, 1);
+            }
+            return this;
+        }
+        fire(...args) {
+            const temp = this.listeners.slice();
+            temp.forEach((dispatcher) => dispatcher.apply(this, args));
+            return this;
+        }
+        one(listener) {
+            var func = (...args) => {
+                var result = listener.apply(this, args);
+                this.off(func);
+                return result;
+            };
+            this.on(func);
+            return this;
+        }
+    }
+    Dispatcher.SingleDispatcher = SingleDispatcher;
+    class EventDispatcher {
+        constructor() {
+            this.listeners = new Map();
+        }
+        on(eventName, listener) {
+            if (!this.listeners.has(eventName)) {
+                this.listeners.set(eventName, new SingleDispatcher());
+            }
+            this.listeners.get(eventName).on(listener);
+            return this;
+        }
+        off(eventName, listener) {
+            this.listeners.get(eventName).off(listener);
+            return this;
+        }
+        fire(eventName, ...args) {
+            if (this.listeners.has(eventName)) {
+                const dispatcher = this.listeners.get(eventName);
+                dispatcher.fire.apply(dispatcher, args);
+            }
+            return this;
+        }
+        one(eventName, listener) {
+            if (!this.listeners.has(eventName)) {
+                this.listeners.set(eventName, new SingleDispatcher());
+            }
+            this.listeners.get(eventName).one(listener);
+            return this;
+        }
+        hasEventListener(eventName) {
+            return this.listeners.has(eventName);
+        }
+        clearEventListener(eventName) {
+            if (this.listeners.has(eventName)) {
+                this.listeners.get(eventName).clear();
+            }
+            return this;
+        }
+    }
+    Dispatcher.EventDispatcher = EventDispatcher;
+})(Dispatcher || (Dispatcher = {}));
+var Game;
+(function (Game) {
+    var GUI;
+    (function (GUI) {
+        function isHit(ui, x, y) {
+            const dx = x - ui.left;
+            const dy = y - ui.top;
+            return (0 <= dx && dx < ui.width) && (0 <= dy && dy < ui.height);
+        }
+        GUI.isHit = isHit;
+        class UIDispatcher extends Dispatcher.EventDispatcher {
+            constructor() {
+                super();
+            }
+            onClick(ui, handler) {
+                this.on("pointerdown", (x, y) => {
+                    if (!Game.getScreen().pagePointContainScreen(x, y)) {
+                        return;
+                    }
+                    const [cx, cy] = Game.getScreen().pagePointToScreenPoint(x, y);
+                    if (!isHit(ui, cx, cy)) {
+                        return;
+                    }
+                    let dx = 0;
+                    let dy = 0;
+                    const onPointerMoveHandler = (x, y) => {
+                        const [_x, _y] = Game.getScreen().pagePointToScreenPoint(x, y);
+                        dx += Math.abs(_x - cx);
+                        dy += Math.abs(_y - cy);
+                    };
+                    const onPointerUpHandler = (x, y) => {
+                        this.off("pointermove", onPointerMoveHandler);
+                        this.off("pointerup", onPointerUpHandler);
+                        if (dx + dy < 5) {
+                            const [_x, _y] = Game.getScreen().pagePointToScreenPoint(x, y);
+                            handler(_x - ui.left, _y - ui.top);
+                        }
+                    };
+                    this.on("pointermove", onPointerMoveHandler);
+                    this.on("pointerup", onPointerUpHandler);
+                });
+            }
+            onNcClick(ui, handler) {
+                this.on("pointerdown", (x, y) => {
+                    if (!Game.getScreen().pagePointContainScreen(x, y)) {
+                        return;
+                    }
+                    const [cx, cy] = Game.getScreen().pagePointToScreenPoint(x, y);
+                    if (isHit(ui, cx, cy)) {
+                        return;
+                    }
+                    let dx = 0;
+                    let dy = 0;
+                    const onPointerMoveHandler = (x, y) => {
+                        const [_x, _y] = Game.getScreen().pagePointToScreenPoint(x, y);
+                        dx += Math.abs(_x - cx);
+                        dy += Math.abs(_y - cy);
+                    };
+                    const onPointerUpHandler = (x, y) => {
+                        this.off("pointermove", onPointerMoveHandler);
+                        this.off("pointerup", onPointerUpHandler);
+                        if (dx + dy < 5) {
+                            const [_x, _y] = Game.getScreen().pagePointToScreenPoint(x, y);
+                            handler(_x - ui.left, _y - ui.top);
+                        }
+                    };
+                    this.on("pointermove", onPointerMoveHandler);
+                    this.on("pointerup", onPointerUpHandler);
+                });
+            }
+            onSwipe(ui, handler) {
+                this.on("pointerdown", (x, y) => {
+                    if (!Game.getScreen().pagePointContainScreen(x, y)) {
+                        return;
+                    }
+                    let [cx, cy] = Game.getScreen().pagePointToScreenPoint(x, y);
+                    if (!isHit(ui, cx, cy)) {
+                        return;
+                    }
+                    const onPointerMoveHandler = (x, y) => {
+                        const [_x, _y] = Game.getScreen().pagePointToScreenPoint(x, y);
+                        let dx = (~~_x - ~~cx);
+                        let dy = (~~_y - ~~cy);
+                        cx = _x;
+                        cy = _y;
+                        handler(dx, dy, _x - ui.left, _y - ui.top);
+                    };
+                    const onPointerUpHandler = (x, y) => {
+                        this.off("pointermove", onPointerMoveHandler);
+                        this.off("pointerup", onPointerUpHandler);
+                    };
+                    this.on("pointermove", onPointerMoveHandler);
+                    this.on("pointerup", onPointerUpHandler);
+                    handler(0, 0, cx - ui.left, cy - ui.top);
+                });
+            }
+        }
+        GUI.UIDispatcher = UIDispatcher;
+        class TextBox {
+            constructor(left, top, width, height, { text = "", edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, font = undefined, fontColor = `rgb(0,0,0)`, textAlign = "left", textBaseline = "top", }) {
+                this.left = left;
+                this.top = top;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.edgeColor = edgeColor;
+                this.color = color;
+                this.font = font;
+                this.fontColor = fontColor;
+                this.textAlign = textAlign;
+                this.textBaseline = textBaseline;
+            }
+            draw() {
+                Game.getScreen().beginPath();
+                Game.getScreen().moveTo(9 - 0.5, 1 - 0.5);
+                Game.getScreen().bezierCurveTo(1 - 0.5, 1 - 0.5, 1 - 0.5, 42 - 0.5, 9 - 0.5, 42 - 0.5);
+                Game.getScreen().lineTo(242 - 0.5, 42 - 0.5);
+                Game.getScreen().bezierCurveTo(250 - 0.5, 42 - 0.5, 250 - 0.5, 1 - 0.5, 242 - 0.5, 1 - 0.5);
+                Game.getScreen().lineTo(9 - 0.5, 1 - 0.5);
+                Game.getScreen().closePath();
+                Game.getScreen().fillStyle = this.color;
+                Game.getScreen().fill();
+                Game.getScreen().strokeStyle = this.edgeColor;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().stroke();
+                Game.getScreen().font = this.font;
+                Game.getScreen().fillStyle = this.fontColor;
+                const metrics = Game.getScreen().measureText(this.text);
+                Game.getScreen().textAlign = this.textAlign;
+                Game.getScreen().textBaseline = this.textBaseline;
+                this.text.split(/\n/).forEach((x, i) => {
+                    Game.getScreen().fillText(x, this.left + 8, this.top + i * (10 + 1) + 8);
+                });
+            }
+        }
+        GUI.TextBox = TextBox;
+        class Button {
+            constructor(left, top, width, height, { text = "button", edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, font = undefined, fontColor = `rgb(0,0,0)`, textAlign = "left", textBaseline = "top", }) {
+                this.left = left;
+                this.top = top;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.edgeColor = edgeColor;
+                this.color = color;
+                this.font = font;
+                this.fontColor = fontColor;
+                this.textAlign = textAlign;
+                this.textBaseline = textBaseline;
+            }
+            draw() {
+                Game.getScreen().fillStyle = this.color;
+                Game.getScreen().fillRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
+                Game.getScreen().strokeStyle = this.edgeColor;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
+                Game.getScreen().font = this.font;
+                Game.getScreen().fillStyle = this.fontColor;
+                const text = (this.text instanceof Function) ? this.text.call(this) : this.text;
+                const metrics = Game.getScreen().measureText(text);
+                Game.getScreen().textAlign = this.textAlign;
+                Game.getScreen().textBaseline = this.textBaseline;
+                text.split(/\n/).forEach((x, i) => {
+                    Game.getScreen().fillText(x, this.left + 2, this.top + i * (10 + 1) + 2);
+                });
+            }
+        }
+        GUI.Button = Button;
+        class ListBox {
+            constructor(left, top, width, height, { lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, }) {
+                this.left = left;
+                this.top = top;
+                this.width = width;
+                this.height = height;
+                this.lineHeight = lineHeight;
+                this.drawItem = drawItem;
+                this.getItemCount = getItemCount;
+                this.scrollValue = 0;
+            }
+            update() {
+                var contentHeight = this.getItemCount() * this.lineHeight;
+                if (this.height >= contentHeight) {
+                    this.scrollValue = 0;
+                }
+                else if (this.scrollValue < 0) {
+                    this.scrollValue = 0;
+                }
+                else if (this.scrollValue > (contentHeight - this.height)) {
+                    this.scrollValue = contentHeight - this.height;
+                }
+            }
+            draw() {
+                let sy = -(~~this.scrollValue % this.lineHeight);
+                let index = ~~((~~this.scrollValue) / this.lineHeight);
+                let itemCount = this.getItemCount();
+                let drawResionHeight = this.height - sy;
+                for (;;) {
+                    if (sy >= this.height) {
+                        break;
+                    }
+                    if (index >= itemCount) {
+                        break;
+                    }
+                    Game.getScreen().save();
+                    Game.getScreen().beginPath();
+                    Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1, Math.min(drawResionHeight, this.lineHeight));
+                    Game.getScreen().clip();
+                    this.drawItem(this.left, this.top + sy, this.width, this.lineHeight, index);
+                    Game.getScreen().restore();
+                    drawResionHeight -= this.lineHeight;
+                    sy += this.lineHeight;
+                    index++;
+                }
+            }
+            getItemIndexByPosition(x, y) {
+                if (x < 0 || this.width <= x || y < 0 || this.height <= y) {
+                    return -1;
+                }
+                const index = ~~((y + this.scrollValue) / this.lineHeight);
+                if (index < 0 || index >= this.getItemCount()) {
+                    return -1;
+                }
+                else {
+                    return index;
+                }
+            }
+        }
+        GUI.ListBox = ListBox;
+        class HorizontalSlider {
+            constructor(left, top, width, height, { sliderWidth = 5, edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, bgColor = `rgb(192,192,192)`, font = undefined, fontColor = `rgb(0,0,0)`, minValue = 0, maxValue = 0, }) {
+                this.left = left;
+                this.top = top;
+                this.width = width;
+                this.height = height;
+                this.sliderWidth = sliderWidth;
+                this.edgeColor = edgeColor;
+                this.color = color;
+                this.bgColor = bgColor;
+                this.font = font;
+                this.fontColor = fontColor;
+                this.minValue = minValue;
+                this.maxValue = maxValue;
+                this.value = minValue;
+            }
+            draw() {
+                const lineWidth = this.width - this.sliderWidth;
+                Game.getScreen().fillStyle = this.bgColor;
+                Game.getScreen().fillRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
+                Game.getScreen().fillStyle = this.color;
+                Game.getScreen().strokeStyle = this.edgeColor;
+                Game.getScreen().fillRect(this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)) - 0.5, this.top - 0.5, this.sliderWidth, this.height);
+                Game.getScreen().strokeRect(this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)) - 0.5, this.top - 0.5, this.sliderWidth, this.height);
+            }
+            swipe(lx) {
+                const rangeSize = this.maxValue - this.minValue;
+                if (rangeSize == 0) {
+                    this.value = this.minValue;
+                }
+                else if (lx < 0) {
+                    this.value = this.minValue;
+                }
+                else if (lx >= this.width) {
+                    this.value = this.maxValue;
+                }
+                else {
+                    this.value = Math.trunc((lx * rangeSize) / this.width) + this.minValue;
+                }
+            }
+            update() {
+                const rangeSize = this.maxValue - this.minValue;
+                if (rangeSize == 0) {
+                    this.value = this.minValue;
+                }
+                else if (this.value < this.minValue) {
+                    this.value = this.minValue;
+                }
+                else if (this.value >= this.maxValue) {
+                    this.value = this.maxValue;
+                }
+            }
+        }
+        GUI.HorizontalSlider = HorizontalSlider;
+    })(GUI = Game.GUI || (Game.GUI = {}));
+})(Game || (Game = {}));
+var Scene;
+(function (Scene) {
+    function* shopBuyItem(opt) {
+        const uiComponents = [];
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
+            text: "�w����\n���܂��܂ȕ���E�A�C�e���̍w�����ł��܂��B",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
+            text: `������F${('            ' + 150 + 'G').substr(-13)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        let exitScene = false;
+        const btnExit = new Game.GUI.Button(8, 16 * 9 + 46, 112, 16, {
+            text: "�߂�",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.onClick(btnExit, (x, y) => {
+            exitScene = true;
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        const itemlist = [
+            "�݂���",
+            "���",
+            "�o�i�i",
+            "�I�����W",
+            "�p�C�i�b�v��",
+            "�ڂ񂽂�",
+            "�L�E�C",
+            "�p�p�C��",
+            "�}���S�[",
+            "�R�R�i�b�c",
+            "�Ԃǂ�",
+            "�Ȃ�",
+            "������",
+            "�h���S���t���[�c",
+        ];
+        let selectedItem = -1;
+        const listBox = new Game.GUI.ListBox(8, 46, 112, 8 * 16, {
+            lineHeight: 16,
+            getItemCount: () => itemlist.length,
+            drawItem: (left, top, width, height, index) => {
+                if (selectedItem == index) {
+                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                }
+                else {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                }
+                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                const metrics = Game.getScreen().measureText(itemlist[index]);
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(itemlist[index], left + 9, top + 3);
+            }
+        });
+        dispatcher.onSwipe(listBox, (deltaX, deltaY) => {
+            listBox.scrollValue -= deltaY;
+            listBox.update();
+        });
+        dispatcher.onClick(listBox, (x, y) => {
+            selectedItem = listBox.getItemIndexByPosition(x, y);
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            caption.draw();
+            btnExit.draw();
+            listBox.draw();
+            captionMonay.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (exitScene) {
+                this.next();
+            }
+        };
+        Game.getSceneManager().pop();
+    }
+    function* shop(opt) {
+        const uiComponents = [];
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
+            text: "�w����\n���܂��܂ȕ���E�A�C�e���̍w�����ł��܂��B",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        const btnBuy = new Game.GUI.Button(8, 20 * 0 + 46, 112, 16, {
+            text: "�A�C�e���w��",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.onClick(btnBuy, (x, y) => {
+            Game.getSceneManager().push(shopBuyItem, opt);
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        const btnSell = new Game.GUI.Button(8, 20 * 1 + 46, 112, 16, {
+            text: "�A�C�e�����p",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.onClick(btnBuy, (x, y) => {
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
+            text: `������F${('            ' + 150 + 'G').substr(-13)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        const hoverSlider = new Game.GUI.HorizontalSlider(135 + 14, 80, 108 - 28, 16, {
+            sliderWidth: 5,
+            updownButtonWidth: 10,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            minValue: 0,
+            maxValue: 100,
+        });
+        dispatcher.onSwipe(hoverSlider, (dx, dy, x, y) => {
+            hoverSlider.swipe(x);
+            hoverSlider.update();
+        });
+        const btnSliderDown = new Game.GUI.Button(135, 80, 14, 16, {
+            text: "�|",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.onClick(btnSliderDown, (x, y) => {
+            hoverSlider.value -= 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        const btnSliderUp = new Game.GUI.Button(243 - 14, 80, 14, 16, {
+            text: "�{",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.onClick(btnSliderUp, (x, y) => {
+            hoverSlider.value += 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        });
+        const captionBuyCount = new Game.GUI.Button(135, 64, 108, 16, {
+            text: () => `�w�����F${('           ' + hoverSlider.value + '��').substr(-12)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            caption.draw();
+            btnBuy.draw();
+            btnSell.draw();
+            captionMonay.draw();
+            hoverSlider.draw();
+            btnSliderDown.draw();
+            btnSliderUp.draw();
+            captionBuyCount.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+        };
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(Scene.title);
+    }
+    Scene.shop = shop;
+})(Scene || (Scene = {}));
 class XorShift {
     constructor(w = 0 | Date.now(), x, y, z) {
         if (x === undefined) {
@@ -113,84 +708,6 @@ function normalizePath(path) {
         return s;
     }, new Array()).join("/");
 }
-var Dispatcher;
-(function (Dispatcher) {
-    class SingleDispatcher {
-        constructor() {
-            this.listeners = [];
-        }
-        clear() {
-            this.listeners.length = 0;
-            return this;
-        }
-        on(listener) {
-            this.listeners.push(listener);
-            return this;
-        }
-        off(listener) {
-            const index = this.listeners.indexOf(listener);
-            if (index !== -1) {
-                this.listeners.splice(index, 1);
-            }
-            return this;
-        }
-        fire(...args) {
-            const temp = this.listeners.slice();
-            temp.forEach((dispatcher) => dispatcher.apply(this, args));
-            return this;
-        }
-        one(listener) {
-            var func = (...args) => {
-                var result = listener.apply(this, args);
-                this.off(func);
-                return result;
-            };
-            this.on(func);
-            return this;
-        }
-    }
-    Dispatcher.SingleDispatcher = SingleDispatcher;
-    class EventDispatcher {
-        constructor() {
-            this.listeners = new Map();
-        }
-        on(eventName, listener) {
-            if (!this.listeners.has(eventName)) {
-                this.listeners.set(eventName, new SingleDispatcher());
-            }
-            this.listeners.get(eventName).on(listener);
-            return this;
-        }
-        off(eventName, listener) {
-            this.listeners.get(eventName).off(listener);
-            return this;
-        }
-        fire(eventName, ...args) {
-            if (this.listeners.has(eventName)) {
-                const dispatcher = this.listeners.get(eventName);
-                dispatcher.fire.apply(dispatcher, args);
-            }
-            return this;
-        }
-        one(eventName, listener) {
-            if (!this.listeners.has(eventName)) {
-                this.listeners.set(eventName, new SingleDispatcher());
-            }
-            this.listeners.get(eventName).one(listener);
-            return this;
-        }
-        hasEventListener(eventName) {
-            return this.listeners.has(eventName);
-        }
-        clearEventListener(eventName) {
-            if (this.listeners.has(eventName)) {
-                this.listeners.get(eventName).clear();
-            }
-            return this;
-        }
-    }
-    Dispatcher.EventDispatcher = EventDispatcher;
-})(Dispatcher || (Dispatcher = {}));
 var Game;
 (function (Game) {
     class Video {
@@ -665,6 +1182,9 @@ var Game;
             isUp() {
                 return this.downup === -1;
             }
+            isMove() {
+                return (~~this.startPageX !== ~~this.lastPageX) || (~~this.startPageY !== ~~this.lastPageY);
+            }
             isClick() {
                 return this.clicked;
             }
@@ -673,6 +1193,8 @@ var Game;
             }
             startCapture() {
                 this.capture = true;
+                this.startPageX = ~~this.lastPageX;
+                this.startPageY = ~~this.lastPageY;
             }
             endCapture() {
                 this.capture = false;
@@ -2222,15 +2744,16 @@ var SpriteAnimation;
                 img.onload = () => {
                     resolve(img);
                 };
-                img.onerror = () => { reject(imageSrc + "�̃��[�h�Ɏ��s���܂����B"); };
+                img.onerror = () => { reject(imageSrc + "のロードに失敗しました。"); };
             });
         });
     }
-    function loadSpriteSheet(spriteSheetPath, { loadStartCallback = () => { }, loadEndCallback = () => { } }) {
+    function loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback) {
         return __awaiter(this, void 0, void 0, function* () {
-            loadStartCallback();
             const spriteSheetDir = getDirectory(spriteSheetPath);
+            loadStartCallback();
             const spriteSheetJson = yield ajax(spriteSheetPath, "json").then(y => y.response);
+            loadEndCallback();
             if (spriteSheetJson == null) {
                 throw new Error(spriteSheetPath + " is invalid json.");
             }
@@ -2240,7 +2763,9 @@ var SpriteAnimation;
                 for (let i = 0; i < keys.length; i++) {
                     const key = keys[i];
                     const imageSrc = spriteSheetDir + '/' + spriteSheetJson.source[key];
+                    loadStartCallback();
                     const image = yield loadImage(imageSrc);
+                    loadEndCallback();
                     source.set(key, image);
                 }
             }
@@ -2273,12 +2798,14 @@ var SpriteAnimation;
 })(SpriteAnimation || (SpriteAnimation = {}));
 var Charactor;
 (function (Charactor) {
-    function loadCharactorConfigFromFile(path) {
+    function loadCharactorConfigFromFile(path, loadStartCallback, loadEndCallback) {
         return __awaiter(this, void 0, void 0, function* () {
             const configDirectory = path.substring(0, path.lastIndexOf("/"));
+            loadStartCallback();
             const charactorConfigJson = yield ajax(path, "json").then(x => x.response);
+            loadEndCallback();
             const spriteSheetPath = configDirectory + "/" + charactorConfigJson.sprite;
-            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, {});
+            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback);
             return new CharactorConfig({
                 id: charactorConfigJson.id,
                 name: charactorConfigJson.name,
@@ -2310,15 +2837,33 @@ var Charactor;
             const charactorConfig = Player.playerConfigs.get(config.charactorId);
             super(config.x, config.y, charactorConfig.sprite);
             this.charactorConfig = charactorConfig;
+            this.hp = 100;
+            this.hpMax = 100;
+            this.mp = 100;
+            this.mpMax = 100;
+            this.gold = 0;
+            this.equips = [
+                { name: "竹刀", atk: 5, def: 0 },
+                { name: "体操着", atk: 0, def: 3 },
+                { name: "ブルマ", atk: 0, def: 2 },
+            ];
         }
         static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
             return __awaiter(this, void 0, void 0, function* () {
+                loadStartCallback();
                 const configPaths = yield ajax(Player.configFilePath, "json").then((x) => x.response);
+                loadStartCallback();
                 const rootDirectory = getDirectory(Player.configFilePath);
-                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
                 Player.playerConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
                 return;
             });
+        }
+        get atk() {
+            return this.equips.reduce((s, x) => s += x.atk, 0);
+        }
+        get def() {
+            return this.equips.reduce((s, x) => s += x.atk, 0);
         }
     }
     Player.configFilePath = "./assets/charactor/charactor.json";
@@ -2330,12 +2875,17 @@ var Charactor;
             super(config.x, config.y, charactorConfig.sprite);
             this.charactorConfig = charactorConfig;
             this.life = config.life;
+            this.maxLife = config.maxLife;
+            this.atk = config.atk;
+            this.def = config.def;
         }
         static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
             return __awaiter(this, void 0, void 0, function* () {
                 const configPaths = yield ajax(Monster.configFilePath, "json").then((x) => x.response);
                 const rootDirectory = getDirectory(Monster.configFilePath);
-                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x)));
+                loadStartCallback();
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
+                loadEndCallback();
                 Monster.monsterConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
                 return;
             });
@@ -2377,6 +2927,8 @@ var Scene;
                 mapchip: "./assets/mapchip.png",
                 charactor: "./assets/charactor.png",
                 font7px: "./assets/font7px.png",
+                "shop/bg": "./assets/shop/bg.png",
+                "shop/J11": "./assets/shop/J11.png",
             }, () => { reqResource++; }, () => { loadedResource++; }),
             Game.getSound().loadSoundsToChannel({
                 title: "./assets/sound/title.mp3",
@@ -2385,11 +2937,17 @@ var Scene;
                 kaidan: "./assets/sound/kaidan.mp3",
                 atack: "./assets/sound/se_attacksword_1.mp3",
                 explosion: "./assets/sound/explosion03.mp3",
+                cursor: "./assets/sound/cursor.mp3",
             }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
-            Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
-            Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; })
+            Promise.resolve().then(() => {
+                reqResource++;
+                return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
+            }).then((loadedFontFace) => {
+                document.fonts.add(loadedFontFace);
+                loadedResource++;
+            })
         ]).then(() => {
-            Game.getSceneManager().push(Scene.title, null);
+            Game.getSceneManager().push(Scene.shop, null);
             this.next();
         });
         yield (delta, ms) => {
@@ -2541,7 +3099,10 @@ var Scene;
                 charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
                 x: x.getLeft(),
                 y: x.getTop(),
-                life: 10
+                life: floor + 5,
+                maxLife: floor + 5,
+                atk: ~~(floor * 2),
+                def: ~~(floor / 3) + 1
             });
         });
         const map = new Dungeon.DungeonData({
@@ -2647,11 +3208,20 @@ var Scene;
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
                         const yy = monster.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) && (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
                             const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
                             const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
-                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
+                            const dx = xx * map.gridsize.width +
+                                camera.chipOffX +
+                                monster.offx +
+                                sprite.offsetX +
+                                animFrame.offsetX;
+                            const dy = yy * map.gridsize.height +
+                                camera.chipOffY +
+                                monster.offy +
+                                sprite.offsetY +
+                                animFrame.offsetY;
                             Game.getScreen().drawImage(monster.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, dx, dy, sprite.width, sprite.height);
                         }
                     });
@@ -2661,8 +3231,43 @@ var Scene;
                         Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY, sprite.width, sprite.height);
                     }
                 }
+                if (l === 1) {
+                    const camera = map.camera;
+                    monsters.forEach((monster) => {
+                        const xx = monster.x - camera.chipLeft;
+                        const yy = monster.y - camera.chipTop;
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                            const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                            const dx = xx * map.gridsize.width +
+                                camera.chipOffX +
+                                monster.offx +
+                                sprite.offsetX +
+                                animFrame.offsetX;
+                            const dy = yy * map.gridsize.height +
+                                camera.chipOffY +
+                                monster.offy +
+                                sprite.offsetY +
+                                animFrame.offsetY;
+                            Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                            Game.getScreen().fillRect(dx, dy + sprite.height - 1, map.gridsize.width, 1);
+                            Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                            Game.getScreen().fillRect(dx, dy + sprite.height - 1, ~~(map.gridsize.width * monster.life / monster.maxLife), 1);
+                        }
+                    });
+                    {
+                        const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                        const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+                        Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY + sprite.height - 1, map.gridsize.width, 1);
+                        Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY + sprite.height - 1, ~~(map.gridsize.width * player.hp / player.hpMax), 1);
+                    }
+                }
             });
             sprites.forEach((x) => x.draw(map.camera));
+            draw7pxFont(`${floor}F | HP:${player.hp}/${player.hpMax} | MP:${player.mp}/${player.mpMax} | GOLD:${player.gold}`, 0, 0);
             fade.draw();
             Game.getScreen().restore();
             if (pad.isTouching) {
@@ -2678,7 +3283,10 @@ var Scene;
         yield Scene.waitTimeout({
             timeout: 500,
             init: () => { fade.startFadeIn(); },
-            update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
+            update: (e) => {
+                fade.update(e);
+                updateLighting((v) => v === 1 || v === 10);
+            },
             end: () => { this.next(); },
         });
         onPointerHook();
@@ -2696,7 +3304,8 @@ var Scene;
                             }
                             const playerMoveDir = pad.dir8;
                             const { x, y } = Array2D.DIR8[playerMoveDir];
-                            if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 && map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
+                            if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 &&
+                                map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
                                 player.setDir(playerMoveDir);
                                 break stateloop;
                             }
@@ -2724,175 +3333,195 @@ var Scene;
                                 continue stateloop;
                             }
                         }
-                    case TurnState.PlayerAction: {
-                        turnStateStack[0][0] = TurnState.PlayerActionRunning;
-                        turnStateStack[0][1] = 0;
-                        player.setDir(playerTactics.moveDir);
-                        player.setAnimation("action", 0);
-                    }
-                    case TurnState.PlayerActionRunning: {
-                        const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                        player.setAnimation("action", rate);
-                        if (rate > 0.5 && turnStateStack[0][1] === 0) {
-                            const targetMonster = monsters[playerTactics.targetMonster];
-                            turnStateStack[0][1] = 1;
-                            Game.getSound().reqPlayChannel("atack");
-                            sprites.push(createShowDamageSprite(ms, 5, () => {
-                                return {
-                                    x: targetMonster.offx + targetMonster.x * map.gridsize.width + map.gridsize.width / 2,
-                                    y: targetMonster.offy + targetMonster.y * map.gridsize.height + map.gridsize.height / 2
-                                };
-                            }));
-                            if (targetMonster.life > 0) {
-                                targetMonster.life -= 5;
-                                if (targetMonster.life <= 0) {
-                                    targetMonster.life = 0;
-                                    Game.getSound().reqPlayChannel("explosion");
-                                    turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
+                    case TurnState.PlayerAction:
+                        {
+                            turnStateStack[0][0] = TurnState.PlayerActionRunning;
+                            turnStateStack[0][1] = 0;
+                            player.setDir(playerTactics.moveDir);
+                            player.setAnimation("action", 0);
+                        }
+                    case TurnState.PlayerActionRunning:
+                        {
+                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                            player.setAnimation("action", rate);
+                            if (rate > 0.5 && turnStateStack[0][1] === 0) {
+                                const targetMonster = monsters[playerTactics.targetMonster];
+                                turnStateStack[0][1] = 1;
+                                Game.getSound().reqPlayChannel("atack");
+                                const dmg = ~~(player.atk - targetMonster.def);
+                                sprites.push(createShowDamageSprite(ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
+                                    return {
+                                        x: targetMonster.offx +
+                                            targetMonster.x * map.gridsize.width +
+                                            map.gridsize.width / 2,
+                                        y: targetMonster.offy +
+                                            targetMonster.y * map.gridsize.height +
+                                            map.gridsize.height / 2
+                                    };
+                                }));
+                                if (targetMonster.life > 0 && dmg > 0) {
+                                    targetMonster.life -= dmg;
+                                    if (targetMonster.life <= 0) {
+                                        targetMonster.life = 0;
+                                        Game.getSound().reqPlayChannel("explosion");
+                                        turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
+                                    }
                                 }
                             }
-                        }
-                        if (rate >= 1) {
-                            turnStateStack.shift();
-                            player.setAnimation("move", 0);
-                        }
-                        break stateloop;
-                    }
-                    case TurnState.EnemyAI: {
-                        let px = player.x;
-                        let py = player.y;
-                        if (playerTactics.type === "move") {
-                            const off = Array2D.DIR8[playerTactics.moveDir];
-                            px += off.x;
-                            py += off.y;
-                        }
-                        const cannotMoveMap = new Array2D(map.width, map.height, 0);
-                        monstersTactics.length = monsters.length;
-                        monstersTactics.fill(null);
-                        monsters.forEach((monster, i) => {
-                            if (monster.life <= 0) {
-                                monstersTactics[i] = {
-                                    type: "dead",
-                                    moveDir: 5,
-                                    startTime: 0,
-                                    actionTime: 250,
-                                };
-                                return;
+                            if (rate >= 1) {
+                                turnStateStack.shift();
+                                player.setAnimation("move", 0);
                             }
-                            const dx = px - monster.x;
-                            const dy = py - monster.y;
-                            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
-                                cannotMoveMap.value(monster.x, monster.y, 1);
-                                monstersTactics[i] = {
-                                    type: "action",
-                                    moveDir: dir,
-                                    startTime: 0,
-                                    actionTime: 250,
-                                };
-                                return;
+                            break stateloop;
+                        }
+                    case TurnState.EnemyAI:
+                        {
+                            let px = player.x;
+                            let py = player.y;
+                            if (playerTactics.type === "move") {
+                                const off = Array2D.DIR8[playerTactics.moveDir];
+                                px += off.x;
+                                py += off.y;
                             }
-                            else {
-                                return;
-                            }
-                        });
-                        let changed = true;
-                        while (changed) {
-                            changed = false;
+                            const cannotMoveMap = new Array2D(map.width, map.height, 0);
+                            monstersTactics.length = monsters.length;
+                            monstersTactics.fill(null);
                             monsters.forEach((monster, i) => {
+                                if (monster.life <= 0) {
+                                    monstersTactics[i] = {
+                                        type: "dead",
+                                        moveDir: 5,
+                                        startTime: 0,
+                                        actionTime: 250,
+                                    };
+                                    return;
+                                }
                                 const dx = px - monster.x;
                                 const dy = py - monster.y;
                                 if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                    if (monstersTactics[i] == null) {
-                                        console.error("Action���ׂ��G�̓��삪���肵�Ă��Ȃ�");
-                                    }
-                                    return;
-                                }
-                                else if (monstersTactics[i] == null) {
-                                    const cands = [
-                                        [Math.sign(dx), Math.sign(dy)],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
-                                    ];
-                                    for (let j = 0; j < 3; j++) {
-                                        const [cx, cy] = cands[j];
-                                        const tx = monster.x + cx;
-                                        const ty = monster.y + cy;
-                                        if ((cannotMoveMap.value(tx, ty) === 0) &&
-                                            (map.layer[0].chips.value(tx, ty) === 1 ||
-                                                map.layer[0].chips.value(tx, ty) === 10)) {
-                                            const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
-                                            cannotMoveMap.value(tx, ty, 1);
-                                            monstersTactics[i] = {
-                                                type: "move",
-                                                moveDir: dir,
-                                                startTime: ms,
-                                                actionTime: 250,
-                                            };
-                                            changed = true;
-                                            return;
-                                        }
-                                    }
+                                    const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
                                     cannotMoveMap.value(monster.x, monster.y, 1);
                                     monstersTactics[i] = {
-                                        type: "idle",
-                                        moveDir: 5,
-                                        startTime: ms,
+                                        type: "action",
+                                        moveDir: dir,
+                                        startTime: 0,
                                         actionTime: 250,
                                     };
-                                    changed = true;
+                                    return;
+                                }
+                                else {
                                     return;
                                 }
                             });
-                        }
-                        turnStateStack.shift();
-                        continue stateloop;
-                    }
-                    case TurnState.EnemyAction: {
-                        let enemyId = turnStateStack[0][1];
-                        while (enemyId < monstersTactics.length) {
-                            if (monstersTactics[enemyId].type !== "action") {
-                                enemyId++;
+                            let changed = true;
+                            while (changed) {
+                                changed = false;
+                                monsters.forEach((monster, i) => {
+                                    const dx = px - monster.x;
+                                    const dy = py - monster.y;
+                                    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                                        if (monstersTactics[i] == null) {
+                                            console.error("Actionすべき敵の動作が決定していない");
+                                        }
+                                        return;
+                                    }
+                                    else if (monstersTactics[i] == null) {
+                                        const cands = [
+                                            [Math.sign(dx), Math.sign(dy)],
+                                            (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
+                                            (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
+                                        ];
+                                        for (let j = 0; j < 3; j++) {
+                                            const [cx, cy] = cands[j];
+                                            const tx = monster.x + cx;
+                                            const ty = monster.y + cy;
+                                            if ((cannotMoveMap.value(tx, ty) === 0) &&
+                                                (map.layer[0].chips.value(tx, ty) === 1 ||
+                                                    map.layer[0].chips.value(tx, ty) === 10)) {
+                                                const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
+                                                cannotMoveMap.value(tx, ty, 1);
+                                                monstersTactics[i] = {
+                                                    type: "move",
+                                                    moveDir: dir,
+                                                    startTime: ms,
+                                                    actionTime: 250,
+                                                };
+                                                changed = true;
+                                                return;
+                                            }
+                                        }
+                                        cannotMoveMap.value(monster.x, monster.y, 1);
+                                        monstersTactics[i] = {
+                                            type: "idle",
+                                            moveDir: 5,
+                                            startTime: ms,
+                                            actionTime: 250,
+                                        };
+                                        changed = true;
+                                        return;
+                                    }
+                                });
                             }
-                            else {
-                                break;
-                            }
-                        }
-                        if (enemyId < monstersTactics.length) {
-                            monstersTactics[enemyId].startTime = ms;
-                            monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
-                            monsters[enemyId].setAnimation("action", 0);
-                            turnStateStack[0][0] = TurnState.EnemyActionRunning;
-                            turnStateStack[0][1] = enemyId;
-                            turnStateStack[0][2] = 0;
-                            continue stateloop;
-                        }
-                        else {
                             turnStateStack.shift();
                             continue stateloop;
                         }
-                    }
-                    case TurnState.EnemyActionRunning: {
-                        const enemyId = turnStateStack[0][1];
-                        const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
-                        monsters[enemyId].setAnimation("action", rate);
-                        if (rate > 0.5 && turnStateStack[0][2] === 0) {
-                            turnStateStack[0][2] = 1;
-                            Game.getSound().reqPlayChannel("atack");
-                            sprites.push(createShowDamageSprite(ms, ~~(Math.random() * 10 + 5), () => {
-                                return {
-                                    x: player.offx + player.x * map.gridsize.width + map.gridsize.width / 2,
-                                    y: player.offy + player.y * map.gridsize.height + map.gridsize.height / 2
-                                };
-                            }));
+                    case TurnState.EnemyAction:
+                        {
+                            let enemyId = turnStateStack[0][1];
+                            while (enemyId < monstersTactics.length) {
+                                if (monstersTactics[enemyId].type !== "action") {
+                                    enemyId++;
+                                }
+                                else {
+                                    break;
+                                }
+                            }
+                            if (enemyId < monstersTactics.length) {
+                                monstersTactics[enemyId].startTime = ms;
+                                monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
+                                monsters[enemyId].setAnimation("action", 0);
+                                turnStateStack[0][0] = TurnState.EnemyActionRunning;
+                                turnStateStack[0][1] = enemyId;
+                                turnStateStack[0][2] = 0;
+                                continue stateloop;
+                            }
+                            else {
+                                turnStateStack.shift();
+                                continue stateloop;
+                            }
                         }
-                        if (rate >= 1) {
-                            monsters[enemyId].setAnimation("move", 0);
-                            turnStateStack[0][0] = TurnState.EnemyAction;
-                            turnStateStack[0][1] = enemyId + 1;
+                    case TurnState.EnemyActionRunning:
+                        {
+                            const enemyId = turnStateStack[0][1];
+                            const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
+                            monsters[enemyId].setAnimation("action", rate);
+                            if (rate > 0.5 && turnStateStack[0][2] === 0) {
+                                turnStateStack[0][2] = 1;
+                                Game.getSound().reqPlayChannel("atack");
+                                const dmg = ~~(monsters[enemyId].atk - player.def);
+                                sprites.push(createShowDamageSprite(ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
+                                    return {
+                                        x: player.offx + player.x * map.gridsize.width + map.gridsize.width / 2,
+                                        y: player.offy + player.y * map.gridsize.height + map.gridsize.height / 2
+                                    };
+                                }));
+                                if (player.hp > 0 && dmg > 0) {
+                                    player.hp -= dmg;
+                                    if (player.hp <= 0) {
+                                        player.hp = 0;
+                                    }
+                                }
+                            }
+                            if (rate >= 1) {
+                                if (player.hp == 0) {
+                                    return;
+                                }
+                                monsters[enemyId].setAnimation("move", 0);
+                                turnStateStack[0][0] = TurnState.EnemyAction;
+                                turnStateStack[0][1] = enemyId + 1;
+                            }
+                            break stateloop;
                         }
-                        break stateloop;
-                    }
                     case TurnState.EnemyDead:
                         {
                             turnStateStack[0][0] = TurnState.EnemyDeadRunning;
@@ -2912,74 +3541,77 @@ var Scene;
                             }
                             break stateloop;
                         }
-                    case TurnState.Move: {
-                        turnStateStack[0][0] = TurnState.MoveRunning;
-                        monstersTactics.forEach((monsterTactic, i) => {
-                            if (monsterTactic.type === "move") {
-                                monsters[i].setDir(monsterTactic.moveDir);
-                                monsters[i].setAnimation("move", 0);
-                                monstersTactics[i].startTime = ms;
+                    case TurnState.Move:
+                        {
+                            turnStateStack[0][0] = TurnState.MoveRunning;
+                            monstersTactics.forEach((monsterTactic, i) => {
+                                if (monsterTactic.type === "move") {
+                                    monsters[i].setDir(monsterTactic.moveDir);
+                                    monsters[i].setAnimation("move", 0);
+                                    monstersTactics[i].startTime = ms;
+                                }
+                            });
+                            if (playerTactics.type === "move") {
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation("move", 0);
+                                playerTactics.startTime = ms;
                             }
-                        });
-                        if (playerTactics.type === "move") {
-                            player.setDir(playerTactics.moveDir);
-                            player.setAnimation("move", 0);
-                            playerTactics.startTime = ms;
                         }
-                    }
-                    case TurnState.MoveRunning: {
-                        let finish = true;
-                        monstersTactics.forEach((monsterTactic, i) => {
-                            if (monsterTactic == null) {
-                                return;
-                            }
-                            if (monsterTactic.type === "move") {
-                                const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
-                                monsters[i].setDir(monsterTactic.moveDir);
-                                monsters[i].setAnimation("move", rate);
+                    case TurnState.MoveRunning:
+                        {
+                            let finish = true;
+                            monstersTactics.forEach((monsterTactic, i) => {
+                                if (monsterTactic == null) {
+                                    return;
+                                }
+                                if (monsterTactic.type === "move") {
+                                    const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
+                                    monsters[i].setDir(monsterTactic.moveDir);
+                                    monsters[i].setAnimation("move", rate);
+                                    if (rate < 1) {
+                                        finish = false;
+                                    }
+                                }
+                            });
+                            if (playerTactics.type === "move") {
+                                const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
+                                player.setDir(playerTactics.moveDir);
+                                player.setAnimation("move", rate);
                                 if (rate < 1) {
                                     finish = false;
                                 }
                             }
-                        });
-                        if (playerTactics.type === "move") {
-                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                            player.setDir(playerTactics.moveDir);
-                            player.setAnimation("move", rate);
-                            if (rate < 1) {
-                                finish = false;
-                            }
-                        }
-                        if (finish) {
-                            turnStateStack.shift();
-                            monstersTactics.forEach((monsterTactic, i) => {
-                                if (monsterTactic.type === "move") {
-                                    monsters[i].x += Array2D.DIR8[monsterTactic.moveDir].x;
-                                    monsters[i].y += Array2D.DIR8[monsterTactic.moveDir].y;
-                                    monsters[i].offx = 0;
-                                    monsters[i].offy = 0;
-                                    monsters[i].setAnimation("move", 0);
+                            if (finish) {
+                                turnStateStack.shift();
+                                monstersTactics.forEach((monsterTactic, i) => {
+                                    if (monsterTactic.type === "move") {
+                                        monsters[i].x += Array2D.DIR8[monsterTactic.moveDir].x;
+                                        monsters[i].y += Array2D.DIR8[monsterTactic.moveDir].y;
+                                        monsters[i].offx = 0;
+                                        monsters[i].offy = 0;
+                                        monsters[i].setAnimation("move", 0);
+                                    }
+                                });
+                                if (playerTactics.type === "move") {
+                                    player.x += Array2D.DIR8[playerTactics.moveDir].x;
+                                    player.y += Array2D.DIR8[playerTactics.moveDir].y;
+                                    player.offx = 0;
+                                    player.offy = 0;
+                                    player.setAnimation("move", 0);
                                 }
-                            });
-                            if (playerTactics.type === "move") {
-                                player.x += Array2D.DIR8[playerTactics.moveDir].x;
-                                player.y += Array2D.DIR8[playerTactics.moveDir].y;
-                                player.offx = 0;
-                                player.offy = 0;
-                                player.setAnimation("move", 0);
+                                const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
+                                if (chip === 10) {
+                                    this.next("nextfloor");
+                                }
                             }
-                            const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
-                            if (chip === 10) {
-                                this.next("nextfloor");
-                            }
+                            break stateloop;
                         }
-                        break stateloop;
-                    }
-                    case TurnState.TurnEnd: {
-                        turnStateStack.shift();
-                        monsters = monsters.filter(x => x.life > 0);
-                        break stateloop;
-                    }
+                    case TurnState.TurnEnd:
+                        {
+                            turnStateStack.shift();
+                            monsters = monsters.filter(x => x.life > 0);
+                            break stateloop;
+                        }
                 }
                 break;
             }
@@ -2995,15 +3627,24 @@ var Scene;
                 return !x.update(delta, ms);
             });
             updateLighting((v) => v === 1 || v === 10);
-            if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                Game.getSceneManager().push(Scene.mapview, { map: map, player: player });
+            if (player.hp === 0) {
+                Game.getSceneManager().pop();
+                Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
+                return;
+            }
+            if (Game.getInput().isClick() &&
+                Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+                Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
             }
         };
         Game.getSound().reqPlayChannel("kaidan");
         yield Scene.waitTimeout({
             timeout: 500,
             init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); updateLighting((v) => v === 1 || v === 10); },
+            update: (e) => {
+                fade.update(e);
+                updateLighting((v) => v === 1 || v === 10);
+            },
             end: () => { this.next(); },
         });
         yield Scene.waitTimeout({
@@ -3011,9 +3652,81 @@ var Scene;
             end: () => { this.next(); },
         });
         Game.getSceneManager().pop();
-        Game.getSceneManager().push(dungeon, { player, floor: floor + 1 });
+        Game.getSceneManager().push(dungeon, { player: player, floor: floor + 1 });
     }
     Scene.dungeon = dungeon;
+    function* statusView(opt) {
+        var closeButton = {
+            x: Game.getScreen().offscreenWidth - 20,
+            y: 20,
+            radius: 10
+        };
+        this.draw = () => {
+            opt.upperdraw();
+            Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
+            Game.getScreen().fillRect(20, 20, Game.getScreen().offscreenWidth - 40, Game.getScreen().offscreenHeight - 40);
+            Game.getScreen().save();
+            Game.getScreen().beginPath();
+            Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
+            Game.getScreen().lineWidth = 6;
+            Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().stroke();
+            Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
+            Game.getScreen().lineWidth = 3;
+            Game.getScreen().stroke();
+            Game.getScreen().restore();
+            Game.getScreen().fillStyle = 'rgb(0,0,0)';
+            Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+            Game.getScreen().fillText(`HP:${opt.player.hp}/${opt.player.hpMax}`, 30, 30 + 11 * 3);
+            Game.getScreen().fillText(`MP:${opt.player.mp}/${opt.player.mpMax}`, 30, 30 + 11 * 4);
+            Game.getScreen().fillText(`ATK：${opt.player.atk}`, 30, 30 + 11 * 6);
+            Game.getScreen().fillText(`DEF：${opt.player.def}`, 30, 30 + 11 * 7);
+            opt.player.equips.forEach((e, i) => {
+                Game.getScreen().fillText(`${e.name}`, 30, 30 + 11 * (8 + i));
+            });
+        };
+        yield Scene.waitClick({
+            end: (x, y) => {
+                this.next();
+            }
+        });
+        Game.getSceneManager().pop();
+    }
+    function* gameOver(opt) {
+        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        let fontAlpha = 0;
+        this.draw = () => {
+            opt.upperdraw();
+            fade.draw();
+            Game.getScreen().fillStyle = `rgba(255,255,255,${fontAlpha})`;
+            Game.getScreen().font = "20px 'PixelMplus10-Regular'";
+            const shape = Game.getScreen().measureText(`GAME OVER`);
+            Game.getScreen().fillText(`GAME OVER`, (Game.getScreen().offscreenWidth - shape.width) / 2, (Game.getScreen().offscreenHeight - 20) / 2);
+        };
+        yield Scene.waitTimeout({
+            timeout: 500,
+            start: (e, ms) => { fade.startFadeOut(); },
+            update: (e, ms) => { fade.update(ms); },
+            end: (x, y) => { this.next(); }
+        });
+        yield Scene.waitTimeout({
+            timeout: 500,
+            start: (e, ms) => { fontAlpha = 0; },
+            update: (e, ms) => { fontAlpha = e / 500; },
+            end: (x, y) => { fontAlpha = 1; this.next(); }
+        });
+        yield Scene.waitClick({
+            end: (x, y) => {
+                this.next();
+            }
+        });
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(Scene.title);
+    }
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
@@ -3197,8 +3910,121 @@ var Scene;
     }
     Scene.title = title;
 })(Scene || (Scene = {}));
-function createShowDamageSprite(start, dmg, getpos) {
-    const damage = "" + ~~dmg;
+const charDic = {
+    " ": [0, 0],
+    "!": [5, 0],
+    "\"": [10, 0],
+    "#": [15, 0],
+    "$": [20, 0],
+    "%": [25, 0],
+    "&": [30, 0],
+    "'": [35, 0],
+    "(": [40, 0],
+    ")": [45, 0],
+    "*": [50, 0],
+    "+": [55, 0],
+    ",": [60, 0],
+    "-": [65, 0],
+    ".": [70, 0],
+    "/": [75, 0],
+    "0": [0, 7],
+    "1": [5, 7],
+    "2": [10, 7],
+    "3": [15, 7],
+    "4": [20, 7],
+    "5": [25, 7],
+    "6": [30, 7],
+    "7": [35, 7],
+    "8": [40, 7],
+    "9": [45, 7],
+    ":": [50, 7],
+    ";": [55, 7],
+    "<": [60, 7],
+    "=": [65, 7],
+    ">": [70, 7],
+    "?": [75, 7],
+    "@": [0, 14],
+    "A": [5, 14],
+    "B": [10, 14],
+    "C": [15, 14],
+    "D": [20, 14],
+    "E": [25, 14],
+    "F": [30, 14],
+    "G": [35, 14],
+    "H": [40, 14],
+    "I": [45, 14],
+    "J": [50, 14],
+    "K": [55, 14],
+    "L": [60, 14],
+    "M": [65, 14],
+    "N": [70, 14],
+    "O": [75, 14],
+    "P": [0, 21],
+    "Q": [5, 21],
+    "R": [10, 21],
+    "S": [15, 21],
+    "T": [20, 21],
+    "U": [25, 21],
+    "V": [30, 21],
+    "W": [35, 21],
+    "X": [40, 21],
+    "Y": [45, 21],
+    "Z": [50, 21],
+    "[": [55, 21],
+    "\\": [60, 21],
+    "]": [65, 21],
+    "^": [70, 21],
+    "_": [75, 21],
+    "`": [0, 28],
+    "a": [5, 28],
+    "b": [10, 28],
+    "c": [15, 28],
+    "d": [20, 28],
+    "e": [25, 28],
+    "f": [30, 28],
+    "g": [35, 28],
+    "h": [40, 28],
+    "i": [45, 28],
+    "j": [50, 28],
+    "k": [55, 28],
+    "l": [60, 28],
+    "m": [65, 28],
+    "n": [70, 28],
+    "o": [75, 28],
+    "p": [0, 35],
+    "q": [5, 35],
+    "r": [10, 35],
+    "s": [15, 35],
+    "t": [20, 35],
+    "u": [25, 35],
+    "v": [30, 35],
+    "w": [35, 35],
+    "x": [40, 35],
+    "y": [45, 35],
+    "z": [50, 35],
+    "{": [55, 35],
+    "|": [60, 35],
+    "}": [65, 35],
+    "~": [70, 35]
+};
+function draw7pxFont(str, x, y) {
+    const fontWidth = 5;
+    const fontHeight = 7;
+    let sx = x;
+    let sy = y;
+    for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (ch === "\n") {
+            sy += fontHeight;
+            sx = x;
+            continue;
+        }
+        const [fx, fy] = charDic[str[i]];
+        Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, sx, sy, fontWidth, fontHeight);
+        sx += fontWidth - 1;
+    }
+}
+function createShowDamageSprite(start, damage, getpos) {
     let elapse = 0;
     const fontWidth = 5;
     const fontHeight = 7;
@@ -3222,7 +4048,8 @@ function createShowDamageSprite(start, dmg, getpos) {
                 const dy = Math.sin(rad * Math.PI / 200) * -7;
                 if (0 <= xx + (i + 1) * fontWidth && xx + (i + 0) * fontWidth < Game.getScreen().offscreenWidth &&
                     0 <= yy + (1 * fontHeight) && yy + (0 * fontHeight) < Game.getScreen().offscreenHeight) {
-                    Game.getScreen().drawImage(Game.getScreen().texture("font7px"), ~~damage[i] * fontWidth, 0, fontWidth, fontHeight, (xx + (i + 0) * (fontWidth - 1)) + offx, (yy + (0) * fontHeight) + offy + dy, fontWidth, fontHeight);
+                    const [fx, fy] = charDic[damage[i]];
+                    Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, (xx + (i + 0) * (fontWidth - 1)) + offx, (yy + (0) * fontHeight) + offy + dy, fontWidth, fontHeight);
                 }
             }
         },

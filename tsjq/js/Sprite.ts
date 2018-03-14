@@ -129,8 +129,7 @@ function draw7pxFont(str: string, x: number, y: number) {
     }
 }
 
-function createShowDamageSprite(start: number, dmg: number, getpos: () => IPoint): ISprite {
-    const damage = "" + ~~dmg;
+function createShowDamageSprite(start: number, damage: string, getpos: () => IPoint): ISprite {
     let elapse = 0;
     const fontWidth: number = 5;
     const fontHeight: number = 7;

@@ -1,5 +1,6 @@
 /// <reference path="../../../../../../Program Files (x86)/Microsoft SDKs/TypeScript/2.5/lib.dom.d.ts" />
 /// <reference path="../../../../../../Program Files (x86)/Microsoft SDKs/TypeScript/2.5/lib.es2016.d.ts" />
+/// <reference path="./js/CSSFontLoadingAPI.d.ts" />
 /// <reference path="./js/Lib/Random.ts" />
 /// <reference path="./js/Lib/Type.ts" />
 /// <reference path="./js/Lib/Game/Ajax.ts" />
@@ -12,6 +13,7 @@
 /// <reference path="./js/Lib/Game/Scene.ts" />
 /// <reference path="./js/Lib/Game/Console.ts" />
 /// <reference path="./js/Lib/Game/Game.ts" />
+/// <reference path="./js/lib/game/GUI.ts" />
 /// <reference path="./js/Array2D.ts" />
 /// <reference path="./js/PathFinder.ts" />
 /// <reference path="./js/Dungeon.ts" />
@@ -23,6 +25,7 @@
 /// <reference path="./js/Scene/Helper.ts" />
 /// <reference path="./js/Scene/MapView.ts" />
 /// <reference path="./js/Scene/Title.ts" />
+/// <reference path="./js/Scene/Shop.ts" />
 /// <reference path="./js/Sprite.ts" />
 "use strict";
 // <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />

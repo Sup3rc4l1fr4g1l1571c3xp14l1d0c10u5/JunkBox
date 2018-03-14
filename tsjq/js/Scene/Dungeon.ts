@@ -1,16 +1,16 @@
 namespace Scene {
     enum TurnState {
-        WaitInput,      // プレイヤーの行動決定(入力待ち)
-        PlayerAction,   // プレイヤーの行動実行
+        WaitInput, // プレイヤーの行動決定(入力待ち)
+        PlayerAction, // プレイヤーの行動実行
         PlayerActionRunning,
-        EnemyAI,        // 敵の行動決定
-        EnemyAction,    // 敵の行動実行
+        EnemyAI, // 敵の行動決定
+        EnemyAction, // 敵の行動実行
         EnemyActionRunning,
-        EnemyDead,          // 敵の死亡
-        EnemyDeadRunning,   // 死亡実行
-        Move,           // 移動実行（敵味方同時に行う）
-        MoveRunning,    // 移動実行（敵味方同時に行う）
-        TurnEnd,   // ターン終了
+        EnemyDead, // 敵の死亡
+        EnemyDeadRunning, // 死亡実行
+        Move, // 移動実行（敵味方同時に行う）
+        MoveRunning, // 移動実行（敵味方同時に行う）
+        TurnEnd, // ターン終了
     }
 
     export function* dungeon(param: { player: Charactor.Player, floor: number }): IterableIterator<any> {
@@ -34,8 +34,8 @@ namespace Scene {
                 mapchipsL1.value(x,
                     y - 1,
                     mapchipsL1.value(x, y) === 1 && mapchipsL1.value(x, y - 1) === 0
-                        ? 2
-                        : mapchipsL1.value(x, y - 1),
+                    ? 2
+                    : mapchipsL1.value(x, y - 1),
                 );
             }
         }
@@ -65,8 +65,10 @@ namespace Scene {
                 charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
                 x: x.getLeft(),
                 y: x.getTop(),
-                life: 10,
-                maxLife: 10
+                life: floor + 5,
+                maxLife: floor + 5,
+                atk: ~~(floor*2),
+                def: ~~(floor / 3) + 1
             });
         });
 
@@ -199,11 +201,21 @@ namespace Scene {
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
                         const yy = monster.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) && (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                            const animFrame =
+                                monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
                             const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
-                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
+                            const dx = xx * map.gridsize.width +
+                                camera.chipOffX +
+                                monster.offx +
+                                sprite.offsetX +
+                                animFrame.offsetX;
+                            const dy = yy * map.gridsize.height +
+                                camera.chipOffY +
+                                monster.offy +
+                                sprite.offsetY +
+                                animFrame.offsetY;
 
                             Game.getScreen().drawImage(
                                 monster.spriteSheet.getSpriteImage(sprite),
@@ -245,24 +257,34 @@ namespace Scene {
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
                         const yy = monster.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) && (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                            const animFrame =
+                                monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
                             const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
-                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
+                            const dx = xx * map.gridsize.width +
+                                camera.chipOffX +
+                                monster.offx +
+                                sprite.offsetX +
+                                animFrame.offsetX;
+                            const dy = yy * map.gridsize.height +
+                                camera.chipOffY +
+                                monster.offy +
+                                sprite.offsetY +
+                                animFrame.offsetY;
 
                             Game.getScreen().fillStyle = 'rgb(255,0,0)';
                             Game.getScreen().fillRect(
                                 dx,
                                 dy + sprite.height - 1,
-                                sprite.width,
+                                map.gridsize.width,
                                 1
                             );
                             Game.getScreen().fillStyle = 'rgb(0,255,0)';
                             Game.getScreen().fillRect(
                                 dx,
                                 dy + sprite.height - 1,
-                                ~~(sprite.width * monster.life / monster.maxLife),
+                                ~~(map.gridsize.width * monster.life / monster.maxLife),
                                 1
                             );
                         }
@@ -275,16 +297,16 @@ namespace Scene {
                         // キャラクター体力
                         Game.getScreen().fillStyle = 'rgb(255,0,0)';
                         Game.getScreen().fillRect(
-                            cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
+                            cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
                             cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
-                            sprite.width,
+                            map.gridsize.width,
                             1
                         );
                         Game.getScreen().fillStyle = 'rgb(0,255,0)';
                         Game.getScreen().fillRect(
-                            cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
+                            cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
                             cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
-                            ~~(sprite.width * 1 / 1),
+                            ~~(map.gridsize.width * player.hp / player.hpMax),
                             1
                         );
                     }
@@ -294,7 +316,10 @@ namespace Scene {
             // スプライト
             sprites.forEach((x) => x.draw(map.camera));
 
-            draw7pxFont("12F | LV:99 | HP:100 | MP:100 | GOLD:200", 0, 0);
+            draw7pxFont(
+                `${floor}F | HP:${player.hp}/${player.hpMax} | MP:${player.mp}/${player.mpMax} | GOLD:${player.gold}`,
+                0,
+                0);
 
             // フェード
             fade.draw();
@@ -332,7 +357,10 @@ namespace Scene {
         yield waitTimeout({
             timeout: 500,
             init: () => { fade.startFadeIn(); },
-            update: (e) => { fade.update(e); updateLighting((v: number) => v === 1 || v === 10); },
+            update: (e) => {
+                fade.update(e);
+                updateLighting((v: number) => v === 1 || v === 10);
+            },
             end: () => { this.next(); },
         });
 
@@ -344,76 +372,78 @@ namespace Scene {
         let playerTactics: any = {};
         const monstersTactics: any[] = [];
         yield (delta: number, ms: number) => {
-            stateloop: for (; ;) {
+            stateloop: for (;;) {
                 switch (turnStateStack[0][0]) {
                     case TurnState.WaitInput:
-                        {
-                            // キー入力待ち
-                            if (pad.isTouching === false || pad.distance <= 0.4) {
-                                player.setAnimation("move", 0);
-                                break stateloop;
-                            }
-
-                            // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
-
-                            const playerMoveDir = pad.dir8;
-
-                            // 「行動(Action)」と「移動(Move)」の識別を行う
-
-                            // 移動先が侵入不可能の場合は待機とする
-                            const { x, y } = Array2D.DIR8[playerMoveDir];
-                            if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 && map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
-                                player.setDir(playerMoveDir);
-                                break stateloop;
-                            }
-
-                            // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
-                            const targetMonster =
-                                monsters.findIndex((monster) => (monster.x === player.x + x) &&
-                                    (monster.y === player.y + y));
-                            if (targetMonster !== -1) {
-                                // 移動先に敵がいる＝「行動(Action)」
-
-                                playerTactics = {
-                                    type: "action",
-                                    moveDir: playerMoveDir,
-                                    targetMonster: targetMonster,
-                                    startTime: ms,
-                                    actionTime: 250,
-                                };
-
-                                // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
-                                turnStateStack.unshift(
-                                    [TurnState.PlayerAction, null],
-                                    [TurnState.EnemyAI, null],
-                                    [TurnState.EnemyAction, 0],
-                                    [TurnState.Move, null],
-                                    [TurnState.TurnEnd, null],
-                                );
-                                continue stateloop;
-                            } else {
-                                // 移動先に敵はいない＝「移動(Move)」
-
-                                playerTactics = {
-                                    type: "move",
-                                    moveDir: playerMoveDir,
-                                    startTime: ms,
-                                    actionTime: 250,
-                                };
-
-                                // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
-                                turnStateStack.unshift(
-                                    [TurnState.EnemyAI, null],
-                                    [TurnState.Move, null],
-                                    [TurnState.EnemyAction, 0],
-                                    [TurnState.TurnEnd, null],
-                                );
-                                continue stateloop;
-                            }
-
+                    {
+                        // キー入力待ち
+                        if (pad.isTouching === false || pad.distance <= 0.4) {
+                            player.setAnimation("move", 0);
+                            break stateloop;
                         }
 
-                    case TurnState.PlayerAction: {
+                        // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
+
+                        const playerMoveDir = pad.dir8;
+
+                        // 「行動(Action)」と「移動(Move)」の識別を行う
+
+                        // 移動先が侵入不可能の場合は待機とする
+                        const { x, y } = Array2D.DIR8[playerMoveDir];
+                        if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 &&
+                            map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
+                            player.setDir(playerMoveDir);
+                            break stateloop;
+                        }
+
+                        // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
+                        const targetMonster =
+                            monsters.findIndex((monster) => (monster.x === player.x + x) &&
+                                (monster.y === player.y + y));
+                        if (targetMonster !== -1) {
+                            // 移動先に敵がいる＝「行動(Action)」
+
+                            playerTactics = {
+                                type: "action",
+                                moveDir: playerMoveDir,
+                                targetMonster: targetMonster,
+                                startTime: ms,
+                                actionTime: 250,
+                            };
+
+                            // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
+                            turnStateStack.unshift(
+                                [TurnState.PlayerAction, null],
+                                [TurnState.EnemyAI, null],
+                                [TurnState.EnemyAction, 0],
+                                [TurnState.Move, null],
+                                [TurnState.TurnEnd, null],
+                            );
+                            continue stateloop;
+                        } else {
+                            // 移動先に敵はいない＝「移動(Move)」
+
+                            playerTactics = {
+                                type: "move",
+                                moveDir: playerMoveDir,
+                                startTime: ms,
+                                actionTime: 250,
+                            };
+
+                            // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
+                            turnStateStack.unshift(
+                                [TurnState.EnemyAI, null],
+                                [TurnState.Move, null],
+                                [TurnState.EnemyAction, 0],
+                                [TurnState.TurnEnd, null],
+                            );
+                            continue stateloop;
+                        }
+
+                    }
+
+                    case TurnState.PlayerAction:
+                    {
                         // プレイヤーの行動開始
                         turnStateStack[0][0] = TurnState.PlayerActionRunning;
                         turnStateStack[0][1] = 0;
@@ -421,7 +451,8 @@ namespace Scene {
                         player.setAnimation("action", 0);
                         // fallthrough
                     }
-                    case TurnState.PlayerActionRunning: {
+                    case TurnState.PlayerActionRunning:
+                    {
                         // プレイヤーの行動中
                         const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
                         player.setAnimation("action", rate);
@@ -429,18 +460,24 @@ namespace Scene {
                             const targetMonster: Charactor.Monster = monsters[playerTactics.targetMonster];
                             turnStateStack[0][1] = 1;
                             Game.getSound().reqPlayChannel("atack");
+                            const dmg = ~~(player.atk - targetMonster.def);
+
                             sprites.push(createShowDamageSprite(
                                 ms,
-                                5,
+                                dmg > 0 ? ("" + dmg) : "MISS!!",
                                 () => {
                                     return {
-                                        x: targetMonster.offx + targetMonster.x * map.gridsize.width + map.gridsize.width / 2,
-                                        y: targetMonster.offy + targetMonster.y * map.gridsize.height + map.gridsize.height / 2
+                                        x: targetMonster.offx +
+                                            targetMonster.x * map.gridsize.width +
+                                            map.gridsize.width / 2,
+                                        y: targetMonster.offy +
+                                            targetMonster.y * map.gridsize.height +
+                                            map.gridsize.height / 2
                                     };
                                 }
                             ));
-                            if (targetMonster.life > 0) {
-                                targetMonster.life -= 5;
+                            if (targetMonster.life > 0 && dmg > 0) {
+                                targetMonster.life -= dmg;
                                 if (targetMonster.life <= 0) {
                                     targetMonster.life = 0;
                                     // 敵を死亡状態にする
@@ -458,7 +495,8 @@ namespace Scene {
                         }
                         break stateloop;
                     }
-                    case TurnState.EnemyAI: {
+                    case TurnState.EnemyAI:
+                    {
                         // 敵の行動の決定
 
                         // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
@@ -503,7 +541,7 @@ namespace Scene {
                                 };
                                 return;
                             } else {
-                                return;  // skip
+                                return; // skip
                             }
                         });
 
@@ -536,8 +574,8 @@ namespace Scene {
                                         const tx = monster.x + cx;
                                         const ty = monster.y + cy;
                                         if ((cannotMoveMap.value(tx, ty) === 0) &&
-                                            (map.layer[0].chips.value(tx, ty) === 1 ||
-                                                map.layer[0].chips.value(tx, ty) === 10)) {
+                                        (map.layer[0].chips.value(tx, ty) === 1 ||
+                                            map.layer[0].chips.value(tx, ty) === 10)) {
                                             const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
                                             // 敵全体の移動不能座標に自分を設定
                                             cannotMoveMap.value(tx, ty, 1);
@@ -569,7 +607,8 @@ namespace Scene {
                         turnStateStack.shift();
                         continue stateloop;
                     }
-                    case TurnState.EnemyAction: {
+                    case TurnState.EnemyAction:
+                    {
                         // 敵の行動開始
                         let enemyId = turnStateStack[0][1];
                         while (enemyId < monstersTactics.length) {
@@ -594,7 +633,8 @@ namespace Scene {
                             continue stateloop;
                         }
                     }
-                    case TurnState.EnemyActionRunning: {
+                    case TurnState.EnemyActionRunning:
+                    {
                         // 敵の行動中
                         const enemyId = turnStateStack[0][1];
 
@@ -603,9 +643,10 @@ namespace Scene {
                         if (rate > 0.5 && turnStateStack[0][2] === 0) {
                             turnStateStack[0][2] = 1;
                             Game.getSound().reqPlayChannel("atack");
+                            const dmg = ~~(monsters[enemyId].atk - player.def);
                             sprites.push(createShowDamageSprite(
                                 ms,
-                                ~~(Math.random() * 10 + 5),
+                                dmg > 0 ? ("" + dmg) : "MISS!!",
                                 () => {
                                     return {
                                         x: player.offx + player.x * map.gridsize.width + map.gridsize.width / 2,
@@ -613,8 +654,19 @@ namespace Scene {
                                     };
                                 }
                             ));
+                            if (player.hp > 0 && dmg > 0) {
+                                player.hp -= dmg;
+                                if (player.hp <= 0) {
+                                    player.hp = 0;
+                                }
+                            }
                         }
                         if (rate >= 1) {
+                            if (player.hp == 0) {
+                                // ターン強制終了
+                                return;
+                            }
+
                             // 行動終了。次の敵へ
                             monsters[enemyId].setAnimation("move", 0);
                             turnStateStack[0][0] = TurnState.EnemyAction;
@@ -623,28 +675,29 @@ namespace Scene {
                         break stateloop;
                     }
                     case TurnState.EnemyDead:
-                        {
-                            // 敵の死亡開始
-                            turnStateStack[0][0] = TurnState.EnemyDeadRunning;
-                            const enemyId = turnStateStack[0][1];
-                            turnStateStack[0][2] = ms;
-                            Game.getSound().reqPlayChannel("explosion");
-                            monsters[enemyId].setAnimation("dead", 0);
-                            // fall through;
-                        }
+                    {
+                        // 敵の死亡開始
+                        turnStateStack[0][0] = TurnState.EnemyDeadRunning;
+                        const enemyId = turnStateStack[0][1];
+                        turnStateStack[0][2] = ms;
+                        Game.getSound().reqPlayChannel("explosion");
+                        monsters[enemyId].setAnimation("dead", 0);
+                        // fall through;
+                    }
                     case TurnState.EnemyDeadRunning:
-                        {
-                            // 敵の死亡
-                            turnStateStack[0][0] = TurnState.EnemyDeadRunning;
-                            const enemyId = turnStateStack[0][1];
-                            const diff = ms - turnStateStack[0][2];
-                            monsters[enemyId].setAnimation("dead", diff / 250);
-                            if (diff >= 250) {
-                                turnStateStack.shift();
-                            }
-                            break stateloop;
+                    {
+                        // 敵の死亡
+                        turnStateStack[0][0] = TurnState.EnemyDeadRunning;
+                        const enemyId = turnStateStack[0][1];
+                        const diff = ms - turnStateStack[0][2];
+                        monsters[enemyId].setAnimation("dead", diff / 250);
+                        if (diff >= 250) {
+                            turnStateStack.shift();
                         }
-                    case TurnState.Move: {
+                        break stateloop;
+                    }
+                    case TurnState.Move:
+                    {
                         // 移動開始
                         turnStateStack[0][0] = TurnState.MoveRunning;
                         monstersTactics.forEach((monsterTactic, i: number) => {
@@ -661,7 +714,8 @@ namespace Scene {
                         }
                         // fallthrough
                     }
-                    case TurnState.MoveRunning: {
+                    case TurnState.MoveRunning:
+                    {
                         // 移動実行
                         let finish = true;
                         monstersTactics.forEach((monsterTactic, i: number) => {
@@ -716,7 +770,8 @@ namespace Scene {
                         }
                         break stateloop;
                     }
-                    case TurnState.TurnEnd: {
+                    case TurnState.TurnEnd:
+                    {
                         // ターン終了
                         turnStateStack.shift();
                         monsters = monsters.filter(x => x.life > 0);
@@ -728,13 +783,13 @@ namespace Scene {
 
             // カメラを更新
             map.update({
-                viewpoint: {
-                    x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                    y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                    viewpoint: {
+                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                    },
+                    viewwidth: Game.getScreen().offscreenWidth,
+                    viewheight: Game.getScreen().offscreenHeight,
                 },
-                viewwidth: Game.getScreen().offscreenWidth,
-                viewheight: Game.getScreen().offscreenHeight,
-            },
             );
 
             // スプライトを更新
@@ -744,9 +799,16 @@ namespace Scene {
 
             updateLighting((v: number) => v === 1 || v === 10);
 
-            if (Game.getInput().isClick() && Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+            if (player.hp === 0) {
+                // ターン強制終了
+                Game.getSceneManager().pop();
+                Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
+                return;
+            }
+            if (Game.getInput().isClick() &&
+                Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
                 //Game.getSceneManager().push(mapview, { map: map, player: player });
-                Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
+                Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
             }
 
         };
@@ -755,7 +817,10 @@ namespace Scene {
         yield waitTimeout({
             timeout: 500,
             init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); updateLighting((v: number) => v === 1 || v === 10); },
+            update: (e) => {
+                fade.update(e);
+                updateLighting((v: number) => v === 1 || v === 10);
+            },
             end: () => { this.next(); },
         });
 
@@ -780,7 +845,10 @@ namespace Scene {
         this.draw = () => {
             opt.upperdraw();
             Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
-            Game.getScreen().fillRect(20, 20, Game.getScreen().offscreenWidth - 40, Game.getScreen().offscreenHeight - 40);
+            Game.getScreen().fillRect(20,
+                20,
+                Game.getScreen().offscreenWidth - 40,
+                Game.getScreen().offscreenHeight - 40);
 
             // 閉じるボタン
             Game.getScreen().save();
@@ -788,10 +856,14 @@ namespace Scene {
             Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
             Game.getScreen().lineWidth = 6;
             Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
-            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2, closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2, closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+                closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+                closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+                closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+                closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
             Game.getScreen().stroke();
             Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
             Game.getScreen().lineWidth = 3;
@@ -801,22 +873,16 @@ namespace Scene {
             // ステータス（ダミー）
             Game.getScreen().fillStyle = 'rgb(0,0,0)';
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-            Game.getScreen().fillText('ＬＶ：９９', 30, 30 + 11*0);
-            Game.getScreen().fillText('ＨＰ：９９９', 30, 30 + 11 * 1);
-            Game.getScreen().fillText('ＭＰ：９９９', 30, 30 + 11 * 2);
-            Game.getScreen().fillText('筋力：９９９', 30, 30 + 11 * 3);
-            Game.getScreen().fillText('体力：９９９', 30, 30 + 11 * 4);
-            Game.getScreen().fillText('知性：９９９', 30, 30 + 11 * 5);
-            Game.getScreen().fillText('精神：９９９', 30, 30 + 11 * 6);
-            Game.getScreen().fillText('器用：９９９', 30, 30 + 11 * 7);
-            Game.getScreen().fillText('敏捷：９９９', 30, 30 + 11 * 8);
-            Game.getScreen().fillText('幸運：９９９', 30, 30 + 11 * 9);
+            Game.getScreen().fillText(`HP:${opt.player.hp}/${opt.player.hpMax}`, 30, 30 + 11 * 3);
+            Game.getScreen().fillText(`MP:${opt.player.mp}/${opt.player.mpMax}`, 30, 30 + 11 * 4);
+            Game.getScreen().fillText(`ATK：${opt.player.atk}`, 30, 30 + 11 * 6);
+            Game.getScreen().fillText(`DEF：${opt.player.def}`, 30, 30 + 11 * 7);
 
-            Game.getScreen().fillText('アイスソード', 30, 30 + 11 * 12);
-            Game.getScreen().fillText('アイアンプレート', 30, 30 + 11 * 13);
-            Game.getScreen().fillText('星の腕輪', 30, 30 + 11 * 14);
-            Game.getScreen().fillText('韋駄天の靴', 30, 30 + 11 * 15);
-            
+            opt.player.equips.forEach((e, i) => {
+                Game.getScreen().fillText(`${e.name}`, 30, 30 + 11 * (8 + i));
+            })
+
+
         }
         yield waitClick({
             end: (x, y) => {
@@ -826,5 +892,36 @@ namespace Scene {
         Game.getSceneManager().pop();
     }
 
+    function* gameOver(opt: { player: Charactor.Player, floor: number, upperdraw: () => void }) {
+        const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        let fontAlpha: number = 0;
+        this.draw = () => {
+            opt.upperdraw();
+            fade.draw();
+            Game.getScreen().fillStyle = `rgba(255,255,255,${fontAlpha})`;
+            Game.getScreen().font = "20px 'PixelMplus10-Regular'";
+            const shape = Game.getScreen().measureText(`GAME OVER`);
+            Game.getScreen().fillText(`GAME OVER`, (Game.getScreen().offscreenWidth - shape.width) / 2, (Game.getScreen().offscreenHeight - 20) / 2);
+        }
+        yield waitTimeout({
+            timeout: 500,
+            start: (e, ms) => { fade.startFadeOut(); },
+            update: (e, ms) => { fade.update(ms); },
+            end: (x, y) => { this.next(); }
+        });
+        yield waitTimeout({
+            timeout: 500,
+            start: (e, ms) => { fontAlpha = 0; },
+            update: (e, ms) => { fontAlpha = e / 500; },
+            end: (x, y) => { fontAlpha = 1; this.next(); }
+        });
+        yield waitClick({
+            end: (x, y) => {
+                this.next();
+            }
+        });
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(title);
+    }
 }
 

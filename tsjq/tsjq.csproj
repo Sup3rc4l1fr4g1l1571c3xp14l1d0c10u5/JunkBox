@@ -85,6 +85,9 @@
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="js\CSSFontLoadingAPI.d.ts" />
+    <TypeScriptCompile Include="js\Lib\Game\GUI.ts" />
+    <TypeScriptCompile Include="js\Scene\Shop.ts" />
     <TypeScriptCompile Include="tsjq.ts" />
     <TypeScriptCompile Include="js\Lib\Game\Ajax.ts" />
     <TypeScriptCompile Include="js\Array2D.ts" />

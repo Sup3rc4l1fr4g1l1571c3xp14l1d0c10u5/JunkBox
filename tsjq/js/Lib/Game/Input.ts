@@ -33,6 +33,9 @@ namespace Game {
             private capture: boolean;
             private lastPageX: number;
             private lastPageY: number;
+            private startPageX: number;
+            private startPageY: number;
+            private moveDelta: number;
             private downup: number;
             private clicked: boolean;
             private lastDownPageX: number;
@@ -56,6 +59,9 @@ namespace Game {
             public isUp(): boolean {
                 return this.downup === -1;
             }
+            public isMove(): boolean {
+                return (~~this.startPageX !== ~~this.lastPageX) || (~~this.startPageY !== ~~this.lastPageY);
+            }
             public isClick(): boolean {
                 return this.clicked;
             }
@@ -64,9 +70,12 @@ namespace Game {
             }
             public startCapture(): void {
                 this.capture = true;
+                this.startPageX = ~~this.lastPageX;
+                this.startPageY = ~~this.lastPageY;
             }
             public endCapture(): void {
                 this.capture = false;
+
                 if (this.status === PointerChangeStatus.Down) {
                     if (this.downup < 1) { this.downup = 1; } else { this.downup += 1; }
                 } else if (this.status === PointerChangeStatus.Up) {

@@ -1,3 +1,4 @@
+/// <reference path="lib/random.ts" />
 "use strict";
 
 namespace Dungeon {
@@ -163,7 +164,8 @@ namespace Dungeon {
                 // レイヤー描画フック
                 layerDrawHook(l, this.camera.localPx, this.camera.localPy);
             });
-            // 照明描画
+
+            // 明度描画
             for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
                 for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
                     let light = this.lighting.value(x, y) / 100;

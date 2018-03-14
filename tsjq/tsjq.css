@@ -21,11 +21,11 @@ html, body {
 
             body > section > article > header:before {
                 display: block;
-                font-size: 2rem;
+                font-size: 1.3rem;
                 font-weight: 600;
                 text-align: center;
-                line-height: 2rem;
-                content: "とりあえず作りなさい";
+                line-height: 1.5rem;
+                /*content: "とりあえず作りなさい";*/
             }
 
             body > section > article > header:after {
@@ -34,13 +34,13 @@ html, body {
                 color: white;
                 text-align: center;
                 padding: 4px;
-                margin-top: 3px;
-                margin-bottom: 3px;
+                margin-top: 2px;
+                margin-bottom: 2px;
                 font-weight: 400;
                 font-size: 1.4rem;
                 line-height: 1.4rem;
                 border: 1px black solid;
-                content: "TSJK in ゲーム";
+                /*content: "TSJK in ゲーム";*/
             }
 
         body > section > article > footer:after {
@@ -49,14 +49,14 @@ html, body {
             margin-top: 3px;
             font-size: 0.8rem;
             line-height: 0.8rem;
-            content: "クリアできなくても委員会";
+            /*content: "クリアできなくても委員会";*/
         }
 
         body > section > article > section {
             display: block;
             background-color: black;
             border: 1px black solid;
-            line-height: 0rem;
+            line-height: 0;
         }
         
 #console {
