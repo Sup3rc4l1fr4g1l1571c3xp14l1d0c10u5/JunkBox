@@ -173,6 +173,22 @@ namespace Scene {
 
         let sprites: ISprite[] = [];
 
+        const dispatcher : Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
+        const btnMap = new Game.GUI.Button(0, 0, 14, 14, {
+            text: "Ｍ",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnMap);
+
+        btnMap.click = (x: number, y: number) => {
+            Game.getSceneManager().push(mapview, { map: map, player: player });
+        };
+
         this.draw = () => {
 
             Game.getScreen().save();
@@ -320,6 +336,9 @@ namespace Scene {
                 `${floor}F | HP:${player.hp}/${player.hpMax} | MP:${player.mp}/${player.mpMax} | GOLD:${player.gold}`,
                 0,
                 0);
+
+            // UI
+            dispatcher.draw();
 
             // フェード
             fade.draw();
@@ -805,11 +824,23 @@ namespace Scene {
                 Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
                 return;
             }
-            if (Game.getInput().isClick() &&
-                Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                //Game.getSceneManager().push(mapview, { map: map, player: player });
-                Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
+
+            // ui 
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
             }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+
+            //if (Game.getInput().isClick() &&
+            //    Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+            //    //Game.getSceneManager().push(mapview, { map: map, player: player });
+            //    Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
+            //}
 
         };
         Game.getSound().reqPlayChannel("kaidan");

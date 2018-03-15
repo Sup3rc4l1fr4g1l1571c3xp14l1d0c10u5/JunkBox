@@ -2,11 +2,10 @@
 namespace Scene {
 
     function* shopBuyItem(opt: { player: Charactor.Player }) {
-        const uiComponents: Game.GUI.UI[] = [];
         const dispatcher = new Game.GUI.UIDispatcher();
 
         const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
-            text: "w”ƒ•”\n‚³‚Ü‚´‚Ü‚È•ŠíEƒAƒCƒeƒ€‚Ìw“ü‚ª‚Å‚«‚Ü‚·B",
+            text: "è³¼è²·éƒ¨\nã•ã¾ã–ã¾ãªæ­¦å™¨ãƒ»ã‚¢ã‚¤ãƒ†ãƒ ã®è³¼å…¥ãŒã§ãã¾ã™ã€‚",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -14,9 +13,10 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
+        dispatcher.add(caption);
 
         const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
-            text: `ŠŽ‹àF${('            ' + 150 + 'G').substr(-13)}`,
+            text: `æ‰€æŒé‡‘ï¼š${('            ' + 150 + 'G').substr(-13)}`,
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -24,11 +24,11 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
+        dispatcher.add(captionMonay);
 
-        let exitScene = false;
 
         const btnExit = new Game.GUI.Button(8, 16 * 9 + 46, 112, 16, {
-            text: "–ß‚é",
+            text: "æˆ»ã‚‹",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -36,26 +36,29 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
-        dispatcher.onClick(btnExit, (x: number, y: number) => {
+        dispatcher.add(btnExit);
+
+        let exitScene = false;
+        btnExit.click = (x: number, y: number) => {
             exitScene = true;
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
 
         const itemlist: string[] = [
-            "‚Ý‚©‚ñ",
-            "‚è‚ñ‚²",
-            "ƒoƒiƒi",
-            "ƒIƒŒƒ“ƒW",
-            "ƒpƒCƒiƒbƒvƒ‹",
-            "‚Ú‚ñ‚½‚ñ",
-            "ƒLƒEƒC",
-            "ƒpƒpƒCƒ„",
-            "ƒ}ƒ“ƒS[",
-            "ƒRƒRƒiƒbƒc",
-            "‚Ô‚Ç‚¤",
-            "‚È‚µ",
-            "‚ ‚¯‚Ñ",
-            "ƒhƒ‰ƒSƒ“ƒtƒ‹[ƒc",
+            "ã¿ã‹ã‚“",
+            "ã‚Šã‚“ã”",
+            "ãƒãƒŠãƒŠ",
+            "ã‚ªãƒ¬ãƒ³ã‚¸",
+            "ãƒ‘ã‚¤ãƒŠãƒƒãƒ—ãƒ«",
+            "ã¼ã‚“ãŸã‚“",
+            "ã‚­ã‚¦ã‚¤",
+            "ãƒ‘ãƒ‘ã‚¤ãƒ¤",
+            "ãƒžãƒ³ã‚´ãƒ¼",
+            "ã‚³ã‚³ãƒŠãƒƒãƒ„",
+            "ã¶ã©ã†",
+            "ãªã—",
+            "ã‚ã‘ã³",
+            "ãƒ‰ãƒ©ã‚´ãƒ³ãƒ•ãƒ«ãƒ¼ãƒ„",
         ]
 
         let selectedItem = -1;
@@ -80,15 +83,12 @@ namespace Scene {
                 Game.getScreen().fillText(itemlist[index], left + 9, top + 3);
             }
         });
+        dispatcher.add(listBox);
 
-        dispatcher.onSwipe(listBox, (deltaX: number, deltaY: number) => {
-            listBox.scrollValue -= deltaY;
-            listBox.update();
-        });
-        dispatcher.onClick(listBox, (x: number, y: number) => {
+        listBox.click = (x: number, y: number) => {
             selectedItem = listBox.getItemIndexByPosition(x, y);
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
 
 
         this.draw = () => {
@@ -101,11 +101,8 @@ namespace Scene {
                 Game.getScreen().texture("shop/J11"),
                 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight,
                 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight
-            )
-            caption.draw();
-            btnExit.draw();
-            listBox.draw();
-            captionMonay.draw();
+            );
+            dispatcher.draw();
         }
 
         yield (delta: number, ms: number) => {
@@ -128,11 +125,10 @@ namespace Scene {
     }
 
     export function* shop(opt: { player: Charactor.Player }) {
-        const uiComponents: Game.GUI.UI[] = [];
         const dispatcher = new Game.GUI.UIDispatcher();
 
         const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
-            text: "w”ƒ•”\n‚³‚Ü‚´‚Ü‚È•ŠíEƒAƒCƒeƒ€‚Ìw“ü‚ª‚Å‚«‚Ü‚·B",
+            text: "è³¼è²·éƒ¨\nã•ã¾ã–ã¾ãªæ­¦å™¨ãƒ»ã‚¢ã‚¤ãƒ†ãƒ ã®è³¼å…¥ãŒã§ãã¾ã™ã€‚",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -140,9 +136,10 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
+        dispatcher.add(caption);
 
         const btnBuy = new Game.GUI.Button(8, 20 * 0 + 46, 112, 16, {
-            text: "ƒAƒCƒeƒ€w“ü",
+            text: "ã‚¢ã‚¤ãƒ†ãƒ è³¼å…¥",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -150,13 +147,14 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
-        dispatcher.onClick(btnBuy, (x: number, y: number) => {
+        dispatcher.add(btnBuy);
+        btnBuy.click = (x: number, y: number) => {
             Game.getSceneManager().push(shopBuyItem, opt);
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
 
         const btnSell = new Game.GUI.Button(8, 20 * 1 + 46, 112, 16, {
-            text: "ƒAƒCƒeƒ€”„‹p",
+            text: "ã‚¢ã‚¤ãƒ†ãƒ å£²å´",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -164,12 +162,13 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
-        dispatcher.onClick(btnBuy, (x: number, y: number) => {
+        dispatcher.add(btnSell);
+        btnSell.click = (x: number, y: number) => {
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
 
         const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
-            text: `ŠŽ‹àF${('            ' + 150 + 'G').substr(-13)}`,
+            text: `æ‰€æŒé‡‘ï¼š${('            ' + 150 + 'G').substr(-13)}`,
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -177,6 +176,7 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
+        dispatcher.add(captionMonay);
 
         const hoverSlider = new Game.GUI.HorizontalSlider(135+14, 80, 108-28, 16, {
             sliderWidth : 5,
@@ -188,12 +188,9 @@ namespace Scene {
             minValue: 0,
             maxValue: 100,
         });
-        dispatcher.onSwipe(hoverSlider, (dx: number, dy: number, x: number, y: number) => {
-            hoverSlider.swipe(x);
-            hoverSlider.update();
-        });
+        dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button(135, 80, 14, 16, {
-            text: "|",
+            text: "ï¼",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -201,13 +198,14 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
-        dispatcher.onClick(btnSliderDown, (x: number, y: number) => {
+        dispatcher.add(btnSliderDown);
+        btnSliderDown.click = (x: number, y: number) => {
             hoverSlider.value -= 1;
             hoverSlider.update();
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
         const btnSliderUp = new Game.GUI.Button(243-14, 80, 14, 16, {
-            text: "{",
+            text: "ï¼‹",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -215,13 +213,14 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
-        dispatcher.onClick(btnSliderUp, (x: number, y: number) => {
+        dispatcher.add(btnSliderUp);
+        btnSliderUp.click = (x: number, y: number) => {
             hoverSlider.value += 1;
             hoverSlider.update();
             Game.getSound().reqPlayChannel("cursor");
-        });
+        };
         const captionBuyCount = new Game.GUI.Button(135, 64, 108, 16, {
-            text: () => `w“ü”F${('           ' + hoverSlider.value + 'ŒÂ').substr(-12)}`,
+            text: () => `è³¼å…¥æ•°ï¼š${('           ' + hoverSlider.value + 'å€‹').substr(-12)}`,
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -229,6 +228,7 @@ namespace Scene {
             textAlign: "left",
             textBaseline: "top",
         });
+        dispatcher.add(captionBuyCount);
 
         this.draw = () => {
             Game.getScreen().drawImage(
@@ -241,14 +241,7 @@ namespace Scene {
                 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight,
                 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight
             )
-            caption.draw();
-            btnBuy.draw();
-            btnSell.draw();
-            captionMonay.draw();
-            hoverSlider.draw();
-            btnSliderDown.draw();
-            btnSliderUp.draw();
-            captionBuyCount.draw();
+            dispatcher.draw();
         }
 
         yield (delta: number, ms: number) => {

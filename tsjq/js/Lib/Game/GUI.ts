@@ -6,6 +6,16 @@ namespace Game.GUI {
         width: number;
         height: number;
         draw: () => void;
+        regist: (dispatcher : UIDispatcher) => void;
+        unregist: (dispatcher : UIDispatcher) => void;
+    }
+
+    export interface ClickableUI {
+        click : (x:number, y:number) => void;
+    }
+
+    export interface SwipableUI {
+        swipe : (dx:number, dy:number,x:number, y:number) => void;
     }
 
     export function isHit(ui: UI, x: number, y: number): boolean {
@@ -14,14 +24,73 @@ namespace Game.GUI {
         return (0 <= dx && dx < ui.width) && (0 <= dy && dy < ui.height)
     }
 
+    type EventHandler = (...args : any[]) => void;
+    type CancelHandler = () => void;
+
     export class UIDispatcher extends Dispatcher.EventDispatcher {
+        private uiTable : Map<UI, Map<string, EventHandler[]>>;
+
         constructor() {
             super();
+            this.uiTable = new Map<UI, Map<string, EventHandler[]>>();
         }
 
-        // UI�ɑ΂���N���b�N/�^�b�v�����ߑ�
-        public onClick(ui: UI, handler: (x: number, y: number) => void): void {
-            this.on("pointerdown", (x, y) => {
+        public add(ui: UI) : void  {
+            if (this.uiTable.has(ui)) {
+                return;
+            }
+            this.uiTable.set(ui, new Map<string, EventHandler[]>());
+            ui.regist(this);
+        }
+
+        public remove(ui: UI) : void  {
+            if (!this.uiTable.has(ui)) {
+                return;
+            }
+            ui.unregist(this);
+            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
+            this.uiTable.set(ui,null);
+            eventTable.forEach((values,key) => {
+                values.forEach((value) => this.off(key,value));
+            });
+            this.uiTable.delete(ui);
+        }
+
+        private registUiEvent(ui: UI, event:string, handler : EventHandler) : void  {
+            if (!this.uiTable.has(ui)) {
+                return;
+            }
+            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
+            if (!eventTable.has(event)) {
+                eventTable.set(event, []);
+            }
+            const events = eventTable.get(event);
+            events.push(handler);
+            this.on(event, handler);
+        }
+        private unregistUiEvent(ui: UI, event: string,  handler : EventHandler) : void  {
+            if (!this.uiTable.has(ui)) {
+                return;
+            }
+            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
+            if (!eventTable.has(event)) {
+                return;
+            }
+            const events = eventTable.get(event);
+            const index = events.indexOf(handler);
+            if (index != -1) {
+                events.splice(index,1);
+            }
+            this.off(event, handler);
+        }
+
+        public draw() : void {
+            this.uiTable.forEach((value, key) => key.draw());
+        }
+
+        // UIに対するクリック/タップ操作を捕捉
+        public onClick(ui: UI, handler: (x: number, y: number) => void): CancelHandler {
+            const hookHandler = (x: number, y: number) => {
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -48,12 +117,14 @@ namespace Game.GUI {
                 this.on("pointermove", onPointerMoveHandler);
                 this.on("pointerup", onPointerUpHandler);
 
-            });
+            };
+            this.registUiEvent(ui, "pointerdown", hookHandler);
+            return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
         }
 
-        //UI�O�̃^�b�v/�N���b�N�����ߑ�
-        public onNcClick(ui: UI, handler: (x: number, y: number) => void): void {
-            this.on("pointerdown", (x, y) => {
+        //UI外のタップ/クリック操作を捕捉
+        public onNcClick(ui: UI, handler: (x: number, y: number) => void): CancelHandler {
+            const hookHandler = (x: number, y: number) => {
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -80,13 +151,15 @@ namespace Game.GUI {
                 this.on("pointermove", onPointerMoveHandler);
                 this.on("pointerup", onPointerUpHandler);
 
-            });
+            };
+            this.registUiEvent(ui, "pointerdown", hookHandler);
+            return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
         }
 
-        // UI�ɑ΂���X���C�v�����ߑ�
-        public onSwipe(ui: UI, handler: (dx: number, dy: number, x?:number,y?:number) => void): void {
+        // UIに対するスワイプ操作を捕捉
+        public onSwipe(ui: UI, handler: (dx: number, dy: number, x?:number,y?:number) => void): CancelHandler {
 
-            this.on("pointerdown", (x, y) => {
+            const hookHandler = (x: number, y: number) => {
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -111,8 +184,12 @@ namespace Game.GUI {
                 this.on("pointerup", onPointerUpHandler);
 
                 handler(0, 0, cx-ui.left, cy-ui.top);
-            });
+            };
+            this.registUiEvent(ui, "pointerdown", hookHandler);
+            return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
         }
+
+
     }
 
     export class TextBox implements UI {
@@ -172,9 +249,11 @@ namespace Game.GUI {
             });
 
         }
+        regist(dispatcher : UIDispatcher) {}
+        unregist(dispatcher : UIDispatcher) {}
     }
 
-    export class Button implements UI {
+    export class Button implements UI, ClickableUI {
         public text: string | (() => string);
         public edgeColor: string;
         public color: string;
@@ -182,6 +261,8 @@ namespace Game.GUI {
         public fontColor: string;
         public textAlign: string;
         public textBaseline: string;
+        public click : (x:number,y:number) => void;
+
         constructor(public left: number, public top: number, public width: number, public height: number,
             {
                 text = "button",
@@ -207,6 +288,7 @@ namespace Game.GUI {
             this.fontColor = fontColor;
             this.textAlign = textAlign;
             this.textBaseline = textBaseline;
+            this.click = () => {};
         }
         draw() {
             Game.getScreen().fillStyle = this.color;
@@ -224,11 +306,18 @@ namespace Game.GUI {
                 Game.getScreen().fillText(x, this.left + 2, this.top + i * (10 + 1) + 2);
             });
         }
+        regist(dispatcher : UIDispatcher) {
+            const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
+            this.unregist = (d) => cancelHandler();
+
+        }
+        unregist(dispatcher : UIDispatcher) {}
     }
 
-    export class ListBox implements UI {
+    export class ListBox implements UI, ClickableUI {
         public lineHeight: number;
         public scrollValue: number;
+        public click: (x: number, y: number) => void;
 
         public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
         public getItemCount: () => number;
@@ -246,6 +335,7 @@ namespace Game.GUI {
             this.drawItem = drawItem;
             this.getItemCount = getItemCount;
             this.scrollValue = 0;
+            this.click = () => {}
         }
         update(): void {
             var contentHeight = this.getItemCount() * this.lineHeight;
@@ -288,6 +378,18 @@ namespace Game.GUI {
                 return index;
             }
         }
+        regist(dispatcher : UIDispatcher) {
+            const cancelHandlers = [
+                dispatcher.onSwipe(this, (deltaX: number, deltaY: number) => {
+                    this.scrollValue -= deltaY;
+                    this.update();
+                }),
+                dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args))
+            ];
+            this.unregist = (d) => cancelHandlers.forEach(x => x());
+
+        }
+        unregist(dispatcher : UIDispatcher) {}
     }
 
     export class HorizontalSlider implements UI {
@@ -359,19 +461,6 @@ namespace Game.GUI {
                 this.height
             );
         }
-        swipe(lx: number) {
-            const rangeSize = this.maxValue - this.minValue;
-            if (rangeSize == 0) {
-                this.value = this.minValue;
-            } else if (lx < 0) {
-                this.value = this.minValue;
-            } else if (lx >= this.width) {
-                this.value = this.maxValue;
-            } else {
-                this.value = Math.trunc((lx * rangeSize) / this.width) + this.minValue;
-            }
-
-        }
         update() {
             const rangeSize = this.maxValue - this.minValue;
             if (rangeSize == 0) {
@@ -382,6 +471,27 @@ namespace Game.GUI {
                 this.value = this.maxValue;
             }
         }
+        regist(dispatcher : UIDispatcher) {
+            var cancelHandler = dispatcher.onSwipe(this, (dx, dy, x, y) => {
+                const rangeSize = this.maxValue - this.minValue;
+                if (rangeSize == 0) {
+                    this.value = this.minValue;
+                } else {
+                    if (x <= this.sliderWidth/2) {
+                        this.value = this.minValue;
+                    } else if (x >= this.width-this.sliderWidth/2) {
+                        this.value = this.maxValue;
+                    } else {
+                        const width = this.width - this.sliderWidth;
+                        const xx = x - ~~(this.sliderWidth/2);
+                        this.value = Math.trunc((xx * rangeSize) / width) + this.minValue;
+                    }
+                }
+            });
+            this.unregist = (d) => cancelHandler();
+
+        }
+        unregist(dispatcher : UIDispatcher) {}
     }
 
 

@@ -7,6 +7,1208 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+class Array2D {
+    constructor(width, height, fill) {
+        this.arrayWidth = width;
+        this.arrayHeight = height;
+        if (fill === undefined) {
+            this.matrixBuffer = new Array(width * height);
+        }
+        else {
+            this.matrixBuffer = new Array(width * height).fill(fill);
+        }
+    }
+    get width() {
+        return this.arrayWidth;
+    }
+    get height() {
+        return this.arrayHeight;
+    }
+    value(x, y, value) {
+        if (0 > x || x >= this.arrayWidth || 0 > y || y >= this.arrayHeight) {
+            return 0;
+        }
+        if (value !== undefined) {
+            this.matrixBuffer[y * this.arrayWidth + x] = value;
+        }
+        return this.matrixBuffer[y * this.arrayWidth + x];
+    }
+    fill(value) {
+        this.matrixBuffer.fill(value);
+        return this;
+    }
+    dup() {
+        const m = new Array2D(this.width, this.height);
+        m.matrixBuffer = this.matrixBuffer.slice();
+        return m;
+    }
+    static createFromArray(array, fill) {
+        const h = array.length;
+        const w = Math.max.apply(Math, array.map(x => x.length));
+        const matrix = new Array2D(w, h, fill);
+        array.forEach((vy, y) => vy.forEach((vx, x) => matrix.value(x, y, vx)));
+        return matrix;
+    }
+    toString() {
+        const lines = [];
+        for (let y = 0; y < this.height; y++) {
+            lines[y] = `|${this.matrixBuffer.slice((y + 0) * this.arrayWidth, (y + 1) * this.arrayWidth).join(", ")}|`;
+        }
+        return lines.join("\r\n");
+    }
+}
+Array2D.DIR8 = [
+    { x: +Number.MAX_SAFE_INTEGER, y: +Number.MAX_SAFE_INTEGER },
+    { x: -1, y: +1 },
+    { x: +0, y: +1 },
+    { x: +1, y: +1 },
+    { x: -1, y: +0 },
+    { x: +0, y: +0 },
+    { x: +1, y: +0 },
+    { x: -1, y: -1 },
+    { x: +0, y: -1 },
+    { x: +1, y: -1 }
+];
+var SpriteAnimation;
+(function (SpriteAnimation) {
+    class Animator {
+        constructor(spriteSheet) {
+            this.spriteSheet = spriteSheet;
+            this.offx = 0;
+            this.offy = 0;
+            this.dir = 5;
+            this.animDir = 2;
+            this.animFrame = 0;
+            this.animName = "idle";
+        }
+        setDir(dir) {
+            if (dir === 0) {
+                return;
+            }
+            this.dir = dir;
+            switch (dir) {
+                case 1: {
+                    if (this.animDir === 4) {
+                        this.animDir = 4;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 4;
+                    }
+                    break;
+                }
+                case 3: {
+                    if (this.animDir === 4) {
+                        this.animDir = 6;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 2;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 2;
+                    }
+                    break;
+                }
+                case 9: {
+                    if (this.animDir === 4) {
+                        this.animDir = 6;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 6;
+                    }
+                    break;
+                }
+                case 7: {
+                    if (this.animDir === 4) {
+                        this.animDir = 4;
+                    }
+                    else if (this.animDir === 2) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 8) {
+                        this.animDir = 8;
+                    }
+                    else if (this.animDir === 6) {
+                        this.animDir = 4;
+                    }
+                    break;
+                }
+                case 5: {
+                    break;
+                }
+                default: {
+                    this.animDir = dir;
+                    break;
+                }
+            }
+        }
+        setAnimation(type, rate) {
+            if (rate > 1) {
+                rate = 1;
+            }
+            if (rate < 0) {
+                rate = 0;
+            }
+            if (type === "move" || type === "action") {
+                if (type === "move") {
+                    this.offx = ~~(Array2D.DIR8[this.dir].x * 24 * rate);
+                    this.offy = ~~(Array2D.DIR8[this.dir].y * 24 * rate);
+                }
+                else if (type === "action") {
+                    this.offx = ~~(Array2D.DIR8[this.dir].x * 12 * Math.sin(rate * Math.PI));
+                    this.offy = ~~(Array2D.DIR8[this.dir].y * 12 * Math.sin(rate * Math.PI));
+                }
+                this.animName = Animator.animationName[this.animDir];
+            }
+            else if (type === "dead") {
+                this.animName = "dead";
+                this.offx = 0;
+                this.offy = 0;
+            }
+            else {
+                return;
+            }
+            const animDefs = this.spriteSheet.getAnimation(this.animName);
+            const totalWeight = animDefs.reduce((s, x) => s + x.time, 0);
+            const targetRate = rate * totalWeight;
+            let sum = 0;
+            for (let i = 0; i < animDefs.length; i++) {
+                const next = sum + animDefs[i].time;
+                if (sum <= targetRate && targetRate < next) {
+                    this.animFrame = i;
+                    return;
+                }
+                sum = next;
+            }
+            this.animFrame = animDefs.length - 1;
+        }
+    }
+    Animator.animationName = {
+        2: "move_down",
+        4: "move_left",
+        5: "idle",
+        6: "move_right",
+        8: "move_up",
+    };
+    SpriteAnimation.Animator = Animator;
+    // スプライトシート
+    class SpriteSheet {
+        constructor({ source = null, sprite = null, animation = null }) {
+            this.source = source;
+            this.sprite = sprite;
+            this.animation = animation;
+        }
+        getAnimation(animName) {
+            return this.animation.get(animName);
+        }
+        getAnimationFrame(animName, animFrame) {
+            return this.animation.get(animName)[animFrame];
+        }
+        gtetSprite(spriteName) {
+            return this.sprite.get(spriteName);
+        }
+        getSpriteImage(sprite) {
+            return this.source.get(sprite.source);
+        }
+    }
+    SpriteAnimation.SpriteSheet = SpriteSheet;
+    // スプライト定義
+    class Sprite {
+        constructor(sprite) {
+            this.source = sprite.source;
+            this.left = sprite.left;
+            this.top = sprite.top;
+            this.width = sprite.width;
+            this.height = sprite.height;
+            this.offsetX = sprite.offsetX;
+            this.offsetY = sprite.offsetY;
+        }
+    }
+    // アニメーション定義
+    class Animation {
+        constructor(animation) {
+            this.sprite = animation.sprite;
+            this.time = animation.time;
+            this.offsetX = animation.offsetX;
+            this.offsetY = animation.offsetY;
+        }
+    }
+    function loadImage(imageSrc) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = imageSrc;
+                img.onload = () => {
+                    resolve(img);
+                };
+                img.onerror = () => { reject(imageSrc + "のロードに失敗しました。"); };
+            });
+        });
+    }
+    function loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const spriteSheetDir = getDirectory(spriteSheetPath);
+            loadStartCallback();
+            const spriteSheetJson = yield ajax(spriteSheetPath, "json").then(y => y.response);
+            loadEndCallback();
+            if (spriteSheetJson == null) {
+                throw new Error(spriteSheetPath + " is invalid json.");
+            }
+            const source = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.source);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    const imageSrc = spriteSheetDir + '/' + spriteSheetJson.source[key];
+                    loadStartCallback();
+                    const image = yield loadImage(imageSrc);
+                    loadEndCallback();
+                    source.set(key, image);
+                }
+            }
+            const sprite = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.sprite);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    sprite.set(key, new Sprite(spriteSheetJson.sprite[key]));
+                }
+            }
+            const animation = new Map();
+            {
+                const keys = Object.keys(spriteSheetJson.animation);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    const value = spriteSheetJson.animation[key].map(x => new Animation(x));
+                    animation.set(key, value);
+                }
+            }
+            const spriteSheet = new SpriteSheet({
+                source: source,
+                sprite: sprite,
+                animation: animation,
+            });
+            return spriteSheet;
+        });
+    }
+    SpriteAnimation.loadSpriteSheet = loadSpriteSheet;
+})(SpriteAnimation || (SpriteAnimation = {}));
+var Charactor;
+(function (Charactor) {
+    function loadCharactorConfigFromFile(path, loadStartCallback, loadEndCallback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const configDirectory = path.substring(0, path.lastIndexOf("/"));
+            // キャラクタの設定ファイルを読み取る
+            loadStartCallback();
+            const charactorConfigJson = yield ajax(path, "json").then(x => x.response);
+            loadEndCallback();
+            const spriteSheetPath = configDirectory + "/" + charactorConfigJson.sprite;
+            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback);
+            return new CharactorConfig({
+                id: charactorConfigJson.id,
+                name: charactorConfigJson.name,
+                sprite: sprite,
+                configDirectory: configDirectory
+            });
+        });
+    }
+    Charactor.loadCharactorConfigFromFile = loadCharactorConfigFromFile;
+    class CharactorConfig {
+        constructor({ id = "", name = "", sprite = null, configDirectory = "", }) {
+            this.id = id;
+            this.name = name;
+            this.sprite = sprite;
+            this.configDirectory = configDirectory;
+        }
+    }
+    Charactor.CharactorConfig = CharactorConfig;
+    class CharactorBase extends SpriteAnimation.Animator {
+        constructor(x, y, spriteSheet) {
+            super(spriteSheet);
+            this.x = x;
+            this.y = y;
+        }
+    }
+    Charactor.CharactorBase = CharactorBase;
+    class Player extends CharactorBase {
+        constructor(config) {
+            const charactorConfig = Player.playerConfigs.get(config.charactorId);
+            super(config.x, config.y, charactorConfig.sprite);
+            this.charactorConfig = charactorConfig;
+            this.hp = 100;
+            this.hpMax = 100;
+            this.mp = 100;
+            this.mpMax = 100;
+            this.gold = 0;
+            this.equips = [
+                { name: "竹刀", atk: 5, def: 0 },
+                { name: "体操着", atk: 0, def: 3 },
+                { name: "ブルマ", atk: 0, def: 2 },
+            ];
+        }
+        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                loadStartCallback();
+                const configPaths = yield ajax(Player.configFilePath, "json").then((x) => x.response);
+                loadStartCallback();
+                const rootDirectory = getDirectory(Player.configFilePath);
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
+                Player.playerConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
+                return;
+            });
+        }
+        get atk() {
+            return this.equips.reduce((s, x) => s += x.atk, 0);
+        }
+        get def() {
+            return this.equips.reduce((s, x) => s += x.atk, 0);
+        }
+    }
+    Player.configFilePath = "./assets/charactor/charactor.json";
+    Player.playerConfigs = new Map();
+    Charactor.Player = Player;
+    class Monster extends CharactorBase {
+        constructor(config) {
+            const charactorConfig = Monster.monsterConfigs.get(config.charactorId);
+            super(config.x, config.y, charactorConfig.sprite);
+            this.charactorConfig = charactorConfig;
+            this.life = config.life;
+            this.maxLife = config.maxLife;
+            this.atk = config.atk;
+            this.def = config.def;
+        }
+        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const configPaths = yield ajax(Monster.configFilePath, "json").then((x) => x.response);
+                const rootDirectory = getDirectory(Monster.configFilePath);
+                loadStartCallback();
+                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
+                loadEndCallback();
+                Monster.monsterConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
+                return;
+            });
+        }
+    }
+    Monster.configFilePath = "./assets/monster/monster.json";
+    Monster.monsterConfigs = new Map();
+    Charactor.Monster = Monster;
+})(Charactor || (Charactor = {}));
+class XorShift {
+    constructor(w = 0 | Date.now(), x, y, z) {
+        if (x === undefined) {
+            x = (0 | (w << 13));
+        }
+        if (y === undefined) {
+            y = (0 | ((w >>> 9) ^ (x << 6)));
+        }
+        if (z === undefined) {
+            z = (0 | (y >>> 7));
+        }
+        this.seeds = { x: x >>> 0, y: y >>> 0, z: z >>> 0, w: w >>> 0 };
+        // Object.defineProperty(this, "seeds", { writable: false });
+        this.randCount = 0;
+        this.generator = this.randGen(w, x, y, z);
+    }
+    *randGen(w, x, y, z) {
+        let t;
+        for (;;) {
+            t = x ^ (x << 11);
+            x = y;
+            y = z;
+            z = w;
+            yield w = ((w ^ (w >>> 19)) ^ (t ^ (t >>> 8))) >>> 0;
+        }
+    }
+    rand() {
+        this.randCount = 0 | this.randCount + 1;
+        return this.generator.next().value;
+    }
+    randInt(min = 0, max = 0x7FFFFFFF) {
+        return 0 | this.rand() % (max + 1 - min) + min;
+    }
+    randFloat(min = 0, max = 1) {
+        return Math.fround(this.rand() % 0xFFFF / 0xFFFF) * (max - min) + min;
+    }
+    shuffle(target) {
+        const arr = target.concat();
+        for (let i = 0; i <= arr.length - 2; i = 0 | i + 1) {
+            const r = this.randInt(i, arr.length - 1);
+            const tmp = arr[i];
+            arr[i] = arr[r];
+            arr[r] = tmp;
+        }
+        return arr;
+    }
+    getWeightedValue(data) {
+        const keys = Object.keys(data);
+        const total = keys.reduce((s, x) => s + data[x], 0);
+        const random = this.randInt(0, total);
+        let part = 0;
+        for (const id of keys) {
+            part += data[id];
+            if (random < part) {
+                return id;
+            }
+        }
+        return keys[keys.length - 1];
+    }
+    static default() {
+        return new XorShift(XorShift.defaults.w, XorShift.defaults.x, XorShift.defaults.y, XorShift.defaults.z);
+    }
+}
+XorShift.defaults = {
+    x: 123456789,
+    y: 362436069,
+    z: 521288629,
+    w: 88675123
+};
+var Dungeon;
+(function (Dungeon) {
+    const rand = XorShift.default();
+    // マップ描画時の視点・視野情報
+    class Camera {
+    }
+    Dungeon.Camera = Camera;
+    // ダンジョンデータ
+    class DungeonData {
+        constructor(config) {
+            this.width = config.width;
+            this.height = config.height;
+            this.gridsize = config.gridsize;
+            this.layer = config.layer;
+            this.camera = new Camera();
+            this.lighting = new Array2D(this.width, this.height, 0);
+            this.visibled = new Array2D(this.width, this.height, 0);
+        }
+        clearLighting() {
+            this.lighting.fill(0);
+            return this;
+        }
+        // update camera
+        update(param) {
+            const mapWidth = this.width * this.gridsize.width;
+            const mapHeight = this.height * this.gridsize.height;
+            // マップ上でのカメラの注視点
+            const mapPx = param.viewpoint.x;
+            const mapPy = param.viewpoint.y;
+            // カメラの視野の幅・高さ
+            this.camera.width = param.viewwidth;
+            this.camera.height = param.viewheight;
+            // カメラの注視点が中心となるようなカメラの視野
+            this.camera.left = ~~(mapPx - this.camera.width / 2);
+            this.camera.top = ~~(mapPy - this.camera.height / 2);
+            this.camera.right = this.camera.left + this.camera.width;
+            this.camera.bottom = this.camera.top + this.camera.height;
+            // 視野をマップ内に補正
+            if ((this.camera.left < 0) && (this.camera.right - this.camera.left < mapWidth)) {
+                this.camera.right -= this.camera.left;
+                this.camera.left = 0;
+            }
+            else if ((this.camera.right >= mapWidth) && (this.camera.left - (this.camera.right - mapWidth) >= 0)) {
+                this.camera.left -= (this.camera.right - mapWidth);
+                this.camera.right = mapWidth - 1;
+            }
+            if ((this.camera.top < 0) && (this.camera.bottom - this.camera.top < mapHeight)) {
+                this.camera.bottom -= this.camera.top;
+                this.camera.top = 0;
+            }
+            else if ((this.camera.bottom >= mapHeight) && (this.camera.top - (this.camera.bottom - mapHeight) >= 0)) {
+                this.camera.top -= (this.camera.bottom - mapHeight);
+                this.camera.bottom = mapHeight - 1;
+            }
+            // 視野の左上位置を原点とした注視点を算出
+            this.camera.localPx = mapPx - this.camera.left;
+            this.camera.localPy = mapPy - this.camera.top;
+            // 視野の四隅位置に対応するマップチップ座標を算出
+            this.camera.chipLeft = ~~(this.camera.left / this.gridsize.width);
+            this.camera.chipTop = ~~(this.camera.top / this.gridsize.height);
+            this.camera.chipRight = ~~((this.camera.right + (this.gridsize.width - 1)) / this.gridsize.width);
+            this.camera.chipBottom = ~~((this.camera.bottom + (this.gridsize.height - 1)) / this.gridsize.height);
+            // 視野の左上位置をにマップチップをおいた場合のスクロールによるズレ量を算出
+            this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
+            this.camera.chipOffY = -(this.camera.top % this.gridsize.height);
+        }
+        draw(layerDrawHook) {
+            // 描画開始
+            const gridw = this.gridsize.width;
+            const gridh = this.gridsize.height;
+            Object.keys(this.layer).forEach((key) => {
+                const l = ~~key;
+                for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                    for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                        const chipid = this.layer[l].chips.value(x, y) || 0;
+                        if (this.layer[l].chip[chipid]) {
+                            const xx = (x - this.camera.chipLeft) * gridw;
+                            const yy = (y - this.camera.chipTop) * gridh;
+                            if (!Game.pmode) {
+                                Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                            }
+                            else {
+                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
+                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
+                                Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                                Game.getScreen().strokeRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                            }
+                        }
+                    }
+                }
+                // レイヤー描画フック
+                layerDrawHook(l, this.camera.localPx, this.camera.localPy);
+            });
+            // 明度描画
+            for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
+                for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
+                    let light = this.lighting.value(x, y) / 100;
+                    if (light > 1) {
+                        light = 1;
+                    }
+                    else if (light < 0) {
+                        light = 0;
+                    }
+                    const xx = (x - this.camera.chipLeft) * gridw;
+                    const yy = (y - this.camera.chipTop) * gridh;
+                    Game.getScreen().fillStyle = `rgba(0,0,0,${1 - light})`;
+                    Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
+                }
+            }
+        }
+    }
+    Dungeon.DungeonData = DungeonData;
+    // ダンジョン構成要素基底クラス
+    class Feature {
+    }
+    // 部屋
+    class Room extends Feature {
+        constructor(left, top, right, bottom, door) {
+            super();
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+            this.doors = new Map();
+            if (door !== undefined) {
+                this.addDoor(door.x, door.y);
+            }
+        }
+        static createRandomAt(x, y, dx, dy, options) {
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
+            if (dx === 1) {
+                const y2 = y - options.random.randInt(0, height - 1);
+                return new Room(x + 1, y2, x + width, y2 + height - 1, { x: x, y: y });
+            }
+            if (dx === -1) {
+                const y2 = y - options.random.randInt(0, height - 1);
+                return new Room(x - width, y2, x - 1, y2 + height - 1, { x: x, y: y });
+            }
+            if (dy === 1) {
+                const x2 = x - options.random.randInt(0, width - 1);
+                return new Room(x2, y + 1, x2 + width - 1, y + height, { x: x, y: y });
+            }
+            if (dy === -1) {
+                const x2 = x - options.random.randInt(0, width - 1);
+                return new Room(x2, y - height, x2 + width - 1, y - 1, { x: x, y: y });
+            }
+            throw new Error("dx or dy must be 1 or -1");
+        }
+        static createRandomCenter(cx, cy, options) {
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
+            const x1 = cx - options.random.randInt(0, width - 1);
+            const y1 = cy - options.random.randInt(0, height - 1);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+            return new Room(x1, y1, x2, y2);
+        }
+        static createRandom(availWidth, availHeight, options) {
+            const minw = options.roomWidth.min;
+            const maxw = options.roomWidth.max;
+            const width = options.random.randInt(minw, maxw);
+            const minh = options.roomHeight.min;
+            const maxh = options.roomHeight.max;
+            const height = options.random.randInt(minh, maxh);
+            const left = availWidth - width - 1;
+            const top = availHeight - height - 1;
+            const x1 = 1 + options.random.randInt(0, left - 1);
+            const y1 = 1 + options.random.randInt(0, top - 1);
+            const x2 = x1 + width - 1;
+            const y2 = y1 + height - 1;
+            return new Room(x1, y1, x2, y2);
+        }
+        addDoor(x, y) {
+            this.doors.set(x + "," + y, 1);
+            return this;
+        }
+        getDoors(callback) {
+            for (const key of Object.keys(this.doors)) {
+                const parts = key.split(",");
+                callback({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10) });
+            }
+            return this;
+        }
+        clearDoors() {
+            this.doors.clear();
+            return this;
+        }
+        addDoors(isWallCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x !== left && x !== right && y !== top && y !== bottom) {
+                        continue;
+                    }
+                    if (isWallCallback(x, y)) {
+                        continue;
+                    }
+                    this.addDoor(x, y);
+                }
+            }
+            return this;
+        }
+        debug() {
+            console.log("room", this.left, this.top, this.right, this.bottom);
+        }
+        isValid(isWallCallback, canBeDugCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    if (x === left || x === right || y === top || y === bottom) {
+                        if (!isWallCallback(x, y)) {
+                            return false;
+                        }
+                    }
+                    else {
+                        if (!canBeDugCallback(x, y)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        /**
+         * @param {function} digCallback Dig callback with a signature (x, y, value). Values: 0 = empty, 1 = wall, 2 = door. Multiple doors are allowed.
+         */
+        create(digCallback) {
+            const left = this.left - 1;
+            const right = this.right + 1;
+            const top = this.top - 1;
+            const bottom = this.bottom + 1;
+            for (let x = left; x <= right; x++) {
+                for (let y = top; y <= bottom; y++) {
+                    let value;
+                    if (this.doors.has(x + "," + y)) {
+                        value = 2;
+                    }
+                    else if (x === left || x === right || y === top || y === bottom) {
+                        value = 1;
+                    }
+                    else {
+                        value = 0;
+                    }
+                    digCallback(x, y, value);
+                }
+            }
+        }
+        getCenter() {
+            return { x: Math.round((this.left + this.right) / 2), y: Math.round((this.top + this.bottom) / 2) };
+        }
+        getLeft() {
+            return this.left;
+        }
+        getRight() {
+            return this.right;
+        }
+        getTop() {
+            return this.top;
+        }
+        getBottom() {
+            return this.bottom;
+        }
+    }
+    // 通路
+    class Corridor extends Feature {
+        constructor(startX, startY, endX, endY) {
+            super();
+            this.startX = startX;
+            this.startY = startY;
+            this.endX = endX;
+            this.endY = endY;
+            this.endsWithAWall = true;
+        }
+        static createRandomAt(x, y, dx, dy, options) {
+            const min = options.corridorLength.min;
+            const max = options.corridorLength.max;
+            const length = options.random.randInt(min, max);
+            return new Corridor(x, y, x + dx * length, y + dy * length);
+        }
+        debug() {
+            console.log("corridor", this.startX, this.startY, this.endX, this.endY);
+        }
+        isValid(isWallCallback, canBeDugCallback) {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+            let ok = true;
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+                if (!canBeDugCallback(x, y)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x + nx, y + ny)) {
+                    ok = false;
+                }
+                if (!isWallCallback(x - nx, y - ny)) {
+                    ok = false;
+                }
+                if (!ok) {
+                    length = i;
+                    this.endX = x - dx;
+                    this.endY = y - dy;
+                    break;
+                }
+            }
+            /**
+             * If the length degenerated, this corridor might be invalid
+             */
+            /* not supported */
+            if (length === 0) {
+                return false;
+            }
+            /* length 1 allowed only if the next space is empty */
+            if (length === 1 && isWallCallback(this.endX + dx, this.endY + dy)) {
+                return false;
+            }
+            /**
+             * We do not want the corridor to crash into a corner of a room;
+             * if any of the ending corners is empty, the N+1th cell of this corridor must be empty too.
+             *
+             * Situation:
+             * #######1
+             * .......?
+             * #######2
+             *
+             * The corridor was dug from left to right.
+             * 1, 2 - problematic corners, ? = N+1th cell (not dug)
+             */
+            const firstCornerBad = !isWallCallback(this.endX + dx + nx, this.endY + dy + ny);
+            const secondCornerBad = !isWallCallback(this.endX + dx - nx, this.endY + dy - ny);
+            this.endsWithAWall = isWallCallback(this.endX + dx, this.endY + dy);
+            if ((firstCornerBad || secondCornerBad) && this.endsWithAWall) {
+                return false;
+            }
+            return true;
+        }
+        create(digCallback) {
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            for (let i = 0; i < length; i++) {
+                const x = sx + i * dx;
+                const y = sy + i * dy;
+                digCallback(x, y, 0);
+            }
+            return true;
+        }
+        createPriorityWalls(priorityWallCallback) {
+            if (!this.endsWithAWall) {
+                return;
+            }
+            const sx = this.startX;
+            const sy = this.startY;
+            let dx = this.endX - sx;
+            let dy = this.endY - sy;
+            if (dx) {
+                dx = dx / Math.abs(dx);
+            }
+            if (dy) {
+                dy = dy / Math.abs(dy);
+            }
+            const nx = dy;
+            const ny = -dx;
+            priorityWallCallback(this.endX + dx, this.endY + dy);
+            priorityWallCallback(this.endX + nx, this.endY + ny);
+            priorityWallCallback(this.endX - nx, this.endY - ny);
+        }
+    }
+    class Generator {
+        constructor(width, height, { random = new XorShift(), roomWidth = { min: 3, max: 9 }, /* room minimum and maximum width */ roomHeight = { min: 3, max: 5 }, /* room minimum and maximum height */ corridorLength = { min: 3, max: 10 }, /* corridor minimum and maximum length */ dugPercentage = 0.2, /* we stop after this percentage of level area has been dug out */ loopLimit = 100000, }) {
+            this.width = width;
+            this.height = height;
+            this.rooms = []; /* list of all rooms */
+            this.corridors = [];
+            this.options = {
+                random: random,
+                roomWidth: roomWidth,
+                roomHeight: roomHeight,
+                corridorLength: corridorLength,
+                dugPercentage: dugPercentage,
+                loopLimit: loopLimit,
+            };
+            this.features = {
+                Room: 4,
+                Corridor: 4,
+            };
+            this.featureAttempts = 20; /* how many times do we try to create a feature on a suitable wall */
+            this.walls = new Map(); /* these are available for digging */
+            this.digCallback = this.digCallback.bind(this);
+            this.canBeDugCallback = this.canBeDugCallback.bind(this);
+            this.isWallCallback = this.isWallCallback.bind(this);
+            this.priorityWallCallback = this.priorityWallCallback.bind(this);
+        }
+        create(callback) {
+            this.rooms = [];
+            this.corridors = [];
+            this.map = this.fillMap(1);
+            this.walls.clear();
+            this.dug = 0;
+            const area = (this.width - 2) * (this.height - 2);
+            this.firstRoom();
+            let t1 = 0;
+            let priorityWalls = 0;
+            do {
+                if (t1++ > this.options.loopLimit) {
+                    break;
+                }
+                /* find a good wall */
+                const wall = this.findWall();
+                if (!wall) {
+                    break;
+                } /* no more walls */
+                const parts = wall.split(",");
+                const x = parseInt(parts[0]);
+                const y = parseInt(parts[1]);
+                const dir = this.getDiggingDirection(x, y);
+                if (!dir) {
+                    continue;
+                } /* this wall is not suitable */
+                // consolere.log("wall", x, y);
+                /* try adding a feature */
+                let featureAttempts = 0;
+                do {
+                    featureAttempts++;
+                    if (this.tryFeature(x, y, dir.x, dir.y)) {
+                        // if (this._rooms.length + this._corridors.length === 2) { this._rooms[0].addDoor(x, y); } /* first room oficially has doors */
+                        this.removeSurroundingWalls(x, y);
+                        this.removeSurroundingWalls(x - dir.x, y - dir.y);
+                        break;
+                    }
+                } while (featureAttempts < this.featureAttempts);
+                priorityWalls = 0;
+                for (const [, value] of this.walls) {
+                    if (value > 1) {
+                        priorityWalls++;
+                    }
+                }
+            } while ((this.dug / area) < this.options.dugPercentage || priorityWalls); /* fixme number of priority walls */
+            this.addDoors();
+            if (callback) {
+                for (let i = 0; i < this.width; i++) {
+                    for (let j = 0; j < this.height; j++) {
+                        callback(i, j, this.map[i][j]);
+                    }
+                }
+            }
+            this.walls.clear();
+            this.map = null;
+            this.rooms = this.options.random.shuffle(this.rooms);
+            return this;
+        }
+        digCallback(x, y, value) {
+            if (value === 0 || value === 2) {
+                this.map[x][y] = 0;
+                this.dug++;
+            }
+            else {
+                this.walls.set(x + "," + y, 1);
+            }
+        }
+        isWallCallback(x, y) {
+            if (x < 0 || y < 0 || x >= this.width || y >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+        canBeDugCallback(x, y) {
+            if (x < 1 || y < 1 || x + 1 >= this.width || y + 1 >= this.height) {
+                return false;
+            }
+            return (this.map[x][y] === 1);
+        }
+        priorityWallCallback(x, y) {
+            this.walls.set(x + "," + y, 2);
+        }
+        findWall() {
+            const prio1 = [];
+            const prio2 = [];
+            for (const [id, prio] of this.walls) {
+                if (prio === 2) {
+                    prio2.push(id);
+                }
+                else {
+                    prio1.push(id);
+                }
+            }
+            const arr = (prio2.length ? prio2 : prio1);
+            if (!arr.length) {
+                return null;
+            } /* no walls :/ */
+            const id2 = arr.sort()[this.options.random.randInt(0, arr.length - 1)]; // sort to make the order deterministic
+            this.walls.delete(id2);
+            return id2;
+        }
+        firstRoom() {
+            const cx = Math.floor(this.width / 2);
+            const cy = Math.floor(this.height / 2);
+            const room = Room.createRandomCenter(cx, cy, this.options);
+            this.rooms.push(room);
+            room.create(this.digCallback);
+        }
+        fillMap(value) {
+            const map = [];
+            for (let i = 0; i < this.width; i++) {
+                map.push([]);
+                for (let j = 0; j < this.height; j++) {
+                    map[i].push(value);
+                }
+            }
+            return map;
+        }
+        tryFeature(x, y, dx, dy) {
+            const featureType = this.options.random.getWeightedValue(this.features);
+            const feature = Generator.featureCreateMethodTable[featureType](x, y, dx, dy, this.options);
+            if (!feature.isValid(this.isWallCallback, this.canBeDugCallback)) {
+                return false;
+            }
+            feature.create(this.digCallback);
+            if (feature instanceof Room) {
+                this.rooms.push(feature);
+            }
+            if (feature instanceof Corridor) {
+                feature.createPriorityWalls(this.priorityWallCallback);
+                this.corridors.push(feature);
+            }
+            return true;
+        }
+        removeSurroundingWalls(cx, cy) {
+            const deltas = Generator.rotdirs4;
+            for (const delta of deltas) {
+                const x1 = cx + delta.x;
+                const y1 = cy + delta.y;
+                this.walls.delete(x1 + "," + y1);
+                const x2 = cx + 2 * delta.x;
+                const y2 = cy + 2 * delta.y;
+                this.walls.delete(x2 + "," + y2);
+            }
+        }
+        getDiggingDirection(cx, cy) {
+            if (cx <= 0 || cy <= 0 || cx >= this.width - 1 || cy >= this.height - 1) {
+                return null;
+            }
+            let result = null;
+            const deltas = Generator.rotdirs4;
+            for (const delta of deltas) {
+                const x = cx + delta.x;
+                const y = cy + delta.y;
+                if (!this.map[x][y]) {
+                    if (result) {
+                        return null;
+                    }
+                    result = delta;
+                }
+            }
+            /* no empty neighbor */
+            if (!result) {
+                return null;
+            }
+            return { x: -result.x, y: -result.y };
+        }
+        addDoors() {
+            const data = this.map;
+            const isWallCallback = (x, y) => {
+                return (data[x][y] === 1);
+            };
+            for (const room of this.rooms) {
+                room.clearDoors();
+                room.addDoors(isWallCallback);
+            }
+        }
+        getRooms() {
+            return this.rooms;
+        }
+        getCorridors() {
+            return this.corridors;
+        }
+    }
+    Generator.featureCreateMethodTable = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
+    Generator.rotdirs4 = [
+        { x: 0, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 }
+    ];
+    function generate(w, h, callback) {
+        return new Generator(w, h, { random: rand }).create(callback);
+    }
+    Dungeon.generate = generate;
+})(Dungeon || (Dungeon = {}));
+function ajax(uri, type) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.responseType = type;
+        xhr.open("GET", uri, true);
+        xhr.onerror = (ev) => {
+            reject(ev);
+        };
+        xhr.onload = () => {
+            resolve(xhr);
+        };
+        xhr.send();
+    });
+}
+var Game;
+(function (Game) {
+    class ConsoleView {
+        constructor() {
+            const log = console.log.bind(console);
+            const error = console.error.bind(console);
+            const warn = console.warn.bind(console);
+            const table = console.table ? console.table.bind(console) : null;
+            const toString = (x) => (x instanceof Error) ? x.message : (typeof x === 'string' ? x : JSON.stringify(x));
+            const outer = document.createElement('div');
+            outer.id = 'console';
+            const div = document.createElement('div');
+            outer.appendChild(div);
+            const printToDiv = (stackTraceObject, ...args) => {
+                const msg = Array.prototype.slice.call(args, 0)
+                    .map(toString)
+                    .join(' ');
+                const text = div.textContent;
+                const trace = stackTraceObject ? stackTraceObject.stack.split(/\n/)[1] : "";
+                div.textContent = text + trace + ": " + msg + '\n';
+                while (div.clientHeight > document.body.clientHeight) {
+                    const lines = div.textContent.split(/\n/);
+                    lines.shift();
+                    div.textContent = lines.join('\n');
+                }
+            };
+            console.log = (...args) => {
+                log.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.error = (...args) => {
+                error.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift('ERROR:');
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.warn = (...args) => {
+                warn.apply(null, args);
+                const dupargs = Array.prototype.slice.call(args, 0);
+                dupargs.unshift('WARNING:');
+                dupargs.unshift(new Error());
+                printToDiv.apply(null, dupargs);
+            };
+            console.table = (...args) => {
+                if (typeof table === 'function') {
+                    table.apply(null, args);
+                }
+                const objArr = args[0];
+                const keys = (typeof objArr[0] !== 'undefined') ? Object.keys(objArr[0]) : [];
+                const numCols = keys.length;
+                const len = objArr.length;
+                const $table = document.createElement('table');
+                const $head = document.createElement('thead');
+                let $tdata = document.createElement('td');
+                $tdata.innerHTML = 'Index';
+                $head.appendChild($tdata);
+                for (let k = 0; k < numCols; k++) {
+                    $tdata = document.createElement('td');
+                    $tdata.innerHTML = keys[k];
+                    $head.appendChild($tdata);
+                }
+                $table.appendChild($head);
+                for (let i = 0; i < len; i++) {
+                    const $line = document.createElement('tr');
+                    $tdata = document.createElement('td');
+                    $tdata.innerHTML = "" + i;
+                    $line.appendChild($tdata);
+                    for (let j = 0; j < numCols; j++) {
+                        $tdata = document.createElement('td');
+                        $tdata.innerHTML = objArr[i][keys[j]];
+                        $line.appendChild($tdata);
+                    }
+                    $table.appendChild($line);
+                }
+                div.appendChild($table);
+            };
+            window.addEventListener('error', (err) => {
+                printToDiv(null, 'EXCEPTION:', err.message + '\n  ' + err.filename, err.lineno + ':' + err.colno);
+            });
+            document.body.appendChild(outer);
+        }
+        static install() {
+            if (!this.instance) {
+                this.instance = new ConsoleView();
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+    }
+    Game.ConsoleView = ConsoleView;
+})(Game || (Game = {}));
 var Dispatcher;
 (function (Dispatcher) {
     class SingleDispatcher {
@@ -87,6 +1289,55 @@ var Dispatcher;
 })(Dispatcher || (Dispatcher = {}));
 var Game;
 (function (Game) {
+    Game.pmode = false;
+    let video = null;
+    let sceneManager = null;
+    let inputDispacher = null;
+    let timer = null;
+    let soundManager = null;
+    function create(config) {
+        return new Promise((resolve, reject) => {
+            try {
+                Game.ConsoleView.install();
+                document.title = config.title;
+                video = new Game.Video(config.video);
+                video.imageSmoothingEnabled = false;
+                sceneManager = new Game.Scene.SceneManager();
+                timer = new Game.Timer.AnimationTimer();
+                inputDispacher = new Game.Input.InputManager();
+                soundManager = new Game.Sound.SoundManager();
+                resolve();
+            }
+            catch (e) {
+                reject(e);
+            }
+        });
+    }
+    Game.create = create;
+    function getScreen() {
+        return video;
+    }
+    Game.getScreen = getScreen;
+    function getTimer() {
+        return timer;
+    }
+    Game.getTimer = getTimer;
+    function getSceneManager() {
+        return sceneManager;
+    }
+    Game.getSceneManager = getSceneManager;
+    function getInput() {
+        return inputDispacher;
+    }
+    Game.getInput = getInput;
+    function getSound() {
+        return soundManager;
+    }
+    Game.getSound = getSound;
+})(Game || (Game = {}));
+/// <reference path="eventdispatcher.ts" />
+var Game;
+(function (Game) {
     var GUI;
     (function (GUI) {
         function isHit(ui, x, y) {
@@ -98,9 +1349,60 @@ var Game;
         class UIDispatcher extends Dispatcher.EventDispatcher {
             constructor() {
                 super();
+                this.uiTable = new Map();
             }
+            add(ui) {
+                if (this.uiTable.has(ui)) {
+                    return;
+                }
+                this.uiTable.set(ui, new Map());
+                ui.regist(this);
+            }
+            remove(ui) {
+                if (!this.uiTable.has(ui)) {
+                    return;
+                }
+                ui.unregist(this);
+                const eventTable = this.uiTable.get(ui);
+                this.uiTable.set(ui, null);
+                eventTable.forEach((values, key) => {
+                    values.forEach((value) => this.off(key, value));
+                });
+                this.uiTable.delete(ui);
+            }
+            registUiEvent(ui, event, handler) {
+                if (!this.uiTable.has(ui)) {
+                    return;
+                }
+                const eventTable = this.uiTable.get(ui);
+                if (!eventTable.has(event)) {
+                    eventTable.set(event, []);
+                }
+                const events = eventTable.get(event);
+                events.push(handler);
+                this.on(event, handler);
+            }
+            unregistUiEvent(ui, event, handler) {
+                if (!this.uiTable.has(ui)) {
+                    return;
+                }
+                const eventTable = this.uiTable.get(ui);
+                if (!eventTable.has(event)) {
+                    return;
+                }
+                const events = eventTable.get(event);
+                const index = events.indexOf(handler);
+                if (index != -1) {
+                    events.splice(index, 1);
+                }
+                this.off(event, handler);
+            }
+            draw() {
+                this.uiTable.forEach((value, key) => key.draw());
+            }
+            // UIに対するクリック/タップ操作を捕捉
             onClick(ui, handler) {
-                this.on("pointerdown", (x, y) => {
+                const hookHandler = (x, y) => {
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -125,10 +1427,13 @@ var Game;
                     };
                     this.on("pointermove", onPointerMoveHandler);
                     this.on("pointerup", onPointerUpHandler);
-                });
+                };
+                this.registUiEvent(ui, "pointerdown", hookHandler);
+                return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
             }
+            //UI外のタップ/クリック操作を捕捉
             onNcClick(ui, handler) {
-                this.on("pointerdown", (x, y) => {
+                const hookHandler = (x, y) => {
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -153,10 +1458,13 @@ var Game;
                     };
                     this.on("pointermove", onPointerMoveHandler);
                     this.on("pointerup", onPointerUpHandler);
-                });
+                };
+                this.registUiEvent(ui, "pointerdown", hookHandler);
+                return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
             }
+            // UIに対するスワイプ操作を捕捉
             onSwipe(ui, handler) {
-                this.on("pointerdown", (x, y) => {
+                const hookHandler = (x, y) => {
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -179,7 +1487,9 @@ var Game;
                     this.on("pointermove", onPointerMoveHandler);
                     this.on("pointerup", onPointerUpHandler);
                     handler(0, 0, cx - ui.left, cy - ui.top);
-                });
+                };
+                this.registUiEvent(ui, "pointerdown", hookHandler);
+                return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
             }
         }
         GUI.UIDispatcher = UIDispatcher;
@@ -219,6 +1529,8 @@ var Game;
                     Game.getScreen().fillText(x, this.left + 8, this.top + i * (10 + 1) + 8);
                 });
             }
+            regist(dispatcher) { }
+            unregist(dispatcher) { }
         }
         GUI.TextBox = TextBox;
         class Button {
@@ -234,6 +1546,7 @@ var Game;
                 this.fontColor = fontColor;
                 this.textAlign = textAlign;
                 this.textBaseline = textBaseline;
+                this.click = () => { };
             }
             draw() {
                 Game.getScreen().fillStyle = this.color;
@@ -251,6 +1564,11 @@ var Game;
                     Game.getScreen().fillText(x, this.left + 2, this.top + i * (10 + 1) + 2);
                 });
             }
+            regist(dispatcher) {
+                const cancelHandler = dispatcher.onClick(this, (...args) => this.click.apply(this, args));
+                this.unregist = (d) => cancelHandler();
+            }
+            unregist(dispatcher) { }
         }
         GUI.Button = Button;
         class ListBox {
@@ -263,6 +1581,7 @@ var Game;
                 this.drawItem = drawItem;
                 this.getItemCount = getItemCount;
                 this.scrollValue = 0;
+                this.click = () => { };
             }
             update() {
                 var contentHeight = this.getItemCount() * this.lineHeight;
@@ -311,6 +1630,17 @@ var Game;
                     return index;
                 }
             }
+            regist(dispatcher) {
+                const cancelHandlers = [
+                    dispatcher.onSwipe(this, (deltaX, deltaY) => {
+                        this.scrollValue -= deltaY;
+                        this.update();
+                    }),
+                    dispatcher.onClick(this, (...args) => this.click.apply(this, args))
+                ];
+                this.unregist = (d) => cancelHandlers.forEach(x => x());
+            }
+            unregist(dispatcher) { }
         }
         GUI.ListBox = ListBox;
         class HorizontalSlider {
@@ -338,21 +1668,6 @@ var Game;
                 Game.getScreen().fillRect(this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)) - 0.5, this.top - 0.5, this.sliderWidth, this.height);
                 Game.getScreen().strokeRect(this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)) - 0.5, this.top - 0.5, this.sliderWidth, this.height);
             }
-            swipe(lx) {
-                const rangeSize = this.maxValue - this.minValue;
-                if (rangeSize == 0) {
-                    this.value = this.minValue;
-                }
-                else if (lx < 0) {
-                    this.value = this.minValue;
-                }
-                else if (lx >= this.width) {
-                    this.value = this.maxValue;
-                }
-                else {
-                    this.value = Math.trunc((lx * rangeSize) / this.width) + this.minValue;
-                }
-            }
             update() {
                 const rangeSize = this.maxValue - this.minValue;
                 if (rangeSize == 0) {
@@ -365,722 +1680,32 @@ var Game;
                     this.value = this.maxValue;
                 }
             }
+            regist(dispatcher) {
+                var cancelHandler = dispatcher.onSwipe(this, (dx, dy, x, y) => {
+                    const rangeSize = this.maxValue - this.minValue;
+                    if (rangeSize == 0) {
+                        this.value = this.minValue;
+                    }
+                    else {
+                        if (x <= this.sliderWidth / 2) {
+                            this.value = this.minValue;
+                        }
+                        else if (x >= this.width - this.sliderWidth / 2) {
+                            this.value = this.maxValue;
+                        }
+                        else {
+                            const width = this.width - this.sliderWidth;
+                            const xx = x - ~~(this.sliderWidth / 2);
+                            this.value = Math.trunc((xx * rangeSize) / width) + this.minValue;
+                        }
+                    }
+                });
+                this.unregist = (d) => cancelHandler();
+            }
+            unregist(dispatcher) { }
         }
         GUI.HorizontalSlider = HorizontalSlider;
     })(GUI = Game.GUI || (Game.GUI = {}));
-})(Game || (Game = {}));
-var Scene;
-(function (Scene) {
-    function* shopBuyItem(opt) {
-        const uiComponents = [];
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
-            text: "�w����\n���܂��܂ȕ���E�A�C�e���̍w�����ł��܂��B",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
-            text: `������F${('            ' + 150 + 'G').substr(-13)}`,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        let exitScene = false;
-        const btnExit = new Game.GUI.Button(8, 16 * 9 + 46, 112, 16, {
-            text: "�߂�",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.onClick(btnExit, (x, y) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        const itemlist = [
-            "�݂���",
-            "���",
-            "�o�i�i",
-            "�I�����W",
-            "�p�C�i�b�v��",
-            "�ڂ񂽂�",
-            "�L�E�C",
-            "�p�p�C��",
-            "�}���S�[",
-            "�R�R�i�b�c",
-            "�Ԃǂ�",
-            "�Ȃ�",
-            "������",
-            "�h���S���t���[�c",
-        ];
-        let selectedItem = -1;
-        const listBox = new Game.GUI.ListBox(8, 46, 112, 8 * 16, {
-            lineHeight: 16,
-            getItemCount: () => itemlist.length,
-            drawItem: (left, top, width, height, index) => {
-                if (selectedItem == index) {
-                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
-                }
-                else {
-                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                }
-                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                const metrics = Game.getScreen().measureText(itemlist[index]);
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index], left + 9, top + 3);
-            }
-        });
-        dispatcher.onSwipe(listBox, (deltaX, deltaY) => {
-            listBox.scrollValue -= deltaY;
-            listBox.update();
-        });
-        dispatcher.onClick(listBox, (x, y) => {
-            selectedItem = listBox.getItemIndexByPosition(x, y);
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            caption.draw();
-            btnExit.draw();
-            listBox.draw();
-            captionMonay.draw();
-        };
-        yield (delta, ms) => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (exitScene) {
-                this.next();
-            }
-        };
-        Game.getSceneManager().pop();
-    }
-    function* shop(opt) {
-        const uiComponents = [];
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
-            text: "�w����\n���܂��܂ȕ���E�A�C�e���̍w�����ł��܂��B",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        const btnBuy = new Game.GUI.Button(8, 20 * 0 + 46, 112, 16, {
-            text: "�A�C�e���w��",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.onClick(btnBuy, (x, y) => {
-            Game.getSceneManager().push(shopBuyItem, opt);
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        const btnSell = new Game.GUI.Button(8, 20 * 1 + 46, 112, 16, {
-            text: "�A�C�e�����p",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.onClick(btnBuy, (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
-            text: `������F${('            ' + 150 + 'G').substr(-13)}`,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        const hoverSlider = new Game.GUI.HorizontalSlider(135 + 14, 80, 108 - 28, 16, {
-            sliderWidth: 5,
-            updownButtonWidth: 10,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            minValue: 0,
-            maxValue: 100,
-        });
-        dispatcher.onSwipe(hoverSlider, (dx, dy, x, y) => {
-            hoverSlider.swipe(x);
-            hoverSlider.update();
-        });
-        const btnSliderDown = new Game.GUI.Button(135, 80, 14, 16, {
-            text: "�|",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.onClick(btnSliderDown, (x, y) => {
-            hoverSlider.value -= 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        const btnSliderUp = new Game.GUI.Button(243 - 14, 80, 14, 16, {
-            text: "�{",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.onClick(btnSliderUp, (x, y) => {
-            hoverSlider.value += 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        });
-        const captionBuyCount = new Game.GUI.Button(135, 64, 108, 16, {
-            text: () => `�w�����F${('           ' + hoverSlider.value + '��').substr(-12)}`,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            caption.draw();
-            btnBuy.draw();
-            btnSell.draw();
-            captionMonay.draw();
-            hoverSlider.draw();
-            btnSliderDown.draw();
-            btnSliderUp.draw();
-            captionBuyCount.draw();
-        };
-        yield (delta, ms) => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-        };
-        Game.getSceneManager().pop();
-        Game.getSceneManager().push(Scene.title);
-    }
-    Scene.shop = shop;
-})(Scene || (Scene = {}));
-class XorShift {
-    constructor(w = 0 | Date.now(), x, y, z) {
-        if (x === undefined) {
-            x = (0 | (w << 13));
-        }
-        if (y === undefined) {
-            y = (0 | ((w >>> 9) ^ (x << 6)));
-        }
-        if (z === undefined) {
-            z = (0 | (y >>> 7));
-        }
-        this.seeds = { x: x >>> 0, y: y >>> 0, z: z >>> 0, w: w >>> 0 };
-        this.randCount = 0;
-        this.generator = this.randGen(w, x, y, z);
-    }
-    *randGen(w, x, y, z) {
-        let t;
-        for (;;) {
-            t = x ^ (x << 11);
-            x = y;
-            y = z;
-            z = w;
-            yield w = ((w ^ (w >>> 19)) ^ (t ^ (t >>> 8))) >>> 0;
-        }
-    }
-    rand() {
-        this.randCount = 0 | this.randCount + 1;
-        return this.generator.next().value;
-    }
-    randInt(min = 0, max = 0x7FFFFFFF) {
-        return 0 | this.rand() % (max + 1 - min) + min;
-    }
-    randFloat(min = 0, max = 1) {
-        return Math.fround(this.rand() % 0xFFFF / 0xFFFF) * (max - min) + min;
-    }
-    shuffle(target) {
-        const arr = target.concat();
-        for (let i = 0; i <= arr.length - 2; i = 0 | i + 1) {
-            const r = this.randInt(i, arr.length - 1);
-            const tmp = arr[i];
-            arr[i] = arr[r];
-            arr[r] = tmp;
-        }
-        return arr;
-    }
-    getWeightedValue(data) {
-        const keys = Object.keys(data);
-        const total = keys.reduce((s, x) => s + data[x], 0);
-        const random = this.randInt(0, total);
-        let part = 0;
-        for (const id of keys) {
-            part += data[id];
-            if (random < part) {
-                return id;
-            }
-        }
-        return keys[keys.length - 1];
-    }
-    static default() {
-        return new XorShift(XorShift.defaults.w, XorShift.defaults.x, XorShift.defaults.y, XorShift.defaults.z);
-    }
-}
-XorShift.defaults = {
-    x: 123456789,
-    y: 362436069,
-    z: 521288629,
-    w: 88675123
-};
-function ajax(uri, type) {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.responseType = type;
-        xhr.open("GET", uri, true);
-        xhr.onerror = (ev) => {
-            reject(ev);
-        };
-        xhr.onload = () => {
-            resolve(xhr);
-        };
-        xhr.send();
-    });
-}
-function getDirectory(path) {
-    return path.substring(0, path.lastIndexOf("/"));
-}
-function normalizePath(path) {
-    return path.split("/").reduce((s, x) => {
-        if (x === "..") {
-            if (s.length > 1) {
-                s.pop();
-            }
-            else {
-                throw new Error("bad path");
-            }
-        }
-        else if (x === ".") {
-            if (s.length === 0) {
-                s.push(x);
-            }
-        }
-        else {
-            s.push(x);
-        }
-        return s;
-    }, new Array()).join("/");
-}
-var Game;
-(function (Game) {
-    class Video {
-        constructor(config) {
-            this.canvasElement = document.getElementById(config.id);
-            if (!this.canvasElement) {
-                throw new Error("your browser is not support canvas.");
-            }
-            this.id = config.id;
-            this.offscreenWidth = config.offscreenWidth;
-            this.offscreenHeight = config.offscreenHeight;
-            this.scaleX = config.scaleX;
-            this.scaleY = config.scaleY;
-            this.canvasElement.width = this.offscreenWidth * this.scaleX;
-            this.canvasElement.height = this.offscreenHeight * this.scaleY;
-            this.canvasRenderingContext2D = this.canvasElement.getContext("2d");
-            if (!this.canvasRenderingContext2D) {
-                throw new Error("your browser is not support CanvasRenderingContext2D.");
-            }
-            this.images = new Map();
-            this.arc = this.canvasRenderingContext2D.arc.bind(this.canvasRenderingContext2D);
-            this.arcTo = this.canvasRenderingContext2D.arcTo.bind(this.canvasRenderingContext2D);
-            this.beginPath = this.canvasRenderingContext2D.beginPath.bind(this.canvasRenderingContext2D);
-            this.bezierCurveTo = this.canvasRenderingContext2D.bezierCurveTo.bind(this.canvasRenderingContext2D);
-            this.clearRect = this.canvasRenderingContext2D.clearRect.bind(this.canvasRenderingContext2D);
-            this.clip = this.canvasRenderingContext2D.clip.bind(this.canvasRenderingContext2D);
-            this.closePath = this.canvasRenderingContext2D.closePath.bind(this.canvasRenderingContext2D);
-            this.createImageData = this.canvasRenderingContext2D.createImageData.bind(this.canvasRenderingContext2D);
-            this.createLinearGradient = this.canvasRenderingContext2D.createLinearGradient.bind(this.canvasRenderingContext2D);
-            this.createPattern = this.canvasRenderingContext2D.createPattern.bind(this.canvasRenderingContext2D);
-            this.createRadialGradient = this.canvasRenderingContext2D.createRadialGradient.bind(this.canvasRenderingContext2D);
-            this.drawImage = this.canvasRenderingContext2D.drawImage.bind(this.canvasRenderingContext2D);
-            this.fill = this.canvasRenderingContext2D.fill.bind(this.canvasRenderingContext2D);
-            this.fillRect = this.canvasRenderingContext2D.fillRect.bind(this.canvasRenderingContext2D);
-            this.fillText = this.canvasRenderingContext2D.fillText.bind(this.canvasRenderingContext2D);
-            this.getImageData = this.canvasRenderingContext2D.getImageData.bind(this.canvasRenderingContext2D);
-            this.getLineDash = this.canvasRenderingContext2D.getLineDash.bind(this.canvasRenderingContext2D);
-            this.isPointInPath = this.canvasRenderingContext2D.isPointInPath.bind(this.canvasRenderingContext2D);
-            this.lineTo = this.canvasRenderingContext2D.lineTo.bind(this.canvasRenderingContext2D);
-            this.measureText = this.canvasRenderingContext2D.measureText.bind(this.canvasRenderingContext2D);
-            this.moveTo = this.canvasRenderingContext2D.moveTo.bind(this.canvasRenderingContext2D);
-            this.putImageData = this.canvasRenderingContext2D.putImageData.bind(this.canvasRenderingContext2D);
-            this.quadraticCurveTo = this.canvasRenderingContext2D.quadraticCurveTo.bind(this.canvasRenderingContext2D);
-            this.rect = this.canvasRenderingContext2D.rect.bind(this.canvasRenderingContext2D);
-            this.restore = this.canvasRenderingContext2D.restore.bind(this.canvasRenderingContext2D);
-            this.rotate = this.canvasRenderingContext2D.rotate.bind(this.canvasRenderingContext2D);
-            this.save = this.canvasRenderingContext2D.save.bind(this.canvasRenderingContext2D);
-            this.scale = this.canvasRenderingContext2D.scale.bind(this.canvasRenderingContext2D);
-            this.setLineDash = this.canvasRenderingContext2D.setLineDash.bind(this.canvasRenderingContext2D);
-            this.setTransform = this.canvasRenderingContext2D.setTransform.bind(this.canvasRenderingContext2D);
-            this.stroke = this.canvasRenderingContext2D.stroke.bind(this.canvasRenderingContext2D);
-            this.strokeRect = this.canvasRenderingContext2D.strokeRect.bind(this.canvasRenderingContext2D);
-            this.strokeText = this.canvasRenderingContext2D.strokeText.bind(this.canvasRenderingContext2D);
-            this.transform = this.canvasRenderingContext2D.transform.bind(this.canvasRenderingContext2D);
-            this.translate = this.canvasRenderingContext2D.translate.bind(this.canvasRenderingContext2D);
-            this.ellipse = this.canvasRenderingContext2D.ellipse.bind(this.canvasRenderingContext2D);
-        }
-        get canvas() { return this.canvasRenderingContext2D.canvas; }
-        get fillStyle() { return this.canvasRenderingContext2D.fillStyle; }
-        set fillStyle(value) { this.canvasRenderingContext2D.fillStyle = value; }
-        get font() { return this.canvasRenderingContext2D.font; }
-        set font(value) { this.canvasRenderingContext2D.font = value; }
-        get globalAlpha() { return this.canvasRenderingContext2D.globalAlpha; }
-        set globalAlpha(value) { this.canvasRenderingContext2D.globalAlpha = value; }
-        get globalCompositeOperation() { return this.canvasRenderingContext2D.globalCompositeOperation; }
-        set globalCompositeOperation(value) { this.canvasRenderingContext2D.globalCompositeOperation = value; }
-        get lineCap() { return this.canvasRenderingContext2D.lineCap; }
-        set lineCap(value) { this.canvasRenderingContext2D.lineCap = value; }
-        get lineDashOffset() { return this.canvasRenderingContext2D.lineDashOffset; }
-        set lineDashOffset(value) { this.canvasRenderingContext2D.lineDashOffset = value; }
-        get lineJoin() { return this.canvasRenderingContext2D.lineJoin; }
-        set lineJoin(value) { this.canvasRenderingContext2D.lineJoin = value; }
-        get lineWidth() { return this.canvasRenderingContext2D.lineWidth; }
-        set lineWidth(value) { this.canvasRenderingContext2D.lineWidth = value; }
-        get miterLimit() { return this.canvasRenderingContext2D.miterLimit; }
-        set miterLimit(value) { this.canvasRenderingContext2D.miterLimit = value; }
-        get shadowBlur() { return this.canvasRenderingContext2D.shadowBlur; }
-        set shadowBlur(value) { this.canvasRenderingContext2D.shadowBlur = value; }
-        get shadowColor() { return this.canvasRenderingContext2D.shadowColor; }
-        set shadowColor(value) { this.canvasRenderingContext2D.shadowColor = value; }
-        get shadowOffsetX() { return this.canvasRenderingContext2D.shadowOffsetX; }
-        set shadowOffsetX(value) { this.canvasRenderingContext2D.shadowOffsetX = value; }
-        get shadowOffsetY() { return this.canvasRenderingContext2D.shadowOffsetY; }
-        set shadowOffsetY(value) { this.canvasRenderingContext2D.shadowOffsetY = value; }
-        get strokeStyle() { return this.canvasRenderingContext2D.strokeStyle; }
-        set strokeStyle(value) { this.canvasRenderingContext2D.strokeStyle = value; }
-        get textAlign() { return this.canvasRenderingContext2D.textAlign; }
-        set textAlign(value) { this.canvasRenderingContext2D.textAlign = value; }
-        get textBaseline() { return this.canvasRenderingContext2D.textBaseline; }
-        set textBaseline(value) { this.canvasRenderingContext2D.textBaseline = value; }
-        get imageSmoothingEnabled() {
-            if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                return this.canvasRenderingContext2D.imageSmoothingEnabled;
-            }
-            if ('mozImageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                return this.canvasRenderingContext2D.mozImageSmoothingEnabled;
-            }
-            if ('webkitImageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                return this.canvasRenderingContext2D.webkitImageSmoothingEnabled;
-            }
-            return false;
-        }
-        set imageSmoothingEnabled(value) {
-            if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                this.canvasRenderingContext2D.imageSmoothingEnabled = value;
-                return;
-            }
-            if ('mozImageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                this.canvasRenderingContext2D.mozImageSmoothingEnabled = value;
-                return;
-            }
-            if ('webkitImageSmoothingEnabled' in this.canvasRenderingContext2D) {
-                this.canvasRenderingContext2D.webkitImageSmoothingEnabled = value;
-                return;
-            }
-        }
-        drawTile(image, offsetX, offsetY, sprite, spritesize, tile) {
-            for (let y = 0; y < tile.height; y++) {
-                for (let x = 0; x < tile.width; x++) {
-                    const chip = tile.value(x, y);
-                    this.drawImage(image, sprite[chip][0] * spritesize[0], sprite[chip][1] * spritesize[1], spritesize[0], spritesize[1], offsetX + x * spritesize[0], offsetY + y * spritesize[1], spritesize[0], spritesize[1]);
-                }
-            }
-        }
-        get width() {
-            return this.canvasRenderingContext2D.canvas.width;
-        }
-        get height() {
-            return this.canvasRenderingContext2D.canvas.height;
-        }
-        loadImage(asserts, startCallback = () => { }, endCallback = () => { }) {
-            return Promise.all(Object.keys(asserts).map((x) => new Promise((resolve, reject) => {
-                startCallback(x);
-                const img = new Image();
-                img.onload = () => {
-                    this.images.set(x, img);
-                    endCallback(x);
-                    resolve();
-                };
-                img.onerror = () => {
-                    const msg = `ファイル ${asserts[x]}のロードに失敗。`;
-                    console.error(msg);
-                    reject(msg);
-                };
-                img.src = asserts[x];
-            }))).then(() => {
-                return true;
-            });
-        }
-        texture(id) {
-            return this.images.get(id);
-        }
-        begin() {
-            Game.getScreen().save();
-            Game.getScreen().clearRect(0, 0, this.width, this.height);
-            Game.getScreen().scale(this.scaleX, this.scaleY);
-            Game.getScreen().save();
-        }
-        end() {
-            Game.getScreen().restore();
-            Game.getScreen().restore();
-        }
-        pagePointToScreenPoint(x, y) {
-            const cr = this.canvasRenderingContext2D.canvas.getBoundingClientRect();
-            const sx = (x - (cr.left + window.pageXOffset));
-            const sy = (y - (cr.top + window.pageYOffset));
-            return [sx / this.scaleX, sy / this.scaleY];
-        }
-        pagePointContainScreen(x, y) {
-            const pos = this.pagePointToScreenPoint(x, y);
-            return 0 <= pos[0] && pos[0] < this.offscreenWidth && 0 <= pos[1] && pos[1] < this.offscreenHeight;
-        }
-    }
-    Game.Video = Video;
-})(Game || (Game = {}));
-var Game;
-(function (Game) {
-    let Sound;
-    (function (Sound) {
-        class ManagedSoundChannel {
-            constructor() {
-                this.audioBufferNode = null;
-                this.playRequest = false;
-                this.stopRequest = false;
-                this.loopPlay = false;
-            }
-            reset() {
-                this.audioBufferNode = null;
-                this.playRequest = false;
-                this.stopRequest = false;
-                this.loopPlay = false;
-            }
-        }
-        class UnmanagedSoundChannel {
-            constructor(sound, buffer) {
-                this.isEnded = true;
-                this.bufferSource = null;
-                this.buffer = null;
-                this.sound = null;
-                this.buffer = buffer;
-                this.sound = sound;
-                this.reset();
-            }
-            reset() {
-                this.stop();
-                this.bufferSource = this.sound.createBufferSource(this.buffer);
-                this.bufferSource.onended = () => this.isEnded = true;
-            }
-            loopplay() {
-                if (this.isEnded) {
-                    this.bufferSource.loop = true;
-                    this.bufferSource.start(0);
-                    this.isEnded = false;
-                }
-            }
-            play() {
-                if (this.isEnded) {
-                    this.bufferSource.loop = false;
-                    this.bufferSource.start(0);
-                    this.isEnded = false;
-                }
-            }
-            stop() {
-                if (!this.isEnded) {
-                    this.bufferSource.stop(0);
-                    this.bufferSource.disconnect();
-                    this.isEnded = true;
-                }
-            }
-        }
-        class SoundManager {
-            constructor() {
-                this.bufferSourceIdCount = 0;
-                if (window.AudioContext) {
-                    console.log("Use AudioContext.");
-                    this.audioContext = new window.AudioContext();
-                }
-                else if (window.webkitAudioContext) {
-                    console.log("Use webkitAudioContext.");
-                    this.audioContext = new window.webkitAudioContext();
-                }
-                else {
-                    console.error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
-                    throw new Error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
-                }
-                this.channels = new Map();
-                this.bufferSourceIdCount = 0;
-                this.playingBufferSources = new Map();
-                this.reset();
-                const touchEventHooker = () => {
-                    const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
-                    const channel = buffer.getChannelData(0);
-                    channel.fill(0);
-                    const src = this.audioContext.createBufferSource();
-                    src.buffer = buffer;
-                    src.connect(this.audioContext.destination);
-                    src.start(this.audioContext.currentTime);
-                    document.body.removeEventListener('touchstart', touchEventHooker);
-                };
-                document.body.addEventListener('touchstart', touchEventHooker);
-            }
-            createBufferSource(buffer) {
-                const bufferSource = this.audioContext.createBufferSource();
-                bufferSource.buffer = buffer;
-                bufferSource.connect(this.audioContext.destination);
-                return bufferSource;
-            }
-            loadSound(file) {
-                return ajax(file, "arraybuffer").then(xhr => {
-                    return new Promise((resolve, reject) => {
-                        this.audioContext.decodeAudioData(xhr.response, (audioBufferNode) => {
-                            resolve(audioBufferNode);
-                        }, (ev) => {
-                            reject(ev);
-                        });
-                    });
-                });
-            }
-            loadSoundToChannel(file, channelId) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    const audioBufferNode = yield this.loadSound(file);
-                    const channel = new ManagedSoundChannel();
-                    channel.audioBufferNode = audioBufferNode;
-                    this.channels.set(channelId, channel);
-                    return;
-                });
-            }
-            loadSoundsToChannel(config, startCallback = () => { }, endCallback = () => { }) {
-                return Promise.all(Object.keys(config).map((channelId) => {
-                    startCallback(channelId);
-                    const ret = this.loadSoundToChannel(config[channelId], channelId).then(() => endCallback(channelId));
-                    return ret;
-                })).then(() => { });
-            }
-            createUnmanagedSoundChannel(file) {
-                return this.loadSound(file)
-                    .then((audioBufferNode) => new UnmanagedSoundChannel(this, audioBufferNode));
-            }
-            reqPlayChannel(channelId, loop = false) {
-                const channel = this.channels.get(channelId);
-                if (channel) {
-                    channel.playRequest = true;
-                    channel.loopPlay = loop;
-                }
-            }
-            reqStopChannel(channelId) {
-                const channel = this.channels.get(channelId);
-                if (channel) {
-                    channel.stopRequest = true;
-                }
-            }
-            playChannel() {
-                this.channels.forEach((c, i) => {
-                    if (c.stopRequest) {
-                        c.stopRequest = false;
-                        if (c.audioBufferNode == null) {
-                            return;
-                        }
-                        this.playingBufferSources.forEach((value, key) => {
-                            if (value.id === i) {
-                                const srcNode = value.buffer;
-                                srcNode.stop();
-                                srcNode.disconnect();
-                                this.playingBufferSources.set(key, null);
-                                this.playingBufferSources.delete(key);
-                            }
-                        });
-                    }
-                    if (c.playRequest) {
-                        c.playRequest = false;
-                        if (c.audioBufferNode == null) {
-                            return;
-                        }
-                        const src = this.audioContext.createBufferSource();
-                        if (src == null) {
-                            throw new Error("createBufferSourceに失敗。");
-                        }
-                        const bufferid = this.bufferSourceIdCount++;
-                        this.playingBufferSources.set(bufferid, { id: i, buffer: src });
-                        src.buffer = c.audioBufferNode;
-                        src.loop = c.loopPlay;
-                        src.connect(this.audioContext.destination);
-                        src.onended = (() => {
-                            const srcNode = src;
-                            srcNode.stop(0);
-                            srcNode.disconnect();
-                            this.playingBufferSources.set(bufferid, null);
-                            this.playingBufferSources.delete(bufferid);
-                        }).bind(null, bufferid);
-                        src.start(0);
-                    }
-                });
-            }
-            stop() {
-                const oldPlayingBufferSources = this.playingBufferSources;
-                this.playingBufferSources = new Map();
-                oldPlayingBufferSources.forEach((value, key) => {
-                    const s = value.buffer;
-                    if (s != null) {
-                        s.stop(0);
-                        s.disconnect();
-                        oldPlayingBufferSources.set(key, null);
-                        oldPlayingBufferSources.delete(key);
-                    }
-                });
-            }
-            reset() {
-                this.channels.clear();
-                this.playingBufferSources.clear();
-            }
-        }
-        Sound.SoundManager = SoundManager;
-    })(Sound = Game.Sound || (Game.Sound = {}));
 })(Game || (Game = {}));
 var Game;
 (function (Game) {
@@ -1127,6 +1752,7 @@ var Game;
                         this.sDistY = 0;
                     }, 100);
                 });
+                // add event listener to body
                 document.onselectstart = () => false;
                 document.oncontextmenu = () => false;
                 if (document.body["pointermove"] !== undefined) {
@@ -1361,26 +1987,26 @@ var Game;
             }
             get dir4() {
                 switch (~~((this.angle + 360 + 45) / 90) % 4) {
-                    case 0: return 6;
-                    case 1: return 2;
-                    case 2: return 4;
-                    case 3: return 8;
+                    case 0: return 6; // left
+                    case 1: return 2; // up
+                    case 2: return 4; // right
+                    case 3: return 8; // down
                 }
-                return 5;
+                return 5; // neutral
             }
             get dir8() {
                 const d = ~~((this.angle + 360 + 22.5) / 45) % 8;
                 switch (d) {
-                    case 0: return 6;
-                    case 1: return 3;
-                    case 2: return 2;
-                    case 3: return 1;
-                    case 4: return 4;
-                    case 5: return 7;
-                    case 6: return 8;
-                    case 7: return 9;
+                    case 0: return 6; // right
+                    case 1: return 3; // right-down
+                    case 2: return 2; // down
+                    case 3: return 1; // left-down
+                    case 4: return 4; // left
+                    case 5: return 7; // left-up
+                    case 6: return 8; // up
+                    case 7: return 9; // right-up
                 }
-                return 5;
+                return 5; // neutral
             }
             isHit(x, y) {
                 const dx = x - this.x;
@@ -1444,41 +2070,30 @@ var Game;
         Input.VirtualStick = VirtualStick;
     })(Input = Game.Input || (Game.Input = {}));
 })(Game || (Game = {}));
-var Game;
-(function (Game) {
-    let Timer;
-    (function (Timer) {
-        class AnimationTimer extends Dispatcher.SingleDispatcher {
-            constructor() {
-                super();
-                this.animationFrameId = NaN;
-                this.prevTime = NaN;
+function getDirectory(path) {
+    return path.substring(0, path.lastIndexOf("/"));
+}
+function normalizePath(path) {
+    return path.split("/").reduce((s, x) => {
+        if (x === "..") {
+            if (s.length > 1) {
+                s.pop();
             }
-            start() {
-                if (!isNaN(this.animationFrameId)) {
-                    this.stop();
-                }
-                this.animationFrameId = requestAnimationFrame(this.tick.bind(this));
-                return !isNaN(this.animationFrameId);
-            }
-            stop() {
-                if (!isNaN(this.animationFrameId)) {
-                    cancelAnimationFrame(this.animationFrameId);
-                    this.animationFrameId = NaN;
-                }
-            }
-            tick(ts) {
-                requestAnimationFrame(this.tick.bind(this));
-                if (!isNaN(this.prevTime)) {
-                    const delta = ts - this.prevTime;
-                    this.fire(delta, ts);
-                }
-                this.prevTime = ts;
+            else {
+                throw new Error("bad path");
             }
         }
-        Timer.AnimationTimer = AnimationTimer;
-    })(Timer = Game.Timer || (Game.Timer = {}));
-})(Game || (Game = {}));
+        else if (x === ".") {
+            if (s.length === 0) {
+                s.push(x);
+            }
+        }
+        else {
+            s.push(x);
+        }
+        return s;
+    }, new Array()).join("/");
+}
 var Game;
 (function (Game) {
     let Scene;
@@ -1555,210 +2170,425 @@ var Game;
 })(Game || (Game = {}));
 var Game;
 (function (Game) {
-    class ConsoleView {
-        constructor() {
-            const log = console.log.bind(console);
-            const error = console.error.bind(console);
-            const warn = console.warn.bind(console);
-            const table = console.table ? console.table.bind(console) : null;
-            const toString = (x) => (x instanceof Error) ? x.message : (typeof x === 'string' ? x : JSON.stringify(x));
-            const outer = document.createElement('div');
-            outer.id = 'console';
-            const div = document.createElement('div');
-            outer.appendChild(div);
-            const printToDiv = (stackTraceObject, ...args) => {
-                const msg = Array.prototype.slice.call(args, 0)
-                    .map(toString)
-                    .join(' ');
-                const text = div.textContent;
-                const trace = stackTraceObject ? stackTraceObject.stack.split(/\n/)[1] : "";
-                div.textContent = text + trace + ": " + msg + '\n';
-                while (div.clientHeight > document.body.clientHeight) {
-                    const lines = div.textContent.split(/\n/);
-                    lines.shift();
-                    div.textContent = lines.join('\n');
+    let Sound;
+    (function (Sound) {
+        class ManagedSoundChannel {
+            constructor() {
+                this.audioBufferNode = null;
+                this.playRequest = false;
+                this.stopRequest = false;
+                this.loopPlay = false;
+            }
+            reset() {
+                this.audioBufferNode = null;
+                this.playRequest = false;
+                this.stopRequest = false;
+                this.loopPlay = false;
+            }
+        }
+        class UnmanagedSoundChannel {
+            constructor(sound, buffer) {
+                this.isEnded = true;
+                this.bufferSource = null;
+                this.buffer = null;
+                this.sound = null;
+                this.buffer = buffer;
+                this.sound = sound;
+                this.reset();
+            }
+            reset() {
+                this.stop();
+                this.bufferSource = this.sound.createBufferSource(this.buffer);
+                this.bufferSource.onended = () => this.isEnded = true;
+            }
+            loopplay() {
+                if (this.isEnded) {
+                    this.bufferSource.loop = true;
+                    this.bufferSource.start(0);
+                    this.isEnded = false;
                 }
-            };
-            console.log = (...args) => {
-                log.apply(null, args);
-                const dupargs = Array.prototype.slice.call(args, 0);
-                dupargs.unshift(new Error());
-                printToDiv.apply(null, dupargs);
-            };
-            console.error = (...args) => {
-                error.apply(null, args);
-                const dupargs = Array.prototype.slice.call(args, 0);
-                dupargs.unshift('ERROR:');
-                dupargs.unshift(new Error());
-                printToDiv.apply(null, dupargs);
-            };
-            console.warn = (...args) => {
-                warn.apply(null, args);
-                const dupargs = Array.prototype.slice.call(args, 0);
-                dupargs.unshift('WARNING:');
-                dupargs.unshift(new Error());
-                printToDiv.apply(null, dupargs);
-            };
-            console.table = (...args) => {
-                if (typeof table === 'function') {
-                    table.apply(null, args);
+            }
+            play() {
+                if (this.isEnded) {
+                    this.bufferSource.loop = false;
+                    this.bufferSource.start(0);
+                    this.isEnded = false;
                 }
-                const objArr = args[0];
-                const keys = (typeof objArr[0] !== 'undefined') ? Object.keys(objArr[0]) : [];
-                const numCols = keys.length;
-                const len = objArr.length;
-                const $table = document.createElement('table');
-                const $head = document.createElement('thead');
-                let $tdata = document.createElement('td');
-                $tdata.innerHTML = 'Index';
-                $head.appendChild($tdata);
-                for (let k = 0; k < numCols; k++) {
-                    $tdata = document.createElement('td');
-                    $tdata.innerHTML = keys[k];
-                    $head.appendChild($tdata);
+            }
+            stop() {
+                if (!this.isEnded) {
+                    this.bufferSource.stop(0);
+                    this.bufferSource.disconnect();
+                    this.isEnded = true;
                 }
-                $table.appendChild($head);
-                for (let i = 0; i < len; i++) {
-                    const $line = document.createElement('tr');
-                    $tdata = document.createElement('td');
-                    $tdata.innerHTML = "" + i;
-                    $line.appendChild($tdata);
-                    for (let j = 0; j < numCols; j++) {
-                        $tdata = document.createElement('td');
-                        $tdata.innerHTML = objArr[i][keys[j]];
-                        $line.appendChild($tdata);
+            }
+        }
+        class SoundManager {
+            constructor() {
+                this.bufferSourceIdCount = 0;
+                if (window.AudioContext) {
+                    console.log("Use AudioContext.");
+                    this.audioContext = new window.AudioContext();
+                }
+                else if (window.webkitAudioContext) {
+                    console.log("Use webkitAudioContext.");
+                    this.audioContext = new window.webkitAudioContext();
+                }
+                else {
+                    console.error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                    throw new Error("Neither AudioContext nor webkitAudioContext is supported by your browser.");
+                }
+                this.channels = new Map();
+                this.bufferSourceIdCount = 0;
+                this.playingBufferSources = new Map();
+                this.reset();
+                const touchEventHooker = () => {
+                    // A small hack to unlock AudioContext on mobile safari.
+                    const buffer = this.audioContext.createBuffer(1, (this.audioContext.sampleRate / 100), this.audioContext.sampleRate);
+                    const channel = buffer.getChannelData(0);
+                    channel.fill(0);
+                    const src = this.audioContext.createBufferSource();
+                    src.buffer = buffer;
+                    src.connect(this.audioContext.destination);
+                    src.start(this.audioContext.currentTime);
+                    document.body.removeEventListener('touchstart', touchEventHooker);
+                };
+                document.body.addEventListener('touchstart', touchEventHooker);
+            }
+            createBufferSource(buffer) {
+                const bufferSource = this.audioContext.createBufferSource();
+                bufferSource.buffer = buffer;
+                bufferSource.connect(this.audioContext.destination);
+                return bufferSource;
+            }
+            loadSound(file) {
+                return ajax(file, "arraybuffer").then(xhr => {
+                    return new Promise((resolve, reject) => {
+                        this.audioContext.decodeAudioData(xhr.response, (audioBufferNode) => {
+                            resolve(audioBufferNode);
+                        }, (ev) => {
+                            reject(ev);
+                        });
+                    });
+                });
+                //
+                // decodeAudioData dose not return 'Promise Object 'on mobile safari :-(
+                // Therefore, these codes will not work ...
+                //
+                // const xhr: XMLHttpRequest = await ajax(file, "arraybuffer");
+                // var audioBufferNode = await this.audioContext.decodeAudioData(xhr.response);
+                // return audioBufferNode;
+            }
+            loadSoundToChannel(file, channelId) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    const audioBufferNode = yield this.loadSound(file);
+                    const channel = new ManagedSoundChannel();
+                    channel.audioBufferNode = audioBufferNode;
+                    this.channels.set(channelId, channel);
+                    return;
+                });
+            }
+            loadSoundsToChannel(config, startCallback = () => { }, endCallback = () => { }) {
+                return Promise.all(Object.keys(config).map((channelId) => {
+                    startCallback(channelId);
+                    const ret = this.loadSoundToChannel(config[channelId], channelId).then(() => endCallback(channelId));
+                    return ret;
+                })).then(() => { });
+            }
+            createUnmanagedSoundChannel(file) {
+                return this.loadSound(file)
+                    .then((audioBufferNode) => new UnmanagedSoundChannel(this, audioBufferNode));
+            }
+            reqPlayChannel(channelId, loop = false) {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.playRequest = true;
+                    channel.loopPlay = loop;
+                }
+            }
+            reqStopChannel(channelId) {
+                const channel = this.channels.get(channelId);
+                if (channel) {
+                    channel.stopRequest = true;
+                }
+            }
+            playChannel() {
+                this.channels.forEach((c, i) => {
+                    if (c.stopRequest) {
+                        c.stopRequest = false;
+                        if (c.audioBufferNode == null) {
+                            return;
+                        }
+                        this.playingBufferSources.forEach((value, key) => {
+                            if (value.id === i) {
+                                const srcNode = value.buffer;
+                                srcNode.stop();
+                                srcNode.disconnect();
+                                this.playingBufferSources.set(key, null);
+                                this.playingBufferSources.delete(key);
+                            }
+                        });
                     }
-                    $table.appendChild($line);
-                }
-                div.appendChild($table);
-            };
-            window.addEventListener('error', (err) => {
-                printToDiv(null, 'EXCEPTION:', err.message + '\n  ' + err.filename, err.lineno + ':' + err.colno);
-            });
-            document.body.appendChild(outer);
-        }
-        static install() {
-            if (!this.instance) {
-                this.instance = new ConsoleView();
-                return true;
+                    if (c.playRequest) {
+                        c.playRequest = false;
+                        if (c.audioBufferNode == null) {
+                            return;
+                        }
+                        const src = this.audioContext.createBufferSource();
+                        if (src == null) {
+                            throw new Error("createBufferSourceに失敗。");
+                        }
+                        const bufferid = this.bufferSourceIdCount++;
+                        this.playingBufferSources.set(bufferid, { id: i, buffer: src });
+                        src.buffer = c.audioBufferNode;
+                        src.loop = c.loopPlay;
+                        src.connect(this.audioContext.destination);
+                        src.onended = (() => {
+                            const srcNode = src;
+                            srcNode.stop(0);
+                            srcNode.disconnect();
+                            this.playingBufferSources.set(bufferid, null);
+                            this.playingBufferSources.delete(bufferid);
+                        }).bind(null, bufferid);
+                        src.start(0);
+                    }
+                });
             }
-            else {
-                return false;
+            stop() {
+                const oldPlayingBufferSources = this.playingBufferSources;
+                this.playingBufferSources = new Map();
+                oldPlayingBufferSources.forEach((value, key) => {
+                    const s = value.buffer;
+                    if (s != null) {
+                        s.stop(0);
+                        s.disconnect();
+                        oldPlayingBufferSources.set(key, null);
+                        oldPlayingBufferSources.delete(key);
+                    }
+                });
+            }
+            reset() {
+                this.channels.clear();
+                this.playingBufferSources.clear();
             }
         }
-    }
-    Game.ConsoleView = ConsoleView;
+        Sound.SoundManager = SoundManager;
+    })(Sound = Game.Sound || (Game.Sound = {}));
 })(Game || (Game = {}));
 var Game;
 (function (Game) {
-    Game.pmode = false;
-    let video = null;
-    let sceneManager = null;
-    let inputDispacher = null;
-    let timer = null;
-    let soundManager = null;
-    function create(config) {
-        return new Promise((resolve, reject) => {
-            try {
-                Game.ConsoleView.install();
-                document.title = config.title;
-                video = new Game.Video(config.video);
-                video.imageSmoothingEnabled = false;
-                sceneManager = new Game.Scene.SceneManager();
-                timer = new Game.Timer.AnimationTimer();
-                inputDispacher = new Game.Input.InputManager();
-                soundManager = new Game.Sound.SoundManager();
-                resolve();
+    let Timer;
+    (function (Timer) {
+        class AnimationTimer extends Dispatcher.SingleDispatcher {
+            constructor() {
+                super();
+                this.animationFrameId = NaN;
+                this.prevTime = NaN;
             }
-            catch (e) {
-                reject(e);
+            start() {
+                if (!isNaN(this.animationFrameId)) {
+                    this.stop();
+                }
+                this.animationFrameId = requestAnimationFrame(this.tick.bind(this));
+                return !isNaN(this.animationFrameId);
             }
-        });
-    }
-    Game.create = create;
-    function getScreen() {
-        return video;
-    }
-    Game.getScreen = getScreen;
-    function getTimer() {
-        return timer;
-    }
-    Game.getTimer = getTimer;
-    function getSceneManager() {
-        return sceneManager;
-    }
-    Game.getSceneManager = getSceneManager;
-    function getInput() {
-        return inputDispacher;
-    }
-    Game.getInput = getInput;
-    function getSound() {
-        return soundManager;
-    }
-    Game.getSound = getSound;
+            stop() {
+                if (!isNaN(this.animationFrameId)) {
+                    cancelAnimationFrame(this.animationFrameId);
+                    this.animationFrameId = NaN;
+                }
+            }
+            tick(ts) {
+                requestAnimationFrame(this.tick.bind(this));
+                if (!isNaN(this.prevTime)) {
+                    const delta = ts - this.prevTime;
+                    this.fire(delta, ts);
+                }
+                this.prevTime = ts;
+            }
+        }
+        Timer.AnimationTimer = AnimationTimer;
+    })(Timer = Game.Timer || (Game.Timer = {}));
 })(Game || (Game = {}));
-class Array2D {
-    constructor(width, height, fill) {
-        this.arrayWidth = width;
-        this.arrayHeight = height;
-        if (fill === undefined) {
-            this.matrixBuffer = new Array(width * height);
+var Game;
+(function (Game) {
+    class Video {
+        constructor(config) {
+            this.canvasElement = document.getElementById(config.id);
+            if (!this.canvasElement) {
+                throw new Error("your browser is not support canvas.");
+            }
+            this.id = config.id;
+            this.offscreenWidth = config.offscreenWidth;
+            this.offscreenHeight = config.offscreenHeight;
+            this.scaleX = config.scaleX;
+            this.scaleY = config.scaleY;
+            this.canvasElement.width = this.offscreenWidth * this.scaleX;
+            this.canvasElement.height = this.offscreenHeight * this.scaleY;
+            this.canvasRenderingContext2D = this.canvasElement.getContext("2d");
+            if (!this.canvasRenderingContext2D) {
+                throw new Error("your browser is not support CanvasRenderingContext2D.");
+            }
+            this.images = new Map();
+            this.arc = this.canvasRenderingContext2D.arc.bind(this.canvasRenderingContext2D);
+            this.arcTo = this.canvasRenderingContext2D.arcTo.bind(this.canvasRenderingContext2D);
+            this.beginPath = this.canvasRenderingContext2D.beginPath.bind(this.canvasRenderingContext2D);
+            this.bezierCurveTo = this.canvasRenderingContext2D.bezierCurveTo.bind(this.canvasRenderingContext2D);
+            this.clearRect = this.canvasRenderingContext2D.clearRect.bind(this.canvasRenderingContext2D);
+            this.clip = this.canvasRenderingContext2D.clip.bind(this.canvasRenderingContext2D);
+            this.closePath = this.canvasRenderingContext2D.closePath.bind(this.canvasRenderingContext2D);
+            this.createImageData = this.canvasRenderingContext2D.createImageData.bind(this.canvasRenderingContext2D);
+            this.createLinearGradient = this.canvasRenderingContext2D.createLinearGradient.bind(this.canvasRenderingContext2D);
+            this.createPattern = this.canvasRenderingContext2D.createPattern.bind(this.canvasRenderingContext2D);
+            this.createRadialGradient = this.canvasRenderingContext2D.createRadialGradient.bind(this.canvasRenderingContext2D);
+            this.drawImage = this.canvasRenderingContext2D.drawImage.bind(this.canvasRenderingContext2D);
+            this.fill = this.canvasRenderingContext2D.fill.bind(this.canvasRenderingContext2D);
+            this.fillRect = this.canvasRenderingContext2D.fillRect.bind(this.canvasRenderingContext2D);
+            this.fillText = this.canvasRenderingContext2D.fillText.bind(this.canvasRenderingContext2D);
+            this.getImageData = this.canvasRenderingContext2D.getImageData.bind(this.canvasRenderingContext2D);
+            this.getLineDash = this.canvasRenderingContext2D.getLineDash.bind(this.canvasRenderingContext2D);
+            this.isPointInPath = this.canvasRenderingContext2D.isPointInPath.bind(this.canvasRenderingContext2D);
+            this.lineTo = this.canvasRenderingContext2D.lineTo.bind(this.canvasRenderingContext2D);
+            this.measureText = this.canvasRenderingContext2D.measureText.bind(this.canvasRenderingContext2D);
+            this.moveTo = this.canvasRenderingContext2D.moveTo.bind(this.canvasRenderingContext2D);
+            this.putImageData = this.canvasRenderingContext2D.putImageData.bind(this.canvasRenderingContext2D);
+            this.quadraticCurveTo = this.canvasRenderingContext2D.quadraticCurveTo.bind(this.canvasRenderingContext2D);
+            this.rect = this.canvasRenderingContext2D.rect.bind(this.canvasRenderingContext2D);
+            this.restore = this.canvasRenderingContext2D.restore.bind(this.canvasRenderingContext2D);
+            this.rotate = this.canvasRenderingContext2D.rotate.bind(this.canvasRenderingContext2D);
+            this.save = this.canvasRenderingContext2D.save.bind(this.canvasRenderingContext2D);
+            this.scale = this.canvasRenderingContext2D.scale.bind(this.canvasRenderingContext2D);
+            this.setLineDash = this.canvasRenderingContext2D.setLineDash.bind(this.canvasRenderingContext2D);
+            this.setTransform = this.canvasRenderingContext2D.setTransform.bind(this.canvasRenderingContext2D);
+            this.stroke = this.canvasRenderingContext2D.stroke.bind(this.canvasRenderingContext2D);
+            this.strokeRect = this.canvasRenderingContext2D.strokeRect.bind(this.canvasRenderingContext2D);
+            this.strokeText = this.canvasRenderingContext2D.strokeText.bind(this.canvasRenderingContext2D);
+            this.transform = this.canvasRenderingContext2D.transform.bind(this.canvasRenderingContext2D);
+            this.translate = this.canvasRenderingContext2D.translate.bind(this.canvasRenderingContext2D);
+            this.ellipse = this.canvasRenderingContext2D.ellipse.bind(this.canvasRenderingContext2D);
         }
-        else {
-            this.matrixBuffer = new Array(width * height).fill(fill);
+        //
+        get canvas() { return this.canvasRenderingContext2D.canvas; }
+        get fillStyle() { return this.canvasRenderingContext2D.fillStyle; }
+        set fillStyle(value) { this.canvasRenderingContext2D.fillStyle = value; }
+        get font() { return this.canvasRenderingContext2D.font; }
+        set font(value) { this.canvasRenderingContext2D.font = value; }
+        get globalAlpha() { return this.canvasRenderingContext2D.globalAlpha; }
+        set globalAlpha(value) { this.canvasRenderingContext2D.globalAlpha = value; }
+        get globalCompositeOperation() { return this.canvasRenderingContext2D.globalCompositeOperation; }
+        set globalCompositeOperation(value) { this.canvasRenderingContext2D.globalCompositeOperation = value; }
+        get lineCap() { return this.canvasRenderingContext2D.lineCap; }
+        set lineCap(value) { this.canvasRenderingContext2D.lineCap = value; }
+        get lineDashOffset() { return this.canvasRenderingContext2D.lineDashOffset; }
+        set lineDashOffset(value) { this.canvasRenderingContext2D.lineDashOffset = value; }
+        get lineJoin() { return this.canvasRenderingContext2D.lineJoin; }
+        set lineJoin(value) { this.canvasRenderingContext2D.lineJoin = value; }
+        get lineWidth() { return this.canvasRenderingContext2D.lineWidth; }
+        set lineWidth(value) { this.canvasRenderingContext2D.lineWidth = value; }
+        get miterLimit() { return this.canvasRenderingContext2D.miterLimit; }
+        set miterLimit(value) { this.canvasRenderingContext2D.miterLimit = value; }
+        // get msFillRule(): string { return this.context.msFillRule; }
+        // set msFillRule(value: string) { this.context.msFillRule = value; }
+        get shadowBlur() { return this.canvasRenderingContext2D.shadowBlur; }
+        set shadowBlur(value) { this.canvasRenderingContext2D.shadowBlur = value; }
+        get shadowColor() { return this.canvasRenderingContext2D.shadowColor; }
+        set shadowColor(value) { this.canvasRenderingContext2D.shadowColor = value; }
+        get shadowOffsetX() { return this.canvasRenderingContext2D.shadowOffsetX; }
+        set shadowOffsetX(value) { this.canvasRenderingContext2D.shadowOffsetX = value; }
+        get shadowOffsetY() { return this.canvasRenderingContext2D.shadowOffsetY; }
+        set shadowOffsetY(value) { this.canvasRenderingContext2D.shadowOffsetY = value; }
+        get strokeStyle() { return this.canvasRenderingContext2D.strokeStyle; }
+        set strokeStyle(value) { this.canvasRenderingContext2D.strokeStyle = value; }
+        get textAlign() { return this.canvasRenderingContext2D.textAlign; }
+        set textAlign(value) { this.canvasRenderingContext2D.textAlign = value; }
+        get textBaseline() { return this.canvasRenderingContext2D.textBaseline; }
+        set textBaseline(value) { this.canvasRenderingContext2D.textBaseline = value; }
+        get imageSmoothingEnabled() {
+            if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                return this.canvasRenderingContext2D.imageSmoothingEnabled;
+            }
+            if ('mozImageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                return this.canvasRenderingContext2D.mozImageSmoothingEnabled;
+            }
+            if ('webkitImageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                return this.canvasRenderingContext2D.webkitImageSmoothingEnabled;
+            }
+            return false;
+        }
+        set imageSmoothingEnabled(value) {
+            if ('imageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                this.canvasRenderingContext2D.imageSmoothingEnabled = value;
+                return;
+            }
+            if ('mozImageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                this.canvasRenderingContext2D.mozImageSmoothingEnabled = value;
+                return;
+            }
+            if ('webkitImageSmoothingEnabled' in this.canvasRenderingContext2D) {
+                this.canvasRenderingContext2D.webkitImageSmoothingEnabled = value;
+                return;
+            }
+        }
+        drawTile(image, offsetX, offsetY, sprite, spritesize, tile) {
+            for (let y = 0; y < tile.height; y++) {
+                for (let x = 0; x < tile.width; x++) {
+                    const chip = tile.value(x, y);
+                    this.drawImage(image, sprite[chip][0] * spritesize[0], sprite[chip][1] * spritesize[1], spritesize[0], spritesize[1], offsetX + x * spritesize[0], offsetY + y * spritesize[1], spritesize[0], spritesize[1]);
+                }
+            }
+        }
+        get width() {
+            return this.canvasRenderingContext2D.canvas.width;
+        }
+        get height() {
+            return this.canvasRenderingContext2D.canvas.height;
+        }
+        loadImage(asserts, startCallback = () => { }, endCallback = () => { }) {
+            return Promise.all(Object.keys(asserts).map((x) => new Promise((resolve, reject) => {
+                startCallback(x);
+                const img = new Image();
+                img.onload = () => {
+                    this.images.set(x, img);
+                    endCallback(x);
+                    resolve();
+                };
+                img.onerror = () => {
+                    const msg = `ファイル ${asserts[x]}のロードに失敗。`;
+                    console.error(msg);
+                    reject(msg);
+                };
+                img.src = asserts[x];
+            }))).then(() => {
+                return true;
+            });
+        }
+        texture(id) {
+            return this.images.get(id);
+        }
+        //
+        begin() {
+            Game.getScreen().save();
+            Game.getScreen().clearRect(0, 0, this.width, this.height);
+            Game.getScreen().scale(this.scaleX, this.scaleY);
+            Game.getScreen().save();
+        }
+        end() {
+            Game.getScreen().restore();
+            Game.getScreen().restore();
+        }
+        pagePointToScreenPoint(x, y) {
+            const cr = this.canvasRenderingContext2D.canvas.getBoundingClientRect();
+            const sx = (x - (cr.left + window.pageXOffset));
+            const sy = (y - (cr.top + window.pageYOffset));
+            return [sx / this.scaleX, sy / this.scaleY];
+        }
+        pagePointContainScreen(x, y) {
+            const pos = this.pagePointToScreenPoint(x, y);
+            return 0 <= pos[0] && pos[0] < this.offscreenWidth && 0 <= pos[1] && pos[1] < this.offscreenHeight;
         }
     }
-    get width() {
-        return this.arrayWidth;
-    }
-    get height() {
-        return this.arrayHeight;
-    }
-    value(x, y, value) {
-        if (0 > x || x >= this.arrayWidth || 0 > y || y >= this.arrayHeight) {
-            return 0;
-        }
-        if (value !== undefined) {
-            this.matrixBuffer[y * this.arrayWidth + x] = value;
-        }
-        return this.matrixBuffer[y * this.arrayWidth + x];
-    }
-    fill(value) {
-        this.matrixBuffer.fill(value);
-        return this;
-    }
-    dup() {
-        const m = new Array2D(this.width, this.height);
-        m.matrixBuffer = this.matrixBuffer.slice();
-        return m;
-    }
-    static createFromArray(array, fill) {
-        const h = array.length;
-        const w = Math.max.apply(Math, array.map(x => x.length));
-        const matrix = new Array2D(w, h, fill);
-        array.forEach((vy, y) => vy.forEach((vx, x) => matrix.value(x, y, vx)));
-        return matrix;
-    }
-    toString() {
-        const lines = [];
-        for (let y = 0; y < this.height; y++) {
-            lines[y] = `|${this.matrixBuffer.slice((y + 0) * this.arrayWidth, (y + 1) * this.arrayWidth).join(", ")}|`;
-        }
-        return lines.join("\r\n");
-    }
-}
-Array2D.DIR8 = [
-    { x: +Number.MAX_SAFE_INTEGER, y: +Number.MAX_SAFE_INTEGER },
-    { x: -1, y: +1 },
-    { x: +0, y: +1 },
-    { x: +1, y: +1 },
-    { x: -1, y: +0 },
-    { x: +0, y: +0 },
-    { x: +1, y: +0 },
-    { x: -1, y: -1 },
-    { x: +0, y: -1 },
-    { x: +1, y: -1 }
-];
+    Game.Video = Video;
+})(Game || (Game = {}));
 var PathFinder;
 (function (PathFinder) {
     const dir4 = [
@@ -1777,7 +2607,12 @@ var PathFinder;
         { x: -1, y: 1 },
         { x: -1, y: -1 }
     ];
-    function calcDistanceByDijkstra({ array2D = null, sx = null, sy = null, value = null, costs = null, left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = undefined }) {
+    // ダイクストラ法を用いた距離算出
+    function calcDistanceByDijkstra({ array2D = null, sx = null, // 探索始点X座標
+        sy = null, // 探索始点Y座標
+        value = null, // 探索打ち切りの閾値
+        costs = null, // ノードの重み
+        left = 0, top = 0, right = undefined, bottom = undefined, timeout = 1000, topology = 8, output = undefined }) {
         if (left === undefined || left < 0) {
             right = 0;
         }
@@ -1819,6 +2654,7 @@ var PathFinder;
         }
     }
     PathFinder.calcDistanceByDijkstra = calcDistanceByDijkstra;
+    // A*での経路探索
     function pathfind(array2D, fromX, fromY, toX, toY, costs, opts) {
         opts = Object.assign({ topology: 8 }, opts);
         const topology = opts.topology;
@@ -1834,6 +2670,7 @@ var PathFinder;
         }
         const todo = [];
         const add = ((x, y, prev) => {
+            // distance
             let distance;
             switch (topology) {
                 case 4:
@@ -1852,6 +2689,7 @@ var PathFinder;
                 g: (prev ? prev.g + 1 : 0),
                 distance: distance
             };
+            /* insert into priority queue */
             const f = obj.g + obj.distance;
             for (let i = 0; i < todo.length; i++) {
                 const item = todo[i];
@@ -1863,6 +2701,7 @@ var PathFinder;
             }
             todo.push(obj);
         });
+        // set start position
         add(toX, toY, null);
         const done = new Map();
         while (todo.length) {
@@ -1870,11 +2709,13 @@ var PathFinder;
             {
                 const id = item.x + "," + item.y;
                 if (done.has(id)) {
+                    /* 探索済みなので探索しない */
                     continue;
                 }
                 done.set(id, item);
             }
             if (item.x === fromX && item.y === fromY) {
+                /* 始点に到達したので経路を生成して返す */
                 const result = [];
                 while (item) {
                     result.push(item);
@@ -1883,15 +2724,18 @@ var PathFinder;
                 return result;
             }
             else {
+                /* 隣接地点から移動可能地点を探す */
                 for (let i = 0; i < dirs.length; i++) {
                     const dir = dirs[i];
                     const x = item.x + dir.x;
                     const y = item.y + dir.y;
                     const cost = costs[this.value(x, y)];
                     if (cost < 0) {
+                        /* 侵入不可能 */
                         continue;
                     }
                     else {
+                        /* 移動可能地点が探索済みでないなら探索キューに追加 */
                         const id = x + "," + y;
                         if (done.has(id)) {
                             continue;
@@ -1901,9 +2745,11 @@ var PathFinder;
                 }
             }
         }
+        /* 始点に到達しなかったので空の経路を返す */
         return [];
     }
     PathFinder.pathfind = pathfind;
+    // 重み距離を使ったA*
     function pathfindByPropergation(array2D, fromX, fromY, toX, toY, propagation, { topology = 8 }) {
         let dirs;
         if (topology === 4) {
@@ -1917,6 +2763,7 @@ var PathFinder;
         }
         const todo = [];
         const add = ((x, y, prev) => {
+            // distance
             const distance = Math.abs(propagation.value(x, y) - propagation.value(fromX, fromY));
             const obj = {
                 x: x,
@@ -1925,6 +2772,7 @@ var PathFinder;
                 g: (prev ? prev.g + 1 : 0),
                 distance: distance
             };
+            /* insert into priority queue */
             const f = obj.g + obj.distance;
             for (let i = 0; i < todo.length; i++) {
                 const item = todo[i];
@@ -1936,6 +2784,7 @@ var PathFinder;
             }
             todo.push(obj);
         });
+        // set start position
         add(toX, toY, null);
         const done = new Map();
         while (todo.length) {
@@ -1943,11 +2792,13 @@ var PathFinder;
             {
                 const id = item.x + "," + item.y;
                 if (done.has(id)) {
+                    /* 探索済みなので探索しない */
                     continue;
                 }
                 done.set(id, item);
             }
             if (item.x === fromX && item.y === fromY) {
+                /* 始点に到達したので経路を生成して返す */
                 const result = [];
                 while (item) {
                     result.push(item);
@@ -1956,14 +2807,17 @@ var PathFinder;
                 return result;
             }
             else {
+                /* 隣接地点から移動可能地点を探す */
                 dirs.forEach((dir) => {
                     const x = item.x + dir.x;
                     const y = item.y + dir.y;
                     const pow = propagation.value(x, y);
                     if (pow === 0) {
+                        /* 侵入不可能 */
                         return;
                     }
                     else {
+                        /* 移動可能地点が探索済みでないなら探索キューに追加 */
                         const id = x + "," + y;
                         if (done.has(id)) {
                             return;
@@ -1975,926 +2829,11 @@ var PathFinder;
                 });
             }
         }
+        /* 始点に到達しなかったので空の経路を返す */
         return [];
     }
     PathFinder.pathfindByPropergation = pathfindByPropergation;
 })(PathFinder || (PathFinder = {}));
-var Dungeon;
-(function (Dungeon) {
-    const rand = XorShift.default();
-    class Camera {
-    }
-    Dungeon.Camera = Camera;
-    class DungeonData {
-        constructor(config) {
-            this.width = config.width;
-            this.height = config.height;
-            this.gridsize = config.gridsize;
-            this.layer = config.layer;
-            this.camera = new Camera();
-            this.lighting = new Array2D(this.width, this.height, 0);
-            this.visibled = new Array2D(this.width, this.height, 0);
-        }
-        clearLighting() {
-            this.lighting.fill(0);
-            return this;
-        }
-        update(param) {
-            const mapWidth = this.width * this.gridsize.width;
-            const mapHeight = this.height * this.gridsize.height;
-            const mapPx = param.viewpoint.x;
-            const mapPy = param.viewpoint.y;
-            this.camera.width = param.viewwidth;
-            this.camera.height = param.viewheight;
-            this.camera.left = ~~(mapPx - this.camera.width / 2);
-            this.camera.top = ~~(mapPy - this.camera.height / 2);
-            this.camera.right = this.camera.left + this.camera.width;
-            this.camera.bottom = this.camera.top + this.camera.height;
-            if ((this.camera.left < 0) && (this.camera.right - this.camera.left < mapWidth)) {
-                this.camera.right -= this.camera.left;
-                this.camera.left = 0;
-            }
-            else if ((this.camera.right >= mapWidth) && (this.camera.left - (this.camera.right - mapWidth) >= 0)) {
-                this.camera.left -= (this.camera.right - mapWidth);
-                this.camera.right = mapWidth - 1;
-            }
-            if ((this.camera.top < 0) && (this.camera.bottom - this.camera.top < mapHeight)) {
-                this.camera.bottom -= this.camera.top;
-                this.camera.top = 0;
-            }
-            else if ((this.camera.bottom >= mapHeight) && (this.camera.top - (this.camera.bottom - mapHeight) >= 0)) {
-                this.camera.top -= (this.camera.bottom - mapHeight);
-                this.camera.bottom = mapHeight - 1;
-            }
-            this.camera.localPx = mapPx - this.camera.left;
-            this.camera.localPy = mapPy - this.camera.top;
-            this.camera.chipLeft = ~~(this.camera.left / this.gridsize.width);
-            this.camera.chipTop = ~~(this.camera.top / this.gridsize.height);
-            this.camera.chipRight = ~~((this.camera.right + (this.gridsize.width - 1)) / this.gridsize.width);
-            this.camera.chipBottom = ~~((this.camera.bottom + (this.gridsize.height - 1)) / this.gridsize.height);
-            this.camera.chipOffX = -(this.camera.left % this.gridsize.width);
-            this.camera.chipOffY = -(this.camera.top % this.gridsize.height);
-        }
-        draw(layerDrawHook) {
-            const gridw = this.gridsize.width;
-            const gridh = this.gridsize.height;
-            Object.keys(this.layer).forEach((key) => {
-                const l = ~~key;
-                for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
-                    for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
-                        const chipid = this.layer[l].chips.value(x, y) || 0;
-                        if (this.layer[l].chip[chipid]) {
-                            const xx = (x - this.camera.chipLeft) * gridw;
-                            const yy = (y - this.camera.chipTop) * gridh;
-                            if (!Game.pmode) {
-                                Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                            }
-                            else {
-                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
-                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
-                                Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                                Game.getScreen().strokeRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                            }
-                        }
-                    }
-                }
-                layerDrawHook(l, this.camera.localPx, this.camera.localPy);
-            });
-            for (let y = this.camera.chipTop; y <= this.camera.chipBottom; y++) {
-                for (let x = this.camera.chipLeft; x <= this.camera.chipRight; x++) {
-                    let light = this.lighting.value(x, y) / 100;
-                    if (light > 1) {
-                        light = 1;
-                    }
-                    else if (light < 0) {
-                        light = 0;
-                    }
-                    const xx = (x - this.camera.chipLeft) * gridw;
-                    const yy = (y - this.camera.chipTop) * gridh;
-                    Game.getScreen().fillStyle = `rgba(0,0,0,${1 - light})`;
-                    Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                }
-            }
-        }
-    }
-    Dungeon.DungeonData = DungeonData;
-    class Feature {
-    }
-    class Room extends Feature {
-        constructor(left, top, right, bottom, door) {
-            super();
-            this.left = left;
-            this.top = top;
-            this.right = right;
-            this.bottom = bottom;
-            this.doors = new Map();
-            if (door !== undefined) {
-                this.addDoor(door.x, door.y);
-            }
-        }
-        static createRandomAt(x, y, dx, dy, options) {
-            const minw = options.roomWidth.min;
-            const maxw = options.roomWidth.max;
-            const width = options.random.randInt(minw, maxw);
-            const minh = options.roomHeight.min;
-            const maxh = options.roomHeight.max;
-            const height = options.random.randInt(minh, maxh);
-            if (dx === 1) {
-                const y2 = y - options.random.randInt(0, height - 1);
-                return new Room(x + 1, y2, x + width, y2 + height - 1, { x: x, y: y });
-            }
-            if (dx === -1) {
-                const y2 = y - options.random.randInt(0, height - 1);
-                return new Room(x - width, y2, x - 1, y2 + height - 1, { x: x, y: y });
-            }
-            if (dy === 1) {
-                const x2 = x - options.random.randInt(0, width - 1);
-                return new Room(x2, y + 1, x2 + width - 1, y + height, { x: x, y: y });
-            }
-            if (dy === -1) {
-                const x2 = x - options.random.randInt(0, width - 1);
-                return new Room(x2, y - height, x2 + width - 1, y - 1, { x: x, y: y });
-            }
-            throw new Error("dx or dy must be 1 or -1");
-        }
-        static createRandomCenter(cx, cy, options) {
-            const minw = options.roomWidth.min;
-            const maxw = options.roomWidth.max;
-            const width = options.random.randInt(minw, maxw);
-            const minh = options.roomHeight.min;
-            const maxh = options.roomHeight.max;
-            const height = options.random.randInt(minh, maxh);
-            const x1 = cx - options.random.randInt(0, width - 1);
-            const y1 = cy - options.random.randInt(0, height - 1);
-            const x2 = x1 + width - 1;
-            const y2 = y1 + height - 1;
-            return new Room(x1, y1, x2, y2);
-        }
-        static createRandom(availWidth, availHeight, options) {
-            const minw = options.roomWidth.min;
-            const maxw = options.roomWidth.max;
-            const width = options.random.randInt(minw, maxw);
-            const minh = options.roomHeight.min;
-            const maxh = options.roomHeight.max;
-            const height = options.random.randInt(minh, maxh);
-            const left = availWidth - width - 1;
-            const top = availHeight - height - 1;
-            const x1 = 1 + options.random.randInt(0, left - 1);
-            const y1 = 1 + options.random.randInt(0, top - 1);
-            const x2 = x1 + width - 1;
-            const y2 = y1 + height - 1;
-            return new Room(x1, y1, x2, y2);
-        }
-        addDoor(x, y) {
-            this.doors.set(x + "," + y, 1);
-            return this;
-        }
-        getDoors(callback) {
-            for (const key of Object.keys(this.doors)) {
-                const parts = key.split(",");
-                callback({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10) });
-            }
-            return this;
-        }
-        clearDoors() {
-            this.doors.clear();
-            return this;
-        }
-        addDoors(isWallCallback) {
-            const left = this.left - 1;
-            const right = this.right + 1;
-            const top = this.top - 1;
-            const bottom = this.bottom + 1;
-            for (let x = left; x <= right; x++) {
-                for (let y = top; y <= bottom; y++) {
-                    if (x !== left && x !== right && y !== top && y !== bottom) {
-                        continue;
-                    }
-                    if (isWallCallback(x, y)) {
-                        continue;
-                    }
-                    this.addDoor(x, y);
-                }
-            }
-            return this;
-        }
-        debug() {
-            console.log("room", this.left, this.top, this.right, this.bottom);
-        }
-        isValid(isWallCallback, canBeDugCallback) {
-            const left = this.left - 1;
-            const right = this.right + 1;
-            const top = this.top - 1;
-            const bottom = this.bottom + 1;
-            for (let x = left; x <= right; x++) {
-                for (let y = top; y <= bottom; y++) {
-                    if (x === left || x === right || y === top || y === bottom) {
-                        if (!isWallCallback(x, y)) {
-                            return false;
-                        }
-                    }
-                    else {
-                        if (!canBeDugCallback(x, y)) {
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
-        }
-        create(digCallback) {
-            const left = this.left - 1;
-            const right = this.right + 1;
-            const top = this.top - 1;
-            const bottom = this.bottom + 1;
-            for (let x = left; x <= right; x++) {
-                for (let y = top; y <= bottom; y++) {
-                    let value;
-                    if (this.doors.has(x + "," + y)) {
-                        value = 2;
-                    }
-                    else if (x === left || x === right || y === top || y === bottom) {
-                        value = 1;
-                    }
-                    else {
-                        value = 0;
-                    }
-                    digCallback(x, y, value);
-                }
-            }
-        }
-        getCenter() {
-            return { x: Math.round((this.left + this.right) / 2), y: Math.round((this.top + this.bottom) / 2) };
-        }
-        getLeft() {
-            return this.left;
-        }
-        getRight() {
-            return this.right;
-        }
-        getTop() {
-            return this.top;
-        }
-        getBottom() {
-            return this.bottom;
-        }
-    }
-    class Corridor extends Feature {
-        constructor(startX, startY, endX, endY) {
-            super();
-            this.startX = startX;
-            this.startY = startY;
-            this.endX = endX;
-            this.endY = endY;
-            this.endsWithAWall = true;
-        }
-        static createRandomAt(x, y, dx, dy, options) {
-            const min = options.corridorLength.min;
-            const max = options.corridorLength.max;
-            const length = options.random.randInt(min, max);
-            return new Corridor(x, y, x + dx * length, y + dy * length);
-        }
-        debug() {
-            console.log("corridor", this.startX, this.startY, this.endX, this.endY);
-        }
-        isValid(isWallCallback, canBeDugCallback) {
-            const sx = this.startX;
-            const sy = this.startY;
-            let dx = this.endX - sx;
-            let dy = this.endY - sy;
-            let length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-            if (dx) {
-                dx = dx / Math.abs(dx);
-            }
-            if (dy) {
-                dy = dy / Math.abs(dy);
-            }
-            const nx = dy;
-            const ny = -dx;
-            let ok = true;
-            for (let i = 0; i < length; i++) {
-                const x = sx + i * dx;
-                const y = sy + i * dy;
-                if (!canBeDugCallback(x, y)) {
-                    ok = false;
-                }
-                if (!isWallCallback(x + nx, y + ny)) {
-                    ok = false;
-                }
-                if (!isWallCallback(x - nx, y - ny)) {
-                    ok = false;
-                }
-                if (!ok) {
-                    length = i;
-                    this.endX = x - dx;
-                    this.endY = y - dy;
-                    break;
-                }
-            }
-            if (length === 0) {
-                return false;
-            }
-            if (length === 1 && isWallCallback(this.endX + dx, this.endY + dy)) {
-                return false;
-            }
-            const firstCornerBad = !isWallCallback(this.endX + dx + nx, this.endY + dy + ny);
-            const secondCornerBad = !isWallCallback(this.endX + dx - nx, this.endY + dy - ny);
-            this.endsWithAWall = isWallCallback(this.endX + dx, this.endY + dy);
-            if ((firstCornerBad || secondCornerBad) && this.endsWithAWall) {
-                return false;
-            }
-            return true;
-        }
-        create(digCallback) {
-            const sx = this.startX;
-            const sy = this.startY;
-            let dx = this.endX - sx;
-            let dy = this.endY - sy;
-            const length = 1 + Math.max(Math.abs(dx), Math.abs(dy));
-            if (dx) {
-                dx = dx / Math.abs(dx);
-            }
-            if (dy) {
-                dy = dy / Math.abs(dy);
-            }
-            for (let i = 0; i < length; i++) {
-                const x = sx + i * dx;
-                const y = sy + i * dy;
-                digCallback(x, y, 0);
-            }
-            return true;
-        }
-        createPriorityWalls(priorityWallCallback) {
-            if (!this.endsWithAWall) {
-                return;
-            }
-            const sx = this.startX;
-            const sy = this.startY;
-            let dx = this.endX - sx;
-            let dy = this.endY - sy;
-            if (dx) {
-                dx = dx / Math.abs(dx);
-            }
-            if (dy) {
-                dy = dy / Math.abs(dy);
-            }
-            const nx = dy;
-            const ny = -dx;
-            priorityWallCallback(this.endX + dx, this.endY + dy);
-            priorityWallCallback(this.endX + nx, this.endY + ny);
-            priorityWallCallback(this.endX - nx, this.endY - ny);
-        }
-    }
-    class Generator {
-        constructor(width, height, { random = new XorShift(), roomWidth = { min: 3, max: 9 }, roomHeight = { min: 3, max: 5 }, corridorLength = { min: 3, max: 10 }, dugPercentage = 0.2, loopLimit = 100000, }) {
-            this.width = width;
-            this.height = height;
-            this.rooms = [];
-            this.corridors = [];
-            this.options = {
-                random: random,
-                roomWidth: roomWidth,
-                roomHeight: roomHeight,
-                corridorLength: corridorLength,
-                dugPercentage: dugPercentage,
-                loopLimit: loopLimit,
-            };
-            this.features = {
-                Room: 4,
-                Corridor: 4,
-            };
-            this.featureAttempts = 20;
-            this.walls = new Map();
-            this.digCallback = this.digCallback.bind(this);
-            this.canBeDugCallback = this.canBeDugCallback.bind(this);
-            this.isWallCallback = this.isWallCallback.bind(this);
-            this.priorityWallCallback = this.priorityWallCallback.bind(this);
-        }
-        create(callback) {
-            this.rooms = [];
-            this.corridors = [];
-            this.map = this.fillMap(1);
-            this.walls.clear();
-            this.dug = 0;
-            const area = (this.width - 2) * (this.height - 2);
-            this.firstRoom();
-            let t1 = 0;
-            let priorityWalls = 0;
-            do {
-                if (t1++ > this.options.loopLimit) {
-                    break;
-                }
-                const wall = this.findWall();
-                if (!wall) {
-                    break;
-                }
-                const parts = wall.split(",");
-                const x = parseInt(parts[0]);
-                const y = parseInt(parts[1]);
-                const dir = this.getDiggingDirection(x, y);
-                if (!dir) {
-                    continue;
-                }
-                let featureAttempts = 0;
-                do {
-                    featureAttempts++;
-                    if (this.tryFeature(x, y, dir.x, dir.y)) {
-                        this.removeSurroundingWalls(x, y);
-                        this.removeSurroundingWalls(x - dir.x, y - dir.y);
-                        break;
-                    }
-                } while (featureAttempts < this.featureAttempts);
-                priorityWalls = 0;
-                for (const [, value] of this.walls) {
-                    if (value > 1) {
-                        priorityWalls++;
-                    }
-                }
-            } while ((this.dug / area) < this.options.dugPercentage || priorityWalls);
-            this.addDoors();
-            if (callback) {
-                for (let i = 0; i < this.width; i++) {
-                    for (let j = 0; j < this.height; j++) {
-                        callback(i, j, this.map[i][j]);
-                    }
-                }
-            }
-            this.walls.clear();
-            this.map = null;
-            this.rooms = this.options.random.shuffle(this.rooms);
-            return this;
-        }
-        digCallback(x, y, value) {
-            if (value === 0 || value === 2) {
-                this.map[x][y] = 0;
-                this.dug++;
-            }
-            else {
-                this.walls.set(x + "," + y, 1);
-            }
-        }
-        isWallCallback(x, y) {
-            if (x < 0 || y < 0 || x >= this.width || y >= this.height) {
-                return false;
-            }
-            return (this.map[x][y] === 1);
-        }
-        canBeDugCallback(x, y) {
-            if (x < 1 || y < 1 || x + 1 >= this.width || y + 1 >= this.height) {
-                return false;
-            }
-            return (this.map[x][y] === 1);
-        }
-        priorityWallCallback(x, y) {
-            this.walls.set(x + "," + y, 2);
-        }
-        findWall() {
-            const prio1 = [];
-            const prio2 = [];
-            for (const [id, prio] of this.walls) {
-                if (prio === 2) {
-                    prio2.push(id);
-                }
-                else {
-                    prio1.push(id);
-                }
-            }
-            const arr = (prio2.length ? prio2 : prio1);
-            if (!arr.length) {
-                return null;
-            }
-            const id2 = arr.sort()[this.options.random.randInt(0, arr.length - 1)];
-            this.walls.delete(id2);
-            return id2;
-        }
-        firstRoom() {
-            const cx = Math.floor(this.width / 2);
-            const cy = Math.floor(this.height / 2);
-            const room = Room.createRandomCenter(cx, cy, this.options);
-            this.rooms.push(room);
-            room.create(this.digCallback);
-        }
-        fillMap(value) {
-            const map = [];
-            for (let i = 0; i < this.width; i++) {
-                map.push([]);
-                for (let j = 0; j < this.height; j++) {
-                    map[i].push(value);
-                }
-            }
-            return map;
-        }
-        tryFeature(x, y, dx, dy) {
-            const featureType = this.options.random.getWeightedValue(this.features);
-            const feature = Generator.featureCreateMethodTable[featureType](x, y, dx, dy, this.options);
-            if (!feature.isValid(this.isWallCallback, this.canBeDugCallback)) {
-                return false;
-            }
-            feature.create(this.digCallback);
-            if (feature instanceof Room) {
-                this.rooms.push(feature);
-            }
-            if (feature instanceof Corridor) {
-                feature.createPriorityWalls(this.priorityWallCallback);
-                this.corridors.push(feature);
-            }
-            return true;
-        }
-        removeSurroundingWalls(cx, cy) {
-            const deltas = Generator.rotdirs4;
-            for (const delta of deltas) {
-                const x1 = cx + delta.x;
-                const y1 = cy + delta.y;
-                this.walls.delete(x1 + "," + y1);
-                const x2 = cx + 2 * delta.x;
-                const y2 = cy + 2 * delta.y;
-                this.walls.delete(x2 + "," + y2);
-            }
-        }
-        getDiggingDirection(cx, cy) {
-            if (cx <= 0 || cy <= 0 || cx >= this.width - 1 || cy >= this.height - 1) {
-                return null;
-            }
-            let result = null;
-            const deltas = Generator.rotdirs4;
-            for (const delta of deltas) {
-                const x = cx + delta.x;
-                const y = cy + delta.y;
-                if (!this.map[x][y]) {
-                    if (result) {
-                        return null;
-                    }
-                    result = delta;
-                }
-            }
-            if (!result) {
-                return null;
-            }
-            return { x: -result.x, y: -result.y };
-        }
-        addDoors() {
-            const data = this.map;
-            const isWallCallback = (x, y) => {
-                return (data[x][y] === 1);
-            };
-            for (const room of this.rooms) {
-                room.clearDoors();
-                room.addDoors(isWallCallback);
-            }
-        }
-        getRooms() {
-            return this.rooms;
-        }
-        getCorridors() {
-            return this.corridors;
-        }
-    }
-    Generator.featureCreateMethodTable = { "Room": Room.createRandomAt, "Corridor": Corridor.createRandomAt };
-    Generator.rotdirs4 = [
-        { x: 0, y: -1 },
-        { x: 1, y: 0 },
-        { x: 0, y: 1 },
-        { x: -1, y: 0 }
-    ];
-    function generate(w, h, callback) {
-        return new Generator(w, h, { random: rand }).create(callback);
-    }
-    Dungeon.generate = generate;
-})(Dungeon || (Dungeon = {}));
-var SpriteAnimation;
-(function (SpriteAnimation) {
-    class Animator {
-        constructor(spriteSheet) {
-            this.spriteSheet = spriteSheet;
-            this.offx = 0;
-            this.offy = 0;
-            this.dir = 5;
-            this.animDir = 2;
-            this.animFrame = 0;
-            this.animName = "idle";
-        }
-        setDir(dir) {
-            if (dir === 0) {
-                return;
-            }
-            this.dir = dir;
-            switch (dir) {
-                case 1: {
-                    if (this.animDir === 4) {
-                        this.animDir = 4;
-                    }
-                    else if (this.animDir === 2) {
-                        this.animDir = 2;
-                    }
-                    else if (this.animDir === 8) {
-                        this.animDir = 2;
-                    }
-                    else if (this.animDir === 6) {
-                        this.animDir = 4;
-                    }
-                    break;
-                }
-                case 3: {
-                    if (this.animDir === 4) {
-                        this.animDir = 6;
-                    }
-                    else if (this.animDir === 2) {
-                        this.animDir = 2;
-                    }
-                    else if (this.animDir === 8) {
-                        this.animDir = 2;
-                    }
-                    else if (this.animDir === 6) {
-                        this.animDir = 2;
-                    }
-                    break;
-                }
-                case 9: {
-                    if (this.animDir === 4) {
-                        this.animDir = 6;
-                    }
-                    else if (this.animDir === 2) {
-                        this.animDir = 8;
-                    }
-                    else if (this.animDir === 8) {
-                        this.animDir = 8;
-                    }
-                    else if (this.animDir === 6) {
-                        this.animDir = 6;
-                    }
-                    break;
-                }
-                case 7: {
-                    if (this.animDir === 4) {
-                        this.animDir = 4;
-                    }
-                    else if (this.animDir === 2) {
-                        this.animDir = 8;
-                    }
-                    else if (this.animDir === 8) {
-                        this.animDir = 8;
-                    }
-                    else if (this.animDir === 6) {
-                        this.animDir = 4;
-                    }
-                    break;
-                }
-                case 5: {
-                    break;
-                }
-                default: {
-                    this.animDir = dir;
-                    break;
-                }
-            }
-        }
-        setAnimation(type, rate) {
-            if (rate > 1) {
-                rate = 1;
-            }
-            if (rate < 0) {
-                rate = 0;
-            }
-            if (type === "move" || type === "action") {
-                if (type === "move") {
-                    this.offx = ~~(Array2D.DIR8[this.dir].x * 24 * rate);
-                    this.offy = ~~(Array2D.DIR8[this.dir].y * 24 * rate);
-                }
-                else if (type === "action") {
-                    this.offx = ~~(Array2D.DIR8[this.dir].x * 12 * Math.sin(rate * Math.PI));
-                    this.offy = ~~(Array2D.DIR8[this.dir].y * 12 * Math.sin(rate * Math.PI));
-                }
-                this.animName = Animator.animationName[this.animDir];
-            }
-            else if (type === "dead") {
-                this.animName = "dead";
-                this.offx = 0;
-                this.offy = 0;
-            }
-            else {
-                return;
-            }
-            const animDefs = this.spriteSheet.getAnimation(this.animName);
-            const totalWeight = animDefs.reduce((s, x) => s + x.time, 0);
-            const targetRate = rate * totalWeight;
-            let sum = 0;
-            for (let i = 0; i < animDefs.length; i++) {
-                const next = sum + animDefs[i].time;
-                if (sum <= targetRate && targetRate < next) {
-                    this.animFrame = i;
-                    return;
-                }
-                sum = next;
-            }
-            this.animFrame = animDefs.length - 1;
-        }
-    }
-    Animator.animationName = {
-        2: "move_down",
-        4: "move_left",
-        5: "idle",
-        6: "move_right",
-        8: "move_up",
-    };
-    SpriteAnimation.Animator = Animator;
-    class SpriteSheet {
-        constructor({ source = null, sprite = null, animation = null }) {
-            this.source = source;
-            this.sprite = sprite;
-            this.animation = animation;
-        }
-        getAnimation(animName) {
-            return this.animation.get(animName);
-        }
-        getAnimationFrame(animName, animFrame) {
-            return this.animation.get(animName)[animFrame];
-        }
-        gtetSprite(spriteName) {
-            return this.sprite.get(spriteName);
-        }
-        getSpriteImage(sprite) {
-            return this.source.get(sprite.source);
-        }
-    }
-    SpriteAnimation.SpriteSheet = SpriteSheet;
-    class Sprite {
-        constructor(sprite) {
-            this.source = sprite.source;
-            this.left = sprite.left;
-            this.top = sprite.top;
-            this.width = sprite.width;
-            this.height = sprite.height;
-            this.offsetX = sprite.offsetX;
-            this.offsetY = sprite.offsetY;
-        }
-    }
-    class Animation {
-        constructor(animation) {
-            this.sprite = animation.sprite;
-            this.time = animation.time;
-            this.offsetX = animation.offsetX;
-            this.offsetY = animation.offsetY;
-        }
-    }
-    function loadImage(imageSrc) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.src = imageSrc;
-                img.onload = () => {
-                    resolve(img);
-                };
-                img.onerror = () => { reject(imageSrc + "のロードに失敗しました。"); };
-            });
-        });
-    }
-    function loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const spriteSheetDir = getDirectory(spriteSheetPath);
-            loadStartCallback();
-            const spriteSheetJson = yield ajax(spriteSheetPath, "json").then(y => y.response);
-            loadEndCallback();
-            if (spriteSheetJson == null) {
-                throw new Error(spriteSheetPath + " is invalid json.");
-            }
-            const source = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.source);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    const imageSrc = spriteSheetDir + '/' + spriteSheetJson.source[key];
-                    loadStartCallback();
-                    const image = yield loadImage(imageSrc);
-                    loadEndCallback();
-                    source.set(key, image);
-                }
-            }
-            const sprite = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.sprite);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    sprite.set(key, new Sprite(spriteSheetJson.sprite[key]));
-                }
-            }
-            const animation = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.animation);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    const value = spriteSheetJson.animation[key].map(x => new Animation(x));
-                    animation.set(key, value);
-                }
-            }
-            const spriteSheet = new SpriteSheet({
-                source: source,
-                sprite: sprite,
-                animation: animation,
-            });
-            return spriteSheet;
-        });
-    }
-    SpriteAnimation.loadSpriteSheet = loadSpriteSheet;
-})(SpriteAnimation || (SpriteAnimation = {}));
-var Charactor;
-(function (Charactor) {
-    function loadCharactorConfigFromFile(path, loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const configDirectory = path.substring(0, path.lastIndexOf("/"));
-            loadStartCallback();
-            const charactorConfigJson = yield ajax(path, "json").then(x => x.response);
-            loadEndCallback();
-            const spriteSheetPath = configDirectory + "/" + charactorConfigJson.sprite;
-            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback);
-            return new CharactorConfig({
-                id: charactorConfigJson.id,
-                name: charactorConfigJson.name,
-                sprite: sprite,
-                configDirectory: configDirectory
-            });
-        });
-    }
-    Charactor.loadCharactorConfigFromFile = loadCharactorConfigFromFile;
-    class CharactorConfig {
-        constructor({ id = "", name = "", sprite = null, configDirectory = "", }) {
-            this.id = id;
-            this.name = name;
-            this.sprite = sprite;
-            this.configDirectory = configDirectory;
-        }
-    }
-    Charactor.CharactorConfig = CharactorConfig;
-    class CharactorBase extends SpriteAnimation.Animator {
-        constructor(x, y, spriteSheet) {
-            super(spriteSheet);
-            this.x = x;
-            this.y = y;
-        }
-    }
-    Charactor.CharactorBase = CharactorBase;
-    class Player extends CharactorBase {
-        constructor(config) {
-            const charactorConfig = Player.playerConfigs.get(config.charactorId);
-            super(config.x, config.y, charactorConfig.sprite);
-            this.charactorConfig = charactorConfig;
-            this.hp = 100;
-            this.hpMax = 100;
-            this.mp = 100;
-            this.mpMax = 100;
-            this.gold = 0;
-            this.equips = [
-                { name: "竹刀", atk: 5, def: 0 },
-                { name: "体操着", atk: 0, def: 3 },
-                { name: "ブルマ", atk: 0, def: 2 },
-            ];
-        }
-        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
-            return __awaiter(this, void 0, void 0, function* () {
-                loadStartCallback();
-                const configPaths = yield ajax(Player.configFilePath, "json").then((x) => x.response);
-                loadStartCallback();
-                const rootDirectory = getDirectory(Player.configFilePath);
-                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
-                Player.playerConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
-                return;
-            });
-        }
-        get atk() {
-            return this.equips.reduce((s, x) => s += x.atk, 0);
-        }
-        get def() {
-            return this.equips.reduce((s, x) => s += x.atk, 0);
-        }
-    }
-    Player.configFilePath = "./assets/charactor/charactor.json";
-    Player.playerConfigs = new Map();
-    Charactor.Player = Player;
-    class Monster extends CharactorBase {
-        constructor(config) {
-            const charactorConfig = Monster.monsterConfigs.get(config.charactorId);
-            super(config.x, config.y, charactorConfig.sprite);
-            this.charactorConfig = charactorConfig;
-            this.life = config.life;
-            this.maxLife = config.maxLife;
-            this.atk = config.atk;
-            this.def = config.def;
-        }
-        static loadCharactorConfigs(loadStartCallback, loadEndCallback) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const configPaths = yield ajax(Monster.configFilePath, "json").then((x) => x.response);
-                const rootDirectory = getDirectory(Monster.configFilePath);
-                loadStartCallback();
-                const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
-                loadEndCallback();
-                Monster.monsterConfigs = configs.reduce((s, x) => s.set(x.id, x), new Map());
-                return;
-            });
-        }
-    }
-    Monster.configFilePath = "./assets/monster/monster.json";
-    Monster.monsterConfigs = new Map();
-    Charactor.Monster = Monster;
-})(Charactor || (Charactor = {}));
 var Scene;
 (function (Scene) {
     function* boot() {
@@ -2939,6 +2878,8 @@ var Scene;
                 explosion: "./assets/sound/explosion03.mp3",
                 cursor: "./assets/sound/cursor.mp3",
             }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
+            //Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            //Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
                 reqResource++;
                 return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
@@ -2947,6 +2888,7 @@ var Scene;
                 loadedResource++;
             })
         ]).then(() => {
+            //Game.getSceneManager().push(title, null);
             Game.getSceneManager().push(Scene.shop, null);
             this.next();
         });
@@ -2969,17 +2911,21 @@ var Scene;
             Game.getScreen().save();
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, w, h);
+            // 床
             for (let y = 0; y < ~~((w + 23) / 24); y++) {
                 for (let x = 0; x < ~~((w + 23) / 24); x++) {
                     Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 0, 24, 24, x * 24, y * 24, 24, 24);
                 }
             }
+            // 壁
             for (let y = 0; y < 2; y++) {
                 for (let x = 0; x < ~~((w + 23) / 24); x++) {
                     Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 120, 96, 24, 24, x * 24, y * 24 - 23, 24, 24);
                 }
             }
+            // 黒板
             Game.getScreen().drawImage(Game.getScreen().texture("mapchip"), 0, 204, 72, 36, 90, -12, 72, 36);
+            // 各キャラと机
             for (let y = 0; y < 5; y++) {
                 for (let x = 0; x < 6; x++) {
                     const id = y * 6 + x;
@@ -3025,10 +2971,12 @@ var Scene;
             },
             update: (e) => {
                 if (0 <= e && e < 1600) {
+                    // くるくる
                     selectedCharactorDir = ~~(e / 100);
                     selectedCharactorOffY = 0;
                 }
                 else if (1600 <= e && e < 1800) {
+                    // ぴょん
                     selectedCharactorDir = 0;
                     selectedCharactorOffY = Math.sin((e - 1600) * Math.PI / 200) * 20;
                 }
@@ -3071,10 +3019,13 @@ var Scene;
     function* dungeon(param) {
         const player = param.player;
         const floor = param.floor;
+        // マップサイズ算出
         const mapChipW = 30 + floor * 3;
         const mapChipH = 30 + floor * 3;
+        // マップ自動生成
         const mapchipsL1 = new Array2D(mapChipW, mapChipH);
         const layout = Dungeon.generate(mapChipW, mapChipH, (x, y, v) => { mapchipsL1.value(x, y, v ? 0 : 1); });
+        // 装飾
         for (let y = 1; y < mapChipH; y++) {
             for (let x = 0; x < mapChipW; x++) {
                 mapchipsL1.value(x, y - 1, mapchipsL1.value(x, y) === 1 && mapchipsL1.value(x, y - 1) === 0
@@ -3088,12 +3039,16 @@ var Scene;
                 mapchipsL2.value(x, y, (mapchipsL1.value(x, y) === 0) ? 0 : 1);
             }
         }
+        // 部屋は生成後にシャッフルしているのでそのまま取り出す
         const rooms = layout.rooms.slice();
+        // 開始位置
         const startPos = rooms[0].getCenter();
         player.x = startPos.x;
         player.y = startPos.y;
+        // 階段位置
         const stairsPos = rooms[1].getCenter();
         mapchipsL1.value(stairsPos.x, stairsPos.y, 10);
+        // モンスター配置
         let monsters = rooms.splice(2).map((x) => {
             return new Charactor.Monster({
                 charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
@@ -3128,6 +3083,7 @@ var Scene;
                 },
             },
         });
+        // カメラを更新
         map.update({
             viewpoint: {
                 x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
@@ -3137,6 +3093,7 @@ var Scene;
             viewheight: Game.getScreen().offscreenHeight,
         });
         Game.getSound().reqPlayChannel("dungeon", true);
+        // assign virtual pad
         const pad = new Game.Input.VirtualStick();
         const pointerdown = (ev) => {
             if (pad.onpointingstart(ev.pointerId)) {
@@ -3194,16 +3151,32 @@ var Scene;
         };
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         let sprites = [];
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const btnMap = new Game.GUI.Button(0, 0, 14, 14, {
+            text: "Ｍ",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnMap);
+        btnMap.click = (x, y) => {
+            Game.getSceneManager().push(Scene.mapview, { map: map, player: player });
+        };
         this.draw = () => {
             Game.getScreen().save();
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             map.draw((l, cameraLocalPx, cameraLocalPy) => {
                 if (l === 0) {
+                    // 影
                     Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
                     Game.getScreen().beginPath();
                     Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
                     Game.getScreen().fill();
+                    // モンスター
                     const camera = map.camera;
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
@@ -3228,10 +3201,13 @@ var Scene;
                     {
                         const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
                         const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
-                        Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY, sprite.width, sprite.height);
+                        // キャラクター
+                        Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY, sprite.width, sprite.height);
                     }
                 }
                 if (l === 1) {
+                    // インフォメーションの描画
+                    // モンスター体力
                     const camera = map.camera;
                     monsters.forEach((monster) => {
                         const xx = monster.x - camera.chipLeft;
@@ -3259,17 +3235,23 @@ var Scene;
                     {
                         const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
                         const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+                        // キャラクター体力
                         Game.getScreen().fillStyle = 'rgb(255,0,0)';
-                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY + sprite.height - 1, map.gridsize.width, 1);
+                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY + sprite.height - 1, map.gridsize.width, 1);
                         Game.getScreen().fillStyle = 'rgb(0,255,0)';
-                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + sprite.offsetY + animFrame.offsetY + sprite.height - 1, ~~(map.gridsize.width * player.hp / player.hpMax), 1);
+                        Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY + sprite.height - 1, ~~(map.gridsize.width * player.hp / player.hpMax), 1);
                     }
                 }
             });
+            // スプライト
             sprites.forEach((x) => x.draw(map.camera));
             draw7pxFont(`${floor}F | HP:${player.hp}/${player.hpMax} | MP:${player.mp}/${player.mpMax} | GOLD:${player.gold}`, 0, 0);
+            // UI
+            dispatcher.draw();
+            // フェード
             fade.draw();
             Game.getScreen().restore();
+            // バーチャルジョイスティックの描画
             if (pad.isTouching) {
                 Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
                 Game.getScreen().beginPath();
@@ -3290,6 +3272,7 @@ var Scene;
             end: () => { this.next(); },
         });
         onPointerHook();
+        // ターンの状態（フェーズ）
         const turnStateStack = [[TurnState.WaitInput, null]];
         let playerTactics = {};
         const monstersTactics = [];
@@ -3298,20 +3281,26 @@ var Scene;
                 switch (turnStateStack[0][0]) {
                     case TurnState.WaitInput:
                         {
+                            // キー入力待ち
                             if (pad.isTouching === false || pad.distance <= 0.4) {
                                 player.setAnimation("move", 0);
                                 break stateloop;
                             }
+                            // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
                             const playerMoveDir = pad.dir8;
+                            // 「行動(Action)」と「移動(Move)」の識別を行う
+                            // 移動先が侵入不可能の場合は待機とする
                             const { x, y } = Array2D.DIR8[playerMoveDir];
                             if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 &&
                                 map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
                                 player.setDir(playerMoveDir);
                                 break stateloop;
                             }
+                            // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
                             const targetMonster = monsters.findIndex((monster) => (monster.x === player.x + x) &&
                                 (monster.y === player.y + y));
                             if (targetMonster !== -1) {
+                                // 移動先に敵がいる＝「行動(Action)」
                                 playerTactics = {
                                     type: "action",
                                     moveDir: playerMoveDir,
@@ -3319,29 +3308,35 @@ var Scene;
                                     startTime: ms,
                                     actionTime: 250,
                                 };
+                                // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
                                 turnStateStack.unshift([TurnState.PlayerAction, null], [TurnState.EnemyAI, null], [TurnState.EnemyAction, 0], [TurnState.Move, null], [TurnState.TurnEnd, null]);
                                 continue stateloop;
                             }
                             else {
+                                // 移動先に敵はいない＝「移動(Move)」
                                 playerTactics = {
                                     type: "move",
                                     moveDir: playerMoveDir,
                                     startTime: ms,
                                     actionTime: 250,
                                 };
+                                // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
                                 turnStateStack.unshift([TurnState.EnemyAI, null], [TurnState.Move, null], [TurnState.EnemyAction, 0], [TurnState.TurnEnd, null]);
                                 continue stateloop;
                             }
                         }
                     case TurnState.PlayerAction:
                         {
+                            // プレイヤーの行動開始
                             turnStateStack[0][0] = TurnState.PlayerActionRunning;
                             turnStateStack[0][1] = 0;
                             player.setDir(playerTactics.moveDir);
                             player.setAnimation("action", 0);
+                            // fallthrough
                         }
                     case TurnState.PlayerActionRunning:
                         {
+                            // プレイヤーの行動中
                             const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
                             player.setAnimation("action", rate);
                             if (rate > 0.5 && turnStateStack[0][1] === 0) {
@@ -3363,12 +3358,16 @@ var Scene;
                                     targetMonster.life -= dmg;
                                     if (targetMonster.life <= 0) {
                                         targetMonster.life = 0;
+                                        // 敵を死亡状態にする
+                                        // explosion
                                         Game.getSound().reqPlayChannel("explosion");
+                                        // 死亡処理を割り込みで行わせる
                                         turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
                                     }
                                 }
                             }
                             if (rate >= 1) {
+                                // プレイヤーの行動終了
                                 turnStateStack.shift();
                                 player.setAnimation("move", 0);
                             }
@@ -3376,6 +3375,8 @@ var Scene;
                         }
                     case TurnState.EnemyAI:
                         {
+                            // 敵の行動の決定
+                            // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
                             let px = player.x;
                             let py = player.y;
                             if (playerTactics.type === "move") {
@@ -3386,8 +3387,11 @@ var Scene;
                             const cannotMoveMap = new Array2D(map.width, map.height, 0);
                             monstersTactics.length = monsters.length;
                             monstersTactics.fill(null);
+                            // 行動(Action)と移動(Move)は分離しないと移動で敵が重なる
+                            // 行動(Action)する敵を決定
                             monsters.forEach((monster, i) => {
                                 if (monster.life <= 0) {
+                                    // 死亡状態なので何もしない
                                     monstersTactics[i] = {
                                         type: "dead",
                                         moveDir: 5,
@@ -3399,7 +3403,9 @@ var Scene;
                                 const dx = px - monster.x;
                                 const dy = py - monster.y;
                                 if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                                    // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
                                     const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
+                                    // 敵全体の移動不能座標に自分を設定
                                     cannotMoveMap.value(monster.x, monster.y, 1);
                                     monstersTactics[i] = {
                                         type: "action",
@@ -3410,9 +3416,11 @@ var Scene;
                                     return;
                                 }
                                 else {
-                                    return;
+                                    return; // skip
                                 }
                             });
+                            // 移動(Move)する敵の移動先を決定する
+                            // 最良の移動先に移動前のキャラクターが存在することを考慮して移動処理が発生しなくなるまで計算を繰り返す。
                             let changed = true;
                             while (changed) {
                                 changed = false;
@@ -3426,6 +3434,9 @@ var Scene;
                                         return;
                                     }
                                     else if (monstersTactics[i] == null) {
+                                        // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
+                                        // とりあえず軸合わせ戦略で動く
+                                        // 移動先の候補表から最良の移動先を選ぶ
                                         const cands = [
                                             [Math.sign(dx), Math.sign(dy)],
                                             (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
@@ -3439,6 +3450,7 @@ var Scene;
                                                 (map.layer[0].chips.value(tx, ty) === 1 ||
                                                     map.layer[0].chips.value(tx, ty) === 10)) {
                                                 const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
+                                                // 敵全体の移動不能座標に自分を設定
                                                 cannotMoveMap.value(tx, ty, 1);
                                                 monstersTactics[i] = {
                                                     type: "move",
@@ -3450,6 +3462,8 @@ var Scene;
                                                 return;
                                             }
                                         }
+                                        // 移動先が全部移動不能だったので待機を選択
+                                        // 敵全体の移動不能座標に自分を設定
                                         cannotMoveMap.value(monster.x, monster.y, 1);
                                         monstersTactics[i] = {
                                             type: "idle",
@@ -3462,11 +3476,13 @@ var Scene;
                                     }
                                 });
                             }
+                            // 敵の行動の決定の終了
                             turnStateStack.shift();
                             continue stateloop;
                         }
                     case TurnState.EnemyAction:
                         {
+                            // 敵の行動開始
                             let enemyId = turnStateStack[0][1];
                             while (enemyId < monstersTactics.length) {
                                 if (monstersTactics[enemyId].type !== "action") {
@@ -3476,6 +3492,7 @@ var Scene;
                                     break;
                                 }
                             }
+                            // 移動と違い、行動の場合は１キャラづつ行動を行う。
                             if (enemyId < monstersTactics.length) {
                                 monstersTactics[enemyId].startTime = ms;
                                 monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
@@ -3486,12 +3503,14 @@ var Scene;
                                 continue stateloop;
                             }
                             else {
+                                // もう動かす敵がいない
                                 turnStateStack.shift();
                                 continue stateloop;
                             }
                         }
                     case TurnState.EnemyActionRunning:
                         {
+                            // 敵の行動中
                             const enemyId = turnStateStack[0][1];
                             const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
                             monsters[enemyId].setAnimation("action", rate);
@@ -3514,8 +3533,10 @@ var Scene;
                             }
                             if (rate >= 1) {
                                 if (player.hp == 0) {
+                                    // ターン強制終了
                                     return;
                                 }
+                                // 行動終了。次の敵へ
                                 monsters[enemyId].setAnimation("move", 0);
                                 turnStateStack[0][0] = TurnState.EnemyAction;
                                 turnStateStack[0][1] = enemyId + 1;
@@ -3524,14 +3545,17 @@ var Scene;
                         }
                     case TurnState.EnemyDead:
                         {
+                            // 敵の死亡開始
                             turnStateStack[0][0] = TurnState.EnemyDeadRunning;
                             const enemyId = turnStateStack[0][1];
                             turnStateStack[0][2] = ms;
                             Game.getSound().reqPlayChannel("explosion");
                             monsters[enemyId].setAnimation("dead", 0);
+                            // fall through;
                         }
                     case TurnState.EnemyDeadRunning:
                         {
+                            // 敵の死亡
                             turnStateStack[0][0] = TurnState.EnemyDeadRunning;
                             const enemyId = turnStateStack[0][1];
                             const diff = ms - turnStateStack[0][2];
@@ -3543,6 +3567,7 @@ var Scene;
                         }
                     case TurnState.Move:
                         {
+                            // 移動開始
                             turnStateStack[0][0] = TurnState.MoveRunning;
                             monstersTactics.forEach((monsterTactic, i) => {
                                 if (monsterTactic.type === "move") {
@@ -3556,9 +3581,11 @@ var Scene;
                                 player.setAnimation("move", 0);
                                 playerTactics.startTime = ms;
                             }
+                            // fallthrough
                         }
                     case TurnState.MoveRunning:
                         {
+                            // 移動実行
                             let finish = true;
                             monstersTactics.forEach((monsterTactic, i) => {
                                 if (monsterTactic == null) {
@@ -3569,7 +3596,7 @@ var Scene;
                                     monsters[i].setDir(monsterTactic.moveDir);
                                     monsters[i].setAnimation("move", rate);
                                     if (rate < 1) {
-                                        finish = false;
+                                        finish = false; // 行動終了していないフラグをセット
                                     }
                                 }
                             });
@@ -3578,10 +3605,11 @@ var Scene;
                                 player.setDir(playerTactics.moveDir);
                                 player.setAnimation("move", rate);
                                 if (rate < 1) {
-                                    finish = false;
+                                    finish = false; // 行動終了していないフラグをセット
                                 }
                             }
                             if (finish) {
+                                // 行動終了
                                 turnStateStack.shift();
                                 monstersTactics.forEach((monsterTactic, i) => {
                                     if (monsterTactic.type === "move") {
@@ -3599,8 +3627,10 @@ var Scene;
                                     player.offy = 0;
                                     player.setAnimation("move", 0);
                                 }
+                                // 現在位置のマップチップを取得
                                 const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
                                 if (chip === 10) {
+                                    // 階段なので次の階層に移動させる。
                                     this.next("nextfloor");
                                 }
                             }
@@ -3608,6 +3638,7 @@ var Scene;
                         }
                     case TurnState.TurnEnd:
                         {
+                            // ターン終了
                             turnStateStack.shift();
                             monsters = monsters.filter(x => x.life > 0);
                             break stateloop;
@@ -3615,6 +3646,7 @@ var Scene;
                 }
                 break;
             }
+            // カメラを更新
             map.update({
                 viewpoint: {
                     x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
@@ -3623,19 +3655,32 @@ var Scene;
                 viewwidth: Game.getScreen().offscreenWidth,
                 viewheight: Game.getScreen().offscreenHeight,
             });
+            // スプライトを更新
             sprites = sprites.filter((x) => {
                 return !x.update(delta, ms);
             });
             updateLighting((v) => v === 1 || v === 10);
             if (player.hp === 0) {
+                // ターン強制終了
                 Game.getSceneManager().pop();
                 Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
                 return;
             }
-            if (Game.getInput().isClick() &&
-                Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
-                Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
+            // ui 
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
             }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            //if (Game.getInput().isClick() &&
+            //    Game.getScreen().pagePointContainScreen(Game.getInput().pageX, Game.getInput().pageY)) {
+            //    //Game.getSceneManager().push(mapview, { map: map, player: player });
+            //    Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
+            //}
         };
         Game.getSound().reqPlayChannel("kaidan");
         yield Scene.waitTimeout({
@@ -3665,6 +3710,7 @@ var Scene;
             opt.upperdraw();
             Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
             Game.getScreen().fillRect(20, 20, Game.getScreen().offscreenWidth - 40, Game.getScreen().offscreenHeight - 40);
+            // 閉じるボタン
             Game.getScreen().save();
             Game.getScreen().beginPath();
             Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
@@ -3679,6 +3725,7 @@ var Scene;
             Game.getScreen().lineWidth = 3;
             Game.getScreen().stroke();
             Game.getScreen().restore();
+            // ステータス（ダミー）
             Game.getScreen().fillStyle = 'rgb(0,0,0)';
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
             Game.getScreen().fillText(`HP:${opt.player.hp}/${opt.player.hpMax}`, 30, 30 + 11 * 3);
@@ -3833,6 +3880,7 @@ var Scene;
             Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             const offx = ~~((Game.getScreen().offscreenWidth - data.map.width * 5) / 2);
             const offy = ~~((Game.getScreen().offscreenHeight - data.map.height * 5) / 2);
+            // ミニマップを描画
             for (let y = 0; y < data.map.height; y++) {
                 for (let x = 0; x < data.map.width; x++) {
                     const chip = data.map.layer[0].chips.value(x, y);
@@ -3867,9 +3915,236 @@ var Scene;
     }
     Scene.mapview = mapview;
 })(Scene || (Scene = {}));
+/// <reference path="../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    function* shopBuyItem(opt) {
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
+            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
+            text: `所持金：${('            ' + 150 + 'G').substr(-13)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(captionMonay);
+        const btnExit = new Game.GUI.Button(8, 16 * 9 + 46, 112, 16, {
+            text: "戻る",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnExit);
+        let exitScene = false;
+        btnExit.click = (x, y) => {
+            exitScene = true;
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const itemlist = [
+            "みかん",
+            "りんご",
+            "バナナ",
+            "オレンジ",
+            "パイナップル",
+            "ぼんたん",
+            "キウイ",
+            "パパイヤ",
+            "マンゴー",
+            "ココナッツ",
+            "ぶどう",
+            "なし",
+            "あけび",
+            "ドラゴンフルーツ",
+        ];
+        let selectedItem = -1;
+        const listBox = new Game.GUI.ListBox(8, 46, 112, 8 * 16, {
+            lineHeight: 16,
+            getItemCount: () => itemlist.length,
+            drawItem: (left, top, width, height, index) => {
+                if (selectedItem == index) {
+                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                }
+                else {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                }
+                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                const metrics = Game.getScreen().measureText(itemlist[index]);
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(itemlist[index], left + 9, top + 3);
+            }
+        });
+        dispatcher.add(listBox);
+        listBox.click = (x, y) => {
+            selectedItem = listBox.getItemIndexByPosition(x, y);
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            dispatcher.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (exitScene) {
+                this.next();
+            }
+        };
+        Game.getSceneManager().pop();
+    }
+    function* shop(opt) {
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox(1, 1, 250, 42, {
+            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        const btnBuy = new Game.GUI.Button(8, 20 * 0 + 46, 112, 16, {
+            text: "アイテム購入",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnBuy);
+        btnBuy.click = (x, y) => {
+            Game.getSceneManager().push(shopBuyItem, opt);
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnSell = new Game.GUI.Button(8, 20 * 1 + 46, 112, 16, {
+            text: "アイテム売却",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnSell);
+        btnSell.click = (x, y) => {
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const captionMonay = new Game.GUI.Button(135, 46, 108, 16, {
+            text: `所持金：${('            ' + 150 + 'G').substr(-13)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(captionMonay);
+        const hoverSlider = new Game.GUI.HorizontalSlider(135 + 14, 80, 108 - 28, 16, {
+            sliderWidth: 5,
+            updownButtonWidth: 10,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            minValue: 0,
+            maxValue: 100,
+        });
+        dispatcher.add(hoverSlider);
+        const btnSliderDown = new Game.GUI.Button(135, 80, 14, 16, {
+            text: "－",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnSliderDown);
+        btnSliderDown.click = (x, y) => {
+            hoverSlider.value -= 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnSliderUp = new Game.GUI.Button(243 - 14, 80, 14, 16, {
+            text: "＋",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(btnSliderUp);
+        btnSliderUp.click = (x, y) => {
+            hoverSlider.value += 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const captionBuyCount = new Game.GUI.Button(135, 64, 108, 16, {
+            text: () => `購入数：${('           ' + hoverSlider.value + '個').substr(-12)}`,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(captionBuyCount);
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            dispatcher.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+        };
+        Game.getSceneManager().pop();
+        Game.getSceneManager().push(Scene.title);
+    }
+    Scene.shop = shop;
+})(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
     function* title() {
+        // setup
         let showClickOrTap = false;
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         this.draw = () => {
@@ -4045,7 +4320,7 @@ function createShowDamageSprite(start, damage, getpos) {
                 if (rad < 0) {
                     continue;
                 }
-                const dy = Math.sin(rad * Math.PI / 200) * -7;
+                const dy = Math.sin(rad * Math.PI / 200) * -7; // 7 = 跳ね上がる高さ
                 if (0 <= xx + (i + 1) * fontWidth && xx + (i + 0) * fontWidth < Game.getScreen().offscreenWidth &&
                     0 <= yy + (1 * fontHeight) && yy + (0 * fontHeight) < Game.getScreen().offscreenHeight) {
                     const [fx, fy] = charDic[damage[i]];
@@ -4055,6 +4330,7 @@ function createShowDamageSprite(start, damage, getpos) {
         },
     };
 }
+// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 window.onload = () => {
     Game.create({
         title: "TSJQ",
@@ -4079,3 +4355,4 @@ window.onload = () => {
         Game.getTimer().start();
     });
 };
+//# sourceMappingURL=tsjq.js.map
