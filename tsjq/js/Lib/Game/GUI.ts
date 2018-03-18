@@ -193,6 +193,10 @@ namespace Game.GUI {
     }
 
     export class TextBox implements UI {
+        public left: number;
+        public top: number;
+        public width: number;
+        public height: number;
         public text: string;
         public edgeColor: string;
         public color: string;
@@ -200,8 +204,12 @@ namespace Game.GUI {
         public fontColor: string;
         public textAlign: string;
         public textBaseline: string;
-        constructor(public left: number, public top: number, public width: number, public height: number,
+        constructor(
             {
+                left = 0,
+                top = 0,
+                width = 0,
+                height = 0,
                 text = "",
                 edgeColor = `rgb(128,128,128)`,
                 color = `rgb(255,255,255)`,
@@ -210,14 +218,22 @@ namespace Game.GUI {
                 textAlign = "left",
                 textBaseline = "top",
             }: {
-                    text?: string;
-                    edgeColor?: string;
-                    color?: string;
-                    font?: string;
-                    fontColor?: string;
-                    textAlign?: string;
-                    textBaseline?: string;
+                left: number;
+                top: number;
+                width: number;
+                height: number;
+                text?: string;
+                edgeColor?: string;
+                color?: string;
+                font?: string;
+                fontColor?: string;
+                textAlign?: string;
+                textBaseline?: string;
                 }) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
             this.text = text;
             this.edgeColor = edgeColor;
             this.color = color;
@@ -254,6 +270,26 @@ namespace Game.GUI {
     }
 
     export class Button implements UI, ClickableUI {
+        public static defaultValue: {
+            edgeColor: string;
+            color: string;
+            font: string;
+            fontColor: string;
+            textAlign: string;
+            textBaseline: string;
+        } = {
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        };
+
+        public left: number;
+        public top: number;
+        public width: number;
+        public height: number;
         public text: string | (() => string);
         public edgeColor: string;
         public color: string;
@@ -263,16 +299,24 @@ namespace Game.GUI {
         public textBaseline: string;
         public click : (x:number,y:number) => void;
 
-        constructor(public left: number, public top: number, public width: number, public height: number,
+        constructor(
             {
-                text = "button",
-                edgeColor = `rgb(128,128,128)`,
-                color = `rgb(255,255,255)`,
-                font = undefined,
-                fontColor = `rgb(0,0,0)`,
-                textAlign = "left",
-                textBaseline = "top",
+                left = 0,
+                top = 0,
+                width = 0,
+                height = 0,
+                 text = "",
+                 edgeColor = Button.defaultValue.edgeColor,
+                 color = Button.defaultValue.color,
+                 font = Button.defaultValue.font,
+                 fontColor = Button.defaultValue.fontColor,
+                 textAlign = Button.defaultValue.textAlign,
+                 textBaseline = Button.defaultValue.textBaseline,
             }: {
+                    left: number;
+                    top: number;
+                    width: number;
+                    height: number;
                     text?: string | (() => string);
                     edgeColor?: string;
                     color?: string;
@@ -281,6 +325,10 @@ namespace Game.GUI {
                     textAlign?: string;
                     textBaseline?: string;
                 }) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
             this.text = text;
             this.edgeColor = edgeColor;
             this.color = color;
@@ -298,12 +346,14 @@ namespace Game.GUI {
             Game.getScreen().strokeRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
             Game.getScreen().font = this.font;
             Game.getScreen().fillStyle = this.fontColor;
-            const text = (this.text instanceof Function) ? (this.text as Function).call(this) : this.text
+            const text = (this.text instanceof Function) ? (this.text as (() => string)).call(this) : this.text
             const metrics = Game.getScreen().measureText(text);
+            const height  = Game.getScreen().measureText("あ").width;
+            const lines = text.split(/\n/);
             Game.getScreen().textAlign = this.textAlign;
             Game.getScreen().textBaseline = this.textBaseline;
-            text.split(/\n/).forEach((x: string, i: number) => {
-                Game.getScreen().fillText(x, this.left + 2, this.top + i * (10 + 1) + 2);
+            lines.forEach((x: string, i: number) => {
+                Game.getScreen().fillText(x, this.left + 1, this.top + i * (height + 1) + 1);
             });
         }
         regist(dispatcher : UIDispatcher) {
@@ -313,24 +363,105 @@ namespace Game.GUI {
         }
         unregist(dispatcher : UIDispatcher) {}
     }
+    export class ImageButton implements UI, ClickableUI {
+        public left: number;
+        public top: number;
+        public width: number;
+        public height: number;
+        public texture: string;
+        public texLeft: number;
+        public texTop: number;
+        public texWidth: number;
+        public texHeight: number;
+        public click : (x:number,y:number) => void;
 
+        constructor(
+            {
+                left = 0,
+                top = 0,
+                width = 0,
+                height = 0,
+                texture = "",
+                texLeft = 0,
+                texTop = 0,
+                texWidth = width,
+                texHeight = height,
+            }: {
+                    left: number;
+                    top: number;
+                    width: number;
+                    height: number;
+                    texture: string;
+                    texLeft: number;
+                    texTop: number;
+                    texWidth: number;
+                    texHeight: number;
+                }) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
+            this.texture = texture;
+            this.texLeft = texLeft;
+            this.texTop = texTop;
+            this.texWidth = texWidth;
+            this.texHeight = texHeight;
+            this.click = () => {};
+        }
+        draw() {
+            Game.getScreen().drawImage(
+                Game.getScreen().texture(this.texture),
+                this.texLeft,
+                this.texTop,
+                this.texWidth,
+                this.texHeight,
+                this.left,
+                this.top,
+                this.width,
+                this.height
+            );
+
+        }
+        regist(dispatcher : UIDispatcher) {
+            const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
+            this.unregist = (d) => cancelHandler();
+
+        }
+        unregist(dispatcher : UIDispatcher) {}
+    }
     export class ListBox implements UI, ClickableUI {
+        public left: number;
+        public top: number;
+        public width: number;
+        public height: number;
         public lineHeight: number;
         public scrollValue: number;
         public click: (x: number, y: number) => void;
 
         public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
         public getItemCount: () => number;
-        constructor(public left: number, public top: number, public width: number, public height: number,
+        constructor(
             {
+                left = 0,
+                top = 0,
+                width = 0,
+                height = 0,
                 lineHeight = 12,
                 drawItem = () => { },
                 getItemCount = () => 0,
             }: {
-                    lineHeight?: number
-                    drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
-                    getItemCount?: () => number,
-                }) {
+                left: number;
+                top: number;
+                width: number;
+                height: number;
+                lineHeight?: number
+                drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
+                getItemCount?: () => number,
+            }) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
             this.lineHeight = lineHeight;
             this.drawItem = drawItem;
             this.getItemCount = getItemCount;
@@ -393,6 +524,10 @@ namespace Game.GUI {
     }
 
     export class HorizontalSlider implements UI {
+        public left: number;
+        public top: number;
+        public width: number;
+        public height: number;
         public sliderWidth: number;
         public edgeColor: string;
         public color: string;
@@ -404,8 +539,12 @@ namespace Game.GUI {
         public minValue: number;
         public maxValue: number;
 
-        constructor(public left: number, public top: number, public width: number, public height: number,
+        constructor(
             {
+                left = 0,
+                top = 0,
+                width = 0,
+                height = 0,
                 sliderWidth = 5,
                 edgeColor = `rgb(128,128,128)`,
                 color = `rgb(255,255,255)`,
@@ -414,8 +553,11 @@ namespace Game.GUI {
                 fontColor = `rgb(0,0,0)`,
                 minValue = 0,
                 maxValue = 0,
-
             }: {
+                left: number;
+                top: number;
+                width: number;
+                height: number;
                 sliderWidth?: number;
                 updownButtonWidth?: number;
                 edgeColor?: string;
@@ -426,6 +568,10 @@ namespace Game.GUI {
                     minValue?: number;
                     maxValue?: number;
                 }) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
             this.sliderWidth = sliderWidth;
             this.edgeColor = edgeColor;
             this.color = color;

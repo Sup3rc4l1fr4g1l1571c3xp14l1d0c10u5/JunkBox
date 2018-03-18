@@ -34,8 +34,8 @@ namespace Scene {
                 mapchipsL1.value(x,
                     y - 1,
                     mapchipsL1.value(x, y) === 1 && mapchipsL1.value(x, y - 1) === 0
-                    ? 2
-                    : mapchipsL1.value(x, y - 1),
+                        ? 2
+                        : mapchipsL1.value(x, y - 1)
                 );
             }
         }
@@ -61,16 +61,14 @@ namespace Scene {
 
         // モンスター配置
         let monsters = rooms.splice(2).map((x) => {
-            return new Charactor.Monster({
-                charactorId: Charactor.Monster.monsterConfigs.get("slime").id,
-                x: x.getLeft(),
-                y: x.getTop(),
-                life: floor + 5,
-                maxLife: floor + 5,
-                atk: ~~(floor*2),
-                def: ~~(floor / 3) + 1
+            var monster = new Charactor.Monster("slime");
+                monster.x = x.getLeft();
+                monster.y = x.getTop();
+                monster.life = monster.maxLife = floor + 5;
+                monster.atk = ~~(floor * 2);
+                monster.def = ~~(floor / 3) + 1;
+                return monster;
             });
-        });
 
         const map: Dungeon.DungeonData = new Dungeon.DungeonData({
             width: mapChipW,
@@ -173,20 +171,86 @@ namespace Scene {
 
         let sprites: ISprite[] = [];
 
-        const dispatcher : Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
-        const btnMap = new Game.GUI.Button(0, 0, 14, 14, {
-            text: "Ｍ",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(btnMap);
+        const dispatcher: Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
 
-        btnMap.click = (x: number, y: number) => {
+        const mapButton = new Game.GUI.ImageButton({
+            left: 141 + 22 * 0,
+            top: 0,
+            width: 23,
+            height: 19,
+            texture: "menuicon",
+            texLeft: 23 * 0,
+            texTop: 0,
+            texWidth: 23,
+            texHeight: 19
+        });
+        dispatcher.add(mapButton);
+        mapButton.click = (x: number, y: number) => {
             Game.getSceneManager().push(mapview, { map: map, player: player });
+        };
+
+        const itemButton = new Game.GUI.ImageButton({
+            left: 141 + 22 * 1,
+            top: 0,
+            width: 23,
+            height: 19,
+            texture: "menuicon",
+            texLeft: 23 * 1,
+            texTop: 0,
+            texWidth: 23,
+            texHeight: 19
+        });
+        dispatcher.add(itemButton);
+        itemButton.click = (x: number, y: number) => {
+            //Game.getSceneManager().push(mapview, { map: map, player: player });
+        };
+
+        const equipButton = new Game.GUI.ImageButton({
+            left: 141 + 22 * 2,
+            top: 0,
+            width: 23,
+            height: 19,
+            texture: "menuicon",
+            texLeft: 23 * 2,
+            texTop: 0,
+            texWidth: 23,
+            texHeight: 19
+        });
+        dispatcher.add(equipButton);
+        equipButton.click = (x: number, y: number) => {
+            //Game.getSceneManager().push(mapview, { map: map, player: player });
+        };
+
+        const statusButton = new Game.GUI.ImageButton({
+            left: 141 + 22 * 3,
+            top: 0,
+            width: 23,
+            height: 19,
+            texture: "menuicon",
+            texLeft: 23 * 3,
+            texTop: 0,
+            texWidth: 23,
+            texHeight: 19
+        });
+        dispatcher.add(statusButton);
+        statusButton.click = (x: number, y: number) => {
+            Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
+        };
+
+        const otherButton = new Game.GUI.ImageButton({
+            left: 141 + 22 * 4,
+            top: 0,
+            width: 23,
+            height: 19,
+            texture: "menuicon",
+            texLeft: 23 * 4,
+            texTop: 0,
+            texWidth: 23,
+            texHeight: 19
+        });
+        dispatcher.add(otherButton);
+        otherButton.click = (x: number, y: number) => {
+            //Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
         };
 
         this.draw = () => {
@@ -208,7 +272,7 @@ namespace Scene {
                         3,
                         0,
                         0,
-                        Math.PI * 2,
+                        Math.PI * 2
                     );
                     Game.getScreen().fill();
 
@@ -322,7 +386,7 @@ namespace Scene {
                         Game.getScreen().fillRect(
                             cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
                             cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
-                            ~~(map.gridsize.width * player.hp / player.hpMax),
+                            ~~(map.gridsize.width * player.getForward().hp / player.getForward().hpMax),
                             1
                         );
                     }
@@ -332,10 +396,11 @@ namespace Scene {
             // スプライト
             sprites.forEach((x) => x.draw(map.camera));
 
-            draw7pxFont(
-                `${floor}F | HP:${player.hp}/${player.hpMax} | MP:${player.mp}/${player.mpMax} | GOLD:${player.gold}`,
-                0,
-                0);
+            // 情報
+            draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
+            draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
+            draw7pxFont(`     | GOLD:${GameData.Money}`, 0, 6 * 2);
+            //menuicon
 
             // UI
             dispatcher.draw();
@@ -355,7 +420,7 @@ namespace Scene {
                     pad.radius * 1.2,
                     0,
                     0,
-                    Math.PI * 2,
+                    Math.PI * 2
                 );
                 Game.getScreen().fill();
                 Game.getScreen().beginPath();
@@ -366,7 +431,7 @@ namespace Scene {
                     pad.radius,
                     0,
                     0,
-                    Math.PI * 2,
+                    Math.PI * 2
                 );
                 Game.getScreen().fill();
             }
@@ -386,443 +451,54 @@ namespace Scene {
         onPointerHook();
 
         // ターンの状態（フェーズ）
-        const turnStateStack: Array<[TurnState, any]> = [[TurnState.WaitInput, null]];
+        const turnContext: TurnContext = {
+            ms: 0,
+            pad: pad,
+            player: player,
+            monsters: monsters,
+            map: map,
+            tactics: {
+                player: {},
+                monsters: []
+            },
+            sprites: sprites,
+            scene: this,
+        };
+
+        const turnStateStack: IterableIterator<any>[] = [];
+        turnStateStack.unshift(WaitInput(turnStateStack, turnContext));
 
         let playerTactics: any = {};
         const monstersTactics: any[] = [];
         yield (delta: number, ms: number) => {
-            stateloop: for (;;) {
-                switch (turnStateStack[0][0]) {
-                    case TurnState.WaitInput:
-                    {
-                        // キー入力待ち
-                        if (pad.isTouching === false || pad.distance <= 0.4) {
-                            player.setAnimation("move", 0);
-                            break stateloop;
-                        }
-
-                        // キー入力されたのでプレイヤーの移動方向(5)は移動しない。
-
-                        const playerMoveDir = pad.dir8;
-
-                        // 「行動(Action)」と「移動(Move)」の識別を行う
-
-                        // 移動先が侵入不可能の場合は待機とする
-                        const { x, y } = Array2D.DIR8[playerMoveDir];
-                        if (map.layer[0].chips.value(player.x + x, player.y + y) !== 1 &&
-                            map.layer[0].chips.value(player.x + x, player.y + y) !== 10) {
-                            player.setDir(playerMoveDir);
-                            break stateloop;
-                        }
-
-                        // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
-                        const targetMonster =
-                            monsters.findIndex((monster) => (monster.x === player.x + x) &&
-                                (monster.y === player.y + y));
-                        if (targetMonster !== -1) {
-                            // 移動先に敵がいる＝「行動(Action)」
-
-                            playerTactics = {
-                                type: "action",
-                                moveDir: playerMoveDir,
-                                targetMonster: targetMonster,
-                                startTime: ms,
-                                actionTime: 250,
-                            };
-
-                            // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
-                            turnStateStack.unshift(
-                                [TurnState.PlayerAction, null],
-                                [TurnState.EnemyAI, null],
-                                [TurnState.EnemyAction, 0],
-                                [TurnState.Move, null],
-                                [TurnState.TurnEnd, null],
-                            );
-                            continue stateloop;
-                        } else {
-                            // 移動先に敵はいない＝「移動(Move)」
-
-                            playerTactics = {
-                                type: "move",
-                                moveDir: playerMoveDir,
-                                startTime: ms,
-                                actionTime: 250,
-                            };
-
-                            // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
-                            turnStateStack.unshift(
-                                [TurnState.EnemyAI, null],
-                                [TurnState.Move, null],
-                                [TurnState.EnemyAction, 0],
-                                [TurnState.TurnEnd, null],
-                            );
-                            continue stateloop;
-                        }
-
-                    }
-
-                    case TurnState.PlayerAction:
-                    {
-                        // プレイヤーの行動開始
-                        turnStateStack[0][0] = TurnState.PlayerActionRunning;
-                        turnStateStack[0][1] = 0;
-                        player.setDir(playerTactics.moveDir);
-                        player.setAnimation("action", 0);
-                        // fallthrough
-                    }
-                    case TurnState.PlayerActionRunning:
-                    {
-                        // プレイヤーの行動中
-                        const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                        player.setAnimation("action", rate);
-                        if (rate > 0.5 && turnStateStack[0][1] === 0) {
-                            const targetMonster: Charactor.Monster = monsters[playerTactics.targetMonster];
-                            turnStateStack[0][1] = 1;
-                            Game.getSound().reqPlayChannel("atack");
-                            const dmg = ~~(player.atk - targetMonster.def);
-
-                            sprites.push(createShowDamageSprite(
-                                ms,
-                                dmg > 0 ? ("" + dmg) : "MISS!!",
-                                () => {
-                                    return {
-                                        x: targetMonster.offx +
-                                            targetMonster.x * map.gridsize.width +
-                                            map.gridsize.width / 2,
-                                        y: targetMonster.offy +
-                                            targetMonster.y * map.gridsize.height +
-                                            map.gridsize.height / 2
-                                    };
-                                }
-                            ));
-                            if (targetMonster.life > 0 && dmg > 0) {
-                                targetMonster.life -= dmg;
-                                if (targetMonster.life <= 0) {
-                                    targetMonster.life = 0;
-                                    // 敵を死亡状態にする
-                                    // explosion
-                                    Game.getSound().reqPlayChannel("explosion");
-                                    // 死亡処理を割り込みで行わせる
-                                    turnStateStack.splice(1, 0, [TurnState.EnemyDead, playerTactics.targetMonster, 0]);
-                                }
-                            }
-                        }
-                        if (rate >= 1) {
-                            // プレイヤーの行動終了
-                            turnStateStack.shift();
-                            player.setAnimation("move", 0);
-                        }
-                        break stateloop;
-                    }
-                    case TurnState.EnemyAI:
-                    {
-                        // 敵の行動の決定
-
-                        // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
-                        let px = player.x;
-                        let py = player.y;
-                        if (playerTactics.type === "move") {
-                            const off = Array2D.DIR8[playerTactics.moveDir];
-                            px += off.x;
-                            py += off.y;
-                        }
-
-                        const cannotMoveMap = new Array2D(map.width, map.height, 0);
-                        monstersTactics.length = monsters.length;
-                        monstersTactics.fill(null);
-
-                        // 行動(Action)と移動(Move)は分離しないと移動で敵が重なる
-
-                        // 行動(Action)する敵を決定
-                        monsters.forEach((monster, i) => {
-                            if (monster.life <= 0) {
-                                // 死亡状態なので何もしない
-                                monstersTactics[i] = {
-                                    type: "dead",
-                                    moveDir: 5,
-                                    startTime: 0,
-                                    actionTime: 250,
-                                };
-                                return;
-                            }
-                            const dx = px - monster.x;
-                            const dy = py - monster.y;
-                            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
-                                const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
-                                // 敵全体の移動不能座標に自分を設定
-                                cannotMoveMap.value(monster.x, monster.y, 1);
-                                monstersTactics[i] = {
-                                    type: "action",
-                                    moveDir: dir,
-                                    startTime: 0,
-                                    actionTime: 250,
-                                };
-                                return;
-                            } else {
-                                return; // skip
-                            }
-                        });
-
-                        // 移動(Move)する敵の移動先を決定する
-                        // 最良の移動先に移動前のキャラクターが存在することを考慮して移動処理が発生しなくなるまで計算を繰り返す。
-                        let changed = true;
-                        while (changed) {
-                            changed = false;
-                            monsters.forEach((monster, i) => {
-                                const dx = px - monster.x;
-                                const dy = py - monster.y;
-                                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-                                    if (monstersTactics[i] == null) {
-                                        console.error("Actionすべき敵の動作が決定していない");
-                                    }
-                                    return;
-                                } else if (monstersTactics[i] == null) {
-                                    // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
-                                    // とりあえず軸合わせ戦略で動く
-
-                                    // 移動先の候補表から最良の移動先を選ぶ
-                                    const cands = [
-                                        [Math.sign(dx), Math.sign(dy)],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
-                                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
-                                    ];
-
-                                    for (let j = 0; j < 3; j++) {
-                                        const [cx, cy] = cands[j];
-                                        const tx = monster.x + cx;
-                                        const ty = monster.y + cy;
-                                        if ((cannotMoveMap.value(tx, ty) === 0) &&
-                                        (map.layer[0].chips.value(tx, ty) === 1 ||
-                                            map.layer[0].chips.value(tx, ty) === 10)) {
-                                            const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
-                                            // 敵全体の移動不能座標に自分を設定
-                                            cannotMoveMap.value(tx, ty, 1);
-                                            monstersTactics[i] = {
-                                                type: "move",
-                                                moveDir: dir,
-                                                startTime: ms,
-                                                actionTime: 250,
-                                            };
-                                            changed = true;
-                                            return;
-                                        }
-                                    }
-                                    // 移動先が全部移動不能だったので待機を選択
-                                    // 敵全体の移動不能座標に自分を設定
-                                    cannotMoveMap.value(monster.x, monster.y, 1);
-                                    monstersTactics[i] = {
-                                        type: "idle",
-                                        moveDir: 5,
-                                        startTime: ms,
-                                        actionTime: 250,
-                                    };
-                                    changed = true;
-                                    return;
-                                }
-                            });
-                        }
-                        // 敵の行動の決定の終了
-                        turnStateStack.shift();
-                        continue stateloop;
-                    }
-                    case TurnState.EnemyAction:
-                    {
-                        // 敵の行動開始
-                        let enemyId = turnStateStack[0][1];
-                        while (enemyId < monstersTactics.length) {
-                            if (monstersTactics[enemyId].type !== "action") {
-                                enemyId++;
-                            } else {
-                                break;
-                            }
-                        }
-                        // 移動と違い、行動の場合は１キャラづつ行動を行う。
-                        if (enemyId < monstersTactics.length) {
-                            monstersTactics[enemyId].startTime = ms;
-                            monsters[enemyId].setDir(monstersTactics[enemyId].moveDir);
-                            monsters[enemyId].setAnimation("action", 0);
-                            turnStateStack[0][0] = TurnState.EnemyActionRunning;
-                            turnStateStack[0][1] = enemyId;
-                            turnStateStack[0][2] = 0;
-                            continue stateloop;
-                        } else {
-                            // もう動かす敵がいない
-                            turnStateStack.shift();
-                            continue stateloop;
-                        }
-                    }
-                    case TurnState.EnemyActionRunning:
-                    {
-                        // 敵の行動中
-                        const enemyId = turnStateStack[0][1];
-
-                        const rate = (ms - monstersTactics[enemyId].startTime) / monstersTactics[enemyId].actionTime;
-                        monsters[enemyId].setAnimation("action", rate);
-                        if (rate > 0.5 && turnStateStack[0][2] === 0) {
-                            turnStateStack[0][2] = 1;
-                            Game.getSound().reqPlayChannel("atack");
-                            const dmg = ~~(monsters[enemyId].atk - player.def);
-                            sprites.push(createShowDamageSprite(
-                                ms,
-                                dmg > 0 ? ("" + dmg) : "MISS!!",
-                                () => {
-                                    return {
-                                        x: player.offx + player.x * map.gridsize.width + map.gridsize.width / 2,
-                                        y: player.offy + player.y * map.gridsize.height + map.gridsize.height / 2
-                                    };
-                                }
-                            ));
-                            if (player.hp > 0 && dmg > 0) {
-                                player.hp -= dmg;
-                                if (player.hp <= 0) {
-                                    player.hp = 0;
-                                }
-                            }
-                        }
-                        if (rate >= 1) {
-                            if (player.hp == 0) {
-                                // ターン強制終了
-                                return;
-                            }
-
-                            // 行動終了。次の敵へ
-                            monsters[enemyId].setAnimation("move", 0);
-                            turnStateStack[0][0] = TurnState.EnemyAction;
-                            turnStateStack[0][1] = enemyId + 1;
-                        }
-                        break stateloop;
-                    }
-                    case TurnState.EnemyDead:
-                    {
-                        // 敵の死亡開始
-                        turnStateStack[0][0] = TurnState.EnemyDeadRunning;
-                        const enemyId = turnStateStack[0][1];
-                        turnStateStack[0][2] = ms;
-                        Game.getSound().reqPlayChannel("explosion");
-                        monsters[enemyId].setAnimation("dead", 0);
-                        // fall through;
-                    }
-                    case TurnState.EnemyDeadRunning:
-                    {
-                        // 敵の死亡
-                        turnStateStack[0][0] = TurnState.EnemyDeadRunning;
-                        const enemyId = turnStateStack[0][1];
-                        const diff = ms - turnStateStack[0][2];
-                        monsters[enemyId].setAnimation("dead", diff / 250);
-                        if (diff >= 250) {
-                            turnStateStack.shift();
-                        }
-                        break stateloop;
-                    }
-                    case TurnState.Move:
-                    {
-                        // 移動開始
-                        turnStateStack[0][0] = TurnState.MoveRunning;
-                        monstersTactics.forEach((monsterTactic, i: number) => {
-                            if (monsterTactic.type === "move") {
-                                monsters[i].setDir(monsterTactic.moveDir);
-                                monsters[i].setAnimation("move", 0);
-                                monstersTactics[i].startTime = ms;
-                            }
-                        });
-                        if (playerTactics.type === "move") {
-                            player.setDir(playerTactics.moveDir);
-                            player.setAnimation("move", 0);
-                            playerTactics.startTime = ms;
-                        }
-                        // fallthrough
-                    }
-                    case TurnState.MoveRunning:
-                    {
-                        // 移動実行
-                        let finish = true;
-                        monstersTactics.forEach((monsterTactic, i: number) => {
-                            if (monsterTactic == null) {
-                                return;
-                            }
-                            if (monsterTactic.type === "move") {
-                                const rate = (ms - monsterTactic.startTime) / monsterTactic.actionTime;
-                                monsters[i].setDir(monsterTactic.moveDir);
-                                monsters[i].setAnimation("move", rate);
-                                if (rate < 1) {
-                                    finish = false; // 行動終了していないフラグをセット
-                                }
-                            }
-                        });
-                        if (playerTactics.type === "move") {
-                            const rate = (ms - playerTactics.startTime) / playerTactics.actionTime;
-                            player.setDir(playerTactics.moveDir);
-                            player.setAnimation("move", rate);
-                            if (rate < 1) {
-                                finish = false; // 行動終了していないフラグをセット
-                            }
-                        }
-                        if (finish) {
-                            // 行動終了
-                            turnStateStack.shift();
-
-                            monstersTactics.forEach((monsterTactic, i) => {
-                                if (monsterTactic.type === "move") {
-                                    monsters[i].x += Array2D.DIR8[monsterTactic.moveDir].x;
-                                    monsters[i].y += Array2D.DIR8[monsterTactic.moveDir].y;
-                                    monsters[i].offx = 0;
-                                    monsters[i].offy = 0;
-                                    monsters[i].setAnimation("move", 0);
-                                }
-                            });
-                            if (playerTactics.type === "move") {
-                                player.x += Array2D.DIR8[playerTactics.moveDir].x;
-                                player.y += Array2D.DIR8[playerTactics.moveDir].y;
-                                player.offx = 0;
-                                player.offy = 0;
-                                player.setAnimation("move", 0);
-                            }
-
-                            // 現在位置のマップチップを取得
-                            const chip = map.layer[0].chips.value(~~player.x, ~~player.y);
-                            if (chip === 10) {
-                                // 階段なので次の階層に移動させる。
-                                this.next("nextfloor");
-                            }
-
-                        }
-                        break stateloop;
-                    }
-                    case TurnState.TurnEnd:
-                    {
-                        // ターン終了
-                        turnStateStack.shift();
-                        monsters = monsters.filter(x => x.life > 0);
-                        break stateloop;
-                    }
-                }
-                break;
-            }
+            turnContext.ms = ms;
+            while (turnStateStack[0].next().done) { }
 
             // カメラを更新
             map.update({
-                    viewpoint: {
-                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
-                    },
-                    viewwidth: Game.getScreen().offscreenWidth,
-                    viewheight: Game.getScreen().offscreenHeight,
+                viewpoint: {
+                    x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                    y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
                 },
+                viewwidth: Game.getScreen().offscreenWidth,
+                viewheight: Game.getScreen().offscreenHeight
+            }
             );
 
             // スプライトを更新
-            sprites = sprites.filter((x) => {
-                return !x.update(delta, ms);
-            });
+            sprites.removeIf((x) => x.update(delta, ms));
 
             updateLighting((v: number) => v === 1 || v === 10);
 
-            if (player.hp === 0) {
-                // ターン強制終了
-                Game.getSceneManager().pop();
-                Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
-                return;
+            if (player.getForward().hp === 0) {
+                if (player.getBackward().hp !== 0) {
+                    player.active = player.active == 0 ? 1 : 0;
+                } else {
+                    // ターン強制終了
+                    Game.getSceneManager().pop();
+                    Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
+                    return;
+                }
             }
 
             // ui 
@@ -865,6 +541,414 @@ namespace Scene {
 
     }
 
+    interface TurnContext {
+        ms: number;
+        pad: Game.Input.VirtualStick;
+        player: Charactor.Player;
+        monsters: Charactor.Monster[];
+        map: Dungeon.DungeonData;
+        tactics: {
+            player: any;
+            monsters: any[];
+        };
+        sprites: ISprite[];
+        scene: Game.Scene.Scene;
+    };
+
+    function* WaitInput(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        for (; ;) {
+            // キー入力待ち
+            if (context.pad.isTouching === false || context.pad.distance <= 0.4) {
+                context.player.setAnimation("move", 0);
+                yield;
+                continue;
+            }
+
+            // キー入力された
+
+            const playerMoveDir = context.pad.dir8;
+
+            // 「行動(Action)」と「移動(Move)」の識別を行う
+
+            // 移動先が侵入不可能の場合は待機とする
+            const { x, y } = Array2D.DIR8[playerMoveDir];
+            if (context.map.layer[0].chips.value(context.player.x + x, context.player.y + y) !== 1 &&
+                context.map.layer[0].chips.value(context.player.x + x, context.player.y + y) !== 10) {
+                context.player.setDir(playerMoveDir);
+                yield;
+                continue;
+            }
+
+            turnStateStack.shift();
+
+            // 移動先に敵がいる場合は「行動(Action)」、いない場合は「移動(Move)」
+            const targetMonster = context.monsters.findIndex((monster) => (monster.x === context.player.x + x) && (monster.y === context.player.y + y));
+            if (targetMonster !== -1) {
+                // 移動先に敵がいる＝「行動(Action)」
+
+                context.tactics.player = {
+                    type: "action",
+                    moveDir: playerMoveDir,
+                    targetMonster: targetMonster,
+                    startTime: 0,
+                    actionTime: 250,
+                };
+
+                // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
+                turnStateStack.unshift(
+                    PlayerAction(turnStateStack, context),
+                    EnemyAI(turnStateStack, context),
+                    EnemyAction(turnStateStack, context),
+                    Move(turnStateStack, context),
+                    TurnEnd(turnStateStack, context)
+                );
+                return;
+            } else {
+                // 移動先に敵はいない＝「移動(Move)」
+
+                context.tactics.player = {
+                    type: "move",
+                    moveDir: playerMoveDir,
+                    startTime: 0,
+                    actionTime: 250,
+                };
+
+                // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
+                turnStateStack.unshift(
+                    EnemyAI(turnStateStack, context),
+                    Move(turnStateStack, context),
+                    EnemyAction(turnStateStack, context),
+                    TurnEnd(turnStateStack, context)
+                );
+                return;
+            }
+        }
+    }
+
+    function* PlayerAction(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        // プレイヤーの行動
+        const startTime = context.ms;
+        context.player.setDir(context.tactics.player.moveDir);
+        context.player.setAnimation("action", 0);
+        let acted = false;
+        for (; ;) {
+            const rate = (context.ms - startTime) / context.tactics.player.actionTime;
+            context.player.setAnimation("action", rate);
+            if (rate >= 0.5 && acted == false) {
+                acted = true;
+                const targetMonster: Charactor.Monster = context.monsters[context.tactics.player.targetMonster];
+                Game.getSound().reqPlayChannel("atack");
+                const dmg = ~~(context.player.atk - targetMonster.def);
+
+                context.sprites.push(createShowDamageSprite(
+                    context.ms,
+                    dmg > 0 ? ("" + dmg) : "MISS!!",
+                    () => {
+                        return {
+                            x: targetMonster.offx + targetMonster.x * context.map.gridsize.width + context.map.gridsize.width / 2,
+                            y: targetMonster.offy + targetMonster.y * context.map.gridsize.height + context.map.gridsize.height / 2
+                        };
+                    }
+                ));
+                if (targetMonster.life > 0 && dmg > 0) {
+                    targetMonster.life -= dmg;
+                    if (targetMonster.life <= 0) {
+                        targetMonster.life = 0;
+                        // 敵を死亡状態にする
+                        // explosion
+                        Game.getSound().reqPlayChannel("explosion");
+                        // 死亡処理を割り込みで行わせる
+                        turnStateStack.splice(1, 0, EnemyDead(turnStateStack, context, context.tactics.player.targetMonster));
+                    }
+                }
+            }
+            if (rate >= 1) {
+                // プレイヤーの行動終了
+                turnStateStack.shift();
+                context.player.setAnimation("move", 0);
+                return;
+            }
+            yield;
+        }
+    }
+    function* EnemyDead(turnStateStack: IterableIterator<boolean>[], context: TurnContext, enemyId: number): IterableIterator<any> {
+        // 敵の死亡
+        const start = context.ms;
+        Game.getSound().reqPlayChannel("explosion");
+        context.monsters[enemyId].setAnimation("dead", 0);
+        for (; ;) {
+            const diff = context.ms - start;
+            context.monsters[enemyId].setAnimation("dead", diff / 250);
+            if (diff >= 250) {
+                turnStateStack.shift();
+                return;
+            }
+            yield;
+        }
+    }
+    function* EnemyAI(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        // 敵の行動の決定
+
+        // 移動不可能地点を書き込む配列
+        const cannotMoveMap = new Array2D(context.map.width, context.map.height, 0);
+        context.tactics.monsters.length = context.monsters.length;
+        context.tactics.monsters.fill(null);
+        context.monsters.forEach((monster, i) => {
+            // 敵全体の移動不能座標に自分を設定
+            cannotMoveMap.value(monster.x, monster.y, 1);
+        });
+
+
+        // プレイヤーが移動する場合、移動先にいると想定して敵の行動を決定する
+        let px = context.player.x;
+        let py = context.player.y;
+        if (context.tactics.player.type === "move") {
+            const off = Array2D.DIR8[context.tactics.player.moveDir];
+            px += off.x;
+            py += off.y;
+        }
+        cannotMoveMap.value(px, py, 1);
+
+        // 行動(Action)と移動(Move)は分離しないと移動で敵が重なる
+
+        // 行動(Action)する敵を決定
+        context.monsters.forEach((monster, i) => {
+            if (monster.life <= 0) {
+                // 死亡状態なので何もしない
+                context.tactics.monsters[i] = {
+                    type: "dead",
+                    moveDir: 5,
+                    startTime: 0,
+                    actionTime: 250,
+                };
+                cannotMoveMap.value(monster.x, monster.y, 0);
+                return;
+            }
+            const dx = px - monster.x;
+            const dy = py - monster.y;
+            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                // 移動先のプレイヤー位置は現在位置に隣接しているので、行動(Action)を選択
+                const dir = Array2D.DIR8.findIndex((x) => x.x === dx && x.y === dy);
+                // 移動不能座標に変化は無し
+                context.tactics.monsters[i] = {
+                    type: "action",
+                    moveDir: dir,
+                    startTime: 0,
+                    actionTime: 250,
+                };
+                return;
+            } else {
+                return; // skip
+            }
+        });
+
+        // 移動(Move)する敵の移動先を決定する
+        // 最良の移動先にキャラクターが存在することを考慮して移動処理が発生しなくなるまで計算を繰り返す。
+        let changed = true;
+        while (changed) {
+            changed = false;
+            context.monsters.forEach((monster, i) => {
+                const dx = px - monster.x;
+                const dy = py - monster.y;
+                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                    if (context.tactics.monsters[i] == null) {
+                        console.error("Actionすべき敵の動作が決定していない");
+                    }
+                    return;
+                } else if (context.tactics.monsters[i] == null) {
+                    // 移動先のプレイヤー位置は現在位置に隣接していないので、移動(Move)を選択
+                    // とりあえず軸合わせ戦略で動く
+
+                    // 移動先の候補表から最良の移動先を選ぶ
+                    const cands = [
+                        [Math.sign(dx), Math.sign(dy)],
+                        (Math.abs(dx) > Math.abs(dy)) ? [0, Math.sign(dy)] : [Math.sign(dx), 0],
+                        (Math.abs(dx) > Math.abs(dy)) ? [Math.sign(dx), 0] : [0, Math.sign(dy)],
+                    ];
+
+                    for (let j = 0; j < cands.length; j++) {
+                        const [cx, cy] = cands[j];
+                        const tx = monster.x + cx;
+                        const ty = monster.y + cy;
+                        if ((cannotMoveMap.value(tx, ty) === 0) && (context.map.layer[0].chips.value(tx, ty) === 1 || context.map.layer[0].chips.value(tx, ty) === 10)) {
+                            const dir = Array2D.DIR8.findIndex((x) => x.x === cx && x.y === cy);
+                            // 移動不能座標を変更
+                            cannotMoveMap.value(monster.x, monster.y, 0);
+                            cannotMoveMap.value(tx, ty, 1);
+                            context.tactics.monsters[i] = {
+                                type: "move",
+                                moveDir: dir,
+                                startTime: 0,
+                                actionTime: 250,
+                            };
+                            changed = true;
+                            return;
+                        }
+                    }
+                    // 移動先が全部移動不能だったので待機を選択
+                    // 敵全体の移動不能座標に自分を設定
+                    cannotMoveMap.value(monster.x, monster.y, 1);
+                    context.tactics.monsters[i] = {
+                        type: "idle",
+                        moveDir: 5,
+                        startTime: 0,
+                        actionTime: 250,
+                    };
+                    changed = true;
+                    return;
+                }
+            });
+        }
+        // 敵の行動の決定の終了
+        turnStateStack.shift();
+    }
+    function* EnemyAction(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        // 敵の行動開始
+        for (let enemyId = 0; enemyId < context.tactics.monsters.length; enemyId++) {
+            if (context.tactics.monsters[enemyId].type !== "action") {
+                continue;
+            }
+            context.tactics.monsters[enemyId].startTime = context.ms;
+            context.monsters[enemyId].setDir(context.tactics.monsters[enemyId].moveDir);
+            context.monsters[enemyId].setAnimation("action", 0);
+            yield* EnemyDoAction(turnStateStack, context, enemyId);
+        }
+        // もう動かす敵がいない
+        turnStateStack.shift();
+        return;
+    }
+    function* EnemyDoAction(turnStateStack: IterableIterator<boolean>[], context: TurnContext, enemyId: number): IterableIterator<any> {
+        const startTime = context.ms;
+        let acted = false;
+        for (; ;) {
+            const rate = (context.ms - startTime) / context.tactics.monsters[enemyId].actionTime;
+            context.monsters[enemyId].setAnimation("action", rate);
+            if (rate >= 0.5 && acted == false) {
+                acted = true;
+                Game.getSound().reqPlayChannel("atack");
+                const dmg = ~~(context.monsters[enemyId].atk - context.player.def);
+                context.sprites.push(createShowDamageSprite(
+                    context.ms,
+                    dmg > 0 ? ("" + dmg) : "MISS!!",
+                    () => {
+                        return {
+                            x: context.player.offx + context.player.x * context.map.gridsize.width + context.map.gridsize.width / 2,
+                            y: context.player.offy + context.player.y * context.map.gridsize.height + context.map.gridsize.height / 2
+                        };
+                    }
+                ));
+                if (context.player.getForward().hp > 0 && dmg > 0) {
+                    context.player.getForward().hp -= dmg;
+                    if (context.player.getForward().hp <= 0) {
+                        context.player.getForward().hp = 0;
+                    }
+                }
+            }
+            if (rate >= 1) {
+                // 行動終了。次の敵へ
+                context.monsters[enemyId].setAnimation("action", 0);
+                return;
+            }
+            yield;
+        }
+    }
+    function* Move(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        // 移動開始
+        const start = context.ms;
+        context.tactics.monsters.forEach((monsterTactic: any, i: number) => {
+            if (monsterTactic.type === "move") {
+                context.monsters[i].setDir(monsterTactic.moveDir);
+                context.monsters[i].setAnimation("move", 0);
+            }
+        });
+        if (context.tactics.player.type === "move") {
+            context.player.setDir(context.tactics.player.moveDir);
+            context.player.setAnimation("move", 0);
+        }
+
+        for (; ;) {
+            // 移動実行
+            let finish = true;
+            context.tactics.monsters.forEach((monsterTactic: any, i: number) => {
+                if (monsterTactic == null) {
+                    return;
+                }
+                if (monsterTactic.type === "move") {
+                    const rate = (context.ms - start) / monsterTactic.actionTime;
+                    context.monsters[i].setDir(monsterTactic.moveDir);
+                    context.monsters[i].setAnimation("move", rate);
+                    if (rate < 1) {
+                        finish = false; // 行動終了していないフラグをセット
+                    } else {
+                        context.monsters[i].x += Array2D.DIR8[monsterTactic.moveDir].x;
+                        context.monsters[i].y += Array2D.DIR8[monsterTactic.moveDir].y;
+                        context.monsters[i].offx = 0;
+                        context.monsters[i].offy = 0;
+                        context.monsters[i].setAnimation("move", 0);
+                    }
+                }
+            });
+            if (context.tactics.player.type === "move") {
+                const rate = (context.ms - start) / context.tactics.player.actionTime;
+                context.player.setDir(context.tactics.player.moveDir);
+                context.player.setAnimation("move", rate);
+                if (rate < 1) {
+                    finish = false; // 行動終了していないフラグをセット
+                } else {
+                    context.player.x += Array2D.DIR8[context.tactics.player.moveDir].x;
+                    context.player.y += Array2D.DIR8[context.tactics.player.moveDir].y;
+                    context.player.offx = 0;
+                    context.player.offy = 0;
+                    context.player.setAnimation("move", 0);
+                }
+            }
+            if (finish) {
+                // 行動終了
+                turnStateStack.shift();
+                return;
+            }
+            yield;
+        }
+    }
+
+    function* TurnEnd(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+        turnStateStack.shift();
+
+        // 死亡したモンスターを消去
+        context.monsters.removeIf(x => x.life == 0);
+
+        // 現在位置のマップチップを取得
+        const chip = context.map.layer[0].chips.value(~~context.player.x, ~~context.player.y);
+        if (chip === 10) {
+            // 階段なので次の階層に移動させる。
+            context.scene.next("nextfloor");
+            yield;
+        } else {
+            turnStateStack.unshift(WaitInput(turnStateStack, context));
+        }
+        return;
+    }
+
+    function showStatusText(str: string, x:number, y:number): void {
+        const fontWidth: number = 5;
+        const fontHeight: number = 7;
+
+        const len = str.length;
+        for (let i = 0; i < str.length; i++) {
+            const [fx, fy] = charDic[str[i]];
+            Game.getScreen().drawImage(
+                Game.getScreen().texture("font7wpx"),
+                fx,
+                fy,
+                fontWidth,
+                fontHeight,
+                (x + (i + 0) * (fontWidth - 1)),
+                (y + (0) * fontHeight),
+                fontWidth,
+                fontHeight
+            );
+        }
+    }
 
     function* statusView(opt: { player: Charactor.Player, floor: number, upperdraw: () => void }) {
         var closeButton = {
@@ -875,43 +959,77 @@ namespace Scene {
 
         this.draw = () => {
             opt.upperdraw();
-            Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
-            Game.getScreen().fillRect(20,
-                20,
-                Game.getScreen().offscreenWidth - 40,
-                Game.getScreen().offscreenHeight - 40);
+            //Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
+            //Game.getScreen().fillRect(20,
+            //    20,
+            //    Game.getScreen().offscreenWidth - 40,
+            //    Game.getScreen().offscreenHeight - 40);
 
-            // 閉じるボタン
-            Game.getScreen().save();
-            Game.getScreen().beginPath();
-            Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
-            Game.getScreen().lineWidth = 6;
-            Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
-            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
-                closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
-                closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
-                closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
-                closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
-            Game.getScreen().stroke();
-            Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
-            Game.getScreen().lineWidth = 3;
-            Game.getScreen().stroke();
-            Game.getScreen().restore();
+            //// 閉じるボタン
+            //Game.getScreen().save();
+            //Game.getScreen().beginPath();
+            //Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
+            //Game.getScreen().lineWidth = 6;
+            //Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
+            //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+            //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+            //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+            //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+            //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+            //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+            //Game.getScreen().stroke();
+            //Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
+            //Game.getScreen().lineWidth = 3;
+            //Game.getScreen().stroke();
+            //Game.getScreen().restore();
 
-            // ステータス（ダミー）
-            Game.getScreen().fillStyle = 'rgb(0,0,0)';
+            // ステータス(前衛)
+            {
+            const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
+            const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2);
+            Game.getScreen().drawImage(
+                Game.getScreen().texture("status"),
+                0, 0, 190, 121,
+                left,
+                top,
+                190, 121
+            );
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-            Game.getScreen().fillText(`HP:${opt.player.hp}/${opt.player.hpMax}`, 30, 30 + 11 * 3);
-            Game.getScreen().fillText(`MP:${opt.player.mp}/${opt.player.mpMax}`, 30, 30 + 11 * 4);
-            Game.getScreen().fillText(`ATK：${opt.player.atk}`, 30, 30 + 11 * 6);
-            Game.getScreen().fillText(`DEF：${opt.player.def}`, 30, 30 + 11 * 7);
-
-            opt.player.equips.forEach((e, i) => {
-                Game.getScreen().fillText(`${e.name}`, 30, 30 + 11 * (8 + i));
-            })
+            Game.getScreen().fillStyle = `rgb(0,0,0)`;
+            Game.getScreen().textAlign = "left";
+            Game.getScreen().textBaseline = "top";
+            Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
+            showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`,left+85,top+56);
+            showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`,left+145,top+56);
+            showStatusText(`${opt.player.getForward().equips.reduce((s,x) => s + x.atk,0)}`,left+85,top+64);
+            showStatusText(`${opt.player.getForward().equips.reduce((s,x) => s + x.def,0)}`,left+145,top+64);
+            }
+            // 後衛
+            {
+            const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
+            const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2) + 121;
+            Game.getScreen().drawImage(
+                Game.getScreen().texture("status"),
+                0, 0, 190, 121,
+                left,
+                top,
+                190, 121
+            );
+            Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+            Game.getScreen().fillStyle = `rgb(0,0,0)`;
+            Game.getScreen().textAlign = "left";
+            Game.getScreen().textBaseline = "top";
+            Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
+            showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`,left+85,top+56);
+            showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`,left+145,top+56);
+            showStatusText(`${opt.player.getBackward().equips.reduce((s,x) => s + x.atk,0)}`,left+85,top+64);
+            showStatusText(`${opt.player.getBackward().equips.reduce((s,x) => s + x.def,0)}`,left+145,top+64);
+            }
+            //opt.player.equips.forEach((e, i) => {
+            //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
+            //})
 
 
         }

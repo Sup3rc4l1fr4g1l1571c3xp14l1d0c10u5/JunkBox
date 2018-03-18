@@ -112,8 +112,8 @@ namespace Game {
                             (audioBufferNode) => {
                                 resolve(audioBufferNode);
                             },
-                            (ev) => {
-                                reject(ev);
+                            () => {
+                                reject(new Error(`cannot decodeAudioData : ${file} `));
                             }
                         );
                     });

@@ -2,7 +2,7 @@
 
 namespace Game {
     export namespace Scene {
-        class Scene {
+        export class Scene {
             private manager: SceneManager;
             private state: Iterator<any>;
             private init: (data: any) => Iterator<any>;

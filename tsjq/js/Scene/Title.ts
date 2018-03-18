@@ -1,4 +1,4 @@
-namespace Scene {
+        namespace Scene {
     export function* title(): IterableIterator<any> {
         // setup
         let showClickOrTap = false;
@@ -14,13 +14,13 @@ namespace Scene {
             Game.getScreen().drawImage(
                 Game.getScreen().texture("title"),
                 0, 0, 192, 72,
-                w / 2 - 192 / 2, 50, 192, 72,
+                w / 2 - 192 / 2, 50, 192, 72
             );
             if (showClickOrTap) {
                 Game.getScreen().drawImage(
                     Game.getScreen().texture("title"),
                     0, 72, 168, 24,
-                    w / 2 - 168 / 2, h - 50, 168, 24,
+                    w / 2 - 168 / 2, h - 50, 168, 24
                 );
             }
             fade.draw();
@@ -47,7 +47,7 @@ namespace Scene {
             init: () => { fade.startFadeOut(); },
             update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
             end: () => {
-                Game.getSceneManager().push(classroom, null);
+                Game.getSceneManager().push(corridor, null);
                 this.next();
             },
         });

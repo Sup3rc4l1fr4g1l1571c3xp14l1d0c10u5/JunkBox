@@ -31,6 +31,11 @@ namespace Scene {
                 mapchip: "./assets/mapchip.png",
                 charactor: "./assets/charactor.png",
                 font7px: "./assets/font7px.png",
+                font7wpx: "./assets/font7wpx.png",
+                menuicon: "./assets/menuicon.png",
+                status: "./assets/status.png",
+                corridorbg: "./assets/corridorbg.png",
+                classroom: "./assets/classroom.png",
                 "shop/bg": "./assets/shop/bg.png",
                 "shop/J11": "./assets/shop/J11.png",
             },
@@ -49,8 +54,7 @@ namespace Scene {
                 () => { reqResource++; },
                 () => { loadedResource++; },
             ).catch((ev) => console.log("failed2", ev)),
-            //Charactor.Player.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
-            //Charactor.Monster.loadCharactorConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            GameData.loadConfigs(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
                 reqResource++;
                 return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
@@ -59,8 +63,8 @@ namespace Scene {
                 loadedResource++;
             })
         ]).then(() => {
-            //Game.getSceneManager().push(title, null);
-            Game.getSceneManager().push(shop, null);
+            Game.getSceneManager().push(title, null);
+            //Game.getSceneManager().push(shop, null);
             this.next();
         });
         yield (delta: number, ms: number) => {

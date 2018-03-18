@@ -1,4 +1,4 @@
-﻿<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\TypeScript\Microsoft.TypeScript.Default.props" Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\TypeScript\Microsoft.TypeScript.Default.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -85,13 +85,17 @@
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="js\Charactor\CharactorBase.ts" />
+    <TypeScriptCompile Include="js\Charactor\Player.ts" />
+    <TypeScriptCompile Include="js\Charactor\Monster.ts" />
     <TypeScriptCompile Include="js\CSSFontLoadingAPI.d.ts" />
+    <TypeScriptCompile Include="js\GameData.ts" />
     <TypeScriptCompile Include="js\Lib\Game\GUI.ts" />
+    <TypeScriptCompile Include="js\Scene\Corridor.ts" />
     <TypeScriptCompile Include="js\Scene\Shop.ts" />
     <TypeScriptCompile Include="tsjq.ts" />
     <TypeScriptCompile Include="js\Lib\Game\Ajax.ts" />
     <TypeScriptCompile Include="js\Array2D.ts" />
-    <TypeScriptCompile Include="js\Charactor.ts" />
     <TypeScriptCompile Include="js\Dungeon.ts" />
     <TypeScriptCompile Include="js\Lib\Game\Console.ts" />
     <TypeScriptCompile Include="js\Lib\Game\EventDispatcher.ts" />
