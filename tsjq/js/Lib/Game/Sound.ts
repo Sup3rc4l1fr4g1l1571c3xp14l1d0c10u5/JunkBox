@@ -201,11 +201,11 @@ namespace Game {
                         src.loop = c.loopPlay;
                         src.connect(this.audioContext.destination);
                         src.onended = ((): void => {
-                            const srcNode = src;
-                            srcNode.stop(0);
-                            srcNode.disconnect();
+                            src.stop(0);
+                            src.disconnect();
                             this.playingBufferSources.set(bufferid, null);
                             this.playingBufferSources.delete(bufferid);
+                            src.onended = null;
                         }).bind(null, bufferid);
                         src.start(0);
                     }
@@ -213,8 +213,7 @@ namespace Game {
             }
 
             public stop(): void {
-                const oldPlayingBufferSources: Map<number, { id: string; buffer: AudioBufferSourceNode }> =
-                    this.playingBufferSources;
+                const oldPlayingBufferSources: Map<number, { id: string; buffer: AudioBufferSourceNode }> = this.playingBufferSources;
                 this.playingBufferSources = new Map<number, { id: string; buffer: AudioBufferSourceNode }>();
                 oldPlayingBufferSources.forEach((value, key) => {
                     const s: AudioBufferSourceNode = value.buffer;
