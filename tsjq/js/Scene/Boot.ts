@@ -50,6 +50,10 @@ namespace Scene {
                 atack: "./assets/sound/se_attacksword_1.mp3",
                 explosion: "./assets/sound/explosion03.mp3",
                 cursor: "./assets/sound/cursor.mp3",
+                sen_ge_gusya01:"./assets/sound/sen_ge_gusya01.mp3",
+                boyon1:"./assets/sound/boyon1.mp3",
+                boyoyon1:"./assets/sound/boyoyon1.mp3",
+                meka_ge_reji_op01:"./assets/sound/meka_ge_reji_op01.mp3"
             },
                 () => { reqResource++; },
                 () => { loadedResource++; },

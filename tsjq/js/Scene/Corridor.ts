@@ -4,7 +4,7 @@ namespace Scene {
     export function* corridor() {
         const dispatcher = new Game.GUI.UIDispatcher();
         const fade = new Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
-        let selected : () => void = null;
+        let selected: () => void = null;
 
         const caption = new Game.GUI.TextBox({
             left: 1,
@@ -61,9 +61,11 @@ namespace Scene {
             selected = () => {
                 Game.getSceneManager().pop();
                 Game.getSound().reqStopChannel("classroom");
-                Game.getSceneManager().push(dungeon, {player:new Charactor.Player(), floor:1});
+                Game.getSceneManager().push(dungeon, { player: new Charactor.Player(), floor: 1 });
             };
         };
+
+        btnDungeon.enable = GameData.forwardCharactor != null;
 
         this.draw = () => {
             Game.getScreen().drawImage(
@@ -75,47 +77,48 @@ namespace Scene {
             fade.draw();
         }
 
-                    Game.getSound().reqPlayChannel("classroom", true);
+        Game.getSound().reqPlayChannel("classroom", true);
 
         for (; ;) {
-        yield waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeIn(); },
-            update: (e) => { fade.update(e); },
-            end: () => {
-                fade.stop();
-                this.next();
-            },
-        });
+            yield waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeIn(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
 
-        yield (delta: number, ms: number) => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (selected != null) {
-                this.next();
-            }
-        };
+            yield (delta: number, ms: number) => {
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                btnDungeon.enable = GameData.forwardCharactor != null;
+                if (selected != null) {
+                    this.next();
+                }
+            };
 
 
 
-        yield waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); },
-            end: () => {
-                fade.stop();
-                this.next();
-            },
-        });
+            yield waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeOut(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
             selected();
             selected = null;
-            }
+        }
     }
 }

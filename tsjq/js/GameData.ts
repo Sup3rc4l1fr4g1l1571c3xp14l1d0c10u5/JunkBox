@@ -1,22 +1,54 @@
 namespace GameData {
     
-    export interface Item {
-        name:string;
+
+    export enum ItemKind {
+        Wepon,
+        Armor1,
+        Armor2,
+        Accessory,
+        Tool,
+        Treasure,
     }
 
-    export interface EquipableItem extends Item {
-        name:string;
+    interface ItemBase {
+        name: string;
+        price: number;
+        kind: ItemKind;
+        description: string;
+        stackable: boolean;
+    }
+    export interface WeponData extends ItemBase {
         atk: number;
         def: number;
+        condition: string;
+    }
+    export interface ArmorData extends ItemBase {
+        atk: number;
+        def: number;
+        condition: string;
+    }
+    export interface AccessoryData extends ItemBase {
+        atk: number;
+        def: number;
+        condition: string;
+    }
+    export interface ToolData extends ItemBase {
+        effect: (...args: any[]) => void;
+    }
+    export interface TreasureData extends ItemBase {
     }
 
+    export type ItemData = WeponData | ArmorData | AccessoryData | ToolData | TreasureData;
+    export type EquipableItemData = WeponData | ArmorData | AccessoryData;
+
+
     export interface ItemBoxEntry {
-        item : Item;
-        count : Number
+        item: ItemData;
+        count : number;
     }
 
     export const ItemBox : ItemBoxEntry [] = [];
-    export let Money : number = 100;
+    export let Money : number = 10000;
 
     //
     //
@@ -130,14 +162,26 @@ namespace GameData {
         id:string ;
         hp: number;
         mp: number;
-        equips: EquipableItem[];
+        equips: {
+            wepon1?: EquipableItemData;
+            armor1?: EquipableItemData;
+            armor2?: EquipableItemData;
+            accessory1?: EquipableItemData;
+            accessory2?: EquipableItemData;
+        };
     }
 
     export class PlayerData implements IPlayerData{
         public id:string ;
         public hp: number;
         public mp: number;
-        public equips: EquipableItem[];
+        public equips: {
+            wepon1?: EquipableItemData;
+            armor1?: EquipableItemData;
+            armor2?: EquipableItemData;
+            accessory1?: EquipableItemData;
+            accessory2?: EquipableItemData;
+        };
         public get config(): CharactorConfig {
             return playerConfigs.get(this.id);
         }
@@ -160,16 +204,17 @@ namespace GameData {
     }
     const charactorDatas: Map<string, PlayerData> = new Map<string, PlayerData>();
 
-    export function getPlayerData(id: string,defaultIfEmpty:boolean = true) : PlayerData {
+    export function getPlayerData(id: string) : PlayerData {
         let ret = charactorDatas.get(id);
-        if (ret == null && defaultIfEmpty) {
+        if (ret == null) {
             let cfg = playerConfigs.get(id);
             if (cfg != null) {
                 ret = new PlayerData();
-                ret.equips = [];
+                ret.equips = {};
                 ret.hp = 100;
                 ret.mp = 100;
                 ret.id = id;
+                charactorDatas.set(id,ret);
             }
         }
         return ret;

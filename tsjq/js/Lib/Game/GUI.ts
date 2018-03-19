@@ -5,6 +5,8 @@ namespace Game.GUI {
         top: number;
         width: number;
         height: number;
+        visible: boolean;
+        enable: boolean;
         draw: () => void;
         regist: (dispatcher : UIDispatcher) => void;
         unregist: (dispatcher : UIDispatcher) => void;
@@ -85,12 +87,19 @@ namespace Game.GUI {
         }
 
         public draw() : void {
-            this.uiTable.forEach((value, key) => key.draw());
+            this.uiTable.forEach((value, key) => {
+                if (key.visible) {
+                    key.draw();
+                }
+            });
         }
 
         // UIに対するクリック/タップ操作を捕捉
         public onClick(ui: UI, handler: (x: number, y: number) => void): CancelHandler {
             const hookHandler = (x: number, y: number) => {
+                if (!ui.visible || !ui.enable) {
+                    return;
+                }
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -125,6 +134,9 @@ namespace Game.GUI {
         //UI外のタップ/クリック操作を捕捉
         public onNcClick(ui: UI, handler: (x: number, y: number) => void): CancelHandler {
             const hookHandler = (x: number, y: number) => {
+                if (!ui.visible || !ui.enable) {
+                    return;
+                }
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -160,6 +172,9 @@ namespace Game.GUI {
         public onSwipe(ui: UI, handler: (dx: number, dy: number, x?:number,y?:number) => void): CancelHandler {
 
             const hookHandler = (x: number, y: number) => {
+                if (!ui.visible || !ui.enable) {
+                    return;
+                }
                 if (!Game.getScreen().pagePointContainScreen(x, y)) {
                     return;
                 }
@@ -204,6 +219,8 @@ namespace Game.GUI {
         public fontColor: string;
         public textAlign: string;
         public textBaseline: string;
+        public visible: boolean;
+        public enable: boolean;
         constructor(
             {
                 left = 0,
@@ -217,6 +234,8 @@ namespace Game.GUI {
                 fontColor = `rgb(0,0,0)`,
                 textAlign = "left",
                 textBaseline = "top",
+                visible = true,
+                enable = true
             }: {
                 left: number;
                 top: number;
@@ -229,6 +248,8 @@ namespace Game.GUI {
                 fontColor?: string;
                 textAlign?: string;
                 textBaseline?: string;
+                visible?: boolean;
+                enable?: boolean;
                 }) {
             this.left = left;
             this.top = top;
@@ -241,14 +262,23 @@ namespace Game.GUI {
             this.fontColor = fontColor;
             this.textAlign = textAlign;
             this.textBaseline = textBaseline;
+            this.visible = visible;
+            this.enable = enable;
         }
         draw() {
+            const a = this.left + 8;
+            const b = this.left + this.width - 8;
+            const c = this.left;
+            const d = this.left + this.width;
+            const e = this.top;
+            const f = this.top + this.height;
+
             Game.getScreen().beginPath();
-            Game.getScreen().moveTo(9 - 0.5, 1 - 0.5);
-            Game.getScreen().bezierCurveTo(1 - 0.5, 1 - 0.5, 1 - 0.5, 42 - 0.5, 9 - 0.5, 42 - 0.5);
-            Game.getScreen().lineTo(242 - 0.5, 42 - 0.5);
-            Game.getScreen().bezierCurveTo(250 - 0.5, 42 - 0.5, 250 - 0.5, 1 - 0.5, 242 - 0.5, 1 - 0.5);
-            Game.getScreen().lineTo(9 - 0.5, 1 - 0.5);
+            Game.getScreen().moveTo              (  a - 0.5, e - 0.5);
+            Game.getScreen().bezierCurveTo       (  c - 0.5, e - 0.5, c - 0.5, f - 0.5, a - 0.5, f - 0.5);
+            Game.getScreen().lineTo              (  b - 0.5, f - 0.5);
+            Game.getScreen().bezierCurveTo       (  d - 0.5, f - 0.5, d - 0.5, e - 0.5, b - 0.5, e - 0.5);
+            Game.getScreen().lineTo              (  a - 0.5, e - 0.5);
             Game.getScreen().closePath();
             Game.getScreen().fillStyle = this.color;
             Game.getScreen().fill();
@@ -261,7 +291,7 @@ namespace Game.GUI {
             Game.getScreen().textAlign = this.textAlign;
             Game.getScreen().textBaseline = this.textBaseline;
             this.text.split(/\n/).forEach((x: string, i: number) => {
-                Game.getScreen().fillText(x, this.left + 8, this.top + i * (10 + 1) + 8);
+                Game.getScreen().fillText(x, a, this.top + i * (10 + 1) +2);
             });
 
         }
@@ -277,6 +307,11 @@ namespace Game.GUI {
             fontColor: string;
             textAlign: string;
             textBaseline: string;
+            visible: boolean;
+            enable: boolean;
+            disableEdgeColor: string;
+            disableColor: string;
+            disableFontColor: string;
         } = {
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
@@ -284,6 +319,11 @@ namespace Game.GUI {
             fontColor: `rgb(255,255,255)`,
             textAlign: "left",
             textBaseline: "top",
+            visible: true,
+            enable: true,
+            disableEdgeColor: `rgb(34,34,34)`,
+            disableColor: `rgb(133,133,133)`,
+            disableFontColor: `rgb(192,192,192)`,
         };
 
         public left: number;
@@ -297,7 +337,12 @@ namespace Game.GUI {
         public fontColor: string;
         public textAlign: string;
         public textBaseline: string;
+        public visible: boolean;
+        public enable: boolean;
         public click : (x:number,y:number) => void;
+        public disableEdgeColor: string;
+        public disableColor: string;
+        public disableFontColor: string;
 
         constructor(
             {
@@ -312,6 +357,11 @@ namespace Game.GUI {
                  fontColor = Button.defaultValue.fontColor,
                  textAlign = Button.defaultValue.textAlign,
                  textBaseline = Button.defaultValue.textBaseline,
+                 visible = Button.defaultValue.visible,
+                 enable = Button.defaultValue.enable,
+                 disableEdgeColor = Button.defaultValue.disableEdgeColor,
+                 disableColor = Button.defaultValue.disableColor,
+                 disableFontColor = Button.defaultValue.disableFontColor,
             }: {
                     left: number;
                     top: number;
@@ -324,6 +374,11 @@ namespace Game.GUI {
                     fontColor?: string;
                     textAlign?: string;
                     textBaseline?: string;
+                    visible?: boolean;
+                    enable?: boolean;
+                    disableEdgeColor?: string;
+                    disableColor?: string;
+                    disableFontColor?: string;
                 }) {
             this.left = left;
             this.top = top;
@@ -336,16 +391,21 @@ namespace Game.GUI {
             this.fontColor = fontColor;
             this.textAlign = textAlign;
             this.textBaseline = textBaseline;
+            this.visible = visible;
+            this.enable = enable;
             this.click = () => {};
+            this.disableEdgeColor = disableEdgeColor;
+            this.disableColor = disableColor;
+            this.disableFontColor = disableFontColor;
         }
         draw() {
-            Game.getScreen().fillStyle = this.color;
+            Game.getScreen().fillStyle = this.enable ? this.color : this.disableColor
             Game.getScreen().fillRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
-            Game.getScreen().strokeStyle = this.edgeColor;
+            Game.getScreen().strokeStyle = this.enable ? this.edgeColor : this.disableEdgeColor;
             Game.getScreen().lineWidth = 1;
             Game.getScreen().strokeRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
             Game.getScreen().font = this.font;
-            Game.getScreen().fillStyle = this.fontColor;
+            Game.getScreen().fillStyle = this.enable ? this.fontColor : this.disableFontColor;
             const text = (this.text instanceof Function) ? (this.text as (() => string)).call(this) : this.text
             const metrics = Game.getScreen().measureText(text);
             const height  = Game.getScreen().measureText("あ").width;
@@ -373,6 +433,8 @@ namespace Game.GUI {
         public texTop: number;
         public texWidth: number;
         public texHeight: number;
+        public visible: boolean;
+        public enable: boolean;
         public click : (x:number,y:number) => void;
 
         constructor(
@@ -381,21 +443,25 @@ namespace Game.GUI {
                 top = 0,
                 width = 0,
                 height = 0,
-                texture = "",
+                texture = null,
                 texLeft = 0,
                 texTop = 0,
-                texWidth = width,
-                texHeight = height,
+                texWidth = 0,
+                texHeight = 0,
+                visible = true,
+                enable = true
             }: {
                     left: number;
                     top: number;
                     width: number;
                     height: number;
-                    texture: string;
-                    texLeft: number;
-                    texTop: number;
-                    texWidth: number;
-                    texHeight: number;
+                    texture?: string;
+                    texLeft?: number;
+                    texTop?: number;
+                    texWidth?: number;
+                    texHeight?: number;
+                    visible?: boolean;
+                    enable?: boolean;
                 }) {
             this.left = left;
             this.top = top;
@@ -406,21 +472,24 @@ namespace Game.GUI {
             this.texTop = texTop;
             this.texWidth = texWidth;
             this.texHeight = texHeight;
+            this.visible = visible;
+            this.enable = enable;
             this.click = () => {};
         }
         draw() {
-            Game.getScreen().drawImage(
-                Game.getScreen().texture(this.texture),
-                this.texLeft,
-                this.texTop,
-                this.texWidth,
-                this.texHeight,
-                this.left,
-                this.top,
-                this.width,
-                this.height
-            );
-
+            if (this.texture != null) {
+                Game.getScreen().drawImage(
+                    Game.getScreen().texture(this.texture),
+                    this.texLeft,
+                    this.texTop,
+                    this.texWidth,
+                    this.texHeight,
+                    this.left,
+                    this.top,
+                    this.width,
+                    this.height
+                );
+            }
         }
         regist(dispatcher : UIDispatcher) {
             const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
@@ -436,6 +505,8 @@ namespace Game.GUI {
         public height: number;
         public lineHeight: number;
         public scrollValue: number;
+        public visible: boolean;
+        public enable: boolean;
         public click: (x: number, y: number) => void;
 
         public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
@@ -449,6 +520,8 @@ namespace Game.GUI {
                 lineHeight = 12,
                 drawItem = () => { },
                 getItemCount = () => 0,
+                visible = true,
+                enable = true
             }: {
                 left: number;
                 top: number;
@@ -457,6 +530,8 @@ namespace Game.GUI {
                 lineHeight?: number
                 drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
                 getItemCount?: () => number,
+                visible?: boolean;
+                enable?: boolean;
             }) {
             this.left = left;
             this.top = top;
@@ -466,6 +541,8 @@ namespace Game.GUI {
             this.drawItem = drawItem;
             this.getItemCount = getItemCount;
             this.scrollValue = 0;
+            this.visible = visible;
+            this.enable = enable;
             this.click = () => {}
         }
         update(): void {
@@ -538,6 +615,8 @@ namespace Game.GUI {
         public value: number;
         public minValue: number;
         public maxValue: number;
+        public visible: boolean;
+        public enable: boolean;
 
         constructor(
             {
@@ -553,6 +632,8 @@ namespace Game.GUI {
                 fontColor = `rgb(0,0,0)`,
                 minValue = 0,
                 maxValue = 0,
+                visible = true,
+                enable = true
             }: {
                 left: number;
                 top: number;
@@ -567,7 +648,11 @@ namespace Game.GUI {
                 fontColor?: string;
                     minValue?: number;
                     maxValue?: number;
-                }) {
+            visible?: boolean;
+            enable?: boolean;
+                }
+
+        ) {
             this.left = left;
             this.top = top;
             this.width = width;
@@ -581,6 +666,8 @@ namespace Game.GUI {
             this.minValue = minValue;
             this.maxValue = maxValue;
             this.value = minValue;
+            this.visible = visible;
+            this.enable = enable;
         }
         draw() {
             const lineWidth = this.width - this.sliderWidth;

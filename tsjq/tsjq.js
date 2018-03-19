@@ -1060,11 +1060,18 @@ var Game;
                 this.off(event, handler);
             }
             draw() {
-                this.uiTable.forEach((value, key) => key.draw());
+                this.uiTable.forEach((value, key) => {
+                    if (key.visible) {
+                        key.draw();
+                    }
+                });
             }
             // UIに対するクリック/タップ操作を捕捉
             onClick(ui, handler) {
                 const hookHandler = (x, y) => {
+                    if (!ui.visible || !ui.enable) {
+                        return;
+                    }
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -1096,6 +1103,9 @@ var Game;
             //UI外のタップ/クリック操作を捕捉
             onNcClick(ui, handler) {
                 const hookHandler = (x, y) => {
+                    if (!ui.visible || !ui.enable) {
+                        return;
+                    }
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -1127,6 +1137,9 @@ var Game;
             // UIに対するスワイプ操作を捕捉
             onSwipe(ui, handler) {
                 const hookHandler = (x, y) => {
+                    if (!ui.visible || !ui.enable) {
+                        return;
+                    }
                     if (!Game.getScreen().pagePointContainScreen(x, y)) {
                         return;
                     }
@@ -1156,7 +1169,7 @@ var Game;
         }
         GUI.UIDispatcher = UIDispatcher;
         class TextBox {
-            constructor({ left = 0, top = 0, width = 0, height = 0, text = "", edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, font = undefined, fontColor = `rgb(0,0,0)`, textAlign = "left", textBaseline = "top", }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, text = "", edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, font = undefined, fontColor = `rgb(0,0,0)`, textAlign = "left", textBaseline = "top", visible = true, enable = true }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1168,14 +1181,22 @@ var Game;
                 this.fontColor = fontColor;
                 this.textAlign = textAlign;
                 this.textBaseline = textBaseline;
+                this.visible = visible;
+                this.enable = enable;
             }
             draw() {
+                const a = this.left + 8;
+                const b = this.left + this.width - 8;
+                const c = this.left;
+                const d = this.left + this.width;
+                const e = this.top;
+                const f = this.top + this.height;
                 Game.getScreen().beginPath();
-                Game.getScreen().moveTo(9 - 0.5, 1 - 0.5);
-                Game.getScreen().bezierCurveTo(1 - 0.5, 1 - 0.5, 1 - 0.5, 42 - 0.5, 9 - 0.5, 42 - 0.5);
-                Game.getScreen().lineTo(242 - 0.5, 42 - 0.5);
-                Game.getScreen().bezierCurveTo(250 - 0.5, 42 - 0.5, 250 - 0.5, 1 - 0.5, 242 - 0.5, 1 - 0.5);
-                Game.getScreen().lineTo(9 - 0.5, 1 - 0.5);
+                Game.getScreen().moveTo(a - 0.5, e - 0.5);
+                Game.getScreen().bezierCurveTo(c - 0.5, e - 0.5, c - 0.5, f - 0.5, a - 0.5, f - 0.5);
+                Game.getScreen().lineTo(b - 0.5, f - 0.5);
+                Game.getScreen().bezierCurveTo(d - 0.5, f - 0.5, d - 0.5, e - 0.5, b - 0.5, e - 0.5);
+                Game.getScreen().lineTo(a - 0.5, e - 0.5);
                 Game.getScreen().closePath();
                 Game.getScreen().fillStyle = this.color;
                 Game.getScreen().fill();
@@ -1188,7 +1209,7 @@ var Game;
                 Game.getScreen().textAlign = this.textAlign;
                 Game.getScreen().textBaseline = this.textBaseline;
                 this.text.split(/\n/).forEach((x, i) => {
-                    Game.getScreen().fillText(x, this.left + 8, this.top + i * (10 + 1) + 8);
+                    Game.getScreen().fillText(x, a, this.top + i * (10 + 1) + 2);
                 });
             }
             regist(dispatcher) { }
@@ -1196,7 +1217,7 @@ var Game;
         }
         GUI.TextBox = TextBox;
         class Button {
-            constructor({ left = 0, top = 0, width = 0, height = 0, text = "", edgeColor = Button.defaultValue.edgeColor, color = Button.defaultValue.color, font = Button.defaultValue.font, fontColor = Button.defaultValue.fontColor, textAlign = Button.defaultValue.textAlign, textBaseline = Button.defaultValue.textBaseline, }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, text = "", edgeColor = Button.defaultValue.edgeColor, color = Button.defaultValue.color, font = Button.defaultValue.font, fontColor = Button.defaultValue.fontColor, textAlign = Button.defaultValue.textAlign, textBaseline = Button.defaultValue.textBaseline, visible = Button.defaultValue.visible, enable = Button.defaultValue.enable, disableEdgeColor = Button.defaultValue.disableEdgeColor, disableColor = Button.defaultValue.disableColor, disableFontColor = Button.defaultValue.disableFontColor, }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1208,16 +1229,21 @@ var Game;
                 this.fontColor = fontColor;
                 this.textAlign = textAlign;
                 this.textBaseline = textBaseline;
+                this.visible = visible;
+                this.enable = enable;
                 this.click = () => { };
+                this.disableEdgeColor = disableEdgeColor;
+                this.disableColor = disableColor;
+                this.disableFontColor = disableFontColor;
             }
             draw() {
-                Game.getScreen().fillStyle = this.color;
+                Game.getScreen().fillStyle = this.enable ? this.color : this.disableColor;
                 Game.getScreen().fillRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
-                Game.getScreen().strokeStyle = this.edgeColor;
+                Game.getScreen().strokeStyle = this.enable ? this.edgeColor : this.disableEdgeColor;
                 Game.getScreen().lineWidth = 1;
                 Game.getScreen().strokeRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
                 Game.getScreen().font = this.font;
-                Game.getScreen().fillStyle = this.fontColor;
+                Game.getScreen().fillStyle = this.enable ? this.fontColor : this.disableFontColor;
                 const text = (this.text instanceof Function) ? this.text.call(this) : this.text;
                 const metrics = Game.getScreen().measureText(text);
                 const height = Game.getScreen().measureText("あ").width;
@@ -1241,10 +1267,15 @@ var Game;
             fontColor: `rgb(255,255,255)`,
             textAlign: "left",
             textBaseline: "top",
+            visible: true,
+            enable: true,
+            disableEdgeColor: `rgb(34,34,34)`,
+            disableColor: `rgb(133,133,133)`,
+            disableFontColor: `rgb(192,192,192)`,
         };
         GUI.Button = Button;
         class ImageButton {
-            constructor({ left = 0, top = 0, width = 0, height = 0, texture = "", texLeft = 0, texTop = 0, texWidth = width, texHeight = height, }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, texture = null, texLeft = 0, texTop = 0, texWidth = 0, texHeight = 0, visible = true, enable = true }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1254,10 +1285,14 @@ var Game;
                 this.texTop = texTop;
                 this.texWidth = texWidth;
                 this.texHeight = texHeight;
+                this.visible = visible;
+                this.enable = enable;
                 this.click = () => { };
             }
             draw() {
-                Game.getScreen().drawImage(Game.getScreen().texture(this.texture), this.texLeft, this.texTop, this.texWidth, this.texHeight, this.left, this.top, this.width, this.height);
+                if (this.texture != null) {
+                    Game.getScreen().drawImage(Game.getScreen().texture(this.texture), this.texLeft, this.texTop, this.texWidth, this.texHeight, this.left, this.top, this.width, this.height);
+                }
             }
             regist(dispatcher) {
                 const cancelHandler = dispatcher.onClick(this, (...args) => this.click.apply(this, args));
@@ -1267,7 +1302,7 @@ var Game;
         }
         GUI.ImageButton = ImageButton;
         class ListBox {
-            constructor({ left = 0, top = 0, width = 0, height = 0, lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, visible = true, enable = true }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1276,6 +1311,8 @@ var Game;
                 this.drawItem = drawItem;
                 this.getItemCount = getItemCount;
                 this.scrollValue = 0;
+                this.visible = visible;
+                this.enable = enable;
                 this.click = () => { };
             }
             update() {
@@ -1339,7 +1376,7 @@ var Game;
         }
         GUI.ListBox = ListBox;
         class HorizontalSlider {
-            constructor({ left = 0, top = 0, width = 0, height = 0, sliderWidth = 5, edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, bgColor = `rgb(192,192,192)`, font = undefined, fontColor = `rgb(0,0,0)`, minValue = 0, maxValue = 0, }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, sliderWidth = 5, edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, bgColor = `rgb(192,192,192)`, font = undefined, fontColor = `rgb(0,0,0)`, minValue = 0, maxValue = 0, visible = true, enable = true }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1353,6 +1390,8 @@ var Game;
                 this.minValue = minValue;
                 this.maxValue = maxValue;
                 this.value = minValue;
+                this.visible = visible;
+                this.enable = enable;
             }
             draw() {
                 const lineWidth = this.width - this.sliderWidth;
@@ -2293,6 +2332,10 @@ Array.prototype.removeIf = function (callback) {
         }
     }
 };
+Object.prototype.reduce = function (callback, seed) {
+    Object.keys(this).forEach(key => seed = callback(seed, [this[key], key]));
+    return seed;
+};
 var PathFinder;
 (function (PathFinder) {
     const dir4 = [
@@ -2586,6 +2629,10 @@ var Scene;
                 atack: "./assets/sound/se_attacksword_1.mp3",
                 explosion: "./assets/sound/explosion03.mp3",
                 cursor: "./assets/sound/cursor.mp3",
+                sen_ge_gusya01: "./assets/sound/sen_ge_gusya01.mp3",
+                boyon1: "./assets/sound/boyon1.mp3",
+                boyoyon1: "./assets/sound/boyoyon1.mp3",
+                meka_ge_reji_op01: "./assets/sound/meka_ge_reji_op01.mp3"
             }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
             GameData.loadConfigs(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
@@ -2877,7 +2924,7 @@ var Scene;
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText(charactorData.data.config.name, left + 48 - 8, top + 3 + 12 * 0);
             Game.getScreen().fillText(`HP:${charactorData.data.hp} MP:${charactorData.data.mp}`, left + 48 - 8, top + 3 + 12 * 1);
-            Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce((s, x) => s + x.atk, 0)} DEF:${charactorData.data.equips.reduce((s, x) => s + x.def, 0)}`, left + 48 - 8, top + 12 * 2);
+            Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce((s, [v, k]) => s + v.atk, 0)} DEF:${charactorData.data.equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 48 - 8, top + 12 * 2);
         }
     }
     function* organization() {
@@ -2909,12 +2956,12 @@ var Scene;
             exitScene = true;
             Game.getSound().reqPlayChannel("cursor");
         };
-        const charactors = GameData.getPlayerIds().map(x => new StatusSprite(GameData.getPlayerData(x, true)));
+        const charactors = GameData.getPlayerIds().map(x => new StatusSprite(GameData.getPlayerData(x)));
         let team = [GameData.getPlayerIds().findIndex(x => x == GameData.forwardCharactor), GameData.getPlayerIds().findIndex(x => x == GameData.backwardCharactor)];
-        let selectedSize = -1;
-        let selectedItem = -1;
+        let selectedSide = -1;
+        let selectedCharactor = -1;
         let anim = 0;
-        const listBox = new Game.GUI.ListBox({
+        const charactorListBox = new Game.GUI.ListBox({
             left: 131,
             top: 46,
             width: 112,
@@ -2922,13 +2969,13 @@ var Scene;
             lineHeight: 48,
             getItemCount: () => charactors.length,
             drawItem: (left, top, width, height, index) => {
-                drawStatusSprite(charactors[index], selectedItem == index, left, top, width, height, anim);
+                drawStatusSprite(charactors[index], selectedCharactor == index, left, top, width, height, anim);
             }
         });
-        dispatcher.add(listBox);
-        listBox.click = (x, y) => {
-            const select = listBox.getItemIndexByPosition(x, y);
-            selectedItem = selectedItem == select ? null : select;
+        dispatcher.add(charactorListBox);
+        charactorListBox.click = (x, y) => {
+            const select = charactorListBox.getItemIndexByPosition(x, y);
+            selectedCharactor = selectedCharactor == select ? null : select;
             Game.getSound().reqPlayChannel("cursor");
         };
         const forwardBtn = new Game.GUI.ImageButton({
@@ -2953,10 +3000,10 @@ var Scene;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText("前衛", forwardBtn.left + 1, forwardBtn.top + 1);
-            drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSize == 0, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
+            drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
         };
         forwardBtn.click = (x, y) => {
-            selectedSize = selectedSize == 0 ? -1 : 0;
+            selectedSide = selectedSide == 0 ? -1 : 0;
             Game.getSound().reqPlayChannel("cursor");
         };
         dispatcher.add(forwardBtn);
@@ -2982,10 +3029,10 @@ var Scene;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText("後衛", backwordBtn.left + 1, backwordBtn.top + 1);
-            drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSize == 1, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
+            drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
         };
         backwordBtn.click = (x, y) => {
-            selectedSize = selectedSize == 1 ? -1 : 1;
+            selectedSide = selectedSide == 1 ? -1 : 1;
             Game.getSound().reqPlayChannel("cursor");
         };
         dispatcher.add(backwordBtn);
@@ -3004,14 +3051,294 @@ var Scene;
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            if (selectedSize != -1 && selectedItem != -1) {
-                team[selectedSize] = selectedItem;
-                selectedSize = -1;
-                selectedItem = -1;
+            if (selectedSide != -1 && selectedCharactor != -1) {
+                team[selectedSide] = selectedCharactor;
+                selectedSide = -1;
+                selectedCharactor = -1;
             }
             if (exitScene) {
                 GameData.forwardCharactor = team[0] == -1 ? null : charactors[team[0]].data.id;
                 GameData.backwardCharactor = team[1] == -1 ? null : charactors[team[1]].data.id;
+                this.next();
+            }
+        };
+        Game.getSceneManager().pop();
+    }
+    function* equipEdit() {
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox({
+            left: 1,
+            top: 1,
+            width: 250,
+            height: 42,
+            text: "装備変更",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        const btnExit = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 11 + 46,
+            width: 112,
+            height: 16,
+            text: "戻る",
+        });
+        dispatcher.add(btnExit);
+        let exitScene = false;
+        btnExit.click = (x, y) => {
+            exitScene = true;
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const charactors = GameData.getPlayerIds().map(x => new StatusSprite(GameData.getPlayerData(x)));
+        let team = [GameData.getPlayerIds().findIndex(x => x == GameData.forwardCharactor), GameData.getPlayerIds().findIndex(x => x == GameData.backwardCharactor)];
+        let selectedCharactor = -1;
+        let selectedEquipPosition = -1;
+        let anim = 0;
+        const charactorListBox = new Game.GUI.ListBox({
+            left: 131,
+            top: 46,
+            width: 112,
+            height: 4 * 48,
+            lineHeight: 48,
+            getItemCount: () => charactors.length,
+            drawItem: (left, top, width, height, index) => {
+                drawStatusSprite(charactors[index], selectedCharactor == index, left, top, width, height, anim);
+            }
+        });
+        dispatcher.add(charactorListBox);
+        charactorListBox.click = (x, y) => {
+            const select = charactorListBox.getItemIndexByPosition(x, y);
+            selectedCharactor = selectedCharactor == select ? null : select;
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        let selectedItem = -1;
+        const itemLists = [];
+        let updateItemList = () => {
+            var newItemLists = GameData.ItemBox.map((x, i) => {
+                switch (selectedEquipPosition) {
+                    case 0:
+                        return (x.item.kind == GameData.ItemKind.Wepon) ? i : -1;
+                    case 1:
+                        return (x.item.kind == GameData.ItemKind.Armor1) ? i : -1;
+                    case 2:
+                        return (x.item.kind == GameData.ItemKind.Armor2) ? i : -1;
+                    case 3:
+                    case 4:
+                        return (x.item.kind == GameData.ItemKind.Accessory) ? i : -1;
+                    default:
+                        return -1;
+                }
+            }).filter(x => x != -1);
+            itemLists.length = 0;
+            Array.prototype.push.apply(itemLists, newItemLists);
+        };
+        const itemListBox = new Game.GUI.ListBox({
+            left: 131,
+            top: 46,
+            width: 112,
+            height: 12 * 16,
+            lineHeight: 16,
+            getItemCount: () => itemLists.length,
+            drawItem: (left, top, width, height, index) => {
+                if (selectedItem == index) {
+                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                }
+                else {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                }
+                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(GameData.ItemBox[itemLists[index]].item.name, left + 3, top + 3);
+            }
+        });
+        dispatcher.add(itemListBox);
+        itemListBox.click = (x, y) => {
+            const select = itemListBox.getItemIndexByPosition(x, y);
+            Game.getSound().reqPlayChannel("cursor");
+            if (select == -1) {
+                return;
+            }
+            switch (selectedEquipPosition) {
+                case 0:
+                    if (charactors[selectedCharactor].data.equips.wepon1 != null) {
+                        const oldItem = charactors[selectedCharactor].data.equips.wepon1;
+                        charactors[selectedCharactor].data.equips.wepon1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                    }
+                    else {
+                        charactors[selectedCharactor].data.equips.wepon1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox.splice(itemLists[select], 1);
+                    }
+                    updateItemList();
+                    break;
+                case 1:
+                    if (charactors[selectedCharactor].data.equips.armor1 != null) {
+                        const oldItem = charactors[selectedCharactor].data.equips.armor1;
+                        charactors[selectedCharactor].data.equips.armor1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                    }
+                    else {
+                        charactors[selectedCharactor].data.equips.armor1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox.splice(itemLists[select], 1);
+                    }
+                    updateItemList();
+                    break;
+                case 2:
+                    if (charactors[selectedCharactor].data.equips.armor2 != null) {
+                        const oldItem = charactors[selectedCharactor].data.equips.armor2;
+                        charactors[selectedCharactor].data.equips.armor2 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                    }
+                    else {
+                        charactors[selectedCharactor].data.equips.armor2 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox.splice(itemLists[select], 1);
+                    }
+                    updateItemList();
+                    break;
+                case 3:
+                    if (charactors[selectedCharactor].data.equips.accessory1 != null) {
+                        const oldItem = charactors[selectedCharactor].data.equips.accessory1;
+                        charactors[selectedCharactor].data.equips.accessory1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                    }
+                    else {
+                        charactors[selectedCharactor].data.equips.accessory1 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox.splice(itemLists[select], 1);
+                    }
+                    updateItemList();
+                    break;
+                case 4:
+                    if (charactors[selectedCharactor].data.equips.accessory2 != null) {
+                        const oldItem = charactors[selectedCharactor].data.equips.accessory2;
+                        charactors[selectedCharactor].data.equips.accessory2 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                    }
+                    else {
+                        charactors[selectedCharactor].data.equips.accessory2 = GameData.ItemBox[itemLists[select]].item;
+                        GameData.ItemBox.splice(itemLists[select], 1);
+                    }
+                    updateItemList();
+                    break;
+                default:
+                    break;
+            }
+        };
+        const statusViewBtn = new Game.GUI.ImageButton({
+            left: 8,
+            top: 46,
+            width: 112,
+            height: 48,
+            texture: null,
+            texLeft: 0,
+            texTop: 0,
+            texWidth: 0,
+            texHeight: 0
+        });
+        statusViewBtn.draw = () => {
+            drawStatusSprite(charactors[selectedCharactor], false, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
+        };
+        statusViewBtn.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = -1;
+        };
+        dispatcher.add(statusViewBtn);
+        const btnWepon1 = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 0 + 46 + 50,
+            width: 112,
+            height: 16,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.wepon1 == null) ? "(武器)" : charactors[selectedCharactor].data.equips.wepon1.name,
+        });
+        dispatcher.add(btnWepon1);
+        btnWepon1.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = selectedEquipPosition == 0 ? -1 : 0;
+            updateItemList();
+        };
+        const btnArmor1 = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 1 + 46 + 50,
+            width: 112,
+            height: 16,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor1 == null) ? "(防具・上半身)" : charactors[selectedCharactor].data.equips.armor1.name,
+        });
+        dispatcher.add(btnArmor1);
+        btnArmor1.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = selectedEquipPosition == 1 ? -1 : 1;
+            updateItemList();
+        };
+        const btnArmor2 = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 2 + 46 + 50,
+            width: 112,
+            height: 16,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor2 == null) ? "(防具・下半身)" : charactors[selectedCharactor].data.equips.armor2.name,
+        });
+        dispatcher.add(btnArmor2);
+        btnArmor2.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = selectedEquipPosition == 2 ? -1 : 2;
+            updateItemList();
+        };
+        const btnAccessory1 = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 3 + 46 + 50,
+            width: 112,
+            height: 16,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory1 == null) ? "(アクセサリ１)" : charactors[selectedCharactor].data.equips.accessory1.name,
+        });
+        dispatcher.add(btnAccessory1);
+        btnAccessory1.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = selectedEquipPosition == 3 ? -1 : 3;
+            updateItemList();
+        };
+        const btnAccessory2 = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 4 + 46 + 50,
+            width: 112,
+            height: 16,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory2 == null) ? "(アクセサリ２)" : charactors[selectedCharactor].data.equips.accessory2.name,
+        });
+        dispatcher.add(btnAccessory2);
+        btnAccessory2.click = () => {
+            Game.getSound().reqPlayChannel("cursor");
+            selectedEquipPosition = selectedEquipPosition == 4 ? -1 : 4;
+            updateItemList();
+        };
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            dispatcher.draw();
+        };
+        itemListBox.visible = selectedEquipPosition != -1;
+        charactorListBox.visible = selectedEquipPosition == -1;
+        btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactor != -1;
+        yield (delta, ms) => {
+            anim = ms % 1000;
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            itemListBox.visible = selectedEquipPosition != -1;
+            charactorListBox.visible = selectedEquipPosition == -1;
+            btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactor != -1;
+            if (exitScene) {
                 this.next();
             }
         };
@@ -3055,6 +3382,7 @@ var Scene;
         });
         dispatcher.add(btnEquip);
         btnEquip.click = (x, y) => {
+            Game.getSceneManager().push(equipEdit);
             Game.getSound().reqPlayChannel("cursor");
         };
         const btnItemBox = new Game.GUI.Button({
@@ -3063,6 +3391,7 @@ var Scene;
             width: 112,
             height: 16,
             text: "道具箱",
+            visible: false
         });
         dispatcher.add(btnItemBox);
         btnItemBox.click = (x, y) => {
@@ -3926,8 +4255,8 @@ var Scene;
                 Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
                 showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`, left + 85, top + 56);
                 showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
-                showStatusText(`${opt.player.getForward().equips.reduce((s, x) => s + x.atk, 0)}`, left + 85, top + 64);
-                showStatusText(`${opt.player.getForward().equips.reduce((s, x) => s + x.def, 0)}`, left + 145, top + 64);
+                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + v.atk, 0)}`, left + 85, top + 64);
+                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 145, top + 64);
             }
             // 後衛
             {
@@ -3941,8 +4270,8 @@ var Scene;
                 Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
                 showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`, left + 85, top + 56);
                 showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`, left + 145, top + 56);
-                showStatusText(`${opt.player.getBackward().equips.reduce((s, x) => s + x.atk, 0)}`, left + 85, top + 64);
-                showStatusText(`${opt.player.getBackward().equips.reduce((s, x) => s + x.def, 0)}`, left + 145, top + 64);
+                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + v.atk, 0)}`, left + 85, top + 64);
+                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 145, top + 64);
             }
             //opt.player.equips.forEach((e, i) => {
             //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
@@ -4146,42 +4475,23 @@ var Scene;
             textBaseline: "top",
         });
         dispatcher.add(caption);
-        const captionMonay = new Game.GUI.Button({
-            left: 135,
-            top: 46,
-            width: 108,
-            height: 16,
-            text: `所持金：${('            ' + 150 + 'G').substr(-13)}`,
-        });
-        dispatcher.add(captionMonay);
-        const btnExit = new Game.GUI.Button({
-            left: 8,
-            top: 16 * 11 + 46,
-            width: 112,
-            height: 16,
-            text: "戻る",
-        });
-        dispatcher.add(btnExit);
-        let exitScene = false;
-        btnExit.click = (x, y) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        };
         const itemlist = [
-            "みかん",
-            "りんご",
-            "バナナ",
-            "オレンジ",
-            "パイナップル",
-            "ぼんたん",
-            "キウイ",
-            "パパイヤ",
-            "マンゴー",
-            "ココナッツ",
-            "ぶどう",
-            "なし",
-            "あけび",
-            "ドラゴンフルーツ",
+            { name: "竹刀", price: 300, kind: GameData.ItemKind.Wepon, description: "471.", atk: 3, def: 0, condition: "", stackable: false },
+            { name: "鉄パイプ", price: 500, kind: GameData.ItemKind.Wepon, description: "819.", atk: 5, def: 0, condition: "", stackable: false },
+            { name: "バット", price: 700, kind: GameData.ItemKind.Wepon, description: "89.", atk: 7, def: 0, condition: "", stackable: false },
+            { name: "水着", price: 200, kind: GameData.ItemKind.Armor1, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
+            { name: "制服", price: 400, kind: GameData.ItemKind.Armor1, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
+            { name: "体操着", price: 600, kind: GameData.ItemKind.Armor1, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
+            { name: "スカート", price: 200, kind: GameData.ItemKind.Armor2, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
+            { name: "ブルマ", price: 400, kind: GameData.ItemKind.Armor2, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
+            { name: "ズボン", price: 600, kind: GameData.ItemKind.Armor2, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
+            { name: "ヘアバンド", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
+            { name: "メガネ", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
+            { name: "靴下", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
+            { name: "イモメロン", price: 100, kind: GameData.ItemKind.Tool, description: "food.", effect: (data) => { }, stackable: true },
+            { name: "プリングルス", price: 890, kind: GameData.ItemKind.Tool, description: "140546.", effect: (data) => { }, stackable: true },
+            { name: "バンテリン", price: 931, kind: GameData.ItemKind.Tool, description: "931.", effect: (data) => { }, stackable: true },
+            { name: "サラダチキン", price: 1000, kind: GameData.ItemKind.Tool, description: "dmkt.", effect: (data) => { }, stackable: true },
         ];
         let selectedItem = -1;
         const listBox = new Game.GUI.ListBox({
@@ -4206,7 +4516,10 @@ var Scene;
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index], left + 9, top + 3);
+                Game.getScreen().fillText(itemlist[index].name, left + 3, top + 3);
+                Game.getScreen().textAlign = "right";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(itemlist[index].price + "G", left + 112, top + 3);
             }
         });
         dispatcher.add(listBox);
@@ -4214,73 +4527,12 @@ var Scene;
             selectedItem = listBox.getItemIndexByPosition(x, y);
             Game.getSound().reqPlayChannel("cursor");
         };
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            dispatcher.draw();
-        };
-        yield (delta, ms) => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (exitScene) {
-                this.next();
-            }
-        };
-        Game.getSceneManager().pop();
-    }
-    function* shop() {
-        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        const btnBuy = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 0 + 46,
-            width: 112,
-            height: 16,
-            text: "アイテム購入",
-        });
-        dispatcher.add(btnBuy);
-        btnBuy.click = (x, y) => {
-            Game.getSceneManager().push(shopBuyItem);
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnSell = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 1 + 46,
-            width: 112,
-            height: 16,
-            text: "アイテム売却",
-        });
-        dispatcher.add(btnSell);
-        btnSell.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-        };
         const captionMonay = new Game.GUI.Button({
             left: 135,
             top: 46,
             width: 108,
             height: 16,
-            text: `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
         const hoverSlider = new Game.GUI.HorizontalSlider({
@@ -4329,9 +4581,383 @@ var Scene;
             top: 64,
             width: 108,
             height: 16,
-            text: () => `購入数：${('           ' + hoverSlider.value + '個').substr(-12)}`,
+            text: () => `購入数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : itemlist[selectedItem].price * hoverSlider.value)).substr(-8) + "G"}`,
         });
         dispatcher.add(captionBuyCount);
+        const btnDoBuy = new Game.GUI.Button({
+            left: 135,
+            top: 110,
+            width: 112,
+            height: 16,
+            text: "購入",
+        });
+        dispatcher.add(btnDoBuy);
+        btnDoBuy.click = (x, y) => {
+            if ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money)) {
+                GameData.Money -= itemlist[selectedItem].price * hoverSlider.value;
+                if (itemlist[selectedItem].stackable) {
+                    var index = GameData.ItemBox.findIndex(x => x.item.name == itemlist[selectedItem].name);
+                    if (index == -1) {
+                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: hoverSlider.value });
+                    }
+                    else {
+                        GameData.ItemBox[index].count += hoverSlider.value;
+                    }
+                }
+                else {
+                    for (let i = 0; i < hoverSlider.value; i++) {
+                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: 1 });
+                    }
+                }
+                selectedItem = -1;
+                hoverSlider.value = 0;
+            }
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnExit = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 11 + 46,
+            width: 112,
+            height: 16,
+            text: "戻る",
+        });
+        dispatcher.add(btnExit);
+        let exitScene = false;
+        btnExit.click = (x, y) => {
+            exitScene = true;
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = false;
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
+            dispatcher.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = (selectedItem != -1);
+            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money));
+            if (exitScene) {
+                this.next();
+            }
+        };
+        Game.getSceneManager().pop();
+    }
+    function* shopSellItem() {
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox({
+            left: 1,
+            top: 1,
+            width: 250,
+            height: 42,
+            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        let selectedItem = -1;
+        const listBox = new Game.GUI.ListBox({
+            left: 8,
+            top: 46,
+            width: 112,
+            height: 10 * 16,
+            lineHeight: 16,
+            getItemCount: () => GameData.ItemBox.length,
+            drawItem: (left, top, width, height, index) => {
+                if (selectedItem == index) {
+                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                }
+                else {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                }
+                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(GameData.ItemBox[index].item.name, left + 3, top + 3);
+                Game.getScreen().textAlign = "right";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText(GameData.ItemBox[index].item.price + "G", left + 112, top + 3);
+            }
+        });
+        dispatcher.add(listBox);
+        listBox.click = (x, y) => {
+            selectedItem = listBox.getItemIndexByPosition(x, y);
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const captionMonay = new Game.GUI.Button({
+            left: 135,
+            top: 46,
+            width: 108,
+            height: 16,
+            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+        });
+        dispatcher.add(captionMonay);
+        const hoverSlider = new Game.GUI.HorizontalSlider({
+            left: 135 + 14,
+            top: 80,
+            width: 108 - 28,
+            height: 16,
+            sliderWidth: 5,
+            updownButtonWidth: 10,
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            minValue: 0,
+            maxValue: 100,
+        });
+        dispatcher.add(hoverSlider);
+        const btnSliderDown = new Game.GUI.Button({
+            left: 135,
+            top: 80,
+            width: 14,
+            height: 16,
+            text: "－",
+        });
+        dispatcher.add(btnSliderDown);
+        btnSliderDown.click = (x, y) => {
+            hoverSlider.value -= 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnSliderUp = new Game.GUI.Button({
+            left: 243 - 14,
+            top: 80,
+            width: 14,
+            height: 16,
+            text: "＋",
+        });
+        dispatcher.add(btnSliderUp);
+        btnSliderUp.click = (x, y) => {
+            hoverSlider.value += 1;
+            hoverSlider.update();
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const captionSellCount = new Game.GUI.Button({
+            left: 135,
+            top: 64,
+            width: 108,
+            height: 16,
+            text: () => `売却数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : GameData.ItemBox[selectedItem].item.price * hoverSlider.value)).substr(-8) + "G"}`,
+        });
+        dispatcher.add(captionSellCount);
+        const btnDoSell = new Game.GUI.Button({
+            left: 135,
+            top: 110,
+            width: 112,
+            height: 16,
+            text: "売却",
+        });
+        dispatcher.add(btnDoSell);
+        btnDoSell.click = (x, y) => {
+            if ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].item.price * hoverSlider.value <= GameData.Money)) {
+                GameData.Money += GameData.ItemBox[selectedItem].item.price * hoverSlider.value;
+                if (GameData.ItemBox[selectedItem].item.stackable && GameData.ItemBox[selectedItem].count > hoverSlider.value) {
+                    GameData.ItemBox[selectedItem].count -= hoverSlider.value;
+                }
+                else {
+                    GameData.ItemBox.splice(selectedItem, 1);
+                }
+                selectedItem = -1;
+                hoverSlider.value = 0;
+            }
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnExit = new Game.GUI.Button({
+            left: 8,
+            top: 16 * 11 + 46,
+            width: 112,
+            height: 16,
+            text: "戻る",
+        });
+        dispatcher.add(btnExit);
+        let exitScene = false;
+        btnExit.click = (x, y) => {
+            exitScene = true;
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = false;
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
+            dispatcher.draw();
+        };
+        yield (delta, ms) => {
+            if (Game.getInput().isDown()) {
+                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isMove()) {
+                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            if (Game.getInput().isUp()) {
+                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+            }
+            captionSellCount.visible = btnDoSell.visible = (selectedItem != -1);
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (GameData.ItemBox[selectedItem].item.stackable);
+            if ((selectedItem != -1) && (!GameData.ItemBox[selectedItem].item.stackable)) {
+                hoverSlider.value = 1;
+            }
+            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].count >= hoverSlider.value));
+            if (exitScene) {
+                this.next();
+            }
+        };
+        Game.getSceneManager().pop();
+    }
+    function* talkScene() {
+        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox({
+            left: 1,
+            top: Game.getScreen().offscreenHeight - 42,
+            width: 250,
+            height: 42,
+            text: "",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        this.draw = () => {
+            dispatcher.draw();
+            fade.draw();
+        };
+        yield Scene.waitTimeout({
+            timeout: 3000,
+            init: () => { fade.startFadeIn(); },
+            end: () => {
+                this.next();
+            },
+        });
+        yield Scene.waitTimeout({
+            timeout: 500,
+            update: (e) => { fade.update(e); },
+            end: () => {
+                fade.stop();
+                this.next();
+            },
+        });
+        const texts = [
+            "【声Ａ】\nこれが今度の実験体かしら。",
+            "【声Ｂ】\nはい、資料によると芋女のＪＫとのことですわ。",
+            "【声Ａ】\nということは、例のルートから･･･ですわね。",
+            "【声Ｂ】\n負債は相当な額だったそうですわ。",
+            "【声Ａ】\n夢破れたりですわね、ふふふ…。\nでも、この実験で生まれ変わりますわ。",
+            "【声Ｂ】\n生きていれば…ですわね、うふふふふふ…。",
+            "【声Ａ】\nそういうことですわね。では、始めましょうか。",
+            "【声Ｂ】\nはい、お姉さま。",
+        ];
+        for (const text of texts) {
+            yield Scene.waitClick({
+                start: (e) => { caption.text = text; },
+                end: () => { this.next(); },
+            });
+        }
+        yield Scene.waitTimeout({
+            timeout: 500,
+            init: () => { fade.startFadeOut(); },
+            update: (e) => { fade.update(e); },
+            end: () => {
+                this.next();
+            },
+        });
+        yield Scene.waitTimeout({
+            timeout: 1000,
+            end: () => {
+                this.next();
+            },
+        });
+        GameData.Money = 0;
+        Game.getSceneManager().pop();
+        Game.getSound().reqPlayChannel("classroom", true);
+    }
+    function* shop() {
+        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const caption = new Game.GUI.TextBox({
+            left: 1,
+            top: 1,
+            width: 250,
+            height: 42,
+            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        const btnBuy = new Game.GUI.Button({
+            left: 8,
+            top: 20 * 0 + 46,
+            width: 112,
+            height: 16,
+            text: "アイテム購入",
+        });
+        dispatcher.add(btnBuy);
+        btnBuy.click = (x, y) => {
+            Game.getSceneManager().push(shopBuyItem);
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const btnSell = new Game.GUI.Button({
+            left: 8,
+            top: 20 * 1 + 46,
+            width: 112,
+            height: 16,
+            text: "アイテム売却",
+        });
+        dispatcher.add(btnSell);
+        btnSell.click = (x, y) => {
+            Game.getSceneManager().push(shopSellItem);
+            Game.getSound().reqPlayChannel("cursor");
+        };
+        const captionMonay = new Game.GUI.Button({
+            left: 135,
+            top: 46,
+            width: 108,
+            height: 16,
+            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+        });
+        dispatcher.add(captionMonay);
+        const btnMomyu = new Game.GUI.ImageButton({
+            left: 151,
+            top: 179,
+            width: 61,
+            height: 31,
+            texture: null
+        });
+        dispatcher.add(btnMomyu);
+        let momyu = 0;
+        btnMomyu.click = (x, y) => {
+            if (Math.random() > 0.5) {
+                Game.getSound().reqPlayChannel("boyon1");
+            }
+            else {
+                Game.getSound().reqPlayChannel("boyoyon1");
+            }
+            momyu += 500;
+        };
         const btnExit = new Game.GUI.Button({
             left: 8,
             top: 16 * 11 + 46,
@@ -4347,7 +4973,7 @@ var Scene;
         };
         this.draw = () => {
             Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 127 * ((momyu >= 5000) ? 1 : 0), 0, 127, 141, 113, 83, 127, 141);
             dispatcher.draw();
             fade.draw();
         };
@@ -4374,16 +5000,54 @@ var Scene;
                 this.next();
             }
         };
-        yield Scene.waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); },
-            end: () => {
-                fade.stop();
-                this.next();
-            },
-        });
-        Game.getSceneManager().pop();
+        if (momyu > 0) {
+            Game.getSound().reqPlayChannel("meka_ge_reji_op01");
+            GameData.Money -= momyu;
+            yield Scene.waitTimeout({
+                timeout: 1000,
+                end: () => {
+                    this.next();
+                },
+            });
+        }
+        if (GameData.Money <= -50000) {
+            Game.getSound().reqStopChannel("classroom");
+            Game.getSound().reqPlayChannel("sen_ge_gusya01");
+            let rad = 0;
+            this.draw = () => {
+                Game.getScreen().translate(0, Math.sin(rad) * Math.cos(rad / 4) * 100);
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 141, 127, 141, 113, 83, 127, 141);
+                dispatcher.draw();
+                fade.draw();
+            };
+            yield Scene.waitTimeout({
+                timeout: 1000,
+                init: () => { fade.startFadeOut(); },
+                update: (e) => {
+                    rad = e * Math.PI / 25;
+                    fade.update(e);
+                },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
+            Game.getSceneManager().pop();
+            Game.getSceneManager().push(talkScene);
+        }
+        else {
+            yield Scene.waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeOut(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
+            Game.getSceneManager().pop();
+        }
     }
     Scene.shop = shop;
 })(Scene || (Scene = {}));
@@ -4589,8 +5253,17 @@ var Charactor;
 })(Charactor || (Charactor = {}));
 var GameData;
 (function (GameData) {
+    let ItemKind;
+    (function (ItemKind) {
+        ItemKind[ItemKind["Wepon"] = 0] = "Wepon";
+        ItemKind[ItemKind["Armor1"] = 1] = "Armor1";
+        ItemKind[ItemKind["Armor2"] = 2] = "Armor2";
+        ItemKind[ItemKind["Accessory"] = 3] = "Accessory";
+        ItemKind[ItemKind["Tool"] = 4] = "Tool";
+        ItemKind[ItemKind["Treasure"] = 5] = "Treasure";
+    })(ItemKind = GameData.ItemKind || (GameData.ItemKind = {}));
     GameData.ItemBox = [];
-    GameData.Money = 100;
+    GameData.Money = 10000;
     function loadCharactorConfigFromFile(path, loadStartCallback, loadEndCallback) {
         return __awaiter(this, void 0, void 0, function* () {
             const configDirectory = path.substring(0, path.lastIndexOf("/"));
@@ -4678,16 +5351,17 @@ var GameData;
     }
     GameData.PlayerData = PlayerData;
     const charactorDatas = new Map();
-    function getPlayerData(id, defaultIfEmpty = true) {
+    function getPlayerData(id) {
         let ret = charactorDatas.get(id);
-        if (ret == null && defaultIfEmpty) {
+        if (ret == null) {
             let cfg = playerConfigs.get(id);
             if (cfg != null) {
                 ret = new PlayerData();
-                ret.equips = [];
+                ret.equips = {};
                 ret.hp = 100;
                 ret.mp = 100;
                 ret.id = id;
+                charactorDatas.set(id, ret);
             }
         }
         return ret;
@@ -4750,6 +5424,7 @@ var Charactor;
     }
     Charactor.Monster = Monster;
 })(Charactor || (Charactor = {}));
+//  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
 var Charactor;
 (function (Charactor) {
     class Player extends Charactor.CharactorBase {
@@ -4762,7 +5437,7 @@ var Charactor;
                 id: GameData.forwardCharactor,
                 name: forward.config.name,
                 spriteSheet: forward.config.sprite,
-                equips: forward.equips.slice(),
+                equips: Object.assign({}, forward.equips),
                 mp: forward.mp,
                 hp: forward.hp,
                 mpMax: forward.mp,
@@ -4774,7 +5449,7 @@ var Charactor;
                     id: GameData.backwardCharactor,
                     spriteSheet: backward.config.sprite,
                     name: backward.config.name,
-                    equips: backward.equips.slice(),
+                    equips: Object.assign({}, backward.equips),
                     mp: backward.mp,
                     hp: backward.hp,
                     mpMax: backward.mp,
@@ -4794,10 +5469,10 @@ var Charactor;
         set spriteSheet(value) {
         }
         get atk() {
-            return this.members[this.active].equips.reduce((s, x) => s += x.atk, 0);
+            return this.members[this.active].equips.reduce((s, [v, k]) => s += v.atk, 0);
         }
         get def() {
-            return this.members[this.active].equips.reduce((s, x) => s += x.def, 0);
+            return this.members[this.active].equips.reduce((s, [v, k]) => s += v.def, 0);
         }
     }
     Charactor.Player = Player;
@@ -4889,6 +5564,7 @@ var Scene;
                 Game.getSceneManager().push(Scene.dungeon, { player: new Charactor.Player(), floor: 1 });
             };
         };
+        btnDungeon.enable = GameData.forwardCharactor != null;
         this.draw = () => {
             Game.getScreen().drawImage(Game.getScreen().texture("corridorbg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             dispatcher.draw();
@@ -4915,6 +5591,7 @@ var Scene;
                 if (Game.getInput().isUp()) {
                     dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
                 }
+                btnDungeon.enable = GameData.forwardCharactor != null;
                 if (selected != null) {
                     this.next();
                 }

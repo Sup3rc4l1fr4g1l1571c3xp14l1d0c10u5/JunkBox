@@ -3,12 +3,20 @@
 /// <reference path="./CharactorBase.ts" />
 "use strict";
 
+//  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
+
 namespace Charactor {
     interface MemberStatus {
         id:string;
         name:string;
         spriteSheet: SpriteAnimation.SpriteSheet;
-        equips: GameData.EquipableItem[];
+        equips:  {
+            wepon1?: GameData.EquipableItemData;
+            armor1?: GameData.EquipableItemData;
+            armor2?: GameData.EquipableItemData;
+            accessory1?: GameData.EquipableItemData;
+            accessory2?: GameData.EquipableItemData;
+        };
         hp: number;
         mp: number;
         hpMax: number;
@@ -36,7 +44,7 @@ namespace Charactor {
                 id:GameData.forwardCharactor,
                 name:forward.config.name,
                 spriteSheet : forward.config.sprite,
-                equips : forward.equips.slice(),
+                equips: Object.assign({}, forward.equips),
                 mp : forward.mp,
                 hp : forward.hp,
                 mpMax : forward.mp,
@@ -48,7 +56,7 @@ namespace Charactor {
                 id:GameData.backwardCharactor,
                     spriteSheet : backward.config.sprite,
                 name:backward.config.name,
-                    equips : backward.equips.slice(),
+                    equips : Object.assign({}, backward.equips),
                     mp : backward.mp,
                     hp : backward.hp,
                     mpMax : backward.mp,
@@ -58,10 +66,10 @@ namespace Charactor {
         }
 
         public get atk() {
-            return this.members[this.active].equips.reduce((s, x) => s += x.atk, 0);
+            return this.members[this.active].equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s += v.atk, 0);
         }
         public get def() {
-            return this.members[this.active].equips.reduce((s, x) => s += x.def, 0);
+            return this.members[this.active].equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s += v.def, 0);
         }
 
     }

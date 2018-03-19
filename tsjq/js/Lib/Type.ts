@@ -27,3 +27,12 @@ Array.prototype.removeIf = function<T>(callback:(item:T, index:number) => boolea
         }
     }
 };
+
+interface Object {
+    reduce<TValue, T>(callback:(seed:T, vk:[TValue, string]) => T, seed:T):T ;
+}
+
+Object.prototype.reduce = function <TValue, T>(callback: (seed: T, vk: [TValue, string]) => T, seed: T): T {
+    Object.keys(this).forEach(key => seed = callback(seed, [this[key], key]));
+    return seed;
+};

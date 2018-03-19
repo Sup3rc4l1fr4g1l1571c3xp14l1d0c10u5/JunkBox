@@ -1003,8 +1003,8 @@ namespace Scene {
             Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`,left+85,top+56);
             showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`,left+145,top+56);
-            showStatusText(`${opt.player.getForward().equips.reduce((s,x) => s + x.atk,0)}`,left+85,top+64);
-            showStatusText(`${opt.player.getForward().equips.reduce((s,x) => s + x.def,0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getForward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k])=> s + v.atk,0)}`,left+85,top+64);
+            showStatusText(`${opt.player.getForward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k])=> s + v.def,0)}`,left+145,top+64);
             }
             // 後衛
             {
@@ -1024,8 +1024,8 @@ namespace Scene {
             Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`,left+85,top+56);
             showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`,left+145,top+56);
-            showStatusText(`${opt.player.getBackward().equips.reduce((s,x) => s + x.atk,0)}`,left+85,top+64);
-            showStatusText(`${opt.player.getBackward().equips.reduce((s,x) => s + x.def,0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getBackward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s + v.atk,0)}`,left+85,top+64);
+            showStatusText(`${opt.player.getBackward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s + v.def,0)}`,left+145,top+64);
             }
             //opt.player.equips.forEach((e, i) => {
             //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
