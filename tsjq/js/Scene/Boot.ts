@@ -58,7 +58,8 @@ namespace Scene {
                 () => { reqResource++; },
                 () => { loadedResource++; },
             ).catch((ev) => console.log("failed2", ev)),
-            GameData.loadConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            Data.Monster.SetupMonsterData(() => { reqResource++; }, () => { loadedResource++; }),
+            Data.Charactor.SetupCharactorData(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
                 reqResource++;
                 return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
@@ -68,7 +69,10 @@ namespace Scene {
             })
         ]).then(() => {
             Game.getSceneManager().push(title, null);
-            //Game.getSceneManager().push(shop, null);
+
+            //const sd = new Data.SaveData.SaveData();
+            //sd.loadGameData();
+            //Game.getSceneManager().push(shop, sd);
             this.next();
         });
         yield (delta: number, ms: number) => {

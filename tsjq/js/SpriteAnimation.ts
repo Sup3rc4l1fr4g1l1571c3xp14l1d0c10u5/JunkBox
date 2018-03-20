@@ -101,163 +101,110 @@ namespace SpriteAnimation {
         }
     }
 
-    namespace Json {
-        // スプライトシート
-        export interface ISpriteSheet {
-            source: { [id: string]: string };
-            sprite: { [id: string]: ISprite };
-            animation: { [id: string]: IAnimation[] };
-        }
-
-        // スプライト定義
-        export interface ISprite {
-            source: string;
-            left: number;
-            top: number;
-            width: number;
-            height: number;
-            offsetX: number;
-            offsetY: number;
-        }
-
-        // アニメーション定義
-        export interface IAnimation {
-            sprite: string;
-            time: number;
-            offsetX: number;
-            offsetY: number;
-        }
+    // スプライトシート
+    export interface ISpriteSheet {
+            source: {[key:number] : string};
+            sprite: { 
+                [key: number]:  ISprite
+            };
+            animation: {
+                [key: string]: IAnimation[]
+            };
+    }
+    export interface ISprite {
+        source: number;
+        left:number;
+        top:number;
+        width:number;
+        height:number;
+        offsetX:number;
+        offsetY:number;
+    }
+    export interface IAnimation {
+        sprite:number;
+        time:number;
+        offsetX: number;
+        offsetY:number;
     }
 
     // スプライトシート
     export class SpriteSheet {
-        public source: Map<string, HTMLImageElement>;
-        public sprite: Map<string, Sprite>;
-        public animation: Map<string, Animation[]>;
-        constructor({ source = null, sprite = null, animation = null }: { source: Map<string, HTMLImageElement>; sprite: Map<string, Sprite>; animation: Map<string, Animation[]> }) {
+        public source: Map<number, HTMLImageElement>;
+        public sprite: Map<number, ISprite>;
+        public animation: Map<string, IAnimation[]>;
+        constructor({ source = null, sprite = null, animation = null }: { source: Map<number, HTMLImageElement>; sprite: Map<number, ISprite>; animation: Map<string, IAnimation[]> }) {
             this.source = source;
             this.sprite = sprite;
             this.animation = animation;
         }
 
-        public getAnimation(animName: string): Animation[] {
+        public getAnimation(animName: string): IAnimation[] {
             return this.animation.get(animName);
         }
 
-        public getAnimationFrame(animName: string, animFrame: number): Animation {
+        public getAnimationFrame(animName: string, animFrame: number): IAnimation {
             return this.animation.get(animName)[animFrame];
         }
 
-        public gtetSprite(spriteName: string): Sprite {
-            return this.sprite.get(spriteName);
+        public gtetSprite(id: number): ISprite {
+            return this.sprite.get(id);
         }
 
-        public getSpriteImage(sprite: Sprite): HTMLImageElement {
+        public getSpriteImage(sprite: ISprite): HTMLImageElement {
             return this.source.get(sprite.source);
         }
-    }
 
-    // スプライト定義
-    class Sprite {
-        public source: string;
-        public left: number;
-        public top: number;
-        public width: number;
-        public height: number;
-        public offsetX: number;
-        public offsetY: number;
-
-        constructor(sprite: Json.ISprite) {
-            this.source = sprite.source;
-            this.left = sprite.left;
-            this.top = sprite.top;
-            this.width = sprite.width;
-            this.height = sprite.height;
-            this.offsetX = sprite.offsetX;
-            this.offsetY = sprite.offsetY;
+        private static async loadImage(imageSrc: string): Promise<HTMLImageElement> {
+            return new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.src = imageSrc;
+                img.onload = () => {
+                    resolve(img);
+                };
+                img.onerror = () => { 
+                    reject(imageSrc + "のロードに失敗しました。"); 
+                };
+            });
         }
 
-    }
+        public static async Create(
+            ss: ISpriteSheet,
+            loadStartCallback: () => void,
+            loadEndCallback: () => void
+        ) : Promise<SpriteSheet> {
+            const source: Map<number, HTMLImageElement> = new Map<number, HTMLImageElement>();
+            const sprite: Map<number, ISprite> = new Map<number, ISprite>();
+            const animation: Map<string, IAnimation[]> = new Map<string, IAnimation[]>();
 
-    // アニメーション定義
-    class Animation {
-        public sprite: string;
-        public time: number;
-        public offsetX: number;
-        public offsetY: number;
 
-        constructor(animation: Json.IAnimation) {
-            this.sprite = animation.sprite;
-            this.time = animation.time;
-            this.offsetX = animation.offsetX;
-            this.offsetY = animation.offsetY;
-        }
-    }
-
-    async function loadImage(imageSrc: string): Promise<HTMLImageElement> {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.src = imageSrc;
-            img.onload = () => {
-                resolve(img);
-            };
-            img.onerror = () => { reject(imageSrc + "のロードに失敗しました。"); };
-        });
-    }
-
-    export async function loadSpriteSheet(
-        spriteSheetPath: string,
-        loadStartCallback: () => void,
-        loadEndCallback: () => void
-    ): Promise<SpriteSheet> {
-
-        const spriteSheetDir: string = getDirectory(spriteSheetPath);
-        loadStartCallback();
-        const spriteSheetJson: Json.ISpriteSheet = await ajax(spriteSheetPath, "json").then(y => y.response as Json.ISpriteSheet);
-        loadEndCallback();
-        if (spriteSheetJson == null) {
-            throw new Error(spriteSheetPath + " is invalid json.");
-        }
-
-        const source: Map<string, HTMLImageElement> = new Map<string, HTMLImageElement>();
-        {
-            const keys = Object.keys(spriteSheetJson.source);
+            {
+            const keys = Object.keys(ss.source);
             for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-                const imageSrc: string = spriteSheetDir + '/' + spriteSheetJson.source[key];
+                const key = ~~keys[i];
+                const imageSrc: string = ss.source[key];
                 loadStartCallback();
-                const image: HTMLImageElement = await loadImage(imageSrc);
+                const image: HTMLImageElement = await SpriteSheet.loadImage(imageSrc);
                 loadEndCallback();
                 source.set(key, image);
             }
-        }
-
-        const sprite: Map<string, Sprite> = new Map<string, Sprite>();
-        {
-            const keys = Object.keys(spriteSheetJson.sprite);
+                }
+            {
+            const keys = Object.keys(ss.sprite);
+            for (let i = 0; i < keys.length; i++) {
+                const key = ~~keys[i];
+                sprite.set(key, ss.sprite[key]);
+            }
+                }
+            {
+            const keys = Object.keys(ss.animation);
             for (let i = 0; i < keys.length; i++) {
                 const key = keys[i];
-                sprite.set(key, new Sprite(spriteSheetJson.sprite[key]));
+                animation.set(key, ss.animation[key]);
             }
+                }
+            return new SpriteSheet({source:source, sprite:sprite, animation:animation});
+
         }
-
-        const animation: Map<string, Animation[]> = new Map<string, Animation[]>();
-        {
-            const keys = Object.keys(spriteSheetJson.animation);
-            for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-                const value = spriteSheetJson.animation[key].map(x => new Animation(x));
-                animation.set(key, value);
-            }
-        }
-
-        const spriteSheet: SpriteSheet = new SpriteSheet({
-            source: source,
-            sprite: sprite,
-            animation: animation,
-        });
-
-        return spriteSheet;
     }
 
 }

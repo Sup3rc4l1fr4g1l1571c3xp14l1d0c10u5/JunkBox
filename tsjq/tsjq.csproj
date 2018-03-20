@@ -85,11 +85,16 @@
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="js\Charactor\CharactorBase.ts" />
-    <TypeScriptCompile Include="js\Charactor\Player.ts" />
-    <TypeScriptCompile Include="js\Charactor\Monster.ts" />
+    <TypeScriptCompile Include="js\Font7px.ts" />
+    <TypeScriptCompile Include="js\Unit\UnitBase.ts" />
+    <TypeScriptCompile Include="js\Unit\Player.ts" />
+    <TypeScriptCompile Include="js\Unit\Monster.ts" />
     <TypeScriptCompile Include="js\CSSFontLoadingAPI.d.ts" />
-    <TypeScriptCompile Include="js\GameData.ts" />
+    <TypeScriptCompile Include="js\Data\SaveData.ts" />
+    <TypeScriptCompile Include="js\Data\Item.ts" />
+    <TypeScriptCompile Include="js\Data\Monster.ts" />
+    <TypeScriptCompile Include="js\Data\Charactor.ts" />
+    <TypeScriptCompile Include="js\Data\Player.ts" />
     <TypeScriptCompile Include="js\Lib\Game\GUI.ts" />
     <TypeScriptCompile Include="js\Scene\Corridor.ts" />
     <TypeScriptCompile Include="js\Scene\Shop.ts" />
@@ -114,7 +119,7 @@
     <TypeScriptCompile Include="js\Scene\Boot.ts" />
     <TypeScriptCompile Include="js\Scene\ClassRoom.ts" />
     <TypeScriptCompile Include="js\Scene\Helper.ts" />
-    <TypeScriptCompile Include="js\Sprite.ts" />
+    <TypeScriptCompile Include="js\Particle.ts" />
     <TypeScriptCompile Include="js\SpriteAnimation.ts" />
     <TypeScriptCompile Include="js\Lib\Type.ts" />
   </ItemGroup>

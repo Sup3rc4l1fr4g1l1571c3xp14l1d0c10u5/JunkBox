@@ -1,5 +1,5 @@
 namespace Scene {
-    export function* mapview(data: { map: Dungeon.DungeonData, player: Charactor.Player }): IterableIterator<any> {
+    export function* mapview(data: { map: Dungeon.DungeonData, player: Unit.Player }): IterableIterator<any> {
         this.draw = () => {
             Game.getScreen().save();
             Game.getScreen().fillStyle = "rgb(0,0,0)";

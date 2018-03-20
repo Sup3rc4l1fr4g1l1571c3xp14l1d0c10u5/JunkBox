@@ -1,47 +1,45 @@
 /// <reference path="../SpriteAnimation.ts" />
-/// <reference path="../GameData.ts" />
-/// <reference path="./CharactorBase.ts" />
+/// <reference path="./UnitBase.ts" />
 "use strict";
 
 //  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
 
-namespace Charactor {
+namespace Unit {
     interface MemberStatus {
         id:string;
         name:string;
         spriteSheet: SpriteAnimation.SpriteSheet;
-        equips:  {
-            wepon1?: GameData.EquipableItemData;
-            armor1?: GameData.EquipableItemData;
-            armor2?: GameData.EquipableItemData;
-            accessory1?: GameData.EquipableItemData;
-            accessory2?: GameData.EquipableItemData;
+        equips: {
+            wepon1?: Data.Item.ItemBoxEntry;
+            armor1?: Data.Item.ItemBoxEntry;
+            armor2?: Data.Item.ItemBoxEntry;
+            accessory1?: Data.Item.ItemBoxEntry;
+            accessory2?: Data.Item.ItemBoxEntry;
         };
         hp: number;
         mp: number;
         hpMax: number;
         mpMax: number;
     }
-    export class Player extends CharactorBase {
+    export class Player extends UnitBase {
         public members: MemberStatus[] = [];
             public active : number;
         public getForward(): MemberStatus {
-            return this.members[this.active == 0 ? 0 : 1];
+            return this.members[this.active === 0 ? 0 : 1];
         }
         public getBackward(): MemberStatus {
-            return this.members[this.active == 0 ? 1 : 0];
+            return this.members[this.active === 0 ? 1 : 0];
         }
         public get spriteSheet(): SpriteAnimation.SpriteSheet {
             return this.members[this.active].spriteSheet;
         }
         public set spriteSheet(value: SpriteAnimation.SpriteSheet) {
         }
-        constructor() {
-            super(0, 0, GameData.getPlayerData(GameData.forwardCharactor).config.sprite);
-            const forward = GameData.getPlayerData(GameData.forwardCharactor);
+        constructor(forward: Data.Player.PlayerData, backward: Data.Player.PlayerData) {
+            super(0, 0,forward.config.sprite);
             this.active = 0;
             this.members[0] = {
-                id:GameData.forwardCharactor,
+                id: forward.id,
                 name:forward.config.name,
                 spriteSheet : forward.config.sprite,
                 equips: Object.assign({}, forward.equips),
@@ -50,10 +48,9 @@ namespace Charactor {
                 mpMax : forward.mp,
                 hpMax : forward.hp
             };
-            const backward = GameData.getPlayerData(GameData.backwardCharactor);
             if (backward != null) {
                 this.members[1] = {
-                id:GameData.backwardCharactor,
+                    id: backward.id,
                     spriteSheet : backward.config.sprite,
                 name:backward.config.name,
                     equips : Object.assign({}, backward.equips),
@@ -66,10 +63,10 @@ namespace Charactor {
         }
 
         public get atk() {
-            return this.members[this.active].equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s += v.atk, 0);
+            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0);
         }
         public get def() {
-            return this.members[this.active].equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s += v.def, 0);
+            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0);
         }
 
     }

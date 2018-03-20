@@ -18,9 +18,9 @@
 /// <reference path="./js/PathFinder.ts" />
 /// <reference path="./js/Dungeon.ts" />
 /// <reference path="./js/SpriteAnimation.ts" />
-/// <reference path="./js/charactor/charactorbase.ts" />
-/// <reference path="./js/charactor/monster.ts" />
-/// <reference path="./js/charactor/player.ts" />
+/// <reference path="./js/Unit/UnitBase.ts" />
+/// <reference path="./js/Unit/Monster.ts" />
+/// <reference path="./js/Unit/Player.ts" />
 /// <reference path="./js/Scene/Boot.ts" />
 /// <reference path="./js/Scene/ClassRoom.ts" />
 /// <reference path="./js/Scene/Dungeon.ts" />
@@ -28,7 +28,13 @@
 /// <reference path="./js/Scene/MapView.ts" />
 /// <reference path="./js/Scene/Title.ts" />
 /// <reference path="./js/Scene/Shop.ts" />
-/// <reference path="./js/Sprite.ts" />
+/// <reference path="./js/Particle.ts" />
+/// <reference path="./js/Font7px.ts" />
+/// <reference path="./js/Data/Item.ts" />
+/// <reference path="./js/Data/Charactor.ts" />
+/// <reference path="./js/Data/Monster.ts" />
+/// <reference path="./js/Data/Player.ts" />
+/// <reference path="./js/Data/SaveData.ts" />
 "use strict";
 // <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 
@@ -44,7 +50,7 @@ window.onload = () => {
         }
     }).then(() => {
         Game.getSceneManager().push(Scene.boot, null);
-        Game.getTimer().on((delta, now, id) => {
+        Game.getTimer().on((delta, now) => {
             Game.getInput().endCapture();
             Game.getSceneManager().update(delta, now);
             Game.getInput().startCapture();

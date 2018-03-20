@@ -290,10 +290,7 @@ namespace Game.GUI {
             const metrics = Game.getScreen().measureText(this.text);
             Game.getScreen().textAlign = this.textAlign;
             Game.getScreen().textBaseline = this.textBaseline;
-            this.text.split(/\n/).forEach((x: string, i: number) => {
-                Game.getScreen().fillText(x, a, this.top + i * (10 + 1) +2);
-            });
-
+            Game.getScreen().fillTextBox(this.text, a, e, this.width, this.height);
         }
         regist(dispatcher : UIDispatcher) {}
         unregist(dispatcher : UIDispatcher) {}
@@ -407,14 +404,10 @@ namespace Game.GUI {
             Game.getScreen().font = this.font;
             Game.getScreen().fillStyle = this.enable ? this.fontColor : this.disableFontColor;
             const text = (this.text instanceof Function) ? (this.text as (() => string)).call(this) : this.text
-            const metrics = Game.getScreen().measureText(text);
-            const height  = Game.getScreen().measureText("あ").width;
-            const lines = text.split(/\n/);
             Game.getScreen().textAlign = this.textAlign;
             Game.getScreen().textBaseline = this.textBaseline;
-            lines.forEach((x: string, i: number) => {
-                Game.getScreen().fillText(x, this.left + 1, this.top + i * (height + 1) + 1);
-            });
+            Game.getScreen().fillTextBox(text, this.left + 1, this.top + 1, this.width - 2, this.height - 2);
+
         }
         regist(dispatcher : UIDispatcher) {
             const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
@@ -507,6 +500,7 @@ namespace Game.GUI {
         public scrollValue: number;
         public visible: boolean;
         public enable: boolean;
+        public scrollbarWidth: number;
         public click: (x: number, y: number) => void;
 
         public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
@@ -521,7 +515,8 @@ namespace Game.GUI {
                 drawItem = () => { },
                 getItemCount = () => 0,
                 visible = true,
-                enable = true
+                enable = true,
+                scrollbarWidth = 1
             }: {
                 left: number;
                 top: number;
@@ -532,6 +527,7 @@ namespace Game.GUI {
                 getItemCount?: () => number,
                 visible?: boolean;
                 enable?: boolean;
+                scrollbarWidth?: number;
             }) {
             this.left = left;
             this.top = top;
@@ -543,6 +539,7 @@ namespace Game.GUI {
             this.scrollValue = 0;
             this.visible = visible;
             this.enable = enable;
+            this.scrollbarWidth = scrollbarWidth;
             this.click = () => {}
         }
         update(): void {
@@ -566,13 +563,27 @@ namespace Game.GUI {
                 if (index >= itemCount) { break; }
                 Game.getScreen().save();
                 Game.getScreen().beginPath();
-                Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1, Math.min(drawResionHeight, this.lineHeight));
+                Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1 - this.scrollbarWidth, Math.min(drawResionHeight, this.lineHeight));
                 Game.getScreen().clip();
-                this.drawItem(this.left, this.top + sy, this.width, this.lineHeight, index);
+                this.drawItem(this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
                 Game.getScreen().restore();
                 drawResionHeight -= this.lineHeight;
                 sy += this.lineHeight;
                 index++;
+            }
+            const contentHeight = this.lineHeight * itemCount;
+            if (contentHeight > this.height) {
+                const viewSizeRate = this.height * 1.0 / contentHeight;
+                const scrollBarHeight = viewSizeRate * this.height;
+                const scrollBarBlankHeight = this.height - scrollBarHeight;
+                const scrollPosRate = this.scrollValue * 1.0 / (contentHeight - this.height);
+                const scrollBarTop =(scrollBarBlankHeight * scrollPosRate);
+
+                Game.getScreen().fillStyle = "rgb(128,128,128)";
+                Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top, this.scrollbarWidth, this.height);
+
+                Game.getScreen().fillStyle = "rgb(255,255,255)";
+                Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top + ~~scrollBarTop, this.scrollbarWidth, ~~scrollBarHeight);
             }
         }
         getItemIndexByPosition(x: number, y: number) {
@@ -633,7 +644,7 @@ namespace Game.GUI {
                 minValue = 0,
                 maxValue = 0,
                 visible = true,
-                enable = true
+                enable = true,
             }: {
                 left: number;
                 top: number;

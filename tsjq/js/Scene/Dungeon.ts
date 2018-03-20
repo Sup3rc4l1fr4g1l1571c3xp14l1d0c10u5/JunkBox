@@ -13,7 +13,7 @@ namespace Scene {
         TurnEnd, // ターン終了
     }
 
-    export function* dungeon(param: { player: Charactor.Player, floor: number }): IterableIterator<any> {
+    export function* dungeon(param: { saveData: Data.SaveData.SaveData, player: Unit.Player, floor: number }): IterableIterator < any > {
         const player = param.player;
         const floor = param.floor;
 
@@ -61,7 +61,7 @@ namespace Scene {
 
         // モンスター配置
         let monsters = rooms.splice(2).map((x) => {
-            var monster = new Charactor.Monster("slime");
+            var monster = new Unit.Monster("slime");
                 monster.x = x.getLeft();
                 monster.y = x.getTop();
                 monster.life = monster.maxLife = floor + 5;
@@ -169,7 +169,7 @@ namespace Scene {
 
         const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
 
-        let sprites: ISprite[] = [];
+        let particles: Particle.IParticle[] = [];
 
         const dispatcher: Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
 
@@ -394,12 +394,12 @@ namespace Scene {
             });
 
             // スプライト
-            sprites.forEach((x) => x.draw(map.camera));
+            particles.forEach((x) => x.draw(map.camera));
 
             // 情報
-            draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
-            draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
-            draw7pxFont(`     | GOLD:${GameData.Money}`, 0, 6 * 2);
+            Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
+            Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
+            Font7px.draw7pxFont(`     | GOLD:${param.saveData.Money}`, 0, 6 * 2);
             //menuicon
 
             // UI
@@ -461,7 +461,7 @@ namespace Scene {
                 player: {},
                 monsters: []
             },
-            sprites: sprites,
+            sprites: particles,
             scene: this,
         };
 
@@ -471,6 +471,8 @@ namespace Scene {
         let playerTactics: any = {};
         const monstersTactics: any[] = [];
         yield (delta: number, ms: number) => {
+
+            // ターン進行
             turnContext.ms = ms;
             while (turnStateStack[0].next().done) { }
 
@@ -486,7 +488,7 @@ namespace Scene {
             );
 
             // スプライトを更新
-            sprites.removeIf((x) => x.update(delta, ms));
+            particles.removeIf((x) => x.update(delta, ms));
 
             updateLighting((v: number) => v === 1 || v === 10);
 
@@ -496,7 +498,7 @@ namespace Scene {
                 } else {
                     // ターン強制終了
                     Game.getSceneManager().pop();
-                    Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
+                    Game.getSceneManager().push(gameOver, { saveData : param.saveData, player: player, floor: floor, upperdraw: this.draw });
                     return;
                 }
             }
@@ -537,21 +539,21 @@ namespace Scene {
         });
 
         Game.getSceneManager().pop();
-        Game.getSceneManager().push(dungeon, { player: player, floor: floor + 1 });
+        Game.getSceneManager().push(dungeon, { saveData: param.saveData, player: player, floor: floor + 1 });
 
     }
 
     interface TurnContext {
         ms: number;
         pad: Game.Input.VirtualStick;
-        player: Charactor.Player;
-        monsters: Charactor.Monster[];
+        player: Unit.Player;
+        monsters: Unit.Monster[];
         map: Dungeon.DungeonData;
         tactics: {
             player: any;
             monsters: any[];
         };
-        sprites: ISprite[];
+        sprites: Particle.IParticle[];
         scene: Game.Scene.Scene;
     };
 
@@ -636,11 +638,11 @@ namespace Scene {
             context.player.setAnimation("action", rate);
             if (rate >= 0.5 && acted == false) {
                 acted = true;
-                const targetMonster: Charactor.Monster = context.monsters[context.tactics.player.targetMonster];
+                const targetMonster: Unit.Monster = context.monsters[context.tactics.player.targetMonster];
                 Game.getSound().reqPlayChannel("atack");
                 const dmg = ~~(context.player.atk - targetMonster.def);
 
-                context.sprites.push(createShowDamageSprite(
+                context.sprites.push(Particle.createShowDamageSprite(
                     context.ms,
                     dmg > 0 ? ("" + dmg) : "MISS!!",
                     () => {
@@ -827,7 +829,7 @@ namespace Scene {
                 acted = true;
                 Game.getSound().reqPlayChannel("atack");
                 const dmg = ~~(context.monsters[enemyId].atk - context.player.def);
-                context.sprites.push(createShowDamageSprite(
+                context.sprites.push(Particle.createShowDamageSprite(
                     context.ms,
                     dmg > 0 ? ("" + dmg) : "MISS!!",
                     () => {
@@ -917,6 +919,27 @@ namespace Scene {
         // 死亡したモンスターを消去
         context.monsters.removeIf(x => x.life == 0);
 
+        // 前衛はターン経過によるMP消費が発生する
+        if (context.player.getForward().mp > 0) {
+            context.player.getForward().mp -= 1;
+            // HPが減少している場合はMPを消費してHPを回復
+            if (context.player.getForward().hp < context.player.getForward().hpMax && context.player.getForward().mp > 0) {
+                context.player.getForward().hp += 1;
+                context.player.getForward().mp -= 1;
+            }
+        } else if (context.player.getForward().hp > 1) {
+            // mpが無い場合はhpが減少
+            context.player.getForward().hp -= 1;
+        }
+
+        // 後衛はターン経過によるMP消費が無い
+        // HPが減少している場合はMPを消費してHPを回復
+        if (context.player.getBackward().hp < context.player.getBackward().hpMax && context.player.getBackward().mp > 0) {
+            context.player.getBackward().hp += 1;
+            context.player.getBackward().mp -= 1;
+        }
+
+
         // 現在位置のマップチップを取得
         const chip = context.map.layer[0].chips.value(~~context.player.x, ~~context.player.y);
         if (chip === 10) {
@@ -935,7 +958,7 @@ namespace Scene {
 
         const len = str.length;
         for (let i = 0; i < str.length; i++) {
-            const [fx, fy] = charDic[str[i]];
+            const [fx, fy] = Font7px.charDic[str[i]];
             Game.getScreen().drawImage(
                 Game.getScreen().texture("font7wpx"),
                 fx,
@@ -950,7 +973,7 @@ namespace Scene {
         }
     }
 
-    function* statusView(opt: { player: Charactor.Player, floor: number, upperdraw: () => void }) {
+    function* statusView(opt: { saveData: Data.SaveData.SaveData, player: Unit.Player, floor: number, upperdraw: () => void }) {
         var closeButton = {
             x: Game.getScreen().offscreenWidth - 20,
             y: 20,
@@ -1002,9 +1025,9 @@ namespace Scene {
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`,left+85,top+56);
-            showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`,left+145,top+56);
-            showStatusText(`${opt.player.getForward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k])=> s + v.atk,0)}`,left+85,top+64);
-            showStatusText(`${opt.player.getForward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k])=> s + v.def,0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
+            showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0)}`, left + 85, top + 64);
+            showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0)}`,left+145,top+64);
             }
             // 後衛
             {
@@ -1024,8 +1047,8 @@ namespace Scene {
             Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`,left+85,top+56);
             showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`,left+145,top+56);
-            showStatusText(`${opt.player.getBackward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s + v.atk,0)}`,left+85,top+64);
-            showStatusText(`${opt.player.getBackward().equips.reduce<GameData.EquipableItemData,number>((s, [v,k]) => s + v.def,0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getBackward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).atk),0)}`,left+85,top+64);
+            showStatusText(`${opt.player.getBackward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def),0)}`,left+145,top+64);
             }
             //opt.player.equips.forEach((e, i) => {
             //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
@@ -1041,7 +1064,7 @@ namespace Scene {
         Game.getSceneManager().pop();
     }
 
-    function* gameOver(opt: { player: Charactor.Player, floor: number, upperdraw: () => void }) {
+    function* gameOver(opt: { saveData: Data.SaveData.SaveData, player: Unit.Player, floor: number, upperdraw: () => void }) {
         const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         let fontAlpha: number = 0;
         this.draw = () => {

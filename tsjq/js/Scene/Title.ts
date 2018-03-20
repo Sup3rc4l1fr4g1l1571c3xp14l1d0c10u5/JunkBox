@@ -47,7 +47,9 @@
             init: () => { fade.startFadeOut(); },
             update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
             end: () => {
-                Game.getSceneManager().push(corridor, null);
+                const saveData = new Data.SaveData.SaveData();
+                saveData.loadGameData();
+                Game.getSceneManager().push(corridor, saveData);
                 this.next();
             },
         });

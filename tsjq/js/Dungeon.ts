@@ -128,35 +128,18 @@ namespace Dungeon {
                         if (/*(chipid === 1 || chipid === 10) && */this.layer[l].chip[chipid]) {
                             const xx = (x - this.camera.chipLeft) * gridw;
                             const yy = (y - this.camera.chipTop) * gridh;
-                            if (!Game.pmode) {
-                                Game.getScreen().drawImage(
-                                    Game.getScreen().texture(this.layer[l].texture),
-                                    this.layer[l].chip[chipid].x,
-                                    this.layer[l].chip[chipid].y,
-                                    gridw,
-                                    gridh,
-                                    0 + xx + this.camera.chipOffX,
-                                    0 + yy + this.camera.chipOffY,
-                                    gridw,
-                                    gridh
-                                );
+                            Game.getScreen().drawImage(
+                                Game.getScreen().texture(this.layer[l].texture),
+                                this.layer[l].chip[chipid].x,
+                                this.layer[l].chip[chipid].y,
+                                gridw,
+                                gridh,
+                                0 + xx + this.camera.chipOffX,
+                                0 + yy + this.camera.chipOffY,
+                                gridw,
+                                gridh
+                            );
 
-                            } else {
-                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
-                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
-                                Game.getScreen().fillRect(
-                                    0 + xx + this.camera.chipOffX,
-                                    0 + yy + this.camera.chipOffY,
-                                    gridw,
-                                    gridh
-                                );
-                                Game.getScreen().strokeRect(
-                                    0 + xx + this.camera.chipOffX,
-                                    0 + yy + this.camera.chipOffY,
-                                    gridw,
-                                    gridh
-                                );
-                            }
                         }
                     }
                 }

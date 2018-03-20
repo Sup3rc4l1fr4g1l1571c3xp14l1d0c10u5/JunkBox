@@ -216,15 +216,7 @@ var Dungeon;
                         if (this.layer[l].chip[chipid]) {
                             const xx = (x - this.camera.chipLeft) * gridw;
                             const yy = (y - this.camera.chipTop) * gridh;
-                            if (!Game.pmode) {
-                                Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                            }
-                            else {
-                                Game.getScreen().fillStyle = `rgba(185,122,87,1)`;
-                                Game.getScreen().strokeStyle = `rgba(0,0,0,1)`;
-                                Game.getScreen().fillRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                                Game.getScreen().strokeRect(0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
-                            }
+                            Game.getScreen().drawImage(Game.getScreen().texture(this.layer[l].texture), this.layer[l].chip[chipid].x, this.layer[l].chip[chipid].y, gridw, gridh, 0 + xx + this.camera.chipOffX, 0 + yy + this.camera.chipOffY, gridw, gridh);
                         }
                     }
                 }
@@ -951,7 +943,6 @@ var Dispatcher;
 })(Dispatcher || (Dispatcher = {}));
 var Game;
 (function (Game) {
-    Game.pmode = false;
     let video = null;
     let sceneManager = null;
     let inputDispacher = null;
@@ -1208,9 +1199,7 @@ var Game;
                 const metrics = Game.getScreen().measureText(this.text);
                 Game.getScreen().textAlign = this.textAlign;
                 Game.getScreen().textBaseline = this.textBaseline;
-                this.text.split(/\n/).forEach((x, i) => {
-                    Game.getScreen().fillText(x, a, this.top + i * (10 + 1) + 2);
-                });
+                Game.getScreen().fillTextBox(this.text, a, e, this.width, this.height);
             }
             regist(dispatcher) { }
             unregist(dispatcher) { }
@@ -1245,14 +1234,9 @@ var Game;
                 Game.getScreen().font = this.font;
                 Game.getScreen().fillStyle = this.enable ? this.fontColor : this.disableFontColor;
                 const text = (this.text instanceof Function) ? this.text.call(this) : this.text;
-                const metrics = Game.getScreen().measureText(text);
-                const height = Game.getScreen().measureText("あ").width;
-                const lines = text.split(/\n/);
                 Game.getScreen().textAlign = this.textAlign;
                 Game.getScreen().textBaseline = this.textBaseline;
-                lines.forEach((x, i) => {
-                    Game.getScreen().fillText(x, this.left + 1, this.top + i * (height + 1) + 1);
-                });
+                Game.getScreen().fillTextBox(text, this.left + 1, this.top + 1, this.width - 2, this.height - 2);
             }
             regist(dispatcher) {
                 const cancelHandler = dispatcher.onClick(this, (...args) => this.click.apply(this, args));
@@ -1302,7 +1286,7 @@ var Game;
         }
         GUI.ImageButton = ImageButton;
         class ListBox {
-            constructor({ left = 0, top = 0, width = 0, height = 0, lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, visible = true, enable = true }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, visible = true, enable = true, scrollbarWidth = 1 }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -1313,6 +1297,7 @@ var Game;
                 this.scrollValue = 0;
                 this.visible = visible;
                 this.enable = enable;
+                this.scrollbarWidth = scrollbarWidth;
                 this.click = () => { };
             }
             update() {
@@ -1341,13 +1326,25 @@ var Game;
                     }
                     Game.getScreen().save();
                     Game.getScreen().beginPath();
-                    Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1, Math.min(drawResionHeight, this.lineHeight));
+                    Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1 - this.scrollbarWidth, Math.min(drawResionHeight, this.lineHeight));
                     Game.getScreen().clip();
-                    this.drawItem(this.left, this.top + sy, this.width, this.lineHeight, index);
+                    this.drawItem(this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
                     Game.getScreen().restore();
                     drawResionHeight -= this.lineHeight;
                     sy += this.lineHeight;
                     index++;
+                }
+                const contentHeight = this.lineHeight * itemCount;
+                if (contentHeight > this.height) {
+                    const viewSizeRate = this.height * 1.0 / contentHeight;
+                    const scrollBarHeight = viewSizeRate * this.height;
+                    const scrollBarBlankHeight = this.height - scrollBarHeight;
+                    const scrollPosRate = this.scrollValue * 1.0 / (contentHeight - this.height);
+                    const scrollBarTop = (scrollBarBlankHeight * scrollPosRate);
+                    Game.getScreen().fillStyle = "rgb(128,128,128)";
+                    Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top, this.scrollbarWidth, this.height);
+                    Game.getScreen().fillStyle = "rgb(255,255,255)";
+                    Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top + ~~scrollBarTop, this.scrollbarWidth, ~~scrollBarHeight);
                 }
             }
             getItemIndexByPosition(x, y) {
@@ -1376,7 +1373,7 @@ var Game;
         }
         GUI.ListBox = ListBox;
         class HorizontalSlider {
-            constructor({ left = 0, top = 0, width = 0, height = 0, sliderWidth = 5, edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, bgColor = `rgb(192,192,192)`, font = undefined, fontColor = `rgb(0,0,0)`, minValue = 0, maxValue = 0, visible = true, enable = true }) {
+            constructor({ left = 0, top = 0, width = 0, height = 0, sliderWidth = 5, edgeColor = `rgb(128,128,128)`, color = `rgb(255,255,255)`, bgColor = `rgb(192,192,192)`, font = undefined, fontColor = `rgb(0,0,0)`, minValue = 0, maxValue = 0, visible = true, enable = true, }) {
                 this.left = left;
                 this.top = top;
                 this.width = width;
@@ -2078,13 +2075,13 @@ var Game;
                         src.buffer = c.audioBufferNode;
                         src.loop = c.loopPlay;
                         src.connect(this.audioContext.destination);
-                        src.onended = (() => {
-                            const srcNode = src;
-                            srcNode.stop(0);
-                            srcNode.disconnect();
+                        src.onended = () => {
+                            src.stop(0);
+                            src.disconnect();
                             this.playingBufferSources.set(bufferid, null);
                             this.playingBufferSources.delete(bufferid);
-                        }).bind(null, bufferid);
+                            src.onended = null; // If you forget this null assignment, the AudioBufferSourceNode object will not be destroyed and a memory leak will occur. :-(
+                        };
                         src.start(0);
                     }
                 });
@@ -2263,6 +2260,47 @@ var Game;
                 this.canvasRenderingContext2D.webkitImageSmoothingEnabled = value;
                 return;
             }
+        }
+        drawTextBox(text, left, top, width, height, drawTextPred) {
+            const metrics = this.measureText(text);
+            const lineHeight = this.measureText("あ").width;
+            const lines = text.split(/\n/);
+            let offY = 0;
+            lines.forEach((x, i) => {
+                const metrics = this.measureText(x);
+                const sublines = [];
+                if (metrics.width > width) {
+                    let len = 1;
+                    while (x.length > 0) {
+                        const metrics = this.measureText(x.substr(0, len));
+                        if (metrics.width > width) {
+                            sublines.push(x.substr(0, len - 1));
+                            x = x.substring(len - 1);
+                            len = 1;
+                        }
+                        else if (len == x.length) {
+                            sublines.push(x);
+                            break;
+                        }
+                        else {
+                            len++;
+                        }
+                    }
+                }
+                else {
+                    sublines.push(x);
+                }
+                sublines.forEach((x) => {
+                    drawTextPred(x, left + 1, top + offY + 1);
+                    offY += (lineHeight + 1);
+                });
+            });
+        }
+        fillTextBox(text, left, top, width, height) {
+            this.drawTextBox(text, left, top, width, height, this.fillText.bind(this));
+        }
+        strokeTextBox(text, left, top, width, height) {
+            this.drawTextBox(text, left, top, width, height, this.strokeText.bind(this));
         }
         drawTile(image, offsetX, offsetY, sprite, spritesize, tile) {
             for (let y = 0; y < tile.height; y++) {
@@ -2634,7 +2672,8 @@ var Scene;
                 boyoyon1: "./assets/sound/boyoyon1.mp3",
                 meka_ge_reji_op01: "./assets/sound/meka_ge_reji_op01.mp3"
             }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
-            GameData.loadConfigs(() => { reqResource++; }, () => { loadedResource++; }),
+            Data.Monster.SetupMonsterData(() => { reqResource++; }, () => { loadedResource++; }),
+            Data.Charactor.SetupCharactorData(() => { reqResource++; }, () => { loadedResource++; }),
             Promise.resolve().then(() => {
                 reqResource++;
                 return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
@@ -2644,7 +2683,9 @@ var Scene;
             })
         ]).then(() => {
             Game.getSceneManager().push(Scene.title, null);
-            //Game.getSceneManager().push(shop, null);
+            //const sd = new Data.SaveData.SaveData();
+            //sd.loadGameData();
+            //Game.getSceneManager().push(shop, sd);
             this.next();
         });
         yield (delta, ms) => {
@@ -2802,107 +2843,83 @@ var SpriteAnimation;
         getAnimationFrame(animName, animFrame) {
             return this.animation.get(animName)[animFrame];
         }
-        gtetSprite(spriteName) {
-            return this.sprite.get(spriteName);
+        gtetSprite(id) {
+            return this.sprite.get(id);
         }
         getSpriteImage(sprite) {
             return this.source.get(sprite.source);
         }
+        static loadImage(imageSrc) {
+            return __awaiter(this, void 0, void 0, function* () {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.src = imageSrc;
+                    img.onload = () => {
+                        resolve(img);
+                    };
+                    img.onerror = () => {
+                        reject(imageSrc + "のロードに失敗しました。");
+                    };
+                });
+            });
+        }
+        static Create(ss, loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const source = new Map();
+                const sprite = new Map();
+                const animation = new Map();
+                {
+                    const keys = Object.keys(ss.source);
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = ~~keys[i];
+                        const imageSrc = ss.source[key];
+                        loadStartCallback();
+                        const image = yield SpriteSheet.loadImage(imageSrc);
+                        loadEndCallback();
+                        source.set(key, image);
+                    }
+                }
+                {
+                    const keys = Object.keys(ss.sprite);
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = ~~keys[i];
+                        sprite.set(key, ss.sprite[key]);
+                    }
+                }
+                {
+                    const keys = Object.keys(ss.animation);
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = keys[i];
+                        animation.set(key, ss.animation[key]);
+                    }
+                }
+                return new SpriteSheet({ source: source, sprite: sprite, animation: animation });
+            });
+        }
     }
     SpriteAnimation.SpriteSheet = SpriteSheet;
-    // スプライト定義
-    class Sprite {
-        constructor(sprite) {
-            this.source = sprite.source;
-            this.left = sprite.left;
-            this.top = sprite.top;
-            this.width = sprite.width;
-            this.height = sprite.height;
-            this.offsetX = sprite.offsetX;
-            this.offsetY = sprite.offsetY;
-        }
-    }
-    // アニメーション定義
-    class Animation {
-        constructor(animation) {
-            this.sprite = animation.sprite;
-            this.time = animation.time;
-            this.offsetX = animation.offsetX;
-            this.offsetY = animation.offsetY;
-        }
-    }
-    function loadImage(imageSrc) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.src = imageSrc;
-                img.onload = () => {
-                    resolve(img);
-                };
-                img.onerror = () => { reject(imageSrc + "のロードに失敗しました。"); };
-            });
-        });
-    }
-    function loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const spriteSheetDir = getDirectory(spriteSheetPath);
-            loadStartCallback();
-            const spriteSheetJson = yield ajax(spriteSheetPath, "json").then(y => y.response);
-            loadEndCallback();
-            if (spriteSheetJson == null) {
-                throw new Error(spriteSheetPath + " is invalid json.");
-            }
-            const source = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.source);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    const imageSrc = spriteSheetDir + '/' + spriteSheetJson.source[key];
-                    loadStartCallback();
-                    const image = yield loadImage(imageSrc);
-                    loadEndCallback();
-                    source.set(key, image);
-                }
-            }
-            const sprite = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.sprite);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    sprite.set(key, new Sprite(spriteSheetJson.sprite[key]));
-                }
-            }
-            const animation = new Map();
-            {
-                const keys = Object.keys(spriteSheetJson.animation);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    const value = spriteSheetJson.animation[key].map(x => new Animation(x));
-                    animation.set(key, value);
-                }
-            }
-            const spriteSheet = new SpriteSheet({
-                source: source,
-                sprite: sprite,
-                animation: animation,
-            });
-            return spriteSheet;
-        });
-    }
-    SpriteAnimation.loadSpriteSheet = loadSpriteSheet;
 })(SpriteAnimation || (SpriteAnimation = {}));
 /// <reference path="../SpriteAnimation.ts" />
 var Scene;
 (function (Scene) {
+    let DrawMode;
+    (function (DrawMode) {
+        DrawMode[DrawMode["Normal"] = 0] = "Normal";
+        DrawMode[DrawMode["Selected"] = 1] = "Selected";
+        DrawMode[DrawMode["Disable"] = 2] = "Disable";
+    })(DrawMode || (DrawMode = {}));
     class StatusSprite extends SpriteAnimation.Animator {
         constructor(data) {
             super(data.config.sprite);
             this.data = data;
         }
     }
-    function drawStatusSprite(charactorData, selected, left, top, width, height, anim) {
-        if (selected) {
+    function drawStatusSprite(charactorData, drawMode, left, top, width, height, anim) {
+        if (drawMode == DrawMode.Selected) {
             Game.getScreen().fillStyle = `rgb(24,196,195)`;
+        }
+        else if (drawMode == DrawMode.Disable) {
+            Game.getScreen().fillStyle = `rgb(133,133,133)`;
         }
         else {
             Game.getScreen().fillStyle = `rgb(24,133,196)`;
@@ -2924,10 +2941,10 @@ var Scene;
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText(charactorData.data.config.name, left + 48 - 8, top + 3 + 12 * 0);
             Game.getScreen().fillText(`HP:${charactorData.data.hp} MP:${charactorData.data.mp}`, left + 48 - 8, top + 3 + 12 * 1);
-            Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce((s, [v, k]) => s + v.atk, 0)} DEF:${charactorData.data.equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 48 - 8, top + 12 * 2);
+            Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0)} DEF:${charactorData.data.equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0)}`, left + 48 - 8, top + 12 * 2);
         }
     }
-    function* organization() {
+    function* organization(saveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
             left: 1,
@@ -2954,10 +2971,11 @@ var Scene;
         let exitScene = false;
         btnExit.click = (x, y) => {
             exitScene = true;
+            saveData.saveGameData();
             Game.getSound().reqPlayChannel("cursor");
         };
-        const charactors = GameData.getPlayerIds().map(x => new StatusSprite(GameData.getPlayerData(x)));
-        let team = [GameData.getPlayerIds().findIndex(x => x == GameData.forwardCharactor), GameData.getPlayerIds().findIndex(x => x == GameData.backwardCharactor)];
+        const charactors = Data.Charactor.getPlayerIds().map(x => new StatusSprite(saveData.findCharactorById(x)));
+        let team = [Data.Charactor.getPlayerIds().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.getPlayerIds().findIndex(x => x == saveData.backwardCharactor)];
         let selectedSide = -1;
         let selectedCharactor = -1;
         let anim = 0;
@@ -2969,12 +2987,15 @@ var Scene;
             lineHeight: 48,
             getItemCount: () => charactors.length,
             drawItem: (left, top, width, height, index) => {
-                drawStatusSprite(charactors[index], selectedCharactor == index, left, top, width, height, anim);
+                drawStatusSprite(charactors[index], team.includes(index) ? DrawMode.Disable : (selectedCharactor == index) ? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
             }
         });
         dispatcher.add(charactorListBox);
         charactorListBox.click = (x, y) => {
             const select = charactorListBox.getItemIndexByPosition(x, y);
+            if (team.includes(select)) {
+                return;
+            }
             selectedCharactor = selectedCharactor == select ? null : select;
             Game.getSound().reqPlayChannel("cursor");
         };
@@ -2991,16 +3012,16 @@ var Scene;
         });
         forwardBtn.draw = () => {
             Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(forwardBtn.left - 0.5, forwardBtn.top + 1 - 0.5, forwardBtn.width, 12);
+            Game.getScreen().fillRect(forwardBtn.left - 0.5, forwardBtn.top - 0.5, forwardBtn.width, 13);
             Game.getScreen().strokeStyle = `rgb(12,34,98)`;
             Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(forwardBtn.left - 0.5, forwardBtn.top + 1 - 0.5, forwardBtn.width, 12);
+            Game.getScreen().strokeRect(forwardBtn.left - 0.5, forwardBtn.top - 0.5, forwardBtn.width, 13);
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
             Game.getScreen().fillStyle = `rgb(255,255,255)`;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText("前衛", forwardBtn.left + 1, forwardBtn.top + 1);
-            drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
+            drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0 ? DrawMode.Selected : DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
         };
         forwardBtn.click = (x, y) => {
             selectedSide = selectedSide == 0 ? -1 : 0;
@@ -3020,16 +3041,16 @@ var Scene;
         });
         backwordBtn.draw = () => {
             Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(backwordBtn.left - 0.5, backwordBtn.top + 1 - 0.5, backwordBtn.width, 12);
+            Game.getScreen().fillRect(backwordBtn.left - 0.5, backwordBtn.top - 0.5, backwordBtn.width, 13);
             Game.getScreen().strokeStyle = `rgb(12,34,98)`;
             Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(backwordBtn.left - 0.5, backwordBtn.top + 1 - 0.5, backwordBtn.width, 12);
+            Game.getScreen().strokeRect(backwordBtn.left - 0.5, backwordBtn.top - 0.5, backwordBtn.width, 13);
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
             Game.getScreen().fillStyle = `rgb(255,255,255)`;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
             Game.getScreen().fillText("後衛", backwordBtn.left + 1, backwordBtn.top + 1);
-            drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
+            drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1 ? DrawMode.Selected : DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
         };
         backwordBtn.click = (x, y) => {
             selectedSide = selectedSide == 1 ? -1 : 1;
@@ -3057,14 +3078,14 @@ var Scene;
                 selectedCharactor = -1;
             }
             if (exitScene) {
-                GameData.forwardCharactor = team[0] == -1 ? null : charactors[team[0]].data.id;
-                GameData.backwardCharactor = team[1] == -1 ? null : charactors[team[1]].data.id;
+                saveData.forwardCharactor = team[0] == -1 ? null : charactors[team[0]].data.id;
+                saveData.backwardCharactor = team[1] == -1 ? null : charactors[team[1]].data.id;
                 this.next();
             }
         };
         Game.getSceneManager().pop();
     }
-    function* equipEdit() {
+    function* equipEdit(saveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
             left: 1,
@@ -3091,10 +3112,11 @@ var Scene;
         let exitScene = false;
         btnExit.click = (x, y) => {
             exitScene = true;
+            saveData.saveGameData();
             Game.getSound().reqPlayChannel("cursor");
         };
-        const charactors = GameData.getPlayerIds().map(x => new StatusSprite(GameData.getPlayerData(x)));
-        let team = [GameData.getPlayerIds().findIndex(x => x == GameData.forwardCharactor), GameData.getPlayerIds().findIndex(x => x == GameData.backwardCharactor)];
+        const charactors = Data.Charactor.getPlayerIds().map(x => new StatusSprite(saveData.findCharactorById(x)));
+        let team = [Data.Charactor.getPlayerIds().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.getPlayerIds().findIndex(x => x == saveData.backwardCharactor)];
         let selectedCharactor = -1;
         let selectedEquipPosition = -1;
         let anim = 0;
@@ -3106,7 +3128,7 @@ var Scene;
             lineHeight: 48,
             getItemCount: () => charactors.length,
             drawItem: (left, top, width, height, index) => {
-                drawStatusSprite(charactors[index], selectedCharactor == index, left, top, width, height, anim);
+                drawStatusSprite(charactors[index], selectedCharactor == index ? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
             }
         });
         dispatcher.add(charactorListBox);
@@ -3118,17 +3140,21 @@ var Scene;
         let selectedItem = -1;
         const itemLists = [];
         let updateItemList = () => {
-            var newItemLists = GameData.ItemBox.map((x, i) => {
+            var newItemLists = saveData.ItemBox.map((x, i) => {
+                if (x == null) {
+                    return -1;
+                }
+                const itemData = Data.Item.findItemDataById(x.id);
                 switch (selectedEquipPosition) {
                     case 0:
-                        return (x.item.kind == GameData.ItemKind.Wepon) ? i : -1;
+                        return (itemData.kind == Data.Item.ItemKind.Wepon) ? i : -1;
                     case 1:
-                        return (x.item.kind == GameData.ItemKind.Armor1) ? i : -1;
+                        return (itemData.kind == Data.Item.ItemKind.Armor1) ? i : -1;
                     case 2:
-                        return (x.item.kind == GameData.ItemKind.Armor2) ? i : -1;
+                        return (itemData.kind == Data.Item.ItemKind.Armor2) ? i : -1;
                     case 3:
                     case 4:
-                        return (x.item.kind == GameData.ItemKind.Accessory) ? i : -1;
+                        return (itemData.kind == Data.Item.ItemKind.Accessory) ? i : -1;
                     default:
                         return -1;
                 }
@@ -3158,7 +3184,7 @@ var Scene;
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(GameData.ItemBox[itemLists[index]].item.name, left + 3, top + 3);
+                Game.getScreen().fillText(Data.Item.findItemDataById(saveData.ItemBox[itemLists[index]].id).name, left + 3, top + 3);
             }
         });
         dispatcher.add(itemListBox);
@@ -3172,60 +3198,60 @@ var Scene;
                 case 0:
                     if (charactors[selectedCharactor].data.equips.wepon1 != null) {
                         const oldItem = charactors[selectedCharactor].data.equips.wepon1;
-                        charactors[selectedCharactor].data.equips.wepon1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                        charactors[selectedCharactor].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox[itemLists[select]] = oldItem;
                     }
                     else {
-                        charactors[selectedCharactor].data.equips.wepon1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox.splice(itemLists[select], 1);
+                        charactors[selectedCharactor].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox.splice(itemLists[select], 1);
                     }
                     updateItemList();
                     break;
                 case 1:
                     if (charactors[selectedCharactor].data.equips.armor1 != null) {
                         const oldItem = charactors[selectedCharactor].data.equips.armor1;
-                        charactors[selectedCharactor].data.equips.armor1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                        charactors[selectedCharactor].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox[itemLists[select]] = oldItem;
                     }
                     else {
-                        charactors[selectedCharactor].data.equips.armor1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox.splice(itemLists[select], 1);
+                        charactors[selectedCharactor].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox.splice(itemLists[select], 1);
                     }
                     updateItemList();
                     break;
                 case 2:
                     if (charactors[selectedCharactor].data.equips.armor2 != null) {
                         const oldItem = charactors[selectedCharactor].data.equips.armor2;
-                        charactors[selectedCharactor].data.equips.armor2 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                        charactors[selectedCharactor].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox[itemLists[select]] = oldItem;
                     }
                     else {
-                        charactors[selectedCharactor].data.equips.armor2 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox.splice(itemLists[select], 1);
+                        charactors[selectedCharactor].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox.splice(itemLists[select], 1);
                     }
                     updateItemList();
                     break;
                 case 3:
                     if (charactors[selectedCharactor].data.equips.accessory1 != null) {
                         const oldItem = charactors[selectedCharactor].data.equips.accessory1;
-                        charactors[selectedCharactor].data.equips.accessory1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                        charactors[selectedCharactor].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox[itemLists[select]] = oldItem;
                     }
                     else {
-                        charactors[selectedCharactor].data.equips.accessory1 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox.splice(itemLists[select], 1);
+                        charactors[selectedCharactor].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox.splice(itemLists[select], 1);
                     }
                     updateItemList();
                     break;
                 case 4:
                     if (charactors[selectedCharactor].data.equips.accessory2 != null) {
                         const oldItem = charactors[selectedCharactor].data.equips.accessory2;
-                        charactors[selectedCharactor].data.equips.accessory2 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox[itemLists[select]].item = oldItem;
+                        charactors[selectedCharactor].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox[itemLists[select]] = oldItem;
                     }
                     else {
-                        charactors[selectedCharactor].data.equips.accessory2 = GameData.ItemBox[itemLists[select]].item;
-                        GameData.ItemBox.splice(itemLists[select], 1);
+                        charactors[selectedCharactor].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
+                        saveData.ItemBox.splice(itemLists[select], 1);
                     }
                     updateItemList();
                     break;
@@ -3245,7 +3271,7 @@ var Scene;
             texHeight: 0
         });
         statusViewBtn.draw = () => {
-            drawStatusSprite(charactors[selectedCharactor], false, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
+            drawStatusSprite(charactors[selectedCharactor], DrawMode.Normal, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
         };
         statusViewBtn.click = () => {
             Game.getSound().reqPlayChannel("cursor");
@@ -3257,7 +3283,7 @@ var Scene;
             top: 16 * 0 + 46 + 50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.wepon1 == null) ? "(武器)" : charactors[selectedCharactor].data.equips.wepon1.name,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.wepon1 == null) ? "(武器)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.wepon1.id).name,
         });
         dispatcher.add(btnWepon1);
         btnWepon1.click = () => {
@@ -3270,7 +3296,7 @@ var Scene;
             top: 16 * 1 + 46 + 50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor1 == null) ? "(防具・上半身)" : charactors[selectedCharactor].data.equips.armor1.name,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor1 == null) ? "(防具・上半身)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.armor1.id).name,
         });
         dispatcher.add(btnArmor1);
         btnArmor1.click = () => {
@@ -3283,7 +3309,7 @@ var Scene;
             top: 16 * 2 + 46 + 50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor2 == null) ? "(防具・下半身)" : charactors[selectedCharactor].data.equips.armor2.name,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor2 == null) ? "(防具・下半身)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.armor2.id).name,
         });
         dispatcher.add(btnArmor2);
         btnArmor2.click = () => {
@@ -3296,7 +3322,7 @@ var Scene;
             top: 16 * 3 + 46 + 50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory1 == null) ? "(アクセサリ１)" : charactors[selectedCharactor].data.equips.accessory1.name,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory1 == null) ? "(アクセサリ１)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.accessory1.id).name,
         });
         dispatcher.add(btnAccessory1);
         btnAccessory1.click = () => {
@@ -3309,7 +3335,7 @@ var Scene;
             top: 16 * 4 + 46 + 50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory2 == null) ? "(アクセサリ２)" : charactors[selectedCharactor].data.equips.accessory2.name,
+            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory2 == null) ? "(アクセサリ２)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.accessory2.id).name,
         });
         dispatcher.add(btnAccessory2);
         btnAccessory2.click = () => {
@@ -3344,7 +3370,7 @@ var Scene;
         };
         Game.getSceneManager().pop();
     }
-    function* classroom() {
+    function* classroom(saveData) {
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
@@ -3370,7 +3396,7 @@ var Scene;
         });
         dispatcher.add(btnOrganization);
         btnOrganization.click = (x, y) => {
-            Game.getSceneManager().push(organization);
+            Game.getSceneManager().push(organization, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
         const btnEquip = new Game.GUI.Button({
@@ -3382,7 +3408,7 @@ var Scene;
         });
         dispatcher.add(btnEquip);
         btnEquip.click = (x, y) => {
-            Game.getSceneManager().push(equipEdit);
+            Game.getSceneManager().push(equipEdit, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
         const btnItemBox = new Game.GUI.Button({
@@ -3408,6 +3434,7 @@ var Scene;
         let exitScene = false;
         btnExit.click = (x, y) => {
             exitScene = true;
+            saveData.saveGameData();
             Game.getSound().reqPlayChannel("cursor");
         };
         this.draw = () => {
@@ -3450,6 +3477,115 @@ var Scene;
         Game.getSceneManager().pop();
     }
     Scene.classroom = classroom;
+})(Scene || (Scene = {}));
+/// <reference path="../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    function* corridor(saveData) {
+        const dispatcher = new Game.GUI.UIDispatcher();
+        const fade = new Scene.Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
+        let selected = null;
+        const caption = new Game.GUI.TextBox({
+            left: 1,
+            top: 1,
+            width: 250,
+            height: 42,
+            text: "移動先を選択してください。",
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px 'PixelMplus10-Regular'",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+        });
+        dispatcher.add(caption);
+        const btnBuy = new Game.GUI.Button({
+            left: 8,
+            top: 20 * 0 + 46,
+            width: 112,
+            height: 16,
+            text: "教室",
+        });
+        dispatcher.add(btnBuy);
+        btnBuy.click = (x, y) => {
+            Game.getSound().reqPlayChannel("cursor");
+            selected = () => Game.getSceneManager().push(Scene.classroom, saveData);
+        };
+        const btnSell = new Game.GUI.Button({
+            left: 8,
+            top: 20 * 1 + 46,
+            width: 112,
+            height: 16,
+            text: "購買部",
+        });
+        dispatcher.add(btnSell);
+        btnSell.click = (x, y) => {
+            Game.getSound().reqPlayChannel("cursor");
+            selected = () => Game.getSceneManager().push(Scene.shop, saveData);
+        };
+        const btnDungeon = new Game.GUI.Button({
+            left: 8,
+            top: 20 * 3 + 46,
+            width: 112,
+            height: 16,
+            text: "迷宮",
+        });
+        dispatcher.add(btnDungeon);
+        btnDungeon.click = (x, y) => {
+            Game.getSound().reqPlayChannel("cursor");
+            Game.getSound().reqStopChannel("classroom");
+            selected = () => {
+                Game.getSceneManager().pop();
+                Game.getSound().reqStopChannel("classroom");
+                Game.getSceneManager().push(Scene.dungeon, { saveData: saveData, player: new Unit.Player(saveData.findCharactorById(saveData.forwardCharactor), saveData.findCharactorById(saveData.backwardCharactor)), floor: 1 });
+            };
+        };
+        btnDungeon.enable = saveData.forwardCharactor != null;
+        this.draw = () => {
+            Game.getScreen().drawImage(Game.getScreen().texture("corridorbg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            dispatcher.draw();
+            fade.draw();
+        };
+        Game.getSound().reqPlayChannel("classroom", true);
+        for (;;) {
+            yield Scene.waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeIn(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
+            yield (delta, ms) => {
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                btnDungeon.enable = saveData.forwardCharactor != null;
+                if (selected != null) {
+                    this.next();
+                }
+            };
+            yield Scene.waitTimeout({
+                timeout: 500,
+                init: () => { fade.startFadeOut(); },
+                update: (e) => { fade.update(e); },
+                end: () => {
+                    fade.stop();
+                    this.next();
+                },
+            });
+            selected();
+            selected = null;
+        }
+    }
+    Scene.corridor = corridor;
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
@@ -3501,7 +3637,7 @@ var Scene;
         mapchipsL1.value(stairsPos.x, stairsPos.y, 10);
         // モンスター配置
         let monsters = rooms.splice(2).map((x) => {
-            var monster = new Charactor.Monster("slime");
+            var monster = new Unit.Monster("slime");
             monster.x = x.getLeft();
             monster.y = x.getTop();
             monster.life = monster.maxLife = floor + 5;
@@ -3599,7 +3735,7 @@ var Scene;
             });
         };
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-        let sprites = [];
+        let particles = [];
         const dispatcher = new Game.GUI.UIDispatcher();
         const mapButton = new Game.GUI.ImageButton({
             left: 141 + 22 * 0,
@@ -3755,11 +3891,11 @@ var Scene;
                 }
             });
             // スプライト
-            sprites.forEach((x) => x.draw(map.camera));
+            particles.forEach((x) => x.draw(map.camera));
             // 情報
-            draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
-            draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
-            draw7pxFont(`     | GOLD:${GameData.Money}`, 0, 6 * 2);
+            Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
+            Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
+            Font7px.draw7pxFont(`     | GOLD:${param.saveData.Money}`, 0, 6 * 2);
             //menuicon
             // UI
             dispatcher.draw();
@@ -3798,7 +3934,7 @@ var Scene;
                 player: {},
                 monsters: []
             },
-            sprites: sprites,
+            sprites: particles,
             scene: this,
         };
         const turnStateStack = [];
@@ -3806,6 +3942,7 @@ var Scene;
         let playerTactics = {};
         const monstersTactics = [];
         yield (delta, ms) => {
+            // ターン進行
             turnContext.ms = ms;
             while (turnStateStack[0].next().done) { }
             // カメラを更新
@@ -3818,7 +3955,7 @@ var Scene;
                 viewheight: Game.getScreen().offscreenHeight
             });
             // スプライトを更新
-            sprites.removeIf((x) => x.update(delta, ms));
+            particles.removeIf((x) => x.update(delta, ms));
             updateLighting((v) => v === 1 || v === 10);
             if (player.getForward().hp === 0) {
                 if (player.getBackward().hp !== 0) {
@@ -3827,7 +3964,7 @@ var Scene;
                 else {
                     // ターン強制終了
                     Game.getSceneManager().pop();
-                    Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
+                    Game.getSceneManager().push(gameOver, { saveData: param.saveData, player: player, floor: floor, upperdraw: this.draw });
                     return;
                 }
             }
@@ -3862,7 +3999,7 @@ var Scene;
             end: () => { this.next(); },
         });
         Game.getSceneManager().pop();
-        Game.getSceneManager().push(dungeon, { player: player, floor: floor + 1 });
+        Game.getSceneManager().push(dungeon, { saveData: param.saveData, player: player, floor: floor + 1 });
     }
     Scene.dungeon = dungeon;
     ;
@@ -3929,7 +4066,7 @@ var Scene;
                 const targetMonster = context.monsters[context.tactics.player.targetMonster];
                 Game.getSound().reqPlayChannel("atack");
                 const dmg = ~~(context.player.atk - targetMonster.def);
-                context.sprites.push(createShowDamageSprite(context.ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
+                context.sprites.push(Particle.createShowDamageSprite(context.ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
                     return {
                         x: targetMonster.offx + targetMonster.x * context.map.gridsize.width + context.map.gridsize.width / 2,
                         y: targetMonster.offy + targetMonster.y * context.map.gridsize.height + context.map.gridsize.height / 2
@@ -4106,7 +4243,7 @@ var Scene;
                 acted = true;
                 Game.getSound().reqPlayChannel("atack");
                 const dmg = ~~(context.monsters[enemyId].atk - context.player.def);
-                context.sprites.push(createShowDamageSprite(context.ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
+                context.sprites.push(Particle.createShowDamageSprite(context.ms, dmg > 0 ? ("" + dmg) : "MISS!!", () => {
                     return {
                         x: context.player.offx + context.player.x * context.map.gridsize.width + context.map.gridsize.width / 2,
                         y: context.player.offy + context.player.y * context.map.gridsize.height + context.map.gridsize.height / 2
@@ -4190,6 +4327,25 @@ var Scene;
         turnStateStack.shift();
         // 死亡したモンスターを消去
         context.monsters.removeIf(x => x.life == 0);
+        // 前衛はターン経過によるMP消費が発生する
+        if (context.player.getForward().mp > 0) {
+            context.player.getForward().mp -= 1;
+            // HPが減少している場合はMPを消費してHPを回復
+            if (context.player.getForward().hp < context.player.getForward().hpMax && context.player.getForward().mp > 0) {
+                context.player.getForward().hp += 1;
+                context.player.getForward().mp -= 1;
+            }
+        }
+        else if (context.player.getForward().hp > 1) {
+            // mpが無い場合はhpが減少
+            context.player.getForward().hp -= 1;
+        }
+        // 後衛はターン経過によるMP消費が無い
+        // HPが減少している場合はMPを消費してHPを回復
+        if (context.player.getBackward().hp < context.player.getBackward().hpMax && context.player.getBackward().mp > 0) {
+            context.player.getBackward().hp += 1;
+            context.player.getBackward().mp -= 1;
+        }
         // 現在位置のマップチップを取得
         const chip = context.map.layer[0].chips.value(~~context.player.x, ~~context.player.y);
         if (chip === 10) {
@@ -4207,7 +4363,7 @@ var Scene;
         const fontHeight = 7;
         const len = str.length;
         for (let i = 0; i < str.length; i++) {
-            const [fx, fy] = charDic[str[i]];
+            const [fx, fy] = Font7px.charDic[str[i]];
             Game.getScreen().drawImage(Game.getScreen().texture("font7wpx"), fx, fy, fontWidth, fontHeight, (x + (i + 0) * (fontWidth - 1)), (y + (0) * fontHeight), fontWidth, fontHeight);
         }
     }
@@ -4255,8 +4411,8 @@ var Scene;
                 Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
                 showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`, left + 85, top + 56);
                 showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
-                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + v.atk, 0)}`, left + 85, top + 64);
-                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 145, top + 64);
+                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0)}`, left + 85, top + 64);
+                showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0)}`, left + 145, top + 64);
             }
             // 後衛
             {
@@ -4270,8 +4426,8 @@ var Scene;
                 Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
                 showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`, left + 85, top + 56);
                 showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`, left + 145, top + 56);
-                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + v.atk, 0)}`, left + 85, top + 64);
-                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + v.def, 0)}`, left + 145, top + 64);
+                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0)}`, left + 85, top + 64);
+                showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0)}`, left + 145, top + 64);
             }
             //opt.player.equips.forEach((e, i) => {
             //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
@@ -4459,7 +4615,7 @@ var Scene;
 /// <reference path="../lib/game/eventdispatcher.ts" />
 var Scene;
 (function (Scene) {
-    function* shopBuyItem() {
+    function* shopBuyItem(saveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
             left: 1,
@@ -4475,24 +4631,6 @@ var Scene;
             textBaseline: "top",
         });
         dispatcher.add(caption);
-        const itemlist = [
-            { name: "竹刀", price: 300, kind: GameData.ItemKind.Wepon, description: "471.", atk: 3, def: 0, condition: "", stackable: false },
-            { name: "鉄パイプ", price: 500, kind: GameData.ItemKind.Wepon, description: "819.", atk: 5, def: 0, condition: "", stackable: false },
-            { name: "バット", price: 700, kind: GameData.ItemKind.Wepon, description: "89.", atk: 7, def: 0, condition: "", stackable: false },
-            { name: "水着", price: 200, kind: GameData.ItemKind.Armor1, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "制服", price: 400, kind: GameData.ItemKind.Armor1, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
-            { name: "体操着", price: 600, kind: GameData.ItemKind.Armor1, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
-            { name: "スカート", price: 200, kind: GameData.ItemKind.Armor2, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "ブルマ", price: 400, kind: GameData.ItemKind.Armor2, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
-            { name: "ズボン", price: 600, kind: GameData.ItemKind.Armor2, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
-            { name: "ヘアバンド", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "メガネ", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "靴下", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "イモメロン", price: 100, kind: GameData.ItemKind.Tool, description: "food.", effect: (data) => { }, stackable: true },
-            { name: "プリングルス", price: 890, kind: GameData.ItemKind.Tool, description: "140546.", effect: (data) => { }, stackable: true },
-            { name: "バンテリン", price: 931, kind: GameData.ItemKind.Tool, description: "931.", effect: (data) => { }, stackable: true },
-            { name: "サラダチキン", price: 1000, kind: GameData.ItemKind.Tool, description: "dmkt.", effect: (data) => { }, stackable: true },
-        ];
         let selectedItem = -1;
         const listBox = new Game.GUI.ListBox({
             left: 8,
@@ -4500,8 +4638,9 @@ var Scene;
             width: 112,
             height: 10 * 16,
             lineHeight: 16,
-            getItemCount: () => itemlist.length,
+            getItemCount: () => saveData.shopStockList.length,
             drawItem: (left, top, width, height, index) => {
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 }
@@ -4516,10 +4655,10 @@ var Scene;
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index].name, left + 3, top + 3);
+                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
                 Game.getScreen().textAlign = "right";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index].price + "G", left + 112, top + 3);
+                Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
             }
         });
         dispatcher.add(listBox);
@@ -4528,17 +4667,17 @@ var Scene;
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
         const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 135 + 14,
-            top: 80,
-            width: 108 - 28,
+            left: 131 + 14,
+            top: 90,
+            width: 112 - 28,
             height: 16,
             sliderWidth: 5,
             updownButtonWidth: 10,
@@ -4547,12 +4686,12 @@ var Scene;
             font: "10px 'PixelMplus10-Regular'",
             fontColor: `rgb(255,255,255)`,
             minValue: 0,
-            maxValue: 100,
+            maxValue: 99,
         });
         dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button({
-            left: 135,
-            top: 80,
+            left: 131,
+            top: 90,
             width: 14,
             height: 16,
             text: "－",
@@ -4565,7 +4704,7 @@ var Scene;
         };
         const btnSliderUp = new Game.GUI.Button({
             left: 243 - 14,
-            top: 80,
+            top: 90,
             width: 14,
             height: 16,
             text: "＋",
@@ -4577,15 +4716,22 @@ var Scene;
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionBuyCount = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 64,
-            width: 108,
-            height: 16,
-            text: () => `購入数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : itemlist[selectedItem].price * hoverSlider.value)).substr(-8) + "G"}`,
+            width: 112,
+            height: 24,
+            text: () => {
+                if (selectedItem == -1) {
+                    return '';
+                }
+                else {
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + saveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                }
+            },
         });
         dispatcher.add(captionBuyCount);
         const btnDoBuy = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 110,
             width: 112,
             height: 16,
@@ -4593,27 +4739,80 @@ var Scene;
         });
         dispatcher.add(btnDoBuy);
         btnDoBuy.click = (x, y) => {
-            if ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money)) {
-                GameData.Money -= itemlist[selectedItem].price * hoverSlider.value;
-                if (itemlist[selectedItem].stackable) {
-                    var index = GameData.ItemBox.findIndex(x => x.item.name == itemlist[selectedItem].name);
-                    if (index == -1) {
-                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: hoverSlider.value });
+            if (selectedItem != -1) {
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                if ((hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (itemData.price * hoverSlider.value <= saveData.Money)) {
+                    saveData.Money -= itemData.price * hoverSlider.value;
+                    if (itemData.stackable) {
+                        var index = saveData.ItemBox.findIndex(x => x.id == itemData.id);
+                        if (index == -1) {
+                            saveData.ItemBox.push({ id: saveData.shopStockList[selectedItem].id, condition: saveData.shopStockList[selectedItem].condition, count: hoverSlider.value });
+                        }
+                        else {
+                            saveData.ItemBox[index].count += hoverSlider.value;
+                        }
+                        saveData.shopStockList[selectedItem].count -= hoverSlider.value;
                     }
                     else {
-                        GameData.ItemBox[index].count += hoverSlider.value;
+                        for (let i = 0; i < hoverSlider.value; i++) {
+                            saveData.ItemBox.push({ id: saveData.shopStockList[selectedItem].id, condition: saveData.shopStockList[selectedItem].condition, count: 1 });
+                        }
+                        saveData.shopStockList[selectedItem].count -= hoverSlider.value;
                     }
-                }
-                else {
-                    for (let i = 0; i < hoverSlider.value; i++) {
-                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: 1 });
+                    if (saveData.shopStockList[selectedItem].count <= 0) {
+                        saveData.shopStockList.splice(selectedItem, 1);
                     }
+                    selectedItem = -1;
+                    hoverSlider.value = 0;
+                    saveData.saveGameData();
+                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
                 }
-                selectedItem = -1;
-                hoverSlider.value = 0;
             }
-            Game.getSound().reqPlayChannel("cursor");
+            //Game.getSound().reqPlayChannel("cursor");
         };
+        const btnItemData = new Game.GUI.Button({
+            left: 131,
+            top: 142,
+            width: 112,
+            height: 60,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                switch (itemData.kind) {
+                    case Data.Item.ItemKind.Wepon:
+                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor1:
+                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor2:
+                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Accessory:
+                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Tool:
+                        return `種別：道具`;
+                    case Data.Item.ItemKind.Treasure:
+                        return `種別：その他`;
+                    default:
+                        return "";
+                }
+            },
+        });
+        dispatcher.add(btnItemData);
+        const btnDescription = new Game.GUI.Button({
+            left: 131,
+            top: 212,
+            width: 112,
+            height: 36,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                return itemData.description;
+            },
+        });
+        dispatcher.add(btnDescription);
         const btnExit = new Game.GUI.Button({
             left: 8,
             top: 16 * 11 + 46,
@@ -4627,7 +4826,7 @@ var Scene;
             exitScene = true;
             Game.getSound().reqPlayChannel("cursor");
         };
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = false;
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = false;
         this.draw = () => {
             Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
@@ -4643,15 +4842,15 @@ var Scene;
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = (selectedItem != -1);
-            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money));
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
+            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value <= saveData.Money));
             if (exitScene) {
                 this.next();
             }
         };
         Game.getSceneManager().pop();
     }
-    function* shopSellItem() {
+    function* shopSellItem(saveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
             left: 1,
@@ -4674,8 +4873,9 @@ var Scene;
             width: 112,
             height: 10 * 16,
             lineHeight: 16,
-            getItemCount: () => GameData.ItemBox.length,
+            getItemCount: () => saveData.ItemBox.length,
             drawItem: (left, top, width, height, index) => {
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 }
@@ -4690,10 +4890,10 @@ var Scene;
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(GameData.ItemBox[index].item.name, left + 3, top + 3);
+                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
                 Game.getScreen().textAlign = "right";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(GameData.ItemBox[index].item.price + "G", left + 112, top + 3);
+                Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
             }
         });
         dispatcher.add(listBox);
@@ -4702,17 +4902,17 @@ var Scene;
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
         const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 135 + 14,
+            left: 131 + 14,
             top: 80,
-            width: 108 - 28,
+            width: 112 - 28,
             height: 16,
             sliderWidth: 5,
             updownButtonWidth: 10,
@@ -4725,7 +4925,7 @@ var Scene;
         });
         dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 80,
             width: 14,
             height: 16,
@@ -4751,15 +4951,22 @@ var Scene;
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionSellCount = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 64,
-            width: 108,
-            height: 16,
-            text: () => `売却数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : GameData.ItemBox[selectedItem].item.price * hoverSlider.value)).substr(-8) + "G"}`,
+            width: 112,
+            height: 24,
+            text: () => {
+                if (selectedItem == -1) {
+                    return '';
+                }
+                else {
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + saveData.ItemBox[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                }
+            },
         });
         dispatcher.add(captionSellCount);
         const btnDoSell = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 110,
             width: 112,
             height: 16,
@@ -4767,19 +4974,86 @@ var Scene;
         });
         dispatcher.add(btnDoSell);
         btnDoSell.click = (x, y) => {
-            if ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].item.price * hoverSlider.value <= GameData.Money)) {
-                GameData.Money += GameData.ItemBox[selectedItem].item.price * hoverSlider.value;
-                if (GameData.ItemBox[selectedItem].item.stackable && GameData.ItemBox[selectedItem].count > hoverSlider.value) {
-                    GameData.ItemBox[selectedItem].count -= hoverSlider.value;
+            if (selectedItem != -1) {
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                if ((hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value)) {
+                    saveData.Money += itemData.price * hoverSlider.value;
+                    const shopStockIndex = saveData.shopStockList.findIndex(x => x.id == saveData.ItemBox[selectedItem].id);
+                    if (shopStockIndex == -1) {
+                        let newstock = Object.assign({}, saveData.ItemBox[selectedItem]);
+                        newstock.condition = "";
+                        newstock.count = hoverSlider.value;
+                        for (let i = 0; i < saveData.shopStockList.length; i++) {
+                            if (saveData.shopStockList[i].id > newstock.id) {
+                                saveData.shopStockList.splice(i, 0, newstock);
+                                newstock = null;
+                                break;
+                            }
+                        }
+                        if (newstock != null) {
+                            saveData.shopStockList.push(newstock);
+                        }
+                    }
+                    else {
+                        saveData.shopStockList[shopStockIndex].count += hoverSlider.value;
+                    }
+                    if (itemData.stackable && saveData.ItemBox[selectedItem].count > hoverSlider.value) {
+                        saveData.ItemBox[selectedItem].count -= hoverSlider.value;
+                    }
+                    else {
+                        saveData.ItemBox.splice(selectedItem, 1);
+                    }
+                    selectedItem = -1;
+                    hoverSlider.value = 0;
+                    saveData.saveGameData();
+                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
                 }
-                else {
-                    GameData.ItemBox.splice(selectedItem, 1);
-                }
-                selectedItem = -1;
-                hoverSlider.value = 0;
             }
-            Game.getSound().reqPlayChannel("cursor");
+            //Game.getSound().reqPlayChannel("cursor");
         };
+        const btnItemData = new Game.GUI.Button({
+            left: 131,
+            top: 142,
+            width: 112,
+            height: 60,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                switch (itemData.kind) {
+                    case Data.Item.ItemKind.Wepon:
+                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor1:
+                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor2:
+                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Accessory:
+                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Tool:
+                        return `種別：道具`;
+                    case Data.Item.ItemKind.Treasure:
+                        return `種別：その他`;
+                    default:
+                        return "";
+                }
+            },
+        });
+        dispatcher.add(btnItemData);
+        const btnDescription = new Game.GUI.Button({
+            left: 131,
+            top: 212,
+            width: 112,
+            height: 36,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                return itemData.description;
+            },
+        });
+        dispatcher.add(btnDescription);
         const btnExit = new Game.GUI.Button({
             left: 8,
             top: 16 * 11 + 46,
@@ -4793,7 +5067,7 @@ var Scene;
             exitScene = true;
             Game.getSound().reqPlayChannel("cursor");
         };
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = false;
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = false;
         this.draw = () => {
             Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
@@ -4809,19 +5083,19 @@ var Scene;
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            captionSellCount.visible = btnDoSell.visible = (selectedItem != -1);
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (GameData.ItemBox[selectedItem].item.stackable);
-            if ((selectedItem != -1) && (!GameData.ItemBox[selectedItem].item.stackable)) {
+            captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable);
+            if ((selectedItem != -1) && (!Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable)) {
                 hoverSlider.value = 1;
             }
-            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].count >= hoverSlider.value));
+            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value));
             if (exitScene) {
                 this.next();
             }
         };
         Game.getSceneManager().pop();
     }
-    function* talkScene() {
+    function* talkScene(saveData) {
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
@@ -4887,11 +5161,13 @@ var Scene;
                 this.next();
             },
         });
-        GameData.Money = 0;
+        saveData.ItemBox.push({ id: 304, condition: "", count: 1 });
+        saveData.Money = 0;
+        saveData.saveGameData();
         Game.getSceneManager().pop();
         Game.getSound().reqPlayChannel("classroom", true);
     }
-    function* shop() {
+    function* shop(saveData) {
         const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
@@ -4917,7 +5193,7 @@ var Scene;
         });
         dispatcher.add(btnBuy);
         btnBuy.click = (x, y) => {
-            Game.getSceneManager().push(shopBuyItem);
+            Game.getSceneManager().push(shopBuyItem, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
         const btnSell = new Game.GUI.Button({
@@ -4929,15 +5205,15 @@ var Scene;
         });
         dispatcher.add(btnSell);
         btnSell.click = (x, y) => {
-            Game.getSceneManager().push(shopSellItem);
+            Game.getSceneManager().push(shopSellItem, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
         const btnMomyu = new Game.GUI.ImageButton({
@@ -5002,7 +5278,7 @@ var Scene;
         };
         if (momyu > 0) {
             Game.getSound().reqPlayChannel("meka_ge_reji_op01");
-            GameData.Money -= momyu;
+            saveData.Money -= momyu;
             yield Scene.waitTimeout({
                 timeout: 1000,
                 end: () => {
@@ -5010,7 +5286,7 @@ var Scene;
                 },
             });
         }
-        if (GameData.Money <= -50000) {
+        if (saveData.Money <= -50000) {
             Game.getSound().reqStopChannel("classroom");
             Game.getSound().reqPlayChannel("sen_ge_gusya01");
             let rad = 0;
@@ -5034,7 +5310,7 @@ var Scene;
                 },
             });
             Game.getSceneManager().pop();
-            Game.getSceneManager().push(talkScene);
+            Game.getSceneManager().push(talkScene, saveData);
         }
         else {
             yield Scene.waitTimeout({
@@ -5088,353 +5364,50 @@ var Scene;
             init: () => { fade.startFadeOut(); },
             update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
             end: () => {
-                Game.getSceneManager().push(Scene.corridor, null);
+                const saveData = new Data.SaveData.SaveData();
+                saveData.loadGameData();
+                Game.getSceneManager().push(Scene.corridor, saveData);
                 this.next();
             },
         });
     }
     Scene.title = title;
 })(Scene || (Scene = {}));
-const charDic = {
-    " ": [0, 0],
-    "!": [5, 0],
-    "\"": [10, 0],
-    "#": [15, 0],
-    "$": [20, 0],
-    "%": [25, 0],
-    "&": [30, 0],
-    "'": [35, 0],
-    "(": [40, 0],
-    ")": [45, 0],
-    "*": [50, 0],
-    "+": [55, 0],
-    ",": [60, 0],
-    "-": [65, 0],
-    ".": [70, 0],
-    "/": [75, 0],
-    "0": [0, 7],
-    "1": [5, 7],
-    "2": [10, 7],
-    "3": [15, 7],
-    "4": [20, 7],
-    "5": [25, 7],
-    "6": [30, 7],
-    "7": [35, 7],
-    "8": [40, 7],
-    "9": [45, 7],
-    ":": [50, 7],
-    ";": [55, 7],
-    "<": [60, 7],
-    "=": [65, 7],
-    ">": [70, 7],
-    "?": [75, 7],
-    "@": [0, 14],
-    "A": [5, 14],
-    "B": [10, 14],
-    "C": [15, 14],
-    "D": [20, 14],
-    "E": [25, 14],
-    "F": [30, 14],
-    "G": [35, 14],
-    "H": [40, 14],
-    "I": [45, 14],
-    "J": [50, 14],
-    "K": [55, 14],
-    "L": [60, 14],
-    "M": [65, 14],
-    "N": [70, 14],
-    "O": [75, 14],
-    "P": [0, 21],
-    "Q": [5, 21],
-    "R": [10, 21],
-    "S": [15, 21],
-    "T": [20, 21],
-    "U": [25, 21],
-    "V": [30, 21],
-    "W": [35, 21],
-    "X": [40, 21],
-    "Y": [45, 21],
-    "Z": [50, 21],
-    "[": [55, 21],
-    "\\": [60, 21],
-    "]": [65, 21],
-    "^": [70, 21],
-    "_": [75, 21],
-    "`": [0, 28],
-    "a": [5, 28],
-    "b": [10, 28],
-    "c": [15, 28],
-    "d": [20, 28],
-    "e": [25, 28],
-    "f": [30, 28],
-    "g": [35, 28],
-    "h": [40, 28],
-    "i": [45, 28],
-    "j": [50, 28],
-    "k": [55, 28],
-    "l": [60, 28],
-    "m": [65, 28],
-    "n": [70, 28],
-    "o": [75, 28],
-    "p": [0, 35],
-    "q": [5, 35],
-    "r": [10, 35],
-    "s": [15, 35],
-    "t": [20, 35],
-    "u": [25, 35],
-    "v": [30, 35],
-    "w": [35, 35],
-    "x": [40, 35],
-    "y": [45, 35],
-    "z": [50, 35],
-    "{": [55, 35],
-    "|": [60, 35],
-    "}": [65, 35],
-    "~": [70, 35]
-};
-function draw7pxFont(str, x, y) {
-    const fontWidth = 5;
-    const fontHeight = 7;
-    let sx = x;
-    let sy = y;
-    for (let i = 0; i < str.length; i++) {
-        const ch = str[i];
-        if (ch === "\n") {
-            sy += fontHeight;
-            sx = x;
-            continue;
-        }
-        const [fx, fy] = charDic[str[i]];
-        Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, sx, sy, fontWidth, fontHeight);
-        sx += fontWidth - 1;
-    }
-}
-function createShowDamageSprite(start, damage, getpos) {
-    let elapse = 0;
-    const fontWidth = 5;
-    const fontHeight = 7;
-    return {
-        update: (delta, ms) => {
-            elapse = ms - start;
-            return (elapse > 500);
-        },
-        draw: (camera) => {
-            const { x: sx, y: sy } = getpos();
-            const xx = sx - camera.left;
-            const yy = sy - camera.top;
-            const len = damage.length;
-            const offx = -(len) * (fontWidth - 1) / 2;
-            const offy = 0;
-            for (let i = 0; i < damage.length; i++) {
-                const rad = Math.min(elapse - i * 20, 200);
-                if (rad < 0) {
-                    continue;
-                }
-                const dy = Math.sin(rad * Math.PI / 200) * -7; // 7 = 跳ね上がる高さ
-                if (0 <= xx + (i + 1) * fontWidth && xx + (i + 0) * fontWidth < Game.getScreen().offscreenWidth &&
-                    0 <= yy + (1 * fontHeight) && yy + (0 * fontHeight) < Game.getScreen().offscreenHeight) {
-                    const [fx, fy] = charDic[damage[i]];
-                    Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, (xx + (i + 0) * (fontWidth - 1)) + offx, (yy + (0) * fontHeight) + offy + dy, fontWidth, fontHeight);
-                }
-            }
-        },
-    };
-}
-var Charactor;
-(function (Charactor) {
-    class CharactorBase extends SpriteAnimation.Animator {
+var Unit;
+(function (Unit) {
+    class UnitBase extends SpriteAnimation.Animator {
         constructor(x, y, spriteSheet) {
             super(spriteSheet);
             this.x = x;
             this.y = y;
         }
     }
-    Charactor.CharactorBase = CharactorBase;
-})(Charactor || (Charactor = {}));
-var GameData;
-(function (GameData) {
-    let ItemKind;
-    (function (ItemKind) {
-        ItemKind[ItemKind["Wepon"] = 0] = "Wepon";
-        ItemKind[ItemKind["Armor1"] = 1] = "Armor1";
-        ItemKind[ItemKind["Armor2"] = 2] = "Armor2";
-        ItemKind[ItemKind["Accessory"] = 3] = "Accessory";
-        ItemKind[ItemKind["Tool"] = 4] = "Tool";
-        ItemKind[ItemKind["Treasure"] = 5] = "Treasure";
-    })(ItemKind = GameData.ItemKind || (GameData.ItemKind = {}));
-    GameData.ItemBox = [];
-    GameData.Money = 10000;
-    function loadCharactorConfigFromFile(path, loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const configDirectory = path.substring(0, path.lastIndexOf("/"));
-            // キャラクタの設定ファイルを読み取る
-            loadStartCallback();
-            const charactorConfigJson = yield ajax(path, "json").then(x => x.response);
-            loadEndCallback();
-            const spriteSheetPath = configDirectory + "/" + charactorConfigJson.sprite;
-            const sprite = yield SpriteAnimation.loadSpriteSheet(spriteSheetPath, loadStartCallback, loadEndCallback);
-            return new CharactorConfig({
-                id: charactorConfigJson.id,
-                name: charactorConfigJson.name,
-                sprite: sprite,
-                configDirectory: configDirectory
-            });
-        });
-    }
-    //
-    //
-    //
-    class CharactorConfig {
-        constructor({ id = "", name = "", sprite = null, configDirectory = "", }) {
-            this.id = id;
-            this.name = name;
-            this.sprite = sprite;
-            this.configDirectory = configDirectory;
-        }
-    }
-    GameData.CharactorConfig = CharactorConfig;
-    function loadCharactorConfigs(target, path, loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            loadStartCallback();
-            const configPaths = yield ajax(path, "json").then((x) => x.response);
-            loadStartCallback();
-            const rootDirectory = getDirectory(path);
-            const configs = yield Promise.all(configPaths.map(x => loadCharactorConfigFromFile(rootDirectory + '/' + x, loadStartCallback, loadEndCallback)));
-            target.clear();
-            configs.forEach((x) => target.set(x.id, x));
-            return;
-        });
-    }
-    const playerConfigFilePath = "./assets/charactor/charactor.json";
-    const playerConfigs = new Map();
-    function getPlayerIds() {
-        const keys = [];
-        for (const [key, value] of playerConfigs) {
-            keys.push(key);
-        }
-        return keys;
-    }
-    GameData.getPlayerIds = getPlayerIds;
-    class MonsterConfig extends CharactorConfig {
-    }
-    const monsterConfigFilePath = "./assets/monster/monster.json";
-    const monsterConfigs = new Map();
-    function loadConfigs(loadStartCallback, loadEndCallback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return Promise.all([
-                loadCharactorConfigs(playerConfigs, playerConfigFilePath, loadStartCallback, loadEndCallback),
-                loadCharactorConfigs(monsterConfigs, monsterConfigFilePath, loadStartCallback, loadEndCallback),
-            ]).then(x => { });
-        });
-    }
-    GameData.loadConfigs = loadConfigs;
-    class PlayerData {
-        get config() {
-            return playerConfigs.get(this.id);
-        }
-        toObject() {
-            return {
-                id: this.id,
-                hp: this.hp,
-                mp: this.mp,
-                equips: this.equips
-            };
-        }
-        static fromObject(obj) {
-            const data = new PlayerData();
-            data.id = obj.id;
-            data.hp = obj.hp;
-            data.mp = obj.mp;
-            data.equips = obj.equips;
-            return data;
-        }
-    }
-    GameData.PlayerData = PlayerData;
-    const charactorDatas = new Map();
-    function getPlayerData(id) {
-        let ret = charactorDatas.get(id);
-        if (ret == null) {
-            let cfg = playerConfigs.get(id);
-            if (cfg != null) {
-                ret = new PlayerData();
-                ret.equips = {};
-                ret.hp = 100;
-                ret.mp = 100;
-                ret.id = id;
-                charactorDatas.set(id, ret);
-            }
-        }
-        return ret;
-    }
-    GameData.getPlayerData = getPlayerData;
-    function setPlayerData(id, data) {
-        charactorDatas.set(id, data);
-    }
-    GameData.setPlayerData = setPlayerData;
-    // 前衛
-    GameData.forwardCharactor = null;
-    // 後衛
-    GameData.backwardCharactor = null;
-    //
-    //
-    //
-    function getMonsterConfig(id) {
-        return monsterConfigs.get(id);
-    }
-    GameData.getMonsterConfig = getMonsterConfig;
-    function saveGameData() {
-        const charactorDataHash = [];
-        charactorDatas.forEach((v, k) => charactorDataHash.push(v.toObject()));
-        const data = {
-            itemBox: GameData.ItemBox,
-            money: GameData.Money,
-            charactorDatas: charactorDataHash
-        };
-        window.localStorage.setItem("GameData", JSON.stringify(data));
-    }
-    GameData.saveGameData = saveGameData;
-    function loadGameData() {
-        const dataStr = window.localStorage.getItem("GameData");
-        if (dataStr == null) {
-            return false;
-        }
-        const data = JSON.parse(dataStr);
-        charactorDatas.clear();
-        data.charactorDatas.forEach((v) => {
-            charactorDatas.set(v.id, PlayerData.fromObject(v));
-        });
-        GameData.ItemBox.length = 0;
-        Array.prototype.push.apply(GameData.ItemBox, data.itemBox);
-        GameData.Money = data.money;
-        return true;
-    }
-    GameData.loadGameData = loadGameData;
-})(GameData || (GameData = {}));
-var Charactor;
-(function (Charactor) {
-    class Monster extends Charactor.CharactorBase {
+    Unit.UnitBase = UnitBase;
+})(Unit || (Unit = {}));
+var Unit;
+(function (Unit) {
+    class Monster extends Unit.UnitBase {
         constructor(monsterId) {
-            var data = GameData.getMonsterConfig(monsterId);
+            var data = Data.Monster.getMonsterData(monsterId);
             super(0, 0, data.sprite);
-            this.life = data.hp;
-            this.maxLife = data.hp;
-            this.atk = data.atk;
-            this.def = data.def;
+            this.life = data.status.hp;
+            this.maxLife = data.status.hp;
+            this.atk = data.status.atk;
+            this.def = data.status.def;
         }
     }
-    Charactor.Monster = Monster;
-})(Charactor || (Charactor = {}));
+    Unit.Monster = Monster;
+})(Unit || (Unit = {}));
 //  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
-var Charactor;
-(function (Charactor) {
-    class Player extends Charactor.CharactorBase {
-        constructor() {
-            super(0, 0, GameData.getPlayerData(GameData.forwardCharactor).config.sprite);
+var Unit;
+(function (Unit) {
+    class Player extends Unit.UnitBase {
+        constructor(forward, backward) {
+            super(0, 0, forward.config.sprite);
             this.members = [];
-            const forward = GameData.getPlayerData(GameData.forwardCharactor);
             this.active = 0;
             this.members[0] = {
-                id: GameData.forwardCharactor,
+                id: forward.id,
                 name: forward.config.name,
                 spriteSheet: forward.config.sprite,
                 equips: Object.assign({}, forward.equips),
@@ -5443,10 +5416,9 @@ var Charactor;
                 mpMax: forward.mp,
                 hpMax: forward.hp
             };
-            const backward = GameData.getPlayerData(GameData.backwardCharactor);
             if (backward != null) {
                 this.members[1] = {
-                    id: GameData.backwardCharactor,
+                    id: backward.id,
                     spriteSheet: backward.config.sprite,
                     name: backward.config.name,
                     equips: Object.assign({}, backward.equips),
@@ -5458,10 +5430,10 @@ var Charactor;
             }
         }
         getForward() {
-            return this.members[this.active == 0 ? 0 : 1];
+            return this.members[this.active === 0 ? 0 : 1];
         }
         getBackward() {
-            return this.members[this.active == 0 ? 1 : 0];
+            return this.members[this.active === 0 ? 1 : 0];
         }
         get spriteSheet() {
             return this.members[this.active].spriteSheet;
@@ -5469,14 +5441,2303 @@ var Charactor;
         set spriteSheet(value) {
         }
         get atk() {
-            return this.members[this.active].equips.reduce((s, [v, k]) => s += v.atk, 0);
+            return this.members[this.active].equips.reduce((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0);
         }
         get def() {
-            return this.members[this.active].equips.reduce((s, [v, k]) => s += v.def, 0);
+            return this.members[this.active].equips.reduce((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0);
         }
     }
-    Charactor.Player = Player;
-})(Charactor || (Charactor = {}));
+    Unit.Player = Player;
+})(Unit || (Unit = {}));
+var Particle;
+(function (Particle) {
+    function createShowDamageSprite(start, damage, getpos) {
+        let elapse = 0;
+        const fontWidth = 5;
+        const fontHeight = 7;
+        return {
+            update: (delta, ms) => {
+                elapse = ms - start;
+                return (elapse > 500);
+            },
+            draw: (camera) => {
+                const { x: sx, y: sy } = getpos();
+                const xx = sx - camera.left;
+                const yy = sy - camera.top;
+                const len = damage.length;
+                const offx = -(len) * (fontWidth - 1) / 2;
+                const offy = 0;
+                for (let i = 0; i < damage.length; i++) {
+                    const rad = Math.min(elapse - i * 20, 200);
+                    if (rad < 0) {
+                        continue;
+                    }
+                    const dy = Math.sin(rad * Math.PI / 200) * -7; // 7 = 跳ね上がる高さ
+                    if (0 <= xx + (i + 1) * fontWidth &&
+                        xx + (i + 0) * fontWidth < Game.getScreen().offscreenWidth &&
+                        0 <= yy + (1 * fontHeight) &&
+                        yy + (0 * fontHeight) < Game.getScreen().offscreenHeight) {
+                        const [fx, fy] = Font7px.charDic[damage[i]];
+                        Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, (xx + (i + 0) * (fontWidth - 1)) + offx, (yy + (0) * fontHeight) + offy + dy, fontWidth, fontHeight);
+                    }
+                }
+            },
+        };
+    }
+    Particle.createShowDamageSprite = createShowDamageSprite;
+})(Particle || (Particle = {}));
+var Font7px;
+(function (Font7px) {
+    Font7px.charDic = {
+        " ": [0, 0],
+        "!": [5, 0],
+        "\"": [10, 0],
+        "#": [15, 0],
+        "$": [20, 0],
+        "%": [25, 0],
+        "&": [30, 0],
+        "'": [35, 0],
+        "(": [40, 0],
+        ")": [45, 0],
+        "*": [50, 0],
+        "+": [55, 0],
+        ",": [60, 0],
+        "-": [65, 0],
+        ".": [70, 0],
+        "/": [75, 0],
+        "0": [0, 7],
+        "1": [5, 7],
+        "2": [10, 7],
+        "3": [15, 7],
+        "4": [20, 7],
+        "5": [25, 7],
+        "6": [30, 7],
+        "7": [35, 7],
+        "8": [40, 7],
+        "9": [45, 7],
+        ":": [50, 7],
+        ";": [55, 7],
+        "<": [60, 7],
+        "=": [65, 7],
+        ">": [70, 7],
+        "?": [75, 7],
+        "@": [0, 14],
+        "A": [5, 14],
+        "B": [10, 14],
+        "C": [15, 14],
+        "D": [20, 14],
+        "E": [25, 14],
+        "F": [30, 14],
+        "G": [35, 14],
+        "H": [40, 14],
+        "I": [45, 14],
+        "J": [50, 14],
+        "K": [55, 14],
+        "L": [60, 14],
+        "M": [65, 14],
+        "N": [70, 14],
+        "O": [75, 14],
+        "P": [0, 21],
+        "Q": [5, 21],
+        "R": [10, 21],
+        "S": [15, 21],
+        "T": [20, 21],
+        "U": [25, 21],
+        "V": [30, 21],
+        "W": [35, 21],
+        "X": [40, 21],
+        "Y": [45, 21],
+        "Z": [50, 21],
+        "[": [55, 21],
+        "\\": [60, 21],
+        "]": [65, 21],
+        "^": [70, 21],
+        "_": [75, 21],
+        "`": [0, 28],
+        "a": [5, 28],
+        "b": [10, 28],
+        "c": [15, 28],
+        "d": [20, 28],
+        "e": [25, 28],
+        "f": [30, 28],
+        "g": [35, 28],
+        "h": [40, 28],
+        "i": [45, 28],
+        "j": [50, 28],
+        "k": [55, 28],
+        "l": [60, 28],
+        "m": [65, 28],
+        "n": [70, 28],
+        "o": [75, 28],
+        "p": [0, 35],
+        "q": [5, 35],
+        "r": [10, 35],
+        "s": [15, 35],
+        "t": [20, 35],
+        "u": [25, 35],
+        "v": [30, 35],
+        "w": [35, 35],
+        "x": [40, 35],
+        "y": [45, 35],
+        "z": [50, 35],
+        "{": [55, 35],
+        "|": [60, 35],
+        "}": [65, 35],
+        "~": [70, 35]
+    };
+    function draw7pxFont(str, x, y) {
+        const fontWidth = 5;
+        const fontHeight = 7;
+        let sx = x;
+        let sy = y;
+        for (let i = 0; i < str.length; i++) {
+            const ch = str[i];
+            if (ch === "\n") {
+                sy += fontHeight;
+                sx = x;
+                continue;
+            }
+            const [fx, fy] = Font7px.charDic[str[i]];
+            Game.getScreen().drawImage(Game.getScreen().texture("font7px"), fx, fy, fontWidth, fontHeight, sx, sy, fontWidth, fontHeight);
+            sx += fontWidth - 1;
+        }
+    }
+    Font7px.draw7pxFont = draw7pxFont;
+})(Font7px || (Font7px = {}));
+var Data;
+(function (Data) {
+    var Item;
+    (function (Item) {
+        let ItemKind;
+        (function (ItemKind) {
+            ItemKind[ItemKind["Wepon"] = 0] = "Wepon";
+            ItemKind[ItemKind["Armor1"] = 1] = "Armor1";
+            ItemKind[ItemKind["Armor2"] = 2] = "Armor2";
+            ItemKind[ItemKind["Accessory"] = 3] = "Accessory";
+            ItemKind[ItemKind["Tool"] = 4] = "Tool";
+            ItemKind[ItemKind["Treasure"] = 5] = "Treasure";
+        })(ItemKind = Item.ItemKind || (Item.ItemKind = {}));
+        const ItemTable = [
+            /* Wepon */
+            { id: 1, name: "竹刀", price: 300, kind: ItemKind.Wepon, description: "授業用なので少しボロイ", hp: 0, mp: 0, atk: 3, def: 0, effects: (data) => { }, stackable: false },
+            { id: 2, name: "鉄パイプ", price: 500, kind: ItemKind.Wepon, description: "手ごろな大きさと重さで扱いやすい", hp: 0, mp: 0, atk: 5, def: 0, effects: (data) => { }, stackable: false },
+            { id: 3, name: "バット", price: 700, kind: ItemKind.Wepon, description: "目指せ場外ホームラン", hp: 0, mp: 0, atk: 7, def: 0, effects: (data) => { }, stackable: false },
+            /* Armor1 */
+            { id: 101, name: "水着", price: 200, kind: ItemKind.Armor1, description: "動きやすいが防御はやや不安", hp: 0, mp: 0, atk: 0, def: 1, effects: (data) => { }, stackable: false },
+            { id: 102, name: "制服", price: 400, kind: ItemKind.Armor1, description: "学校指定です", hp: 0, mp: 0, atk: 0, def: 2, effects: (data) => { }, stackable: false },
+            { id: 103, name: "体操着", price: 600, kind: ItemKind.Armor1, description: "胸部が窮屈と不評", hp: 0, mp: 0, atk: 0, def: 3, effects: (data) => { }, stackable: false },
+            /* Armor2 */
+            { id: 201, name: "スカート", price: 200, kind: ItemKind.Armor2, description: "エッチな風さんですぅ", hp: 0, mp: 0, atk: 0, def: 1, effects: (data) => { }, stackable: false },
+            { id: 202, name: "ブルマ", price: 400, kind: ItemKind.Armor2, description: "歳がバレますわ！", hp: 0, mp: 0, atk: 0, def: 2, effects: (data) => { }, stackable: false },
+            { id: 203, name: "ズボン", price: 600, kind: ItemKind.Armor2, description: "足が細く見えます。", hp: 0, mp: 0, atk: 0, def: 3, effects: (data) => { }, stackable: false },
+            /* Accessory */
+            { id: 301, name: "ヘアバンド", price: 2000, kind: ItemKind.Accessory, description: "デコ！", hp: 0, mp: 0, atk: 0, def: 1, effects: (data) => { }, stackable: false },
+            { id: 302, name: "メガネ", price: 2000, kind: ItemKind.Accessory, description: "メガネは不人気", hp: 0, mp: 0, atk: 0, def: 1, effects: (data) => { }, stackable: false },
+            { id: 303, name: "靴下", price: 2000, kind: ItemKind.Accessory, description: "色も長さも様々", hp: 0, mp: 0, atk: 0, def: 1, effects: (data) => { }, stackable: false },
+            { id: 304, name: "欠けた歯車", price: 0, kind: ItemKind.Accessory, description: "ナニカサレタヨウダ…", hp: 0, mp: 0, atk: 1, def: 1, effects: (data) => { }, stackable: false },
+            /* Tool */
+            { id: 501, name: "イモメロン", price: 100, kind: ItemKind.Tool, description: "空腹時にどうぞ", hp: 0, mp: 0, atk: 0, def: 0, effects: (data) => { }, stackable: true },
+            { id: 502, name: "プリングルス", price: 890, kind: ItemKind.Tool, description: "歌舞伎役者もおすすめ", hp: 0, mp: 0, atk: 0, def: 0, effects: (data) => { }, stackable: true },
+            { id: 503, name: "バンテリン", price: 931, kind: ItemKind.Tool, description: "ありがたい…", hp: 0, mp: 0, atk: 0, def: 0, effects: (data) => { }, stackable: true },
+            { id: 504, name: "サラダチキン", price: 1000, kind: ItemKind.Tool, description: "このハーブはダメかと…", hp: 0, mp: 0, atk: 0, def: 0, effects: (data) => { }, stackable: true },
+        ];
+        function findItemDataById(id) {
+            const idx = ItemTable.findIndex(x => x.id == id);
+            return ItemTable[idx];
+        }
+        Item.findItemDataById = findItemDataById;
+    })(Item = Data.Item || (Data.Item = {}));
+})(Data || (Data = {}));
+var Data;
+(function (Data) {
+    var Charactor;
+    (function (Charactor) {
+        ;
+        const charactorTable = [
+            {
+                id: "_u01",
+                name: "ウ1",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u01/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u02",
+                name: "ウ2",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u02/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u03",
+                name: "ウ3",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u03/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u04",
+                name: "ウ4",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u04/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u05",
+                name: "ウ5",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u05/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u06",
+                name: "ウ6",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u06/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u07",
+                name: "ウ7",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u07/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u08",
+                name: "ウ8",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u08/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u09",
+                name: "ウ9",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u09/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u10",
+                name: "ウ10",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u10/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u11",
+                name: "ウ11",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u11/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u12",
+                name: "ウ12",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u12/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u13",
+                name: "ウ13",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u13/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u14",
+                name: "ウ14",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u14/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u15",
+                name: "ウ15",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u15/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u16",
+                name: "ウ16",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u16/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u17",
+                name: "ウ17",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u17/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u18",
+                name: "ウ18",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u18/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u19",
+                name: "ウ19",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u19/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u20",
+                name: "ウ20",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u20/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u21",
+                name: "ウ21",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u21/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u22",
+                name: "ウ22",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u22/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u23",
+                name: "ウ23",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u23/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u24",
+                name: "ウ24",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u24/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u25",
+                name: "ウ25",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u25/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u26",
+                name: "ウ26",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u26/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u27",
+                name: "ウ27",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u27/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u28",
+                name: "ウ28",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u28/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u29",
+                name: "ウ29",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u29/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+            {
+                id: "_u30",
+                name: "ウ30",
+                status: {
+                    hp: 100,
+                    mp: 100,
+                    atk: 0,
+                    def: 0
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/charactor/_u30/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        1: { source: 0, left: 48, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        2: { source: 0, left: 96, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        3: { source: 0, left: 144, top: 0, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        4: { source: 0, left: 0, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        5: { source: 0, left: 48, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        6: { source: 0, left: 96, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        7: { source: 0, left: 144, top: 48, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        8: { source: 0, left: 0, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        9: { source: 0, left: 48, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        10: { source: 0, left: 96, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        11: { source: 0, left: 144, top: 96, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        12: { source: 0, left: 0, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        13: { source: 0, left: 48, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        14: { source: 0, left: 96, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 },
+                        15: { source: 0, left: 144, top: 144, width: 48, height: 48, offsetX: 0, offsetY: -12 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                    }
+                }
+            },
+        ];
+        const charactorData = new Map();
+        function configToData(config, loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const id = config.id;
+                const name = config.name;
+                const status = config.status;
+                const sprite = yield SpriteAnimation.SpriteSheet.Create(config.sprite, loadStartCallback, loadEndCallback);
+                return { id: id, name: name, status: status, sprite: sprite };
+            });
+        }
+        function SetupCharactorData(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const datas = yield Promise.all(charactorTable.map(x => configToData(x, loadStartCallback, loadEndCallback)));
+                datas.forEach(x => charactorData.set(x.id, x));
+            });
+        }
+        Charactor.SetupCharactorData = SetupCharactorData;
+        function getPlayerIds() {
+            return Array.from(charactorData.keys());
+        }
+        Charactor.getPlayerIds = getPlayerIds;
+        function getPlayerConfig(id) {
+            return charactorData.get(id);
+        }
+        Charactor.getPlayerConfig = getPlayerConfig;
+    })(Charactor = Data.Charactor || (Data.Charactor = {}));
+})(Data || (Data = {}));
+var Data;
+(function (Data) {
+    var Monster;
+    (function (Monster) {
+        ;
+        const monsterConfig = [
+            {
+                id: "slime",
+                name: "スライム",
+                status: {
+                    hp: 5,
+                    atk: 3,
+                    def: 1,
+                    gold: 10,
+                },
+                sprite: {
+                    source: {
+                        0: "./assets/monster/slime/walk.png"
+                    },
+                    sprite: {
+                        0: { source: 0, left: 0, top: 0, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        1: { source: 0, left: 24, top: 0, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        2: { source: 0, left: 48, top: 0, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        3: { source: 0, left: 72, top: 0, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        4: { source: 0, left: 0, top: 24, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        5: { source: 0, left: 24, top: 24, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        6: { source: 0, left: 48, top: 24, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        7: { source: 0, left: 72, top: 24, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        8: { source: 0, left: 0, top: 48, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        9: { source: 0, left: 24, top: 48, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        10: { source: 0, left: 48, top: 48, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        11: { source: 0, left: 72, top: 48, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        12: { source: 0, left: 0, top: 72, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        13: { source: 0, left: 24, top: 72, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        14: { source: 0, left: 48, top: 72, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        15: { source: 0, left: 72, top: 72, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        16: { source: 0, left: 0, top: 120, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        17: { source: 0, left: 24, top: 120, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        18: { source: 0, left: 48, top: 120, width: 24, height: 24, offsetX: 0, offsetY: 0 },
+                        19: { source: 0, left: 72, top: 120, width: 24, height: 24, offsetX: 0, offsetY: 0 }
+                    },
+                    animation: {
+                        idle: [
+                            { sprite: 0, time: 1, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_down: [
+                            { sprite: 0, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 1, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 2, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 3, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_left: [
+                            { sprite: 4, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 5, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 6, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 7, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_up: [
+                            { sprite: 8, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 9, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 10, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 11, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        move_right: [
+                            { sprite: 12, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 13, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 14, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 15, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ],
+                        dead: [
+                            { sprite: 16, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 17, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 18, time: 0.25, offsetX: 0, offsetY: 0 },
+                            { sprite: 19, time: 0.25, offsetX: 0, offsetY: 0 }
+                        ]
+                    }
+                }
+            }
+        ];
+        const monsterData = new Map();
+        function configToData(config, loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const id = config.id;
+                const name = config.name;
+                const status = config.status;
+                const sprite = yield SpriteAnimation.SpriteSheet.Create(config.sprite, loadStartCallback, loadEndCallback);
+                return { id: id, name: name, status: status, sprite: sprite };
+            });
+        }
+        function SetupMonsterData(loadStartCallback, loadEndCallback) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const datas = yield Promise.all(monsterConfig.map(x => configToData(x, loadStartCallback, loadEndCallback)));
+                datas.forEach(x => monsterData.set(x.id, x));
+            });
+        }
+        Monster.SetupMonsterData = SetupMonsterData;
+        function getMonsterIds() {
+            return Array.from(monsterData.keys());
+        }
+        Monster.getMonsterIds = getMonsterIds;
+        function getMonsterData(id) {
+            return monsterData.get(id);
+        }
+        Monster.getMonsterData = getMonsterData;
+    })(Monster = Data.Monster || (Data.Monster = {}));
+})(Data || (Data = {}));
+var Data;
+(function (Data) {
+    var Player;
+    (function (Player) {
+        ;
+        class PlayerData {
+            constructor(playerData) {
+                this.playerData = playerData;
+            }
+            get id() { return this.playerData.id; }
+            set id(value) { this.playerData.id = value; }
+            get hp() { return this.playerData.hp; }
+            set hp(value) { this.playerData.hp = value; }
+            get mp() { return this.playerData.mp; }
+            set mp(value) { this.playerData.mp = value; }
+            get equips() { return this.playerData.equips; }
+            set equips(value) { this.playerData.equips = value; }
+            get config() {
+                return Data.Charactor.getPlayerConfig(this.id);
+            }
+        }
+        Player.PlayerData = PlayerData;
+    })(Player = Data.Player || (Data.Player = {}));
+})(Data || (Data = {}));
+var Data;
+(function (Data) {
+    var SaveData;
+    (function (SaveData_1) {
+        class SaveData {
+            constructor() {
+                this.ItemBox = [];
+                this.Money = 10000;
+                this.charactorDatas = [];
+                this.forwardCharactor = null;
+                this.backwardCharactor = null;
+                this.shopStockList = [
+                    { id: 1, condition: "", count: 5 },
+                    { id: 2, condition: "", count: 5 },
+                    { id: 3, condition: "", count: 5 },
+                    { id: 101, condition: "", count: 5 },
+                    { id: 102, condition: "", count: 5 },
+                    { id: 103, condition: "", count: 5 },
+                    { id: 201, condition: "", count: 5 },
+                    { id: 202, condition: "", count: 5 },
+                    { id: 203, condition: "", count: 5 },
+                    { id: 301, condition: "", count: 5 },
+                    { id: 302, condition: "", count: 5 },
+                    { id: 303, condition: "", count: 5 },
+                    { id: 501, condition: "", count: 5 },
+                    { id: 502, condition: "", count: 5 },
+                    { id: 503, condition: "", count: 5 },
+                    { id: 504, condition: "", count: 5 },
+                ];
+            }
+            findCharactorById(id) {
+                let ret = this.charactorDatas.find(x => x.id == id);
+                if (ret == null) {
+                    ret = {
+                        id: id,
+                        hp: 100,
+                        mp: 100,
+                        equips: {
+                            wepon1: null,
+                            armor1: null,
+                            armor2: null,
+                            accessory1: null,
+                            accessory2: null,
+                        }
+                    };
+                    this.charactorDatas.push(ret);
+                    this.saveGameData();
+                }
+                return new Data.Player.PlayerData(ret);
+            }
+            saveGameData() {
+                window.localStorage.setItem("SaveData", JSON.stringify(this));
+            }
+            loadGameData() {
+                const dataStr = window.localStorage.getItem("SaveData");
+                if (dataStr == null) {
+                    return false;
+                }
+                const data = JSON.parse(dataStr);
+                const result = Object.assign(this, data);
+                return true;
+            }
+        }
+        SaveData_1.SaveData = SaveData;
+    })(SaveData = Data.SaveData || (Data.SaveData = {}));
+})(Data || (Data = {}));
 // <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 window.onload = () => {
     Game.create({
@@ -5490,7 +7751,7 @@ window.onload = () => {
         }
     }).then(() => {
         Game.getSceneManager().push(Scene.boot, null);
-        Game.getTimer().on((delta, now, id) => {
+        Game.getTimer().on((delta, now) => {
             Game.getInput().endCapture();
             Game.getSceneManager().update(delta, now);
             Game.getInput().startCapture();
@@ -5502,113 +7763,4 @@ window.onload = () => {
         Game.getTimer().start();
     });
 };
-/// <reference path="../lib/game/eventdispatcher.ts" />
-var Scene;
-(function (Scene) {
-    function* corridor() {
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const fade = new Scene.Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
-        let selected = null;
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "移動先を選択してください。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        const btnBuy = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 0 + 46,
-            width: 112,
-            height: 16,
-            text: "教室",
-        });
-        dispatcher.add(btnBuy);
-        btnBuy.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(Scene.classroom, null);
-        };
-        const btnSell = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 1 + 46,
-            width: 112,
-            height: 16,
-            text: "購買部",
-        });
-        dispatcher.add(btnSell);
-        btnSell.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(Scene.shop, null);
-        };
-        const btnDungeon = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 3 + 46,
-            width: 112,
-            height: 16,
-            text: "迷宮",
-        });
-        dispatcher.add(btnDungeon);
-        btnDungeon.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            Game.getSound().reqStopChannel("classroom");
-            selected = () => {
-                Game.getSceneManager().pop();
-                Game.getSound().reqStopChannel("classroom");
-                Game.getSceneManager().push(Scene.dungeon, { player: new Charactor.Player(), floor: 1 });
-            };
-        };
-        btnDungeon.enable = GameData.forwardCharactor != null;
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("corridorbg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            dispatcher.draw();
-            fade.draw();
-        };
-        Game.getSound().reqPlayChannel("classroom", true);
-        for (;;) {
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeIn(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            yield (delta, ms) => {
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                btnDungeon.enable = GameData.forwardCharactor != null;
-                if (selected != null) {
-                    this.next();
-                }
-            };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeOut(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            selected();
-            selected = null;
-        }
-    }
-    Scene.corridor = corridor;
-})(Scene || (Scene = {}));
 //# sourceMappingURL=tsjq.js.map

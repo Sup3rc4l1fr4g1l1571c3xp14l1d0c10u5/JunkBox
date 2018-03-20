@@ -1,7 +1,7 @@
 /// <reference path="../lib/game/eventdispatcher.ts" />
 namespace Scene {
 
-    export function* corridor() {
+    export function* corridor(saveData: Data.SaveData.SaveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
         const fade = new Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
         let selected: () => void = null;
@@ -31,7 +31,7 @@ namespace Scene {
         dispatcher.add(btnBuy);
         btnBuy.click = (x: number, y: number) => {
             Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(classroom, null);
+            selected = () => Game.getSceneManager().push(classroom, saveData);
         };
 
         const btnSell = new Game.GUI.Button({
@@ -44,7 +44,7 @@ namespace Scene {
         dispatcher.add(btnSell);
         btnSell.click = (x: number, y: number) => {
             Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(shop, null);
+            selected = () => Game.getSceneManager().push(shop, saveData);
         };
 
         const btnDungeon = new Game.GUI.Button({
@@ -61,11 +61,11 @@ namespace Scene {
             selected = () => {
                 Game.getSceneManager().pop();
                 Game.getSound().reqStopChannel("classroom");
-                Game.getSceneManager().push(dungeon, { player: new Charactor.Player(), floor: 1 });
+                Game.getSceneManager().push(dungeon, { saveData: saveData, player: new Unit.Player(saveData.findCharactorById(saveData.forwardCharactor), saveData.findCharactorById(saveData.backwardCharactor)), floor: 1 });
             };
         };
 
-        btnDungeon.enable = GameData.forwardCharactor != null;
+        btnDungeon.enable = saveData.forwardCharactor != null;
 
         this.draw = () => {
             Game.getScreen().drawImage(
@@ -100,7 +100,7 @@ namespace Scene {
                 if (Game.getInput().isUp()) {
                     dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
                 }
-                btnDungeon.enable = GameData.forwardCharactor != null;
+                btnDungeon.enable = saveData.forwardCharactor != null;
                 if (selected != null) {
                     this.next();
                 }

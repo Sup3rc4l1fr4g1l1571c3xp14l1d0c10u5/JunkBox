@@ -1,7 +1,7 @@
 /// <reference path="../lib/game/eventdispatcher.ts" />
 namespace Scene {
 
-    function* shopBuyItem() {
+    function* shopBuyItem(saveData: Data.SaveData.SaveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
 
         const caption = new Game.GUI.TextBox({
@@ -19,25 +19,6 @@ namespace Scene {
         });
         dispatcher.add(caption);
 
-        const itemlist: GameData.ItemData[] = [
-            { name: "竹刀", price: 300, kind: GameData.ItemKind.Wepon, description: "471.", atk: 3, def: 0, condition: "", stackable: false },
-            { name: "鉄パイプ", price: 500, kind: GameData.ItemKind.Wepon, description: "819.", atk: 5, def: 0, condition: "", stackable: false },
-            { name: "バット", price: 700, kind: GameData.ItemKind.Wepon, description: "89.", atk: 7, def: 0, condition: "", stackable: false },
-            { name: "水着", price: 200, kind: GameData.ItemKind.Armor1, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "制服", price: 400, kind: GameData.ItemKind.Armor1, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
-            { name: "体操着", price: 600, kind: GameData.ItemKind.Armor1, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
-            { name: "スカート", price: 200, kind: GameData.ItemKind.Armor2, description: "3.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "ブルマ", price: 400, kind: GameData.ItemKind.Armor2, description: "1.", atk: 0, def: 2, condition: "", stackable: false },
-            { name: "ズボン", price: 600, kind: GameData.ItemKind.Armor2, description: "2.", atk: 0, def: 3, condition: "", stackable: false },
-            { name: "ヘアバンド", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "メガネ", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "靴下", price: 2000, kind: GameData.ItemKind.Accessory, description: "2.", atk: 0, def: 1, condition: "", stackable: false },
-            { name: "イモメロン", price: 100, kind: GameData.ItemKind.Tool, description: "food.", effect: (data) => { }, stackable: true},
-            { name: "プリングルス", price: 890, kind: GameData.ItemKind.Tool, description: "140546.", effect: (data) => { }, stackable: true },
-            { name: "バンテリン", price: 931, kind: GameData.ItemKind.Tool, description: "931.", effect: (data) => { }, stackable: true },
-            { name: "サラダチキン", price: 1000, kind: GameData.ItemKind.Tool, description: "dmkt.", effect: (data) => { }, stackable: true },
-        ];
-
         let selectedItem = -1;
         const listBox = new Game.GUI.ListBox({
             left: 8,
@@ -45,8 +26,9 @@ namespace Scene {
             width: 112,
             height: 10 * 16,
             lineHeight: 16,
-            getItemCount: () => itemlist.length,
+            getItemCount: () => saveData.shopStockList.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 } else {
@@ -60,10 +42,10 @@ namespace Scene {
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index].name, left + 3, top + 3);
+                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
                 Game.getScreen().textAlign = "right";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemlist[index].price + "G", left + 112, top + 3);
+                Game.getScreen().fillText(itemData.price + "G", left + 112-3, top + 3);
             }
         });
         dispatcher.add(listBox);
@@ -74,18 +56,18 @@ namespace Scene {
         };
 
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
 
         const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 135 + 14,
-            top: 80,
-            width: 108 - 28,
+            left: 131 + 14,
+            top: 90,
+            width: 112 - 28,
             height: 16,
             sliderWidth: 5,
             updownButtonWidth: 10,
@@ -94,12 +76,12 @@ namespace Scene {
             font: "10px 'PixelMplus10-Regular'",
             fontColor: `rgb(255,255,255)`,
             minValue: 0,
-            maxValue: 100,
+            maxValue: 99,
         });
         dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button({
-            left: 135,
-            top: 80,
+            left: 131,
+            top: 90,
             width: 14,
             height: 16,
             text: "－",
@@ -112,7 +94,7 @@ namespace Scene {
         };
         const btnSliderUp = new Game.GUI.Button({
             left: 243 - 14,
-            top: 80,
+            top: 90,
             width: 14,
             height: 16,
             text: "＋",
@@ -124,16 +106,22 @@ namespace Scene {
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionBuyCount = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 64,
-            width: 108,
-            height: 16,
-            text: () => `購入数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : itemlist[selectedItem].price * hoverSlider.value)).substr(-8)+"G"}`,
+            width: 112,
+            height: 24,
+            text: () => {
+                if (selectedItem == -1) {
+                    return '';
+                } else {
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + saveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                }
+            },
         });
         dispatcher.add(captionBuyCount);
 
         const btnDoBuy = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 110,
             width: 112,
             height: 16,
@@ -142,25 +130,80 @@ namespace Scene {
         dispatcher.add(btnDoBuy);
 
         btnDoBuy.click = (x: number, y: number) => {
-            if ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money)) {
-                GameData.Money -= itemlist[selectedItem].price * hoverSlider.value;
-                if (itemlist[selectedItem].stackable) {
-                    var index = GameData.ItemBox.findIndex(x => x.item.name == itemlist[selectedItem].name);
-                    if (index == -1) {
-                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: hoverSlider.value });
+            if (selectedItem != -1) {
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                if ((hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (itemData.price * hoverSlider.value <= saveData.Money)) {
+                    saveData.Money -= itemData.price * hoverSlider.value;
+                    if (itemData.stackable) {
+                        var index = saveData.ItemBox.findIndex(x => x.id == itemData.id);
+                        if (index == -1) {
+                            saveData.ItemBox.push({ id: saveData.shopStockList[selectedItem].id, condition: saveData.shopStockList[selectedItem].condition, count: hoverSlider.value });
+                        } else {
+                            saveData.ItemBox[index].count += hoverSlider.value;
+                        }
+                        saveData.shopStockList[selectedItem].count -= hoverSlider.value;
                     } else {
-                        GameData.ItemBox[index].count += hoverSlider.value;
+                        for (let i = 0; i < hoverSlider.value; i++) {
+                            saveData.ItemBox.push({ id: saveData.shopStockList[selectedItem].id, condition: saveData.shopStockList[selectedItem].condition, count: 1 });
+                        }
+                        saveData.shopStockList[selectedItem].count -= hoverSlider.value;
                     }
-                } else {
-                    for (let i = 0; i < hoverSlider.value; i++) {
-                        GameData.ItemBox.push({ item: itemlist[selectedItem], count: 1 });
+                    if (saveData.shopStockList[selectedItem].count <= 0) {
+                        saveData.shopStockList.splice(selectedItem, 1);
                     }
+                    selectedItem = -1;
+                    hoverSlider.value = 0;
+                    saveData.saveGameData();
+                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
                 }
-                selectedItem = -1;
-                hoverSlider.value = 0;
             }
-            Game.getSound().reqPlayChannel("cursor");
+            //Game.getSound().reqPlayChannel("cursor");
         };
+
+        const btnItemData = new Game.GUI.Button({
+            left: 131,
+            top: 142,
+            width: 112,
+            height: 60,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                switch (itemData.kind) {
+                    case Data.Item.ItemKind.Wepon:
+                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor1:
+                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor2:
+                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Accessory:
+                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Tool:
+                        return `種別：道具`;
+                    case Data.Item.ItemKind.Treasure:
+                        return `種別：その他`;
+                    default:
+                        return "";
+                }
+            },
+        });
+        dispatcher.add(btnItemData);
+
+        const btnDescription = new Game.GUI.Button({
+            left: 131,
+            top: 212,
+            width: 112,
+            height: 36,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                return itemData.description;
+            },
+        });
+        dispatcher.add(btnDescription);
 
         const btnExit = new Game.GUI.Button({
             left: 8,
@@ -177,8 +220,8 @@ namespace Scene {
             Game.getSound().reqPlayChannel("cursor");
         };
 
- 
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = false;
+
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = false;
 
 
         this.draw = () => {
@@ -205,8 +248,8 @@ namespace Scene {
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = (selectedItem != -1);
-            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (itemlist[selectedItem].price * hoverSlider.value <= GameData.Money));
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
+            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value <= saveData.Money));
 
             if (exitScene) {
                 this.next();
@@ -217,7 +260,7 @@ namespace Scene {
         Game.getSceneManager().pop();
     }
 
-    function* shopSellItem() {
+    function* shopSellItem(saveData: Data.SaveData.SaveData) {
         const dispatcher = new Game.GUI.UIDispatcher();
 
         const caption = new Game.GUI.TextBox({
@@ -242,8 +285,9 @@ namespace Scene {
             width: 112,
             height: 10 * 16,
             lineHeight: 16,
-            getItemCount: () => GameData.ItemBox.length,
+            getItemCount: () => saveData.ItemBox.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 } else {
@@ -257,10 +301,10 @@ namespace Scene {
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(GameData.ItemBox[index].item.name, left + 3, top + 3);
+                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
                 Game.getScreen().textAlign = "right";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(GameData.ItemBox[index].item.price + "G", left + 112, top + 3);
+                Game.getScreen().fillText(itemData.price + "G", left + 112-3, top + 3);
             }
         });
         dispatcher.add(listBox);
@@ -271,18 +315,18 @@ namespace Scene {
         };
 
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () => `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
 
         const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 135 + 14,
+            left: 131 + 14,
             top: 80,
-            width: 108 - 28,
+            width: 112 - 28,
             height: 16,
             sliderWidth: 5,
             updownButtonWidth: 10,
@@ -295,7 +339,7 @@ namespace Scene {
         });
         dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 80,
             width: 14,
             height: 16,
@@ -321,16 +365,22 @@ namespace Scene {
             Game.getSound().reqPlayChannel("cursor");
         };
         const captionSellCount = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 64,
-            width: 108,
-            height: 16,
-            text: () => `売却数：${('  ' + hoverSlider.value).substr(-2) + "/" + ('  ' + (selectedItem == -1 ? 0 : GameData.ItemBox[selectedItem].item.price * hoverSlider.value)).substr(-8) + "G"}`,
+            width: 112,
+            height: 24,
+            text: () => {
+                if (selectedItem == -1) {
+                    return '';
+                } else {
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + saveData.ItemBox[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                }
+            },
         });
         dispatcher.add(captionSellCount);
 
         const btnDoSell = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 110,
             width: 112,
             height: 16,
@@ -339,18 +389,87 @@ namespace Scene {
         dispatcher.add(btnDoSell);
 
         btnDoSell.click = (x: number, y: number) => {
-            if ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].item.price * hoverSlider.value <= GameData.Money)) {
-                GameData.Money += GameData.ItemBox[selectedItem].item.price * hoverSlider.value;
-                if (GameData.ItemBox[selectedItem].item.stackable && GameData.ItemBox[selectedItem].count > hoverSlider.value) {
-                    GameData.ItemBox[selectedItem].count -= hoverSlider.value;
-                } else {
-                    GameData.ItemBox.splice(selectedItem, 1);
+            if (selectedItem != -1) {
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                if ((hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value)) {
+                    saveData.Money += itemData.price * hoverSlider.value;
+                    const shopStockIndex = saveData.shopStockList.findIndex(x => x.id == saveData.ItemBox[selectedItem].id);
+                    if (shopStockIndex == -1) {
+                        let newstock: Data.Item.ItemBoxEntry = Object.assign({}, saveData.ItemBox[selectedItem]);
+                        newstock.condition = "";
+                        newstock.count = hoverSlider.value;
+                        for (let i = 0; i < saveData.shopStockList.length; i++){
+                           if (saveData.shopStockList[i].id > newstock.id) {
+                               saveData.shopStockList.splice(i, 0, newstock);
+                               newstock = null;
+                               break;
+                           }
+                        }
+                    if (newstock != null) {
+                            saveData.shopStockList.push(newstock);
+                        }
+
+                    } else {
+                        saveData.shopStockList[shopStockIndex].count += hoverSlider.value;
+                    }
+                    if (itemData.stackable && saveData.ItemBox[selectedItem].count > hoverSlider.value) {
+                        saveData.ItemBox[selectedItem].count -= hoverSlider.value;
+                    } else {
+                        saveData.ItemBox.splice(selectedItem, 1);
+                    }
+                    selectedItem = -1;
+                    hoverSlider.value = 0;
+                    saveData.saveGameData();
+                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
                 }
-                selectedItem = -1;
-                hoverSlider.value = 0;
             }
-            Game.getSound().reqPlayChannel("cursor");
+            //Game.getSound().reqPlayChannel("cursor");
         };
+
+        const btnItemData = new Game.GUI.Button({
+            left: 131,
+            top: 142,
+            width: 112,
+            height: 60,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                switch (itemData.kind) {
+                    case Data.Item.ItemKind.Wepon:
+                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor1:
+                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Armor2:
+                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Accessory:
+                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                    case Data.Item.ItemKind.Tool:
+                        return `種別：道具`;
+                    case Data.Item.ItemKind.Treasure:
+                        return `種別：その他`;
+                    default:
+                        return "";
+                }
+            },
+        });
+        dispatcher.add(btnItemData);
+
+        const btnDescription = new Game.GUI.Button({
+            left: 131,
+            top: 212,
+            width: 112,
+            height: 36,
+            text: () => {
+                if (selectedItem == -1) {
+                    return "";
+                }
+                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                return itemData.description;
+            },
+        });
+        dispatcher.add(btnDescription);
 
         const btnExit = new Game.GUI.Button({
             left: 8,
@@ -368,7 +487,7 @@ namespace Scene {
         };
 
 
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = false;
+        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = false;
 
 
         this.draw = () => {
@@ -395,12 +514,12 @@ namespace Scene {
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            captionSellCount.visible = btnDoSell.visible = (selectedItem != -1); 
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (GameData.ItemBox[selectedItem].item.stackable);
-            if ((selectedItem != -1) && (!GameData.ItemBox[selectedItem].item.stackable)) {
+            captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1); 
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable);
+            if ((selectedItem != -1) && (!Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable)) {
                 hoverSlider.value = 1;
             }
-            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (GameData.ItemBox[selectedItem].count >= hoverSlider.value));
+            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value));
 
             if (exitScene) {
                 this.next();
@@ -411,7 +530,7 @@ namespace Scene {
         Game.getSceneManager().pop();
     }
 
-    function* talkScene() {
+    function* talkScene(saveData: Data.SaveData.SaveData) {
         const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
         const dispatcher = new Game.GUI.UIDispatcher();
         const caption = new Game.GUI.TextBox({
@@ -479,13 +598,15 @@ namespace Scene {
             },
         });
 
-        GameData.Money = 0; 
+        saveData.ItemBox.push({ id: 304, condition: "", count: 1 });
+        saveData.Money = 0;
+        saveData.saveGameData();
         Game.getSceneManager().pop();
             Game.getSound().reqPlayChannel("classroom", true);
 
     }
 
-    export function* shop() {
+    export function* shop(saveData: Data.SaveData.SaveData) {
         const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
 
         const dispatcher = new Game.GUI.UIDispatcher();
@@ -514,7 +635,7 @@ namespace Scene {
         });
         dispatcher.add(btnBuy);
         btnBuy.click = (x: number, y: number) => {
-            Game.getSceneManager().push(shopBuyItem);
+            Game.getSceneManager().push(shopBuyItem, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
 
@@ -527,16 +648,16 @@ namespace Scene {
         });
         dispatcher.add(btnSell);
         btnSell.click = (x: number, y: number) => {
-            Game.getSceneManager().push(shopSellItem);
+            Game.getSceneManager().push(shopSellItem, saveData);
             Game.getSound().reqPlayChannel("cursor");
         };
 
         const captionMonay = new Game.GUI.Button({
-            left: 135,
+            left: 131,
             top: 46,
-            width: 108,
+            width: 112,
             height: 16,
-            text: () =>  `所持金：${('            ' + GameData.Money + ' G').substr(-13)}`,
+            text: () => `所持金：${('            ' + saveData.Money + ' G').substr(-13)}`,
         });
         dispatcher.add(captionMonay);
 
@@ -616,7 +737,7 @@ namespace Scene {
         };
         if (momyu > 0) {
             Game.getSound().reqPlayChannel("meka_ge_reji_op01");
-            GameData.Money -= momyu;
+            saveData.Money -= momyu;
             yield waitTimeout({
                 timeout: 1000,
                 end: () => {
@@ -625,7 +746,7 @@ namespace Scene {
             });
         }
 
-        if (GameData.Money <= -50000) {
+        if (saveData.Money <= -50000) {
             Game.getSound().reqStopChannel("classroom");
             Game.getSound().reqPlayChannel("sen_ge_gusya01");
                 
@@ -659,7 +780,7 @@ namespace Scene {
             });
 
             Game.getSceneManager().pop();
-            Game.getSceneManager().push(talkScene);
+            Game.getSceneManager().push(talkScene, saveData);
         } else {
             yield waitTimeout({
                 timeout: 500,

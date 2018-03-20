@@ -2,8 +2,8 @@
 /// <reference path="../Lib/Type.ts" />
 "use strict";
 
-namespace Charactor {
-    export abstract class CharactorBase extends SpriteAnimation.Animator implements IPoint {
+namespace Unit {
+    export abstract class UnitBase extends SpriteAnimation.Animator implements IPoint {
         public x: number;
         public y: number;
 

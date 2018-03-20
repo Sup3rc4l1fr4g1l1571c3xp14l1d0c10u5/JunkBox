@@ -1,8 +1,6 @@
 "use strict";
 
 namespace Game {
-    export const pmode: boolean = false;
-
     let video: Video = null;
     let sceneManager: Scene.SceneManager = null;
     let inputDispacher: Input.InputManager = null;

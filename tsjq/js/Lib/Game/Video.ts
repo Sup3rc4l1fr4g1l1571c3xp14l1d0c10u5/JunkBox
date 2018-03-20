@@ -263,6 +263,48 @@ namespace Game {
             endAngle: number,
             anticlockwise?: boolean) => void;
 
+
+        private drawTextBox(text: string, left: number, top: number, width: number, height: number, drawTextPred: (text: string, x: number, y: number, maxWidth?: number) => void) : void {
+            const metrics = this.measureText(text);
+            const lineHeight = this.measureText("あ").width;
+            const lines = text.split(/\n/);
+            let offY = 0;
+            lines.forEach((x: string, i: number) => {
+                const metrics = this.measureText(x);
+                const sublines: string[] = [];
+                if (metrics.width > width) {
+                    let len = 1;
+                    while (x.length > 0) {
+                        const metrics = this.measureText(x.substr(0, len));
+                        if (metrics.width > width) {
+                            sublines.push(x.substr(0, len - 1));
+                            x = x.substring(len - 1);
+                            len = 1;
+                        } else if (len == x.length) {
+                            sublines.push(x);
+                            break;
+                        } else {
+                            len++;
+                        }
+                    }
+                } else {
+                    sublines.push(x);
+                }
+                sublines.forEach((x) => {
+                    drawTextPred(x, left + 1, top + offY + 1);
+                    offY += (lineHeight + 1);
+                });
+            });
+        }
+
+        public fillTextBox(text: string, left: number, top: number, width: number, height: number): void {
+            this.drawTextBox(text, left, top, width, height, this.fillText.bind(this));
+        }
+
+        public strokeTextBox(text: string, left: number, top: number, width: number, height: number): void {
+            this.drawTextBox(text, left, top, width, height, this.strokeText.bind(this));
+        }
+
         public drawTile(
             image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,

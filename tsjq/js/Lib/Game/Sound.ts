@@ -200,13 +200,13 @@ namespace Game {
                         src.buffer = c.audioBufferNode;
                         src.loop = c.loopPlay;
                         src.connect(this.audioContext.destination);
-                        src.onended = ((): void => {
+                        src.onended = () => {
                             src.stop(0);
                             src.disconnect();
                             this.playingBufferSources.set(bufferid, null);
                             this.playingBufferSources.delete(bufferid);
-                            src.onended = null;
-                        }).bind(null, bufferid);
+                            src.onended = null; // If you forget this null assignment, the AudioBufferSourceNode object will not be destroyed and a memory leak will occur. :-(
+                        };
                         src.start(0);
                     }
                 });
