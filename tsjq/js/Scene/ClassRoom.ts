@@ -6,8 +6,8 @@ namespace Scene {
         Disable
     }
     class StatusSprite extends SpriteAnimation.Animator {
-        constructor(public data: Data.Player.PlayerData) {
-            super(data.config.sprite);
+        constructor(public data: Data.Player.Data) {
+            super(Data.Charactor.get(data.id).sprite);
         }
     }
 
@@ -19,10 +19,10 @@ namespace Scene {
                 } else {
                     Game.getScreen().fillStyle = `rgb(24,133,196)`;
                 }
-                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().fillRect(left, top, width, height);
                 Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                 Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeRect(left, top, width, height);
 
                 if (charactorData != null) {
                     charactorData.setDir(2);
@@ -47,9 +47,9 @@ namespace Scene {
                     Game.getScreen().fillStyle = `rgb(255,255,255)`;
                     Game.getScreen().textAlign = "left";
                     Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(charactorData.data.config.name, left + 48-8, top + 3+ 12*0);
+                    Game.getScreen().fillText(Data.Charactor.get(charactorData.data.id).name, left + 48-8, top + 3+ 12*0);
                     Game.getScreen().fillText(`HP:${charactorData.data.hp} MP:${charactorData.data.mp}`, left + 48 - 8, top + 3 + 12 * 1);
-                    Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0:Data.Item.findItemDataById(v.id).atk), 0)} DEF:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0)}`, left + 48 - 8, top + 12 * 2);
+                    Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0:Data.Item.get(v.id).atk), 0)} DEF:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 48 - 8, top + 12 * 2);
                 }
     }
 
@@ -87,20 +87,20 @@ namespace Scene {
             Game.getSound().reqPlayChannel("cursor");
         };
 
-        const charactors = Data.Charactor.getPlayerIds().map(x => new StatusSprite(saveData.findCharactorById(x)));
-        let team = [Data.Charactor.getPlayerIds().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.getPlayerIds().findIndex(x => x == saveData.backwardCharactor)];
+        const charactors = Data.Charactor.keys().map(x => new StatusSprite(saveData.findCharactorById(x)));
+        let team = [Data.Charactor.keys().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.keys().findIndex(x => x == saveData.backwardCharactor)];
         let selectedSide :number= -1;
-        let selectedCharactor :number = -1;
+        let selectedCharactorIndex :number = -1;
         let anim = 0;
         const charactorListBox = new Game.GUI.ListBox({
             left: 131,
             top: 46,
-            width: 112,
+            width: 112+1,
             height: 4 * 48,
             lineHeight: 48,
             getItemCount: () => charactors.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
-                drawStatusSprite(charactors[index], team.includes(index) ? DrawMode.Disable : (selectedCharactor == index) ? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
+                drawStatusSprite(charactors[index], team.includes(index) ? DrawMode.Disable : (selectedCharactorIndex == index) ? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
             }
         });
         dispatcher.add(charactorListBox);
@@ -110,7 +110,7 @@ namespace Scene {
             if (team.includes(select)) {
                 return;
             }
-            selectedCharactor = selectedCharactor == select ? null : select;
+            selectedCharactorIndex = selectedCharactorIndex == select ? null : select;
             Game.getSound().reqPlayChannel("cursor");
         };
 
@@ -127,15 +127,15 @@ namespace Scene {
         });
         forwardBtn.draw = () => {
             Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(forwardBtn.left - 0.5, forwardBtn.top - 0.5, forwardBtn.width, 13);
+            Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
             Game.getScreen().strokeStyle = `rgb(12,34,98)`;
             Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(forwardBtn.left - 0.5, forwardBtn.top - 0.5, forwardBtn.width, 13);
+            Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
             Game.getScreen().fillStyle = `rgb(255,255,255)`;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
-            Game.getScreen().fillText("前衛", forwardBtn.left+1, forwardBtn.top + 1);
+            Game.getScreen().fillText("前衛", forwardBtn.left+2, forwardBtn.top + 2);
 
             drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0 ? DrawMode.Selected : DrawMode.Normal, forwardBtn.left, forwardBtn.top+12, forwardBtn.width, 48, anim);
         };
@@ -158,15 +158,15 @@ namespace Scene {
         });
         backwordBtn.draw = () => {
             Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(backwordBtn.left - 0.5, backwordBtn.top - 0.5, backwordBtn.width, 13);
+            Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
             Game.getScreen().strokeStyle = `rgb(12,34,98)`;
             Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(backwordBtn.left - 0.5, backwordBtn.top - 0.5, backwordBtn.width, 13);
+            Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
             Game.getScreen().font = "10px 'PixelMplus10-Regular'";
             Game.getScreen().fillStyle = `rgb(255,255,255)`;
             Game.getScreen().textAlign = "left";
             Game.getScreen().textBaseline = "top";
-            Game.getScreen().fillText("後衛", backwordBtn.left+1, backwordBtn.top + 1);
+            Game.getScreen().fillText("後衛", backwordBtn.left+2, backwordBtn.top + 2);
 
             drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1? DrawMode.Selected : DrawMode.Normal, backwordBtn.left, backwordBtn.top+12, backwordBtn.width, 48, anim);
         };
@@ -196,10 +196,10 @@ namespace Scene {
             if (Game.getInput().isUp()) {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
-            if (selectedSide != -1 && selectedCharactor != -1) {
-                team[selectedSide] = selectedCharactor;
+            if (selectedSide != -1 && selectedCharactorIndex != -1) {
+                team[selectedSide] = selectedCharactorIndex;
                 selectedSide = -1;
-                selectedCharactor = -1;
+                selectedCharactorIndex = -1;
             }
             if (exitScene) {
                 saveData.forwardCharactor  = team[0] == -1 ? null : charactors[team[0]].data.id;
@@ -246,26 +246,26 @@ namespace Scene {
             Game.getSound().reqPlayChannel("cursor");
         };
 
-        const charactors = Data.Charactor.getPlayerIds().map(x => new StatusSprite(saveData.findCharactorById(x)));
-        let team = [Data.Charactor.getPlayerIds().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.getPlayerIds().findIndex(x => x == saveData.backwardCharactor)];
-        let selectedCharactor :number = -1;
+        const charactors = Data.Charactor.keys().map(x => new StatusSprite(saveData.findCharactorById(x)));
+        let team = [Data.Charactor.keys().findIndex(x => x == saveData.forwardCharactor), Data.Charactor.keys().findIndex(x => x == saveData.backwardCharactor)];
+        let selectedCharactorIndex :number = -1;
         let selectedEquipPosition :number = -1;
         let anim = 0;
         const charactorListBox = new Game.GUI.ListBox({
             left: 131,
             top: 46,
-            width: 112,
+            width: 112+1,
             height: 4 * 48,
             lineHeight: 48,
             getItemCount: () => charactors.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
-                drawStatusSprite(charactors[index], selectedCharactor == index? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
+                drawStatusSprite(charactors[index], selectedCharactorIndex == index? DrawMode.Selected : DrawMode.Normal, left, top, width, height, anim);
             }
         });
         dispatcher.add(charactorListBox);
         charactorListBox.click = (x: number, y: number) => {
             const select = charactorListBox.getItemIndexByPosition(x, y);
-            selectedCharactor = selectedCharactor == select ? null : select;
+            selectedCharactorIndex = selectedCharactorIndex == select ? -1 : select;
             Game.getSound().reqPlayChannel("cursor");
         };
 
@@ -273,21 +273,21 @@ namespace Scene {
         const itemLists : number[] = [];
 
         let updateItemList = () => {
-            var newItemLists = saveData.ItemBox.map((x, i) => {
+            const newItemLists = saveData.ItemBox.map((x, i) => {
                 if (x == null) {
                     return -1;
                 }
-                const itemData = Data.Item.findItemDataById(x.id);
+                const itemData = Data.Item.get(x.id);
                 switch (selectedEquipPosition) {
                     case 0:
-                        return (itemData.kind == Data.Item.ItemKind.Wepon) ? i : -1;
+                        return (itemData.kind == Data.Item.Kind.Wepon) ? i : -1;
                     case 1:
-                        return (itemData.kind == Data.Item.ItemKind.Armor1) ? i : -1;
+                        return (itemData.kind == Data.Item.Kind.Armor1) ? i : -1;
                     case 2:
-                        return (itemData.kind == Data.Item.ItemKind.Armor2) ? i : -1;
+                        return (itemData.kind == Data.Item.Kind.Armor2) ? i : -1;
                     case 3:
                     case 4:
-                        return (itemData.kind == Data.Item.ItemKind.Accessory) ? i : -1;
+                        return (itemData.kind == Data.Item.Kind.Accessory) ? i : -1;
                     default:
                         return -1;
                 }
@@ -299,7 +299,7 @@ namespace Scene {
         const itemListBox = new Game.GUI.ListBox({
             left: 131,
             top: 46,
-            width: 112,
+            width: 112+1,
             height: 12 * 16,
             lineHeight: 16,
             getItemCount: () => itemLists.length,
@@ -309,76 +309,76 @@ namespace Scene {
                 } else {
                     Game.getScreen().fillStyle = `rgb(24,133,196)`;
                 }
-                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().fillRect(left, top, width, height);
                 Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                 Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeRect(left, top, width, height);
                 Game.getScreen().font = "10px 'PixelMplus10-Regular'";
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(Data.Item.findItemDataById(saveData.ItemBox[itemLists[index]].id).name, left + 3, top + 3);
+                Game.getScreen().fillText(Data.Item.get(saveData.ItemBox[itemLists[index]].id).name, left + 3, top + 3);
             }
         });
         dispatcher.add(itemListBox);
         itemListBox.click = (x,y) => {
             const select = itemListBox.getItemIndexByPosition(x, y);
             Game.getSound().reqPlayChannel("cursor");
-            if (select == -1) {
+            if (select == -1 || selectedCharactorIndex == -1) {
                 return;
             }
                 switch (selectedEquipPosition) {
                     case 0:
-                        if (charactors[selectedCharactor].data.equips.wepon1 != null) {
-                            const oldItem = charactors[selectedCharactor].data.equips.wepon1;
-                            charactors[selectedCharactor].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
+                        if (charactors[selectedCharactorIndex].data.equips.wepon1 != null) {
+                            const oldItem = charactors[selectedCharactorIndex].data.equips.wepon1;
+                            charactors[selectedCharactorIndex].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox[itemLists[select]] = oldItem;
                         } else {
-                            charactors[selectedCharactor].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
+                            charactors[selectedCharactorIndex].data.equips.wepon1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox.splice(itemLists[select],1);
                         }
                         updateItemList();
                         break;
                     case 1:
-                        if (charactors[selectedCharactor].data.equips.armor1 != null) {
-                            const oldItem = charactors[selectedCharactor].data.equips.armor1;
-                            charactors[selectedCharactor].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
+                        if (charactors[selectedCharactorIndex].data.equips.armor1 != null) {
+                            const oldItem = charactors[selectedCharactorIndex].data.equips.armor1;
+                            charactors[selectedCharactorIndex].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox[itemLists[select]] = oldItem;
                         } else {
-                            charactors[selectedCharactor].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
+                            charactors[selectedCharactorIndex].data.equips.armor1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox.splice(itemLists[select],1);
                         }
                         updateItemList();
                         break;
                     case 2:
-                        if (charactors[selectedCharactor].data.equips.armor2 != null) {
-                            const oldItem = charactors[selectedCharactor].data.equips.armor2;
-                            charactors[selectedCharactor].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
+                        if (charactors[selectedCharactorIndex].data.equips.armor2 != null) {
+                            const oldItem = charactors[selectedCharactorIndex].data.equips.armor2;
+                            charactors[selectedCharactorIndex].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox[itemLists[select]] = oldItem;
                         } else {
-                            charactors[selectedCharactor].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
+                            charactors[selectedCharactorIndex].data.equips.armor2 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox.splice(itemLists[select],1);
                         }
                         updateItemList();
                         break;
                     case 3:
-                        if (charactors[selectedCharactor].data.equips.accessory1 != null) {
-                            const oldItem = charactors[selectedCharactor].data.equips.accessory1;
-                            charactors[selectedCharactor].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
+                        if (charactors[selectedCharactorIndex].data.equips.accessory1 != null) {
+                            const oldItem = charactors[selectedCharactorIndex].data.equips.accessory1;
+                            charactors[selectedCharactorIndex].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox[itemLists[select]] = oldItem;
                         } else {
-                            charactors[selectedCharactor].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
+                            charactors[selectedCharactorIndex].data.equips.accessory1 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox.splice(itemLists[select],1);
                         }
                         updateItemList();
                         break;
                     case 4:
-                        if (charactors[selectedCharactor].data.equips.accessory2 != null) {
-                            const oldItem = charactors[selectedCharactor].data.equips.accessory2;
-                            charactors[selectedCharactor].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
+                        if (charactors[selectedCharactorIndex].data.equips.accessory2 != null) {
+                            const oldItem = charactors[selectedCharactorIndex].data.equips.accessory2;
+                            charactors[selectedCharactorIndex].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox[itemLists[select]] = oldItem;
                         } else {
-                            charactors[selectedCharactor].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
+                            charactors[selectedCharactorIndex].data.equips.accessory2 = saveData.ItemBox[itemLists[select]];
                             saveData.ItemBox.splice(itemLists[select],1);
                         }
                         updateItemList();
@@ -401,7 +401,7 @@ namespace Scene {
             texHeight:0
         });
         statusViewBtn.draw = () => {
-            drawStatusSprite(charactors[selectedCharactor], DrawMode.Normal, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
+            drawStatusSprite(charactors[selectedCharactorIndex], DrawMode.Normal, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
         };
         statusViewBtn.click = () => {
             Game.getSound().reqPlayChannel("cursor");
@@ -414,7 +414,7 @@ namespace Scene {
             top: 16 * 0 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.wepon1 == null) ? "(武器)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.wepon1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.wepon1 == null) ? "(武器)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.wepon1.id).name,
         });
         dispatcher.add(btnWepon1);
         btnWepon1.click = () => {
@@ -428,7 +428,7 @@ namespace Scene {
             top: 16 * 1 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor1 == null) ? "(防具・上半身)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.armor1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor1 == null) ? "(防具・上半身)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor1.id).name,
         });
         dispatcher.add(btnArmor1);
         btnArmor1.click = () => {
@@ -442,7 +442,7 @@ namespace Scene {
             top: 16 * 2 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.armor2 == null) ? "(防具・下半身)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.armor2.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor2 == null) ? "(防具・下半身)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor2.id).name,
         });
         dispatcher.add(btnArmor2);
         btnArmor2.click = () => {
@@ -456,7 +456,7 @@ namespace Scene {
             top: 16 * 3 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory1 == null) ? "(アクセサリ１)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.accessory1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory1 == null) ? "(アクセサリ１)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory1.id).name,
         });
         dispatcher.add(btnAccessory1);
         btnAccessory1.click = () => {
@@ -470,7 +470,7 @@ namespace Scene {
             top: 16 * 4 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactor == -1 || charactors[selectedCharactor].data.equips.accessory2 == null) ? "(アクセサリ２)" : Data.Item.findItemDataById(charactors[selectedCharactor].data.equips.accessory2.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory2 == null) ? "(アクセサリ２)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory2.id).name,
         });
         dispatcher.add(btnAccessory2);
         btnAccessory2.click = () => {
@@ -490,7 +490,7 @@ namespace Scene {
 
         itemListBox.visible = selectedEquipPosition != -1;
         charactorListBox.visible = selectedEquipPosition == -1;
-        btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactor != -1;
+        btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactorIndex != -1;
 
         yield (delta: number, ms: number) => {
             anim = ms % 1000;
@@ -505,7 +505,7 @@ namespace Scene {
             }
             itemListBox.visible = selectedEquipPosition != -1;
             charactorListBox.visible = selectedEquipPosition == -1;
-            btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactor != -1;
+            btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactorIndex != -1;
             if (exitScene) {
                 this.next();
             }

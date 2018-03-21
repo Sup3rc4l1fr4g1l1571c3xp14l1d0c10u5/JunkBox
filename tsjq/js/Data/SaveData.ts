@@ -2,19 +2,10 @@
 
 namespace Data.SaveData {
     
-    interface ISaveData {
-        ItemBox: Data.Item.ItemBoxEntry[];
-        Money: number;
-        charactorDatas: Data.Player.IPlayerData[];
-
-        forwardCharactor: string;
-        backwardCharactor: string;
-    }
-
-    export class SaveData implements ISaveData {
+    export class SaveData {
         ItemBox: Data.Item.ItemBoxEntry[] = [];
         Money: number = 10000;
-        charactorDatas: Data.Player.IPlayerData[] = [];
+        charactorDatas: Data.Player.Data[] = [];
         forwardCharactor: string = null;
         backwardCharactor: string = null;
         shopStockList : Data.Item.ItemBoxEntry[] = [
@@ -30,14 +21,20 @@ namespace Data.SaveData {
             { id: 301, condition: "", count: 5 },
             { id: 302, condition: "", count: 5 },
             { id: 303, condition: "", count: 5 },
+            { id: 304, condition: "", count: 5 },
+            { id: 305, condition: "", count: 5 },
             { id: 501, condition: "", count: 5 },
             { id: 502, condition: "", count: 5 },
             { id: 503, condition: "", count: 5 },
             { id: 504, condition: "", count: 5 },
+            { id: 505, condition: "", count: 5 },
+            { id: 506, condition: "", count: 5 },
+            { id: 507, condition: "", count: 5 },
+            { id: 508, condition: "", count: 5 },
         ];
         
-        findCharactorById(id: string) {
-            let ret = this.charactorDatas.find(x => x.id == id);
+        findCharactorById(id: string) : Player.Data {
+            let ret: Player.Data= this.charactorDatas.find(x => x.id === id);
             if (ret == null) {
                 ret =  {
                     id: id,
@@ -54,7 +51,7 @@ namespace Data.SaveData {
                 this.charactorDatas.push(ret);
                 this.saveGameData();
             }
-            return new Data.Player.PlayerData(ret);
+            return ret;
         }
 
         saveGameData() {
@@ -67,7 +64,7 @@ namespace Data.SaveData {
                 return false;
             }
             const data: SaveData = JSON.parse(dataStr);
-            const result = Object.assign(this, data);
+            Object.assign(this, data);
             return true;
         }
 

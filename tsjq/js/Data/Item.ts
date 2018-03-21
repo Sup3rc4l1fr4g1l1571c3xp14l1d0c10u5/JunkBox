@@ -1,7 +1,7 @@
 "use strict";
 
 namespace Data.Item {
-    export enum ItemKind {
+    export enum Kind {
         Wepon,
         Armor1,
         Armor2,
@@ -10,11 +10,11 @@ namespace Data.Item {
         Treasure,
     }
 
-    export interface ItemData {
+    export interface Data {
         id: number;
         name: string;
         price: number;
-        kind: ItemKind;
+        kind: Kind;
         description: string;
         stackable: boolean;
         hp: number;
@@ -22,6 +22,7 @@ namespace Data.Item {
         atk: number;
         def: number;
         effects: (...args: any[]) => void;
+        useToPlayer?: (...args: any[]) => void;
     }
 
     export interface ItemBoxEntry {
@@ -30,37 +31,47 @@ namespace Data.Item {
         count: number;
     }
 
-    const ItemTable: ItemData[] = [
+    const Datas: Data[] = [
         /* Wepon */
-        { id: 1, name: "’|“", price: 300, kind: ItemKind.Wepon, description: "Žö‹Æ—p‚È‚Ì‚Å­‚µƒ{ƒƒC", hp: 0, mp: 0, atk: 3, def: 0, effects: (data: any) => { }, stackable: false },
-        { id: 2, name: "“SƒpƒCƒv", price: 500, kind: ItemKind.Wepon, description: "Žè‚²‚ë‚È‘å‚«‚³‚Æd‚³‚Åˆµ‚¢‚â‚·‚¢", hp: 0, mp: 0, atk: 5, def: 0, effects: (data: any) => { }, stackable: false },
-        { id: 3, name: "ƒoƒbƒg", price: 700, kind: ItemKind.Wepon, description: "–ÚŽw‚¹êŠOƒz[ƒ€ƒ‰ƒ“", hp: 0, mp: 0, atk: 7, def: 0, effects: (data: any) => { }, stackable: false },
+        { id: 1, name: "ç«¹åˆ€", price: 300, kind: Kind.Wepon, description: "æŽˆæ¥­ç”¨ãªã®ã§å°‘ã—ãƒœãƒ­ã‚¤", hp: 0, mp: 0, atk: 3, def: 0, effects: (data: any) => { }, stackable: false },
+        { id: 2, name: "é‰„ãƒ‘ã‚¤ãƒ—", price: 500, kind: Kind.Wepon, description: "æ‰‹ã”ã‚ãªå¤§ãã•ã¨é‡ã•ã§æ‰±ã„ã‚„ã™ã„", hp: 0, mp: 0, atk: 5, def: 0, effects: (data: any) => { }, stackable: false },
+        { id: 3, name: "ãƒãƒƒãƒˆ", price: 700, kind: Kind.Wepon, description: "ç›®æŒ‡ã›å ´å¤–ãƒ›ãƒ¼ãƒ ãƒ©ãƒ³", hp: 0, mp: 0, atk: 7, def: 0, effects: (data: any) => { }, stackable: false },
 
         /* Armor1 */
-        { id: 101, name: "…’…", price: 200, kind: ItemKind.Armor1, description: "“®‚«‚â‚·‚¢‚ª–hŒä‚Í‚â‚â•sˆÀ", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
-        { id: 102, name: "§•ž", price: 400, kind: ItemKind.Armor1, description: "ŠwZŽw’è‚Å‚·", hp: 0, mp: 0, atk: 0, def: 2, effects: (data: any) => { }, stackable: false },
-        { id: 103, name: "‘Ì‘€’…", price: 600, kind: ItemKind.Armor1, description: "‹¹•”‚ª‹‡‹ü‚Æ•s•]", hp: 0, mp: 0, atk: 0, def: 3, effects: (data: any) => { }, stackable: false },
+        { id: 101, name: "æ°´ç€", price: 200, kind: Kind.Armor1, description: "å‹•ãã‚„ã™ã„ãŒé˜²å¾¡ã¯ã‚„ã‚„ä¸å®‰", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 102, name: "åˆ¶æœ", price: 400, kind: Kind.Armor1, description: "å­¦æ ¡æŒ‡å®šã®ã‚‚ã®ã‚‰ã—ã„", hp: 0, mp: 0, atk: 0, def: 2, effects: (data: any) => { }, stackable: false },
+        { id: 103, name: "ä½“æ“ç€", price: 600, kind: Kind.Armor1, description: "èƒ¸éƒ¨ãŒçª®å±ˆã¨ä¸è©•", hp: 0, mp: 0, atk: 0, def: 3, effects: (data: any) => { }, stackable: false },
 
         /* Armor2 */
-        { id: 201, name: "ƒXƒJ[ƒg", price: 200, kind: ItemKind.Armor2, description: "ƒGƒbƒ`‚È•—‚³‚ñ‚Å‚·‚£", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
-        { id: 202, name: "ƒuƒ‹ƒ}", price: 400, kind: ItemKind.Armor2, description: "Î‚ªƒoƒŒ‚Ü‚·‚íI", hp: 0, mp: 0, atk: 0, def: 2, effects: (data: any) => { }, stackable: false },
-        { id: 203, name: "ƒYƒ{ƒ“", price: 600, kind: ItemKind.Armor2, description: "‘«‚ª×‚­Œ©‚¦‚Ü‚·B", hp: 0, mp: 0, atk: 0, def: 3, effects: (data: any) => { }, stackable: false },
+        { id: 201, name: "ã‚¹ã‚«ãƒ¼ãƒˆ", price: 200, kind: Kind.Armor2, description: "ã‚¨ãƒƒãƒãªé¢¨ã•ã‚“ã§ã™ã…", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 202, name: "ãƒ–ãƒ«ãƒž", price: 400, kind: Kind.Armor2, description: "æ­³ãŒãƒãƒ¬ã¾ã™ã‚ï¼", hp: 0, mp: 0, atk: 0, def: 2, effects: (data: any) => { }, stackable: false },
+        { id: 203, name: "ã‚ºãƒœãƒ³", price: 600, kind: Kind.Armor2, description: "è¶³ãŒç´°ãè¦‹ãˆã¾ã™ã€‚", hp: 0, mp: 0, atk: 0, def: 3, effects: (data: any) => { }, stackable: false },
 
         /* Accessory */
-        { id: 301, name: "ƒwƒAƒoƒ“ƒh", price: 2000, kind: ItemKind.Accessory, description: "ƒfƒRI", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
-        { id: 302, name: "ƒƒKƒl", price: 2000, kind: ItemKind.Accessory, description: "ƒƒKƒl‚Í•sl‹C", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
-        { id: 303, name: "ŒC‰º", price: 2000, kind: ItemKind.Accessory, description: "F‚à’·‚³‚à—lX", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
-        { id: 304, name: "Œ‡‚¯‚½Ž•ŽÔ", price: 0, kind: ItemKind.Accessory, description: "ƒiƒjƒJƒTƒŒƒ^ƒˆƒEƒ_c", hp: 0, mp: 0, atk: 1, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 301, name: "ãƒ˜ã‚¢ãƒãƒ³ãƒ‰", price: 2000, kind: Kind.Accessory, description: "ãƒ‡ã‚³ï¼", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 302, name: "ãƒ¡ã‚¬ãƒ", price: 2000, kind: Kind.Accessory, description: "ãƒ¡ã‚¬ãƒã¯ä¸äººæ°—", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 303, name: "é´ä¸‹", price: 2000, kind: Kind.Accessory, description: "è‰²ã‚‚é•·ã•ã‚‚æ§˜ã€…", hp: 0, mp: 0, atk: 0, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 304, name: "æ¬ ã‘ãŸæ­¯è»Š", price: 0, kind: Kind.Accessory, description: "ãƒŠãƒ‹ã‚«ã‚µãƒ¬ã‚¿ãƒ¨ã‚¦ãƒ€â€¦", hp: 0, mp: 0, atk: 1, def: 1, effects: (data: any) => { }, stackable: false },
+        { id: 305, name: "æ‚ªé­”ã®æ ¸(ãƒ¬ãƒ—ãƒªã‚«)", price: 0, kind: Kind.Accessory, description: "ã‚«ãƒãƒ£ã‚«ãƒãƒ£ã™ã‚‹ã¨ãƒšã‚«ãƒ¼ã¨å…‰ã‚‹ã€‚", hp: 0, mp: 0, atk: 2, def: 0, effects: (data: any) => { }, stackable: false },
 
         /* Tool */
-        { id: 501, name: "ƒCƒ‚ƒƒƒ“", price: 100, kind: ItemKind.Tool, description: "‹ó• Žž‚É‚Ç‚¤‚¼", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
-        { id: 502, name: "ƒvƒŠƒ“ƒOƒ‹ƒX", price: 890, kind: ItemKind.Tool, description: "‰Ì•‘Šê–ðŽÒ‚à‚¨‚·‚·‚ß", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
-        { id: 503, name: "ƒoƒ“ƒeƒŠƒ“", price: 931, kind: ItemKind.Tool, description: "‚ ‚è‚ª‚½‚¢c", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
-        { id: 504, name: "ƒTƒ‰ƒ_ƒ`ƒLƒ“", price: 1000, kind: ItemKind.Tool, description: "‚±‚Ìƒn[ƒu‚Íƒ_ƒ‚©‚Æc", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 501, name: "ã‚¤ãƒ¢ãƒ¡ãƒ­ãƒ³", price: 100, kind: Kind.Tool, description: "ç©ºè…¹æ™‚ã«ã©ã†ãž", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true, useToPlayer: (member: Unit.MemberStatus) => { member.mp += 10; } },
+        { id: 502, name: "ãƒ—ãƒªãƒ³ã‚°ãƒ«ã‚¹", price: 890, kind: Kind.Tool, description: "ã‚ã®æ­Œèˆžä¼Žå½¹è€…ã‚‚ãŠã™ã™ã‚", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 503, name: "ãƒãƒ³ãƒ†ãƒªãƒ³", price: 931, kind: Kind.Tool, description: "è‚©ã«ã‚‚è…°ã«ã‚‚åŠ¹ã„ã¦ãã‚Œã‚‹ã€‚ã‚ã‚ŠãŒãŸã„â€¦", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 504, name: "ã‚µãƒ©ãƒ€ãƒã‚­ãƒ³", price: 1000, kind: Kind.Tool, description: "æã‚‰ãã“ã®ãƒãƒ¼ãƒ–ã¯ãƒ€ãƒ¡ã‹ã¨â€¦", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 505, name: "ã‚«ãƒ¬ãƒ¼ãƒ¡ã‚·", price: 1000, kind: Kind.Tool, description: "ã‚¸ãƒ£ã‚¹ãƒ†ã‚£ã‚¹ï¼", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 506, name: "ãƒŒã‚«ã‚³ãƒ¼ãƒ©", price: 1000, kind: Kind.Tool, description: "ãƒŒã‚«ãƒƒã¨ã•ã‚ã‚„ã‹ï¼", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 507, name: "ãƒãƒ³ãƒãƒ¼ã‚°", price: 3000, kind: Kind.Tool, description: "ä¸‰ã¤ä¸¦ã¹ã‚‹ã¨ä½•ã‹ã«è¦‹ãˆã‚‹ã‚ˆã†ã ", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
+        { id: 508, name: "ã‚¹ãƒˆãƒ­ãƒ³ã‚°ã‚¼ãƒ­", price: 955, kind: Kind.Tool, description: "è€ãˆã‚‰ã‚Œãªã„ã€‚å‘‘ã‚€ã€‚", hp: 0, mp: 0, atk: 0, def: 0, effects: (data: any) => { }, stackable: true },
     ];
 
-    export function findItemDataById(id: number): ItemData {
-        const idx = ItemTable.findIndex(x => x.id == id);
-        return ItemTable[idx];
+    const Table: Map<number, Data> = Datas.reduce((s, x) => s.set(x.id, x), new Map<number, Data>());
+
+    export function keys(): string[] {
+        return Array.from(Table.keys());
+    }
+
+    export function get(id: number): Data {
+        return Table.get(id);
     }
 }

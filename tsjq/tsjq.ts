@@ -1,5 +1,5 @@
-/// <reference path="../../../../../../Program Files (x86)/Microsoft SDKs/TypeScript/2.5/lib.dom.d.ts" />
-/// <reference path="../../../../../../Program Files (x86)/Microsoft SDKs/TypeScript/2.5/lib.es2016.d.ts" />
+/// <reference path="c:/Program Files (x86)/Microsoft SDKs/TypeScript/2.6/lib.dom.d.ts" />
+/// <reference path="c:/Program Files (x86)/Microsoft SDKs/TypeScript/2.6/lib.es2016.d.ts" />
 /// <reference path="./js/CSSFontLoadingAPI.d.ts" />
 /// <reference path="./js/Lib/Random.ts" />
 /// <reference path="./js/Lib/Type.ts" />
@@ -45,8 +45,8 @@ window.onload = () => {
             id: "glcanvas",
             offscreenWidth: 252,
             offscreenHeight: 252,
-            scaleX: 2,
-            scaleY: 2,
+            scaleX: 1,
+            scaleY: 1,
         }
     }).then(() => {
         Game.getSceneManager().push(Scene.boot, null);

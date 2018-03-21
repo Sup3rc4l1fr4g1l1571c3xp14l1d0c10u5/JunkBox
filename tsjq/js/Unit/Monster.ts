@@ -13,7 +13,7 @@ namespace Unit {
 
 
         constructor(monsterId: string) {
-            var data = Data.Monster.getMonsterData(monsterId);
+            const data = Data.Monster.get(monsterId);
             super(0, 0, data.sprite);
             this.life = data.status.hp;
             this.maxLife = data.status.hp;

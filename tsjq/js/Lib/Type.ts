@@ -16,11 +16,12 @@ interface IRange {
 }
 
 interface Array<T> {
-    removeIf(callback:(item:T, index:number) => boolean):void;
+    removeIf(callback: (item: T, index: number) => boolean): void;
+    includes(item: T): boolean;
 }
 
 Array.prototype.removeIf = function<T>(callback:(item:T, index:number) => boolean) : void {
-    var i = this.length;
+    let i = this.length;
     while (i--) {
         if (callback(this[i], i)) {
             this.splice(i, 1);

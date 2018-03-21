@@ -183,7 +183,7 @@ namespace SpriteAnimation {
                 const key = ~~keys[i];
                 const imageSrc: string = ss.source[key];
                 loadStartCallback();
-                const image: HTMLImageElement = await SpriteSheet.loadImage(imageSrc);
+                const image: HTMLImageElement = await SpriteSheet.loadImage(imageSrc).catch(() => null);
                 loadEndCallback();
                 source.set(key, image);
             }

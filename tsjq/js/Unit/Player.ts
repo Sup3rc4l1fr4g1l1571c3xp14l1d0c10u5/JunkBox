@@ -5,9 +5,9 @@
 //  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
 
 namespace Unit {
-    interface MemberStatus {
-        id:string;
-        name:string;
+    export interface MemberStatus {
+        id: string;
+        name: string;
         spriteSheet: SpriteAnimation.SpriteSheet;
         equips: {
             wepon1?: Data.Item.ItemBoxEntry;
@@ -23,7 +23,7 @@ namespace Unit {
     }
     export class Player extends UnitBase {
         public members: MemberStatus[] = [];
-            public active : number;
+        public active: number;
         public getForward(): MemberStatus {
             return this.members[this.active === 0 ? 0 : 1];
         }
@@ -35,38 +35,40 @@ namespace Unit {
         }
         public set spriteSheet(value: SpriteAnimation.SpriteSheet) {
         }
-        constructor(forward: Data.Player.PlayerData, backward: Data.Player.PlayerData) {
-            super(0, 0,forward.config.sprite);
+        constructor(forward: Data.Player.Data, backward: Data.Player.Data) {
+            super(0, 0, Data.Charactor.get(forward.id).sprite);
+            const forwardConfig = Data.Charactor.get(forward.id);
             this.active = 0;
             this.members[0] = {
                 id: forward.id,
-                name:forward.config.name,
-                spriteSheet : forward.config.sprite,
+                name: forwardConfig.name,
+                spriteSheet: forwardConfig.sprite,
                 equips: Object.assign({}, forward.equips),
-                mp : forward.mp,
-                hp : forward.hp,
-                mpMax : forward.mp,
-                hpMax : forward.hp
+                mp: forward.mp,
+                hp: forward.hp,
+                mpMax: forward.mp,
+                hpMax: forward.hp
             };
             if (backward != null) {
+                const backwardConfig = Data.Charactor.get(backward.id);
                 this.members[1] = {
                     id: backward.id,
-                    spriteSheet : backward.config.sprite,
-                name:backward.config.name,
-                    equips : Object.assign({}, backward.equips),
-                    mp : backward.mp,
-                    hp : backward.hp,
-                    mpMax : backward.mp,
-                    hpMax : backward.hp
+                    spriteSheet: backwardConfig.sprite,
+                    name: backwardConfig.name,
+                    equips: Object.assign({}, backward.equips),
+                    mp: backward.mp,
+                    hp: backward.hp,
+                    mpMax: backward.mp,
+                    hpMax: backward.hp
                 };
             }
         }
 
         public get atk() {
-            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).atk), 0);
+            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.get(v.id).atk), 0);
         }
         public get def() {
-            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.findItemDataById(v.id).def), 0);
+            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.get(v.id).def), 0);
         }
 
     }

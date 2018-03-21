@@ -2,9 +2,9 @@
 
 namespace Data.Monster {
 
-    interface MonsterConfig {
-        id:string;
-        name:string;
+    interface Setting {
+        id: string;
+        name: string;
         status: {
             hp: number;
             atk: number;
@@ -14,10 +14,10 @@ namespace Data.Monster {
         sprite: SpriteAnimation.ISpriteSheet;
     };
 
-    const monsterConfig: MonsterConfig[] = [
+    const Settings: Setting[] = [
         {
             id: "slime",
-            name: "ƒXƒ‰ƒCƒ€",
+            name: "ã‚¹ãƒ©ã‚¤ãƒ ",
             status: {
                 hp: 5,
                 atk: 3,
@@ -90,9 +90,9 @@ namespace Data.Monster {
         }
     ];
 
-    interface MonsterData {
-        id:string;
-        name:string;
+    interface Data {
+        id: string;
+        name: string;
         status: {
             hp: number;
             atk: number;
@@ -102,27 +102,30 @@ namespace Data.Monster {
         sprite: SpriteAnimation.SpriteSheet;
     }
 
-    const monsterData: Map<string,MonsterData> = new Map<string,MonsterData>();
+    const Table: Map<string, Data> = new Map<string, Data>();
+    const SortedKeys: string[] = [];
 
-    async function configToData(config: MonsterConfig,loadStartCallback: () => void, loadEndCallback: () => void): Promise<MonsterData> {
-                const id  = config.id;
-                const name  = config.name;
-                const status  = config.status;
-                const sprite  = await SpriteAnimation.SpriteSheet.Create(config.sprite, loadStartCallback, loadEndCallback);
-        return {id:id, name:name, status:status, sprite: sprite};
+    async function regist(config: Setting, loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
+        const id = config.id;
+        const name = config.name;
+        const status = config.status;
+        const sprite = await SpriteAnimation.SpriteSheet.Create(config.sprite, loadStartCallback, loadEndCallback);
+        const data = { id: id, name: name, status: status, sprite: sprite };
+        Table.set(data.id, data);
     }
 
-    export async function SetupMonsterData(loadStartCallback: () => void, loadEndCallback: () => void) : Promise<void> {
-        const datas = await Promise.all(monsterConfig.map(x => configToData(x, loadStartCallback, loadEndCallback)));
-        datas.forEach(x =>monsterData.set(x.id, x));
+    export async function initialize(loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
+        await Promise.all(Settings.map(x => regist(x, loadStartCallback, loadEndCallback)));
+        SortedKeys.length = 0;
+        SortedKeys.push(...Array.from(Table.keys()).sort());
     }
 
-    export function getMonsterIds(): string[] {
-        return Array.from(monsterData.keys());
+    export function keys(): string[] {
+        return SortedKeys;
     }
 
-    export function getMonsterData(id: string): MonsterData {
-        return monsterData.get(id);
+    export function get(id: string): Data {
+        return Table.get(id);
     }
 
 }

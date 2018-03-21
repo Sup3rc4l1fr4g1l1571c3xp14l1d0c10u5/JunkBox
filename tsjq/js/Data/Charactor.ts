@@ -2,7 +2,7 @@
 
 namespace Data.Charactor {
 
-    interface CharactorConfig {
+    interface Setting {
         id: string;
         name: string;
         status: {
@@ -14,10 +14,10 @@ namespace Data.Charactor {
         sprite: SpriteAnimation.ISpriteSheet;
     };
 
-    const charactorTable: CharactorConfig[] = [
+    const Settings: Setting[] = [
         {
             id: "_u01",
-            name: "ウ1",
+            name: "繧ｦ1",
             status: {
                 hp: 100,
                 mp: 100,
@@ -80,7 +80,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u02",
-            name: "ウ2",
+            name: "繧ｦ2",
             status: {
                 hp: 100,
                 mp: 100,
@@ -143,7 +143,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u03",
-            name: "ウ3",
+            name: "繧ｦ3",
             status: {
                 hp: 100,
                 mp: 100,
@@ -206,7 +206,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u04",
-            name: "ウ4",
+            name: "繧ｦ4",
             status: {
                 hp: 100,
                 mp: 100,
@@ -269,7 +269,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u05",
-            name: "ウ5",
+            name: "繧ｦ5",
             status: {
                 hp: 100,
                 mp: 100,
@@ -332,7 +332,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u06",
-            name: "ウ6",
+            name: "繧ｦ6",
             status: {
                 hp: 100,
                 mp: 100,
@@ -395,7 +395,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u07",
-            name: "ウ7",
+            name: "繧ｦ7",
             status: {
                 hp: 100,
                 mp: 100,
@@ -458,7 +458,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u08",
-            name: "ウ8",
+            name: "繧ｦ8",
             status: {
                 hp: 100,
                 mp: 100,
@@ -521,7 +521,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u09",
-            name: "ウ9",
+            name: "繧ｦ9",
             status: {
                 hp: 100,
                 mp: 100,
@@ -584,7 +584,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u10",
-            name: "ウ10",
+            name: "繧ｦ10",
             status: {
                 hp: 100,
                 mp: 100,
@@ -647,7 +647,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u11",
-            name: "ウ11",
+            name: "繧ｦ11",
             status: {
                 hp: 100,
                 mp: 100,
@@ -710,7 +710,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u12",
-            name: "ウ12",
+            name: "繧ｦ12",
             status: {
                 hp: 100,
                 mp: 100,
@@ -773,7 +773,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u13",
-            name: "ウ13",
+            name: "繧ｦ13",
             status: {
                 hp: 100,
                 mp: 100,
@@ -836,7 +836,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u14",
-            name: "ウ14",
+            name: "繧ｦ14",
             status: {
                 hp: 100,
                 mp: 100,
@@ -899,7 +899,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u15",
-            name: "ウ15",
+            name: "繧ｦ15",
             status: {
                 hp: 100,
                 mp: 100,
@@ -962,7 +962,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u16",
-            name: "ウ16",
+            name: "繧ｦ16",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1025,7 +1025,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u17",
-            name: "ウ17",
+            name: "繧ｦ17",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1088,7 +1088,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u18",
-            name: "ウ18",
+            name: "繧ｦ18",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1151,7 +1151,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u19",
-            name: "ウ19",
+            name: "繧ｦ19",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1214,7 +1214,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u20",
-            name: "ウ20",
+            name: "繧ｦ20",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1277,7 +1277,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u21",
-            name: "ウ21",
+            name: "繧ｦ21",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1340,7 +1340,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u22",
-            name: "ウ22",
+            name: "繧ｦ22",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1403,7 +1403,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u23",
-            name: "ウ23",
+            name: "繧ｦ23",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1466,7 +1466,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u24",
-            name: "ウ24",
+            name: "繧ｦ24",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1529,7 +1529,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u25",
-            name: "ウ25",
+            name: "繧ｦ25",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1592,7 +1592,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u26",
-            name: "ウ26",
+            name: "繧ｦ26",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1655,7 +1655,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u27",
-            name: "ウ27",
+            name: "繧ｦ27",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1718,7 +1718,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u28",
-            name: "ウ28",
+            name: "繧ｦ28",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1781,7 +1781,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u29",
-            name: "ウ29",
+            name: "繧ｦ29",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1844,7 +1844,7 @@ namespace Data.Charactor {
         },
         {
             id: "_u30",
-            name: "ウ30",
+            name: "繧ｦ30",
             status: {
                 hp: 100,
                 mp: 100,
@@ -1908,7 +1908,7 @@ namespace Data.Charactor {
 
     ];
 
-    export interface CharactorData {
+    export interface Data {
         id: string;
         name: string;
         status: {
@@ -1920,27 +1920,30 @@ namespace Data.Charactor {
         sprite: SpriteAnimation.SpriteSheet;
     }
 
-    const charactorData: Map<string, CharactorData> = new Map<string, CharactorData>();
+    const Table: Map<string, Data> = new Map<string, Data>();
+    const SortedKeys: string[] = [];
 
-    async function configToData(config: CharactorConfig, loadStartCallback: () => void, loadEndCallback: () => void): Promise<CharactorData> {
+    async function regist(config: Setting, loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
         const id = config.id;
         const name = config.name;
         const status = config.status;
         const sprite = await SpriteAnimation.SpriteSheet.Create(config.sprite, loadStartCallback, loadEndCallback);
-        return { id: id, name: name, status: status, sprite: sprite };
+        const data : Data = { id: id, name: name, status: status, sprite: sprite };
+        Table.set(data.id, data);
     }
 
-    export async function SetupCharactorData(loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
-        const datas = await Promise.all(charactorTable.map(x => configToData(x, loadStartCallback, loadEndCallback)));
-        datas.forEach(x => charactorData.set(x.id, x));
+    export async function initialize(loadStartCallback: () => void, loadEndCallback: () => void): Promise<void> {
+        await Promise.all(Settings.map(x => regist(x, loadStartCallback, loadEndCallback)));
+        SortedKeys.length = 0;
+        SortedKeys.push(...Array.from(Table.keys()).sort());
     }
 
-    export function getPlayerIds(): string[] {
-        return Array.from(charactorData.keys());
+    export function keys(): string[] {
+        return SortedKeys;
     }
 
-    export function getPlayerConfig(id: string): CharactorData {
-        return charactorData.get(id);
+    export function get(id: string): Data {
+        return Table.get(id);
     }
 
 }

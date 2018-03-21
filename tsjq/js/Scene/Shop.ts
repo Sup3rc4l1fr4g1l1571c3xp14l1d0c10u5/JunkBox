@@ -23,21 +23,21 @@ namespace Scene {
         const listBox = new Game.GUI.ListBox({
             left: 8,
             top: 46,
-            width: 112,
+            width: 112+1,
             height: 10 * 16,
             lineHeight: 16,
             getItemCount: () => saveData.shopStockList.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
-                const itemData = Data.Item.findItemDataById(saveData.shopStockList[index].id);
+                const itemData = Data.Item.get(saveData.shopStockList[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 } else {
                     Game.getScreen().fillStyle = `rgb(24,133,196)`;
                 }
-                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().fillRect(left, top, width, height);
                 Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                 Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeRect(left, top, width, height);
                 Game.getScreen().font = "10px 'PixelMplus10-Regular'";
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
@@ -114,7 +114,7 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return '';
                 } else {
-                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + saveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + saveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.get(saveData.shopStockList[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
                 }
             },
         });
@@ -131,11 +131,11 @@ namespace Scene {
 
         btnDoBuy.click = (x: number, y: number) => {
             if (selectedItem != -1) {
-                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                const itemData = Data.Item.get(saveData.shopStockList[selectedItem].id);
                 if ((hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (itemData.price * hoverSlider.value <= saveData.Money)) {
                     saveData.Money -= itemData.price * hoverSlider.value;
                     if (itemData.stackable) {
-                        var index = saveData.ItemBox.findIndex(x => x.id == itemData.id);
+                        const index = saveData.ItemBox.findIndex(x => x.id == itemData.id);
                         if (index == -1) {
                             saveData.ItemBox.push({ id: saveData.shopStockList[selectedItem].id, condition: saveData.shopStockList[selectedItem].condition, count: hoverSlider.value });
                         } else {
@@ -169,19 +169,19 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return "";
                 }
-                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                const itemData = Data.Item.get(saveData.shopStockList[selectedItem].id);
                 switch (itemData.kind) {
-                    case Data.Item.ItemKind.Wepon:
+                    case Data.Item.Kind.Wepon:
                         return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Armor1:
+                    case Data.Item.Kind.Armor1:
                         return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Armor2:
+                    case Data.Item.Kind.Armor2:
                         return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Accessory:
+                    case Data.Item.Kind.Accessory:
                         return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Tool:
+                    case Data.Item.Kind.Tool:
                         return `種別：道具`;
-                    case Data.Item.ItemKind.Treasure:
+                    case Data.Item.Kind.Treasure:
                         return `種別：その他`;
                     default:
                         return "";
@@ -199,7 +199,7 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return "";
                 }
-                const itemData = Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id);
+                const itemData = Data.Item.get(saveData.shopStockList[selectedItem].id);
                 return itemData.description;
             },
         });
@@ -249,7 +249,7 @@ namespace Scene {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
             hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
-            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (Data.Item.findItemDataById(saveData.shopStockList[selectedItem].id).price * hoverSlider.value <= saveData.Money));
+            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.shopStockList[selectedItem].count >= hoverSlider.value) && (Data.Item.get(saveData.shopStockList[selectedItem].id).price * hoverSlider.value <= saveData.Money));
 
             if (exitScene) {
                 this.next();
@@ -282,21 +282,21 @@ namespace Scene {
         const listBox = new Game.GUI.ListBox({
             left: 8,
             top: 46,
-            width: 112,
+            width: 112 + 1,
             height: 10 * 16,
             lineHeight: 16,
             getItemCount: () => saveData.ItemBox.length,
             drawItem: (left: number, top: number, width: number, height: number, index: number) => {
-                const itemData = Data.Item.findItemDataById(saveData.ItemBox[index].id);
+                const itemData = Data.Item.get(saveData.ItemBox[index].id);
                 if (selectedItem == index) {
                     Game.getScreen().fillStyle = `rgb(24,196,195)`;
                 } else {
                     Game.getScreen().fillStyle = `rgb(24,133,196)`;
                 }
-                Game.getScreen().fillRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().fillRect(left, top, width, height);
                 Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                 Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left - 0.5, top + 1 - 0.5, width, height - 2);
+                Game.getScreen().strokeRect(left, top, width, height);
                 Game.getScreen().font = "10px 'PixelMplus10-Regular'";
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
@@ -325,7 +325,7 @@ namespace Scene {
 
         const hoverSlider = new Game.GUI.HorizontalSlider({
             left: 131 + 14,
-            top: 80,
+            top: 90,
             width: 112 - 28,
             height: 16,
             sliderWidth: 5,
@@ -340,7 +340,7 @@ namespace Scene {
         dispatcher.add(hoverSlider);
         const btnSliderDown = new Game.GUI.Button({
             left: 131,
-            top: 80,
+            top: 90,
             width: 14,
             height: 16,
             text: "－",
@@ -353,7 +353,7 @@ namespace Scene {
         };
         const btnSliderUp = new Game.GUI.Button({
             left: 243 - 14,
-            top: 80,
+            top: 90,
             width: 14,
             height: 16,
             text: "＋",
@@ -373,7 +373,7 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return '';
                 } else {
-                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + saveData.ItemBox[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
+                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + saveData.ItemBox[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.get(saveData.ItemBox[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
                 }
             },
         });
@@ -390,7 +390,7 @@ namespace Scene {
 
         btnDoSell.click = (x: number, y: number) => {
             if (selectedItem != -1) {
-                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                const itemData = Data.Item.get(saveData.ItemBox[selectedItem].id);
                 if ((hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value)) {
                     saveData.Money += itemData.price * hoverSlider.value;
                     const shopStockIndex = saveData.shopStockList.findIndex(x => x.id == saveData.ItemBox[selectedItem].id);
@@ -435,19 +435,19 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return "";
                 }
-                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                const itemData = Data.Item.get(saveData.ItemBox[selectedItem].id);
                 switch (itemData.kind) {
-                    case Data.Item.ItemKind.Wepon:
+                    case Data.Item.Kind.Wepon:
                         return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Armor1:
+                    case Data.Item.Kind.Armor1:
                         return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Armor2:
+                    case Data.Item.Kind.Armor2:
                         return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Accessory:
+                    case Data.Item.Kind.Accessory:
                         return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.ItemKind.Tool:
+                    case Data.Item.Kind.Tool:
                         return `種別：道具`;
-                    case Data.Item.ItemKind.Treasure:
+                    case Data.Item.Kind.Treasure:
                         return `種別：その他`;
                     default:
                         return "";
@@ -465,7 +465,7 @@ namespace Scene {
                 if (selectedItem == -1) {
                     return "";
                 }
-                const itemData = Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id);
+                const itemData = Data.Item.get(saveData.ItemBox[selectedItem].id);
                 return itemData.description;
             },
         });
@@ -515,8 +515,8 @@ namespace Scene {
                 dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
             }
             captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1); 
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable);
-            if ((selectedItem != -1) && (!Data.Item.findItemDataById(saveData.ItemBox[selectedItem].id).stackable)) {
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (Data.Item.get(saveData.ItemBox[selectedItem].id).stackable);
+            if ((selectedItem != -1) && (!Data.Item.get(saveData.ItemBox[selectedItem].id).stackable)) {
                 hoverSlider.value = 1;
             }
             btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (saveData.ItemBox[selectedItem].count >= hoverSlider.value));
@@ -528,6 +528,7 @@ namespace Scene {
 
 
         Game.getSceneManager().pop();
+        return;
     }
 
     function* talkScene(saveData: Data.SaveData.SaveData) {
@@ -603,7 +604,7 @@ namespace Scene {
         saveData.saveGameData();
         Game.getSceneManager().pop();
             Game.getSound().reqPlayChannel("classroom", true);
-
+        return;
     }
 
     export function* shop(saveData: Data.SaveData.SaveData) {

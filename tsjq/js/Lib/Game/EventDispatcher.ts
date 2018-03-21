@@ -4,7 +4,7 @@ namespace Dispatcher {
     type EventHandler = (...args: any[]) => void;
 
     export class SingleDispatcher {
-        private /*@readonly@*/ listeners: Array<EventHandler>;
+        private /*@readonly@*/ listeners: EventHandler[];
 
         constructor() {
             this.listeners = [];
@@ -35,8 +35,8 @@ namespace Dispatcher {
         }
 
         public one(listener: EventHandler): SingleDispatcher {
-            var func = (...args: any[]) => {
-                var result = listener.apply(this, args);
+            const func = (...args: any[]) => {
+                const result = listener.apply(this, args);
                 this.off(func);
                 return result;
             };

@@ -123,7 +123,7 @@ namespace Game {
                 // Therefore, these codes will not work ...
                 //
                 // const xhr: XMLHttpRequest = await ajax(file, "arraybuffer");
-                // var audioBufferNode = await this.audioContext.decodeAudioData(xhr.response);
+                // const audioBufferNode = await this.audioContext.decodeAudioData(xhr.response);
                 // return audioBufferNode;
             }
 

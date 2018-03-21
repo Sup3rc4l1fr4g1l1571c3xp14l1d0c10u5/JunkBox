@@ -57,7 +57,7 @@ namespace Game {
             this.createLinearGradient = this.canvasRenderingContext2D.createLinearGradient.bind(this.canvasRenderingContext2D);
             this.createPattern = this.canvasRenderingContext2D.createPattern.bind(this.canvasRenderingContext2D);
             this.createRadialGradient = this.canvasRenderingContext2D.createRadialGradient.bind(this.canvasRenderingContext2D);
-            this.drawImage = this.canvasRenderingContext2D.drawImage.bind(this.canvasRenderingContext2D);
+            //this.drawImage = this.canvasRenderingContext2D.drawImage.bind(this.canvasRenderingContext2D);
             this.fill = this.canvasRenderingContext2D.fill.bind(this.canvasRenderingContext2D);
             this.fillRect = this.canvasRenderingContext2D.fillRect.bind(this.canvasRenderingContext2D);
             this.fillText = this.canvasRenderingContext2D.fillText.bind(this.canvasRenderingContext2D);
@@ -77,7 +77,7 @@ namespace Game {
             this.setLineDash = this.canvasRenderingContext2D.setLineDash.bind(this.canvasRenderingContext2D);
             this.setTransform = this.canvasRenderingContext2D.setTransform.bind(this.canvasRenderingContext2D);
             this.stroke = this.canvasRenderingContext2D.stroke.bind(this.canvasRenderingContext2D);
-            this.strokeRect = this.canvasRenderingContext2D.strokeRect.bind(this.canvasRenderingContext2D);
+            //this.strokeRect = this.canvasRenderingContext2D.strokeRect.bind(this.canvasRenderingContext2D);
             this.strokeText = this.canvasRenderingContext2D.strokeText.bind(this.canvasRenderingContext2D);
             this.transform = this.canvasRenderingContext2D.transform.bind(this.canvasRenderingContext2D);
             this.translate = this.canvasRenderingContext2D.translate.bind(this.canvasRenderingContext2D);
@@ -89,7 +89,7 @@ namespace Game {
         public get canvas(): HTMLCanvasElement { return this.canvasRenderingContext2D.canvas; }
 
         public get fillStyle(): string | CanvasGradient | CanvasPattern { return this.canvasRenderingContext2D.fillStyle; }
-
+            
         public set fillStyle(value: string | CanvasGradient | CanvasPattern) { this.canvasRenderingContext2D.fillStyle = value; }
 
         public get font(): string { return this.canvasRenderingContext2D.font; }
@@ -211,7 +211,7 @@ namespace Game {
             y1: number,
             r1: number
         ) => CanvasGradient;
-        public drawImage: (
+        public drawImage(
             image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement,
             offsetX: number,
             offsetY: number,
@@ -220,7 +220,12 @@ namespace Game {
             canvasOffsetX?: number,
             canvasOffsetY?: number,
             canvasImageWidth?: number,
-            canvasImageHeight?: number) => void;
+            canvasImageHeight?: number): void {
+            if (image != null) {
+                this.canvasRenderingContext2D.drawImage(image, offsetX, offsetY, width, height, canvasOffsetX, canvasOffsetY, canvasImageWidth, canvasImageHeight);
+            }
+
+            }
         public fill: (fillRule?: string) => void;
         public fillRect: (x: number, y: number, w: number, h: number) => void;
         public fillText: (text: string, x: number, y: number, maxWidth?: number) => void;
@@ -248,7 +253,9 @@ namespace Game {
         public setLineDash: (segments: number[]) => void;
         public setTransform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
         public stroke: () => void;
-        public strokeRect: (x: number, y: number, w: number, h: number) => void;
+        public strokeRect(x: number, y: number, w: number, h: number) {
+            this.canvasRenderingContext2D.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        }
         public strokeText: (text: string, x: number, y: number, maxWidth?: number) => void;
         public transform: (m11: number, m12: number, m21: number, m22: number, dx: number, dy: number) => void;
         public translate: (x: number, y: number) => void;
@@ -370,6 +377,8 @@ namespace Game {
             Game.getScreen().save();
             Game.getScreen().clearRect(0, 0, this.width, this.height);
             Game.getScreen().scale(this.scaleX, this.scaleY);
+            Game.getScreen().fillStyle = "rgb(255,255,255)";
+            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             Game.getScreen().save();
 
         }

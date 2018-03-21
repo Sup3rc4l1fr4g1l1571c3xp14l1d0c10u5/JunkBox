@@ -8,16 +8,16 @@ namespace Game.GUI {
         visible: boolean;
         enable: boolean;
         draw: () => void;
-        regist: (dispatcher : UIDispatcher) => void;
-        unregist: (dispatcher : UIDispatcher) => void;
+        regist: (dispatcher: UIDispatcher) => void;
+        unregist: (dispatcher: UIDispatcher) => void;
     }
 
     export interface ClickableUI {
-        click : (x:number, y:number) => void;
+        click: (x: number, y: number) => void;
     }
 
     export interface SwipableUI {
-        swipe : (dx:number, dy:number,x:number, y:number) => void;
+        swipe: (dx: number, dy: number, x: number, y: number) => void;
     }
 
     export function isHit(ui: UI, x: number, y: number): boolean {
@@ -26,18 +26,18 @@ namespace Game.GUI {
         return (0 <= dx && dx < ui.width) && (0 <= dy && dy < ui.height)
     }
 
-    type EventHandler = (...args : any[]) => void;
+    type EventHandler = (...args: any[]) => void;
     type CancelHandler = () => void;
 
     export class UIDispatcher extends Dispatcher.EventDispatcher {
-        private uiTable : Map<UI, Map<string, EventHandler[]>>;
+        private uiTable: Map<UI, Map<string, EventHandler[]>>;
 
         constructor() {
             super();
             this.uiTable = new Map<UI, Map<string, EventHandler[]>>();
         }
 
-        public add(ui: UI) : void  {
+        public add(ui: UI): void {
             if (this.uiTable.has(ui)) {
                 return;
             }
@@ -45,24 +45,24 @@ namespace Game.GUI {
             ui.regist(this);
         }
 
-        public remove(ui: UI) : void  {
+        public remove(ui: UI): void {
             if (!this.uiTable.has(ui)) {
                 return;
             }
             ui.unregist(this);
-            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
-            this.uiTable.set(ui,null);
-            eventTable.forEach((values,key) => {
-                values.forEach((value) => this.off(key,value));
+            const eventTable: Map<string, EventHandler[]> = this.uiTable.get(ui);
+            this.uiTable.set(ui, null);
+            eventTable.forEach((values, key) => {
+                values.forEach((value) => this.off(key, value));
             });
             this.uiTable.delete(ui);
         }
 
-        private registUiEvent(ui: UI, event:string, handler : EventHandler) : void  {
+        private registUiEvent(ui: UI, event: string, handler: EventHandler): void {
             if (!this.uiTable.has(ui)) {
                 return;
             }
-            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
+            const eventTable: Map<string, EventHandler[]> = this.uiTable.get(ui);
             if (!eventTable.has(event)) {
                 eventTable.set(event, []);
             }
@@ -70,23 +70,23 @@ namespace Game.GUI {
             events.push(handler);
             this.on(event, handler);
         }
-        private unregistUiEvent(ui: UI, event: string,  handler : EventHandler) : void  {
+        private unregistUiEvent(ui: UI, event: string, handler: EventHandler): void {
             if (!this.uiTable.has(ui)) {
                 return;
             }
-            const eventTable : Map<string, EventHandler[]> = this.uiTable.get(ui);
+            const eventTable: Map<string, EventHandler[]> = this.uiTable.get(ui);
             if (!eventTable.has(event)) {
                 return;
             }
             const events = eventTable.get(event);
             const index = events.indexOf(handler);
             if (index != -1) {
-                events.splice(index,1);
+                events.splice(index, 1);
             }
             this.off(event, handler);
         }
 
-        public draw() : void {
+        public draw(): void {
             this.uiTable.forEach((value, key) => {
                 if (key.visible) {
                     key.draw();
@@ -169,7 +169,7 @@ namespace Game.GUI {
         }
 
         // UIに対するスワイプ操作を捕捉
-        public onSwipe(ui: UI, handler: (dx: number, dy: number, x?:number,y?:number) => void): CancelHandler {
+        public onSwipe(ui: UI, handler: (dx: number, dy: number, x?: number, y?: number) => void): CancelHandler {
 
             const hookHandler = (x: number, y: number) => {
                 if (!ui.visible || !ui.enable) {
@@ -189,7 +189,7 @@ namespace Game.GUI {
                     let dy = (~~_y - ~~cy);
                     cx = _x;
                     cy = _y;
-                    handler(dx, dy, _x-ui.left, _y-ui.top);
+                    handler(dx, dy, _x - ui.left, _y - ui.top);
                 };
                 const onPointerUpHandler = (x: number, y: number) => {
                     this.off("pointermove", onPointerMoveHandler);
@@ -198,7 +198,7 @@ namespace Game.GUI {
                 this.on("pointermove", onPointerMoveHandler);
                 this.on("pointerup", onPointerUpHandler);
 
-                handler(0, 0, cx-ui.left, cy-ui.top);
+                handler(0, 0, cx - ui.left, cy - ui.top);
             };
             this.registUiEvent(ui, "pointerdown", hookHandler);
             return () => this.unregistUiEvent(ui, "pointerdown", hookHandler);
@@ -237,19 +237,19 @@ namespace Game.GUI {
                 visible = true,
                 enable = true
             }: {
-                left: number;
-                top: number;
-                width: number;
-                height: number;
-                text?: string;
-                edgeColor?: string;
-                color?: string;
-                font?: string;
-                fontColor?: string;
-                textAlign?: string;
-                textBaseline?: string;
-                visible?: boolean;
-                enable?: boolean;
+                    left: number;
+                    top: number;
+                    width: number;
+                    height: number;
+                    text?: string;
+                    edgeColor?: string;
+                    color?: string;
+                    font?: string;
+                    fontColor?: string;
+                    textAlign?: string;
+                    textBaseline?: string;
+                    visible?: boolean;
+                    enable?: boolean;
                 }) {
             this.left = left;
             this.top = top;
@@ -274,14 +274,21 @@ namespace Game.GUI {
             const f = this.top + this.height;
 
             Game.getScreen().beginPath();
-            Game.getScreen().moveTo              (  a - 0.5, e - 0.5);
-            Game.getScreen().bezierCurveTo       (  c - 0.5, e - 0.5, c - 0.5, f - 0.5, a - 0.5, f - 0.5);
-            Game.getScreen().lineTo              (  b - 0.5, f - 0.5);
-            Game.getScreen().bezierCurveTo       (  d - 0.5, f - 0.5, d - 0.5, e - 0.5, b - 0.5, e - 0.5);
-            Game.getScreen().lineTo              (  a - 0.5, e - 0.5);
+            Game.getScreen().moveTo(a, e);
+            Game.getScreen().bezierCurveTo(c, e, c, f, a, f);
+            Game.getScreen().lineTo(b, f);
+            Game.getScreen().bezierCurveTo(d, f, d, e, b, e);
+            Game.getScreen().lineTo(a, e);
             Game.getScreen().closePath();
             Game.getScreen().fillStyle = this.color;
             Game.getScreen().fill();
+            Game.getScreen().beginPath();
+            Game.getScreen().moveTo(a + 0.5, e + 0.5);
+            Game.getScreen().bezierCurveTo(c + 0.5, e + 0.5, c + 0.5, f - 0.5, a + 0.5, f - 0.5);
+            Game.getScreen().lineTo(b - 0.5, f - 0.5);
+            Game.getScreen().bezierCurveTo(d - 0.5, f - 0.5, d - 0.5, e + 0.5, b - 0.5, e + 0.5);
+            Game.getScreen().lineTo(a + 0.5, e + 0.5);
+            Game.getScreen().closePath();
             Game.getScreen().strokeStyle = this.edgeColor;
             Game.getScreen().lineWidth = 1;
             Game.getScreen().stroke();
@@ -292,8 +299,8 @@ namespace Game.GUI {
             Game.getScreen().textBaseline = this.textBaseline;
             Game.getScreen().fillTextBox(this.text, a, e, this.width, this.height);
         }
-        regist(dispatcher : UIDispatcher) {}
-        unregist(dispatcher : UIDispatcher) {}
+        regist(dispatcher: UIDispatcher) { }
+        unregist(dispatcher: UIDispatcher) { }
     }
 
     export class Button implements UI, ClickableUI {
@@ -336,7 +343,7 @@ namespace Game.GUI {
         public textBaseline: string;
         public visible: boolean;
         public enable: boolean;
-        public click : (x:number,y:number) => void;
+        public click: (x: number, y: number) => void;
         public disableEdgeColor: string;
         public disableColor: string;
         public disableFontColor: string;
@@ -347,18 +354,18 @@ namespace Game.GUI {
                 top = 0,
                 width = 0,
                 height = 0,
-                 text = "",
-                 edgeColor = Button.defaultValue.edgeColor,
-                 color = Button.defaultValue.color,
-                 font = Button.defaultValue.font,
-                 fontColor = Button.defaultValue.fontColor,
-                 textAlign = Button.defaultValue.textAlign,
-                 textBaseline = Button.defaultValue.textBaseline,
-                 visible = Button.defaultValue.visible,
-                 enable = Button.defaultValue.enable,
-                 disableEdgeColor = Button.defaultValue.disableEdgeColor,
-                 disableColor = Button.defaultValue.disableColor,
-                 disableFontColor = Button.defaultValue.disableFontColor,
+                text = "",
+                edgeColor = Button.defaultValue.edgeColor,
+                color = Button.defaultValue.color,
+                font = Button.defaultValue.font,
+                fontColor = Button.defaultValue.fontColor,
+                textAlign = Button.defaultValue.textAlign,
+                textBaseline = Button.defaultValue.textBaseline,
+                visible = Button.defaultValue.visible,
+                enable = Button.defaultValue.enable,
+                disableEdgeColor = Button.defaultValue.disableEdgeColor,
+                disableColor = Button.defaultValue.disableColor,
+                disableFontColor = Button.defaultValue.disableFontColor,
             }: {
                     left: number;
                     top: number;
@@ -390,17 +397,17 @@ namespace Game.GUI {
             this.textBaseline = textBaseline;
             this.visible = visible;
             this.enable = enable;
-            this.click = () => {};
+            this.click = () => { };
             this.disableEdgeColor = disableEdgeColor;
             this.disableColor = disableColor;
             this.disableFontColor = disableFontColor;
         }
         draw() {
             Game.getScreen().fillStyle = this.enable ? this.color : this.disableColor
-            Game.getScreen().fillRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
+            Game.getScreen().fillRect(this.left, this.top, this.width, this.height);
             Game.getScreen().strokeStyle = this.enable ? this.edgeColor : this.disableEdgeColor;
             Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(this.left - 0.5, this.top - 0.5, this.width, this.height);
+            Game.getScreen().strokeRect(this.left, this.top, this.width, this.height);
             Game.getScreen().font = this.font;
             Game.getScreen().fillStyle = this.enable ? this.fontColor : this.disableFontColor;
             const text = (this.text instanceof Function) ? (this.text as (() => string)).call(this) : this.text
@@ -409,12 +416,12 @@ namespace Game.GUI {
             Game.getScreen().fillTextBox(text, this.left + 1, this.top + 1, this.width - 2, this.height - 2);
 
         }
-        regist(dispatcher : UIDispatcher) {
-            const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
+        regist(dispatcher: UIDispatcher) {
+            const cancelHandler = dispatcher.onClick(this, (...args: any[]) => this.click.apply(this, args));
             this.unregist = (d) => cancelHandler();
 
         }
-        unregist(dispatcher : UIDispatcher) {}
+        unregist(dispatcher: UIDispatcher) { }
     }
     export class ImageButton implements UI, ClickableUI {
         public left: number;
@@ -428,7 +435,7 @@ namespace Game.GUI {
         public texHeight: number;
         public visible: boolean;
         public enable: boolean;
-        public click : (x:number,y:number) => void;
+        public click: (x: number, y: number) => void;
 
         constructor(
             {
@@ -467,7 +474,7 @@ namespace Game.GUI {
             this.texHeight = texHeight;
             this.visible = visible;
             this.enable = enable;
-            this.click = () => {};
+            this.click = () => { };
         }
         draw() {
             if (this.texture != null) {
@@ -484,12 +491,12 @@ namespace Game.GUI {
                 );
             }
         }
-        regist(dispatcher : UIDispatcher) {
-            const cancelHandler = dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args));
+        regist(dispatcher: UIDispatcher) {
+            const cancelHandler = dispatcher.onClick(this, (...args: any[]) => this.click.apply(this, args));
             this.unregist = (d) => cancelHandler();
 
         }
-        unregist(dispatcher : UIDispatcher) {}
+        unregist(dispatcher: UIDispatcher) { }
     }
     export class ListBox implements UI, ClickableUI {
         public left: number;
@@ -501,6 +508,7 @@ namespace Game.GUI {
         public visible: boolean;
         public enable: boolean;
         public scrollbarWidth: number;
+        public space: number;
         public click: (x: number, y: number) => void;
 
         public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
@@ -516,19 +524,21 @@ namespace Game.GUI {
                 getItemCount = () => 0,
                 visible = true,
                 enable = true,
-                scrollbarWidth = 1
+                scrollbarWidth = 1,
+                space = 2
             }: {
-                left: number;
-                top: number;
-                width: number;
-                height: number;
-                lineHeight?: number
-                drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
-                getItemCount?: () => number,
-                visible?: boolean;
-                enable?: boolean;
-                scrollbarWidth?: number;
-            }) {
+                    left: number;
+                    top: number;
+                    width: number;
+                    height: number;
+                    lineHeight?: number
+                    drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
+                    getItemCount?: () => number,
+                    visible?: boolean;
+                    enable?: boolean;
+                    scrollbarWidth?: number;
+                    space?: number;
+                }) {
             this.left = left;
             this.top = top;
             this.width = width;
@@ -540,10 +550,21 @@ namespace Game.GUI {
             this.visible = visible;
             this.enable = enable;
             this.scrollbarWidth = scrollbarWidth;
-            this.click = () => {}
+            this.space = space;
+            this.click = () => { }
         }
+
+        private contentHeight(): number {
+            const itemCount = this.getItemCount();
+            if (itemCount === 0) {
+                return 0;
+            } else {
+                return this.lineHeight + (this.lineHeight + this.space) * (itemCount - 1);
+            }
+        }
+
         update(): void {
-            var contentHeight = this.getItemCount() * this.lineHeight;
+            const contentHeight = this.contentHeight();
 
             if (this.height >= contentHeight) {
                 this.scrollValue = 0;
@@ -554,8 +575,10 @@ namespace Game.GUI {
             }
         }
         draw() {
-            let sy = -(~~this.scrollValue % this.lineHeight);
-            let index = ~~((~~this.scrollValue) / this.lineHeight);
+            this.update();
+            const scrollValue = ~~this.scrollValue;
+            let sy = -(scrollValue % (this.lineHeight + this.space));
+            let index = ~~(scrollValue / (this.lineHeight + this.space))
             let itemCount = this.getItemCount();
             let drawResionHeight = this.height - sy;
             for (; ;) {
@@ -563,52 +586,53 @@ namespace Game.GUI {
                 if (index >= itemCount) { break; }
                 Game.getScreen().save();
                 Game.getScreen().beginPath();
-                Game.getScreen().rect(this.left - 1, Math.max(this.top, this.top + sy), this.width + 1 - this.scrollbarWidth, Math.min(drawResionHeight, this.lineHeight));
+                Game.getScreen().rect(this.left, Math.max(this.top, this.top + sy), this.width - this.scrollbarWidth, Math.min(drawResionHeight, this.lineHeight));
                 Game.getScreen().clip();
                 this.drawItem(this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
                 Game.getScreen().restore();
-                drawResionHeight -= this.lineHeight;
-                sy += this.lineHeight;
+                drawResionHeight -= this.lineHeight + this.space;
+                sy += this.lineHeight + this.space;
                 index++;
             }
-            const contentHeight = this.lineHeight * itemCount;
+            const contentHeight = this.contentHeight();
             if (contentHeight > this.height) {
                 const viewSizeRate = this.height * 1.0 / contentHeight;
-                const scrollBarHeight = viewSizeRate * this.height;
+                const scrollBarHeight = ~~(viewSizeRate * this.height);
                 const scrollBarBlankHeight = this.height - scrollBarHeight;
                 const scrollPosRate = this.scrollValue * 1.0 / (contentHeight - this.height);
-                const scrollBarTop =(scrollBarBlankHeight * scrollPosRate);
+                const scrollBarTop = ~~(scrollBarBlankHeight * scrollPosRate);
 
                 Game.getScreen().fillStyle = "rgb(128,128,128)";
                 Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top, this.scrollbarWidth, this.height);
 
                 Game.getScreen().fillStyle = "rgb(255,255,255)";
-                Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top + ~~scrollBarTop, this.scrollbarWidth, ~~scrollBarHeight);
+                Game.getScreen().fillRect(this.left + this.width - this.scrollbarWidth, this.top + scrollBarTop, this.scrollbarWidth, scrollBarHeight);
             }
         }
         getItemIndexByPosition(x: number, y: number) {
+            this.update();
             if (x < 0 || this.width <= x || y < 0 || this.height <= y) {
                 return -1;
             }
-            const index = ~~((y + this.scrollValue) / this.lineHeight);
+            const index = ~~((y + this.scrollValue) / (this.lineHeight + this.space));
             if (index < 0 || index >= this.getItemCount()) {
                 return -1;
             } else {
                 return index;
             }
         }
-        regist(dispatcher : UIDispatcher) {
+        regist(dispatcher: UIDispatcher) {
             const cancelHandlers = [
                 dispatcher.onSwipe(this, (deltaX: number, deltaY: number) => {
                     this.scrollValue -= deltaY;
                     this.update();
                 }),
-                dispatcher.onClick(this, (...args:any[]) => this.click.apply(this,args))
+                dispatcher.onClick(this, (...args: any[]) => this.click.apply(this, args))
             ];
             this.unregist = (d) => cancelHandlers.forEach(x => x());
 
         }
-        unregist(dispatcher : UIDispatcher) {}
+        unregist(dispatcher: UIDispatcher) { }
     }
 
     export class HorizontalSlider implements UI {
@@ -646,21 +670,21 @@ namespace Game.GUI {
                 visible = true,
                 enable = true,
             }: {
-                left: number;
-                top: number;
-                width: number;
-                height: number;
-                sliderWidth?: number;
-                updownButtonWidth?: number;
-                edgeColor?: string;
-                color?: string;
-                bgColor?: string;
-                font?: string;
-                fontColor?: string;
+                    left: number;
+                    top: number;
+                    width: number;
+                    height: number;
+                    sliderWidth?: number;
+                    updownButtonWidth?: number;
+                    edgeColor?: string;
+                    color?: string;
+                    bgColor?: string;
+                    font?: string;
+                    fontColor?: string;
                     minValue?: number;
                     maxValue?: number;
-            visible?: boolean;
-            enable?: boolean;
+                    visible?: boolean;
+                    enable?: boolean;
                 }
 
         ) {
@@ -685,22 +709,22 @@ namespace Game.GUI {
 
             Game.getScreen().fillStyle = this.bgColor;
             Game.getScreen().fillRect(
-                this.left-0.5,
-                this.top-0.5,
+                this.left,
+                this.top,
                 this.width,
                 this.height
             );
             Game.getScreen().fillStyle = this.color;
             Game.getScreen().strokeStyle = this.edgeColor;
             Game.getScreen().fillRect(
-                this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue))-0.5,
-                this.top-0.5,
+                this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)),
+                this.top,
                 this.sliderWidth,
                 this.height
             );
             Game.getScreen().strokeRect(
-                this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue))-0.5,
-                this.top-0.5,
+                this.left + ~~(lineWidth * (this.value - this.minValue) / (this.maxValue - this.minValue)),
+                this.top,
                 this.sliderWidth,
                 this.height
             );
@@ -715,19 +739,19 @@ namespace Game.GUI {
                 this.value = this.maxValue;
             }
         }
-        regist(dispatcher : UIDispatcher) {
-            var cancelHandler = dispatcher.onSwipe(this, (dx, dy, x, y) => {
+        regist(dispatcher: UIDispatcher) {
+            const cancelHandler = dispatcher.onSwipe(this, (dx, dy, x, y) => {
                 const rangeSize = this.maxValue - this.minValue;
                 if (rangeSize == 0) {
                     this.value = this.minValue;
                 } else {
-                    if (x <= this.sliderWidth/2) {
+                    if (x <= this.sliderWidth / 2) {
                         this.value = this.minValue;
-                    } else if (x >= this.width-this.sliderWidth/2) {
+                    } else if (x >= this.width - this.sliderWidth / 2) {
                         this.value = this.maxValue;
                     } else {
                         const width = this.width - this.sliderWidth;
-                        const xx = x - ~~(this.sliderWidth/2);
+                        const xx = x - ~~(this.sliderWidth / 2);
                         this.value = Math.trunc((xx * rangeSize) / width) + this.minValue;
                     }
                 }
@@ -735,7 +759,7 @@ namespace Game.GUI {
             this.unregist = (d) => cancelHandler();
 
         }
-        unregist(dispatcher : UIDispatcher) {}
+        unregist(dispatcher: UIDispatcher) { }
     }
 
 
