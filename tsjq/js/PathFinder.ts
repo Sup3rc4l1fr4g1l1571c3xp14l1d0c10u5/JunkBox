@@ -86,7 +86,7 @@ namespace PathFinder {
 
             work.value(px, py, nextValue); output(px, py, nextValue);
 
-            Array.prototype.push.apply(request, dirs.map(({ x, y }) => [px + x, py + y, nextValue]));
+            request.push(...dirs.map(({ x, y }) => [px + x, py + y, nextValue]));
         }
     }
 

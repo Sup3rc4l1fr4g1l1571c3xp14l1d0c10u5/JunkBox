@@ -1,7 +1,7 @@
 /// <reference path="../lib/game/eventdispatcher.ts" />
 namespace Scene {
 
-    export function* corridor(saveData: Data.SaveData.SaveData) {
+    export function* corridor() {
         const dispatcher = new Game.GUI.UIDispatcher();
         const fade = new Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
         let selected: () => void = null;
@@ -31,7 +31,7 @@ namespace Scene {
         dispatcher.add(btnBuy);
         btnBuy.click = (x: number, y: number) => {
             Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(classroom, saveData);
+            selected = () => Game.getSceneManager().push(ClassRoom.top);
         };
 
         const btnSell = new Game.GUI.Button({
@@ -44,7 +44,7 @@ namespace Scene {
         dispatcher.add(btnSell);
         btnSell.click = (x: number, y: number) => {
             Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(shop, saveData);
+            selected = () => Game.getSceneManager().push(shop);
         };
 
         const btnDungeon = new Game.GUI.Button({
@@ -61,11 +61,11 @@ namespace Scene {
             selected = () => {
                 Game.getSceneManager().pop();
                 Game.getSound().reqStopChannel("classroom");
-                Game.getSceneManager().push(dungeon, { saveData: saveData, player: new Unit.Player(saveData.findCharactorById(saveData.forwardCharactor), saveData.findCharactorById(saveData.backwardCharactor)), floor: 1 });
+                Game.getSceneManager().push(Dungeon.dungeon, { player: new Unit.Player(Data.SaveData.findCharactorById(Data.SaveData.forwardCharactor), Data.SaveData.findCharactorById(Data.SaveData.backwardCharactor)), floor: 1 });
             };
         };
 
-        btnDungeon.enable = saveData.forwardCharactor != null;
+        btnDungeon.enable = Data.SaveData.forwardCharactor != null;
 
         this.draw = () => {
             Game.getScreen().drawImage(
@@ -90,7 +90,7 @@ namespace Scene {
                 },
             });
 
-            yield (delta: number, ms: number) => {
+            yield () => {
                 if (Game.getInput().isDown()) {
                     dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
                 }
@@ -100,7 +100,7 @@ namespace Scene {
                 if (Game.getInput().isUp()) {
                     dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
                 }
-                btnDungeon.enable = saveData.forwardCharactor != null;
+                btnDungeon.enable = Data.SaveData.forwardCharactor != null;
                 if (selected != null) {
                     this.next();
                 }

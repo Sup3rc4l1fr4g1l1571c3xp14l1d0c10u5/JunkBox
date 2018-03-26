@@ -28,7 +28,7 @@
         };
 
         yield waitClick({
-            update: (e, ms) => { showClickOrTap = (~~(ms / 500) % 2) === 0; },
+            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 500) % 2) === 0; },
             check: () => true,
             end: () => {
                 Game.getSound().reqPlayChannel("title");
@@ -38,18 +38,17 @@
 
         yield waitTimeout({
             timeout: 1000,
-            update: (e, ms) => { showClickOrTap = (~~(ms / 50) % 2) === 0; },
+            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
             end: () => this.next(),
         });
 
         yield waitTimeout({
             timeout: 500,
             init: () => { fade.startFadeOut(); },
-            update: (e, ms) => { fade.update(e); showClickOrTap = (~~(ms / 50) % 2) === 0; },
+            update: (e) => { fade.update(e); showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
             end: () => {
-                const saveData = new Data.SaveData.SaveData();
-                saveData.loadGameData();
-                Game.getSceneManager().push(corridor, saveData);
+                Data.SaveData.load();
+                Game.getSceneManager().push(corridor);
                 this.next();
             },
         });

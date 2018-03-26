@@ -36,6 +36,7 @@ namespace Scene {
                 status: "./assets/status.png",
                 corridorbg: "./assets/corridorbg.png",
                 classroom: "./assets/classroom.png",
+                "drops" : "./assets/drops.png",
                 "shop/bg": "./assets/shop/bg.png",
                 "shop/J11": "./assets/shop/J11.png",
             },
@@ -53,7 +54,9 @@ namespace Scene {
                 sen_ge_gusya01:"./assets/sound/sen_ge_gusya01.mp3",
                 boyon1:"./assets/sound/boyon1.mp3",
                 boyoyon1:"./assets/sound/boyoyon1.mp3",
-                meka_ge_reji_op01:"./assets/sound/meka_ge_reji_op01.mp3"
+                meka_ge_reji_op01:"./assets/sound/meka_ge_reji_op01.mp3",
+                coin:"./assets/sound/Cash_Register-Drawer01-1.mp3",
+                open:"./assets/sound/locker-open1.mp3"
             },
                 () => { reqResource++; },
                 () => { loadedResource++; },
@@ -75,8 +78,8 @@ namespace Scene {
             //Game.getSceneManager().push(shop, sd);
             //this.next();
         });
-        yield (delta: number, ms: number) => {
-            n = ~(ms / 50);
+        yield () => {
+            n = ~~(Game.getTimer().now / 50);
         };
         return;
     }

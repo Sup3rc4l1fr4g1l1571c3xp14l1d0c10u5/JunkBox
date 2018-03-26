@@ -3,8 +3,8 @@
 namespace Particle {
 
     export interface IParticle {
-        update(ms: number, delta: number): boolean;
-        draw(camera: Dungeon.Camera): void;
+        update(): boolean;
+        draw(camera: MapData.Camera): void;
     }
 
     export function createShowDamageSprite(start: number, damage: string, getpos: () => IPoint): Particle.IParticle {
@@ -12,11 +12,11 @@ namespace Particle {
         const fontWidth: number = 5;
         const fontHeight: number = 7;
         return {
-            update: (delta: number, ms: number): boolean => {
-                elapse = ms - start;
+            update: (): boolean => {
+                elapse = Game.getTimer().now - start;
                 return (elapse > 500);
             },
-            draw: (camera: Dungeon.Camera): void => {
+            draw: (camera: MapData.Camera): void => {
                 const { x: sx, y: sy } = getpos();
 
                 const xx = sx - camera.left;

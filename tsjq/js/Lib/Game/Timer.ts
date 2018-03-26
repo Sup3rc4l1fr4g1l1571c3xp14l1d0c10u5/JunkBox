@@ -5,18 +5,22 @@ namespace Game {
         export class AnimationTimer extends Dispatcher.SingleDispatcher {
             private animationFrameId: number;
             private prevTime: number;
+            public get now() : number {
+                return this.prevTime;
+            }
 
             constructor() {
                 super();
                 this.animationFrameId = NaN;
                 this.prevTime = NaN;
+                this.tick = this.tick.bind(this);
             }
 
             public start(): boolean {
                 if (!isNaN(this.animationFrameId)) {
                     this.stop();
                 }
-                this.animationFrameId = requestAnimationFrame(this.tick.bind(this));
+                this.animationFrameId = requestAnimationFrame(this.tick);
                 return !isNaN(this.animationFrameId);
             }
 
@@ -28,10 +32,9 @@ namespace Game {
             }
 
             private tick(ts: number): void {
-                requestAnimationFrame(this.tick.bind(this));
+                requestAnimationFrame(this.tick);
                 if (!isNaN(this.prevTime)) {
-                    const delta = ts - this.prevTime;
-                    this.fire(delta, ts);
+                    this.fire();
                 }
                 this.prevTime = ts;
             }

@@ -18,8 +18,14 @@ namespace Game {
                 this.resume = () => { };
             }
 
+            public dispose() {
+                this.state.return();
+                this.state = this.update = null;
+            }
+
             public next(...args: any[]): any {
-                this.update = this.state.next.apply(this.state, args).value;
+                const ret = this.state.next.apply(this.state, args);
+                this.update = ret.value;
             }
 
             public enter(...data: any[]): void {
@@ -27,7 +33,7 @@ namespace Game {
                 this.next();
             }
 
-            public update: (delta: number, now: number) => void;
+            public update: () => void;
 
             public draw: () => void;
 
@@ -41,9 +47,10 @@ namespace Game {
 
         export class SceneManager {
             private sceneStack: Scene[];
-
+            private disposeScenes: Scene[];
             constructor() {
                 this.sceneStack = [];
+                this.disposeScenes = [];
             }
 
             public push<T>(sceneDef: (data?: T) => IterableIterator<any>, arg? : T): void {
@@ -56,15 +63,19 @@ namespace Game {
                 }
             }
 
-            public pop(): void {
+            public pop(scene:Scene = null): void {
                 if (this.sceneStack.length === 0) {
                     throw new Error("there is no scene.");
+                }
+                if (scene != null && this.peek() != scene) {
+                    return;
                 }
                 if (this.peek() != null) {
                     const p = this.sceneStack.pop();
                     if (p.leave != null) {
                         p.leave();
                     }
+                    this.disposeScenes.push(p);
                 }
 
                 if (this.peek() != null && this.peek().resume != null) {
@@ -81,6 +92,8 @@ namespace Game {
             }
 
             public update(...args: any[]): SceneManager {
+                this.disposeScenes.forEach(x => x.dispose());
+                this.disposeScenes.length = 0;
                 if (this.peek() != null && this.peek().update != null) {
                     this.peek().update.apply(this.peek(), args);
                 }

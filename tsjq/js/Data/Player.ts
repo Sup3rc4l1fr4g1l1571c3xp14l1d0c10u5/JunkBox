@@ -2,7 +2,7 @@
 
 namespace Data.Player {
 
-    interface EquipData {
+    export interface EquipData {
         wepon1: Item.ItemBoxEntry;
         armor1: Item.ItemBoxEntry;
         armor2: Item.ItemBoxEntry;

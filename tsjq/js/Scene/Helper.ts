@@ -64,22 +64,22 @@ namespace Scene {
     }: {
             timeout: number;
             init?: () => void;
-            start?: (elapsed: number, ms: number) => void;
-            update?: (elapsed: number, ms: number) => void;
-            end?: (elapsed: number, ms: number) => void;
+            start?: (elapsed: number) => void;
+            update?: (elapsed: number) => void;
+            end?: (elapsed: number) => void;
         }) {
         let startTime = -1;
         init();
-        return (delta: number, ms: number) => {
+        return () => {
             if (startTime === -1) {
-                startTime = ms;
-                start(0, ms);
+                startTime = Game.getTimer().now;
+                start(Game.getTimer().now);
             }
-            const elapsed = ms - startTime;
+            const elapsed = Game.getTimer().now - startTime;
             if (elapsed >= timeout) {
-                end(elapsed, ms);
+                end(elapsed);
             } else {
-                update(elapsed, ms);
+                update(elapsed);
             }
         };
     }
@@ -90,18 +90,18 @@ namespace Scene {
         check = () => true,
         end = () => { },
     }: {
-            update?: (elapsed: number, ms: number) => void;
-            start?: (elapsed: number, ms: number) => void;
-            check?: (x: number, y: number, elapsed: number, ms: number) => boolean;
-            end?: (x: number, y: number, elapsed: number, ms: number) => void;
+            update?: (elapsed: number) => void;
+            start?: (elapsed: number) => void;
+            check?: (x: number, y: number, elapsed: number) => boolean;
+            end?: (x: number, y: number, elapsed: number) => void;
         }) {
         let startTime = -1;
-        return (delta: number, ms: number) => {
+        return () => {
             if (startTime === -1) {
-                startTime = ms;
-                start(0, ms);
+                startTime = Game.getTimer().now;
+                start(0);
             }
-            const elapsed = ms - startTime;
+            const elapsed = Game.getTimer().now - startTime;
             if (Game.getInput().isClick()) {
                 const pX = Game.getInput().pageX;
                 const pY = Game.getInput().pageY;
@@ -109,13 +109,13 @@ namespace Scene {
                     const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
                     const xx = pos[0];
                     const yy = pos[1];
-                    if (check(xx, yy, elapsed, ms)) {
-                        end(xx, yy, elapsed, ms);
+                    if (check(xx, yy, elapsed)) {
+                        end(xx, yy, elapsed);
                         return;
                     }
                 }
             }
-            update(elapsed, ms);
+            update(elapsed);
         };
     }
 }

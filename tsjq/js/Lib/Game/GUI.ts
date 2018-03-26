@@ -1,5 +1,9 @@
 /// <reference path="eventdispatcher.ts" />
 namespace Game.GUI {
+
+    /**
+     * コントロールコンポーネントインタフェース
+     */
     export interface UI {
         left: number;
         top: number;
@@ -12,14 +16,26 @@ namespace Game.GUI {
         unregist: (dispatcher: UIDispatcher) => void;
     }
 
+    /**
+     * クリック操作インタフェース
+     */
     export interface ClickableUI {
         click: (x: number, y: number) => void;
     }
 
+    /**
+     * スワイプ操作インタフェース
+     */
     export interface SwipableUI {
         swipe: (dx: number, dy: number, x: number, y: number) => void;
     }
 
+    /**
+     * UI領域内に点(x,y)があるか判定
+     * @param ui {UI}
+     * @param x {number}
+     * @param y {number}
+     */
     export function isHit(ui: UI, x: number, y: number): boolean {
         const dx = x - ui.left;
         const dy = y - ui.top;
@@ -297,7 +313,7 @@ namespace Game.GUI {
             const metrics = Game.getScreen().measureText(this.text);
             Game.getScreen().textAlign = this.textAlign;
             Game.getScreen().textBaseline = this.textBaseline;
-            Game.getScreen().fillTextBox(this.text, a, e, this.width, this.height);
+            Game.getScreen().fillTextBox(this.text, a, e+2, this.width, this.height-4);
         }
         regist(dispatcher: UIDispatcher) { }
         unregist(dispatcher: UIDispatcher) { }
@@ -578,9 +594,13 @@ namespace Game.GUI {
             this.update();
             const scrollValue = ~~this.scrollValue;
             let sy = -(scrollValue % (this.lineHeight + this.space));
-            let index = ~~(scrollValue / (this.lineHeight + this.space))
+            let index = ~~(scrollValue / (this.lineHeight + this.space));
             let itemCount = this.getItemCount();
             let drawResionHeight = this.height - sy;
+
+            Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
+            Game.getScreen().fillRect(this.left, this.top, this.width, this.height);
+
             for (; ;) {
                 if (sy >= this.height) { break; }
                 if (index >= itemCount) { break; }
@@ -634,7 +654,6 @@ namespace Game.GUI {
         }
         unregist(dispatcher: UIDispatcher) { }
     }
-
     export class HorizontalSlider implements UI {
         public left: number;
         public top: number;

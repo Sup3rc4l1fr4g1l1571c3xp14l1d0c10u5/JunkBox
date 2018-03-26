@@ -2,25 +2,18 @@
 /// <reference path="./UnitBase.ts" />
 "use strict";
 
-//  =((100+N58*N59)-(100+N61*N62)) * (1 + N60 - N63) / 10
-
 namespace Unit {
     export interface MemberStatus {
         id: string;
         name: string;
         spriteSheet: SpriteAnimation.SpriteSheet;
-        equips: {
-            wepon1?: Data.Item.ItemBoxEntry;
-            armor1?: Data.Item.ItemBoxEntry;
-            armor2?: Data.Item.ItemBoxEntry;
-            accessory1?: Data.Item.ItemBoxEntry;
-            accessory2?: Data.Item.ItemBoxEntry;
-        };
+        equips: Data.Player.EquipData;
         hp: number;
         mp: number;
         hpMax: number;
         mpMax: number;
     }
+
     export class Player extends UnitBase {
         public members: MemberStatus[] = [];
         public active: number;
@@ -44,10 +37,10 @@ namespace Unit {
                 name: forwardConfig.name,
                 spriteSheet: forwardConfig.sprite,
                 equips: Object.assign({}, forward.equips),
-                mp: forward.mp,
-                hp: forward.hp,
-                mpMax: forward.mp,
-                hpMax: forward.hp
+                mp: forward.mp + Player.reduceEquips(forward.equips, (s, x) => s + x.mp, 0),
+                hp: forward.hp + Player.reduceEquips(forward.equips, (s, x) => s + x.hp, 0),
+                mpMax: forward.mp + Player.reduceEquips(forward.equips, (s, x) => s + x.mp, 0),
+                hpMax: forward.hp + Player.reduceEquips(forward.equips, (s, x) => s + x.hp, 0)
             };
             if (backward != null) {
                 const backwardConfig = Data.Charactor.get(backward.id);
@@ -56,19 +49,23 @@ namespace Unit {
                     spriteSheet: backwardConfig.sprite,
                     name: backwardConfig.name,
                     equips: Object.assign({}, backward.equips),
-                    mp: backward.mp,
-                    hp: backward.hp,
-                    mpMax: backward.mp,
-                    hpMax: backward.hp
+                    mp: backward.mp + Player.reduceEquips(backward.equips, (s, x) => s + x.mp, 0),
+                    hp: backward.hp + Player.reduceEquips(backward.equips, (s, x) => s + x.hp, 0),
+                    mpMax: backward.mp + Player.reduceEquips(backward.equips, (s, x) => s + x.mp, 0),
+                    hpMax: backward.hp + Player.reduceEquips(backward.equips, (s, x) => s + x.hp, 0)
                 };
             }
         }
 
+        private static reduceEquips<T>(equipData: Data.Player.EquipData, pred:(s: T, x: Data.Item.Data) => T, seed:T): T {
+            return equipData.reduce<Data.Item.ItemBoxEntry, T>((s, [v, k]) => (v == null) ? s : pred(s, Data.Item.get(v.id)),seed);
+        }
+
         public get atk() {
-            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.get(v.id).atk), 0);
+            return Player.reduceEquips(this.members[this.active].equips, (s, x) => s + x.atk, 0);
         }
         public get def() {
-            return this.members[this.active].equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s += (v == null ? 0 : Data.Item.get(v.id).def), 0);
+            return Player.reduceEquips(this.members[this.active].equips, (s, x) => s + x.def, 0);
         }
 
     }
