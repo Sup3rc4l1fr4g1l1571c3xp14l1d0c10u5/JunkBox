@@ -30,7 +30,7 @@ namespace Scene.Dungeon {
             const animFrame = charactorData.spriteSheet.getAnimationFrame(charactorData.animName, charactorData.animFrame);
             const sprite = charactorData.spriteSheet.gtetSprite(animFrame.sprite);
 
-            // キャラクター
+            // 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ
             Game.getScreen().drawImage(
                 charactorData.spriteSheet.getSpriteImage(sprite),
                 sprite.left,

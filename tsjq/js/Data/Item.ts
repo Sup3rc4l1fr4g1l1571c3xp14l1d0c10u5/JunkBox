@@ -417,7 +417,7 @@ namespace Data {
                 stackable: true,
                 useToParty: (party: Unit.Player) => {
                     Game.getSceneManager().pop();
-                    Game.getSceneManager().push(Scene.corridor);
+                    Game.getSceneManager().push(new Scene.Corridor());
                     return true;
                 }
             },

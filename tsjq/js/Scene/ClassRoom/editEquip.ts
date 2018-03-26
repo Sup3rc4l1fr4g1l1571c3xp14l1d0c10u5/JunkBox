@@ -8,7 +8,7 @@ namespace Scene.ClassRoom {
             top: 1,
             width: 250,
             height: 42,
-            text: "‘•”õ•ÏX",
+            text: "è£…å‚™å¤‰æ›´",
             edgeColor: `rgb(12,34,98)`,
             color: `rgb(24,133,196)`,
             font: "10px 'PixelMplus10-Regular'",
@@ -23,7 +23,7 @@ namespace Scene.ClassRoom {
             top: 16 * 11 + 46,
             width: 112,
             height: 16,
-            text: "–ß‚é",
+            text: "æˆ»ã‚‹",
         });
         dispatcher.add(btnExit);
 
@@ -202,7 +202,7 @@ namespace Scene.ClassRoom {
             top: 16 * 0 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.wepon1 == null) ? "(•Ší)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.wepon1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.wepon1 == null) ? "(æ­¦å™¨)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.wepon1.id).name,
         });
         dispatcher.add(btnWepon1);
         btnWepon1.click = () => {
@@ -216,7 +216,7 @@ namespace Scene.ClassRoom {
             top: 16 * 1 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor1 == null) ? "(–h‹ïEã”¼g)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor1 == null) ? "(é˜²å…·ãƒ»ä¸ŠåŠèº«)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor1.id).name,
         });
         dispatcher.add(btnArmor1);
         btnArmor1.click = () => {
@@ -230,7 +230,7 @@ namespace Scene.ClassRoom {
             top: 16 * 2 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor2 == null) ? "(–h‹ïE‰º”¼g)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor2.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor2 == null) ? "(é˜²å…·ãƒ»ä¸‹åŠèº«)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor2.id).name,
         });
         dispatcher.add(btnArmor2);
         btnArmor2.click = () => {
@@ -244,7 +244,7 @@ namespace Scene.ClassRoom {
             top: 16 * 3 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory1 == null) ? "(ƒAƒNƒZƒTƒŠ‚P)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory1.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory1 == null) ? "(ã‚¢ã‚¯ã‚»ã‚µãƒªï¼‘)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory1.id).name,
         });
         dispatcher.add(btnAccessory1);
         btnAccessory1.click = () => {
@@ -258,7 +258,7 @@ namespace Scene.ClassRoom {
             top: 16 * 4 + 46+50,
             width: 112,
             height: 16,
-            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory2 == null) ? "(ƒAƒNƒZƒTƒŠ‚Q)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory2.id).name,
+            text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory2 == null) ? "(ã‚¢ã‚¯ã‚»ã‚µãƒªï¼’)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory2.id).name,
         });
         dispatcher.add(btnAccessory2);
         btnAccessory2.click = () => {

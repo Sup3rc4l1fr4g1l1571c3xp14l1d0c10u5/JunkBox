@@ -1,492 +1,12 @@
-/// <reference path="./gameOver.ts" />
-/// <reference path="./statusView.ts" />
-/// <reference path="./itemBoxSelectPlayer.ts" />
-/// <reference path="./itemBoxSelectItem.ts" />
+/// <reference path="./GameOver.ts" />
+/// <reference path="./StatusView.ts" />
+/// <reference path="./ItemBoxSelectPlayer.ts" />
+/// <reference path="./ItemBoxSelectItem.ts" />
 /// <reference path="./MapView.ts" />
 /// <reference path="./StatusSprite.ts" />
 "use strict";
 
 namespace Scene.Dungeon {
-
-
-
-    export function* dungeon(param: { player: Unit.Player, floor: number }): IterableIterator < any > {
-        const player = param.player;
-        const floor = param.floor;
-
-        // マップ生成
-        const map = MapData.Generator.generate({
-            floor:floor,
-            gridsize: { width: 24, height: 24 },
-            layer: {
-                0: {
-                    texture: "mapchip",
-                    chip: {
-                        1: { x: 48, y: 0 },
-                        2: { x: 96, y: 96 },
-                        10: { x: 96, y: 0 },
-                    },
-                    chips: null,
-                },
-                1: {
-                    texture: "mapchip",
-                    chip: {
-                        0: { x: 96, y: 72 },
-                    },
-                    chips: null,
-                },
-            }
-        });
-
-        param.player.x = map.startPos.x;
-        param.player.y = map.startPos.y;
-
-        // モンスター配置
-        let monsters = map.rooms.splice(2).map((x) => {
-            const monster = new Unit.Monster("slime");
-                monster.x = x.left;
-                monster.y = x.top;
-                monster.life = monster.maxLife = floor + 5;
-                monster.atk = ~~(floor * 2);
-                monster.def = ~~(floor / 3) + 1;
-                return monster;
-            });
-
-        // ドロップアイテム等の情報
-        const drops : DropItem[] = [];
-
-        // カメラを更新
-        map.update({
-            viewpoint: {
-                x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
-            },
-            viewwidth: Game.getScreen().offscreenWidth,
-            viewheight: Game.getScreen().offscreenHeight,
-        });
-
-        Game.getSound().reqPlayChannel("dungeon", true);
-
-        // assign virtual pad
-        const pad = new Game.Input.VirtualStick();
-
-        const pointerdown = (ev: PointerEvent): void => {
-            if (pad.onpointingstart(ev.pointerId)) {
-                const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-                pad.x = pos[0];
-                pad.y = pos[1];
-            }
-        };
-        const pointermove = (ev: PointerEvent): void => {
-            const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-            pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
-        };
-        const pointerup = (ev: PointerEvent): void => {
-            pad.onpointingend(ev.pointerId);
-        };
-
-        const onPointerHook = () => {
-            Game.getInput().on("pointerdown", pointerdown);
-            Game.getInput().on("pointermove", pointermove);
-            Game.getInput().on("pointerup", pointerup);
-            Game.getInput().on("pointerleave", pointerup);
-        };
-        const offPointerHook = () => {
-            Game.getInput().off("pointerdown", pointerdown);
-            Game.getInput().off("pointermove", pointermove);
-            Game.getInput().off("pointerup", pointerup);
-            Game.getInput().off("pointerleave", pointerup);
-        };
-
-        this.suspend = () => {
-            offPointerHook();
-            Game.getSound().reqStopChannel("dungeon");
-        };
-        this.resume = () => {
-            onPointerHook();
-            Game.getSound().reqPlayChannel("dungeon", true);
-        };
-        this.leave = () => {
-            offPointerHook();
-            Game.getSound().reqStopChannel("dungeon");
-        };
-
-        function updateLighting(iswalkable: (x: number) => boolean) : void {
-            map.clearLighting();
-            PathFinder.calcDistanceByDijkstra({
-                array2D: map.layer[0].chips,
-                sx: player.x,
-                sy: player.y,
-                value: 140,
-                costs: (v) => iswalkable(v) ? 20 : 50,
-                output: (x, y, v) => {
-                    map.lighting.value(x, y, v);
-                    if (map.visibled.value(x, y) < v) {
-                        map.visibled.value(x, y, v);
-                    }
-                },
-            });
-        };
-
-        const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-
-        const particles: Particle.IParticle[] = [];
-
-        const dispatcher: Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
-
-        const mapButton = new Game.GUI.ImageButton({
-            left: 141 + 22 * 0,
-            top: 0,
-            width: 23,
-            height: 19,
-            texture: "menuicon",
-            texLeft: 23 * 0,
-            texTop: 0,
-            texWidth: 23,
-            texHeight: 19
-        });
-        dispatcher.add(mapButton);
-        mapButton.click = (x: number, y: number) => {
-            Game.getSceneManager().push(mapview, { map: map, player: player });
-        };
-
-        const itemButton = new Game.GUI.ImageButton({
-            left: 141 + 22 * 1,
-            top: 0,
-            width: 23,
-            height: 19,
-            texture: "menuicon",
-            texLeft: 23 * 1,
-            texTop: 0,
-            texWidth: 23,
-            texHeight: 19
-        });
-        dispatcher.add(itemButton);
-        itemButton.click = (x: number, y: number) => {
-            Game.getSceneManager().push(itemBoxSelectItem, { player: player, floor: floor, upperdraw: this.draw });
-        };
-
-        const equipButton = new Game.GUI.ImageButton({
-            left: 141 + 22 * 2,
-            top: 0,
-            width: 23,
-            height: 19,
-            texture: "menuicon",
-            texLeft: 23 * 2,
-            texTop: 0,
-            texWidth: 23,
-            texHeight: 19
-        });
-        dispatcher.add(equipButton);
-        equipButton.click = (x: number, y: number) => {
-            //Game.getSceneManager().push(mapview, { map: map, player: player });
-        };
-
-        const statusButton = new Game.GUI.ImageButton({
-            left: 141 + 22 * 3,
-            top: 0,
-            width: 23,
-            height: 19,
-            texture: "menuicon",
-            texLeft: 23 * 3,
-            texTop: 0,
-            texWidth: 23,
-            texHeight: 19
-        });
-        dispatcher.add(statusButton);
-        statusButton.click = (x: number, y: number) => {
-            Game.getSceneManager().push(statusView, { player: player, floor: floor, upperdraw: this.draw });
-        };
-
-        const otherButton = new Game.GUI.ImageButton({
-            left: 141 + 22 * 4,        
-            top: 0,
-            width: 23,
-            height: 19,
-            texture: "menuicon",
-            texLeft: 23 * 4,
-            texTop: 0,
-            texWidth: 23,
-            texHeight: 19
-        });
-        dispatcher.add(otherButton);
-        otherButton.click = (x: number, y: number) => {
-            //Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
-        };
-
-        this.draw = () => {
-
-            Game.getScreen().save();
-            Game.getScreen().fillStyle = "rgb(255,255,255)";
-            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-
-            map.draw((l: number, cameraLocalPx: number, cameraLocalPy: number) => {
-                if (l === 0) {
-                    // 影
-                    Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
-
-                    Game.getScreen().beginPath();
-                    Game.getScreen().ellipse(
-                        cameraLocalPx,
-                        cameraLocalPy + 7,
-                        12,
-                        3,
-                        0,
-                        0,
-                        Math.PI * 2
-                    );
-                    Game.getScreen().fill();
-
-                    const camera: MapData.Camera = map.camera;
-
-                    // ドロップアイテム
-                    drops.forEach((drop) => {
-                        const xx = drop.x - camera.chipLeft;
-                        const yy = drop.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-
-                            const dx = xx * map.gridsize.width + camera.chipOffX;
-                            const dy = yy * map.gridsize.height + camera.chipOffY;
-
-                            drop.draw(dx, dy);
-                        }
-                    });
-
-                    // モンスター
-                    monsters.forEach((monster) => {
-                        const xx = monster.x - camera.chipLeft;
-                        const yy = monster.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                            const animFrame =
-                                monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
-                            const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                            const dx = xx * map.gridsize.width +
-                                camera.chipOffX +
-                                monster.offx +
-                                sprite.offsetX +
-                                animFrame.offsetX;
-                            const dy = yy * map.gridsize.height +
-                                camera.chipOffY +
-                                monster.offy +
-                                sprite.offsetY +
-                                animFrame.offsetY;
-
-                            Game.getScreen().drawImage(
-                                monster.spriteSheet.getSpriteImage(sprite),
-                                sprite.left,
-                                sprite.top,
-                                sprite.width,
-                                sprite.height,
-                                dx,
-                                dy,
-                                sprite.width,
-                                sprite.height
-                            );
-                        }
-                    });
-
-                    {
-                        const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
-                        const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
-
-                        // キャラクター
-                        Game.getScreen().drawImage(
-                            player.spriteSheet.getSpriteImage(sprite),
-                            sprite.left,
-                            sprite.top,
-                            sprite.width,
-                            sprite.height,
-                            cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
-                            cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY,
-                            sprite.width,
-                            sprite.height
-                        );
-                    }
-                }
-                if (l === 1) {
-                    // インフォメーションの描画
-
-                    // モンスター体力
-                    const camera: MapData.Camera = map.camera;
-                    monsters.forEach((monster) => {
-                        const xx = monster.x - camera.chipLeft;
-                        const yy = monster.y - camera.chipTop;
-                        if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                            (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                            const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
-                            const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                            const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
-                            const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
-
-                            Game.getScreen().fillStyle = 'rgb(255,0,0)';
-                            Game.getScreen().fillRect(
-                                dx,
-                                dy + sprite.height - 1,
-                                map.gridsize.width,
-                                1
-                            );
-                            Game.getScreen().fillStyle = 'rgb(0,255,0)';
-                            Game.getScreen().fillRect(
-                                dx,
-                                dy + sprite.height - 1,
-                                ~~(map.gridsize.width * monster.life / monster.maxLife),
-                                1
-                            );
-                        }
-                    });
-
-                    {
-                        const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
-                        const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
-
-                        // キャラクター体力
-                        Game.getScreen().fillStyle = 'rgb(255,0,0)';
-                        Game.getScreen().fillRect(
-                            cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
-                            cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
-                            map.gridsize.width,
-                            1
-                        );
-                        Game.getScreen().fillStyle = 'rgb(0,255,0)';
-                        Game.getScreen().fillRect(
-                            cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
-                            cameraLocalPy - sprite.height / 2 + /*player.offy + */sprite.offsetY + animFrame.offsetY + sprite.height - 1,
-                            ~~(map.gridsize.width * player.getForward().hp / player.getForward().hpMax),
-                            1
-                        );
-                    }
-                }
-            });
-
-            // スプライト
-            particles.forEach((x) => x.draw(map.camera));
-
-            // 情報
-            Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
-            Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
-            Font7px.draw7pxFont(`     | GOLD:${Data.SaveData.money}`, 0, 6 * 2);
-            //menuicon
-
-            // UI
-            dispatcher.draw();
-
-            // フェード
-            fade.draw();
-            Game.getScreen().restore();
-
-            // バーチャルジョイスティックの描画
-            if (pad.isTouching) {
-                Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
-                Game.getScreen().beginPath();
-                Game.getScreen().ellipse(
-                    pad.x,
-                    pad.y,
-                    pad.radius * 1.2,
-                    pad.radius * 1.2,
-                    0,
-                    0,
-                    Math.PI * 2
-                );
-                Game.getScreen().fill();
-                Game.getScreen().beginPath();
-                Game.getScreen().ellipse(
-                    pad.x + pad.cx,
-                    pad.y + pad.cy,
-                    pad.radius,
-                    pad.radius,
-                    0,
-                    0,
-                    Math.PI * 2
-                );
-                Game.getScreen().fill();
-            }
-
-        };
-
-        yield waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeIn(); },
-            update: (e) => {
-                fade.update(e);
-                updateLighting((v: number) => v === 1 || v === 10);
-            },
-            end: () => { this.next(); },
-        });
-
-        onPointerHook();
-
-        // ターンの状態（フェーズ）
-        const turnContext: TurnContext = {
-            floor: floor,
-            pad: pad,
-            player: player,
-            monsters: monsters,
-            map: map,
-            drops: drops,
-            tactics: {
-                player: {},
-                monsters: []
-            },
-            sprites: particles,
-            scene: this,
-            elapsedTurn: 0,
-        };
-
-        const turnStateStack: IterableIterator<any>[] = [];
-        turnStateStack.unshift(WaitInput.call(this,turnStateStack, turnContext));
-
-        const common_update = () => {
-            // カメラを更新
-            map.update({
-                    viewpoint: {
-                        x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                        y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
-                    },
-                    viewwidth: Game.getScreen().offscreenWidth,
-                    viewheight: Game.getScreen().offscreenHeight
-                }
-            );
-
-            // スプライトを更新
-            particles.removeIf((x) => x.update());
-
-            updateLighting((v: number) => v === 1 || v === 10);
-
-            if (player.getForward().hp === 0) {
-                if (player.getBackward().hp !== 0) {
-                    player.active = player.active == 0 ? 1 : 0;
-                } else {
-                    // ターン強制終了
-                    Game.getSceneManager().pop();
-                    Game.getSceneManager().push(gameOver, { player: player, floor: floor, upperdraw: this.draw });
-                    return;
-                }
-            }
-
-            // ui 
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-
-        };
-
-        yield () => {
-            // ターン進行
-            while (turnStateStack.length > 0 && turnStateStack[0].next().done) { }
-            common_update();
-        };
-
-
-
-    }
 
     interface TurnContext {
         floor: number;
@@ -504,7 +24,535 @@ namespace Scene.Dungeon {
         elapsedTurn: number;
     };
 
-    function* WaitInput(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
+
+    export class Top implements Game.Scene.Scene {
+        draw() {}
+
+        update() {}
+        onPointerHook() {}
+        offPointerHook() {}
+        constructor(param: { player: Unit.Player, floor: number }) {
+
+            const player = param.player;
+            const floor = param.floor;
+
+            // マップ生成
+            const map = MapData.Generator.generate({
+                floor: floor,
+                gridsize: { width: 24, height: 24 },
+                layer: {
+                    0: {
+                        texture: "mapchip",
+                        chip: {
+                            1: { x: 48, y: 0 },
+                            2: { x: 96, y: 96 },
+                            10: { x: 96, y: 0 },
+                        },
+                        chips: null,
+                    },
+                    1: {
+                        texture: "mapchip",
+                        chip: {
+                            0: { x: 96, y: 72 },
+                        },
+                        chips: null,
+                    },
+                }
+            });
+
+            param.player.x = map.startPos.x;
+            param.player.y = map.startPos.y;
+
+            // モンスター配置
+            let monsters = map.rooms.splice(2).map((x) => {
+                const monster = new Unit.Monster("slime");
+                monster.x = x.left;
+                monster.y = x.top;
+                monster.life = monster.maxLife = floor + 5;
+                monster.atk = ~~(floor * 2);
+                monster.def = ~~(floor / 3) + 1;
+                return monster;
+            });
+
+            // ドロップアイテム等の情報
+            const drops: DropItem[] = [];
+
+            // カメラを更新
+            map.update({
+                viewpoint: {
+                    x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                    y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                },
+                viewwidth: Game.getScreen().offscreenWidth,
+                viewheight: Game.getScreen().offscreenHeight,
+            });
+
+            Game.getSound().reqPlayChannel("dungeon", true);
+
+            // assign virtual pad
+            const pad = new Game.Input.VirtualStick();
+
+            const pointerdown = (ev: PointerEvent): void => {
+                if (pad.onpointingstart(ev.pointerId)) {
+                    const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+                    pad.x = pos[0];
+                    pad.y = pos[1];
+                }
+            };
+            const pointermove = (ev: PointerEvent): void => {
+                const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+                pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
+            };
+            const pointerup = (ev: PointerEvent): void => {
+                pad.onpointingend(ev.pointerId);
+            };
+
+            this.onPointerHook = () => {
+                Game.getInput().on("pointerdown", pointerdown);
+                Game.getInput().on("pointermove", pointermove);
+                Game.getInput().on("pointerup", pointerup);
+                Game.getInput().on("pointerleave", pointerup);
+            };
+            this.offPointerHook = () => {
+                Game.getInput().off("pointerdown", pointerdown);
+                Game.getInput().off("pointermove", pointermove);
+                Game.getInput().off("pointerup", pointerup);
+                Game.getInput().off("pointerleave", pointerup);
+            };
+
+            //this.suspend = () => {
+            //    offPointerHook();
+            //    Game.getSound().reqStopChannel("dungeon");
+            //};
+            //this.resume = () => {
+            //    onPointerHook();
+            //    Game.getSound().reqPlayChannel("dungeon", true);
+            //};
+            //this.leave = () => {
+            //    offPointerHook();
+            //    Game.getSound().reqStopChannel("dungeon");
+            //};
+
+            function updateLighting(iswalkable: (x: number) => boolean): void {
+                map.clearLighting();
+                PathFinder.calcDistanceByDijkstra({
+                    array2D: map.layer[0].chips,
+                    sx: player.x,
+                    sy: player.y,
+                    value: 140,
+                    costs: (v) => iswalkable(v) ? 20 : 50,
+                    output: (x, y, v) => {
+                        map.lighting.value(x, y, v);
+                        if (map.visibled.value(x, y) < v) {
+                            map.visibled.value(x, y, v);
+                        }
+                    },
+                });
+            };
+
+            const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+
+            const particles: Particle.IParticle[] = [];
+
+            const dispatcher: Game.GUI.UIDispatcher = new Game.GUI.UIDispatcher();
+
+            const mapButton = new Game.GUI.ImageButton({
+                left: 141 + 22 * 0,
+                top: 0,
+                width: 23,
+                height: 19,
+                texture: "menuicon",
+                texLeft: 23 * 0,
+                texTop: 0,
+                texWidth: 23,
+                texHeight: 19
+            });
+            dispatcher.add(mapButton);
+            mapButton.click = (x: number, y: number) => {
+                const keep = this.update;
+                this.offPointerHook();
+                this.update = () => {
+                    this.onPointerHook();
+                    this.update = keep;
+                }
+                Game.getSceneManager().push(new MapView({ map: map, player: player }));
+            };
+
+            const itemButton = new Game.GUI.ImageButton({
+                left: 141 + 22 * 1,
+                top: 0,
+                width: 23,
+                height: 19,
+                texture: "menuicon",
+                texLeft: 23 * 1,
+                texTop: 0,
+                texWidth: 23,
+                texHeight: 19
+            });
+            dispatcher.add(itemButton);
+            itemButton.click = (x: number, y: number) => {
+                const keep = this.update;
+                this.offPointerHook();
+                this.update = () => {
+                    this.onPointerHook();
+                    this.update = keep;
+                }
+                Game.getSceneManager()
+                    .push(new ItemBoxSelectItem({ selectedItem : -1, player: player, floor: floor, upperdraw: this.draw }));
+            };
+
+            const equipButton = new Game.GUI.ImageButton({
+                left: 141 + 22 * 2,
+                top: 0,
+                width: 23,
+                height: 19,
+                texture: "menuicon",
+                texLeft: 23 * 2,
+                texTop: 0,
+                texWidth: 23,
+                texHeight: 19
+            });
+            dispatcher.add(equipButton);
+            equipButton.click = (x: number, y: number) => {
+                //Game.getSceneManager().push(mapview, { map: map, player: player });
+            };
+
+            const statusButton = new Game.GUI.ImageButton({
+                left: 141 + 22 * 3,
+                top: 0,
+                width: 23,
+                height: 19,
+                texture: "menuicon",
+                texLeft: 23 * 3,
+                texTop: 0,
+                texWidth: 23,
+                texHeight: 19
+            });
+            dispatcher.add(statusButton);
+            statusButton.click = (x: number, y: number) => {
+                const keep = this.update;
+                this.offPointerHook();
+                this.update = () => {
+                    this.onPointerHook();
+                    this.update = keep;
+                }
+                Game.getSceneManager().push(new StatusView({ player: player, floor: floor, upperdraw: this.draw }));
+            };
+
+            const otherButton = new Game.GUI.ImageButton({
+                left: 141 + 22 * 4,
+                top: 0,
+                width: 23,
+                height: 19,
+                texture: "menuicon",
+                texLeft: 23 * 4,
+                texTop: 0,
+                texWidth: 23,
+                texHeight: 19
+            });
+            dispatcher.add(otherButton);
+            otherButton.click = (x: number, y: number) => {
+                //Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
+            };
+
+            this.draw = () => {
+
+                Game.getScreen().save();
+                Game.getScreen().fillStyle = "rgb(255,255,255)";
+                Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+
+                map.draw((l: number, cameraLocalPx: number, cameraLocalPy: number) => {
+                    if (l === 0) {
+                        // 影
+                        Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
+
+                        Game.getScreen().beginPath();
+                        Game.getScreen().ellipse(
+                            cameraLocalPx,
+                            cameraLocalPy + 7,
+                            12,
+                            3,
+                            0,
+                            0,
+                            Math.PI * 2
+                        );
+                        Game.getScreen().fill();
+
+                        const camera: MapData.Camera = map.camera;
+
+                        // ドロップアイテム
+                        drops.forEach((drop) => {
+                            const xx = drop.x - camera.chipLeft;
+                            const yy = drop.y - camera.chipTop;
+                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+
+                                const dx = xx * map.gridsize.width + camera.chipOffX;
+                                const dy = yy * map.gridsize.height + camera.chipOffY;
+
+                                drop.draw(dx, dy);
+                            }
+                        });
+
+                        // モンスター
+                        monsters.forEach((monster) => {
+                            const xx = monster.x - camera.chipLeft;
+                            const yy = monster.y - camera.chipTop;
+                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                                const animFrame =
+                                    monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                                const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                                const dx = xx * map.gridsize.width +
+                                    camera.chipOffX +
+                                    monster.offx +
+                                    sprite.offsetX +
+                                    animFrame.offsetX;
+                                const dy = yy * map.gridsize.height +
+                                    camera.chipOffY +
+                                    monster.offy +
+                                    sprite.offsetY +
+                                    animFrame.offsetY;
+
+                                Game.getScreen().drawImage(
+                                    monster.spriteSheet.getSpriteImage(sprite),
+                                    sprite.left,
+                                    sprite.top,
+                                    sprite.width,
+                                    sprite.height,
+                                    dx,
+                                    dy,
+                                    sprite.width,
+                                    sprite.height
+                                );
+                            }
+                        });
+
+                        {
+                            const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                            const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+
+                            // キャラクター
+                            Game.getScreen().drawImage(
+                                player.spriteSheet.getSpriteImage(sprite),
+                                sprite.left,
+                                sprite.top,
+                                sprite.width,
+                                sprite.height,
+                                cameraLocalPx - sprite.width / 2 + /*player.offx + */sprite.offsetX + animFrame.offsetX,
+                                cameraLocalPy -
+                                sprite.height / 2 + /*player.offy + */sprite.offsetY +
+                                animFrame.offsetY,
+                                sprite.width,
+                                sprite.height
+                            );
+                        }
+                    }
+                    if (l === 1) {
+                        // インフォメーションの描画
+
+                        // モンスター体力
+                        const camera: MapData.Camera = map.camera;
+                        monsters.forEach((monster) => {
+                            const xx = monster.x - camera.chipLeft;
+                            const yy = monster.y - camera.chipTop;
+                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                                const animFrame =
+                                    monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                                const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                                const dx = xx * map.gridsize.width +
+                                    camera.chipOffX +
+                                    monster.offx +
+                                    sprite.offsetX +
+                                    animFrame.offsetX;
+                                const dy = yy * map.gridsize.height +
+                                    camera.chipOffY +
+                                    monster.offy +
+                                    sprite.offsetY +
+                                    animFrame.offsetY;
+
+                                Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                                Game.getScreen().fillRect(
+                                    dx,
+                                    dy + sprite.height - 1,
+                                    map.gridsize.width,
+                                    1
+                                );
+                                Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                                Game.getScreen().fillRect(
+                                    dx,
+                                    dy + sprite.height - 1,
+                                    ~~(map.gridsize.width * monster.life / monster.maxLife),
+                                    1
+                                );
+                            }
+                        });
+
+                        {
+                            const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                            const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+
+                            // キャラクター体力
+                            Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                            Game.getScreen().fillRect(
+                                cameraLocalPx -
+                                map.gridsize.width / 2 + /*player.offx + */sprite.offsetX +
+                                animFrame.offsetX,
+                                cameraLocalPy -
+                                sprite.height / 2 + /*player.offy + */sprite.offsetY +
+                                animFrame.offsetY +
+                                sprite.height -
+                                1,
+                                map.gridsize.width,
+                                1
+                            );
+                            Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                            Game.getScreen().fillRect(
+                                cameraLocalPx -
+                                map.gridsize.width / 2 + /*player.offx + */sprite.offsetX +
+                                animFrame.offsetX,
+                                cameraLocalPy -
+                                sprite.height / 2 + /*player.offy + */sprite.offsetY +
+                                animFrame.offsetY +
+                                sprite.height -
+                                1,
+                                ~~(map.gridsize.width * player.getForward().hp / player.getForward().hpMax),
+                                1
+                            );
+                        }
+                    }
+                });
+
+                // スプライト
+                particles.forEach((x) => x.draw(map.camera));
+
+                // 情報
+                Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
+                Font7px.draw7pxFont(
+                    `${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`,
+                    0,
+                    6 * 1);
+                Font7px.draw7pxFont(`     | GOLD:${Data.SaveData.money}`, 0, 6 * 2);
+                //menuicon
+
+                // UI
+                dispatcher.draw();
+
+                // フェード
+                fade.draw();
+                Game.getScreen().restore();
+
+                // バーチャルジョイスティックの描画
+                if (pad.isTouching) {
+                    Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
+                    Game.getScreen().beginPath();
+                    Game.getScreen().ellipse(
+                        pad.x,
+                        pad.y,
+                        pad.radius * 1.2,
+                        pad.radius * 1.2,
+                        0,
+                        0,
+                        Math.PI * 2
+                    );
+                    Game.getScreen().fill();
+                    Game.getScreen().beginPath();
+                    Game.getScreen().ellipse(
+                        pad.x + pad.cx,
+                        pad.y + pad.cy,
+                        pad.radius,
+                        pad.radius,
+                        0,
+                        0,
+                        Math.PI * 2
+                    );
+                    Game.getScreen().fill();
+                }
+
+            };
+
+            const TurnMain = () => {
+                this.onPointerHook();
+
+                // ターンの状態（フェーズ）
+                const turnContext: TurnContext = {
+                    floor: floor,
+                    pad: pad,
+                    player: player,
+                    monsters: monsters,
+                    map: map,
+                    drops: drops,
+                    tactics: {
+                        player: {},
+                        monsters: []
+                    },
+                    sprites: particles,
+                    scene: this,
+                    elapsedTurn: 0,
+                };
+
+                const turnStateStack: IterableIterator<any>[] = [];
+                turnStateStack.unshift(WaitInput.call(this, turnStateStack, turnContext));
+
+                const common_update = () => {
+                    // カメラを更新
+                    map.update({
+                            viewpoint: {
+                                x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                                y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                            },
+                            viewwidth: Game.getScreen().offscreenWidth,
+                            viewheight: Game.getScreen().offscreenHeight
+                        }
+                    );
+
+                    // スプライトを更新
+                    particles.removeIf((x) => x.update());
+
+                    updateLighting((v: number) => v === 1 || v === 10);
+
+                    if (player.getForward().hp === 0) {
+                        if (player.getBackward().hp !== 0) {
+                            player.active = player.active == 0 ? 1 : 0;
+                        } else {
+                            // ターン強制終了
+                            this.offPointerHook();
+                            Game.getSound().reqStopChannel("dungeon");
+                            Game.getSceneManager().pop();
+                            Game.getSceneManager()
+                                .push(new GameOver({ player: player, floor: floor, upperdraw: this.draw }));
+                            return;
+                        }
+                    }
+
+                    // ui 
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+
+                };
+
+                this.update = () => {
+                    // ターン進行
+                    while (turnStateStack.length > 0 && turnStateStack[0].next().done) {
+                    }
+                    common_update();
+                };
+            }
+
+            this.update = waitFadeIn(fade, TurnMain, () => updateLighting((v: number) => v === 1 || v === 10));
+
+        }
+    }
+
+    function *WaitInput(turnStateStack: IterableIterator<boolean>[], context: TurnContext): IterableIterator<any> {
         for (; ;) {
             // キー入力待ち
             if (context.pad.isTouching === false || context.pad.distance <= 0.4) {
@@ -1016,12 +1064,14 @@ namespace Scene.Dungeon {
             while (Game.getTimer().now - start < 1000) {
                 yield;
             }
+            this.offPointerHook();
+            Game.getSound().reqStopChannel("dungeon");
             if (mode === "next") {
                 Game.getSceneManager().pop();
-                Game.getSceneManager().push(dungeon, { player: context.player, floor: context.floor + 1 });
+                Game.getSceneManager().push(new Top({ player: context.player, floor: context.floor + 1 }));
             } else {
                 Game.getSceneManager().pop();
-                Game.getSceneManager().push(Scene.corridor);
+                Game.getSceneManager().push(new Scene.Corridor());
             }
         turnStateStack.shift();
         return;
@@ -1029,10 +1079,4 @@ namespace Scene.Dungeon {
 
 
 }
-
-
-
-
-
-
 

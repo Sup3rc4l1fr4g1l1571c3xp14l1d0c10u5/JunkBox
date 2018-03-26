@@ -21,7 +21,12 @@ namespace Scene.Dungeon {
         }
     }
 
-    export function* statusView(opt: { player: Unit.Player, floor: number, upperdraw: () => void }): IterableIterator<any> {
+    export class StatusView implements Game.Scene.Scene {
+        draw() {}
+
+        update() {}
+
+        constructor (opt: { player: Unit.Player, floor: number, upperdraw: () => void })  {
         const closeButton = {
             x: Game.getScreen().offscreenWidth - 20,
             y: 20,
@@ -36,7 +41,7 @@ namespace Scene.Dungeon {
             //    Game.getScreen().offscreenWidth - 40,
             //    Game.getScreen().offscreenHeight - 40);
 
-            //// ï¬Ç∂ÇÈÉ{É^Éì
+            //// Èñâ„Åò„Çã„Éú„Çø„É≥
             //Game.getScreen().save();
             //Game.getScreen().beginPath();
             //Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
@@ -56,7 +61,7 @@ namespace Scene.Dungeon {
             //Game.getScreen().stroke();
             //Game.getScreen().restore();
 
-            // ÉXÉeÅ[É^ÉX(ëOâq)
+            // „Çπ„ÉÜ„Éº„Çø„Çπ(ÂâçË°õ)
             {
             const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
             const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2);
@@ -77,7 +82,7 @@ namespace Scene.Dungeon {
             showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
             showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`,left+145,top+64);
             }
-            // å„âq
+            // ÂæåË°õ
             {
             const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
             const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2) + 121;
@@ -104,12 +109,11 @@ namespace Scene.Dungeon {
 
 
         }
-        yield waitClick({
-            end: (x, y) => {
-                this.next();
+        this.update =  waitClick(
+            () => {
+                Game.getSceneManager().pop();
             }
-        });
-        Game.getSceneManager().pop();
+        );
         return;
-    }
+    }}
 }

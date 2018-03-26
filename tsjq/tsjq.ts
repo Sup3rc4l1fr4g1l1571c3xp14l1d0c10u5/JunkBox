@@ -23,7 +23,7 @@
 /// <reference path="./js/Unit/Player.ts" />
 /// <reference path="./js/Scene/Boot.ts" />
 /// <reference path="./js/Scene/ClassRoom/top.ts" />
-/// <reference path="./js/Scene/Dungeon/Dungeon.ts" />
+/// <reference path="./js/Scene/Dungeon/Top.ts" />
 /// <reference path="./js/Scene/Helper.ts" />
 /// <reference path="./js/Scene/Dungeon/MapView.ts" />
 /// <reference path="./js/Scene/Title.ts" />
@@ -50,7 +50,7 @@ window.onload = () => {
             scaleY: 1,
         }
     }).then(() => {
-        Game.getSceneManager().push(Scene.boot, null);
+        Game.getSceneManager().push(new Scene.BootScene());
         Game.getTimer().on((delta, now) => {
             Game.getInput().endCapture();
             Game.getSceneManager().update(delta, now);

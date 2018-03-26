@@ -53,55 +53,89 @@ namespace Scene {
                 Game.getScreen().fillRect(0, 0, this.w, this.h);
             }
         }
+        public isFinish() : boolean {
+            return (this.mode === "fadein" && this.rate === 0) || (this.mode === "fadeout" && this.rate === 1);
+        }
     }
 
-    export function waitTimeout({
-        timeout,
-        init = () => { },
-        start = () => { },
-        update = () => { },
-        end = () => { },
-    }: {
-            timeout: number;
-            init?: () => void;
-            start?: (elapsed: number) => void;
-            update?: (elapsed: number) => void;
-            end?: (elapsed: number) => void;
-        }) {
-        let startTime = -1;
-        init();
+    export function waitFadeIn(fade: Fade, action: () => void, intervalAction?: (e:number) => void) : () => void {
+        fade.startFadeIn();
+        const start = Game.getTimer().now;
         return () => {
-            if (startTime === -1) {
-                startTime = Game.getTimer().now;
-                start(Game.getTimer().now);
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
             }
-            const elapsed = Game.getTimer().now - startTime;
-            if (elapsed >= timeout) {
-                end(elapsed);
-            } else {
-                update(elapsed);
+            fade.update(Game.getTimer().now);
+            if (fade.isFinish()) {
+                fade.stop();
+                action();
             }
         };
-    }
-
-    export function waitClick({
-        update = () => { },
-        start = () => { },
-        check = () => true,
-        end = () => { },
-    }: {
-            update?: (elapsed: number) => void;
-            start?: (elapsed: number) => void;
-            check?: (x: number, y: number, elapsed: number) => boolean;
-            end?: (x: number, y: number, elapsed: number) => void;
-        }) {
-        let startTime = -1;
+    };
+    export function waitFadeOut(fade:Fade, action : () => void, intervalAction?: (e:number) => void) : () => void {
+        fade.startFadeOut();
+        const start = Game.getTimer().now;
         return () => {
-            if (startTime === -1) {
-                startTime = Game.getTimer().now;
-                start(0);
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
             }
-            const elapsed = Game.getTimer().now - startTime;
+            fade.update(Game.getTimer().now);
+            if (fade.isFinish()) {
+                fade.stop();
+                action();
+            }
+        };
+    };
+    export function waitTimeout(ms:number, action : () => void, intervalAction?: (e:number) => void) : () => void {
+        const start = Game.getTimer().now;
+        return () => {
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
+            }
+            if (elaps >= ms) {
+                action();
+            }
+        };
+    };
+    //export function waitTimeout({
+    //    timeout,
+    //    init = () => { },
+    //    start = () => { },
+    //    update = () => { },
+    //    end = () => { },
+    //}: {
+    //        timeout: number;
+    //        init?: () => void;
+    //        start?: (elapsed: number) => void;
+    //        update?: (elapsed: number) => void;
+    //        end?: (elapsed: number) => void;
+    //    }) {
+    //    let startTime = -1;
+    //    init();
+    //    return () => {
+    //        if (startTime === -1) {
+    //            startTime = Game.getTimer().now;
+    //            start(Game.getTimer().now);
+    //        }
+    //        const elapsed = Game.getTimer().now - startTime;
+    //        if (elapsed >= timeout) {
+    //            end(elapsed);
+    //        } else {
+    //            update(elapsed);
+    //        }
+    //    };
+    //}
+
+    export function waitClick(action : (x:number,y:number,e:number) => void, check? : (x:number,y:number,e:number) => void, intervalAction?: (e:number) => void) : () => void {
+        const start = Game.getTimer().now;
+        return () => {
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
+            }
             if (Game.getInput().isClick()) {
                 const pX = Game.getInput().pageX;
                 const pY = Game.getInput().pageY;
@@ -109,13 +143,46 @@ namespace Scene {
                     const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
                     const xx = pos[0];
                     const yy = pos[1];
-                    if (check(xx, yy, elapsed)) {
-                        end(xx, yy, elapsed);
-                        return;
+                    if (check == null || check(xx, yy, elaps)) {
+                        action(xx, yy, elaps);
                     }
                 }
             }
-            update(elapsed);
         };
-    }
+    };
+
+    //export function waitClick({
+    //    update = () => { },
+    //    start = () => { },
+    //    check = () => true,
+    //    end = () => { },
+    //}: {
+    //        update?: (elapsed: number) => void;
+    //        start?: (elapsed: number) => void;
+    //        check?: (x: number, y: number, elapsed: number) => boolean;
+    //        end?: (x: number, y: number, elapsed: number) => void;
+    //    }) {
+    //    let startTime = -1;
+    //    return () => {
+    //        if (startTime === -1) {
+    //            startTime = Game.getTimer().now;
+    //            start(0);
+    //        }
+    //        const elapsed = Game.getTimer().now - startTime;
+    //        if (Game.getInput().isClick()) {
+    //            const pX = Game.getInput().pageX;
+    //            const pY = Game.getInput().pageY;
+    //            if (Game.getScreen().pagePointContainScreen(pX, pY)) {
+    //                const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
+    //                const xx = pos[0];
+    //                const yy = pos[1];
+    //                if (check(xx, yy, elapsed)) {
+    //                    end(xx, yy, elapsed);
+    //                    return;
+    //                }
+    //            }
+    //        }
+    //        update(elapsed);
+    //    };
+    //}
 }

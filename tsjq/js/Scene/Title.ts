@@ -1,11 +1,14 @@
-        namespace Scene {
-    export function* title(): IterableIterator<any> {
+namespace Scene {
+    export class Title implements Game.Scene.Scene {
+        fade : Fade;
         // setup
-        let showClickOrTap = false;
+        constructor() {
+            this.fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            this.draw = this.drawWaitClick;
+            this.update = this.updateWaitClick;
+        }
 
-        const fade = new Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-
-        this.draw = () => {
+        private drawBase(showClickOrTap : boolean) {
             const w = Game.getScreen().offscreenWidth;
             const h = Game.getScreen().offscreenHeight;
             Game.getScreen().save();
@@ -23,34 +26,37 @@
                     w / 2 - 168 / 2, h - 50, 168, 24
                 );
             }
-            fade.draw();
+            this.fade.draw();
             Game.getScreen().restore();
         };
 
-        yield waitClick({
-            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 500) % 2) === 0; },
-            check: () => true,
-            end: () => {
+        draw() {}
+        update() {}
+
+        drawWaitClick() {
+            this.drawBase((~~(Game.getTimer().now / 500) % 2) === 0);
+        }
+        drawDecide() {
+            this.drawBase((~~(Game.getTimer().now / 50) % 2) === 0);
+        }
+
+        updateWaitClick() {
+            if (Game.getInput().isClick()) {
                 Game.getSound().reqPlayChannel("title");
-                this.next();
-            },
-        });
+                this.update = this.updateDecide;
+                this.draw = this.drawDecide;
+            }
+        }
+        updateDecide() {
+            this.update = waitTimeout(500,
+                waitFadeOut(
+                    this.fade,
+                    () => {
+                    Data.SaveData.load();
+                    Game.getSceneManager().push(new Corridor());
+                })
+            );
+        }
 
-        yield waitTimeout({
-            timeout: 1000,
-            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
-            end: () => this.next(),
-        });
-
-        yield waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
-            end: () => {
-                Data.SaveData.load();
-                Game.getSceneManager().push(corridor);
-                this.next();
-            },
-        });
     }
 }

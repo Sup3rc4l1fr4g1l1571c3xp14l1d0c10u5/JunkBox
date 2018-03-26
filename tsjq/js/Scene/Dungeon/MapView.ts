@@ -1,5 +1,6 @@
 namespace Scene {
-    export function* mapview(data: { map: MapData, player: Unit.Player }): IterableIterator<any> {
+    export class MapView implements Game.Scene.Scene {
+        construtor ( data: { map: MapData, player: Unit.Player }): IterableIterator<any> {
         this.draw = () => {
             Game.getScreen().save();
             Game.getScreen().fillStyle = "rgb(0,0,0)";
@@ -41,5 +42,5 @@ namespace Scene {
         };
         yield waitClick({ end: () => this.next() });
         Game.getSceneManager().pop();
-    }
+    }}
 }

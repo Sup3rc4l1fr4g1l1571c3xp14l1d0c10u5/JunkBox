@@ -1,236 +1,253 @@
 namespace Scene.Dungeon {
-    export function* itemBoxSelectPlayer(opt: {
-        selectedItem: number;
-        player: Unit.Player;
-        floor: number;
-        upperdraw: () => void;
-    }): IterableIterator<any> {
-        let anim = 0;
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 14,
-            text: "“¹‹ï” F‘ÎÛ‚ð‘I‚ñ‚Å‚­‚¾‚³‚¢B",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
+    export class ItemBoxSelectPlayer implements Game.Scene.Scene {
+        draw() {}
+        update() {}
+        
+        constructor(opt: {
+            selectedItem: number;
+            player: Unit.Player;
+            floor: number;
+            upperdraw: () => void;
+        }) {
+            let anim = 0;
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: 1,
+                width: 250,
+                height: 14,
+                text: "é“å…·ç®±ï¼šå¯¾è±¡ã‚’é¸ã‚“ã§ãã ã•ã„ã€‚",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
 
 
-        let exitScene = false;
-        const team: StatusSprite[] = [new StatusSprite(opt.player.getForward()), new StatusSprite(opt.player.getBackward())];
-        const forwardBtn = new Game.GUI.ImageButton({
-            left: 8,
-            top: 46,
-            width: 112,
-            height: 48,
-            texture: null,
-            texLeft: 0,
-            texTop: 0,
-            texWidth: 0,
-            texHeight: 0
-        });
-        forwardBtn.draw = () => {
-            Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-            Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-            Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-            Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-            Game.getScreen().fillStyle = `rgb(255,255,255)`;
-            Game.getScreen().textAlign = "left";
-            Game.getScreen().textBaseline = "top";
-            Game.getScreen().fillText("‘O‰q", forwardBtn.left + 2, forwardBtn.top + 2);
+            let exitScene = false;
+            const team: StatusSprite[] = [
+                new StatusSprite(opt.player.getForward()), new StatusSprite(opt.player.getBackward())
+            ];
+            const forwardBtn = new Game.GUI.ImageButton({
+                left: 8,
+                top: 46,
+                width: 112,
+                height: 48,
+                texture: null,
+                texLeft: 0,
+                texTop: 0,
+                texWidth: 0,
+                texHeight: 0
+            });
+            forwardBtn.draw = () => {
+                Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText("å‰è¡›", forwardBtn.left + 2, forwardBtn.top + 2);
 
-            drawStatusSprite(team[0], DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
-        };
-        forwardBtn.click = (x: number, y: number) => {
-            if (opt.selectedItem != -1) {
-                const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
-                const itemData = Data.Item.get(itemId);
-                if (itemData != null && itemData.useToPlayer != null) {
-                    const ret = itemData.useToPlayer(team[0].data);
-                    if (ret == true) {
-                        if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
-                            Data.SaveData.itemBox[opt.selectedItem].count -= 1;
-                        } else {
-                            Data.SaveData.itemBox[opt.selectedItem].count = 0;
-                        }
-                        if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
-                            exitScene = true;
-                            Data.SaveData.itemBox.splice(opt.selectedItem, 1);
-                            opt.selectedItem = -1;
-                        }
-                    }
-                }
-            }
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        dispatcher.add(forwardBtn);
-
-        const backwordBtn = new Game.GUI.ImageButton({
-            left: 8,
-            top: 46 + 70,
-            width: 112,
-            height: 60,
-            texture: null,
-            texLeft: 0,
-            texTop: 0,
-            texWidth: 0,
-            texHeight: 0
-        });
-        backwordBtn.draw = () => {
-            Game.getScreen().fillStyle = `rgb(24,133,196)`;
-            Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-            Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-            Game.getScreen().lineWidth = 1;
-            Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-            Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-            Game.getScreen().fillStyle = `rgb(255,255,255)`;
-            Game.getScreen().textAlign = "left";
-            Game.getScreen().textBaseline = "top";
-            Game.getScreen().fillText("Œã‰q", backwordBtn.left + 2, backwordBtn.top + 2);
-
-            drawStatusSprite(team[1], DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
-        };
-        backwordBtn.click = (x: number, y: number) => {
-            if (opt.selectedItem != -1) {
-                const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
-                const itemData = Data.Item.get(itemId);
-                if (itemData != null && itemData.useToPlayer != null) {
-                    const ret = itemData.useToPlayer(team[1].data);
-                    if (ret == true) {
-                        if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
-                            Data.SaveData.itemBox[opt.selectedItem].count -= 1;
-                        } else {
-                            Data.SaveData.itemBox[opt.selectedItem].count = 0;
-                        }
-                        if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
-                            exitScene = true;
-                            Data.SaveData.itemBox.splice(opt.selectedItem, 1);
-                            opt.selectedItem = -1;
+                drawStatusSprite(team[0],
+                    DrawMode.Normal,
+                    forwardBtn.left,
+                    forwardBtn.top + 12,
+                    forwardBtn.width,
+                    48,
+                    anim);
+            };
+            forwardBtn.click = (x: number, y: number) => {
+                if (opt.selectedItem != -1) {
+                    const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
+                    const itemData = Data.Item.get(itemId);
+                    if (itemData != null && itemData.useToPlayer != null) {
+                        const ret = itemData.useToPlayer(team[0].data);
+                        if (ret == true) {
+                            if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
+                                Data.SaveData.itemBox[opt.selectedItem].count -= 1;
+                            } else {
+                                Data.SaveData.itemBox[opt.selectedItem].count = 0;
+                            }
+                            if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
+                                exitScene = true;
+                                Data.SaveData.itemBox.splice(opt.selectedItem, 1);
+                                opt.selectedItem = -1;
+                            }
                         }
                     }
                 }
-            }
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        dispatcher.add(backwordBtn);
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            dispatcher.add(forwardBtn);
 
-        const captionMonay = new Game.GUI.Button({
-            left: 131,
-            top: 46 - 28,
-            width: 112,
-            height: 16,
-            text: () => `ŠŽ‹àF${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-        });
-        dispatcher.add(captionMonay);
+            const backwordBtn = new Game.GUI.ImageButton({
+                left: 8,
+                top: 46 + 70,
+                width: 112,
+                height: 60,
+                texture: null,
+                texLeft: 0,
+                texTop: 0,
+                texWidth: 0,
+                texHeight: 0
+            });
+            backwordBtn.draw = () => {
+                Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                Game.getScreen().lineWidth = 1;
+                Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                Game.getScreen().textAlign = "left";
+                Game.getScreen().textBaseline = "top";
+                Game.getScreen().fillText("å¾Œè¡›", backwordBtn.left + 2, backwordBtn.top + 2);
 
-        const btnExit = new Game.GUI.Button({
-            left: 131,
-            top: 110,
-            width: 112,
-            height: 16,
-            text: "–ß‚é",
-        });
-        dispatcher.add(btnExit);
-
-        btnExit.click = (x: number, y: number) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        };
-
-        const captionItemCount = new Game.GUI.Button({
-            left: 131,
-            top: 64,
-            width: 112,
-            height: 14,
-            text: () => {
-                if (opt.selectedItem == -1) {
-                    return '';
-                } else {
-                    return `Š—LF${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}ŒÂ`;
+                drawStatusSprite(team[1],
+                    DrawMode.Normal,
+                    backwordBtn.left,
+                    backwordBtn.top + 12,
+                    backwordBtn.width,
+                    48,
+                    anim);
+            };
+            backwordBtn.click = (x: number, y: number) => {
+                if (opt.selectedItem != -1) {
+                    const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
+                    const itemData = Data.Item.get(itemId);
+                    if (itemData != null && itemData.useToPlayer != null) {
+                        const ret = itemData.useToPlayer(team[1].data);
+                        if (ret == true) {
+                            if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
+                                Data.SaveData.itemBox[opt.selectedItem].count -= 1;
+                            } else {
+                                Data.SaveData.itemBox[opt.selectedItem].count = 0;
+                            }
+                            if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
+                                exitScene = true;
+                                Data.SaveData.itemBox.splice(opt.selectedItem, 1);
+                                opt.selectedItem = -1;
+                            }
+                        }
+                    }
                 }
-            },
-        });
-        dispatcher.add(captionItemCount);
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            dispatcher.add(backwordBtn);
 
-        const btnItemData = new Game.GUI.Button({
-            left: 131,
-            top: 142,
-            width: 112,
-            height: 60,
-            text: () => {
-                if (opt.selectedItem == -1) {
-                    return "";
-                }
-                const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                switch (itemData.kind) {
-                    case Data.Item.Kind.Wepon:
-                        return `Ží•ÊF•Ší\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor1:
-                        return `Ží•ÊF–h‹ïEã”¼g\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor2:
-                        return `Ží•ÊF–h‹ïE‰º”¼g\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Accessory:
-                        return `Ží•ÊFƒAƒNƒZƒTƒŠ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Tool:
-                        return `Ží•ÊF“¹‹ï`;
-                    case Data.Item.Kind.Treasure:
-                        return `Ží•ÊF‚»‚Ì‘¼`;
-                    default:
+            const captionMonay = new Game.GUI.Button({
+                left: 131,
+                top: 46 - 28,
+                width: 112,
+                height: 16,
+                text: () => `æ‰€æŒé‡‘ï¼š${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+            });
+            dispatcher.add(captionMonay);
+
+            const btnExit = new Game.GUI.Button({
+                left: 131,
+                top: 110,
+                width: 112,
+                height: 16,
+                text: "æˆ»ã‚‹",
+            });
+            dispatcher.add(btnExit);
+
+            btnExit.click = (x: number, y: number) => {
+                exitScene = true;
+                Game.getSound().reqPlayChannel("cursor");
+            };
+
+            const captionItemCount = new Game.GUI.Button({
+                left: 131,
+                top: 64,
+                width: 112,
+                height: 14,
+                text: () => {
+                    if (opt.selectedItem == -1) {
+                        return '';
+                    } else {
+                        return `æ‰€æœ‰ï¼š${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}å€‹`;
+                    }
+                },
+            });
+            dispatcher.add(captionItemCount);
+
+            const btnItemData = new Game.GUI.Button({
+                left: 131,
+                top: 142,
+                width: 112,
+                height: 60,
+                text: () => {
+                    if (opt.selectedItem == -1) {
                         return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                    switch (itemData.kind) {
+                        case Data.Item.Kind.Wepon:
+                            return `ç¨®åˆ¥ï¼šæ­¦å™¨\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor1:
+                            return `ç¨®åˆ¥ï¼šé˜²å…·ãƒ»ä¸ŠåŠèº«\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor2:
+                            return `ç¨®åˆ¥ï¼šé˜²å…·ãƒ»ä¸‹åŠèº«\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Accessory:
+                            return `ç¨®åˆ¥ï¼šã‚¢ã‚¯ã‚»ã‚µãƒª\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Tool:
+                            return `ç¨®åˆ¥ï¼šé“å…·`;
+                        case Data.Item.Kind.Treasure:
+                            return `ç¨®åˆ¥ï¼šãã®ä»–`;
+                        default:
+                            return "";
+                    }
+                },
+            });
+            dispatcher.add(btnItemData);
+
+            const btnDescription = new Game.GUI.Button({
+                left: 131,
+                top: 212,
+                width: 112,
+                height: 36,
+                text: () => {
+                    if (opt.selectedItem == -1) {
+                        return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                    return itemData.description;
+                },
+            });
+            dispatcher.add(btnDescription);
+
+
+            this.draw = () => {
+                opt.upperdraw();
+                dispatcher.draw();
+            }
+
+            this.update = () => {
+                anim = Game.getTimer().now % 1000;
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
                 }
-            },
-        });
-        dispatcher.add(btnItemData);
-
-        const btnDescription = new Game.GUI.Button({
-            left: 131,
-            top: 212,
-            width: 112,
-            height: 36,
-            text: () => {
-                if (opt.selectedItem == -1) {
-                    return "";
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
                 }
-                const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                return itemData.description;
-            },
-        });
-        dispatcher.add(btnDescription);
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
+                if (exitScene) {
+                    Game.getSceneManager().pop();
+                }
+            };
 
 
-        this.draw = () => {
-            opt.upperdraw();
-            dispatcher.draw();
         }
-
-        yield () => {
-            anim = Game.getTimer().now % 1000;
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
-            if (exitScene) {
-                this.next();
-            }
-        };
-
-
-        Game.getSceneManager().pop();
-        return;        
     }
 }

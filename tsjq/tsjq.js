@@ -2366,7 +2366,7 @@ var Data;
                 stackable: true,
                 useToParty: (party) => {
                     Game.getSceneManager().pop();
-                    Game.getSceneManager().push(Scene.corridor);
+                    Game.getSceneManager().push(new Scene.Corridor());
                     return true;
                 }
             },
@@ -3815,45 +3815,13 @@ function normalizePath(path) {
 var Game;
 (function (Game) {
     let Scene;
-    (function (Scene_1) {
-        class Scene {
-            constructor(manager, init) {
-                this.manager = manager;
-                this.state = null;
-                this.init = init;
-                this.update = () => { };
-                this.draw = () => { };
-                this.leave = () => { };
-                this.suspend = () => { };
-                this.resume = () => { };
-            }
-            dispose() {
-                this.state.return();
-                this.state = this.update = null;
-            }
-            next(...args) {
-                const ret = this.state.next.apply(this.state, args);
-                this.update = ret.value;
-            }
-            enter(...data) {
-                this.state = this.init.apply(this, data);
-                this.next();
-            }
-        }
-        Scene_1.Scene = Scene;
+    (function (Scene) {
         class SceneManager {
             constructor() {
                 this.sceneStack = [];
-                this.disposeScenes = [];
             }
-            push(sceneDef, arg) {
-                if (this.peek() != null && this.peek().suspend != null) {
-                    this.peek().suspend();
-                }
-                this.sceneStack.push(new Scene(this, sceneDef));
-                if (this.peek() != null && this.peek().enter != null) {
-                    this.peek().enter.call(this.peek(), arg);
-                }
+            push(scene) {
+                this.sceneStack.push(scene);
             }
             pop(scene = null) {
                 if (this.sceneStack.length === 0) {
@@ -3863,14 +3831,7 @@ var Game;
                     return;
                 }
                 if (this.peek() != null) {
-                    const p = this.sceneStack.pop();
-                    if (p.leave != null) {
-                        p.leave();
-                    }
-                    this.disposeScenes.push(p);
-                }
-                if (this.peek() != null && this.peek().resume != null) {
-                    this.peek().resume();
+                    this.sceneStack.pop();
                 }
             }
             peek() {
@@ -3882,8 +3843,6 @@ var Game;
                 }
             }
             update(...args) {
-                this.disposeScenes.forEach(x => x.dispose());
-                this.disposeScenes.length = 0;
                 if (this.peek() != null && this.peek().update != null) {
                     this.peek().update.apply(this.peek(), args);
                 }
@@ -3896,7 +3855,7 @@ var Game;
                 return this;
             }
         }
-        Scene_1.SceneManager = SceneManager;
+        Scene.SceneManager = SceneManager;
     })(Scene = Game.Scene || (Game.Scene = {}));
 })(Game || (Game = {}));
 var Game;
@@ -4739,11 +4698,13 @@ var PathFinder;
 })(PathFinder || (PathFinder = {}));
 var Scene;
 (function (Scene) {
-    function* boot() {
-        let n = 0;
-        let reqResource = 0;
-        let loadedResource = 0;
-        this.draw = () => {
+    class BootScene {
+        constructor() {
+            this.reqResource = 0;
+            this.loadedResource = 0;
+        }
+        draw() {
+            const n = ~~(Game.getTimer().now / 50);
             Game.getScreen().fillStyle = "rgb(255,255,255)";
             Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
             Game.getScreen().save();
@@ -4759,171 +4720,166 @@ var Scene;
             }
             Game.getScreen().restore();
             Game.getScreen().fillStyle = "rgb(0,0,0)";
-            const text = `loading ${loadedResource}/${reqResource}`;
+            const text = `loading ${this.loadedResource}/${this.reqResource}`;
             const size = Game.getScreen().measureText(text);
             Game.getScreen().fillText(text, Game.getScreen().offscreenWidth / 2 - size.width / 2, Game.getScreen().offscreenHeight - 20);
-        };
-        Promise.all([
-            Game.getScreen().loadImage({
-                title: "./assets/title.png",
-                mapchip: "./assets/mapchip.png",
-                charactor: "./assets/charactor.png",
-                font7px: "./assets/font7px.png",
-                font7wpx: "./assets/font7wpx.png",
-                menuicon: "./assets/menuicon.png",
-                status: "./assets/status.png",
-                corridorbg: "./assets/corridorbg.png",
-                classroom: "./assets/classroom.png",
-                "drops": "./assets/drops.png",
-                "shop/bg": "./assets/shop/bg.png",
-                "shop/J11": "./assets/shop/J11.png",
-            }, () => { reqResource++; }, () => { loadedResource++; }),
-            Game.getSound().loadSoundsToChannel({
-                title: "./assets/sound/title.mp3",
-                dungeon: "./assets/sound/dungeon.mp3",
-                classroom: "./assets/sound/classroom.mp3",
-                kaidan: "./assets/sound/kaidan.mp3",
-                atack: "./assets/sound/se_attacksword_1.mp3",
-                explosion: "./assets/sound/explosion03.mp3",
-                cursor: "./assets/sound/cursor.mp3",
-                sen_ge_gusya01: "./assets/sound/sen_ge_gusya01.mp3",
-                boyon1: "./assets/sound/boyon1.mp3",
-                boyoyon1: "./assets/sound/boyoyon1.mp3",
-                meka_ge_reji_op01: "./assets/sound/meka_ge_reji_op01.mp3",
-                coin: "./assets/sound/Cash_Register-Drawer01-1.mp3",
-                open: "./assets/sound/locker-open1.mp3"
-            }, () => { reqResource++; }, () => { loadedResource++; }).catch((ev) => console.log("failed2", ev)),
-            Data.Monster.initialize(() => { reqResource++; }, () => { loadedResource++; }),
-            Data.Charactor.initialize(() => { reqResource++; }, () => { loadedResource++; }),
-            Promise.resolve().then(() => {
-                reqResource++;
-                return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {}).load();
-            }).then((loadedFontFace) => {
-                document.fonts.add(loadedFontFace);
-                loadedResource++;
-            })
-        ]).then(() => {
-            Game.getSceneManager().push(Scene.title, null);
-            //const sd = new IData.SaveData.SaveData();
-            //sd.loadGameData();
-            //Game.getSceneManager().push(shop, sd);
-            //this.next();
-        });
-        yield () => {
-            n = ~~(Game.getTimer().now / 50);
-        };
-        return;
+        }
+        ;
+        update() {
+            Promise.all([
+                Game.getScreen().loadImage({
+                    title: "./assets/title.png",
+                    mapchip: "./assets/mapchip.png",
+                    charactor: "./assets/charactor.png",
+                    font7px: "./assets/font7px.png",
+                    font7wpx: "./assets/font7wpx.png",
+                    menuicon: "./assets/menuicon.png",
+                    status: "./assets/status.png",
+                    corridorbg: "./assets/corridorbg.png",
+                    classroom: "./assets/classroom.png",
+                    "drops": "./assets/drops.png",
+                    "shop/bg": "./assets/shop/bg.png",
+                    "shop/J11": "./assets/shop/J11.png",
+                }, () => { this.reqResource++; }, () => { this.loadedResource++; }),
+                Game.getSound().loadSoundsToChannel({
+                    title: "./assets/sound/title.mp3",
+                    dungeon: "./assets/sound/dungeon.mp3",
+                    classroom: "./assets/sound/classroom.mp3",
+                    kaidan: "./assets/sound/kaidan.mp3",
+                    atack: "./assets/sound/se_attacksword_1.mp3",
+                    explosion: "./assets/sound/explosion03.mp3",
+                    cursor: "./assets/sound/cursor.mp3",
+                    sen_ge_gusya01: "./assets/sound/sen_ge_gusya01.mp3",
+                    boyon1: "./assets/sound/boyon1.mp3",
+                    boyoyon1: "./assets/sound/boyoyon1.mp3",
+                    meka_ge_reji_op01: "./assets/sound/meka_ge_reji_op01.mp3",
+                    coin: "./assets/sound/Cash_Register-Drawer01-1.mp3",
+                    open: "./assets/sound/locker-open1.mp3"
+                }, () => { this.reqResource++; }, () => { this.loadedResource++; }).catch((ev) => console.log("failed2", ev)),
+                Data.Monster.initialize(() => { this.reqResource++; }, () => { this.loadedResource++; }),
+                Data.Charactor.initialize(() => { this.reqResource++; }, () => { this.loadedResource++; }),
+                Promise.resolve().then(() => {
+                    this.reqResource++;
+                    return new FontFace("PixelMplus10-Regular", "url(./assets/font/PixelMplus10-Regular.woff2)", {})
+                        .load();
+                }).then((loadedFontFace) => {
+                    document.fonts.add(loadedFontFace);
+                    this.loadedResource++;
+                })
+            ]).then(() => {
+                Game.getSceneManager().push(new Scene.Title());
+                //const sd = new IData.SaveData.SaveData();
+                //sd.loadGameData();
+                //Game.getSceneManager().push(shop, sd);
+                //this.next();
+            });
+            this.update = () => { };
+            return;
+        }
     }
-    Scene.boot = boot;
+    Scene.BootScene = BootScene;
 })(Scene || (Scene = {}));
 /// <reference path="../lib/game/eventdispatcher.ts" />
 var Scene;
 (function (Scene) {
-    function* corridor() {
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const fade = new Scene.Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
-        let selected = null;
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "移動先を選択してください。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        const btnBuy = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 0 + 46,
-            width: 112,
-            height: 16,
-            text: "教室",
-        });
-        dispatcher.add(btnBuy);
-        btnBuy.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(Scene.ClassRoom.top);
-        };
-        const btnSell = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 1 + 46,
-            width: 112,
-            height: 16,
-            text: "購買部",
-        });
-        dispatcher.add(btnSell);
-        btnSell.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            selected = () => Game.getSceneManager().push(Scene.shop);
-        };
-        const btnDungeon = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 3 + 46,
-            width: 112,
-            height: 16,
-            text: "迷宮",
-        });
-        dispatcher.add(btnDungeon);
-        btnDungeon.click = (x, y) => {
-            Game.getSound().reqPlayChannel("cursor");
-            Game.getSound().reqStopChannel("classroom");
-            selected = () => {
-                Game.getSceneManager().pop();
+    class Corridor {
+        constructor() {
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const fade = new Scene.Fade(Game.getScreen().offscreenHeight, Game.getScreen().offscreenHeight);
+            let selected = null;
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: 1,
+                width: 250,
+                height: 42,
+                text: "移動先を選択してください。",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
+            const btnBuy = new Game.GUI.Button({
+                left: 8,
+                top: 20 * 0 + 46,
+                width: 112,
+                height: 16,
+                text: "教室",
+            });
+            dispatcher.add(btnBuy);
+            btnBuy.click = (x, y) => {
+                Game.getSound().reqPlayChannel("cursor");
+                selected = () => Game.getSceneManager().push(new Scene.ClassRoom.Top());
+            };
+            const btnSell = new Game.GUI.Button({
+                left: 8,
+                top: 20 * 1 + 46,
+                width: 112,
+                height: 16,
+                text: "購買部",
+            });
+            dispatcher.add(btnSell);
+            btnSell.click = (x, y) => {
+                Game.getSound().reqPlayChannel("cursor");
+                selected = () => Game.getSceneManager().push(new Scene.Shop());
+            };
+            const btnDungeon = new Game.GUI.Button({
+                left: 8,
+                top: 20 * 3 + 46,
+                width: 112,
+                height: 16,
+                text: "迷宮",
+            });
+            dispatcher.add(btnDungeon);
+            btnDungeon.click = (x, y) => {
+                Game.getSound().reqPlayChannel("cursor");
                 Game.getSound().reqStopChannel("classroom");
-                Game.getSceneManager().push(Scene.Dungeon.dungeon, { player: new Unit.Player(Data.SaveData.findCharactorById(Data.SaveData.forwardCharactor), Data.SaveData.findCharactorById(Data.SaveData.backwardCharactor)), floor: 1 });
+                selected = () => {
+                    Game.getSceneManager().pop();
+                    Game.getSound().reqStopChannel("classroom");
+                    Game.getSceneManager().push(new Scene.Dungeon.Top({
+                        player: new Unit.Player(Data.SaveData.findCharactorById(Data.SaveData.forwardCharactor), Data.SaveData.findCharactorById(Data.SaveData.backwardCharactor)),
+                        floor: 1
+                    }));
+                };
             };
-        };
-        btnDungeon.enable = Data.SaveData.forwardCharactor != null;
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("corridorbg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            dispatcher.draw();
-            fade.draw();
-        };
-        Game.getSound().reqPlayChannel("classroom", true);
-        for (;;) {
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeIn(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            yield () => {
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                btnDungeon.enable = Data.SaveData.forwardCharactor != null;
-                if (selected != null) {
-                    this.next();
-                }
+            btnDungeon.enable = Data.SaveData.forwardCharactor != null;
+            this.draw = () => {
+                Game.getScreen().drawImage(Game.getScreen().texture("corridorbg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                dispatcher.draw();
+                fade.draw();
             };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeOut(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
+            Game.getSound().reqPlayChannel("classroom", true);
+            const main = () => Scene.waitFadeIn(fade, () => {
+                this.update = () => {
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    btnDungeon.enable = Data.SaveData.forwardCharactor != null;
+                    if (selected != null) {
+                        this.update = Scene.waitFadeOut(fade, () => {
+                            fade.stop();
+                            selected();
+                            selected = null;
+                            this.update = main();
+                        });
+                    }
+                };
             });
-            selected();
-            selected = null;
+            this.update = main();
         }
+        draw() { }
+        update() { }
     }
-    Scene.corridor = corridor;
+    Scene.Corridor = Corridor;
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
@@ -4975,34 +4931,94 @@ var Scene;
                 Game.getScreen().fillRect(0, 0, this.w, this.h);
             }
         }
+        isFinish() {
+            return (this.mode === "fadein" && this.rate === 0) || (this.mode === "fadeout" && this.rate === 1);
+        }
     }
     Scene.Fade = Fade;
-    function waitTimeout({ timeout, init = () => { }, start = () => { }, update = () => { }, end = () => { }, }) {
-        let startTime = -1;
-        init();
+    function waitFadeIn(fade, action, intervalAction) {
+        fade.startFadeIn();
+        const start = Game.getTimer().now;
         return () => {
-            if (startTime === -1) {
-                startTime = Game.getTimer().now;
-                start(Game.getTimer().now);
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
             }
-            const elapsed = Game.getTimer().now - startTime;
-            if (elapsed >= timeout) {
-                end(elapsed);
+            fade.update(Game.getTimer().now);
+            if (fade.isFinish()) {
+                fade.stop();
+                action();
             }
-            else {
-                update(elapsed);
+        };
+    }
+    Scene.waitFadeIn = waitFadeIn;
+    ;
+    function waitFadeOut(fade, action, intervalAction) {
+        fade.startFadeOut();
+        const start = Game.getTimer().now;
+        return () => {
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
+            }
+            fade.update(Game.getTimer().now);
+            if (fade.isFinish()) {
+                fade.stop();
+                action();
+            }
+        };
+    }
+    Scene.waitFadeOut = waitFadeOut;
+    ;
+    function waitTimeout(ms, action, intervalAction) {
+        const start = Game.getTimer().now;
+        return () => {
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
+            }
+            if (elaps >= ms) {
+                action();
             }
         };
     }
     Scene.waitTimeout = waitTimeout;
-    function waitClick({ update = () => { }, start = () => { }, check = () => true, end = () => { }, }) {
-        let startTime = -1;
+    ;
+    //export function waitTimeout({
+    //    timeout,
+    //    init = () => { },
+    //    start = () => { },
+    //    update = () => { },
+    //    end = () => { },
+    //}: {
+    //        timeout: number;
+    //        init?: () => void;
+    //        start?: (elapsed: number) => void;
+    //        update?: (elapsed: number) => void;
+    //        end?: (elapsed: number) => void;
+    //    }) {
+    //    let startTime = -1;
+    //    init();
+    //    return () => {
+    //        if (startTime === -1) {
+    //            startTime = Game.getTimer().now;
+    //            start(Game.getTimer().now);
+    //        }
+    //        const elapsed = Game.getTimer().now - startTime;
+    //        if (elapsed >= timeout) {
+    //            end(elapsed);
+    //        } else {
+    //            update(elapsed);
+    //        }
+    //    };
+    //}
+    function waitClick(action, check, intervalAction) {
+        const start = Game.getTimer().now;
         return () => {
-            if (startTime === -1) {
-                startTime = Game.getTimer().now;
-                start(0);
+            const elaps = Game.getTimer().now - start;
+            if (intervalAction) {
+                intervalAction(elaps);
             }
-            const elapsed = Game.getTimer().now - startTime;
             if (Game.getInput().isClick()) {
                 const pX = Game.getInput().pageX;
                 const pY = Game.getInput().pageY;
@@ -5010,24 +5026,60 @@ var Scene;
                     const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
                     const xx = pos[0];
                     const yy = pos[1];
-                    if (check(xx, yy, elapsed)) {
-                        end(xx, yy, elapsed);
-                        return;
+                    if (check == null || check(xx, yy, elaps)) {
+                        action(xx, yy, elaps);
                     }
                 }
             }
-            update(elapsed);
         };
     }
     Scene.waitClick = waitClick;
+    ;
+    //export function waitClick({
+    //    update = () => { },
+    //    start = () => { },
+    //    check = () => true,
+    //    end = () => { },
+    //}: {
+    //        update?: (elapsed: number) => void;
+    //        start?: (elapsed: number) => void;
+    //        check?: (x: number, y: number, elapsed: number) => boolean;
+    //        end?: (x: number, y: number, elapsed: number) => void;
+    //    }) {
+    //    let startTime = -1;
+    //    return () => {
+    //        if (startTime === -1) {
+    //            startTime = Game.getTimer().now;
+    //            start(0);
+    //        }
+    //        const elapsed = Game.getTimer().now - startTime;
+    //        if (Game.getInput().isClick()) {
+    //            const pX = Game.getInput().pageX;
+    //            const pY = Game.getInput().pageY;
+    //            if (Game.getScreen().pagePointContainScreen(pX, pY)) {
+    //                const pos = Game.getScreen().pagePointToScreenPoint(pX, pY);
+    //                const xx = pos[0];
+    //                const yy = pos[1];
+    //                if (check(xx, yy, elapsed)) {
+    //                    end(xx, yy, elapsed);
+    //                    return;
+    //                }
+    //            }
+    //        }
+    //        update(elapsed);
+    //    };
+    //}
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
-    function* title() {
+    class Title {
         // setup
-        let showClickOrTap = false;
-        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-        this.draw = () => {
+        constructor() {
+            this.fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            this.draw = this.drawWaitClick;
+            this.update = this.updateWaitClick;
+        }
+        drawBase(showClickOrTap) {
             const w = Game.getScreen().offscreenWidth;
             const h = Game.getScreen().offscreenHeight;
             Game.getScreen().save();
@@ -5037,34 +5089,33 @@ var Scene;
             if (showClickOrTap) {
                 Game.getScreen().drawImage(Game.getScreen().texture("title"), 0, 72, 168, 24, w / 2 - 168 / 2, h - 50, 168, 24);
             }
-            fade.draw();
+            this.fade.draw();
             Game.getScreen().restore();
-        };
-        yield Scene.waitClick({
-            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 500) % 2) === 0; },
-            check: () => true,
-            end: () => {
+        }
+        ;
+        draw() { }
+        update() { }
+        drawWaitClick() {
+            this.drawBase((~~(Game.getTimer().now / 500) % 2) === 0);
+        }
+        drawDecide() {
+            this.drawBase((~~(Game.getTimer().now / 50) % 2) === 0);
+        }
+        updateWaitClick() {
+            if (Game.getInput().isClick()) {
                 Game.getSound().reqPlayChannel("title");
-                this.next();
-            },
-        });
-        yield Scene.waitTimeout({
-            timeout: 1000,
-            update: (e) => { showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
-            end: () => this.next(),
-        });
-        yield Scene.waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); showClickOrTap = (~~(Game.getTimer().now / 50) % 2) === 0; },
-            end: () => {
+                this.update = this.updateDecide;
+                this.draw = this.drawDecide;
+            }
+        }
+        updateDecide() {
+            this.update = Scene.waitTimeout(500, Scene.waitFadeOut(this.fade, () => {
                 Data.SaveData.load();
-                Game.getSceneManager().push(Scene.corridor);
-                this.next();
-            },
-        });
+                Game.getSceneManager().push(new Scene.Corridor());
+            }));
+        }
     }
-    Scene.title = title;
+    Scene.Title = Title;
 })(Scene || (Scene = {}));
 var SpriteAnimation;
 (function (SpriteAnimation) {
@@ -6072,597 +6123,621 @@ var Scene;
 (function (Scene) {
     var ClassRoom;
     (function (ClassRoom) {
-        function* editOrganization() {
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const caption = new Game.GUI.TextBox({
-                left: 1,
-                top: 1,
-                width: 250,
-                height: 42,
-                text: "編成\n迷宮探索時の前衛と後衛を選択してください。",
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px 'PixelMplus10-Regular'",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-            });
-            dispatcher.add(caption);
-            const btnExit = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 11 + 46,
-                width: 112,
-                height: 16,
-                text: "戻る",
-            });
-            dispatcher.add(btnExit);
-            let exitScene = false;
-            btnExit.click = (x, y) => {
-                exitScene = true;
-                Data.SaveData.save();
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const charactors = Data.Charactor.keys().map(x => new ClassRoom.StatusSprite(Data.SaveData.findCharactorById(x)));
-            let team = [Data.Charactor.keys().findIndex(x => x == Data.SaveData.forwardCharactor), Data.Charactor.keys().findIndex(x => x == Data.SaveData.backwardCharactor)];
-            let selectedSide = -1;
-            let selectedCharactorIndex = -1;
-            let anim = 0;
-            const charactorListBox = new Game.GUI.ListBox({
-                left: 131,
-                top: 46,
-                width: 112 + 1,
-                height: 4 * 48,
-                lineHeight: 48,
-                getItemCount: () => charactors.length,
-                drawItem: (left, top, width, height, index) => {
-                    ClassRoom.drawStatusSprite(charactors[index], team.includes(index) ? ClassRoom.DrawMode.Disable : (selectedCharactorIndex == index) ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, left, top, width, height, anim);
-                }
-            });
-            dispatcher.add(charactorListBox);
-            charactorListBox.click = (x, y) => {
-                const select = charactorListBox.getItemIndexByPosition(x, y);
-                if (team.includes(select)) {
-                    return;
-                }
-                selectedCharactorIndex = selectedCharactorIndex == select ? null : select;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const forwardBtn = new Game.GUI.ImageButton({
-                left: 8,
-                top: 46,
-                width: 112,
-                height: 48,
-                texture: null,
-                texLeft: 0,
-                texTop: 0,
-                texWidth: 0,
-                texHeight: 0
-            });
-            forwardBtn.draw = () => {
-                Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("前衛", forwardBtn.left + 2, forwardBtn.top + 2);
-                ClassRoom.drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0 ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
-            };
-            forwardBtn.click = (x, y) => {
-                selectedSide = selectedSide == 0 ? -1 : 0;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            dispatcher.add(forwardBtn);
-            const backwordBtn = new Game.GUI.ImageButton({
-                left: 8,
-                top: 46 + 70,
-                width: 112,
-                height: 60,
-                texture: null,
-                texLeft: 0,
-                texTop: 0,
-                texWidth: 0,
-                texHeight: 0
-            });
-            backwordBtn.draw = () => {
-                Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("後衛", backwordBtn.left + 2, backwordBtn.top + 2);
-                ClassRoom.drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1 ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
-            };
-            backwordBtn.click = (x, y) => {
-                selectedSide = selectedSide == 1 ? -1 : 1;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            dispatcher.add(backwordBtn);
-            this.draw = () => {
-                Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                dispatcher.draw();
-            };
-            yield () => {
-                anim = Game.getTimer().now % 1000;
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (selectedSide != -1 && selectedCharactorIndex != -1) {
-                    team[selectedSide] = selectedCharactorIndex;
-                    selectedSide = -1;
-                    selectedCharactorIndex = -1;
-                }
-                if (exitScene) {
-                    Data.SaveData.forwardCharactor = team[0] == -1 ? null : charactors[team[0]].data.id;
-                    Data.SaveData.backwardCharactor = team[1] == -1 ? null : charactors[team[1]].data.id;
-                    this.next();
-                }
-            };
-            Game.getSceneManager().pop();
-        }
-        ClassRoom.editOrganization = editOrganization;
-    })(ClassRoom = Scene.ClassRoom || (Scene.ClassRoom = {}));
-})(Scene || (Scene = {}));
-/// <reference path="../../SpriteAnimation.ts" />
-var Scene;
-(function (Scene) {
-    var ClassRoom;
-    (function (ClassRoom) {
-        function* editEquip() {
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const caption = new Game.GUI.TextBox({
-                left: 1,
-                top: 1,
-                width: 250,
-                height: 42,
-                text: "装備変更",
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px 'PixelMplus10-Regular'",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-            });
-            dispatcher.add(caption);
-            const btnExit = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 11 + 46,
-                width: 112,
-                height: 16,
-                text: "戻る",
-            });
-            dispatcher.add(btnExit);
-            let exitScene = false;
-            btnExit.click = (x, y) => {
-                exitScene = true;
-                Data.SaveData.save();
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const charactors = Data.Charactor.keys().map(x => new ClassRoom.StatusSprite(Data.SaveData.findCharactorById(x)));
-            let team = [Data.Charactor.keys().findIndex(x => x == Data.SaveData.forwardCharactor), Data.Charactor.keys().findIndex(x => x == Data.SaveData.backwardCharactor)];
-            let selectedCharactorIndex = -1;
-            let selectedEquipPosition = -1;
-            let anim = 0;
-            const charactorListBox = new Game.GUI.ListBox({
-                left: 131,
-                top: 46,
-                width: 112 + 1,
-                height: 4 * 48,
-                lineHeight: 48,
-                getItemCount: () => charactors.length,
-                drawItem: (left, top, width, height, index) => {
-                    ClassRoom.drawStatusSprite(charactors[index], selectedCharactorIndex == index ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, left, top, width, height, anim);
-                }
-            });
-            dispatcher.add(charactorListBox);
-            charactorListBox.click = (x, y) => {
-                const select = charactorListBox.getItemIndexByPosition(x, y);
-                selectedCharactorIndex = selectedCharactorIndex == select ? -1 : select;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            let selectedItem = -1;
-            const itemLists = [];
-            let updateItemList = () => {
-                const newItemLists = Data.SaveData.itemBox.map((x, i) => {
-                    if (x == null) {
-                        return -1;
+        class EditOrganization {
+            constructor() {
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const caption = new Game.GUI.TextBox({
+                    left: 1,
+                    top: 1,
+                    width: 250,
+                    height: 42,
+                    text: "編成\n迷宮探索時の前衛と後衛を選択してください。",
+                    edgeColor: `rgb(12,34,98)`,
+                    color: `rgb(24,133,196)`,
+                    font: "10px 'PixelMplus10-Regular'",
+                    fontColor: `rgb(255,255,255)`,
+                    textAlign: "left",
+                    textBaseline: "top",
+                });
+                dispatcher.add(caption);
+                const btnExit = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 11 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "戻る",
+                });
+                dispatcher.add(btnExit);
+                let exitScene = false;
+                btnExit.click = (x, y) => {
+                    exitScene = true;
+                    Data.SaveData.save();
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const charactors = Data.Charactor.keys().map(x => new ClassRoom.StatusSprite(Data.SaveData.findCharactorById(x)));
+                let team = [
+                    Data.Charactor.keys().findIndex(x => x == Data.SaveData.forwardCharactor),
+                    Data.Charactor.keys().findIndex(x => x == Data.SaveData.backwardCharactor)
+                ];
+                let selectedSide = -1;
+                let selectedCharactorIndex = -1;
+                let anim = 0;
+                const charactorListBox = new Game.GUI.ListBox({
+                    left: 131,
+                    top: 46,
+                    width: 112 + 1,
+                    height: 4 * 48,
+                    lineHeight: 48,
+                    getItemCount: () => charactors.length,
+                    drawItem: (left, top, width, height, index) => {
+                        ClassRoom.drawStatusSprite(charactors[index], team.includes(index)
+                            ? ClassRoom.DrawMode.Disable
+                            : (selectedCharactorIndex == index)
+                                ? ClassRoom.DrawMode.Selected
+                                : ClassRoom.DrawMode.Normal, left, top, width, height, anim);
                     }
-                    const itemData = Data.Item.get(x.id);
-                    switch (selectedEquipPosition) {
-                        case 0:
-                            return (itemData.kind == Data.Item.Kind.Wepon) ? i : -1;
-                        case 1:
-                            return (itemData.kind == Data.Item.Kind.Armor1) ? i : -1;
-                        case 2:
-                            return (itemData.kind == Data.Item.Kind.Armor2) ? i : -1;
-                        case 3:
-                        case 4:
-                            return (itemData.kind == Data.Item.Kind.Accessory) ? i : -1;
-                        default:
-                            return -1;
+                });
+                dispatcher.add(charactorListBox);
+                charactorListBox.click = (x, y) => {
+                    const select = charactorListBox.getItemIndexByPosition(x, y);
+                    if (team.includes(select)) {
+                        return;
                     }
-                }).filter(x => x != -1);
-                itemLists.length = 0;
-                itemLists.push(...newItemLists);
-            };
-            const itemListBox = new Game.GUI.ListBox({
-                left: 131,
-                top: 46,
-                width: 112 + 1,
-                height: 12 * 16,
-                lineHeight: 16,
-                getItemCount: () => itemLists.length,
-                drawItem: (left, top, width, height, index) => {
-                    if (selectedItem == index) {
-                        Game.getScreen().fillStyle = `rgb(24,196,195)`;
-                    }
-                    else {
-                        Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                    }
-                    Game.getScreen().fillRect(left, top, width, height);
+                    selectedCharactorIndex = selectedCharactorIndex == select ? null : select;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const forwardBtn = new Game.GUI.ImageButton({
+                    left: 8,
+                    top: 46,
+                    width: 112,
+                    height: 48,
+                    texture: null,
+                    texLeft: 0,
+                    texTop: 0,
+                    texWidth: 0,
+                    texHeight: 0
+                });
+                forwardBtn.draw = () => {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
                     Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                     Game.getScreen().lineWidth = 1;
-                    Game.getScreen().strokeRect(left, top, width, height);
+                    Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
                     Game.getScreen().font = "10px 'PixelMplus10-Regular'";
                     Game.getScreen().fillStyle = `rgb(255,255,255)`;
                     Game.getScreen().textAlign = "left";
                     Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(Data.Item.get(Data.SaveData.itemBox[itemLists[index]].id).name, left + 3, top + 3);
-                }
-            });
-            dispatcher.add(itemListBox);
-            itemListBox.click = (x, y) => {
-                const select = itemListBox.getItemIndexByPosition(x, y);
-                Game.getSound().reqPlayChannel("cursor");
-                if (select == -1 || selectedCharactorIndex == -1) {
-                    return;
-                }
-                switch (selectedEquipPosition) {
-                    case 0:
-                        if (charactors[selectedCharactorIndex].data.equips.wepon1 != null) {
-                            const oldItem = charactors[selectedCharactorIndex].data.equips.wepon1;
-                            charactors[selectedCharactorIndex].data.equips.wepon1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox[itemLists[select]] = oldItem;
-                        }
-                        else {
-                            charactors[selectedCharactorIndex].data.equips.wepon1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox.splice(itemLists[select], 1);
-                        }
-                        updateItemList();
-                        break;
-                    case 1:
-                        if (charactors[selectedCharactorIndex].data.equips.armor1 != null) {
-                            const oldItem = charactors[selectedCharactorIndex].data.equips.armor1;
-                            charactors[selectedCharactorIndex].data.equips.armor1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox[itemLists[select]] = oldItem;
-                        }
-                        else {
-                            charactors[selectedCharactorIndex].data.equips.armor1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox.splice(itemLists[select], 1);
-                        }
-                        updateItemList();
-                        break;
-                    case 2:
-                        if (charactors[selectedCharactorIndex].data.equips.armor2 != null) {
-                            const oldItem = charactors[selectedCharactorIndex].data.equips.armor2;
-                            charactors[selectedCharactorIndex].data.equips.armor2 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox[itemLists[select]] = oldItem;
-                        }
-                        else {
-                            charactors[selectedCharactorIndex].data.equips.armor2 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox.splice(itemLists[select], 1);
-                        }
-                        updateItemList();
-                        break;
-                    case 3:
-                        if (charactors[selectedCharactorIndex].data.equips.accessory1 != null) {
-                            const oldItem = charactors[selectedCharactorIndex].data.equips.accessory1;
-                            charactors[selectedCharactorIndex].data.equips.accessory1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox[itemLists[select]] = oldItem;
-                        }
-                        else {
-                            charactors[selectedCharactorIndex].data.equips.accessory1 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox.splice(itemLists[select], 1);
-                        }
-                        updateItemList();
-                        break;
-                    case 4:
-                        if (charactors[selectedCharactorIndex].data.equips.accessory2 != null) {
-                            const oldItem = charactors[selectedCharactorIndex].data.equips.accessory2;
-                            charactors[selectedCharactorIndex].data.equips.accessory2 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox[itemLists[select]] = oldItem;
-                        }
-                        else {
-                            charactors[selectedCharactorIndex].data.equips.accessory2 = Data.SaveData.itemBox[itemLists[select]];
-                            Data.SaveData.itemBox.splice(itemLists[select], 1);
-                        }
-                        updateItemList();
-                        break;
-                    default:
-                        break;
-                }
-            };
-            const statusViewBtn = new Game.GUI.ImageButton({
-                left: 8,
-                top: 46,
-                width: 112,
-                height: 48,
-                texture: null,
-                texLeft: 0,
-                texTop: 0,
-                texWidth: 0,
-                texHeight: 0
-            });
-            statusViewBtn.draw = () => {
-                ClassRoom.drawStatusSprite(charactors[selectedCharactorIndex], ClassRoom.DrawMode.Normal, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
-            };
-            statusViewBtn.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = -1;
-            };
-            dispatcher.add(statusViewBtn);
-            const btnWepon1 = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 0 + 46 + 50,
-                width: 112,
-                height: 16,
-                text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.wepon1 == null) ? "(武器)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.wepon1.id).name,
-            });
-            dispatcher.add(btnWepon1);
-            btnWepon1.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = selectedEquipPosition == 0 ? -1 : 0;
-                updateItemList();
-            };
-            const btnArmor1 = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 1 + 46 + 50,
-                width: 112,
-                height: 16,
-                text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor1 == null) ? "(防具・上半身)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor1.id).name,
-            });
-            dispatcher.add(btnArmor1);
-            btnArmor1.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = selectedEquipPosition == 1 ? -1 : 1;
-                updateItemList();
-            };
-            const btnArmor2 = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 2 + 46 + 50,
-                width: 112,
-                height: 16,
-                text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.armor2 == null) ? "(防具・下半身)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor2.id).name,
-            });
-            dispatcher.add(btnArmor2);
-            btnArmor2.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = selectedEquipPosition == 2 ? -1 : 2;
-                updateItemList();
-            };
-            const btnAccessory1 = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 3 + 46 + 50,
-                width: 112,
-                height: 16,
-                text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory1 == null) ? "(アクセサリ１)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory1.id).name,
-            });
-            dispatcher.add(btnAccessory1);
-            btnAccessory1.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = selectedEquipPosition == 3 ? -1 : 3;
-                updateItemList();
-            };
-            const btnAccessory2 = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 4 + 46 + 50,
-                width: 112,
-                height: 16,
-                text: () => (selectedCharactorIndex == -1 || charactors[selectedCharactorIndex].data.equips.accessory2 == null) ? "(アクセサリ２)" : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory2.id).name,
-            });
-            dispatcher.add(btnAccessory2);
-            btnAccessory2.click = () => {
-                Game.getSound().reqPlayChannel("cursor");
-                selectedEquipPosition = selectedEquipPosition == 4 ? -1 : 4;
-                updateItemList();
-            };
-            this.draw = () => {
-                Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                dispatcher.draw();
-            };
-            itemListBox.visible = selectedEquipPosition != -1;
-            charactorListBox.visible = selectedEquipPosition == -1;
-            btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactorIndex != -1;
-            yield () => {
-                anim = Game.getTimer().now % 1000;
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                itemListBox.visible = selectedEquipPosition != -1;
-                charactorListBox.visible = selectedEquipPosition == -1;
-                btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible = selectedCharactorIndex != -1;
-                if (exitScene) {
-                    this.next();
-                }
-            };
-            Game.getSceneManager().pop();
+                    Game.getScreen().fillText("前衛", forwardBtn.left + 2, forwardBtn.top + 2);
+                    ClassRoom.drawStatusSprite(team[0] == -1 ? null : charactors[team[0]], selectedSide == 0 ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
+                };
+                forwardBtn.click = (x, y) => {
+                    selectedSide = selectedSide == 0 ? -1 : 0;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                dispatcher.add(forwardBtn);
+                const backwordBtn = new Game.GUI.ImageButton({
+                    left: 8,
+                    top: 46 + 70,
+                    width: 112,
+                    height: 60,
+                    texture: null,
+                    texLeft: 0,
+                    texTop: 0,
+                    texWidth: 0,
+                    texHeight: 0
+                });
+                backwordBtn.draw = () => {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                    Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                    Game.getScreen().lineWidth = 1;
+                    Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                    Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                    Game.getScreen().textAlign = "left";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText("後衛", backwordBtn.left + 2, backwordBtn.top + 2);
+                    ClassRoom.drawStatusSprite(team[1] == -1 ? null : charactors[team[1]], selectedSide == 1 ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
+                };
+                backwordBtn.click = (x, y) => {
+                    selectedSide = selectedSide == 1 ? -1 : 1;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                dispatcher.add(backwordBtn);
+                this.draw = () => {
+                    Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                    dispatcher.draw();
+                };
+                this.update = () => {
+                    anim = Game.getTimer().now % 1000;
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (selectedSide != -1 && selectedCharactorIndex != -1) {
+                        team[selectedSide] = selectedCharactorIndex;
+                        selectedSide = -1;
+                        selectedCharactorIndex = -1;
+                    }
+                    if (exitScene) {
+                        Data.SaveData.forwardCharactor = team[0] == -1 ? null : charactors[team[0]].data.id;
+                        Data.SaveData.backwardCharactor = team[1] == -1 ? null : charactors[team[1]].data.id;
+                        Game.getSceneManager().pop();
+                    }
+                };
+            }
+            draw() { }
+            update() { }
         }
-        ClassRoom.editEquip = editEquip;
+        ClassRoom.EditOrganization = EditOrganization;
     })(ClassRoom = Scene.ClassRoom || (Scene.ClassRoom = {}));
 })(Scene || (Scene = {}));
 /// <reference path="../../SpriteAnimation.ts" />
-/// <reference path="./StatusSprite.ts" />
-/// <reference path="./editOrganization.ts" />
-/// <reference path="./editEquip.ts" />
 var Scene;
 (function (Scene) {
     var ClassRoom;
     (function (ClassRoom) {
-        function* top() {
-            const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const caption = new Game.GUI.TextBox({
-                left: 1,
-                top: 1,
-                width: 250,
-                height: 42,
-                text: "教室\n探索ペアの編成や生徒の確認ができます。",
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px 'PixelMplus10-Regular'",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-            });
-            dispatcher.add(caption);
-            const btnOrganization = new Game.GUI.Button({
-                left: 8,
-                top: 20 * 0 + 46,
-                width: 112,
-                height: 16,
-                text: "編成",
-            });
-            dispatcher.add(btnOrganization);
-            btnOrganization.click = (x, y) => {
-                Game.getSceneManager().push(ClassRoom.editOrganization);
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const btnEquip = new Game.GUI.Button({
-                left: 8,
-                top: 20 * 1 + 46,
-                width: 112,
-                height: 16,
-                text: "装備変更",
-            });
-            dispatcher.add(btnEquip);
-            btnEquip.click = (x, y) => {
-                Game.getSceneManager().push(ClassRoom.editEquip);
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const btnItemBox = new Game.GUI.Button({
-                left: 8,
-                top: 20 * 2 + 46,
-                width: 112,
-                height: 16,
-                text: "道具箱",
-                visible: false
-            });
-            dispatcher.add(btnItemBox);
-            btnItemBox.click = (x, y) => {
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const btnExit = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 11 + 46,
-                width: 112,
-                height: 16,
-                text: "戻る",
-            });
-            dispatcher.add(btnExit);
-            let exitScene = false;
-            btnExit.click = (x, y) => {
-                exitScene = true;
-                Data.SaveData.save();
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            this.draw = () => {
-                Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                dispatcher.draw();
-                fade.draw();
-            };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeIn(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            yield () => {
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (exitScene) {
-                    this.next();
-                }
-            };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeOut(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            Game.getSceneManager().pop();
+        class EditEquip {
+            constructor() {
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const caption = new Game.GUI.TextBox({
+                    left: 1,
+                    top: 1,
+                    width: 250,
+                    height: 42,
+                    text: "装備変更",
+                    edgeColor: `rgb(12,34,98)`,
+                    color: `rgb(24,133,196)`,
+                    font: "10px 'PixelMplus10-Regular'",
+                    fontColor: `rgb(255,255,255)`,
+                    textAlign: "left",
+                    textBaseline: "top",
+                });
+                dispatcher.add(caption);
+                const btnExit = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 11 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "戻る",
+                });
+                dispatcher.add(btnExit);
+                let exitScene = false;
+                btnExit.click = (x, y) => {
+                    exitScene = true;
+                    Data.SaveData.save();
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const charactors = Data.Charactor.keys().map(x => new ClassRoom.StatusSprite(Data.SaveData.findCharactorById(x)));
+                let team = [
+                    Data.Charactor.keys().findIndex(x => x == Data.SaveData.forwardCharactor),
+                    Data.Charactor.keys().findIndex(x => x == Data.SaveData.backwardCharactor)
+                ];
+                let selectedCharactorIndex = -1;
+                let selectedEquipPosition = -1;
+                let anim = 0;
+                const charactorListBox = new Game.GUI.ListBox({
+                    left: 131,
+                    top: 46,
+                    width: 112 + 1,
+                    height: 4 * 48,
+                    lineHeight: 48,
+                    getItemCount: () => charactors.length,
+                    drawItem: (left, top, width, height, index) => {
+                        ClassRoom.drawStatusSprite(charactors[index], selectedCharactorIndex == index ? ClassRoom.DrawMode.Selected : ClassRoom.DrawMode.Normal, left, top, width, height, anim);
+                    }
+                });
+                dispatcher.add(charactorListBox);
+                charactorListBox.click = (x, y) => {
+                    const select = charactorListBox.getItemIndexByPosition(x, y);
+                    selectedCharactorIndex = selectedCharactorIndex == select ? -1 : select;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                let selectedItem = -1;
+                const itemLists = [];
+                let updateItemList = () => {
+                    const newItemLists = Data.SaveData.itemBox.map((x, i) => {
+                        if (x == null) {
+                            return -1;
+                        }
+                        const itemData = Data.Item.get(x.id);
+                        switch (selectedEquipPosition) {
+                            case 0:
+                                return (itemData.kind == Data.Item.Kind.Wepon) ? i : -1;
+                            case 1:
+                                return (itemData.kind == Data.Item.Kind.Armor1) ? i : -1;
+                            case 2:
+                                return (itemData.kind == Data.Item.Kind.Armor2) ? i : -1;
+                            case 3:
+                            case 4:
+                                return (itemData.kind == Data.Item.Kind.Accessory) ? i : -1;
+                            default:
+                                return -1;
+                        }
+                    }).filter(x => x != -1);
+                    itemLists.length = 0;
+                    itemLists.push(...newItemLists);
+                };
+                const itemListBox = new Game.GUI.ListBox({
+                    left: 131,
+                    top: 46,
+                    width: 112 + 1,
+                    height: 12 * 16,
+                    lineHeight: 16,
+                    getItemCount: () => itemLists.length,
+                    drawItem: (left, top, width, height, index) => {
+                        if (selectedItem == index) {
+                            Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                        }
+                        else {
+                            Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                        }
+                        Game.getScreen().fillRect(left, top, width, height);
+                        Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                        Game.getScreen().lineWidth = 1;
+                        Game.getScreen().strokeRect(left, top, width, height);
+                        Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                        Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                        Game.getScreen().textAlign = "left";
+                        Game.getScreen().textBaseline = "top";
+                        Game.getScreen().fillText(Data.Item.get(Data.SaveData.itemBox[itemLists[index]].id).name, left + 3, top + 3);
+                    }
+                });
+                dispatcher.add(itemListBox);
+                itemListBox.click = (x, y) => {
+                    const select = itemListBox.getItemIndexByPosition(x, y);
+                    Game.getSound().reqPlayChannel("cursor");
+                    if (select == -1 || selectedCharactorIndex == -1) {
+                        return;
+                    }
+                    switch (selectedEquipPosition) {
+                        case 0:
+                            if (charactors[selectedCharactorIndex].data.equips.wepon1 != null) {
+                                const oldItem = charactors[selectedCharactorIndex].data.equips.wepon1;
+                                charactors[selectedCharactorIndex].data.equips.wepon1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox[itemLists[select]] = oldItem;
+                            }
+                            else {
+                                charactors[selectedCharactorIndex].data.equips.wepon1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox.splice(itemLists[select], 1);
+                            }
+                            updateItemList();
+                            break;
+                        case 1:
+                            if (charactors[selectedCharactorIndex].data.equips.armor1 != null) {
+                                const oldItem = charactors[selectedCharactorIndex].data.equips.armor1;
+                                charactors[selectedCharactorIndex].data.equips.armor1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox[itemLists[select]] = oldItem;
+                            }
+                            else {
+                                charactors[selectedCharactorIndex].data.equips.armor1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox.splice(itemLists[select], 1);
+                            }
+                            updateItemList();
+                            break;
+                        case 2:
+                            if (charactors[selectedCharactorIndex].data.equips.armor2 != null) {
+                                const oldItem = charactors[selectedCharactorIndex].data.equips.armor2;
+                                charactors[selectedCharactorIndex].data.equips.armor2 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox[itemLists[select]] = oldItem;
+                            }
+                            else {
+                                charactors[selectedCharactorIndex].data.equips.armor2 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox.splice(itemLists[select], 1);
+                            }
+                            updateItemList();
+                            break;
+                        case 3:
+                            if (charactors[selectedCharactorIndex].data.equips.accessory1 != null) {
+                                const oldItem = charactors[selectedCharactorIndex].data.equips.accessory1;
+                                charactors[selectedCharactorIndex].data.equips.accessory1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox[itemLists[select]] = oldItem;
+                            }
+                            else {
+                                charactors[selectedCharactorIndex].data.equips.accessory1 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox.splice(itemLists[select], 1);
+                            }
+                            updateItemList();
+                            break;
+                        case 4:
+                            if (charactors[selectedCharactorIndex].data.equips.accessory2 != null) {
+                                const oldItem = charactors[selectedCharactorIndex].data.equips.accessory2;
+                                charactors[selectedCharactorIndex].data.equips.accessory2 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox[itemLists[select]] = oldItem;
+                            }
+                            else {
+                                charactors[selectedCharactorIndex].data.equips.accessory2 =
+                                    Data.SaveData.itemBox[itemLists[select]];
+                                Data.SaveData.itemBox.splice(itemLists[select], 1);
+                            }
+                            updateItemList();
+                            break;
+                        default:
+                            break;
+                    }
+                };
+                const statusViewBtn = new Game.GUI.ImageButton({
+                    left: 8,
+                    top: 46,
+                    width: 112,
+                    height: 48,
+                    texture: null,
+                    texLeft: 0,
+                    texTop: 0,
+                    texWidth: 0,
+                    texHeight: 0
+                });
+                statusViewBtn.draw = () => {
+                    ClassRoom.drawStatusSprite(charactors[selectedCharactorIndex], ClassRoom.DrawMode.Normal, statusViewBtn.left, statusViewBtn.top, statusViewBtn.width, 48, anim);
+                };
+                statusViewBtn.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = -1;
+                };
+                dispatcher.add(statusViewBtn);
+                const btnWepon1 = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 0 + 46 + 50,
+                    width: 112,
+                    height: 16,
+                    text: () => (selectedCharactorIndex == -1 ||
+                        charactors[selectedCharactorIndex].data.equips.wepon1 == null)
+                        ? "(武器)"
+                        : Data.Item.get(charactors[selectedCharactorIndex].data.equips.wepon1.id).name,
+                });
+                dispatcher.add(btnWepon1);
+                btnWepon1.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = selectedEquipPosition == 0 ? -1 : 0;
+                    updateItemList();
+                };
+                const btnArmor1 = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 1 + 46 + 50,
+                    width: 112,
+                    height: 16,
+                    text: () => (selectedCharactorIndex == -1 ||
+                        charactors[selectedCharactorIndex].data.equips.armor1 == null)
+                        ? "(防具・上半身)"
+                        : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor1.id).name,
+                });
+                dispatcher.add(btnArmor1);
+                btnArmor1.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = selectedEquipPosition == 1 ? -1 : 1;
+                    updateItemList();
+                };
+                const btnArmor2 = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 2 + 46 + 50,
+                    width: 112,
+                    height: 16,
+                    text: () => (selectedCharactorIndex == -1 ||
+                        charactors[selectedCharactorIndex].data.equips.armor2 == null)
+                        ? "(防具・下半身)"
+                        : Data.Item.get(charactors[selectedCharactorIndex].data.equips.armor2.id).name,
+                });
+                dispatcher.add(btnArmor2);
+                btnArmor2.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = selectedEquipPosition == 2 ? -1 : 2;
+                    updateItemList();
+                };
+                const btnAccessory1 = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 3 + 46 + 50,
+                    width: 112,
+                    height: 16,
+                    text: () => (selectedCharactorIndex == -1 ||
+                        charactors[selectedCharactorIndex].data.equips.accessory1 == null)
+                        ? "(アクセサリ１)"
+                        : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory1.id).name,
+                });
+                dispatcher.add(btnAccessory1);
+                btnAccessory1.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = selectedEquipPosition == 3 ? -1 : 3;
+                    updateItemList();
+                };
+                const btnAccessory2 = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 4 + 46 + 50,
+                    width: 112,
+                    height: 16,
+                    text: () => (selectedCharactorIndex == -1 ||
+                        charactors[selectedCharactorIndex].data.equips.accessory2 == null)
+                        ? "(アクセサリ２)"
+                        : Data.Item.get(charactors[selectedCharactorIndex].data.equips.accessory2.id).name,
+                });
+                dispatcher.add(btnAccessory2);
+                btnAccessory2.click = () => {
+                    Game.getSound().reqPlayChannel("cursor");
+                    selectedEquipPosition = selectedEquipPosition == 4 ? -1 : 4;
+                    updateItemList();
+                };
+                this.draw = () => {
+                    Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                    dispatcher.draw();
+                };
+                itemListBox.visible = selectedEquipPosition != -1;
+                charactorListBox.visible = selectedEquipPosition == -1;
+                btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible = btnAccessory2.visible =
+                    selectedCharactorIndex != -1;
+                this.update = () => {
+                    anim = Game.getTimer().now % 1000;
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    itemListBox.visible = selectedEquipPosition != -1;
+                    charactorListBox.visible = selectedEquipPosition == -1;
+                    btnWepon1.visible = btnArmor1.visible = btnArmor2.visible = btnAccessory1.visible =
+                        btnAccessory2.visible = selectedCharactorIndex != -1;
+                    if (exitScene) {
+                        Game.getSceneManager().pop();
+                    }
+                };
+            }
+            draw() { }
+            update() { }
         }
-        ClassRoom.top = top;
+        ClassRoom.EditEquip = EditEquip;
+    })(ClassRoom = Scene.ClassRoom || (Scene.ClassRoom = {}));
+})(Scene || (Scene = {}));
+/// <reference path="../../SpriteAnimation.ts" />
+/// <reference path="./StatusSprite.ts" />
+/// <reference path="./EditOrganization.ts" />
+/// <reference path="./EditEquip.ts" />
+var Scene;
+(function (Scene) {
+    var ClassRoom;
+    (function (ClassRoom) {
+        class Top {
+            constructor() {
+                const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const caption = new Game.GUI.TextBox({
+                    left: 1,
+                    top: 1,
+                    width: 250,
+                    height: 42,
+                    text: "教室\n探索ペアの編成や生徒の確認ができます。",
+                    edgeColor: `rgb(12,34,98)`,
+                    color: `rgb(24,133,196)`,
+                    font: "10px 'PixelMplus10-Regular'",
+                    fontColor: `rgb(255,255,255)`,
+                    textAlign: "left",
+                    textBaseline: "top",
+                });
+                dispatcher.add(caption);
+                const btnOrganization = new Game.GUI.Button({
+                    left: 8,
+                    top: 20 * 0 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "編成",
+                });
+                dispatcher.add(btnOrganization);
+                btnOrganization.click = (x, y) => {
+                    Game.getSceneManager().push(new ClassRoom.EditOrganization());
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const btnEquip = new Game.GUI.Button({
+                    left: 8,
+                    top: 20 * 1 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "装備変更",
+                });
+                dispatcher.add(btnEquip);
+                btnEquip.click = (x, y) => {
+                    Game.getSceneManager().push(new ClassRoom.EditEquip());
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const btnItemBox = new Game.GUI.Button({
+                    left: 8,
+                    top: 20 * 2 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "道具箱",
+                    visible: false
+                });
+                dispatcher.add(btnItemBox);
+                btnItemBox.click = (x, y) => {
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const btnExit = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 11 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "戻る",
+                });
+                dispatcher.add(btnExit);
+                let exitScene = false;
+                btnExit.click = (x, y) => {
+                    exitScene = true;
+                    Data.SaveData.save();
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                this.draw = () => {
+                    Game.getScreen().drawImage(Game.getScreen().texture("classroom"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                    dispatcher.draw();
+                    fade.draw();
+                };
+                this.update = Scene.waitFadeIn(fade, () => {
+                    this.update = () => {
+                        if (Game.getInput().isDown()) {
+                            dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                        if (Game.getInput().isMove()) {
+                            dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                        if (Game.getInput().isUp()) {
+                            dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                        if (exitScene) {
+                            this.update = Scene.waitFadeOut(fade, () => {
+                                this.update = () => { };
+                                Game.getSceneManager().pop();
+                            });
+                        }
+                    };
+                });
+            }
+            draw() { }
+            update() { }
+        }
+        ClassRoom.Top = Top;
     })(ClassRoom = Scene.ClassRoom || (Scene.ClassRoom = {}));
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
     var Dungeon;
     (function (Dungeon) {
-        function* gameOver(opt) {
-            const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            let fontAlpha = 0;
-            this.draw = () => {
-                opt.upperdraw();
-                fade.draw();
-                Game.getScreen().fillStyle = `rgba(255,255,255,${fontAlpha})`;
-                Game.getScreen().font = "20px 'PixelMplus10-Regular'";
-                const shape = Game.getScreen().measureText(`GAME OVER`);
-                Game.getScreen().fillText(`GAME OVER`, (Game.getScreen().offscreenWidth - shape.width) / 2, (Game.getScreen().offscreenHeight - 20) / 2);
-            };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                start: (e) => { fade.startFadeOut(); },
-                update: (e) => { fade.update(Game.getTimer().now); },
-                end: (x) => { this.next(); }
-            });
-            yield Scene.waitTimeout({
-                timeout: 500,
-                start: (e) => { fontAlpha = 0; },
-                update: (e) => { fontAlpha = e / 500; },
-                end: (e) => { fontAlpha = 1; this.next(); }
-            });
-            yield Scene.waitClick({
-                end: (x, y) => {
-                    this.next();
-                }
-            });
-            Game.getSceneManager().pop();
-            Game.getSceneManager().push(Scene.title);
-            return;
+        class GameOver {
+            constructor(opt) {
+                const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                let fontAlpha = 0;
+                this.draw = () => {
+                    opt.upperdraw();
+                    fade.draw();
+                    Game.getScreen().fillStyle = `rgba(255,255,255,${fontAlpha})`;
+                    Game.getScreen().font = "20px 'PixelMplus10-Regular'";
+                    const shape = Game.getScreen().measureText(`GAME OVER`);
+                    Game.getScreen().fillText(`GAME OVER`, (Game.getScreen().offscreenWidth - shape.width) / 2, (Game.getScreen().offscreenHeight - 20) / 2);
+                };
+                this.update = Scene.waitFadeOut(fade, () => {
+                    Scene.waitTimeout(500, Scene.waitClick(() => {
+                        Game.getSceneManager().pop();
+                        Game.getSceneManager().push(new Scene.Title());
+                    }), (e) => { fontAlpha = Math.min(e, 500) / 500; });
+                });
+                return;
+            }
+            draw() { }
+            update() { }
         }
-        Dungeon.gameOver = gameOver;
+        Dungeon.GameOver = GameOver;
     })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
 })(Scene || (Scene = {}));
 var Scene;
@@ -6678,547 +6753,559 @@ var Scene;
                 Game.getScreen().drawImage(Game.getScreen().texture("font7wpx"), fx, fy, fontWidth, fontHeight, (x + (i + 0) * (fontWidth - 1)), (y + (0) * fontHeight), fontWidth, fontHeight);
             }
         }
-        function* statusView(opt) {
-            const closeButton = {
-                x: Game.getScreen().offscreenWidth - 20,
-                y: 20,
-                radius: 10
-            };
-            this.draw = () => {
-                opt.upperdraw();
-                //Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
-                //Game.getScreen().fillRect(20,
-                //    20,
-                //    Game.getScreen().offscreenWidth - 40,
-                //    Game.getScreen().offscreenHeight - 40);
-                //// �����{�^��
-                //Game.getScreen().save();
-                //Game.getScreen().beginPath();
-                //Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
-                //Game.getScreen().lineWidth = 6;
-                //Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
-                //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
-                //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
-                //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
-                //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-                //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
-                //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
-                //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
-                //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
-                //Game.getScreen().stroke();
-                //Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
-                //Game.getScreen().lineWidth = 3;
-                //Game.getScreen().stroke();
-                //Game.getScreen().restore();
-                // �X�e�[�^�X(�O�q)
-                {
-                    const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
-                    const top = ~~((Game.getScreen().offscreenHeight - 121 * 2) / 2);
-                    Game.getScreen().drawImage(Game.getScreen().texture("status"), 0, 0, 190, 121, left, top, 190, 121);
-                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                    Game.getScreen().fillStyle = `rgb(0,0,0)`;
-                    Game.getScreen().textAlign = "left";
-                    Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
-                    showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`, left + 85, top + 56);
-                    showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
-                    showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
-                    showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 145, top + 64);
-                }
-                // ���q
-                {
-                    const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
-                    const top = ~~((Game.getScreen().offscreenHeight - 121 * 2) / 2) + 121;
-                    Game.getScreen().drawImage(Game.getScreen().texture("status"), 0, 0, 190, 121, left, top, 190, 121);
-                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                    Game.getScreen().fillStyle = `rgb(0,0,0)`;
-                    Game.getScreen().textAlign = "left";
-                    Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
-                    showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`, left + 85, top + 56);
-                    showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`, left + 145, top + 56);
-                    showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
-                    showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 145, top + 64);
-                }
-                //opt.player.equips.forEach((e, i) => {
-                //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
-                //})
-            };
-            yield Scene.waitClick({
-                end: (x, y) => {
-                    this.next();
-                }
-            });
-            Game.getSceneManager().pop();
-            return;
+        class StatusView {
+            constructor(opt) {
+                const closeButton = {
+                    x: Game.getScreen().offscreenWidth - 20,
+                    y: 20,
+                    radius: 10
+                };
+                this.draw = () => {
+                    opt.upperdraw();
+                    //Game.getScreen().fillStyle = 'rgba(255,255,255,0.5)';
+                    //Game.getScreen().fillRect(20,
+                    //    20,
+                    //    Game.getScreen().offscreenWidth - 40,
+                    //    Game.getScreen().offscreenHeight - 40);
+                    //// 閉じるボタン
+                    //Game.getScreen().save();
+                    //Game.getScreen().beginPath();
+                    //Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
+                    //Game.getScreen().lineWidth = 6;
+                    //Game.getScreen().ellipse(closeButton.x, closeButton.y, closeButton.radius, closeButton.radius, 0, 0, 360);
+                    //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+                    //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+                    //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+                    //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+                    //Game.getScreen().moveTo(closeButton.x - Math.sqrt(2) * closeButton.radius / 2,
+                    //    closeButton.y + Math.sqrt(2) * closeButton.radius / 2);
+                    //Game.getScreen().lineTo(closeButton.x + Math.sqrt(2) * closeButton.radius / 2,
+                    //    closeButton.y - Math.sqrt(2) * closeButton.radius / 2);
+                    //Game.getScreen().stroke();
+                    //Game.getScreen().strokeStyle = 'rgba(128,255,255,1)';
+                    //Game.getScreen().lineWidth = 3;
+                    //Game.getScreen().stroke();
+                    //Game.getScreen().restore();
+                    // ステータス(前衛)
+                    {
+                        const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
+                        const top = ~~((Game.getScreen().offscreenHeight - 121 * 2) / 2);
+                        Game.getScreen().drawImage(Game.getScreen().texture("status"), 0, 0, 190, 121, left, top, 190, 121);
+                        Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                        Game.getScreen().fillStyle = `rgb(0,0,0)`;
+                        Game.getScreen().textAlign = "left";
+                        Game.getScreen().textBaseline = "top";
+                        Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
+                        showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`, left + 85, top + 56);
+                        showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
+                        showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
+                        showStatusText(`${opt.player.getForward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 145, top + 64);
+                    }
+                    // 後衛
+                    {
+                        const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
+                        const top = ~~((Game.getScreen().offscreenHeight - 121 * 2) / 2) + 121;
+                        Game.getScreen().drawImage(Game.getScreen().texture("status"), 0, 0, 190, 121, left, top, 190, 121);
+                        Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                        Game.getScreen().fillStyle = `rgb(0,0,0)`;
+                        Game.getScreen().textAlign = "left";
+                        Game.getScreen().textBaseline = "top";
+                        Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
+                        showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`, left + 85, top + 56);
+                        showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`, left + 145, top + 56);
+                        showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
+                        showStatusText(`${opt.player.getBackward().equips.reduce((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 145, top + 64);
+                    }
+                    //opt.player.equips.forEach((e, i) => {
+                    //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);
+                    //})
+                };
+                this.update = Scene.waitClick(() => {
+                    Game.getSceneManager().pop();
+                });
+                return;
+            }
+            draw() { }
+            update() { }
         }
-        Dungeon.statusView = statusView;
+        Dungeon.StatusView = StatusView;
     })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
     var Dungeon;
     (function (Dungeon) {
-        function* itemBoxSelectPlayer(opt) {
-            let anim = 0;
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const caption = new Game.GUI.TextBox({
-                left: 1,
-                top: 1,
-                width: 250,
-                height: 14,
-                text: "道具箱：対象を選んでください。",
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px 'PixelMplus10-Regular'",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-            });
-            dispatcher.add(caption);
-            let exitScene = false;
-            const team = [new Dungeon.StatusSprite(opt.player.getForward()), new Dungeon.StatusSprite(opt.player.getBackward())];
-            const forwardBtn = new Game.GUI.ImageButton({
-                left: 8,
-                top: 46,
-                width: 112,
-                height: 48,
-                texture: null,
-                texLeft: 0,
-                texTop: 0,
-                texWidth: 0,
-                texHeight: 0
-            });
-            forwardBtn.draw = () => {
-                Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("前衛", forwardBtn.left + 2, forwardBtn.top + 2);
-                Dungeon.drawStatusSprite(team[0], Dungeon.DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
-            };
-            forwardBtn.click = (x, y) => {
-                if (opt.selectedItem != -1) {
-                    const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
-                    const itemData = Data.Item.get(itemId);
-                    if (itemData != null && itemData.useToPlayer != null) {
-                        const ret = itemData.useToPlayer(team[0].data);
-                        if (ret == true) {
-                            if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
-                                Data.SaveData.itemBox[opt.selectedItem].count -= 1;
-                            }
-                            else {
-                                Data.SaveData.itemBox[opt.selectedItem].count = 0;
-                            }
-                            if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
-                                exitScene = true;
-                                Data.SaveData.itemBox.splice(opt.selectedItem, 1);
-                                opt.selectedItem = -1;
-                            }
-                        }
-                    }
-                }
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            dispatcher.add(forwardBtn);
-            const backwordBtn = new Game.GUI.ImageButton({
-                left: 8,
-                top: 46 + 70,
-                width: 112,
-                height: 60,
-                texture: null,
-                texLeft: 0,
-                texTop: 0,
-                texWidth: 0,
-                texHeight: 0
-            });
-            backwordBtn.draw = () => {
-                Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("後衛", backwordBtn.left + 2, backwordBtn.top + 2);
-                Dungeon.drawStatusSprite(team[1], Dungeon.DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
-            };
-            backwordBtn.click = (x, y) => {
-                if (opt.selectedItem != -1) {
-                    const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
-                    const itemData = Data.Item.get(itemId);
-                    if (itemData != null && itemData.useToPlayer != null) {
-                        const ret = itemData.useToPlayer(team[1].data);
-                        if (ret == true) {
-                            if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
-                                Data.SaveData.itemBox[opt.selectedItem].count -= 1;
-                            }
-                            else {
-                                Data.SaveData.itemBox[opt.selectedItem].count = 0;
-                            }
-                            if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
-                                exitScene = true;
-                                Data.SaveData.itemBox.splice(opt.selectedItem, 1);
-                                opt.selectedItem = -1;
-                            }
-                        }
-                    }
-                }
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            dispatcher.add(backwordBtn);
-            const captionMonay = new Game.GUI.Button({
-                left: 131,
-                top: 46 - 28,
-                width: 112,
-                height: 16,
-                text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-            });
-            dispatcher.add(captionMonay);
-            const btnExit = new Game.GUI.Button({
-                left: 131,
-                top: 110,
-                width: 112,
-                height: 16,
-                text: "戻る",
-            });
-            dispatcher.add(btnExit);
-            btnExit.click = (x, y) => {
-                exitScene = true;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const captionItemCount = new Game.GUI.Button({
-                left: 131,
-                top: 64,
-                width: 112,
-                height: 14,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return '';
-                    }
-                    else {
-                        return `所有：${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}個`;
-                    }
-                },
-            });
-            dispatcher.add(captionItemCount);
-            const btnItemData = new Game.GUI.Button({
-                left: 131,
-                top: 142,
-                width: 112,
-                height: 60,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return "";
-                    }
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                    switch (itemData.kind) {
-                        case Data.Item.Kind.Wepon:
-                            return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Armor1:
-                            return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Armor2:
-                            return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Accessory:
-                            return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Tool:
-                            return `種別：道具`;
-                        case Data.Item.Kind.Treasure:
-                            return `種別：その他`;
-                        default:
-                            return "";
-                    }
-                },
-            });
-            dispatcher.add(btnItemData);
-            const btnDescription = new Game.GUI.Button({
-                left: 131,
-                top: 212,
-                width: 112,
-                height: 36,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return "";
-                    }
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                    return itemData.description;
-                },
-            });
-            dispatcher.add(btnDescription);
-            this.draw = () => {
-                opt.upperdraw();
-                dispatcher.draw();
-            };
-            yield () => {
-                anim = Game.getTimer().now % 1000;
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
-                if (exitScene) {
-                    this.next();
-                }
-            };
-            Game.getSceneManager().pop();
-            return;
-        }
-        Dungeon.itemBoxSelectPlayer = itemBoxSelectPlayer;
-    })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
-})(Scene || (Scene = {}));
-var Scene;
-(function (Scene) {
-    var Dungeon;
-    (function (Dungeon) {
-        function* itemBoxSelectItem(opt) {
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const caption = new Game.GUI.TextBox({
-                left: 1,
-                top: 1,
-                width: 250,
-                height: 14,
-                text: "道具箱",
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px 'PixelMplus10-Regular'",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-            });
-            dispatcher.add(caption);
-            opt.selectedItem = -1;
-            const listBox = new Game.GUI.ListBox({
-                left: 8,
-                top: 46 - 28,
-                width: 112 + 1,
-                height: 11 * 16,
-                lineHeight: 16,
-                getItemCount: () => Data.SaveData.itemBox.length,
-                drawItem: (left, top, width, height, index) => {
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[index].id);
-                    if (opt.selectedItem == index) {
-                        Game.getScreen().fillStyle = `rgb(24,196,195)`;
-                    }
-                    else {
-                        Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                    }
-                    Game.getScreen().fillRect(left, top, width, height);
+        class ItemBoxSelectPlayer {
+            constructor(opt) {
+                let anim = 0;
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const caption = new Game.GUI.TextBox({
+                    left: 1,
+                    top: 1,
+                    width: 250,
+                    height: 14,
+                    text: "道具箱：対象を選んでください。",
+                    edgeColor: `rgb(12,34,98)`,
+                    color: `rgb(24,133,196)`,
+                    font: "10px 'PixelMplus10-Regular'",
+                    fontColor: `rgb(255,255,255)`,
+                    textAlign: "left",
+                    textBaseline: "top",
+                });
+                dispatcher.add(caption);
+                let exitScene = false;
+                const team = [
+                    new Dungeon.StatusSprite(opt.player.getForward()), new Dungeon.StatusSprite(opt.player.getBackward())
+                ];
+                const forwardBtn = new Game.GUI.ImageButton({
+                    left: 8,
+                    top: 46,
+                    width: 112,
+                    height: 48,
+                    texture: null,
+                    texLeft: 0,
+                    texTop: 0,
+                    texWidth: 0,
+                    texHeight: 0
+                });
+                forwardBtn.draw = () => {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    Game.getScreen().fillRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
                     Game.getScreen().strokeStyle = `rgb(12,34,98)`;
                     Game.getScreen().lineWidth = 1;
-                    Game.getScreen().strokeRect(left, top, width, height);
+                    Game.getScreen().strokeRect(forwardBtn.left, forwardBtn.top, forwardBtn.width, 13);
                     Game.getScreen().font = "10px 'PixelMplus10-Regular'";
                     Game.getScreen().fillStyle = `rgb(255,255,255)`;
                     Game.getScreen().textAlign = "left";
                     Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(itemData.name, left + 3, top + 3);
-                    Game.getScreen().textAlign = "right";
-                    Game.getScreen().textBaseline = "top";
-                    Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
-                }
-            });
-            dispatcher.add(listBox);
-            listBox.click = (x, y) => {
-                opt.selectedItem = listBox.getItemIndexByPosition(x, y);
-                if (opt.selectedItem != -1) {
-                    Game.getSound().reqPlayChannel("cursor");
-                }
-            };
-            const captionMonay = new Game.GUI.Button({
-                left: 131,
-                top: 46 - 28,
-                width: 112,
-                height: 16,
-                text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-            });
-            dispatcher.add(captionMonay);
-            const btnDoUse = new Game.GUI.Button({
-                left: 131,
-                top: 110,
-                width: 112,
-                height: 16,
-                text: "使用",
-            });
-            dispatcher.add(btnDoUse);
-            btnDoUse.click = (x, y) => {
-                if (opt.selectedItem !== -1) {
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                    if (itemData.useToPlayer != null) {
-                        // プレイヤー選択画面にこのアイテムを渡して一時遷移
-                        Game.getSceneManager().push(Dungeon.itemBoxSelectPlayer, opt);
-                    }
-                    else if (itemData.useToParty != null) {
-                        // パーティ全体に適用する
-                        const ret = itemData.useToParty(opt.player);
-                        if (ret == true) {
-                            if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
-                                Data.SaveData.itemBox[opt.selectedItem].count -= 1;
-                            }
-                            else {
-                                Data.SaveData.itemBox[opt.selectedItem].count = 0;
-                            }
-                            if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
-                                exitScene = true;
-                                Data.SaveData.itemBox.splice(opt.selectedItem, 1);
-                                opt.selectedItem = -1;
+                    Game.getScreen().fillText("前衛", forwardBtn.left + 2, forwardBtn.top + 2);
+                    Dungeon.drawStatusSprite(team[0], Dungeon.DrawMode.Normal, forwardBtn.left, forwardBtn.top + 12, forwardBtn.width, 48, anim);
+                };
+                forwardBtn.click = (x, y) => {
+                    if (opt.selectedItem != -1) {
+                        const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
+                        const itemData = Data.Item.get(itemId);
+                        if (itemData != null && itemData.useToPlayer != null) {
+                            const ret = itemData.useToPlayer(team[0].data);
+                            if (ret == true) {
+                                if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
+                                    Data.SaveData.itemBox[opt.selectedItem].count -= 1;
+                                }
+                                else {
+                                    Data.SaveData.itemBox[opt.selectedItem].count = 0;
+                                }
+                                if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
+                                    exitScene = true;
+                                    Data.SaveData.itemBox.splice(opt.selectedItem, 1);
+                                    opt.selectedItem = -1;
+                                }
                             }
                         }
                     }
-                }
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            const captionItemCount = new Game.GUI.Button({
-                left: 131,
-                top: 64,
-                width: 112,
-                height: 14,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return '';
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                dispatcher.add(forwardBtn);
+                const backwordBtn = new Game.GUI.ImageButton({
+                    left: 8,
+                    top: 46 + 70,
+                    width: 112,
+                    height: 60,
+                    texture: null,
+                    texLeft: 0,
+                    texTop: 0,
+                    texWidth: 0,
+                    texHeight: 0
+                });
+                backwordBtn.draw = () => {
+                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    Game.getScreen().fillRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                    Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                    Game.getScreen().lineWidth = 1;
+                    Game.getScreen().strokeRect(backwordBtn.left, backwordBtn.top, backwordBtn.width, 13);
+                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                    Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                    Game.getScreen().textAlign = "left";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText("後衛", backwordBtn.left + 2, backwordBtn.top + 2);
+                    Dungeon.drawStatusSprite(team[1], Dungeon.DrawMode.Normal, backwordBtn.left, backwordBtn.top + 12, backwordBtn.width, 48, anim);
+                };
+                backwordBtn.click = (x, y) => {
+                    if (opt.selectedItem != -1) {
+                        const itemId = Data.SaveData.itemBox[opt.selectedItem].id;
+                        const itemData = Data.Item.get(itemId);
+                        if (itemData != null && itemData.useToPlayer != null) {
+                            const ret = itemData.useToPlayer(team[1].data);
+                            if (ret == true) {
+                                if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
+                                    Data.SaveData.itemBox[opt.selectedItem].count -= 1;
+                                }
+                                else {
+                                    Data.SaveData.itemBox[opt.selectedItem].count = 0;
+                                }
+                                if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
+                                    exitScene = true;
+                                    Data.SaveData.itemBox.splice(opt.selectedItem, 1);
+                                    opt.selectedItem = -1;
+                                }
+                            }
+                        }
                     }
-                    else {
-                        return `所有：${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}個`;
-                    }
-                },
-            });
-            dispatcher.add(captionItemCount);
-            const btnItemData = new Game.GUI.Button({
-                left: 131,
-                top: 142,
-                width: 112,
-                height: 60,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return "";
-                    }
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                    switch (itemData.kind) {
-                        case Data.Item.Kind.Wepon:
-                            return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Armor1:
-                            return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Armor2:
-                            return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Accessory:
-                            return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                        case Data.Item.Kind.Tool:
-                            return `種別：道具`;
-                        case Data.Item.Kind.Treasure:
-                            return `種別：その他`;
-                        default:
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                dispatcher.add(backwordBtn);
+                const captionMonay = new Game.GUI.Button({
+                    left: 131,
+                    top: 46 - 28,
+                    width: 112,
+                    height: 16,
+                    text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+                });
+                dispatcher.add(captionMonay);
+                const btnExit = new Game.GUI.Button({
+                    left: 131,
+                    top: 110,
+                    width: 112,
+                    height: 16,
+                    text: "戻る",
+                });
+                dispatcher.add(btnExit);
+                btnExit.click = (x, y) => {
+                    exitScene = true;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const captionItemCount = new Game.GUI.Button({
+                    left: 131,
+                    top: 64,
+                    width: 112,
+                    height: 14,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
+                            return '';
+                        }
+                        else {
+                            return `所有：${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}個`;
+                        }
+                    },
+                });
+                dispatcher.add(captionItemCount);
+                const btnItemData = new Game.GUI.Button({
+                    left: 131,
+                    top: 142,
+                    width: 112,
+                    height: 60,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
                             return "";
+                        }
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                        switch (itemData.kind) {
+                            case Data.Item.Kind.Wepon:
+                                return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Armor1:
+                                return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Armor2:
+                                return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Accessory:
+                                return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Tool:
+                                return `種別：道具`;
+                            case Data.Item.Kind.Treasure:
+                                return `種別：その他`;
+                            default:
+                                return "";
+                        }
+                    },
+                });
+                dispatcher.add(btnItemData);
+                const btnDescription = new Game.GUI.Button({
+                    left: 131,
+                    top: 212,
+                    width: 112,
+                    height: 36,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
+                            return "";
+                        }
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                        return itemData.description;
+                    },
+                });
+                dispatcher.add(btnDescription);
+                this.draw = () => {
+                    opt.upperdraw();
+                    dispatcher.draw();
+                };
+                this.update = () => {
+                    anim = Game.getTimer().now % 1000;
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
                     }
-                },
-            });
-            dispatcher.add(btnItemData);
-            const btnDescription = new Game.GUI.Button({
-                left: 131,
-                top: 212,
-                width: 112,
-                height: 36,
-                text: () => {
-                    if (opt.selectedItem == -1) {
-                        return "";
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
                     }
-                    const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
-                    return itemData.description;
-                },
-            });
-            dispatcher.add(btnDescription);
-            const btnExit = new Game.GUI.Button({
-                left: 8,
-                top: 16 * 11 + 46,
-                width: 112,
-                height: 16,
-                text: "戻る",
-            });
-            dispatcher.add(btnExit);
-            let exitScene = false;
-            btnExit.click = (x, y) => {
-                exitScene = true;
-                Game.getSound().reqPlayChannel("cursor");
-            };
-            btnDoUse.visible = btnItemData.visible = btnDescription.visible = captionItemCount.visible = false;
-            this.draw = () => {
-                opt.upperdraw();
-                dispatcher.draw();
-            };
-            yield () => {
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
-                btnDoUse.visible = (opt.selectedItem != -1) && (Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id).useToPlayer != null || Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id).useToParty != null);
-                if (exitScene) {
-                    this.next();
-                }
-            };
-            Game.getSceneManager().pop(this);
-            return;
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
+                    if (exitScene) {
+                        Game.getSceneManager().pop();
+                    }
+                };
+            }
+            draw() { }
+            update() { }
         }
-        Dungeon.itemBoxSelectItem = itemBoxSelectItem;
+        Dungeon.ItemBoxSelectPlayer = ItemBoxSelectPlayer;
     })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
-    function* mapview(data) {
-        this.draw = () => {
-            Game.getScreen().save();
-            Game.getScreen().fillStyle = "rgb(0,0,0)";
-            Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            const offx = ~~((Game.getScreen().offscreenWidth - data.map.width * 5) / 2);
-            const offy = ~~((Game.getScreen().offscreenHeight - data.map.height * 5) / 2);
-            // ミニマップを描画
-            for (let y = 0; y < data.map.height; y++) {
-                for (let x = 0; x < data.map.width; x++) {
-                    const chip = data.map.layer[0].chips.value(x, y);
-                    let color = "rgb(52,12,0)";
-                    switch (chip) {
-                        case 1:
-                            color = "rgb(179,116,39)";
-                            break;
-                        case 10:
-                            color = "rgb(255,0,0)";
-                            break;
+    var Dungeon;
+    (function (Dungeon) {
+        class ItemBoxSelectItem {
+            constructor(opt) {
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const caption = new Game.GUI.TextBox({
+                    left: 1,
+                    top: 1,
+                    width: 250,
+                    height: 14,
+                    text: "道具箱",
+                    edgeColor: `rgb(12,34,98)`,
+                    color: `rgb(24,133,196)`,
+                    font: "10px 'PixelMplus10-Regular'",
+                    fontColor: `rgb(255,255,255)`,
+                    textAlign: "left",
+                    textBaseline: "top",
+                });
+                dispatcher.add(caption);
+                opt.selectedItem = -1;
+                const listBox = new Game.GUI.ListBox({
+                    left: 8,
+                    top: 46 - 28,
+                    width: 112 + 1,
+                    height: 11 * 16,
+                    lineHeight: 16,
+                    getItemCount: () => Data.SaveData.itemBox.length,
+                    drawItem: (left, top, width, height, index) => {
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[index].id);
+                        if (opt.selectedItem == index) {
+                            Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                        }
+                        else {
+                            Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                        }
+                        Game.getScreen().fillRect(left, top, width, height);
+                        Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                        Game.getScreen().lineWidth = 1;
+                        Game.getScreen().strokeRect(left, top, width, height);
+                        Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                        Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                        Game.getScreen().textAlign = "left";
+                        Game.getScreen().textBaseline = "top";
+                        Game.getScreen().fillText(itemData.name, left + 3, top + 3);
+                        Game.getScreen().textAlign = "right";
+                        Game.getScreen().textBaseline = "top";
+                        Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
                     }
-                    Game.getScreen().fillStyle = color;
-                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                    let light = 1 - data.map.visibled.value(x, y) / 100;
-                    if (light > 1) {
-                        light = 1;
+                });
+                dispatcher.add(listBox);
+                listBox.click = (x, y) => {
+                    opt.selectedItem = listBox.getItemIndexByPosition(x, y);
+                    if (opt.selectedItem != -1) {
+                        Game.getSound().reqPlayChannel("cursor");
                     }
-                    else if (light < 0) {
-                        light = 0;
+                };
+                const captionMonay = new Game.GUI.Button({
+                    left: 131,
+                    top: 46 - 28,
+                    width: 112,
+                    height: 16,
+                    text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+                });
+                dispatcher.add(captionMonay);
+                const btnDoUse = new Game.GUI.Button({
+                    left: 131,
+                    top: 110,
+                    width: 112,
+                    height: 16,
+                    text: "使用",
+                });
+                dispatcher.add(btnDoUse);
+                btnDoUse.click = (x, y) => {
+                    if (opt.selectedItem !== -1) {
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                        if (itemData.useToPlayer != null) {
+                            // プレイヤー選択画面にこのアイテムを渡して一時遷移
+                            Game.getSceneManager().push(new Dungeon.ItemBoxSelectPlayer(opt));
+                        }
+                        else if (itemData.useToParty != null) {
+                            // パーティ全体に適用する
+                            const ret = itemData.useToParty(opt.player);
+                            if (ret == true) {
+                                if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
+                                    Data.SaveData.itemBox[opt.selectedItem].count -= 1;
+                                }
+                                else {
+                                    Data.SaveData.itemBox[opt.selectedItem].count = 0;
+                                }
+                                if (Data.SaveData.itemBox[opt.selectedItem].count == 0) {
+                                    exitScene = true;
+                                    Data.SaveData.itemBox.splice(opt.selectedItem, 1);
+                                    opt.selectedItem = -1;
+                                }
+                            }
+                        }
                     }
-                    Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
-                    Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
-                }
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                const captionItemCount = new Game.GUI.Button({
+                    left: 131,
+                    top: 64,
+                    width: 112,
+                    height: 14,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
+                            return '';
+                        }
+                        else {
+                            return `所有：${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}個`;
+                        }
+                    },
+                });
+                dispatcher.add(captionItemCount);
+                const btnItemData = new Game.GUI.Button({
+                    left: 131,
+                    top: 142,
+                    width: 112,
+                    height: 60,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
+                            return "";
+                        }
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                        switch (itemData.kind) {
+                            case Data.Item.Kind.Wepon:
+                                return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Armor1:
+                                return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Armor2:
+                                return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Accessory:
+                                return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            case Data.Item.Kind.Tool:
+                                return `種別：道具`;
+                            case Data.Item.Kind.Treasure:
+                                return `種別：その他`;
+                            default:
+                                return "";
+                        }
+                    },
+                });
+                dispatcher.add(btnItemData);
+                const btnDescription = new Game.GUI.Button({
+                    left: 131,
+                    top: 212,
+                    width: 112,
+                    height: 36,
+                    text: () => {
+                        if (opt.selectedItem == -1) {
+                            return "";
+                        }
+                        const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
+                        return itemData.description;
+                    },
+                });
+                dispatcher.add(btnDescription);
+                const btnExit = new Game.GUI.Button({
+                    left: 8,
+                    top: 16 * 11 + 46,
+                    width: 112,
+                    height: 16,
+                    text: "戻る",
+                });
+                dispatcher.add(btnExit);
+                let exitScene = false;
+                btnExit.click = (x, y) => {
+                    exitScene = true;
+                    Game.getSound().reqPlayChannel("cursor");
+                };
+                btnDoUse.visible = btnItemData.visible = btnDescription.visible = captionItemCount.visible = false;
+                this.draw = () => {
+                    opt.upperdraw();
+                    dispatcher.draw();
+                };
+                this.update = () => {
+                    if (Game.getInput().isDown()) {
+                        dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isMove()) {
+                        dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    if (Game.getInput().isUp()) {
+                        dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                    }
+                    btnItemData.visible = btnDescription.visible = captionItemCount.visible = (opt.selectedItem != -1);
+                    btnDoUse.visible = (opt.selectedItem != -1) &&
+                        (Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id).useToPlayer != null ||
+                            Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id).useToParty != null);
+                    if (exitScene) {
+                        Game.getSceneManager().pop(this);
+                    }
+                };
             }
-            Game.getScreen().fillStyle = "rgb(0,255,0)";
-            Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
-            Game.getScreen().restore();
-        };
-        yield Scene.waitClick({ end: () => this.next() });
-        Game.getSceneManager().pop();
+            draw() { }
+            update() { }
+        }
+        Dungeon.ItemBoxSelectItem = ItemBoxSelectItem;
+    })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
+})(Scene || (Scene = {}));
+var Scene;
+(function (Scene) {
+    class MapView {
+        constructor(data) {
+            this.draw = () => {
+                Game.getScreen().save();
+                Game.getScreen().fillStyle = "rgb(0,0,0)";
+                Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                const offx = ~~((Game.getScreen().offscreenWidth - data.map.width * 5) / 2);
+                const offy = ~~((Game.getScreen().offscreenHeight - data.map.height * 5) / 2);
+                // ミニマップを描画
+                for (let y = 0; y < data.map.height; y++) {
+                    for (let x = 0; x < data.map.width; x++) {
+                        const chip = data.map.layer[0].chips.value(x, y);
+                        let color = "rgb(52,12,0)";
+                        switch (chip) {
+                            case 1:
+                                color = "rgb(179,116,39)";
+                                break;
+                            case 10:
+                                color = "rgb(255,0,0)";
+                                break;
+                        }
+                        Game.getScreen().fillStyle = color;
+                        Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
+                        let light = 1 - data.map.visibled.value(x, y) / 100;
+                        if (light > 1) {
+                            light = 1;
+                        }
+                        else if (light < 0) {
+                            light = 0;
+                        }
+                        Game.getScreen().fillStyle = `rgba(0,0,0,${light})`;
+                        Game.getScreen().fillRect(offx + x * 5, offy + y * 5, 5, 5);
+                    }
+                }
+                Game.getScreen().fillStyle = "rgb(0,255,0)";
+                Game.getScreen().fillRect(offx + data.player.x * 5, offy + data.player.y * 5, 5, 5);
+                Game.getScreen().restore();
+            };
+            this.update = Scene.waitClick(() => Game.getSceneManager().pop());
+        }
+        draw() { }
+        update() { }
     }
-    Scene.mapview = mapview;
+    Scene.MapView = MapView;
 })(Scene || (Scene = {}));
 var Scene;
 (function (Scene) {
@@ -7275,324 +7362,48 @@ var Scene;
 (function (Scene) {
     var Dungeon;
     (function (Dungeon) {
-        function* dungeon(param) {
-            const player = param.player;
-            const floor = param.floor;
-            // マップ生成
-            const map = MapData.Generator.generate({
-                floor: floor,
-                gridsize: { width: 24, height: 24 },
-                layer: {
-                    0: {
-                        texture: "mapchip",
-                        chip: {
-                            1: { x: 48, y: 0 },
-                            2: { x: 96, y: 96 },
-                            10: { x: 96, y: 0 },
+        ;
+        class Top {
+            constructor(param) {
+                const player = param.player;
+                const floor = param.floor;
+                // マップ生成
+                const map = MapData.Generator.generate({
+                    floor: floor,
+                    gridsize: { width: 24, height: 24 },
+                    layer: {
+                        0: {
+                            texture: "mapchip",
+                            chip: {
+                                1: { x: 48, y: 0 },
+                                2: { x: 96, y: 96 },
+                                10: { x: 96, y: 0 },
+                            },
+                            chips: null,
                         },
-                        chips: null,
-                    },
-                    1: {
-                        texture: "mapchip",
-                        chip: {
-                            0: { x: 96, y: 72 },
+                        1: {
+                            texture: "mapchip",
+                            chip: {
+                                0: { x: 96, y: 72 },
+                            },
+                            chips: null,
                         },
-                        chips: null,
-                    },
-                }
-            });
-            param.player.x = map.startPos.x;
-            param.player.y = map.startPos.y;
-            // モンスター配置
-            let monsters = map.rooms.splice(2).map((x) => {
-                const monster = new Unit.Monster("slime");
-                monster.x = x.left;
-                monster.y = x.top;
-                monster.life = monster.maxLife = floor + 5;
-                monster.atk = ~~(floor * 2);
-                monster.def = ~~(floor / 3) + 1;
-                return monster;
-            });
-            // ドロップアイテム等の情報
-            const drops = [];
-            // カメラを更新
-            map.update({
-                viewpoint: {
-                    x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
-                    y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
-                },
-                viewwidth: Game.getScreen().offscreenWidth,
-                viewheight: Game.getScreen().offscreenHeight,
-            });
-            Game.getSound().reqPlayChannel("dungeon", true);
-            // assign virtual pad
-            const pad = new Game.Input.VirtualStick();
-            const pointerdown = (ev) => {
-                if (pad.onpointingstart(ev.pointerId)) {
-                    const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-                    pad.x = pos[0];
-                    pad.y = pos[1];
-                }
-            };
-            const pointermove = (ev) => {
-                const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
-                pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
-            };
-            const pointerup = (ev) => {
-                pad.onpointingend(ev.pointerId);
-            };
-            const onPointerHook = () => {
-                Game.getInput().on("pointerdown", pointerdown);
-                Game.getInput().on("pointermove", pointermove);
-                Game.getInput().on("pointerup", pointerup);
-                Game.getInput().on("pointerleave", pointerup);
-            };
-            const offPointerHook = () => {
-                Game.getInput().off("pointerdown", pointerdown);
-                Game.getInput().off("pointermove", pointermove);
-                Game.getInput().off("pointerup", pointerup);
-                Game.getInput().off("pointerleave", pointerup);
-            };
-            this.suspend = () => {
-                offPointerHook();
-                Game.getSound().reqStopChannel("dungeon");
-            };
-            this.resume = () => {
-                onPointerHook();
-                Game.getSound().reqPlayChannel("dungeon", true);
-            };
-            this.leave = () => {
-                offPointerHook();
-                Game.getSound().reqStopChannel("dungeon");
-            };
-            function updateLighting(iswalkable) {
-                map.clearLighting();
-                PathFinder.calcDistanceByDijkstra({
-                    array2D: map.layer[0].chips,
-                    sx: player.x,
-                    sy: player.y,
-                    value: 140,
-                    costs: (v) => iswalkable(v) ? 20 : 50,
-                    output: (x, y, v) => {
-                        map.lighting.value(x, y, v);
-                        if (map.visibled.value(x, y) < v) {
-                            map.visibled.value(x, y, v);
-                        }
-                    },
-                });
-            }
-            ;
-            const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            const particles = [];
-            const dispatcher = new Game.GUI.UIDispatcher();
-            const mapButton = new Game.GUI.ImageButton({
-                left: 141 + 22 * 0,
-                top: 0,
-                width: 23,
-                height: 19,
-                texture: "menuicon",
-                texLeft: 23 * 0,
-                texTop: 0,
-                texWidth: 23,
-                texHeight: 19
-            });
-            dispatcher.add(mapButton);
-            mapButton.click = (x, y) => {
-                Game.getSceneManager().push(Scene.mapview, { map: map, player: player });
-            };
-            const itemButton = new Game.GUI.ImageButton({
-                left: 141 + 22 * 1,
-                top: 0,
-                width: 23,
-                height: 19,
-                texture: "menuicon",
-                texLeft: 23 * 1,
-                texTop: 0,
-                texWidth: 23,
-                texHeight: 19
-            });
-            dispatcher.add(itemButton);
-            itemButton.click = (x, y) => {
-                Game.getSceneManager().push(Dungeon.itemBoxSelectItem, { player: player, floor: floor, upperdraw: this.draw });
-            };
-            const equipButton = new Game.GUI.ImageButton({
-                left: 141 + 22 * 2,
-                top: 0,
-                width: 23,
-                height: 19,
-                texture: "menuicon",
-                texLeft: 23 * 2,
-                texTop: 0,
-                texWidth: 23,
-                texHeight: 19
-            });
-            dispatcher.add(equipButton);
-            equipButton.click = (x, y) => {
-                //Game.getSceneManager().push(mapview, { map: map, player: player });
-            };
-            const statusButton = new Game.GUI.ImageButton({
-                left: 141 + 22 * 3,
-                top: 0,
-                width: 23,
-                height: 19,
-                texture: "menuicon",
-                texLeft: 23 * 3,
-                texTop: 0,
-                texWidth: 23,
-                texHeight: 19
-            });
-            dispatcher.add(statusButton);
-            statusButton.click = (x, y) => {
-                Game.getSceneManager().push(Dungeon.statusView, { player: player, floor: floor, upperdraw: this.draw });
-            };
-            const otherButton = new Game.GUI.ImageButton({
-                left: 141 + 22 * 4,
-                top: 0,
-                width: 23,
-                height: 19,
-                texture: "menuicon",
-                texLeft: 23 * 4,
-                texTop: 0,
-                texWidth: 23,
-                texHeight: 19
-            });
-            dispatcher.add(otherButton);
-            otherButton.click = (x, y) => {
-                //Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
-            };
-            this.draw = () => {
-                Game.getScreen().save();
-                Game.getScreen().fillStyle = "rgb(255,255,255)";
-                Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                map.draw((l, cameraLocalPx, cameraLocalPy) => {
-                    if (l === 0) {
-                        // 影
-                        Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
-                        Game.getScreen().beginPath();
-                        Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
-                        Game.getScreen().fill();
-                        const camera = map.camera;
-                        // ドロップアイテム
-                        drops.forEach((drop) => {
-                            const xx = drop.x - camera.chipLeft;
-                            const yy = drop.y - camera.chipTop;
-                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                                const dx = xx * map.gridsize.width + camera.chipOffX;
-                                const dy = yy * map.gridsize.height + camera.chipOffY;
-                                drop.draw(dx, dy);
-                            }
-                        });
-                        // モンスター
-                        monsters.forEach((monster) => {
-                            const xx = monster.x - camera.chipLeft;
-                            const yy = monster.y - camera.chipTop;
-                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                                const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
-                                const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                                const dx = xx * map.gridsize.width +
-                                    camera.chipOffX +
-                                    monster.offx +
-                                    sprite.offsetX +
-                                    animFrame.offsetX;
-                                const dy = yy * map.gridsize.height +
-                                    camera.chipOffY +
-                                    monster.offy +
-                                    sprite.offsetY +
-                                    animFrame.offsetY;
-                                Game.getScreen().drawImage(monster.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, dx, dy, sprite.width, sprite.height);
-                            }
-                        });
-                        {
-                            const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
-                            const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
-                            // キャラクター
-                            Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY, sprite.width, sprite.height);
-                        }
-                    }
-                    if (l === 1) {
-                        // インフォメーションの描画
-                        // モンスター体力
-                        const camera = map.camera;
-                        monsters.forEach((monster) => {
-                            const xx = monster.x - camera.chipLeft;
-                            const yy = monster.y - camera.chipTop;
-                            if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
-                                (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
-                                const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
-                                const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
-                                const dx = xx * map.gridsize.width + camera.chipOffX + monster.offx + sprite.offsetX + animFrame.offsetX;
-                                const dy = yy * map.gridsize.height + camera.chipOffY + monster.offy + sprite.offsetY + animFrame.offsetY;
-                                Game.getScreen().fillStyle = 'rgb(255,0,0)';
-                                Game.getScreen().fillRect(dx, dy + sprite.height - 1, map.gridsize.width, 1);
-                                Game.getScreen().fillStyle = 'rgb(0,255,0)';
-                                Game.getScreen().fillRect(dx, dy + sprite.height - 1, ~~(map.gridsize.width * monster.life / monster.maxLife), 1);
-                            }
-                        });
-                        {
-                            const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
-                            const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
-                            // キャラクター体力
-                            Game.getScreen().fillStyle = 'rgb(255,0,0)';
-                            Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY + sprite.height - 1, map.gridsize.width, 1);
-                            Game.getScreen().fillStyle = 'rgb(0,255,0)';
-                            Game.getScreen().fillRect(cameraLocalPx - map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy - sprite.height / 2 + /*player.offy + */ sprite.offsetY + animFrame.offsetY + sprite.height - 1, ~~(map.gridsize.width * player.getForward().hp / player.getForward().hpMax), 1);
-                        }
                     }
                 });
-                // スプライト
-                particles.forEach((x) => x.draw(map.camera));
-                // 情報
-                Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
-                Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
-                Font7px.draw7pxFont(`     | GOLD:${Data.SaveData.money}`, 0, 6 * 2);
-                //menuicon
-                // UI
-                dispatcher.draw();
-                // フェード
-                fade.draw();
-                Game.getScreen().restore();
-                // バーチャルジョイスティックの描画
-                if (pad.isTouching) {
-                    Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
-                    Game.getScreen().beginPath();
-                    Game.getScreen().ellipse(pad.x, pad.y, pad.radius * 1.2, pad.radius * 1.2, 0, 0, Math.PI * 2);
-                    Game.getScreen().fill();
-                    Game.getScreen().beginPath();
-                    Game.getScreen().ellipse(pad.x + pad.cx, pad.y + pad.cy, pad.radius, pad.radius, 0, 0, Math.PI * 2);
-                    Game.getScreen().fill();
-                }
-            };
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeIn(); },
-                update: (e) => {
-                    fade.update(e);
-                    updateLighting((v) => v === 1 || v === 10);
-                },
-                end: () => { this.next(); },
-            });
-            onPointerHook();
-            // ターンの状態（フェーズ）
-            const turnContext = {
-                floor: floor,
-                pad: pad,
-                player: player,
-                monsters: monsters,
-                map: map,
-                drops: drops,
-                tactics: {
-                    player: {},
-                    monsters: []
-                },
-                sprites: particles,
-                scene: this,
-                elapsedTurn: 0,
-            };
-            const turnStateStack = [];
-            turnStateStack.unshift(WaitInput.call(this, turnStateStack, turnContext));
-            const common_update = () => {
+                param.player.x = map.startPos.x;
+                param.player.y = map.startPos.y;
+                // モンスター配置
+                let monsters = map.rooms.splice(2).map((x) => {
+                    const monster = new Unit.Monster("slime");
+                    monster.x = x.left;
+                    monster.y = x.top;
+                    monster.life = monster.maxLife = floor + 5;
+                    monster.atk = ~~(floor * 2);
+                    monster.def = ~~(floor / 3) + 1;
+                    return monster;
+                });
+                // ドロップアイテム等の情報
+                const drops = [];
                 // カメラを更新
                 map.update({
                     viewpoint: {
@@ -7600,41 +7411,362 @@ var Scene;
                         y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
                     },
                     viewwidth: Game.getScreen().offscreenWidth,
-                    viewheight: Game.getScreen().offscreenHeight
+                    viewheight: Game.getScreen().offscreenHeight,
                 });
-                // スプライトを更新
-                particles.removeIf((x) => x.update());
-                updateLighting((v) => v === 1 || v === 10);
-                if (player.getForward().hp === 0) {
-                    if (player.getBackward().hp !== 0) {
-                        player.active = player.active == 0 ? 1 : 0;
+                Game.getSound().reqPlayChannel("dungeon", true);
+                // assign virtual pad
+                const pad = new Game.Input.VirtualStick();
+                const pointerdown = (ev) => {
+                    if (pad.onpointingstart(ev.pointerId)) {
+                        const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+                        pad.x = pos[0];
+                        pad.y = pos[1];
                     }
-                    else {
-                        // ターン強制終了
-                        Game.getSceneManager().pop();
-                        Game.getSceneManager().push(Dungeon.gameOver, { player: player, floor: floor, upperdraw: this.draw });
-                        return;
+                };
+                const pointermove = (ev) => {
+                    const pos = Game.getScreen().pagePointToScreenPoint(ev.pageX, ev.pageY);
+                    pad.onpointingmove(ev.pointerId, pos[0], pos[1]);
+                };
+                const pointerup = (ev) => {
+                    pad.onpointingend(ev.pointerId);
+                };
+                this.onPointerHook = () => {
+                    Game.getInput().on("pointerdown", pointerdown);
+                    Game.getInput().on("pointermove", pointermove);
+                    Game.getInput().on("pointerup", pointerup);
+                    Game.getInput().on("pointerleave", pointerup);
+                };
+                this.offPointerHook = () => {
+                    Game.getInput().off("pointerdown", pointerdown);
+                    Game.getInput().off("pointermove", pointermove);
+                    Game.getInput().off("pointerup", pointerup);
+                    Game.getInput().off("pointerleave", pointerup);
+                };
+                //this.suspend = () => {
+                //    offPointerHook();
+                //    Game.getSound().reqStopChannel("dungeon");
+                //};
+                //this.resume = () => {
+                //    onPointerHook();
+                //    Game.getSound().reqPlayChannel("dungeon", true);
+                //};
+                //this.leave = () => {
+                //    offPointerHook();
+                //    Game.getSound().reqStopChannel("dungeon");
+                //};
+                function updateLighting(iswalkable) {
+                    map.clearLighting();
+                    PathFinder.calcDistanceByDijkstra({
+                        array2D: map.layer[0].chips,
+                        sx: player.x,
+                        sy: player.y,
+                        value: 140,
+                        costs: (v) => iswalkable(v) ? 20 : 50,
+                        output: (x, y, v) => {
+                            map.lighting.value(x, y, v);
+                            if (map.visibled.value(x, y) < v) {
+                                map.visibled.value(x, y, v);
+                            }
+                        },
+                    });
+                }
+                ;
+                const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                const particles = [];
+                const dispatcher = new Game.GUI.UIDispatcher();
+                const mapButton = new Game.GUI.ImageButton({
+                    left: 141 + 22 * 0,
+                    top: 0,
+                    width: 23,
+                    height: 19,
+                    texture: "menuicon",
+                    texLeft: 23 * 0,
+                    texTop: 0,
+                    texWidth: 23,
+                    texHeight: 19
+                });
+                dispatcher.add(mapButton);
+                mapButton.click = (x, y) => {
+                    const keep = this.update;
+                    this.offPointerHook();
+                    this.update = () => {
+                        this.onPointerHook();
+                        this.update = keep;
+                    };
+                    Game.getSceneManager().push(new Scene.MapView({ map: map, player: player }));
+                };
+                const itemButton = new Game.GUI.ImageButton({
+                    left: 141 + 22 * 1,
+                    top: 0,
+                    width: 23,
+                    height: 19,
+                    texture: "menuicon",
+                    texLeft: 23 * 1,
+                    texTop: 0,
+                    texWidth: 23,
+                    texHeight: 19
+                });
+                dispatcher.add(itemButton);
+                itemButton.click = (x, y) => {
+                    const keep = this.update;
+                    this.offPointerHook();
+                    this.update = () => {
+                        this.onPointerHook();
+                        this.update = keep;
+                    };
+                    Game.getSceneManager()
+                        .push(new Dungeon.ItemBoxSelectItem({ selectedItem: -1, player: player, floor: floor, upperdraw: this.draw }));
+                };
+                const equipButton = new Game.GUI.ImageButton({
+                    left: 141 + 22 * 2,
+                    top: 0,
+                    width: 23,
+                    height: 19,
+                    texture: "menuicon",
+                    texLeft: 23 * 2,
+                    texTop: 0,
+                    texWidth: 23,
+                    texHeight: 19
+                });
+                dispatcher.add(equipButton);
+                equipButton.click = (x, y) => {
+                    //Game.getSceneManager().push(mapview, { map: map, player: player });
+                };
+                const statusButton = new Game.GUI.ImageButton({
+                    left: 141 + 22 * 3,
+                    top: 0,
+                    width: 23,
+                    height: 19,
+                    texture: "menuicon",
+                    texLeft: 23 * 3,
+                    texTop: 0,
+                    texWidth: 23,
+                    texHeight: 19
+                });
+                dispatcher.add(statusButton);
+                statusButton.click = (x, y) => {
+                    const keep = this.update;
+                    this.offPointerHook();
+                    this.update = () => {
+                        this.onPointerHook();
+                        this.update = keep;
+                    };
+                    Game.getSceneManager().push(new Dungeon.StatusView({ player: player, floor: floor, upperdraw: this.draw }));
+                };
+                const otherButton = new Game.GUI.ImageButton({
+                    left: 141 + 22 * 4,
+                    top: 0,
+                    width: 23,
+                    height: 19,
+                    texture: "menuicon",
+                    texLeft: 23 * 4,
+                    texTop: 0,
+                    texWidth: 23,
+                    texHeight: 19
+                });
+                dispatcher.add(otherButton);
+                otherButton.click = (x, y) => {
+                    //Game.getSceneManager().push(statusView, { player: player, floor:floor, upperdraw: this.draw });
+                };
+                this.draw = () => {
+                    Game.getScreen().save();
+                    Game.getScreen().fillStyle = "rgb(255,255,255)";
+                    Game.getScreen().fillRect(0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                    map.draw((l, cameraLocalPx, cameraLocalPy) => {
+                        if (l === 0) {
+                            // 影
+                            Game.getScreen().fillStyle = "rgba(0,0,0,0.25)";
+                            Game.getScreen().beginPath();
+                            Game.getScreen().ellipse(cameraLocalPx, cameraLocalPy + 7, 12, 3, 0, 0, Math.PI * 2);
+                            Game.getScreen().fill();
+                            const camera = map.camera;
+                            // ドロップアイテム
+                            drops.forEach((drop) => {
+                                const xx = drop.x - camera.chipLeft;
+                                const yy = drop.y - camera.chipTop;
+                                if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                    (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                                    const dx = xx * map.gridsize.width + camera.chipOffX;
+                                    const dy = yy * map.gridsize.height + camera.chipOffY;
+                                    drop.draw(dx, dy);
+                                }
+                            });
+                            // モンスター
+                            monsters.forEach((monster) => {
+                                const xx = monster.x - camera.chipLeft;
+                                const yy = monster.y - camera.chipTop;
+                                if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                    (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                                    const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                                    const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                                    const dx = xx * map.gridsize.width +
+                                        camera.chipOffX +
+                                        monster.offx +
+                                        sprite.offsetX +
+                                        animFrame.offsetX;
+                                    const dy = yy * map.gridsize.height +
+                                        camera.chipOffY +
+                                        monster.offy +
+                                        sprite.offsetY +
+                                        animFrame.offsetY;
+                                    Game.getScreen().drawImage(monster.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, dx, dy, sprite.width, sprite.height);
+                                }
+                            });
+                            {
+                                const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                                const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+                                // キャラクター
+                                Game.getScreen().drawImage(player.spriteSheet.getSpriteImage(sprite), sprite.left, sprite.top, sprite.width, sprite.height, cameraLocalPx - sprite.width / 2 + /*player.offx + */ sprite.offsetX + animFrame.offsetX, cameraLocalPy -
+                                    sprite.height / 2 + /*player.offy + */ sprite.offsetY +
+                                    animFrame.offsetY, sprite.width, sprite.height);
+                            }
+                        }
+                        if (l === 1) {
+                            // インフォメーションの描画
+                            // モンスター体力
+                            const camera = map.camera;
+                            monsters.forEach((monster) => {
+                                const xx = monster.x - camera.chipLeft;
+                                const yy = monster.y - camera.chipTop;
+                                if ((0 <= xx && xx < Game.getScreen().offscreenWidth / 24) &&
+                                    (0 <= yy && yy < Game.getScreen().offscreenHeight / 24)) {
+                                    const animFrame = monster.spriteSheet.getAnimationFrame(monster.animName, monster.animFrame);
+                                    const sprite = monster.spriteSheet.gtetSprite(animFrame.sprite);
+                                    const dx = xx * map.gridsize.width +
+                                        camera.chipOffX +
+                                        monster.offx +
+                                        sprite.offsetX +
+                                        animFrame.offsetX;
+                                    const dy = yy * map.gridsize.height +
+                                        camera.chipOffY +
+                                        monster.offy +
+                                        sprite.offsetY +
+                                        animFrame.offsetY;
+                                    Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                                    Game.getScreen().fillRect(dx, dy + sprite.height - 1, map.gridsize.width, 1);
+                                    Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                                    Game.getScreen().fillRect(dx, dy + sprite.height - 1, ~~(map.gridsize.width * monster.life / monster.maxLife), 1);
+                                }
+                            });
+                            {
+                                const animFrame = player.spriteSheet.getAnimationFrame(player.animName, player.animFrame);
+                                const sprite = player.spriteSheet.gtetSprite(animFrame.sprite);
+                                // キャラクター体力
+                                Game.getScreen().fillStyle = 'rgb(255,0,0)';
+                                Game.getScreen().fillRect(cameraLocalPx -
+                                    map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX +
+                                    animFrame.offsetX, cameraLocalPy -
+                                    sprite.height / 2 + /*player.offy + */ sprite.offsetY +
+                                    animFrame.offsetY +
+                                    sprite.height -
+                                    1, map.gridsize.width, 1);
+                                Game.getScreen().fillStyle = 'rgb(0,255,0)';
+                                Game.getScreen().fillRect(cameraLocalPx -
+                                    map.gridsize.width / 2 + /*player.offx + */ sprite.offsetX +
+                                    animFrame.offsetX, cameraLocalPy -
+                                    sprite.height / 2 + /*player.offy + */ sprite.offsetY +
+                                    animFrame.offsetY +
+                                    sprite.height -
+                                    1, ~~(map.gridsize.width * player.getForward().hp / player.getForward().hpMax), 1);
+                            }
+                        }
+                    });
+                    // スプライト
+                    particles.forEach((x) => x.draw(map.camera));
+                    // 情報
+                    Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
+                    Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`, 0, 6 * 1);
+                    Font7px.draw7pxFont(`     | GOLD:${Data.SaveData.money}`, 0, 6 * 2);
+                    //menuicon
+                    // UI
+                    dispatcher.draw();
+                    // フェード
+                    fade.draw();
+                    Game.getScreen().restore();
+                    // バーチャルジョイスティックの描画
+                    if (pad.isTouching) {
+                        Game.getScreen().fillStyle = "rgba(255,255,255,0.25)";
+                        Game.getScreen().beginPath();
+                        Game.getScreen().ellipse(pad.x, pad.y, pad.radius * 1.2, pad.radius * 1.2, 0, 0, Math.PI * 2);
+                        Game.getScreen().fill();
+                        Game.getScreen().beginPath();
+                        Game.getScreen().ellipse(pad.x + pad.cx, pad.y + pad.cy, pad.radius, pad.radius, 0, 0, Math.PI * 2);
+                        Game.getScreen().fill();
                     }
-                }
-                // ui 
-                if (Game.getInput().isDown()) {
-                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isMove()) {
-                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-                }
-                if (Game.getInput().isUp()) {
-                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-                }
-            };
-            yield () => {
-                // ターン進行
-                while (turnStateStack.length > 0 && turnStateStack[0].next().done) { }
-                common_update();
-            };
+                };
+                const TurnMain = () => {
+                    this.onPointerHook();
+                    // ターンの状態（フェーズ）
+                    const turnContext = {
+                        floor: floor,
+                        pad: pad,
+                        player: player,
+                        monsters: monsters,
+                        map: map,
+                        drops: drops,
+                        tactics: {
+                            player: {},
+                            monsters: []
+                        },
+                        sprites: particles,
+                        scene: this,
+                        elapsedTurn: 0,
+                    };
+                    const turnStateStack = [];
+                    turnStateStack.unshift(WaitInput.call(this, turnStateStack, turnContext));
+                    const common_update = () => {
+                        // カメラを更新
+                        map.update({
+                            viewpoint: {
+                                x: (player.x * map.gridsize.width + player.offx) + map.gridsize.width / 2,
+                                y: (player.y * map.gridsize.height + player.offy) + map.gridsize.height / 2,
+                            },
+                            viewwidth: Game.getScreen().offscreenWidth,
+                            viewheight: Game.getScreen().offscreenHeight
+                        });
+                        // スプライトを更新
+                        particles.removeIf((x) => x.update());
+                        updateLighting((v) => v === 1 || v === 10);
+                        if (player.getForward().hp === 0) {
+                            if (player.getBackward().hp !== 0) {
+                                player.active = player.active == 0 ? 1 : 0;
+                            }
+                            else {
+                                // ターン強制終了
+                                this.offPointerHook();
+                                Game.getSound().reqStopChannel("dungeon");
+                                Game.getSceneManager().pop();
+                                Game.getSceneManager()
+                                    .push(new Dungeon.GameOver({ player: player, floor: floor, upperdraw: this.draw }));
+                                return;
+                            }
+                        }
+                        // ui 
+                        if (Game.getInput().isDown()) {
+                            dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                        if (Game.getInput().isMove()) {
+                            dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                        if (Game.getInput().isUp()) {
+                            dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                        }
+                    };
+                    this.update = () => {
+                        // ターン進行
+                        while (turnStateStack.length > 0 && turnStateStack[0].next().done) {
+                        }
+                        common_update();
+                    };
+                };
+                this.update = Scene.waitFadeIn(fade, TurnMain, () => updateLighting((v) => v === 1 || v === 10));
+            }
+            draw() { }
+            update() { }
+            onPointerHook() { }
+            offPointerHook() { }
         }
-        Dungeon.dungeon = dungeon;
-        ;
+        Dungeon.Top = Top;
         function* WaitInput(turnStateStack, context) {
             for (;;) {
                 // キー入力待ち
@@ -8096,743 +8228,20 @@ var Scene;
             while (Game.getTimer().now - start < 1000) {
                 yield;
             }
+            this.offPointerHook();
+            Game.getSound().reqStopChannel("dungeon");
             if (mode === "next") {
                 Game.getSceneManager().pop();
-                Game.getSceneManager().push(dungeon, { player: context.player, floor: context.floor + 1 });
+                Game.getSceneManager().push(new Top({ player: context.player, floor: context.floor + 1 }));
             }
             else {
                 Game.getSceneManager().pop();
-                Game.getSceneManager().push(Scene.corridor);
+                Game.getSceneManager().push(new Scene.Corridor());
             }
             turnStateStack.shift();
             return;
         }
     })(Dungeon = Scene.Dungeon || (Scene.Dungeon = {}));
-})(Scene || (Scene = {}));
-/// <reference path="../../lib/game/eventdispatcher.ts" />
-var Scene;
-(function (Scene) {
-    function* shopBuyItem() {
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        let selectedItem = -1;
-        const listBox = new Game.GUI.ListBox({
-            left: 8,
-            top: 46,
-            width: 112 + 1,
-            height: 10 * 16,
-            lineHeight: 16,
-            getItemCount: () => Data.SaveData.shopStockList.length,
-            drawItem: (left, top, width, height, index) => {
-                const itemData = Data.Item.get(Data.SaveData.shopStockList[index].id);
-                if (selectedItem == index) {
-                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
-                }
-                else {
-                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                }
-                Game.getScreen().fillRect(left, top, width, height);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left, top, width, height);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
-                Game.getScreen().textAlign = "right";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
-            }
-        });
-        dispatcher.add(listBox);
-        listBox.click = (x, y) => {
-            selectedItem = listBox.getItemIndexByPosition(x, y);
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const captionMonay = new Game.GUI.Button({
-            left: 131,
-            top: 46,
-            width: 112,
-            height: 16,
-            text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-        });
-        dispatcher.add(captionMonay);
-        const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 131 + 14,
-            top: 90,
-            width: 112 - 28,
-            height: 16,
-            sliderWidth: 5,
-            updownButtonWidth: 10,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            minValue: 0,
-            maxValue: 99,
-        });
-        dispatcher.add(hoverSlider);
-        const btnSliderDown = new Game.GUI.Button({
-            left: 131,
-            top: 90,
-            width: 14,
-            height: 16,
-            text: "－",
-        });
-        dispatcher.add(btnSliderDown);
-        btnSliderDown.click = (x, y) => {
-            hoverSlider.value -= 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnSliderUp = new Game.GUI.Button({
-            left: 243 - 14,
-            top: 90,
-            width: 14,
-            height: 16,
-            text: "＋",
-        });
-        dispatcher.add(btnSliderUp);
-        btnSliderUp.click = (x, y) => {
-            hoverSlider.value += 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const captionBuyCount = new Game.GUI.Button({
-            left: 131,
-            top: 64,
-            width: 112,
-            height: 24,
-            text: () => {
-                if (selectedItem === -1) {
-                    return '';
-                }
-                else {
-                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + Data.SaveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.get(Data.SaveData.shopStockList[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
-                }
-            },
-        });
-        dispatcher.add(captionBuyCount);
-        const btnDoBuy = new Game.GUI.Button({
-            left: 131,
-            top: 110,
-            width: 112,
-            height: 16,
-            text: "購入",
-        });
-        dispatcher.add(btnDoBuy);
-        btnDoBuy.click = (x, y) => {
-            if (selectedItem !== -1) {
-                const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
-                if ((hoverSlider.value > 0) && (Data.SaveData.shopStockList[selectedItem].count >= hoverSlider.value) && (itemData.price * hoverSlider.value <= Data.SaveData.money)) {
-                    Data.SaveData.money -= itemData.price * hoverSlider.value;
-                    if (itemData.stackable) {
-                        const index = Data.SaveData.itemBox.findIndex(x => x.id == itemData.id);
-                        if (index === -1) {
-                            Data.SaveData.itemBox.push({ id: Data.SaveData.shopStockList[selectedItem].id, condition: Data.SaveData.shopStockList[selectedItem].condition, count: hoverSlider.value });
-                        }
-                        else {
-                            Data.SaveData.itemBox[index].count += hoverSlider.value;
-                        }
-                        Data.SaveData.shopStockList[selectedItem].count -= hoverSlider.value;
-                    }
-                    else {
-                        for (let i = 0; i < hoverSlider.value; i++) {
-                            Data.SaveData.itemBox.push({ id: Data.SaveData.shopStockList[selectedItem].id, condition: Data.SaveData.shopStockList[selectedItem].condition, count: 1 });
-                        }
-                        Data.SaveData.shopStockList[selectedItem].count -= hoverSlider.value;
-                    }
-                    if (Data.SaveData.shopStockList[selectedItem].count <= 0) {
-                        Data.SaveData.shopStockList.splice(selectedItem, 1);
-                    }
-                    selectedItem = -1;
-                    hoverSlider.value = 0;
-                    Data.SaveData.save();
-                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
-                }
-            }
-            //Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnItemData = new Game.GUI.Button({
-            left: 131,
-            top: 142,
-            width: 112,
-            height: 60,
-            text: () => {
-                if (selectedItem == -1) {
-                    return "";
-                }
-                const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
-                switch (itemData.kind) {
-                    case Data.Item.Kind.Wepon:
-                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor1:
-                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor2:
-                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Accessory:
-                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Tool:
-                        return `種別：道具`;
-                    case Data.Item.Kind.Treasure:
-                        return `種別：その他`;
-                    default:
-                        return "";
-                }
-            },
-        });
-        dispatcher.add(btnItemData);
-        const btnDescription = new Game.GUI.Button({
-            left: 131,
-            top: 212,
-            width: 112,
-            height: 36,
-            text: () => {
-                if (selectedItem == -1) {
-                    return "";
-                }
-                const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
-                return itemData.description;
-            },
-        });
-        dispatcher.add(btnDescription);
-        const btnExit = new Game.GUI.Button({
-            left: 8,
-            top: 16 * 11 + 46,
-            width: 112,
-            height: 16,
-            text: "戻る",
-        });
-        dispatcher.add(btnExit);
-        let exitScene = false;
-        btnExit.click = (x, y) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = false;
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
-            dispatcher.draw();
-        };
-        yield () => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible = btnDoBuy.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
-            btnDoBuy.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (Data.SaveData.shopStockList[selectedItem].count >= hoverSlider.value) && (Data.Item.get(Data.SaveData.shopStockList[selectedItem].id).price * hoverSlider.value <= Data.SaveData.money));
-            if (exitScene) {
-                this.next();
-            }
-        };
-        Game.getSceneManager().pop();
-    }
-    function* shopSellItem() {
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        let selectedItem = -1;
-        const listBox = new Game.GUI.ListBox({
-            left: 8,
-            top: 46,
-            width: 112 + 1,
-            height: 10 * 16,
-            lineHeight: 16,
-            getItemCount: () => Data.SaveData.itemBox.length,
-            drawItem: (left, top, width, height, index) => {
-                const itemData = Data.Item.get(Data.SaveData.itemBox[index].id);
-                if (selectedItem == index) {
-                    Game.getScreen().fillStyle = `rgb(24,196,195)`;
-                }
-                else {
-                    Game.getScreen().fillStyle = `rgb(24,133,196)`;
-                }
-                Game.getScreen().fillRect(left, top, width, height);
-                Game.getScreen().strokeStyle = `rgb(12,34,98)`;
-                Game.getScreen().lineWidth = 1;
-                Game.getScreen().strokeRect(left, top, width, height);
-                Game.getScreen().font = "10px 'PixelMplus10-Regular'";
-                Game.getScreen().fillStyle = `rgb(255,255,255)`;
-                Game.getScreen().textAlign = "left";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemData.name, left + 3, top + 3);
-                Game.getScreen().textAlign = "right";
-                Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
-            }
-        });
-        dispatcher.add(listBox);
-        listBox.click = (x, y) => {
-            selectedItem = listBox.getItemIndexByPosition(x, y);
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const captionMonay = new Game.GUI.Button({
-            left: 131,
-            top: 46,
-            width: 112,
-            height: 16,
-            text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-        });
-        dispatcher.add(captionMonay);
-        const hoverSlider = new Game.GUI.HorizontalSlider({
-            left: 131 + 14,
-            top: 90,
-            width: 112 - 28,
-            height: 16,
-            sliderWidth: 5,
-            updownButtonWidth: 10,
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            minValue: 0,
-            maxValue: 100,
-        });
-        dispatcher.add(hoverSlider);
-        const btnSliderDown = new Game.GUI.Button({
-            left: 131,
-            top: 90,
-            width: 14,
-            height: 16,
-            text: "－",
-        });
-        dispatcher.add(btnSliderDown);
-        btnSliderDown.click = (x, y) => {
-            hoverSlider.value -= 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnSliderUp = new Game.GUI.Button({
-            left: 243 - 14,
-            top: 90,
-            width: 14,
-            height: 16,
-            text: "＋",
-        });
-        dispatcher.add(btnSliderUp);
-        btnSliderUp.click = (x, y) => {
-            hoverSlider.value += 1;
-            hoverSlider.update();
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const captionSellCount = new Game.GUI.Button({
-            left: 131,
-            top: 64,
-            width: 112,
-            height: 24,
-            text: () => {
-                if (selectedItem == -1) {
-                    return '';
-                }
-                else {
-                    return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + Data.SaveData.itemBox[selectedItem].count).substr(-2)}\n価格：${('  ' + (Data.Item.get(Data.SaveData.itemBox[selectedItem].id).price * hoverSlider.value)).substr(-8) + "G"}`;
-                }
-            },
-        });
-        dispatcher.add(captionSellCount);
-        const btnDoSell = new Game.GUI.Button({
-            left: 131,
-            top: 110,
-            width: 112,
-            height: 16,
-            text: "売却",
-        });
-        dispatcher.add(btnDoSell);
-        btnDoSell.click = (x, y) => {
-            if (selectedItem != -1) {
-                const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
-                if ((hoverSlider.value > 0) && (Data.SaveData.itemBox[selectedItem].count >= hoverSlider.value)) {
-                    Data.SaveData.money += itemData.price * hoverSlider.value;
-                    const shopStockIndex = Data.SaveData.shopStockList.findIndex(x => x.id == Data.SaveData.itemBox[selectedItem].id);
-                    if (shopStockIndex == -1) {
-                        let newstock = Object.assign({}, Data.SaveData.itemBox[selectedItem]);
-                        newstock.condition = "";
-                        newstock.count = hoverSlider.value;
-                        for (let i = 0; i < Data.SaveData.shopStockList.length; i++) {
-                            if (Data.SaveData.shopStockList[i].id > newstock.id) {
-                                Data.SaveData.shopStockList.splice(i, 0, newstock);
-                                newstock = null;
-                                break;
-                            }
-                        }
-                        if (newstock != null) {
-                            Data.SaveData.shopStockList.push(newstock);
-                        }
-                    }
-                    else {
-                        Data.SaveData.shopStockList[shopStockIndex].count += hoverSlider.value;
-                    }
-                    if (itemData.stackable && Data.SaveData.itemBox[selectedItem].count > hoverSlider.value) {
-                        Data.SaveData.itemBox[selectedItem].count -= hoverSlider.value;
-                    }
-                    else {
-                        Data.SaveData.itemBox.splice(selectedItem, 1);
-                    }
-                    selectedItem = -1;
-                    hoverSlider.value = 0;
-                    Data.SaveData.save();
-                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
-                }
-            }
-            //Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnItemData = new Game.GUI.Button({
-            left: 131,
-            top: 142,
-            width: 112,
-            height: 60,
-            text: () => {
-                if (selectedItem == -1) {
-                    return "";
-                }
-                const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
-                switch (itemData.kind) {
-                    case Data.Item.Kind.Wepon:
-                        return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor1:
-                        return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Armor2:
-                        return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Accessory:
-                        return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
-                    case Data.Item.Kind.Tool:
-                        return `種別：道具`;
-                    case Data.Item.Kind.Treasure:
-                        return `種別：その他`;
-                    default:
-                        return "";
-                }
-            },
-        });
-        dispatcher.add(btnItemData);
-        const btnDescription = new Game.GUI.Button({
-            left: 131,
-            top: 212,
-            width: 112,
-            height: 36,
-            text: () => {
-                if (selectedItem == -1) {
-                    return "";
-                }
-                const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
-                return itemData.description;
-            },
-        });
-        dispatcher.add(btnDescription);
-        const btnExit = new Game.GUI.Button({
-            left: 8,
-            top: 16 * 11 + 46,
-            width: 112,
-            height: 16,
-            text: "戻る",
-        });
-        dispatcher.add(btnExit);
-        let exitScene = false;
-        btnExit.click = (x, y) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = false;
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
-            dispatcher.draw();
-        };
-        yield () => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
-            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) && (Data.Item.get(Data.SaveData.itemBox[selectedItem].id).stackable);
-            if ((selectedItem != -1) && (!Data.Item.get(Data.SaveData.itemBox[selectedItem].id).stackable)) {
-                hoverSlider.value = 1;
-            }
-            btnDoSell.enable = ((selectedItem != -1) && (hoverSlider.value > 0) && (Data.SaveData.itemBox[selectedItem].count >= hoverSlider.value));
-            if (exitScene) {
-                this.next();
-            }
-        };
-        Game.getSceneManager().pop();
-        return;
-    }
-    function* talkScene() {
-        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: Game.getScreen().offscreenHeight - 42,
-            width: 250,
-            height: 42,
-            text: "",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        this.draw = () => {
-            dispatcher.draw();
-            fade.draw();
-        };
-        yield Scene.waitTimeout({
-            timeout: 3000,
-            init: () => { fade.startFadeIn(); },
-            end: () => {
-                this.next();
-            },
-        });
-        yield Scene.waitTimeout({
-            timeout: 500,
-            update: (e) => { fade.update(e); },
-            end: () => {
-                fade.stop();
-                this.next();
-            },
-        });
-        const texts = [
-            "【声Ａ】\nこれが今度の実験体かしら。",
-            "【声Ｂ】\nはい、資料によると芋女のＪＫとのことですわ。",
-            "【声Ａ】\nということは、例のルートから･･･ですわね。",
-            "【声Ｂ】\n負債は相当な額だったそうですわ。",
-            "【声Ａ】\n夢破れたりですわね、ふふふ…。\nでも、この実験で生まれ変わりますわ。",
-            "【声Ｂ】\n生きていれば…ですわね、うふふふふふ…。",
-            "【声Ａ】\nそういうことですわね。では、始めましょうか。",
-            "【声Ｂ】\nはい、お姉さま。",
-        ];
-        for (const text of texts) {
-            yield Scene.waitClick({
-                start: (e) => { caption.text = text; },
-                end: () => { this.next(); },
-            });
-        }
-        yield Scene.waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeOut(); },
-            update: (e) => { fade.update(e); },
-            end: () => {
-                this.next();
-            },
-        });
-        yield Scene.waitTimeout({
-            timeout: 1000,
-            end: () => {
-                this.next();
-            },
-        });
-        Data.SaveData.itemBox.push({ id: 304, condition: "", count: 1 });
-        Data.SaveData.money = 0;
-        Data.SaveData.save();
-        Game.getSceneManager().pop();
-        Game.getSound().reqPlayChannel("classroom", true);
-        return;
-    }
-    function* shop() {
-        const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-        const dispatcher = new Game.GUI.UIDispatcher();
-        const caption = new Game.GUI.TextBox({
-            left: 1,
-            top: 1,
-            width: 250,
-            height: 42,
-            text: "購買部\nさまざまな武器・アイテムの購入ができます。",
-            edgeColor: `rgb(12,34,98)`,
-            color: `rgb(24,133,196)`,
-            font: "10px 'PixelMplus10-Regular'",
-            fontColor: `rgb(255,255,255)`,
-            textAlign: "left",
-            textBaseline: "top",
-        });
-        dispatcher.add(caption);
-        const btnBuy = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 0 + 46,
-            width: 112,
-            height: 16,
-            text: "アイテム購入",
-        });
-        dispatcher.add(btnBuy);
-        btnBuy.click = (x, y) => {
-            Game.getSceneManager().push(shopBuyItem);
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const btnSell = new Game.GUI.Button({
-            left: 8,
-            top: 20 * 1 + 46,
-            width: 112,
-            height: 16,
-            text: "アイテム売却",
-        });
-        dispatcher.add(btnSell);
-        btnSell.click = (x, y) => {
-            Game.getSceneManager().push(shopSellItem);
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        const captionMonay = new Game.GUI.Button({
-            left: 131,
-            top: 46,
-            width: 112,
-            height: 16,
-            text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
-        });
-        dispatcher.add(captionMonay);
-        const btnMomyu = new Game.GUI.ImageButton({
-            left: 151,
-            top: 179,
-            width: 61,
-            height: 31,
-            texture: null
-        });
-        dispatcher.add(btnMomyu);
-        let momyu = 0;
-        btnMomyu.click = (x, y) => {
-            if (Math.random() > 0.5) {
-                Game.getSound().reqPlayChannel("boyon1");
-            }
-            else {
-                Game.getSound().reqPlayChannel("boyoyon1");
-            }
-            momyu += 500;
-        };
-        const btnExit = new Game.GUI.Button({
-            left: 8,
-            top: 16 * 11 + 46,
-            width: 112,
-            height: 16,
-            text: "戻る",
-        });
-        dispatcher.add(btnExit);
-        let exitScene = false;
-        btnExit.click = (x, y) => {
-            exitScene = true;
-            Game.getSound().reqPlayChannel("cursor");
-        };
-        this.draw = () => {
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 127 * ((momyu >= 5000) ? 1 : 0), 0, 127, 141, 113, 83, 127, 141);
-            dispatcher.draw();
-            fade.draw();
-        };
-        yield Scene.waitTimeout({
-            timeout: 500,
-            init: () => { fade.startFadeIn(); },
-            update: (e) => { fade.update(e); },
-            end: () => {
-                fade.stop();
-                this.next();
-            },
-        });
-        yield () => {
-            if (Game.getInput().isDown()) {
-                dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isMove()) {
-                dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (Game.getInput().isUp()) {
-                dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
-            }
-            if (exitScene) {
-                this.next();
-            }
-        };
-        if (momyu > 0) {
-            Game.getSound().reqPlayChannel("meka_ge_reji_op01");
-            Data.SaveData.money -= momyu;
-            if (Data.SaveData.money <= -50000) {
-                this.draw = () => {
-                    Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                    Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 141, 127, 141, 113, 83, 127, 141);
-                    dispatcher.draw();
-                    fade.draw();
-                };
-            }
-            yield Scene.waitTimeout({
-                timeout: 1000,
-                end: () => {
-                    this.next();
-                },
-            });
-        }
-        if (Data.SaveData.money <= -50000) {
-            Game.getSound().reqStopChannel("classroom");
-            Game.getSound().reqPlayChannel("sen_ge_gusya01");
-            let rad = 0;
-            this.draw = () => {
-                Game.getScreen().translate(0, Math.sin(rad) * Math.cos(rad / 4) * 100);
-                Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
-                Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 141, 127, 141, 113, 83, 127, 141);
-                dispatcher.draw();
-                fade.draw();
-            };
-            yield Scene.waitTimeout({
-                timeout: 1000,
-                init: () => { fade.startFadeOut(); },
-                update: (e) => {
-                    rad = e * Math.PI / 25;
-                    fade.update(e);
-                },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            Game.getSceneManager().pop();
-            Game.getSceneManager().push(talkScene);
-        }
-        else {
-            yield Scene.waitTimeout({
-                timeout: 500,
-                init: () => { fade.startFadeOut(); },
-                update: (e) => { fade.update(e); },
-                end: () => {
-                    fade.stop();
-                    this.next();
-                },
-            });
-            Game.getSceneManager().pop();
-        }
-    }
-    Scene.shop = shop;
 })(Scene || (Scene = {}));
 class DropItem {
     constructor(x, y) {
@@ -8881,7 +8290,7 @@ window.onload = () => {
             scaleY: 1,
         }
     }).then(() => {
-        Game.getSceneManager().push(Scene.boot, null);
+        Game.getSceneManager().push(new Scene.BootScene());
         Game.getTimer().on((delta, now) => {
             Game.getInput().endCapture();
             Game.getSceneManager().update(delta, now);
@@ -8894,4 +8303,750 @@ window.onload = () => {
         Game.getTimer().start();
     });
 };
+/// <reference path="../../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    class ShopSellItem {
+        constructor() {
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: 1,
+                width: 250,
+                height: 42,
+                text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
+            let selectedItem = -1;
+            const listBox = new Game.GUI.ListBox({
+                left: 8,
+                top: 46,
+                width: 112 + 1,
+                height: 10 * 16,
+                lineHeight: 16,
+                getItemCount: () => Data.SaveData.itemBox.length,
+                drawItem: (left, top, width, height, index) => {
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[index].id);
+                    if (selectedItem == index) {
+                        Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                    }
+                    else {
+                        Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    }
+                    Game.getScreen().fillRect(left, top, width, height);
+                    Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                    Game.getScreen().lineWidth = 1;
+                    Game.getScreen().strokeRect(left, top, width, height);
+                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                    Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                    Game.getScreen().textAlign = "left";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText(itemData.name, left + 3, top + 3);
+                    Game.getScreen().textAlign = "right";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
+                }
+            });
+            dispatcher.add(listBox);
+            listBox.click = (x, y) => {
+                selectedItem = listBox.getItemIndexByPosition(x, y);
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const captionMonay = new Game.GUI.Button({
+                left: 131,
+                top: 46,
+                width: 112,
+                height: 16,
+                text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+            });
+            dispatcher.add(captionMonay);
+            const hoverSlider = new Game.GUI.HorizontalSlider({
+                left: 131 + 14,
+                top: 90,
+                width: 112 - 28,
+                height: 16,
+                sliderWidth: 5,
+                updownButtonWidth: 10,
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                minValue: 0,
+                maxValue: 100,
+            });
+            dispatcher.add(hoverSlider);
+            const btnSliderDown = new Game.GUI.Button({
+                left: 131,
+                top: 90,
+                width: 14,
+                height: 16,
+                text: "－",
+            });
+            dispatcher.add(btnSliderDown);
+            btnSliderDown.click = (x, y) => {
+                hoverSlider.value -= 1;
+                hoverSlider.update();
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const btnSliderUp = new Game.GUI.Button({
+                left: 243 - 14,
+                top: 90,
+                width: 14,
+                height: 16,
+                text: "＋",
+            });
+            dispatcher.add(btnSliderUp);
+            btnSliderUp.click = (x, y) => {
+                hoverSlider.value += 1;
+                hoverSlider.update();
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const captionSellCount = new Game.GUI.Button({
+                left: 131,
+                top: 64,
+                width: 112,
+                height: 24,
+                text: () => {
+                    if (selectedItem == -1) {
+                        return '';
+                    }
+                    else {
+                        return `数量：${('  ' + hoverSlider.value).substr(-2)} / 所有：${('  ' + Data.SaveData.itemBox[selectedItem].count).substr(-2)}\n価格：${('  ' +
+                            (Data.Item.get(Data.SaveData.itemBox[selectedItem].id).price * hoverSlider.value))
+                            .substr(-8) +
+                            "G"}`;
+                    }
+                },
+            });
+            dispatcher.add(captionSellCount);
+            const btnDoSell = new Game.GUI.Button({
+                left: 131,
+                top: 110,
+                width: 112,
+                height: 16,
+                text: "売却",
+            });
+            dispatcher.add(btnDoSell);
+            btnDoSell.click = (x, y) => {
+                if (selectedItem != -1) {
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
+                    if ((hoverSlider.value > 0) && (Data.SaveData.itemBox[selectedItem].count >= hoverSlider.value)) {
+                        Data.SaveData.money += itemData.price * hoverSlider.value;
+                        const shopStockIndex = Data.SaveData.shopStockList.findIndex(x => x.id == Data.SaveData.itemBox[selectedItem].id);
+                        if (shopStockIndex == -1) {
+                            let newstock = Object.assign({}, Data.SaveData.itemBox[selectedItem]);
+                            newstock.condition = "";
+                            newstock.count = hoverSlider.value;
+                            for (let i = 0; i < Data.SaveData.shopStockList.length; i++) {
+                                if (Data.SaveData.shopStockList[i].id > newstock.id) {
+                                    Data.SaveData.shopStockList.splice(i, 0, newstock);
+                                    newstock = null;
+                                    break;
+                                }
+                            }
+                            if (newstock != null) {
+                                Data.SaveData.shopStockList.push(newstock);
+                            }
+                        }
+                        else {
+                            Data.SaveData.shopStockList[shopStockIndex].count += hoverSlider.value;
+                        }
+                        if (itemData.stackable && Data.SaveData.itemBox[selectedItem].count > hoverSlider.value) {
+                            Data.SaveData.itemBox[selectedItem].count -= hoverSlider.value;
+                        }
+                        else {
+                            Data.SaveData.itemBox.splice(selectedItem, 1);
+                        }
+                        selectedItem = -1;
+                        hoverSlider.value = 0;
+                        Data.SaveData.save();
+                        Game.getSound().reqPlayChannel("meka_ge_reji_op01");
+                    }
+                }
+                //Game.getSound().reqPlayChannel("cursor");
+            };
+            const btnItemData = new Game.GUI.Button({
+                left: 131,
+                top: 142,
+                width: 112,
+                height: 60,
+                text: () => {
+                    if (selectedItem == -1) {
+                        return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
+                    switch (itemData.kind) {
+                        case Data.Item.Kind.Wepon:
+                            return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor1:
+                            return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor2:
+                            return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Accessory:
+                            return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Tool:
+                            return `種別：道具`;
+                        case Data.Item.Kind.Treasure:
+                            return `種別：その他`;
+                        default:
+                            return "";
+                    }
+                },
+            });
+            dispatcher.add(btnItemData);
+            const btnDescription = new Game.GUI.Button({
+                left: 131,
+                top: 212,
+                width: 112,
+                height: 36,
+                text: () => {
+                    if (selectedItem == -1) {
+                        return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.itemBox[selectedItem].id);
+                    return itemData.description;
+                },
+            });
+            dispatcher.add(btnDescription);
+            const btnExit = new Game.GUI.Button({
+                left: 8,
+                top: 16 * 11 + 46,
+                width: 112,
+                height: 16,
+                text: "戻る",
+            });
+            dispatcher.add(btnExit);
+            let exitScene = false;
+            btnExit.click = (x, y) => {
+                exitScene = true;
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionSellCount.visible =
+                btnDoSell.visible = btnItemData.visible = btnDescription.visible = false;
+            this.draw = () => {
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
+                dispatcher.draw();
+            };
+            this.update = () => {
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                captionSellCount.visible = btnDoSell.visible = btnItemData.visible = btnDescription.visible =
+                    (selectedItem != -1);
+                hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = (selectedItem != -1) &&
+                    (Data.Item.get(Data.SaveData.itemBox[selectedItem].id).stackable);
+                if ((selectedItem != -1) && (!Data.Item.get(Data.SaveData.itemBox[selectedItem].id).stackable)) {
+                    hoverSlider.value = 1;
+                }
+                btnDoSell.enable = ((selectedItem != -1) &&
+                    (hoverSlider.value > 0) &&
+                    (Data.SaveData.itemBox[selectedItem].count >= hoverSlider.value));
+                if (exitScene) {
+                    Game.getSceneManager().pop();
+                }
+            };
+        }
+        update() { }
+        draw() { }
+    }
+    Scene.ShopSellItem = ShopSellItem;
+})(Scene || (Scene = {}));
+/// <reference path="../../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    class ShopBuyItem {
+        constructor() {
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: 1,
+                width: 250,
+                height: 42,
+                text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
+            let selectedItem = -1;
+            const listBox = new Game.GUI.ListBox({
+                left: 8,
+                top: 46,
+                width: 112 + 1,
+                height: 10 * 16,
+                lineHeight: 16,
+                getItemCount: () => Data.SaveData.shopStockList.length,
+                drawItem: (left, top, width, height, index) => {
+                    const itemData = Data.Item.get(Data.SaveData.shopStockList[index].id);
+                    if (selectedItem == index) {
+                        Game.getScreen().fillStyle = `rgb(24,196,195)`;
+                    }
+                    else {
+                        Game.getScreen().fillStyle = `rgb(24,133,196)`;
+                    }
+                    Game.getScreen().fillRect(left, top, width, height);
+                    Game.getScreen().strokeStyle = `rgb(12,34,98)`;
+                    Game.getScreen().lineWidth = 1;
+                    Game.getScreen().strokeRect(left, top, width, height);
+                    Game.getScreen().font = "10px 'PixelMplus10-Regular'";
+                    Game.getScreen().fillStyle = `rgb(255,255,255)`;
+                    Game.getScreen().textAlign = "left";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText(itemData.name, left + 3, top + 3);
+                    Game.getScreen().textAlign = "right";
+                    Game.getScreen().textBaseline = "top";
+                    Game.getScreen().fillText(itemData.price + "G", left + 112 - 3, top + 3);
+                }
+            });
+            dispatcher.add(listBox);
+            listBox.click = (x, y) => {
+                selectedItem = listBox.getItemIndexByPosition(x, y);
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const captionMonay = new Game.GUI.Button({
+                left: 131,
+                top: 46,
+                width: 112,
+                height: 16,
+                text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+            });
+            dispatcher.add(captionMonay);
+            const hoverSlider = new Game.GUI.HorizontalSlider({
+                left: 131 + 14,
+                top: 90,
+                width: 112 - 28,
+                height: 16,
+                sliderWidth: 5,
+                updownButtonWidth: 10,
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                minValue: 0,
+                maxValue: 99,
+            });
+            dispatcher.add(hoverSlider);
+            const btnSliderDown = new Game.GUI.Button({
+                left: 131,
+                top: 90,
+                width: 14,
+                height: 16,
+                text: "－",
+            });
+            dispatcher.add(btnSliderDown);
+            btnSliderDown.click = (x, y) => {
+                hoverSlider.value -= 1;
+                hoverSlider.update();
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const btnSliderUp = new Game.GUI.Button({
+                left: 243 - 14,
+                top: 90,
+                width: 14,
+                height: 16,
+                text: "＋",
+            });
+            dispatcher.add(btnSliderUp);
+            btnSliderUp.click = (x, y) => {
+                hoverSlider.value += 1;
+                hoverSlider.update();
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const captionBuyCount = new Game.GUI.Button({
+                left: 131,
+                top: 64,
+                width: 112,
+                height: 24,
+                text: () => {
+                    if (selectedItem === -1) {
+                        return '';
+                    }
+                    else {
+                        return `数量：${('  ' + hoverSlider.value).substr(-2)} / 在庫：${('  ' + Data.SaveData.shopStockList[selectedItem].count).substr(-2)}\n価格：${('  ' +
+                            (Data.Item.get(Data.SaveData.shopStockList[selectedItem].id).price * hoverSlider.value))
+                            .substr(-8) +
+                            "G"}`;
+                    }
+                },
+            });
+            dispatcher.add(captionBuyCount);
+            const btnDoBuy = new Game.GUI.Button({
+                left: 131,
+                top: 110,
+                width: 112,
+                height: 16,
+                text: "購入",
+            });
+            dispatcher.add(btnDoBuy);
+            btnDoBuy.click = (x, y) => {
+                if (selectedItem !== -1) {
+                    const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
+                    if ((hoverSlider.value > 0) &&
+                        (Data.SaveData.shopStockList[selectedItem].count >= hoverSlider.value) &&
+                        (itemData.price * hoverSlider.value <= Data.SaveData.money)) {
+                        Data.SaveData.money -= itemData.price * hoverSlider.value;
+                        if (itemData.stackable) {
+                            const index = Data.SaveData.itemBox.findIndex(x => x.id == itemData.id);
+                            if (index === -1) {
+                                Data.SaveData.itemBox.push({
+                                    id: Data.SaveData.shopStockList[selectedItem].id,
+                                    condition: Data.SaveData.shopStockList[selectedItem].condition,
+                                    count: hoverSlider.value
+                                });
+                            }
+                            else {
+                                Data.SaveData.itemBox[index].count += hoverSlider.value;
+                            }
+                            Data.SaveData.shopStockList[selectedItem].count -= hoverSlider.value;
+                        }
+                        else {
+                            for (let i = 0; i < hoverSlider.value; i++) {
+                                Data.SaveData.itemBox.push({
+                                    id: Data.SaveData.shopStockList[selectedItem].id,
+                                    condition: Data.SaveData.shopStockList[selectedItem].condition,
+                                    count: 1
+                                });
+                            }
+                            Data.SaveData.shopStockList[selectedItem].count -= hoverSlider.value;
+                        }
+                        if (Data.SaveData.shopStockList[selectedItem].count <= 0) {
+                            Data.SaveData.shopStockList.splice(selectedItem, 1);
+                        }
+                        selectedItem = -1;
+                        hoverSlider.value = 0;
+                        Data.SaveData.save();
+                        Game.getSound().reqPlayChannel("meka_ge_reji_op01");
+                    }
+                }
+                //Game.getSound().reqPlayChannel("cursor");
+            };
+            const btnItemData = new Game.GUI.Button({
+                left: 131,
+                top: 142,
+                width: 112,
+                height: 60,
+                text: () => {
+                    if (selectedItem == -1) {
+                        return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
+                    switch (itemData.kind) {
+                        case Data.Item.Kind.Wepon:
+                            return `種別：武器\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor1:
+                            return `種別：防具・上半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Armor2:
+                            return `種別：防具・下半身\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Accessory:
+                            return `種別：アクセサリ\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                        case Data.Item.Kind.Tool:
+                            return `種別：道具`;
+                        case Data.Item.Kind.Treasure:
+                            return `種別：その他`;
+                        default:
+                            return "";
+                    }
+                },
+            });
+            dispatcher.add(btnItemData);
+            const btnDescription = new Game.GUI.Button({
+                left: 131,
+                top: 212,
+                width: 112,
+                height: 36,
+                text: () => {
+                    if (selectedItem == -1) {
+                        return "";
+                    }
+                    const itemData = Data.Item.get(Data.SaveData.shopStockList[selectedItem].id);
+                    return itemData.description;
+                },
+            });
+            dispatcher.add(btnDescription);
+            const btnExit = new Game.GUI.Button({
+                left: 8,
+                top: 16 * 11 + 46,
+                width: 112,
+                height: 16,
+                text: "戻る",
+            });
+            dispatcher.add(btnExit);
+            let exitScene = false;
+            btnExit.click = (x, y) => {
+                exitScene = true;
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible =
+                btnDoBuy.visible =
+                    btnItemData.visible = btnDescription.visible = false;
+            this.draw = () => {
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 0, 127, 141, 113, 83, 127, 141);
+                dispatcher.draw();
+            };
+            this.update = () => {
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                hoverSlider.visible = btnSliderDown.visible = btnSliderUp.visible = captionBuyCount.visible =
+                    btnDoBuy.visible = btnItemData.visible = btnDescription.visible = (selectedItem != -1);
+                btnDoBuy.enable = ((selectedItem != -1) &&
+                    (hoverSlider.value > 0) &&
+                    (Data.SaveData.shopStockList[selectedItem].count >= hoverSlider.value) &&
+                    (Data.Item.get(Data.SaveData.shopStockList[selectedItem].id).price * hoverSlider.value <=
+                        Data.SaveData.money));
+                if (exitScene) {
+                    Game.getSceneManager().pop();
+                }
+            };
+        }
+        update() { }
+        draw() { }
+    }
+    Scene.ShopBuyItem = ShopBuyItem;
+})(Scene || (Scene = {}));
+/// <reference path="../../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    class TalkScene {
+        constructor() {
+            const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: Game.getScreen().offscreenHeight - 42,
+                width: 250,
+                height: 42,
+                text: "",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
+            this.draw = () => {
+                dispatcher.draw();
+                fade.draw();
+            };
+            const fadein = () => this.update = Scene.waitFadeIn(fade, () => talk(0));
+            const talk = (index) => {
+                const texts = [
+                    "【声Ａ】\nこれが今度の実験体かしら。",
+                    "【声Ｂ】\nはい、資料によると芋女のＪＫとのことですわ。",
+                    "【声Ａ】\nということは、例のルートから･･･ですわね。",
+                    "【声Ｂ】\n負債は相当な額だったそうですわ。",
+                    "【声Ａ】\n夢破れたりですわね、ふふふ…。\nでも、この実験で生まれ変わりますわ。",
+                    "【声Ｂ】\n生きていれば…ですわね、うふふふふふ…。",
+                    "【声Ａ】\nそういうことですわね。では、始めましょうか。",
+                    "【声Ｂ】\nはい、お姉さま。",
+                ];
+                caption.text = texts[index];
+                this.update = () => {
+                    if (Game.getInput().isClick()) {
+                        if (++index === texts.length) {
+                            fadeout();
+                        }
+                        else {
+                            caption.text = texts[index];
+                        }
+                    }
+                };
+            };
+            const fadeout = () => this.update = Scene.waitFadeOut(fade, () => wait());
+            const wait = () => this.update = Scene.waitTimeout(500, () => {
+                Data.SaveData.itemBox.push({ id: 304, condition: "", count: 1 });
+                Data.SaveData.money = 0;
+                Data.SaveData.save();
+                Game.getSceneManager().pop();
+                Game.getSound().reqPlayChannel("classroom", true);
+                this.update = () => { };
+            });
+            fadein();
+        }
+        draw() { }
+        update() { }
+    }
+    Scene.TalkScene = TalkScene;
+})(Scene || (Scene = {}));
+/// <reference path="./ShopSellItem.ts" />
+/// <reference path="./ShopBuyItem.ts" />
+/// <reference path="./TalkScene.ts" />
+/// <reference path="../../lib/game/eventdispatcher.ts" />
+var Scene;
+(function (Scene) {
+    class Shop {
+        constructor() {
+            const fade = new Scene.Fade(Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+            const dispatcher = new Game.GUI.UIDispatcher();
+            const caption = new Game.GUI.TextBox({
+                left: 1,
+                top: 1,
+                width: 250,
+                height: 42,
+                text: "購買部\nさまざまな武器・アイテムの購入ができます。",
+                edgeColor: `rgb(12,34,98)`,
+                color: `rgb(24,133,196)`,
+                font: "10px 'PixelMplus10-Regular'",
+                fontColor: `rgb(255,255,255)`,
+                textAlign: "left",
+                textBaseline: "top",
+            });
+            dispatcher.add(caption);
+            const btnBuy = new Game.GUI.Button({
+                left: 8,
+                top: 20 * 0 + 46,
+                width: 112,
+                height: 16,
+                text: "アイテム購入",
+            });
+            dispatcher.add(btnBuy);
+            btnBuy.click = (x, y) => {
+                Game.getSceneManager().push(new Scene.ShopBuyItem());
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const btnSell = new Game.GUI.Button({
+                left: 8,
+                top: 20 * 1 + 46,
+                width: 112,
+                height: 16,
+                text: "アイテム売却",
+            });
+            dispatcher.add(btnSell);
+            btnSell.click = (x, y) => {
+                Game.getSceneManager().push(new Scene.ShopSellItem());
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            const captionMonay = new Game.GUI.Button({
+                left: 131,
+                top: 46,
+                width: 112,
+                height: 16,
+                text: () => `所持金：${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+            });
+            dispatcher.add(captionMonay);
+            const btnMomyu = new Game.GUI.ImageButton({
+                left: 151,
+                top: 179,
+                width: 61,
+                height: 31,
+                texture: null
+            });
+            dispatcher.add(btnMomyu);
+            let momyu = 0;
+            btnMomyu.click = (x, y) => {
+                if (Math.random() > 0.5) {
+                    Game.getSound().reqPlayChannel("boyon1");
+                }
+                else {
+                    Game.getSound().reqPlayChannel("boyoyon1");
+                }
+                momyu += 500;
+            };
+            const btnExit = new Game.GUI.Button({
+                left: 8,
+                top: 16 * 11 + 46,
+                width: 112,
+                height: 16,
+                text: "戻る",
+            });
+            dispatcher.add(btnExit);
+            let exitScene = false;
+            btnExit.click = (x, y) => {
+                exitScene = true;
+                Game.getSound().reqPlayChannel("cursor");
+            };
+            this.draw = () => {
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 127 * ((momyu >= 5000) ? 1 : 0), 0, 127, 141, 113, 83, 127, 141);
+                dispatcher.draw();
+                fade.draw();
+            };
+            const fadeIn = () => this.update = Scene.waitFadeIn(fade, waitInput);
+            const waitInput = () => this.update = () => {
+                if (Game.getInput().isDown()) {
+                    dispatcher.fire("pointerdown", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isMove()) {
+                    dispatcher.fire("pointermove", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (Game.getInput().isUp()) {
+                    dispatcher.fire("pointerup", Game.getInput().pageX, Game.getInput().pageY);
+                }
+                if (exitScene) {
+                    updateExit();
+                }
+            };
+            const updateExit = () => {
+                if (momyu > 0) {
+                    Game.getSound().reqPlayChannel("meka_ge_reji_op01");
+                    Data.SaveData.money -= momyu;
+                    momyu = 0;
+                    if (Data.SaveData.money <= -50000) {
+                        this.draw = () => {
+                            Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                            Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 141, 127, 141, 113, 83, 127, 141);
+                            dispatcher.draw();
+                            fade.draw();
+                        };
+                    }
+                    this.update = Scene.waitTimeout(500, smashExit);
+                }
+                else {
+                    this.update = Scene.waitFadeOut(fade, () => Game.getSceneManager().pop());
+                }
+            };
+            const smashExit = () => {
+                Game.getSound().reqStopChannel("classroom");
+                Game.getSound().reqPlayChannel("sen_ge_gusya01");
+                let rad = 0;
+                this.draw = () => {
+                    Game.getScreen().translate(0, Math.sin(rad) * Math.cos(rad / 4) * 100);
+                    Game.getScreen().drawImage(Game.getScreen().texture("shop/bg"), 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight, 0, 0, Game.getScreen().offscreenWidth, Game.getScreen().offscreenHeight);
+                    Game.getScreen().drawImage(Game.getScreen().texture("shop/J11"), 0, 141, 127, 141, 113, 83, 127, 141);
+                    dispatcher.draw();
+                    fade.draw();
+                };
+                fade.startFadeOut();
+                this.update = () => {
+                    fade.update(Game.getTimer().now);
+                    rad = Game.getTimer().now * Math.PI / 25;
+                    if (fade.isFinish()) {
+                        fade.stop();
+                        Game.getSceneManager().pop();
+                        Game.getSceneManager().push(new Scene.TalkScene());
+                        this.update = () => { };
+                    }
+                };
+            };
+            fadeIn();
+        }
+        draw() { }
+        update() { }
+    }
+    Scene.Shop = Shop;
+})(Scene || (Scene = {}));
 //# sourceMappingURL=tsjq.js.map
