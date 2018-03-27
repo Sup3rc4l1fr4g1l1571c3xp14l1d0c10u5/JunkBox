@@ -11,7 +11,7 @@ namespace Scene.Dungeon {
     interface TurnContext {
         floor: number;
         pad: Game.Input.VirtualStick;
-        player: Unit.Player;
+        player: Unit.Party;
         monsters: Unit.Monster[];
         map: MapData;
         drops: DropItem[];
@@ -31,7 +31,7 @@ namespace Scene.Dungeon {
         update() {}
         onPointerHook() {}
         offPointerHook() {}
-        constructor(param: { player: Unit.Player, floor: number }) {
+        constructor(param: { player: Unit.Party, floor: number }) {
 
             const player = param.player;
             const floor = param.floor;
@@ -69,8 +69,12 @@ namespace Scene.Dungeon {
                 monster.x = x.left;
                 monster.y = x.top;
                 monster.life = monster.maxLife = floor + 5;
-                monster.atk = ~~(floor * 2);
+                monster.atk = ~~(floor * 2) + 1;
                 monster.def = ~~(floor / 3) + 1;
+                monster.dropRate = {
+                    50: (x:number,y:number) => new GoldBug(x,y, ~~((9+floor) * 0.1 * (Math.random() * 9 + 1))),
+                     5: (x:number,y:number) => new ItemBug(x,y, [{ id: 1001, condition:"", count: 1}]),
+                };
                 return monster;
             });
 
@@ -119,19 +123,6 @@ namespace Scene.Dungeon {
                 Game.getInput().off("pointerup", pointerup);
                 Game.getInput().off("pointerleave", pointerup);
             };
-
-            //this.suspend = () => {
-            //    offPointerHook();
-            //    Game.getSound().reqStopChannel("dungeon");
-            //};
-            //this.resume = () => {
-            //    onPointerHook();
-            //    Game.getSound().reqPlayChannel("dungeon", true);
-            //};
-            //this.leave = () => {
-            //    offPointerHook();
-            //    Game.getSound().reqStopChannel("dungeon");
-            //};
 
             function updateLighting(iswalkable: (x: number) => boolean): void {
                 map.clearLighting();
@@ -429,10 +420,7 @@ namespace Scene.Dungeon {
 
                 // 情報
                 Font7px.draw7pxFont(`     | HP:${player.getForward().hp}/${player.getForward().hpMax}`, 0, 6 * 0);
-                Font7px.draw7pxFont(
-                    `${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`,
-                    0,
-                    6 * 1);
+                Font7px.draw7pxFont(`${('   ' + floor).substr(-3)}F | MP:${player.getForward().mp}/${player.getForward().mpMax}`,0,6 * 1);
                 Font7px.draw7pxFont(`     | GOLD:${Data.SaveData.money}`, 0, 6 * 2);
                 //menuicon
 
@@ -591,14 +579,25 @@ namespace Scene.Dungeon {
                     actionTime: 250,
                 };
 
-                // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
-                turnStateStack.unshift(
-                    PlayerAction.call(this,turnStateStack, context),
-                    EnemyAI.call(this,turnStateStack, context),
-                    EnemyAction.call(this,turnStateStack, context),
-                    Move.call(this,turnStateStack, context),
-                    TurnEnd.call(this,turnStateStack, context)
-                );
+                if (context.player.additiveTurnValue >= 100) {
+                    context.player.additiveTurnValue -= 100;
+                    // プレイヤーの行動のみ実行
+                    context.tactics.monsters.fill(null);
+                    turnStateStack.unshift(
+                        PlayerAction.call(this,turnStateStack, context),
+                        TurnEnd.call(this,turnStateStack, context)
+                    );
+                } else {
+                    // プレイヤーの行動、敵の行動の決定、敵の行動処理、移動実行の順で行う
+                    turnStateStack.unshift(
+                        PlayerAction.call(this,turnStateStack, context),
+                        EnemyAI.call(this,turnStateStack, context),
+                        EnemyAction.call(this,turnStateStack, context),
+                        Move.call(this,turnStateStack, context),
+                        TurnEnd.call(this,turnStateStack, context)
+                    );
+                }
+
                 return;
             } else {
                 // 移動先に敵はいない＝「移動(Move)」
@@ -610,13 +609,23 @@ namespace Scene.Dungeon {
                     actionTime: 250,
                 };
 
-                // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
-                turnStateStack.unshift(
-                    EnemyAI.call(this,turnStateStack, context),
-                    Move.call(this,turnStateStack, context),
-                    EnemyAction.call(this,turnStateStack, context),
-                    TurnEnd.call(this,turnStateStack, context)
-                );
+                if (context.player.additiveTurnValue >= 100) {
+                    context.player.additiveTurnValue -= 100;
+                    context.tactics.monsters.fill(null);
+                    // 移動実行のみ行う。
+                    turnStateStack.unshift(
+                        Move.call(this,turnStateStack, context),
+                        TurnEnd.call(this,turnStateStack, context)
+                    );
+                } else {
+                    // 敵の行動の決定、移動実行、敵の行動処理、の順で行う。
+                    turnStateStack.unshift(
+                        EnemyAI.call(this,turnStateStack, context),
+                        Move.call(this,turnStateStack, context),
+                        EnemyAction.call(this,turnStateStack, context),
+                        TurnEnd.call(this,turnStateStack, context)
+                    );
+                }
                 return;
             }
         }
@@ -675,10 +684,9 @@ namespace Scene.Dungeon {
         monster .setAnimation("dead", 0);
 
         // ドロップ作成は今のところ適当
-        if (Math.random() < 0.8) {
-            context.drops.push(new GoldBug(monster.x, monster.y, ~~(context.floor * (Math.random() * 9 + 1))));
-        } else {
-            context.drops.push(new ItemBug(monster.x, monster.y, [{ id: 1001, condition:"", count: 1}]));
+        const dropHandler = monster.getDrop();
+        if (dropHandler) {
+            context.drops.push(dropHandler(monster.x,monster.y));
         }
             
 
@@ -865,6 +873,9 @@ namespace Scene.Dungeon {
         // 移動開始
         const start = Game.getTimer().now;
         context.tactics.monsters.forEach((monsterTactic: any, i: number) => {
+            if (monsterTactic == null) {
+                return;
+            }
             if (monsterTactic.type === "move") {
                 context.monsters[i].setDir(monsterTactic.moveDir);
                 context.monsters[i].setAnimation("move", 0);
@@ -923,15 +934,25 @@ namespace Scene.Dungeon {
         // 死亡したモンスターを消去
         context.monsters.removeIf(x => x.life == 0);
 
-        // 前衛はターン経過によるMP消費が発生する
+        // バフやデバフを解決
+        Unit.updateMemberStatus(context.player.getForward());
+        Unit.updateMemberStatus(context.player.getBackward());
+
+        // 経過ターンを追加
         context.elapsedTurn += 1;
-        if (context.elapsedTurn % 10 === 0) {
-            if (context.player.getForward().mp > 0) {
+
+        context.player.additiveTurnValue += context.player.additiveTurn;
+        //console.log("context.player.additiveTurnValue=", context.player.additiveTurnValue);
+        // 前衛はターン経過によるMP消費が発生する
+        if (context.player.getForward().mp > 0) {
+            context.player.mpDecTimeValue += context.player.mpDecTime;
+            if (context.player.mpDecTimeValue >= 100) {
+                context.player.mpDecTimeValue -= 100;
                 context.player.getForward().mp -= 1;
-            } else if (context.player.getForward().hp > 1) {
-                // mpが無い場合はhpが減少
-                context.player.getForward().hp -= 1;
             }
+        } else if (context.player.getForward().hp > 1) {
+            // mpが無い場合はhpが一歩づつ減少
+            context.player.getForward().hp -= 1;
         }
 
         // HPが減少している場合はMPを消費してHPを回復

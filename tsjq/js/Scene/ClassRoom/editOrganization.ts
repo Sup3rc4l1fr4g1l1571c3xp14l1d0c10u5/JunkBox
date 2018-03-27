@@ -12,7 +12,7 @@ namespace Scene.ClassRoom {
                 top: 1,
                 width: 250,
                 height: 42,
-                text: "ç·¨æˆ\nè¿·å®®æ¢ç´¢æ™‚ã®å‰è¡›ã¨å¾Œè¡›ã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚",
+                text: "•Ò¬\n–À‹{’Tõ‚Ì‘O‰q‚ÆŒã‰q‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B",
                 edgeColor: `rgb(12,34,98)`,
                 color: `rgb(24,133,196)`,
                 font: "10px 'PixelMplus10-Regular'",
@@ -27,7 +27,7 @@ namespace Scene.ClassRoom {
                 top: 16 * 11 + 46,
                 width: 112,
                 height: 16,
-                text: "æˆ»ã‚‹",
+                text: "–ß‚é",
             });
             dispatcher.add(btnExit);
 
@@ -99,7 +99,7 @@ namespace Scene.ClassRoom {
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("å‰è¡›", forwardBtn.left + 2, forwardBtn.top + 2);
+                Game.getScreen().fillText("‘O‰q", forwardBtn.left + 2, forwardBtn.top + 2);
 
                 drawStatusSprite(team[0] == -1 ? null : charactors[team[0]],
                     selectedSide == 0 ? DrawMode.Selected : DrawMode.Normal,
@@ -136,7 +136,7 @@ namespace Scene.ClassRoom {
                 Game.getScreen().fillStyle = `rgb(255,255,255)`;
                 Game.getScreen().textAlign = "left";
                 Game.getScreen().textBaseline = "top";
-                Game.getScreen().fillText("å¾Œè¡›", backwordBtn.left + 2, backwordBtn.top + 2);
+                Game.getScreen().fillText("Œã‰q", backwordBtn.left + 2, backwordBtn.top + 2);
 
                 drawStatusSprite(team[1] == -1 ? null : charactors[team[1]],
                     selectedSide == 1 ? DrawMode.Selected : DrawMode.Normal,

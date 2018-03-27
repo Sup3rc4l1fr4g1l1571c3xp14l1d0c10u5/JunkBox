@@ -1,3 +1,4 @@
+/// <reference path="../Unit/Party.ts" />
 "use strict";
 
 namespace Data {
@@ -22,9 +23,9 @@ namespace Data {
             mp: number;
             atk: number;
             def: number;
-            effects: (...args: any[]) => void;
+            buffs: (datas: Unit.BuffData[]) => void;
             useToPlayer?: (target: Unit.MemberStatus) => boolean;
-            useToParty?: (targets: Unit.Player) => boolean;
+            useToParty?: (targets: Unit.Party) => boolean;
         }
 
         export interface ItemBoxEntry {
@@ -45,7 +46,7 @@ namespace Data {
                 mp: 0,
                 atk: 3,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -58,7 +59,7 @@ namespace Data {
                 mp: 0,
                 atk: 5,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -71,7 +72,7 @@ namespace Data {
                 mp: 0,
                 atk: 7,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
 
@@ -86,7 +87,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -99,7 +100,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 2,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -112,7 +113,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 3,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
 
@@ -127,7 +128,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -140,7 +141,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 2,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -153,7 +154,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 3,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
 
@@ -168,7 +169,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -181,7 +182,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -194,7 +195,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -207,7 +208,7 @@ namespace Data {
                 mp: 0,
                 atk: 1,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -220,7 +221,7 @@ namespace Data {
                 mp: 10,
                 atk: 0,
                 def: 1,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: false
             },
             {
@@ -233,7 +234,33 @@ namespace Data {
                 mp: 0,
                 atk: 2,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
+                stackable: false
+            },
+            {
+                id: 307,
+                name: "アンクレット",
+                price: 5000,
+                kind: Kind.Accessory,
+                description: "少し素早くなる。",
+                hp: 0,
+                mp: 0,
+                atk: 0,
+                def: 1,
+                buffs: (datas: Unit.BuffData[]) => datas.push(Unit.AdditiveTurn(3)),
+                stackable: false
+            },
+            {
+                id: 308,
+                name: "巨女の小手",
+                price: 5000,
+                kind: Kind.Accessory,
+                description: "力が沸いてきますがお腹も空きます。",
+                hp: 0,
+                mp: 0,
+                atk: 3,
+                def: 0,
+                buffs: (datas: Unit.BuffData[]) => datas.push(Unit.MPDecTime(5)),
                 stackable: false
             },
 
@@ -248,7 +275,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax) {
@@ -269,7 +296,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax || target.hp < target.hpMax) {
@@ -291,7 +318,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax || target.hp < target.hpMax) {
@@ -313,7 +340,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax || target.hp < target.hpMax) {
@@ -335,7 +362,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax || target.hp < target.hpMax) {
@@ -357,7 +384,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.mp < target.mpMax || target.hp < target.hpMax) {
@@ -379,7 +406,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
                 useToPlayer: (target: Unit.MemberStatus) => {
                     if (target.hp < target.hpMax) {
@@ -400,7 +427,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true
             },
             {
@@ -413,11 +440,29 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
-                useToParty: (party: Unit.Player) => {
+                useToParty: (party: Unit.Party) => {
                     Game.getSceneManager().pop();
                     Game.getSceneManager().push(new Scene.Corridor());
+                    return true;
+                }
+            },
+            {
+                id: 901,
+                name: "猛毒薬",
+                price: 0,
+                kind: Kind.Tool,
+                description: "死んでも一緒だよ･･･",
+                hp: 0,
+                mp: 0,
+                atk: 0,
+                def: 0,
+                buffs: (datas: Unit.BuffData[]) => {},
+                stackable: true,
+                useToParty: (party: Unit.Party) => {
+                    party.getForward().hp = 0;
+                    party.getBackward().hp = 0;
                     return true;
                 }
             },
@@ -433,7 +478,7 @@ namespace Data {
                 mp: 0,
                 atk: 0,
                 def: 0,
-                effects: (data: any) => {},
+                buffs: (datas: Unit.BuffData[]) => {},
                 stackable: true,
             },
         ];

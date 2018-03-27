@@ -10,7 +10,7 @@ namespace Unit {
         public maxLife: number;
         public atk: number;
         public def: number;
-
+        public dropRate: {[key:number]:((x:number, y:number) => DropItem)}; // d‚Ý•t‚«
 
         constructor(monsterId: string) {
             const data = Data.Monster.get(monsterId);
@@ -19,6 +19,20 @@ namespace Unit {
             this.maxLife = data.status.hp;
             this.atk = data.status.atk;
             this.def = data.status.def;
+            this.dropRate = {};
+        }
+        getDrop(): ((x:number, y:number) => DropItem) {
+            const keys = Object.keys(this.dropRate);
+            const random = (Math.random() * 100);
+            console.log("drop random=", random);
+            let part = 0;
+            for (const id of keys) {
+                part += ~~id;
+                if (random < part) {
+                    return this.dropRate[~~id];
+                }
+            }
+            return null;
         }
     }
 

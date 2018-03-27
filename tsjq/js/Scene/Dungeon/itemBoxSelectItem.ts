@@ -6,7 +6,7 @@ namespace Scene.Dungeon {
 
         constructor(opt: {
             selectedItem: number;
-            player: Unit.Player;
+            player: Unit.Party;
             floor: number;
             upperdraw: () => void;
         }) {
@@ -16,7 +16,7 @@ namespace Scene.Dungeon {
                 top: 1,
                 width: 250,
                 height: 14,
-                text: "é“å…·ç®±",
+                text: "“¹‹ï” ",
                 edgeColor: `rgb(12,34,98)`,
                 color: `rgb(24,133,196)`,
                 font: "10px 'PixelMplus10-Regular'",
@@ -69,7 +69,7 @@ namespace Scene.Dungeon {
                 top: 46 - 28,
                 width: 112,
                 height: 16,
-                text: () => `æ‰€æŒé‡‘ï¼š${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
+                text: () => `Š‹àF${('            ' + Data.SaveData.money + ' G').substr(-13)}`,
             });
             dispatcher.add(captionMonay);
 
@@ -78,7 +78,7 @@ namespace Scene.Dungeon {
                 top: 110,
                 width: 112,
                 height: 16,
-                text: "ä½¿ç”¨",
+                text: "g—p",
             });
             dispatcher.add(btnDoUse);
 
@@ -86,10 +86,10 @@ namespace Scene.Dungeon {
                 if (opt.selectedItem !== -1) {
                     const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
                     if (itemData.useToPlayer != null) {
-                        // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼é¸æŠç”»é¢ã«ã“ã®ã‚¢ã‚¤ãƒ†ãƒ ã‚’æ¸¡ã—ã¦ä¸€æ™‚é·ç§»
+                        // ƒvƒŒƒCƒ„[‘I‘ğ‰æ–Ê‚É‚±‚ÌƒAƒCƒeƒ€‚ğ“n‚µ‚Äˆê‘JˆÚ
                         Game.getSceneManager().push(new ItemBoxSelectPlayer(opt));
                     } else if (itemData.useToParty != null) {
-                        // ãƒ‘ãƒ¼ãƒ†ã‚£å…¨ä½“ã«é©ç”¨ã™ã‚‹
+                        // ƒp[ƒeƒB‘S‘Ì‚É“K—p‚·‚é
                         const ret = itemData.useToParty(opt.player);
                         if (ret == true) {
                             if (Data.SaveData.itemBox[opt.selectedItem].count > 0) {
@@ -117,7 +117,7 @@ namespace Scene.Dungeon {
                     if (opt.selectedItem == -1) {
                         return '';
                     } else {
-                        return `æ‰€æœ‰ï¼š${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}å€‹`;
+                        return `Š—LF${('  ' + Data.SaveData.itemBox[opt.selectedItem].count).substr(-2)}ŒÂ`;
                     }
                 },
             });
@@ -135,17 +135,17 @@ namespace Scene.Dungeon {
                     const itemData = Data.Item.get(Data.SaveData.itemBox[opt.selectedItem].id);
                     switch (itemData.kind) {
                         case Data.Item.Kind.Wepon:
-                            return `ç¨®åˆ¥ï¼šæ­¦å™¨\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            return `í•ÊF•Ší\nATK:${itemData.atk} | DEF:${itemData.def}`;
                         case Data.Item.Kind.Armor1:
-                            return `ç¨®åˆ¥ï¼šé˜²å…·ãƒ»ä¸ŠåŠèº«\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            return `í•ÊF–h‹ïEã”¼g\nATK:${itemData.atk} | DEF:${itemData.def}`;
                         case Data.Item.Kind.Armor2:
-                            return `ç¨®åˆ¥ï¼šé˜²å…·ãƒ»ä¸‹åŠèº«\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            return `í•ÊF–h‹ïE‰º”¼g\nATK:${itemData.atk} | DEF:${itemData.def}`;
                         case Data.Item.Kind.Accessory:
-                            return `ç¨®åˆ¥ï¼šã‚¢ã‚¯ã‚»ã‚µãƒª\nATK:${itemData.atk} | DEF:${itemData.def}`;
+                            return `í•ÊFƒAƒNƒZƒTƒŠ\nATK:${itemData.atk} | DEF:${itemData.def}`;
                         case Data.Item.Kind.Tool:
-                            return `ç¨®åˆ¥ï¼šé“å…·`;
+                            return `í•ÊF“¹‹ï`;
                         case Data.Item.Kind.Treasure:
-                            return `ç¨®åˆ¥ï¼šãã®ä»–`;
+                            return `í•ÊF‚»‚Ì‘¼`;
                         default:
                             return "";
                     }
@@ -173,7 +173,7 @@ namespace Scene.Dungeon {
                 top: 16 * 11 + 46,
                 width: 112,
                 height: 16,
-                text: "æˆ»ã‚‹",
+                text: "–ß‚é",
             });
             dispatcher.add(btnExit);
 

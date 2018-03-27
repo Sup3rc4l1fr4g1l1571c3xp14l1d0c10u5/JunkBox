@@ -30,7 +30,7 @@ namespace Scene.Dungeon {
             const animFrame = charactorData.spriteSheet.getAnimationFrame(charactorData.animName, charactorData.animFrame);
             const sprite = charactorData.spriteSheet.gtetSprite(animFrame.sprite);
 
-            // 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ
+            // キャラクター
             Game.getScreen().drawImage(
                 charactorData.spriteSheet.getSpriteImage(sprite),
                 sprite.left,
@@ -50,7 +50,7 @@ namespace Scene.Dungeon {
             Game.getScreen().fillText(Data.Charactor.get(charactorData.data.id).name, left + 48 - 8, top + 3 + 12 * 0);
             Game.getScreen().fillText(`HP:${charactorData.data.hp}/${charactorData.data.hpMax}`, left + 48 - 8, top + 3 + 12 * 1);
             Game.getScreen().fillText(`MP:${charactorData.data.mp}/${charactorData.data.mpMax}`, left + 48 - 8, top + 3 + 12 * 2);
-            Game.getScreen().fillText(`ATK:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)} DEF:${charactorData.data.equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`, left + 48 - 8, top + 12 * 3);
+            Game.getScreen().fillText(`ATK:${charactorData.data.atk} DEF:${charactorData.data.def}`, left + 48 - 8, top + 12 * 3);
         }
     }
 

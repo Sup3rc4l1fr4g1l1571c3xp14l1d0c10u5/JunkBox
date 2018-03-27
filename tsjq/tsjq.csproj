@@ -87,17 +87,20 @@
   <ItemGroup>
     <TypeScriptCompile Include="js\DropItem.ts" />
     <TypeScriptCompile Include="js\Font7px.ts" />
-    <TypeScriptCompile Include="js\Scene\ClassRoom\top.ts" />
-    <TypeScriptCompile Include="js\Scene\ClassRoom\editEquip.ts" />
-    <TypeScriptCompile Include="js\Scene\ClassRoom\editOrganization.ts" />
+    <TypeScriptCompile Include="js\Scene\ClassRoom\Top.ts" />
+    <TypeScriptCompile Include="js\Scene\ClassRoom\EditEquip.ts" />
+    <TypeScriptCompile Include="js\Scene\ClassRoom\EditOrganization.ts" />
     <TypeScriptCompile Include="js\Scene\ClassRoom\StatusSprite.ts" />
-    <TypeScriptCompile Include="js\Scene\Dungeon\gameOver.ts" />
-    <TypeScriptCompile Include="js\Scene\Dungeon\itemBoxSelectItem.ts" />
-    <TypeScriptCompile Include="js\Scene\Dungeon\itemBoxSelectPlayer.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon\GameOver.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon\ItemBoxSelectItem.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon\ItemBoxSelectPlayer.ts" />
     <TypeScriptCompile Include="js\Scene\Dungeon\StatusSprite.ts" />
-    <TypeScriptCompile Include="js\Scene\Dungeon\statusView.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon\StatusView.ts" />
+    <TypeScriptCompile Include="js\Scene\Shop\ShopBuyItem.ts" />
+    <TypeScriptCompile Include="js\Scene\Shop\ShopSellItem.ts" />
+    <TypeScriptCompile Include="js\Scene\Shop\TalkScene.ts" />
     <TypeScriptCompile Include="js\Unit\UnitBase.ts" />
-    <TypeScriptCompile Include="js\Unit\Player.ts" />
+    <TypeScriptCompile Include="js\Unit\Party.ts" />
     <TypeScriptCompile Include="js\Unit\Monster.ts" />
     <TypeScriptCompile Include="js\CSSFontLoadingAPI.d.ts" />
     <TypeScriptCompile Include="js\Data\SaveData.ts" />
@@ -107,7 +110,7 @@
     <TypeScriptCompile Include="js\Data\Player.ts" />
     <TypeScriptCompile Include="js\Lib\Game\GUI.ts" />
     <TypeScriptCompile Include="js\Scene\Corridor.ts" />
-    <TypeScriptCompile Include="js\Scene\Shop\Shop.ts" />
+    <TypeScriptCompile Include="js\Scene\Shop\Top.ts" />
     <TypeScriptCompile Include="tsjq.ts" />
     <TypeScriptCompile Include="js\Lib\Game\Ajax.ts" />
     <TypeScriptCompile Include="js\Array2D.ts" />
@@ -124,7 +127,7 @@
     <TypeScriptCompile Include="js\Lib\Random.ts" />
     <TypeScriptCompile Include="js\PathFinder.ts" />
     <TypeScriptCompile Include="js\Scene\Dungeon\MapView.ts" />
-    <TypeScriptCompile Include="js\Scene\Dungeon\Dungeon.ts" />
+    <TypeScriptCompile Include="js\Scene\Dungeon\Top.ts" />
     <TypeScriptCompile Include="js\Scene\Title.ts" />
     <TypeScriptCompile Include="js\Scene\Boot.ts" />
     <TypeScriptCompile Include="js\Scene\Helper.ts" />

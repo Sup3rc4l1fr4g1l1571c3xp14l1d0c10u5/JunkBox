@@ -68,7 +68,6 @@ namespace Scene {
             }
             fade.update(Game.getTimer().now);
             if (fade.isFinish()) {
-                fade.stop();
                 action();
             }
         };
@@ -83,7 +82,6 @@ namespace Scene {
             }
             fade.update(Game.getTimer().now);
             if (fade.isFinish()) {
-                fade.stop();
                 action();
             }
         };

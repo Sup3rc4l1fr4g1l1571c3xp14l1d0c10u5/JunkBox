@@ -177,7 +177,7 @@ namespace Scene {
                             fade.draw();
                         };
                     }
-                    this.update = waitTimeout(500,smashExit);
+                    this.update = waitTimeout(1000,smashExit);
 
                 } else {
                     this.update = waitFadeOut(fade, () => Game.getSceneManager().pop());
@@ -218,16 +218,15 @@ namespace Scene {
                     fade.draw();
                 };
                 fade.startFadeOut();
-                this.update = () => {
-                    fade.update(Game.getTimer().now);
-                    rad = Game.getTimer().now * Math.PI / 25;
-                    if (fade.isFinish()) {
-                        fade.stop();
+                this.update = waitFadeOut(
+                    fade,
+                    () => {
                         Game.getSceneManager().pop();
                         Game.getSceneManager().push(new TalkScene());
                         this.update = () => {};
-                    }
-                };
+                    },
+                    (e) => { rad = Game.getTimer().now * Math.PI / 25; }
+                );
             };
 
 

@@ -28,7 +28,22 @@ namespace Scene {
                 fade.draw();
             }
 
-            const fadein = () => this.update = waitFadeIn(fade, () => talk(0));
+            const fadein = () => {
+                caption.visible = false;
+                fade.startFadeIn();
+                this.update = waitTimeout(
+                    1000,
+                    () => {
+                        this.update = waitFadeIn(
+                            fade,
+                            () => {
+                                caption.visible = true;
+                                this.update = waitTimeout(500, () => talk(0))
+                            }
+                        );
+                    }
+                );
+            };
 
             const talk = (index: number) => {
                 const texts: string[] = [
@@ -56,7 +71,7 @@ namespace Scene {
 
             const fadeout = () => this.update = waitFadeOut(fade, () => wait());
 
-            const wait = () => this.update = waitTimeout(500,
+            const wait = () => this.update = waitTimeout(1000,
                 () => {
                     Data.SaveData.itemBox.push({ id: 304, condition: "", count: 1 });
                     Data.SaveData.money = 0;

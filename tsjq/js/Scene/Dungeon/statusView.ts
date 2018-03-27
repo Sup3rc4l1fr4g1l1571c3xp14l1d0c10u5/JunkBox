@@ -26,7 +26,7 @@ namespace Scene.Dungeon {
 
         update() {}
 
-        constructor (opt: { player: Unit.Player, floor: number, upperdraw: () => void })  {
+        constructor (opt: { player: Unit.Party, floor: number, upperdraw: () => void })  {
         const closeButton = {
             x: Game.getScreen().offscreenWidth - 20,
             y: 20,
@@ -41,7 +41,7 @@ namespace Scene.Dungeon {
             //    Game.getScreen().offscreenWidth - 40,
             //    Game.getScreen().offscreenHeight - 40);
 
-            //// Èñâ„Åò„Çã„Éú„Çø„É≥
+            //// ï¬Ç∂ÇÈÉ{É^Éì
             //Game.getScreen().save();
             //Game.getScreen().beginPath();
             //Game.getScreen().strokeStyle = 'rgba(255,255,255,1)';
@@ -61,7 +61,7 @@ namespace Scene.Dungeon {
             //Game.getScreen().stroke();
             //Game.getScreen().restore();
 
-            // „Çπ„ÉÜ„Éº„Çø„Çπ(ÂâçË°õ)
+            // ÉXÉeÅ[É^ÉX(ëOâq)
             {
             const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
             const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2);
@@ -79,10 +79,10 @@ namespace Scene.Dungeon {
             Game.getScreen().fillText(opt.player.getForward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getForward().hp}/${opt.player.getForward().hpMax}`,left+85,top+56);
             showStatusText(`${opt.player.getForward().mp}/${opt.player.getForward().mpMax}`, left + 145, top + 56);
-            showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk), 0)}`, left + 85, top + 64);
-            showStatusText(`${opt.player.getForward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def), 0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getForward().atk}`, left + 85, top + 64);
+            showStatusText(`${opt.player.getForward().def}`,left+145,top+64);
             }
-            // ÂæåË°õ
+            // å„âq
             {
             const left = ~~((Game.getScreen().offscreenWidth - 190) / 2);
             const top = ~~((Game.getScreen().offscreenHeight - 121*2) / 2) + 121;
@@ -100,8 +100,8 @@ namespace Scene.Dungeon {
             Game.getScreen().fillText(opt.player.getBackward().name, left + 110, top + 36);
             showStatusText(`${opt.player.getBackward().hp}/${opt.player.getBackward().hpMax}`,left+85,top+56);
             showStatusText(`${opt.player.getBackward().mp}/${opt.player.getBackward().mpMax}`,left+145,top+56);
-            showStatusText(`${opt.player.getBackward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).atk),0)}`,left+85,top+64);
-            showStatusText(`${opt.player.getBackward().equips.reduce<Data.Item.ItemBoxEntry, number>((s, [v, k]) => s + (v == null ? 0 : Data.Item.get(v.id).def),0)}`,left+145,top+64);
+            showStatusText(`${opt.player.getBackward().atk}`, left + 85, top + 64);
+            showStatusText(`${opt.player.getBackward().def}`,left+145,top+64);
             }
             //opt.player.equips.forEach((e, i) => {
             //    Game.getScreen().fillText(`${e.name}`, left + 12, top + 144 + 12 * i);

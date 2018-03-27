@@ -41,7 +41,7 @@ class ItemBug extends DropItem  {
     }
     take() {
         Game.getSound().reqPlayChannel("open");
-        // ãã®ã†ã¡ç½ ã¨ã‹ä½œã‚‹ã¹ãã ã‚ã†
+        // ‚»‚Ì‚¤‚¿ã©‚Æ‚©ì‚é‚×‚«‚¾‚ë‚¤
         Data.SaveData.itemBox.push(...this.items);
     }
 }

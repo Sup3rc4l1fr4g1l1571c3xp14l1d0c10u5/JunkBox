@@ -67,7 +67,7 @@ namespace Scene {
                     Game.getSceneManager().push(
                         new Dungeon.Top(
                             {
-                                player: new Unit.Player(Data.SaveData.findCharactorById(Data.SaveData.forwardCharactor),
+                                player: new Unit.Party(Data.SaveData.findCharactorById(Data.SaveData.forwardCharactor),
                                     Data.SaveData.findCharactorById(Data.SaveData.backwardCharactor)),
                                 floor: 1
                             })
