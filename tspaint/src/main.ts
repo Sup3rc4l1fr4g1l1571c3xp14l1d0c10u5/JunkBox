@@ -4,10 +4,14 @@
 
 "use strict";
 
+///////////////////////////////////////////////////////////////
 interface HTMLElement {
     [key: string]: any;
 }
-
+interface HTMLAnchorElement {
+    download: string;
+}
+///////////////////////////////////////////////////////////////
 interface CanvasRenderingContext2D {
     mozImageSmoothingEnabled: boolean;
     imageSmoothingEnabled: boolean;
@@ -43,12 +47,10 @@ interface CanvasRenderingContext2D {
     strokeRectOriginal: (x: number, y: number, w: number, h: number) => void;
 
 };
-
 CanvasRenderingContext2D.prototype.strokeRectOriginal = CanvasRenderingContext2D.prototype.strokeRect;
 CanvasRenderingContext2D.prototype.strokeRect = function (x: number, y: number, w: number, h: number): void {
     this.strokeRectOriginal(x + 0.5, y + 0.5, w - 1, h - 1);
 }
-
 CanvasRenderingContext2D.prototype.drawTextBox = function (text: string, left: number, top: number, width: number, height: number, drawTextPred: (text: string, x: number, y: number, maxWidth?: number) => void) {
     const metrics = this.measureText(text);
     const lineHeight = this.measureText("あ").width;
@@ -81,41 +83,97 @@ CanvasRenderingContext2D.prototype.drawTextBox = function (text: string, left: n
         });
     });
 };
-
 CanvasRenderingContext2D.prototype.fillTextBox = function (text: string, left: number, top: number, width: number, height: number) {
     this.drawTextBox(text, left, top, width, height, this.fillText.bind(this));
 }
-
 CanvasRenderingContext2D.prototype.strokeTextBox = function (text: string, left: number, top: number, width: number, height: number) {
     this.drawTextBox(text, left, top, width, height, this.strokeText.bind(this));
 }
-
+///////////////////////////////////////////////////////////////
 type RGB = [number, number, number];
 type RGBA = [number, number, number, number];
 type HSV = [number, number, number];
 type HSVA = [number, number, number, number];
+function rgb2hsv([r, g, b]: RGB): HSV {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = max - min;
+    if (h > 0.0) {
+        if (max == r) {
+            h = (g - b) / h;
+            if (h < 0.0) {
+                h += 6.0;
+            }
+        } else if (max == g) {
+            h = 2.0 + (b - r) / h;
+        } else {
+            h = 4.0 + (r - g) / h;
+        }
+    }
+    h /= 6.0;
+    let s = (max - min);
+    if (max != 0.0) {
+        s /= max;
+    }
+    let v = max;
 
+    return [~~(h * 360), s, v]
+}
+function hsv2rgb([h, s, v]: HSV): RGB {
+    if (s == 0) {
+        const vv: number = ~~(v * 255 + 0.5);
+        return [vv, vv, vv];
+    } else {
+        const t: number = ((h * 6) % 360) / 360.0;
+        const c1: number = v * (1 - s);
+        const c2: number = v * (1 - s * t);
+        const c3: number = v * (1 - s * (1 - t));
+
+        let r: number = 0;
+        let g: number = 0;
+        let b: number = 0;
+        switch (~~(h / 60)) {
+            case 0: r = v; g = c3; b = c1; break;
+            case 1: r = c2; g = v; b = c1; break;
+            case 2: r = c1; g = v; b = c3; break;
+            case 3: r = c1; g = c2; b = v; break;
+            case 4: r = c3; g = c1; b = v; break;
+            case 5: r = v; g = c1; b = c2; break;
+            default: throw new Error();
+        }
+        const rr: number = ~~(r * 255 + 0.5);
+        const gg: number = ~~(g * 255 + 0.5);
+        const bb: number = ~~(b * 255 + 0.5);
+
+        return [rr, gg, bb];
+    }
+
+}
+///////////////////////////////////////////////////////////////
 interface ImageData {
     clear: () => void;
     copyFrom: (imageData: ImageData) => void;
-    composition: (...srcs: { imageData: ImageData, compositMode: CompositMode }[]) => void;
+    composition: (src: { imageData: ImageData, compositMode: CompositMode }) => void;
     pointSet: (x0: number, y0: number, color: RGBA) => void;
+    putMask: (left:number,top:number,mask:Uint8Array, w:number,h:number,color:RGBA) => void;
+    saveAsBmp: () => ArrayBuffer;
 }
-
+enum CompositMode {
+    Normal,
+    Add,
+    Sub,
+    SubAlpha,
+    Mul,
+    Screen
+}
 ImageData.prototype.copyFrom = function (imageData: ImageData): void {
     if (this.width != imageData.width || this.height != imageData.height) {
         throw new Error("size missmatch")
     }
-    const len = this.width * this.height * 4;
-    for (let i = 0; i < len; i++) {
-        this.data[i] = imageData.data[i];
-    }
+    this.data.set(imageData.data);
 };
 ImageData.prototype.clear = function (): void {
-    const len = this.width * this.height * 4;
-    for (let i = 0; i < len; i++) {
-        this.data[i] = 0x00;
-    }
+    this.data.fill(0);
 };
 ImageData.prototype.pointSet = function (x0: number, y0: number, color: RGBA): void {
     if (0 <= x0 && x0 < this.width && 0 <= y0 && y0 < this.height) {
@@ -126,176 +184,457 @@ ImageData.prototype.pointSet = function (x0: number, y0: number, color: RGBA): v
         this.data[off + 3] = color[3];
     }
 };
-enum CompositMode {
-    Normal,
-    Add,
-    Sub,
-    Mul,
-    Screen
+ImageData.prototype.putMask = function(left: number, top: number, mask: Uint8Array, w: number, h: number, color: RGBA) {
+    const dst = { left: left, top: top, right: left+w, bottom: top+h };
+    const src = { left: 0, top: 0, right: w, bottom: h };
+
+    if (dst.left < 0) {
+        src.left += (-dst.left);
+        dst.left = 0;
+    }
+    if (dst.right >= this.width) {
+        src.right -= (this.width-dst.right);
+        dst.right = this.width;
+    } 
+    if (dst.top < 0) {
+        src.top += (-dst.top);
+        dst.top = 0;
+    }
+    if (dst.bottom >= this.height) {
+        src.bottom -= (this.height-dst.bottom);
+        dst.bottom = this.height;
+    }
+    const width = dst.right - dst.left;
+    const height = dst.bottom - dst.top;
+    const dstData = this.data;
+
+    for (let y = 0; y < height; y++) {
+        let offDst = ((dst.top + y) * this.width + dst.left) * 4;
+        let offSrc = (y + src.top) * w + src.left;
+        for (let x = 0; x < width; x++) {
+            if (mask[offSrc]) {
+                dstData[offDst + 0] = color[0];
+                dstData[offDst + 1] = color[1];
+                dstData[offDst + 2] = color[2];
+                dstData[offDst + 3] = color[3];
+            }
+
+            offSrc += 1;
+            offDst += 4;
+        }
+    }
 }
-ImageData.prototype.composition = function (...srcs: { imageData: ImageData, compositMode: CompositMode }[]): void {
-    const layerLen = srcs.length;
+
+
+ImageData.prototype.composition = function (src: { imageData: ImageData, compositMode: CompositMode }): void {
 
     // precheck
-    for (let i = 0; i < layerLen; i++) {
-        if (this.width != srcs[i].imageData.width || this.height != srcs[i].imageData.height) {
-            throw new Error("size missmatch")
-        }
+    if (this.width != src.imageData.width || this.height != src.imageData.height) {
+        throw new Error("size missmatch")
     }
 
     // operation
     const dataLen = this.height * this.width * 4;
-    for (let i = 0; i < layerLen; i++) {
-        const dstData = this.data;
-        const srcData = srcs[i].imageData.data;
-        switch (srcs[i].compositMode) {
-            case CompositMode.Normal:
-                for (let j = 0; j < dataLen; j += 4) {
-                    const sr = srcData[j + 0];
-                    const sg = srcData[j + 1];
-                    const sb = srcData[j + 2];
-                    const sa = srcData[j + 3] / 255;
+    const dstData = this.data;
+    const srcData = src.imageData.data;
+    switch (src.compositMode) {
+        case CompositMode.Normal:
+            for (let j = 0; j < dataLen; j += 4) {
+                const sr = srcData[j + 0];
+                const sg = srcData[j + 1];
+                const sb = srcData[j + 2];
+                const sa = srcData[j + 3] / 255;
 
-                    const dr = dstData[j + 0];
-                    const dg = dstData[j + 1];
-                    const db = dstData[j + 2];
-                    const da = dstData[j + 3] / 255;
+                const dr = dstData[j + 0];
+                const dg = dstData[j + 1];
+                const db = dstData[j + 2];
+                const da = dstData[j + 3] / 255;
 
-                    const na = sa + da - (sa * da);
+                const na = sa + da - (sa * da);
 
-                    const ra = ~~(na * 255 + 0.5);
-                    let rr = dr;
-                    let rg = dg;
-                    let rb = db;
+                const ra = ~~(na * 255 + 0.5);
+                let rr = dr;
+                let rg = dg;
+                let rb = db;
 
-                    if (na > 0) {
-                        rr = ~~((sr * sa + dr * da * (1.0 - sa)) / na + 0.5);
-                        rg = ~~((sg * sa + dg * da * (1.0 - sa)) / na + 0.5);
-                        rb = ~~((sb * sa + db * da * (1.0 - sa)) / na + 0.5);
-                    }
-
-                    dstData[j + 0] = rr;    //(rr < 0) ? 0 : (rr > 255) ? 255 : rr;  // Math.max(0,Math.min(255,rr)); // Math.max/min is too slow in firefox 54.0.1 :-( 
-                    dstData[j + 1] = rg;    //(rg < 0) ? 0 : (rg > 255) ? 255 : rg;  // Math.max(0,Math.min(255,rg));
-                    dstData[j + 2] = rb;    //(rb < 0) ? 0 : (rb > 255) ? 255 : rb;  // Math.max(0,Math.min(255,rb));
-                    dstData[j + 3] = ra;    //(ra < 0) ? 0 : (ra > 255) ? 255 : ra;  // Math.max(0,Math.min(255,ra));
+                if (na > 0) {
+                    const dasa = da * (1.0 - sa);
+                    rr = ~~((sr * sa + dr * dasa) / na + 0.5);
+                    rg = ~~((sg * sa + dg * dasa) / na + 0.5);
+                    rb = ~~((sb * sa + db * dasa) / na + 0.5);
                 }
-                break;
-            case CompositMode.Add:
-                break;
-            case CompositMode.Mul:
-                break;
-            case CompositMode.Screen:
-                break;
-            case CompositMode.Sub:
-                break;
 
-        }
+                dstData[j + 0] = rr;
+                dstData[j + 1] = rg;
+                dstData[j + 2] = rb;
+                dstData[j + 3] = ra;
+            }
+            break;
+        case CompositMode.Add:
+            break;
+        case CompositMode.Mul:
+            break;
+        case CompositMode.Screen:
+            break;
+        case CompositMode.Sub:
+            break;
+        case CompositMode.SubAlpha:
+            for (let j = 0; j < dataLen; j += 4) {
+                const sa = srcData[j + 3];
+                const da = dstData[j + 3];
+
+                const na = (da * (255 - sa)) / 255;
+
+                const ra = ~~(na + 0.5);
+                dstData[j + 3] = ra;
+            }
+            break;
     }
 };
+ImageData.prototype.saveAsBmp = function (): ArrayBuffer {
 
+    const bitmapData: ArrayBuffer = new ArrayBuffer(14 + 40 + (this.width * this.height * 4)); // sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
 
-namespace TsPaint {
-    namespace Events {
-        export type EventHandler = (...args: any[]) => boolean;
-        class SingleEmitter {
-            private listeners: EventHandler[];
+    //
+    // BITMAPFILEHEADER
+    //
+    const viewOfBitmapFileHeader: DataView = new DataView(bitmapData, 0, 14);
+    viewOfBitmapFileHeader.setUint16(0, 0x4D42, true);      // bfType : 'BM'
+    viewOfBitmapFileHeader.setUint32(2, 14 + 40 + (this.width * this.height * 4), true);   // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+    viewOfBitmapFileHeader.setUint16(6, 0x0000, true);      // bfReserved1 : 0
+    viewOfBitmapFileHeader.setUint16(8, 0x0000, true);      // bfReserved2 : 0
+    viewOfBitmapFileHeader.setUint32(10, 14 + 40, true);    // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
 
-            constructor() {
-                this.listeners = [];
-            }
+    //
+    // BITMAPINFOHEADER
+    //
+    const viewOfBitmapInfoHeader: DataView = new DataView(bitmapData, 14, 40);
+    viewOfBitmapInfoHeader.setUint32(0, 40, true);          // biSize : sizeof(BITMAPINFOHEADER)
+    viewOfBitmapInfoHeader.setUint32(4, this.width, true);  // biWidth : this.width
+    viewOfBitmapInfoHeader.setUint32(8, this.height, true); // biHeight : this.height
+    viewOfBitmapInfoHeader.setUint16(12, 1, true);         // biPlanes : 1
+    viewOfBitmapInfoHeader.setUint16(14, 32, true);         // biBitCount : 32
+    viewOfBitmapInfoHeader.setUint32(16, 0, true);         // biCompression : 0
+    viewOfBitmapInfoHeader.setUint32(20, this.width * this.height * 4, true);         // biSizeImage : this.width * this.height * 4
+    viewOfBitmapInfoHeader.setUint32(24, 0, true);         // biXPixPerMeter : 0
+    viewOfBitmapInfoHeader.setUint32(28, 0, true);         // biYPixPerMeter : 0
+    viewOfBitmapInfoHeader.setUint32(32, 0, true);         // biClrUsed : 0
+    viewOfBitmapInfoHeader.setUint32(36, 0, true);         // biCirImportant : 0
 
-            public clear(): SingleEmitter {
-                this.listeners.length = 0;
-                return this;
-            }
-
-            public on(listener: EventHandler): SingleEmitter {
-                this.listeners.splice(0, 0, listener);
-                return this;
-            }
-
-            public off(listener: EventHandler): SingleEmitter {
-                const index = this.listeners.indexOf(listener);
-                if (index !== -1) {
-                    this.listeners.splice(index, 1);
-                }
-                return this;
-            }
-
-            public fire(...args: any[]): boolean {
-                const temp = this.listeners.slice();
-                for (const dispatcher of temp) {
-                    if (dispatcher.apply(this, args)) {
-                        return true;
-                    }
-                };
-                return false;
-            }
-
-            public one(listener: EventHandler): SingleEmitter {
-                const func = (...args: any[]) => {
-                    const result = listener.apply(this, args);
-                    this.off(func);
-                    return result;
-                };
-
-                this.on(func);
-
-                return this;
-            }
-
+    //
+    // IMAGEDATA
+    //
+    const viewOfBitmapPixelData: DataView = new DataView(bitmapData, 54, this.width * this.height * 4);
+    for (let y = 0; y < this.height; y++) {
+        let scan = (this.height - 1 - y) * this.width * 4;
+        let base = y * this.width * 4;
+        for (let x = 0; x < this.width; x++) {
+            viewOfBitmapPixelData.setUint8(base + 0, this.data[scan + 2]); // B
+            viewOfBitmapPixelData.setUint8(base + 1, this.data[scan + 1]); // G
+            viewOfBitmapPixelData.setUint8(base + 2, this.data[scan + 0]); // R
+            viewOfBitmapPixelData.setUint8(base + 3, this.data[scan + 3]); // A
+            base += 4;
+            scan += 4;
         }
-        export class EventEmitter {
+    }
+    return bitmapData;
 
-            private listeners: Map<string, SingleEmitter>;
+}
+///////////////////////////////////////////////////////////////
+interface IPoint {
+    x: number;
+    y: number;
+}
+namespace IPoint {
+    export function rotate(point: IPoint, rad: number) {
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const rx = point.x * cos - point.y * sin;
+        const ry = point.x * sin + point.y * cos;
+        return { x: rx, y: ry };
+    }
+}
+///////////////////////////////////////////////////////////////
+class HSVColorWheel {
+    private canvas: HTMLCanvasElement;
+    private context: CanvasRenderingContext2D;
+    private imageData: ImageData;
+    private wheelRadius: { min: number, max: number };
+    private svBoxSize: number;
+    private _hsv: HSV = [0, 0, 0];
+    public get hsv(): HSV {
+        return this._hsv.slice() as HSV;
+    }
+    public set hsv(v: HSV) {
+        this._hsv = v.slice() as HSV;
+    }
+    public get rgb(): RGB {
+        return hsv2rgb(this._hsv);
+    }
+    public set rgb(v: RGB) {
+        this._hsv = rgb2hsv(v);
+    }
+    constructor({ width = 0, height = 0, wheelRadiusMin = 76, wheelRadiusMax = 96, svBoxSize = 100 }: { width: number, height: number, wheelRadiusMin?: number, wheelRadiusMax?: number, svBoxSize?: number }) {
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.context = this.canvas.getContext("2d");
+        this.imageData = this.context.createImageData(this.canvas.width, this.canvas.height);
+        this.wheelRadius = { min: wheelRadiusMin, max: wheelRadiusMax };
+        this.svBoxSize = svBoxSize;
+        this._hsv = [0, 0, 0];
+        this.updateImage();
+    }
 
-            constructor() {
-                this.listeners = new Map<string, SingleEmitter>();
-            }
 
-            public on(eventName: string, listener: EventHandler): EventEmitter {
-                if (!this.listeners.has(eventName)) {
-                    this.listeners.set(eventName, new SingleEmitter());
+    private getPixel(x: number, y: number): RGB {
+        if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
+            return [0, 0, 0];
+        }
+        const index = (~~y * this.canvas.width + ~~x) * 4;
+        return [
+            this.imageData.data[index + 0],
+            this.imageData.data[index + 1],
+            this.imageData.data[index + 2],
+            //this.imageData.data[index + 3],
+        ];
+    }
+    private setPixel(x: number, y: number, color: RGB): void {
+        if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
+            return;
+        }
+        const index = (~~y * this.canvas.width + ~~x) * 4;
+        this.imageData.data[index + 0] = color[0];
+        this.imageData.data[index + 1] = color[1];
+        this.imageData.data[index + 2] = color[2];
+        this.imageData.data[index + 3] = 255;
+    }
+    private xorPixel(x: number, y: number): void {
+        if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
+            return;
+        }
+        const index = (~~y * this.canvas.width + ~~x) * 4;
+        this.imageData.data[index + 0] = 255 ^ this.imageData.data[index + 0];
+        this.imageData.data[index + 1] = 255 ^ this.imageData.data[index + 1];
+        this.imageData.data[index + 2] = 255 ^ this.imageData.data[index + 2];
+    }
+
+    private drawInvBox(x: number, y: number, w: number, h: number): void {
+        for (let yy = 0; yy < h; yy++) {
+            this.xorPixel(x + 0, y + yy);
+            this.xorPixel(x + w - 1, y + yy);
+        }
+        for (let xx = 1; xx < w - 1; xx++) {
+            this.xorPixel(x + xx, y + 0);
+            this.xorPixel(x + xx, y + h - 1);
+        }
+    }
+
+    private drawHCircle(): void {
+        for (let iy = 0; iy < this.canvas.height; iy++) {
+            const yy = iy - this.canvas.height / 2;
+            for (let ix = 0; ix < this.canvas.width; ix++) {
+                const xx = ix - this.canvas.width / 2;
+
+                const r = ~~Math.sqrt(xx * xx + yy * yy);
+
+                if (r < this.wheelRadius.min || r >= this.wheelRadius.max) {
+                    continue;
                 }
 
-                this.listeners.get(eventName).on(listener);
-                return this;
-            }
+                const h = (~~(-Math.atan2(yy, xx) * 180 / Math.PI) + 360) % 360;
 
-            public off(eventName: string, listener: EventHandler): EventEmitter {
-                this.listeners.get(eventName).off(listener);
-                return this;
-            }
+                const col = hsv2rgb([h, 1.0, 1.0]);
 
-            public fire(eventName: string, ...args: any[]): boolean {
-                if (this.listeners.has(eventName)) {
-                    const dispatcher = this.listeners.get(eventName);
-                    return dispatcher.fire.apply(dispatcher, args);
-                }
-                return false;
-            }
-
-            public one(eventName: string, listener: EventHandler): EventEmitter {
-                if (!this.listeners.has(eventName)) {
-                    this.listeners.set(eventName, new SingleEmitter());
-                }
-                this.listeners.get(eventName).one(listener);
-
-                return this;
-            }
-
-            public hasEventListener(eventName: string): boolean {
-                return this.listeners.has(eventName);
-            }
-
-            public clearEventListener(eventName: string): EventEmitter {
-                if (this.listeners.has(eventName)) {
-                    this.listeners.get(eventName).clear();
-                }
-                return this;
+                this.setPixel(ix, iy, col);
             }
         }
     }
+
+    private drawSVBox() {
+        for (let iy = 0; iy < this.svBoxSize; iy++) {
+            const v = (this.svBoxSize - 1 - iy) / (this.svBoxSize - 1);
+
+            for (let ix = 0; ix < this.svBoxSize; ix++) {
+                const s = ix / (this.svBoxSize - 1);
+
+                const col = hsv2rgb([this._hsv[0], s, v]);
+
+                this.setPixel(ix + ~~((this.canvas.width - this.svBoxSize) / 2), iy + ~~((this.canvas.height - this.svBoxSize) / 2), col);
+            }
+        }
+    }
+
+    private drawHCursor() {
+        const rd = -this._hsv[0] * Math.PI / 180;
+
+        const xx = this.wheelRadius.min + (this.wheelRadius.max - this.wheelRadius.min) / 2;
+        const yy = 0;
+
+        const x = ~~(xx * Math.cos(rd) - yy * Math.sin(rd) + this.canvas.width / 2);
+        const y = ~~(xx * Math.sin(rd) + yy * Math.cos(rd) + this.canvas.height / 2);
+
+        this.drawInvBox(x - 4, y - 4, 9, 9);
+    }
+
+    private getHValueFromPos(x0: number, y0: number) {
+        const x = x0 - this.canvas.width / 2;
+        const y = y0 - this.canvas.height / 2;
+
+        const h = (~~(-Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+
+        const r = ~~Math.sqrt(x * x + y * y);
+
+        return (r >= this.wheelRadius.min && r < this.wheelRadius.max) ? h : undefined;
+    }
+    private drawSVCursor() {
+        const left = (this.canvas.width - this.svBoxSize) / 2;
+        const top = (this.canvas.height - this.svBoxSize) / 2;
+        this.drawInvBox(left + ~~(this._hsv[1] * this.svBoxSize) - 4, top + ~~((1 - this._hsv[2]) * this.svBoxSize) - 4, 9, 9);
+    }
+    private getSVValueFromPos(x0: number, y0: number) {
+        const x = ~~(x0 - (this.canvas.width - this.svBoxSize) / 2);
+        const y = ~~(y0 - (this.canvas.height - this.svBoxSize) / 2);
+
+        return (0 <= x && x < this.svBoxSize && 0 <= y && y < this.svBoxSize) ? [x / (this.svBoxSize - 1), (this.svBoxSize - 1 - y) / (this.svBoxSize - 1)] : undefined;
+    }
+    private updateImage() {
+        const len = this.canvas.width * this.canvas.height * 4;
+        for (let i = 0; i < len; i++) {
+            this.imageData.data[i] = 0;
+        }
+        this.drawHCircle();
+        this.drawSVBox();
+        this.drawHCursor();
+        this.drawSVCursor();
+        this.context.putImageData(this.imageData, 0, 0);
+    }
+    public draw(context: CanvasRenderingContext2D, x: number, y: number): void {
+        context.drawImage(this.canvas, x, y);
+    }
+    public touch(x: number, y: number): boolean {
+        const ret1 = this.getHValueFromPos(x, y);
+        if (ret1 != undefined) {
+            this._hsv[0] = ret1;
+        }
+        const ret2 = this.getSVValueFromPos(x, y);
+        if (ret2 != undefined) {
+            [this._hsv[1], this._hsv[2]] = ret2;
+        }
+
+        if (ret1 != undefined || ret2 != undefined) {
+            this.updateImage();
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+///////////////////////////////////////////////////////////////
+namespace Events {
+    export type EventHandler = (...args: any[]) => boolean;
+    class SingleEmitter {
+        private listeners: EventHandler[];
+
+        constructor() {
+            this.listeners = [];
+        }
+
+        public clear(): SingleEmitter {
+            this.listeners.length = 0;
+            return this;
+        }
+
+        public on(listener: EventHandler): SingleEmitter {
+            this.listeners.splice(0, 0, listener);
+            return this;
+        }
+
+        public off(listener: EventHandler): SingleEmitter {
+            const index = this.listeners.indexOf(listener);
+            if (index !== -1) {
+                this.listeners.splice(index, 1);
+            }
+            return this;
+        }
+
+        public fire(...args: any[]): boolean {
+            const temp = this.listeners.slice();
+            for (const dispatcher of temp) {
+                if (dispatcher.apply(this, args)) {
+                    return true;
+                }
+            };
+            return false;
+        }
+
+        public one(listener: EventHandler): SingleEmitter {
+            const func = (...args: any[]) => {
+                const result = listener.apply(this, args);
+                this.off(func);
+                return result;
+            };
+
+            this.on(func);
+
+            return this;
+        }
+
+    }
+    export class EventEmitter {
+
+        private listeners: Map<string, SingleEmitter>;
+
+        constructor() {
+            this.listeners = new Map<string, SingleEmitter>();
+        }
+
+        public on(eventName: string, listener: EventHandler): EventEmitter {
+            if (!this.listeners.has(eventName)) {
+                this.listeners.set(eventName, new SingleEmitter());
+            }
+
+            this.listeners.get(eventName).on(listener);
+            return this;
+        }
+
+        public off(eventName: string, listener: EventHandler): EventEmitter {
+            this.listeners.get(eventName).off(listener);
+            return this;
+        }
+
+        public fire(eventName: string, ...args: any[]): boolean {
+            if (this.listeners.has(eventName)) {
+                const dispatcher = this.listeners.get(eventName);
+                return dispatcher.fire.apply(dispatcher, args);
+            }
+            return false;
+        }
+
+        public one(eventName: string, listener: EventHandler): EventEmitter {
+            if (!this.listeners.has(eventName)) {
+                this.listeners.set(eventName, new SingleEmitter());
+            }
+            this.listeners.get(eventName).one(listener);
+
+            return this;
+        }
+
+        public hasEventListener(eventName: string): boolean {
+            return this.listeners.has(eventName);
+        }
+
+        public clearEventListener(eventName: string): EventEmitter {
+            if (this.listeners.has(eventName)) {
+                this.listeners.get(eventName).clear();
+            }
+            return this;
+        }
+    }
+}
+///////////////////////////////////////////////////////////////
+
+namespace TsPaint {
 
     namespace GUI {
         /**
@@ -368,7 +707,7 @@ namespace TsPaint {
                     ui.removeEventListener("pointermove", onPointerMoveHandler);
                     ui.removeEventListener("pointerup", onPointerUpHandler);
                     if (dx + dy < 5) {
-                        ui.dispatchEvent(new UIMouseEvent("click", ev.x - ui.left, ev.y - ui.top));
+                        ui.dispatchEvent(new UIMouseEvent("click", ev.x, ev.y));
                     }
                     ev.preventDefault();
                     ev.stopPropagation();
@@ -393,16 +732,15 @@ namespace TsPaint {
                     return;
                 }
 
-                if (!isHit(ui, x, y)) {
+                if (!ui.isHit(x, y)) {
                     return;
                 }
 
                 ev.preventDefault();
                 ev.stopPropagation();
 
-                let root = ui.parent;
-                while (root.parent) { root = root.parent; }
-
+                let root = ui.root;
+                let isTap = true;
                 const onPointerMoveHandler = (ev: UIMouseEvent) => {
                     let dx = (~~ev.x - ~~x);
                     let dy = (~~ev.y - ~~y);
@@ -428,6 +766,61 @@ namespace TsPaint {
             ui.addEventListener("pointerdown", hookHandler);
         }
 
+        // スワイプorタップ
+        export function installSwipeOrTapDelegate(ui: Control) {
+
+            const hookHandler = (ev: UIMouseEvent) => {
+                let x = ev.x;
+                let y = ev.y;
+                if (!ui.visible || !ui.enable) {
+                    return;
+                }
+
+                if (!ui.isHit(x, y)) {
+                    return;
+                }
+
+                ev.preventDefault();
+                ev.stopPropagation();
+
+                let root = ui.root;
+                let isTap = true;
+                let mx = 0;
+                let my = 0;
+                const onPointerMoveHandler = (ev: UIMouseEvent) => {
+                    let dx = (~~ev.x - ~~x);
+                    let dy = (~~ev.y - ~~y);
+                    mx += dx;
+                    my += dy;
+                    if (mx + my > 5) {
+                        isTap = false;
+                    }
+                    if (isTap == false) {
+                        x = ev.x;
+                        y = ev.y;
+                        dx = mx;
+                        dy = my;
+                        ui.postEvent(new UISwipeEvent("swipe", dx, dy, x, y));
+                    }
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    return;
+                };
+                const onPointerUpHandler = (ev: UIMouseEvent) => {
+                    root.removeEventListener("pointermove", onPointerMoveHandler, true);
+                    root.removeEventListener("pointerup", onPointerUpHandler, true);
+                    if (isTap) {
+                        ui.dispatchEvent(new UIMouseEvent("click", ev.x, ev.y));
+                    }
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    return;
+                };
+                root.addEventListener("pointermove", onPointerMoveHandler, true);
+                root.addEventListener("pointerup", onPointerUpHandler, true);
+            };
+            ui.addEventListener("pointerdown", hookHandler);
+        }
 
         type EventHandler = (event: UIEvent, ...args: any[]) => void;
 
@@ -447,11 +840,19 @@ namespace TsPaint {
             public top: number;
             public width: number;
             public height: number;
+
             public visible: boolean;
             public enable: boolean;
 
             public parent: Control;
             public childrens: Control[];
+
+            public get root(): Control {
+                let root = this.parent;
+                while (root.parent) { root = root.parent; }
+                return root;
+            }
+
 
             private captureListeners: Map<string, EventHandler[]>;
             private bubbleListeners: Map<string, EventHandler[]>;
@@ -517,10 +918,7 @@ namespace TsPaint {
                 this.draw(context);
             }
 
-
-            static MOUSE_EVENT_NAME = ["pointerdown", "pointermove", "pointerup"]
-
-            public enumEventTargets(ret: Control[])  : void {
+            public enumEventTargets(ret: Control[]): void {
                 if (!this.visible || !this.enable) {
                     return;
                 }
@@ -531,13 +929,13 @@ namespace TsPaint {
                 return;
             }
 
-            public enumMouseEventTargets(ret: Control[], x: number, y: number) : boolean {
+            public enumMouseEventTargets(ret: Control[], x: number, y: number): boolean {
                 if (!this.visible || !this.enable) {
                     return false;
                 }
                 ret.push(this);
                 for (let child of this.childrens) {
-                    if (isHit(child, x, y)) {
+                    if (child.isHit(x, y)) {
                         if (child.enumMouseEventTargets(ret, x, y) == true) {
                             return true;
                         }
@@ -567,7 +965,7 @@ namespace TsPaint {
             }
 
             public dispatchEvent(event: UIEvent, ...args: any[]): void {
-                const chain : Control[] = [];
+                const chain: Control[] = [];
                 (event instanceof UIMouseEvent) ? this.enumMouseEventTargets(chain, (event as UIMouseEvent).x, (event as UIMouseEvent).y) : this.enumEventTargets(chain);
                 for (let child of chain) {
                     if (child.captureListeners.has(event.name)) {
@@ -593,46 +991,35 @@ namespace TsPaint {
 
             }
 
-            addChild(child: Control) {
+            addChild(child: Control): void {
                 child.parent = this;
                 this.childrens.push(child);
             }
-            removeChild(child: Control) {
+
+            removeChild(child: Control): boolean {
                 const index = this.childrens.indexOf(child);
                 if (index != -1) {
                     this.childrens.splice(index, 1);
                     child.parent = null;
+                    return true;
                 }
+                return false;
+            }
+
+
+            /**
+             * UI領域内に点(x,y)があるか判定
+             * @param ui {UI}
+             * @param x {number}
+             * @param y {number}
+             */
+            isHit(x: number, y: number): boolean {
+                const { x: dx, y: dy } = this.globalPos;
+                return (dx <= x && x < dx + this.width) && (dy <= y && y < dy + this.height);
             }
 
 
         }
-
-        /**
-         * クリック操作インタフェース
-         */
-        export interface ClickableUI {
-            click: (x: number, y: number) => void;
-        }
-
-        /**
-         * スワイプ操作インタフェース
-         */
-        export interface SwipableUI {
-            swipe: (dx: number, dy: number, x: number, y: number) => void;
-        }
-
-        /**
-         * UI領域内に点(x,y)があるか判定
-         * @param ui {UI}
-         * @param x {number}
-         * @param y {number}
-         */
-        export function isHit(ui: Control, x: number, y: number): boolean {
-            const { x: dx, y: dy } = ui.globalPos;
-            return (dx <= x && x < dx + ui.width) && (dy <= y && y < dy + ui.height);
-        }
-
         export class TextBox extends Control {
             public text: string;
             public edgeColor: string;
@@ -796,7 +1183,7 @@ namespace TsPaint {
                         this.parent.childrens.splice(index, 1);
                         this.parent.childrens.unshift(this);
                     }
-                },true)
+                }, true)
 
             }
             draw(context: CanvasRenderingContext2D) {
@@ -1085,9 +1472,9 @@ namespace TsPaint {
             public scrollValue: number;
             public scrollbarWidth: number;
             public space: number;
-            public click: (x: number, y: number) => void;
+            public click: (ev:UIMouseEvent) => void;
 
-            public drawItem: (left: number, top: number, width: number, height: number, item: number) => void;
+            public drawItem: (context:CanvasRenderingContext2D, left: number, top: number, width: number, height: number, item: number) => void;
             public getItemCount: () => number;
             constructor(
                 {
@@ -1108,7 +1495,7 @@ namespace TsPaint {
                         width: number;
                         height: number;
                         lineHeight?: number
-                        drawItem?: (left: number, top: number, width: number, height: number, item: number) => void,
+                        drawItem?: (context:CanvasRenderingContext2D,left: number, top: number, width: number, height: number, item: number) => void,
                         getItemCount?: () => number,
                         visible?: boolean;
                         enable?: boolean;
@@ -1127,9 +1514,11 @@ namespace TsPaint {
                     this.update();
                 });
 
-                this.addEventListener("click", (event: UIMouseEvent) => this.click.call(this, event))
-                installSwipeDelegate(this);
-                installClickDelecate(this);
+                this.addEventListener("click", (event: UIMouseEvent) => {
+
+                     this.click.call(this, event);
+                })
+                installSwipeOrTapDelegate(this);
 
             }
 
@@ -1171,7 +1560,7 @@ namespace TsPaint {
                     context.beginPath();
                     context.rect(this.left, Math.max(this.top, this.top + sy), this.width - this.scrollbarWidth, Math.min(drawResionHeight, this.lineHeight));
                     context.clip();
-                    this.drawItem(this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
+                    this.drawItem(context, this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
                     context.restore();
                     drawResionHeight -= this.lineHeight + this.space;
                     sy += this.lineHeight + this.space;
@@ -1264,7 +1653,7 @@ namespace TsPaint {
                 this.value = minValue;
                 installSwipeDelegate(this);
                 this.addEventListener("swipe", (event: UISwipeEvent) => {
-                    const { x:l, y:t } = this.globalPos;
+                    const { x: l, y: t } = this.globalPos;
                     const x = event.x - l;
                     const yy = event.y - t;
                     const rangeSize = this.maxValue - this.minValue;
@@ -1331,21 +1720,6 @@ namespace TsPaint {
         }
     }
 
-    interface IPoint {
-        x: number;
-        y: number;
-    }
-
-    namespace IPoint {
-        export function rotate(point: IPoint, rad: number) {
-            const cos = Math.cos(rad);
-            const sin = Math.sin(rad);
-            const rx = point.x * cos - point.y * sin;
-            const ry = point.x * sin + point.y * cos;
-            return { x: rx, y: ry };
-        }
-    }
-
     namespace Brushes {
         export type BrushPred = (x0: number, y0: number) => void;
         export function createSolidBrush(imgData: ImageData, color: RGBA, size: number): BrushPred {
@@ -1358,14 +1732,15 @@ namespace TsPaint {
                 const mask: Uint8Array = new Uint8Array(w * h);
                 Topology.drawCircle(r, r, size, (x1, x2, y) => { for (let i = x1; i <= x2; i++) { mask[w * y + i] = 1; } });
                 return function (x0: number, y0: number): void {
-                    let scan = 0;
-                    for (let yy = -r; yy <= r; yy++) {
-                        for (let xx = -r; xx <= r; xx++) {
-                            if (mask[scan++] != 0) {
-                                imgData.pointSet(x0 + xx, y0 + yy, color);
-                            }
-                        }
-                    }
+                    //let scan = 0;
+                    imgData.putMask(x0-r, y0-r, mask, w, h, color);
+                    //for (let yy = -r; yy <= r; yy++) {
+                    //    for (let xx = -r; xx <= r; xx++) {
+                    //        if (mask[scan++] != 0) {
+                    //            imgData.pointSet(x0 + xx, y0 + yy, color);
+                    //        }
+                    //    }
+                    //}
                 };
             }
         }
@@ -1418,245 +1793,6 @@ namespace TsPaint {
         }
     }
 
-    class HSVColorWheel {
-        private canvas: HTMLCanvasElement;
-        private context: CanvasRenderingContext2D;
-        private imageData: ImageData;
-        private wheelRadius: { min: number, max: number };
-        private svBoxSize: number;
-        private hsv_h: number = 0;
-        private hsv_s: number = 0;
-        private hsv_v: number = 0;
-
-        public get H(): number { return this.hsv_h; }
-        public set H(v: number) { this.hsv_h = (Math.sign(v) < 0 ? 360 : 0) + (~~v % 360); }
-        public get S(): number { return this.hsv_s; }
-        public set S(v: number) { this.hsv_s = (v < 0) ? 0 : (v > 1) ? 1 : v; }
-        public get V(): number { return this.hsv_v; }
-        public set V(v: number) { this.hsv_v = (v < 0) ? 0 : (v > 1) ? 1 : v; }
-        public get rgb(): RGB {
-            return HSVColorWheel.hsv2rgb(this.hsv_h, this.hsv_s, this.hsv_v);
-        }
-        public set rgb(v: RGB) {
-            [this.hsv_h, this.hsv_s, this.hsv_v] = HSVColorWheel.rgb2hsv(v[0], v[1], v[2]);
-        }
-        constructor({ width = 0, height = 0, wheelRadiusMin = 76, wheelRadiusMax = 96, svBoxSize = 100 }: { width: number, height: number, wheelRadiusMin?: number, wheelRadiusMax?: number, svBoxSize?: number }) {
-            this.canvas = document.createElement("canvas");
-            this.canvas.width = width;
-            this.canvas.height = height;
-            this.context = this.canvas.getContext("2d");
-            this.imageData = this.context.createImageData(this.canvas.width, this.canvas.height);
-            this.wheelRadius = { min: wheelRadiusMin, max: wheelRadiusMax };
-            this.svBoxSize = svBoxSize;
-            this.hsv_h = 0;
-            this.hsv_s = 0;
-            this.hsv_v = 0;
-            this.updateImage();
-        }
-        private static rgb2hsv(r: number, g: number, b: number): HSV {
-            let max = r > g ? r : g;
-            max = max > b ? max : b;
-            let min = r < g ? r : g;
-            min = min < b ? min : b;
-            let h = max - min;
-            if (h > 0.0) {
-                if (max == r) {
-                    h = (g - b) / h;
-                    if (h < 0.0) {
-                        h += 6.0;
-                    }
-                } else if (max == g) {
-                    h = 2.0 + (b - r) / h;
-                } else {
-                    h = 4.0 + (r - g) / h;
-                }
-            }
-            h /= 6.0;
-            let s = (max - min);
-            if (max != 0.0) {
-                s /= max;
-            }
-            let v = max;
-
-            return [~~(h * 360), s, v]
-        }
-
-        private static hsv2rgb(h: number, s: number, v: number): RGB {
-            if (s == 0) {
-                const vv: number = ~~(v * 255 + 0.5);
-                return [vv, vv, vv];
-            } else {
-                const t: number = ((h * 6) % 360) / 360.0;
-                const c1: number = v * (1 - s);
-                const c2: number = v * (1 - s * t);
-                const c3: number = v * (1 - s * (1 - t));
-
-                let r: number = 0;
-                let g: number = 0;
-                let b: number = 0;
-                switch (~~(h / 60)) {
-                    case 0: r = v; g = c3; b = c1; break;
-                    case 1: r = c2; g = v; b = c1; break;
-                    case 2: r = c1; g = v; b = c3; break;
-                    case 3: r = c1; g = c2; b = v; break;
-                    case 4: r = c3; g = c1; b = v; break;
-                    case 5: r = v; g = c1; b = c2; break;
-                    default: throw new Error();
-                }
-                const rr: number = ~~(r * 255 + 0.5);
-                const gg: number = ~~(g * 255 + 0.5);
-                const bb: number = ~~(b * 255 + 0.5);
-
-                return [rr, gg, bb];
-            }
-
-        }
-
-        private getPixel(x: number, y: number): RGB {
-            if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
-                return [0, 0, 0];
-            }
-            const index = (~~y * this.canvas.width + ~~x) * 4;
-            return [
-                this.imageData.data[index + 0],
-                this.imageData.data[index + 1],
-                this.imageData.data[index + 2],
-                //this.imageData.data[index + 3],
-            ];
-        }
-        private setPixel(x: number, y: number, color: RGB): void {
-            if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
-                return;
-            }
-            const index = (~~y * this.canvas.width + ~~x) * 4;
-            this.imageData.data[index + 0] = color[0];
-            this.imageData.data[index + 1] = color[1];
-            this.imageData.data[index + 2] = color[2];
-            this.imageData.data[index + 3] = 255;
-        }
-        private xorPixel(x: number, y: number): void {
-            if (x < 0 || this.canvas.width <= x || y < 0 || this.canvas.height <= y) {
-                return;
-            }
-            const index = (~~y * this.canvas.width + ~~x) * 4;
-            this.imageData.data[index + 0] = 255 ^ this.imageData.data[index + 0];
-            this.imageData.data[index + 1] = 255 ^ this.imageData.data[index + 1];
-            this.imageData.data[index + 2] = 255 ^ this.imageData.data[index + 2];
-        }
-
-        private drawInvBox(x: number, y: number, w: number, h: number): void {
-            for (let yy = 0; yy < h; yy++) {
-                this.xorPixel(x + 0, y + yy);
-                this.xorPixel(x + w - 1, y + yy);
-            }
-            for (let xx = 1; xx < w - 1; xx++) {
-                this.xorPixel(x + xx, y + 0);
-                this.xorPixel(x + xx, y + h - 1);
-            }
-        }
-
-        private drawHCircle(): void {
-            for (let iy = 0; iy < this.canvas.height; iy++) {
-                const yy = iy - this.canvas.height / 2;
-                for (let ix = 0; ix < this.canvas.width; ix++) {
-                    const xx = ix - this.canvas.width / 2;
-
-                    const r = ~~Math.sqrt(xx * xx + yy * yy);
-
-                    if (r < this.wheelRadius.min || r >= this.wheelRadius.max) {
-                        continue;
-                    }
-
-                    const h = (~~(-Math.atan2(yy, xx) * 180 / Math.PI) + 360) % 360;
-
-                    const col = HSVColorWheel.hsv2rgb(h, 1.0, 1.0);
-
-                    this.setPixel(ix, iy, col);
-                }
-            }
-        }
-
-        private drawSVBox() {
-            for (let iy = 0; iy < this.svBoxSize; iy++) {
-                const v = (this.svBoxSize - 1 - iy) / (this.svBoxSize - 1);
-
-                for (let ix = 0; ix < this.svBoxSize; ix++) {
-                    const s = ix / (this.svBoxSize - 1);
-
-                    const col = HSVColorWheel.hsv2rgb(this.hsv_h, s, v);
-
-                    this.setPixel(ix + ~~((this.canvas.width - this.svBoxSize) / 2), iy + ~~((this.canvas.height - this.svBoxSize) / 2), col);
-                }
-            }
-        }
-
-        private drawHCursor() {
-            const rd = -this.hsv_h * Math.PI / 180;
-
-            const xx = this.wheelRadius.min + (this.wheelRadius.max - this.wheelRadius.min) / 2;
-            const yy = 0;
-
-            const x = ~~(xx * Math.cos(rd) - yy * Math.sin(rd) + this.canvas.width / 2);
-            const y = ~~(xx * Math.sin(rd) + yy * Math.cos(rd) + this.canvas.height / 2);
-
-            this.drawInvBox(x - 4, y - 4, 9, 9);
-        }
-
-        private getGValue(x0: number, y0: number) {
-            const x = x0 - this.canvas.width / 2;
-            const y = y0 - this.canvas.height / 2;
-
-            const h = (~~(-Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
-
-            const r = ~~Math.sqrt(x * x + y * y);
-
-            return (r >= this.wheelRadius.min && r < this.wheelRadius.max) ? h : undefined;
-        }
-        private drawSVCursor() {
-            const left = (this.canvas.width - this.svBoxSize) / 2;
-            const top = (this.canvas.height - this.svBoxSize) / 2;
-            this.drawInvBox(left + ~~(this.hsv_s * this.svBoxSize) - 4, top + ~~((1 - this.hsv_v) * this.svBoxSize) - 4, 9, 9);
-        }
-        private getSVValue(x0: number, y0: number) {
-            const x = ~~(x0 - (this.canvas.width - this.svBoxSize) / 2);
-            const y = ~~(y0 - (this.canvas.height - this.svBoxSize) / 2);
-
-            return (0 <= x && x < this.svBoxSize && 0 <= y && y < this.svBoxSize) ? [x / (this.svBoxSize - 1), (this.svBoxSize - 1 - y) / (this.svBoxSize - 1)] : undefined;
-        }
-        private updateImage() {
-            const len = this.canvas.width * this.canvas.height * 4;
-            for (let i = 0; i < len; i++) {
-                this.imageData.data[i] = 0;
-            }
-            this.drawHCircle();
-            this.drawSVBox();
-            this.drawHCursor();
-            this.drawSVCursor();
-            this.context.putImageData(this.imageData, 0, 0);
-        }
-        public draw(context: CanvasRenderingContext2D, x: number, y: number): void {
-            context.drawImage(this.canvas, x, y);
-        }
-        public touch(x: number, y: number): boolean {
-            const ret1 = this.getGValue(x, y);
-            if (ret1 != undefined) {
-                this.hsv_h = ret1;
-            }
-            const ret2 = this.getSVValue(x, y);
-            if (ret2 != undefined) {
-                [this.hsv_s, this.hsv_v] = ret2;
-            }
-
-            if (ret1 != undefined || ret2 != undefined) {
-                this.updateImage();
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-    }
-
     class HSVColorWheelUI extends GUI.Control {
         public left: number;
         public top: number;
@@ -1696,9 +1832,9 @@ namespace TsPaint {
             GUI.installSwipeDelegate(this);
 
             this.addEventListener("swipe", (event: GUI.UISwipeEvent) => {
-                const { x: dx, y: dy } = this.globalPos;
-                const x = event.x - dx;
-                const y = event.y - dy;
+                const { x: left, y: top } = this.globalPos;
+                const x = event.x - left;
+                const y = event.y - top;
                 if (this.hsvColorWhell.touch(x, y)) {
                     this.changed();
                 }
@@ -1718,29 +1854,45 @@ namespace TsPaint {
         }
     }
 
-    /**
-     * フリーハンド
-     */
-    class SolidPen {
-        private joints: IPoint[];
+    interface Tool {
+        name: string;
+        compositMode: CompositMode;
 
-        constructor() {
+        down(point: IPoint): void;
+        move(point: IPoint): void;
+        up(point: IPoint): void;
+        draw(config: IPainterConfig, imgData: ImageData): void;
+
+    }
+
+    /**
+     * ブロックペン
+     */
+    class SolidPen implements Tool {
+        protected joints: IPoint[];
+
+        public compositMode: CompositMode;
+        public name: string;
+
+        constructor(name: string, compositMode: CompositMode) {
+            this.name = name;
             this.joints = [];
+            this.compositMode = compositMode;
         }
 
-        public down(point: IPoint) {
+        public down(point: IPoint): void {
             this.joints.length = 0;
             this.joints.push(point);
         }
 
-        public move(point: IPoint) {
+        public move(point: IPoint): void {
             this.joints.push(point);
         }
 
-        public up(point: IPoint) {
+        public up(point: IPoint): void {
         }
 
-        public draw(config: IPainterConfig, imgData: ImageData) {
+        public draw(config: IPainterConfig, imgData: ImageData): void {
             const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
             if (this.joints.length === 1) {
                 Topology.drawLine(this.joints[0], this.joints[0], brush);
@@ -1752,6 +1904,61 @@ namespace TsPaint {
         }
 
     }
+    class CorrectionSolidPen extends SolidPen {
+        // http://jsdo.it/kikuchy/zsWz
+
+        movingAverage(start: number): IPoint {
+            const ret = { x: 0, y: 0 };
+            for (let i = 0; i < CorrectionSolidPen.m; i++) {
+                ret.x += this.joints[start].x;
+                ret.y += this.joints[start].y;
+                start++;
+            }
+            ret.x = ~~(ret.x / CorrectionSolidPen.m);
+            ret.y = ~~(ret.y / CorrectionSolidPen.m);
+            return ret;
+        };
+        static m: number = 10;
+
+        constructor(name: string, compositMode: CompositMode) {
+            super(name, compositMode);
+
+        }
+
+        down(point: IPoint) {
+            this.joints.length = 0;
+            this.joints.push(point);
+        }
+
+        move(point: IPoint) {
+            this.joints.push(point);
+        }
+
+        public up(point: IPoint): void {
+        }
+
+        public draw(config: IPainterConfig, imgData: ImageData): void {
+            const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
+            if (this.joints.length === 1) {
+                Topology.drawLine(this.joints[0], this.joints[0], brush);
+            } else if (this.joints.length <= CorrectionSolidPen.m) {
+                for (let i = 1; i < this.joints.length; i++) {
+                    Topology.drawLine(this.joints[i - 1], this.joints[i - 0], brush);
+                }
+            } else {
+                let prev: IPoint = this.movingAverage(0);
+                Topology.drawLine(this.joints[0],prev,  brush);
+                const len = this.joints.length - CorrectionSolidPen.m;
+                for (let i = 1; i < len ; i++) {
+                    const avg = this.movingAverage(i);
+                    Topology.drawLine(prev, avg, brush);
+                    prev = avg;
+                }
+                Topology.drawLine(prev, this.joints[this.joints.length - 1], brush);
+            }
+
+        }
+    }
 
 
     interface IPainterConfig {
@@ -1761,6 +1968,11 @@ namespace TsPaint {
         scrollX: number;
         scrollY: number;
     };
+
+    interface Layer {
+        imageData: ImageData;
+        compositMode: CompositMode;
+    }
 
     class Painter {
         private parentHtmlElement: HTMLElement;
@@ -1789,12 +2001,13 @@ namespace TsPaint {
         /**
          * 各レイヤー
          */
-        private imageLayerImgData: ImageData;
+        private currentLayer: number;
+        private imageLayerImgDatas: Layer[];
 
         /**
          * 作業レイヤー
          */
-        private workLayerImgData: ImageData;
+        private workLayerImgData: Layer;
 
         /**
          * 作画画面ビュー用
@@ -1811,7 +2024,13 @@ namespace TsPaint {
         private canvasOffsetX: number = 0;
         private canvasOffsetY: number = 0;
 
-        private currentTool: SolidPen = new SolidPen();
+        private tools: Tool[] = [
+            new SolidPen("SolidPen", CompositMode.Normal),
+            new CorrectionSolidPen("SolidPen2", CompositMode.Normal),
+            new SolidPen("Eraser", CompositMode.SubAlpha)
+        ];
+
+        private currentTool: Tool = null;
 
         private config: IPainterConfig = {
             scale: 1,
@@ -1829,14 +2048,22 @@ namespace TsPaint {
 
             this.eventEmitter = new Events.EventEmitter();
 
+            this.currentLayer = 0;
+
             this.imageCanvas = document.createElement("canvas");
             this.imageCanvas.width = width;
             this.imageCanvas.height = height;
             this.imageContext = this.imageCanvas.getContext("2d");
             this.imageContext.imageSmoothingEnabled = false;
-            this.imageLayerImgData = this.imageContext.createImageData(width, height);
+            this.imageLayerImgDatas = [
+                { imageData: this.imageContext.createImageData(width, height), compositMode: CompositMode.Normal },
+                { imageData: this.imageContext.createImageData(width, height), compositMode: CompositMode.Normal },
+                ];
             this.imageLayerCompositedImgData = this.imageContext.createImageData(width, height);
-            this.workLayerImgData = this.imageContext.createImageData(width, height);
+            this.workLayerImgData = {
+                imageData: this.imageContext.createImageData(width, height),
+                compositMode: CompositMode.Normal
+            };
 
             this.viewCanvas = document.createElement("canvas");
             this.viewCanvas.style.position = "absolute";
@@ -1873,9 +2100,6 @@ namespace TsPaint {
             this.updateTimerId = NaN;
 
             this.uiDispacher.addEventListener("update", () => { this.update({ gui: true }); return true; });
-
-            document.onselectstart = () => false;
-            document.oncontextmenu = () => false;
 
             window.addEventListener("resize", () => this.resize());
             this.setupMouseEvent();
@@ -1919,8 +2143,7 @@ namespace TsPaint {
                     minValue: 0,
                     maxValue: 255,
                 });
-                uiAlphaSlider.addEventListener("changed", () =>
-                {
+                uiAlphaSlider.addEventListener("changed", () => {
                     this.config.penColor[3] = uiAlphaSlider.value;
                     this.update({ gui: true });
                 });
@@ -1929,7 +2152,7 @@ namespace TsPaint {
 
                 uiWheelWindow.addChild(uiWindowLabel);
                 this.uiDispacher.addChild(uiWheelWindow);
-            } 
+            }
             {
                 const uiInfoWindow = new GUI.Window({
                     left: 0,
@@ -1960,39 +2183,151 @@ namespace TsPaint {
                 this.uiDispacher.addChild(uiInfoWindow);
             }
             {
-                const uiInfoWindow = new GUI.Window({
+                const uiPenSizeWindow = new GUI.Window({
                     left: 0,
                     top: 0,
                     width: 150,
-                    height: 12 + 2 + 13-1,
+                    height: 12 + 2 + 13 - 1,
                 });
 
                 // Information Window
-                const uiInfoWindowTitle = new GUI.Label({
+                const uiPenSizeWindowTitle = new GUI.Label({
                     left: 0,
                     top: 0,
                     width: 150,
                     height: 12 + 2,
-                    text: 'BrushSize'
+                    text: 'PenSize'
                 });
-                uiInfoWindow.addChild(uiInfoWindowTitle);
-                const uiAlphaSlider = new GUI.HorizontalSlider({
-                    left: uiInfoWindowTitle.left,
-                    top: uiInfoWindowTitle.top + uiInfoWindowTitle.height - 1,
-                    width: uiInfoWindowTitle.width,
+                uiPenSizeWindow.addChild(uiPenSizeWindowTitle);
+                const uiPenSizeSlider = new GUI.HorizontalSlider({
+                    left: uiPenSizeWindowTitle.left,
+                    top: uiPenSizeWindowTitle.top + uiPenSizeWindowTitle.height - 1,
+                    width: uiPenSizeWindowTitle.width,
                     color: 'rgb(255,255,255)',
                     fontColor: 'rgb(0,0,0)',
                     height: 13,
                     minValue: 1,
                     maxValue: 100,
                 });
-                uiAlphaSlider.addEventListener("changed", () =>
-                {
-                    this.config.penSize = uiAlphaSlider.value;
+                uiPenSizeSlider.addEventListener("changed", () => {
+                    this.config.penSize = uiPenSizeSlider.value;
                     this.update({ gui: true });
                 });
-                uiInfoWindow.addChild(uiAlphaSlider);
-                this.uiDispacher.addChild(uiInfoWindow);
+                uiPenSizeWindow.addChild(uiPenSizeSlider);
+                this.uiDispacher.addChild(uiPenSizeWindow);
+            }
+            {
+                const uiToolboxWindow = new GUI.Window({
+                    left: 0,
+                    top: 0,
+                    width: 150,
+                    height: 12 + 2 + 13 - 1,
+                });
+
+                // Information Window
+                const uiToolboxWindowTitle = new GUI.Label({
+                    left: 0,
+                    top: 0,
+                    width: 150,
+                    height: 12 + 2,
+                    text: 'Tools'
+                });
+                uiToolboxWindow.addChild(uiToolboxWindowTitle);
+                let top = uiToolboxWindowTitle.top + uiToolboxWindowTitle.height - 1;
+                const toolButtons: GUI.Button[] = [];
+                for (const tool of this.tools) {
+                    const uiToolBtn = new GUI.Button({
+                        left: uiToolboxWindowTitle.left,
+                        top: top,
+                        width: uiToolboxWindowTitle.width,
+                        color: 'rgb(255,255,255)',
+                        fontColor: 'rgb(0,0,0)',
+                        height: 13,
+                        text: tool.name
+                    });
+                    top += 13 - 1;
+                    uiToolBtn.addEventListener("click", () => {
+                        for (var toolButton of toolButtons) {
+                            toolButton.color = (uiToolBtn == toolButton) ? 'rgb(192,255,255)' : 'rgb(255,255,255)';
+                        }
+                        this.currentTool = tool;
+                        this.update({ gui: true });
+                    });
+                    uiToolboxWindow.addChild(uiToolBtn);
+                    toolButtons.push(uiToolBtn);
+                }
+                const uiSaveButton = new GUI.Button({
+                    left: uiToolboxWindowTitle.left,
+                    top: top,
+                    width: uiToolboxWindowTitle.width,
+                    color: 'rgb(255,255,255)',
+                    fontColor: 'rgb(0,0,0)',
+                    height: 13,
+                    text: "save to bitmap"
+                });
+                top += 13 - 1;
+                uiSaveButton.addEventListener("click", () => {
+                    const blob = new Blob([new Uint8Array(this.imageLayerCompositedImgData.saveAsBmp())], { type: 'image/bmp' });
+                    var blobURL = window.URL.createObjectURL(blob, { oneTimeOnly: true });
+                    const element: HTMLAnchorElement = document.createElement("a");
+                    element.href = blobURL;
+                    element.style.display = "none";
+                    element.download = "image.bmp"
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                });
+                uiToolboxWindow.addChild(uiSaveButton);
+                uiToolboxWindow.height = top;
+                this.uiDispacher.addChild(uiToolboxWindow);
+            }
+            {
+                const uiLayerWindow = new GUI.Window({
+                    left: 0,
+                    top: 0,
+                    width: 150,
+                    height: 12 + 2,
+                });
+
+                // Information Window
+                const uiLayerWindowTitle = new GUI.Label({
+                    left: 0,
+                    top: 0,
+                    width: 150,
+                    height: 12 + 2,
+                    text: 'Layer'
+                });
+                uiLayerWindow.addChild(uiLayerWindowTitle);
+                const uiLayerListBox = new GUI.ListBox({
+                    left: uiLayerWindowTitle.left,
+                    top: 13,
+                    width: uiLayerWindowTitle.width,
+                    height: 48*4,
+                    lineHeight: 48,
+                    getItemCount: () => this.imageLayerImgDatas.length,
+                    drawItem: (context : CanvasRenderingContext2D,left: number, top: number, width: number, height: number, item: number) => {
+                        if (item == this.currentLayer) {
+                            context.fillStyle = `rgb(24,196,195)`;
+                        } else {
+                            context.fillStyle = `rgb(133,133,133)`;
+                        }
+                        context.fillRect(left, top, width, height);
+                        context.strokeStyle = `rgb(12,34,98)`;
+                        context.lineWidth = 1;
+                        context.strokeRect(left, top, width, height);
+                    }
+                });
+                uiLayerListBox.click = (ev:GUI.UIMouseEvent) => {
+                    const { x: gx, y: gy} = uiLayerListBox.globalPos;
+                    const x = ev.x - gx;
+                    const y = ev.y - gy;
+                    const select = uiLayerListBox.getItemIndexByPosition(x, y);
+                    this.currentLayer = select == -1 ? this.currentLayer : select;
+                    this.update({ gui: true });
+                };
+                uiLayerWindow.addChild(uiLayerListBox);
+                uiLayerWindow.height = 13+48*4-1;
+                this.uiDispacher.addChild(uiLayerWindow);
             }
             this.resize();
         }
@@ -2009,7 +2344,7 @@ namespace TsPaint {
                 }
                 if ((e.mouse && (e.detail as MouseEvent).button === 0) ||
                     (e.touch && (e.detail as TouchEvent).touches.length <= 2)) {
-                    if ((e.mouse &&(e.detail as MouseEvent).ctrlKey) || (e.touch &&(e.detail as TouchEvent).touches.length == 2)) {
+                    if ((e.mouse && (e.detail as MouseEvent).ctrlKey) || (e.touch && (e.detail as TouchEvent).touches.length == 2)) {
                         let scrollStartPos: IPoint = this.pointToClient({ x: e.pageX, y: e.pageY });
 
                         const onScrolling = (e: CustomPointerEvent) => {
@@ -2036,38 +2371,59 @@ namespace TsPaint {
                         return true;
                     } else {
                         const onPenMove = (e: CustomPointerEvent) => {
-                            const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
-                            this.currentTool.move(p);
-                            this.workLayerImgData.clear();
-                            this.currentTool.draw(this.config, this.workLayerImgData);
-                            this.imageLayerCompositedImgData.copyFrom(this.imageLayerImgData);
-                            this.imageLayerCompositedImgData.composition(
-                                { imageData: this.workLayerImgData, compositMode: CompositMode.Normal }
-                            );
-                            this.update({ view: true });
+                            if (this.currentTool) {
+                                const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
+                                this.currentTool.move(p);
+                                this.workLayerImgData.imageData.clear();
+                                this.workLayerImgData.compositMode = this.currentTool.compositMode;
+                                this.currentTool.draw(this.config, this.workLayerImgData.imageData);
+                                this.imageLayerCompositedImgData.clear();
+                                for (let i = this.imageLayerImgDatas.length - 1; i >= 0; i--) {
+                                    this.imageLayerCompositedImgData.composition(this.imageLayerImgDatas[i]);
+                                    if (i == this.currentLayer) {
+                                        this.imageLayerCompositedImgData.composition(this.workLayerImgData);
+                                    }
+                                }
+                                this.update({ view: true });
+                            }
                             return true;
                         };
                         const onPenUp = (e: CustomPointerEvent) => {
                             this.eventEmitter.off("pointermove", onPenMove);
-                            const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
-                            this.currentTool.up(p);
-                            this.workLayerImgData.clear();
-                            this.currentTool.draw(this.config, this.workLayerImgData);
-                            this.imageLayerImgData.composition(
-                                { imageData: this.workLayerImgData, compositMode: CompositMode.Normal }
-                            );
-                            this.imageLayerCompositedImgData.copyFrom(this.imageLayerImgData);
-                            this.update({ view: true });
+                            if (this.currentTool) {
+                                const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
+                                this.currentTool.up(p);
+                                this.workLayerImgData.imageData.clear();
+                                this.workLayerImgData.compositMode = this.currentTool.compositMode;
+                                this.currentTool.draw(this.config, this.workLayerImgData.imageData);
+                                this.imageLayerImgDatas[this.currentLayer].imageData.composition(this.workLayerImgData);
+                                this.imageLayerCompositedImgData.clear();
+                                for (let i = this.imageLayerImgDatas.length - 1; i >= 0; i--) {
+                                    this.imageLayerCompositedImgData.composition(this.imageLayerImgDatas[i]);
+                                }
+
+                                this.update({ view: true });
+                            }
                             return true;
                         };
 
-                        this.eventEmitter.on("pointermove", onPenMove);
-                        this.eventEmitter.one("pointerup", onPenUp);
-                        const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
-                        this.currentTool.down(p);
-                        this.workLayerImgData.clear();
-                        this.currentTool.draw(this.config, this.workLayerImgData);
-                        this.update({ view: true });
+                        if (this.currentTool) {
+                            this.eventEmitter.on("pointermove", onPenMove);
+                            this.eventEmitter.one("pointerup", onPenUp);
+                            const p = this.pointToCanvas({ x: e.pageX, y: e.pageY });
+                            this.currentTool.down(p);
+                            this.workLayerImgData.imageData.clear();
+                            this.workLayerImgData.compositMode = this.currentTool.compositMode;
+                            this.currentTool.draw(this.config, this.workLayerImgData.imageData);
+                            this.imageLayerCompositedImgData.clear();
+                            for (let i = this.imageLayerImgDatas.length - 1; i >= 0; i--) {
+                                this.imageLayerCompositedImgData.composition(this.imageLayerImgDatas[i]);
+                                if (i == this.currentLayer) {
+                                    this.imageLayerCompositedImgData.composition(this.workLayerImgData);
+                                }
+                            }
+                            this.update({ view: true });
+                        }
                         return true;
                     }
                 }
@@ -2132,33 +2488,33 @@ namespace TsPaint {
                 (window as any).PointerEvent = function () { /* this is dummy event class */ };
             }
 
-                // add event listener to body
-                document.onselectstart = () => false;
-                document.oncontextmenu = () => false;
-                if (document.body["pointermove"] !== undefined) {
-                    document.body.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
-                    document.body.addEventListener('touchdown', evt => { evt.preventDefault(); }, false);
-                    document.body.addEventListener('touchup', evt => { evt.preventDefault(); }, false);
-                    document.body.addEventListener('mousemove', evt => { evt.preventDefault(); }, false);
-                    document.body.addEventListener('mousedown', evt => { evt.preventDefault(); }, false);
-                    document.body.addEventListener('mouseup', evt => { evt.preventDefault(); }, false);
+            // add event listener to body
+            document.onselectstart = () => false;
+            document.oncontextmenu = () => false;
+            if (document.body["pointermove"] !== undefined) {
+                document.addEventListener('touchmove', evt => { evt.preventDefault(); }, false);
+                document.addEventListener('touchdown', evt => { evt.preventDefault(); }, false);
+                document.addEventListener('touchup', evt => { evt.preventDefault(); }, false);
+                document.addEventListener('mousemove', evt => { evt.preventDefault(); }, false);
+                document.addEventListener('mousedown', evt => { evt.preventDefault(); }, false);
+                document.addEventListener('mouseup', evt => { evt.preventDefault(); }, false);
 
-                    document.body.addEventListener('pointerdown', (ev: PointerEvent) => this.eventEmitter.fire('pointerdown', ev));
-                    document.body.addEventListener('pointermove', (ev: PointerEvent) => this.eventEmitter.fire('pointermove', ev));
-                    document.body.addEventListener('pointerup', (ev: PointerEvent) => this.eventEmitter.fire('pointerup', ev));
-                    document.body.addEventListener('pointerleave', (ev: PointerEvent) => this.eventEmitter.fire('pointerleave', ev));
+                document.addEventListener('pointerdown', (ev: PointerEvent) => this.eventEmitter.fire('pointerdown', ev));
+                document.addEventListener('pointermove', (ev: PointerEvent) => this.eventEmitter.fire('pointermove', ev));
+                document.addEventListener('pointerup', (ev: PointerEvent) => this.eventEmitter.fire('pointerup', ev));
+                document.addEventListener('pointerleave', (ev: PointerEvent) => this.eventEmitter.fire('pointerleave', ev));
 
-                } else {
-                    document.body.addEventListener('mousedown', this.pointerDown.bind(this), false);
-                    document.body.addEventListener('touchstart', this.pointerDown.bind(this), false);
-                    document.body.addEventListener('mouseup', this.pointerUp.bind(this), false);
-                    document.body.addEventListener('touchend', this.pointerUp.bind(this), false);
-                    document.body.addEventListener('mousemove', this.pointerMove.bind(this), false);
-                    document.body.addEventListener('touchmove', this.pointerMove.bind(this), false);
-                    document.body.addEventListener('mouseleave', this.pointerLeave.bind(this), false);
-                    document.body.addEventListener('touchleave', this.pointerLeave.bind(this), false);
-                    document.body.addEventListener('touchcancel', this.pointerUp.bind(this), false);
-                }
+            } else {
+                document.addEventListener('mousedown', this.pointerDown.bind(this), false);
+                document.addEventListener('touchstart', this.pointerDown.bind(this), false);
+                document.addEventListener('mouseup', this.pointerUp.bind(this), false);
+                document.addEventListener('touchend', this.pointerUp.bind(this), false);
+                document.addEventListener('mousemove', this.pointerMove.bind(this), false);
+                document.addEventListener('touchmove', this.pointerMove.bind(this), false);
+                document.addEventListener('mouseleave', this.pointerLeave.bind(this), false);
+                document.addEventListener('touchleave', this.pointerLeave.bind(this), false);
+                document.addEventListener('touchcancel', this.pointerUp.bind(this), false);
+            }
 
             document.addEventListener("mousedown", (...args: any[]) => this.eventEmitter.fire("mousedown", ...args));
             document.addEventListener("mousemove", (...args: any[]) => this.eventEmitter.fire("mousemove", ...args));
@@ -2170,106 +2526,106 @@ namespace TsPaint {
         private timeout: number = -1;
         private sDistX: number = 0;
         private sDistY: number = 0;
-        private maybeClick: boolean= false;
-        private maybeClickX: number =0;
-        private maybeClickY: number =0;
+        private maybeClick: boolean = false;
+        private maybeClickX: number = 0;
+        private maybeClickY: number = 0;
         private prevTimeStamp: number = 0;
-        private prevInputType: string ="";
+        private prevInputType: string = "";
 
-            private checkEvent(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
-                e.preventDefault();
-                const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && (e as PointerEvent).pointerType === "touch");
-                const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && ((e as PointerEvent).pointerType === "mouse" || (e as PointerEvent).pointerType === "pen")));
-                if (istouch && this.prevInputType !== "touch") {
-                    if (e.timeStamp - this.prevTimeStamp >= 500) {
-                        this.prevInputType = "touch";
-                        this.prevTimeStamp = e.timeStamp;
-                        return true;
-                    } else {
-                        return false;
-                    }
-                } else if (ismouse && this.prevInputType !== "mouse") {
-                    if (e.timeStamp - this.prevTimeStamp >= 500) {
-                        this.prevInputType = "mouse";
-                        this.prevTimeStamp = e.timeStamp;
-                        return true;
-                    } else {
-                        return false;
-                    }
-                } else {
-                    this.prevInputType = istouch ? "touch" : ismouse ? "mouse" : "none";
+        private checkEvent(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
+            e.preventDefault();
+            const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && (e as PointerEvent).pointerType === "touch");
+            const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && ((e as PointerEvent).pointerType === "mouse" || (e as PointerEvent).pointerType === "pen")));
+            if (istouch && this.prevInputType !== "touch") {
+                if (e.timeStamp - this.prevTimeStamp >= 500) {
+                    this.prevInputType = "touch";
                     this.prevTimeStamp = e.timeStamp;
-                    return istouch || ismouse;
+                    return true;
+                } else {
+                    return false;
+                }
+            } else if (ismouse && this.prevInputType !== "mouse") {
+                if (e.timeStamp - this.prevTimeStamp >= 500) {
+                    this.prevInputType = "mouse";
+                    this.prevTimeStamp = e.timeStamp;
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                this.prevInputType = istouch ? "touch" : ismouse ? "mouse" : "none";
+                this.prevTimeStamp = e.timeStamp;
+                return istouch || ismouse;
+            }
+        }
+
+        private pointerDown(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
+            if (this.checkEvent(e)) {
+                const evt = this.makePointerEvent("down", e);
+                const singleFinger: boolean = (e instanceof MouseEvent) || (e instanceof TouchEvent && (e as TouchEvent).touches.length === 1);
+                if (!this.isScrolling && singleFinger) {
+                    this.maybeClick = true;
+                    this.maybeClickX = evt.pageX;
+                    this.maybeClickY = evt.pageY;
                 }
             }
+            return false;
+        }
 
-            private pointerDown(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
-                if (this.checkEvent(e)) {
-                    const evt = this.makePointerEvent("down", e);
-                    const singleFinger: boolean = (e instanceof MouseEvent) || (e instanceof TouchEvent && (e as TouchEvent).touches.length === 1);
-                    if (!this.isScrolling && singleFinger) {
-                        this.maybeClick = true;
-                        this.maybeClickX = evt.pageX;
-                        this.maybeClickY = evt.pageY;
-                    }
-                }
-                return false;
+        private pointerLeave(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
+            if (this.checkEvent(e)) {
+                this.maybeClick = false;
+                this.makePointerEvent("leave", e);
             }
+            return false;
+        }
 
-            private pointerLeave(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
-                if (this.checkEvent(e)) {
-                    this.maybeClick = false;
-                    this.makePointerEvent("leave", e);
-                }
-                return false;
+        private pointerMove(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
+            if (this.checkEvent(e)) {
+                this.makePointerEvent("move", e);
             }
+            return false;
+        }
 
-            private pointerMove(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
-                if (this.checkEvent(e)) {
-                    this.makePointerEvent("move", e);
-                }
-                return false;
-            }
-
-            private pointerUp(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
-                if (this.checkEvent(e)) {
-                    const evt = this.makePointerEvent("up", e);
-                    if (this.maybeClick) {
-                        if (Math.abs(this.maybeClickX - evt.pageX) < 5 && Math.abs(this.maybeClickY - evt.pageY) < 5) {
-                            if (!this.isScrolling ||
-                                (Math.abs(this.sDistX - window.pageXOffset) < 5 &&
-                                    Math.abs(this.sDistY - window.pageYOffset) < 5)) {
-                                this.makePointerEvent("click", e);
-                            }
+        private pointerUp(e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): boolean {
+            if (this.checkEvent(e)) {
+                const evt = this.makePointerEvent("up", e);
+                if (this.maybeClick) {
+                    if (Math.abs(this.maybeClickX - evt.pageX) < 5 && Math.abs(this.maybeClickY - evt.pageY) < 5) {
+                        if (!this.isScrolling ||
+                            (Math.abs(this.sDistX - window.pageXOffset) < 5 &&
+                                Math.abs(this.sDistY - window.pageYOffset) < 5)) {
+                            this.makePointerEvent("click", e);
                         }
                     }
-                    this.maybeClick = false;
                 }
-                return false;
+                this.maybeClick = false;
             }
+            return false;
+        }
 
-            private makePointerEvent(type: string, e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): CustomPointerEvent {
-                const evt: CustomPointerEvent = document.createEvent("CustomEvent") as CustomPointerEvent;
-                const eventType = `pointer${type}`;
-                evt.initCustomEvent(eventType, true, true, e);
-                evt.touch = e.type.indexOf("touch") === 0;
-                evt.mouse = e.type.indexOf("mouse") === 0;
-                if (evt.touch) {
-                    const touchEvent: TouchEvent = e as TouchEvent;
-                    evt.pointerId = touchEvent.changedTouches[0].identifier;
-                    evt.pageX = touchEvent.changedTouches[0].pageX;
-                    evt.pageY = touchEvent.changedTouches[0].pageY;
-                }
-                if (evt.mouse) {
-                    const mouseEvent: MouseEvent = e as MouseEvent;
-                    evt.pointerId = 0;
-                    evt.pageX = mouseEvent.clientX + window.pageXOffset;
-                    evt.pageY = mouseEvent.clientY + window.pageYOffset;
-                }
-                evt.maskedEvent = e;
-                this.eventEmitter.fire(eventType, evt);
-                return evt;
+        private makePointerEvent(type: string, e: /*TouchEvent | MouseEvent | PointerEvent*/ UIEvent): CustomPointerEvent {
+            const evt: CustomPointerEvent = document.createEvent("CustomEvent") as CustomPointerEvent;
+            const eventType = `pointer${type}`;
+            evt.initCustomEvent(eventType, true, true, e);
+            evt.touch = e.type.indexOf("touch") === 0;
+            evt.mouse = e.type.indexOf("mouse") === 0;
+            if (evt.touch) {
+                const touchEvent: TouchEvent = e as TouchEvent;
+                evt.pointerId = touchEvent.changedTouches[0].identifier;
+                evt.pageX = touchEvent.changedTouches[0].pageX;
+                evt.pageY = touchEvent.changedTouches[0].pageY;
             }
+            if (evt.mouse) {
+                const mouseEvent: MouseEvent = e as MouseEvent;
+                evt.pointerId = 0;
+                evt.pageX = mouseEvent.clientX + window.pageXOffset;
+                evt.pageY = mouseEvent.clientY + window.pageYOffset;
+            }
+            evt.maskedEvent = e;
+            this.eventEmitter.fire(eventType, evt);
+            return evt;
+        }
         private static resizeCanvas(canvas: HTMLCanvasElement): boolean {
             const displayWidth = canvas.clientWidth;
             const displayHeight = canvas.clientHeight;
@@ -2328,6 +2684,22 @@ namespace TsPaint {
                         this.viewContext.shadowBlur = 10;
                         this.viewContext.fillRect(this.canvasOffsetX + this.config.scrollX, this.canvasOffsetY + this.config.scrollY, this.imageCanvas.width * this.config.scale, this.imageCanvas.height * this.config.scale);
                         this.viewContext.shadowBlur = 0;
+
+                        this.viewContext.fillStyle = "rgb(224,224,224)";
+                        const l = this.canvasOffsetX + this.config.scrollX;
+                        const t = this.canvasOffsetY + this.config.scrollY;
+                        const w = this.imageCanvas.width * this.config.scale;
+                        const h = this.imageCanvas.height * this.config.scale;
+                        const grid: number = 8;
+                        const ww = ~~((w + grid - 1) / grid);
+                        const hh = ~~((h + grid - 1) / grid);
+                        for (let y = 0; y < hh; y++) {
+                            for (let x = 0; x < ww; x++) {
+                                if ((y & 1) != (x & 1)) {
+                                    this.viewContext.fillRect(l + x * grid, t + y * grid, grid, grid);
+                                }
+                            }
+                        }
                         this.viewContext.imageSmoothingEnabled = false;
                         this.viewContext.drawImage(this.imageCanvas, 0, 0, this.imageCanvas.width, this.imageCanvas.height, this.canvasOffsetX + this.config.scrollX, this.canvasOffsetY + this.config.scrollY, this.imageCanvas.width * this.config.scale, this.imageCanvas.height * this.config.scale);
                         this.updateRequest.view = false;
