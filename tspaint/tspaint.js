@@ -1,7 +1,42 @@
+// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 /// <reference path="C:/Program Files (x86)/Microsoft SDKs/TypeScript/2.6/lib.dom.d.ts" />
 /// <reference path="C:/Program Files (x86)/Microsoft SDKs/TypeScript/2.6/lib.es2016.d.ts" />
-// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
 "use strict";
+///////////////////////////////////////////////////////////////
+function saveFileToLocal(filename, blob) {
+    //const blob = new Blob([new Uint8Array(imageLayerCompositedImgData.saveAsBmp())], { type: 'image/bmp' });
+    const blobURL = window.URL.createObjectURL(blob, { oneTimeOnly: true });
+    const element = document.createElement("a");
+    element.href = blobURL;
+    element.style.display = "none";
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+}
+function loadFileFromLocal(accept) {
+    return new Promise((resolve, reject) => {
+        const element = document.createElement("input");
+        element.type = "file";
+        element.style.display = "none";
+        element.accept = accept;
+        document.body.appendChild(element);
+        element.onchange = (ev) => {
+            element.onchange = null;
+            const file = (element.files.length != 0) ? element.files[0] : null;
+            if (file == null) {
+                reject("cannot load file.");
+                return;
+            }
+            else {
+                resolve(file);
+                return;
+            }
+        };
+        element.click();
+        document.body.removeChild(element);
+    });
+}
 ;
 CanvasRenderingContext2D.prototype.strokeRectOriginal = CanvasRenderingContext2D.prototype.strokeRect;
 CanvasRenderingContext2D.prototype.strokeRect = function (x, y, w, h) {
@@ -138,18 +173,19 @@ var CompositMode;
 ImageData.prototype.clear = function () {
     this.data.fill(0);
 };
-ImageData.prototype.pointSet = function (x0, y0, color) {
+ImageData.prototype.pointSet = function (x0, y0, [r, g, b, a]) {
     if (0 <= x0 && x0 < this.width && 0 <= y0 && y0 < this.height) {
         const off = (y0 * this.width + x0) * 4;
-        this.data[off + 0] = color[0];
-        this.data[off + 1] = color[1];
-        this.data[off + 2] = color[2];
-        this.data[off + 3] = color[3];
+        this.data[off + 0] = r;
+        this.data[off + 1] = g;
+        this.data[off + 2] = b;
+        this.data[off + 3] = a;
     }
 };
 ImageData.prototype.putMask = function (left, top, mask, w, h, color) {
     const dst = { left: left, top: top, right: left + w, bottom: top + h };
     const src = { left: 0, top: 0, right: w, bottom: h };
+    // clipping 
     if (dst.left < 0) {
         src.left += (-dst.left);
         dst.left = 0;
@@ -169,18 +205,25 @@ ImageData.prototype.putMask = function (left, top, mask, w, h, color) {
     const width = dst.right - dst.left;
     const height = dst.bottom - dst.top;
     const dstData = this.data;
+    const [r, g, b, a] = color;
+    let offDst = (dst.top * this.width + dst.left) * 4;
+    const stepDst = this.width * 4;
+    let offSrc = (src.top) * w + src.left;
+    const stepSrc = w;
     for (let y = 0; y < height; y++) {
-        let offDst = ((dst.top + y) * this.width + dst.left) * 4;
-        let offSrc = (y + src.top) * w + src.left;
+        let scanDst = offDst;
+        offDst += stepDst;
+        let scanSrc = offSrc;
+        offSrc += stepSrc;
         for (let x = 0; x < width; x++) {
-            if (mask[offSrc]) {
-                dstData[offDst + 0] = color[0];
-                dstData[offDst + 1] = color[1];
-                dstData[offDst + 2] = color[2];
-                dstData[offDst + 3] = color[3];
+            if (mask[scanSrc]) {
+                dstData[scanDst + 0] = r;
+                dstData[scanDst + 1] = g;
+                dstData[scanDst + 2] = b;
+                dstData[scanDst + 3] = a;
             }
-            offSrc += 1;
-            offDst += 4;
+            scanSrc += 1;
+            scanDst += 4;
         }
     }
 };
@@ -240,14 +283,15 @@ ImageData.prototype.composition = function (src) {
             break;
     }
 };
-ImageData.prototype.saveAsBmp = function () {
-    const bitmapData = new ArrayBuffer(14 + 40 + (this.width * this.height * 4)); // sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+///////////////////////////////////////////////////////////////
+function saveAsBmp(imageData) {
+    const bitmapData = new ArrayBuffer(14 + 40 + (imageData.width * imageData.height * 4)); // sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
     //
     // BITMAPFILEHEADER
     //
     const viewOfBitmapFileHeader = new DataView(bitmapData, 0, 14);
     viewOfBitmapFileHeader.setUint16(0, 0x4D42, true); // bfType : 'BM'
-    viewOfBitmapFileHeader.setUint32(2, 14 + 40 + (this.width * this.height * 4), true); // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+    viewOfBitmapFileHeader.setUint32(2, 14 + 40 + (imageData.width * imageData.height * 4), true); // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
     viewOfBitmapFileHeader.setUint16(6, 0x0000, true); // bfReserved1 : 0
     viewOfBitmapFileHeader.setUint16(8, 0x0000, true); // bfReserved2 : 0
     viewOfBitmapFileHeader.setUint32(10, 14 + 40, true); // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
@@ -256,12 +300,12 @@ ImageData.prototype.saveAsBmp = function () {
     //
     const viewOfBitmapInfoHeader = new DataView(bitmapData, 14, 40);
     viewOfBitmapInfoHeader.setUint32(0, 40, true); // biSize : sizeof(BITMAPINFOHEADER)
-    viewOfBitmapInfoHeader.setUint32(4, this.width, true); // biWidth : this.width
-    viewOfBitmapInfoHeader.setUint32(8, this.height, true); // biHeight : this.height
+    viewOfBitmapInfoHeader.setUint32(4, imageData.width, true); // biWidth : data.width
+    viewOfBitmapInfoHeader.setUint32(8, imageData.height, true); // biHeight : data.height
     viewOfBitmapInfoHeader.setUint16(12, 1, true); // biPlanes : 1
     viewOfBitmapInfoHeader.setUint16(14, 32, true); // biBitCount : 32
     viewOfBitmapInfoHeader.setUint32(16, 0, true); // biCompression : 0
-    viewOfBitmapInfoHeader.setUint32(20, this.width * this.height * 4, true); // biSizeImage : this.width * this.height * 4
+    viewOfBitmapInfoHeader.setUint32(20, imageData.width * imageData.height * 4, true); // biSizeImage : imageData.width * imageData.height * 4
     viewOfBitmapInfoHeader.setUint32(24, 0, true); // biXPixPerMeter : 0
     viewOfBitmapInfoHeader.setUint32(28, 0, true); // biYPixPerMeter : 0
     viewOfBitmapInfoHeader.setUint32(32, 0, true); // biClrUsed : 0
@@ -269,21 +313,87 @@ ImageData.prototype.saveAsBmp = function () {
     //
     // IMAGEDATA
     //
-    const viewOfBitmapPixelData = new DataView(bitmapData, 54, this.width * this.height * 4);
-    for (let y = 0; y < this.height; y++) {
-        let scan = (this.height - 1 - y) * this.width * 4;
-        let base = y * this.width * 4;
-        for (let x = 0; x < this.width; x++) {
-            viewOfBitmapPixelData.setUint8(base + 0, this.data[scan + 2]); // B
-            viewOfBitmapPixelData.setUint8(base + 1, this.data[scan + 1]); // G
-            viewOfBitmapPixelData.setUint8(base + 2, this.data[scan + 0]); // R
-            viewOfBitmapPixelData.setUint8(base + 3, this.data[scan + 3]); // A
+    const viewOfBitmapPixelData = new DataView(bitmapData, 14 + 40, imageData.width * imageData.height * 4);
+    for (let y = 0; y < imageData.height; y++) {
+        let scan = (imageData.height - 1 - y) * imageData.width * 4;
+        let base = y * imageData.width * 4;
+        for (let x = 0; x < imageData.width; x++) {
+            viewOfBitmapPixelData.setUint8(base + 0, imageData.data[scan + 2]); // B
+            viewOfBitmapPixelData.setUint8(base + 1, imageData.data[scan + 1]); // G
+            viewOfBitmapPixelData.setUint8(base + 2, imageData.data[scan + 0]); // R
+            viewOfBitmapPixelData.setUint8(base + 3, imageData.data[scan + 3]); // A
             base += 4;
             scan += 4;
         }
     }
     return bitmapData;
-};
+}
+;
+function loadFromBmp(context, bitmapData, { reqWidth = -1, reqHeight = -1 }) {
+    const dataLength = bitmapData.byteLength;
+    //
+    // BITMAPFILEHEADER
+    //
+    const reqSize = (reqWidth >= 0 && reqHeight >= 0) ? reqWidth * reqHeight * 4 : -1;
+    const viewOfBitmapFileHeader = new DataView(bitmapData, 0, 14);
+    const bfType = viewOfBitmapFileHeader.getUint16(0, true); // bfType : 'BM'
+    const bfSize = viewOfBitmapFileHeader.getUint32(2, true); // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+    const bfReserved1 = viewOfBitmapFileHeader.getUint16(6, true); // bfReserved1 : 0
+    const bfReserved2 = viewOfBitmapFileHeader.getUint16(8, true); // bfReserved2 : 0
+    const bfOffBits = viewOfBitmapFileHeader.getUint32(10, true); // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
+    if ((bfType != 0x4D42) ||
+        (bfSize < 14 + 40) || (bfSize != dataLength) || (reqSize != -1 && bfSize < 14 + 40 + reqSize) ||
+        (bfReserved1 != 0) ||
+        (bfReserved2 != 0) ||
+        (bfOffBits < 14 + 40) || (bfOffBits >= dataLength) || (reqSize != -1 && bfOffBits > dataLength - reqSize)) {
+        return null;
+    }
+    //
+    // BITMAPINFOHEADER
+    //
+    const viewOfBitmapInfoHeader = new DataView(bitmapData, 14, 40);
+    const biSize = viewOfBitmapInfoHeader.getUint32(0, true); // biSize : sizeof(BITMAPINFOHEADER)
+    const biWidth = viewOfBitmapInfoHeader.getUint32(4, true); // biWidth : this.width
+    const biHeight = viewOfBitmapInfoHeader.getUint32(8, true); // biHeight : this.height
+    const biPlanes = viewOfBitmapInfoHeader.getUint16(12, true); // biPlanes : 1
+    const biBitCount = viewOfBitmapInfoHeader.getUint16(14, true); // biBitCount : 32
+    const biCompression = viewOfBitmapInfoHeader.getUint32(16, true); // biCompression : 0
+    const biSizeImage = viewOfBitmapInfoHeader.getUint32(20, true); // biSizeImage : this.width * this.height * 4
+    const biXPixPerMeter = viewOfBitmapInfoHeader.getUint32(24, true); // biXPixPerMeter : 0
+    const biYPixPerMeter = viewOfBitmapInfoHeader.getUint32(28, true); // biYPixPerMeter : 0
+    const biClrUsed = viewOfBitmapInfoHeader.getUint32(32, true); // biClrUsed : 0
+    const biCirImportant = viewOfBitmapInfoHeader.getUint32(36, true); // biCirImportant : 0
+    if ((biSize != 40) ||
+        (reqWidth >= 0 && biWidth != reqWidth) ||
+        (reqHeight >= 0 && biHeight != reqHeight) ||
+        (biPlanes != 1) ||
+        (biBitCount != 32) ||
+        (biSizeImage != biWidth * biHeight * 4) || (reqSize >= 0 && biSizeImage != reqSize) ||
+        (biXPixPerMeter != 0) ||
+        (biYPixPerMeter != 0) ||
+        (biClrUsed != 0) ||
+        (biCirImportant != 0)) {
+        return null;
+    }
+    const imageData = context.createImageData(biWidth, biHeight);
+    //
+    // IMAGEDATA
+    //
+    const viewOfBitmapPixelData = new DataView(bitmapData, bfOffBits, biWidth * biHeight * 4);
+    for (let y = 0; y < biHeight; y++) {
+        let scan = (biHeight - 1 - y) * biWidth * 4;
+        let base = y * biWidth * 4;
+        for (let x = 0; x < biWidth; x++) {
+            imageData.data[scan + 2] = viewOfBitmapPixelData.getUint8(base + 0); // B
+            imageData.data[scan + 1] = viewOfBitmapPixelData.getUint8(base + 1); // G
+            imageData.data[scan + 0] = viewOfBitmapPixelData.getUint8(base + 2); // R
+            imageData.data[scan + 3] = viewOfBitmapPixelData.getUint8(base + 3); // A
+            base += 4;
+            scan += 4;
+        }
+    }
+    return imageData;
+}
 var IPoint;
 (function (IPoint) {
     function rotate(point, rad) {
@@ -1167,7 +1277,7 @@ var GUI;
     class ListBox extends Control {
         constructor({ left = 0, top = 0, width = 0, height = 0, lineHeight = 12, drawItem = () => { }, getItemCount = () => 0, visible = true, enable = true, scrollbarWidth = 1, space = 2 }) {
             super({ left: left, top: top, width: width, height: height, visible: visible, enable: enable });
-            this.insertCandPos = -1;
+            this.insertCandPos = null;
             this.lineHeight = lineHeight;
             this.drawItem = drawItem;
             this.getItemCount = getItemCount;
@@ -1183,10 +1293,19 @@ var GUI;
             };
             let animationTimer = 0;
             let animationPrev = 0;
+            let dragItemIndex = -1;
             this.addEventListener("longswipestart", (event) => {
                 mp.x = event.x;
                 mp.y = event.y;
                 animationPrev = Date.now();
+                {
+                    const gp = this.globalPos;
+                    const cursorY = ~~((mp.y - gp.y) + this.scrollValue);
+                    dragItemIndex = ~~((cursorY - this.space) / (this.lineHeight + this.space));
+                    if (dragItemIndex == -1) {
+                        return;
+                    }
+                }
                 const longswipeHandler = () => {
                     const delta = Date.now() - animationPrev;
                     const scrollv = ~~(delta / 10);
@@ -1202,18 +1321,25 @@ var GUI;
                     }
                     // 挿入候補位置を算出
                     const cursorY = ~~((mp.y - gp.y) + this.scrollValue);
-                    this.insertCandPos = ~~(cursorY / (this.lineHeight + this.space));
+                    const hoverItemIndex = ~~((cursorY - this.space) / (this.lineHeight + this.space));
+                    if (cursorY > (hoverItemIndex + 0.5) * (this.lineHeight + this.space)) {
+                        this.insertCandPos = hoverItemIndex + 1;
+                    }
+                    else {
+                        this.insertCandPos = hoverItemIndex;
+                    }
                     const itemCount = this.getItemCount();
                     if (this.insertCandPos < 0) {
                         this.insertCandPos = 0;
                     }
-                    if (this.insertCandPos >= itemCount - 1) {
-                        this.insertCandPos = itemCount - 1;
+                    if (this.insertCandPos >= itemCount) {
+                        this.insertCandPos = itemCount;
                     }
-                    console.log(this.insertCandPos);
+                    //console.log(this.insertCandPos);
                     animationTimer = requestAnimationFrame(longswipeHandler);
                 };
                 longswipeHandler();
+                this.update();
             });
             this.addEventListener("longswipe", (event) => {
                 mp.x = event.x;
@@ -1221,7 +1347,12 @@ var GUI;
             });
             this.addEventListener("longswipeend", (event) => {
                 cancelAnimationFrame(animationTimer);
-                this.insertCandPos = -1;
+                animationTimer = 0;
+                if (dragItemIndex != -1 && this.insertCandPos != null) {
+                    this.dragItem.call(this, dragItemIndex, this.insertCandPos);
+                }
+                this.insertCandPos = null;
+                this.update();
             });
             this.addEventListener("click", (event) => {
                 this.click.call(this, event);
@@ -1234,7 +1365,7 @@ var GUI;
                 return 0;
             }
             else {
-                return this.lineHeight + (this.lineHeight + this.space) * (itemCount - 1);
+                return (this.lineHeight + this.space) * (itemCount) + this.space;
             }
         }
         update() {
@@ -1252,7 +1383,7 @@ var GUI;
         draw(context) {
             this.update();
             const scrollValue = ~~this.scrollValue;
-            let sy = -(scrollValue % (this.lineHeight + this.space));
+            let sy = -(scrollValue % (this.lineHeight + this.space)) + this.space;
             let index = ~~(scrollValue / (this.lineHeight + this.space));
             let itemCount = this.getItemCount();
             let drawResionHeight = this.height - sy;
@@ -1263,6 +1394,12 @@ var GUI;
                 if (sy >= this.height) {
                     break;
                 }
+                if (this.insertCandPos == index) {
+                    context.save();
+                    context.fillStyle = "rgba(255,0,0,1)";
+                    context.fillRect(this.left, this.top + sy - this.space, this.width - this.scrollbarWidth, this.space);
+                    context.restore();
+                }
                 if (index >= itemCount) {
                     break;
                 }
@@ -1272,12 +1409,6 @@ var GUI;
                 context.clip();
                 this.drawItem(context, this.left, this.top + sy, this.width - this.scrollbarWidth, this.lineHeight, index);
                 context.restore();
-                if (this.insertCandPos == index) {
-                    context.save();
-                    context.fillStyle = "rgba(255,0,0,1)";
-                    context.fillRect(this.left, this.top + sy - this.space, this.width - this.scrollbarWidth, this.space);
-                    context.save();
-                }
                 drawResionHeight -= this.lineHeight + this.space;
                 sy += this.lineHeight + this.space;
                 index++;
@@ -1301,7 +1432,7 @@ var GUI;
             if (x < 0 || this.width <= x || y < 0 || this.height <= y) {
                 return -1;
             }
-            const index = ~~((y + this.scrollValue) / (this.lineHeight + this.space));
+            const index = ~~((y + this.scrollValue - this.space) / (this.lineHeight + this.space));
             if (index < 0 || index >= this.getItemCount()) {
                 return -1;
             }
@@ -1442,22 +1573,23 @@ class SolidPen {
         this.joints = [];
         this.compositMode = compositMode;
     }
-    down(point) {
+    down(config, point) {
         this.joints.length = 0;
         this.joints.push(point);
     }
-    move(point) {
+    move(config, point) {
         this.joints.push(point);
     }
-    up(point) {
+    up(config, point) {
     }
     draw(config, imgData) {
         const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
-        if (this.joints.length === 1) {
+        const len = this.joints.length;
+        if (len === 1) {
             Topology.drawLine(this.joints[0], this.joints[0], brush);
         }
         else {
-            for (let i = 1; i < this.joints.length; i++) {
+            for (let i = 1; i < len; i++) {
                 Topology.drawLine(this.joints[i - 1], this.joints[i - 0], brush);
             }
         }
@@ -1481,14 +1613,14 @@ class CorrectionSolidPen extends SolidPen {
     constructor(name, compositMode) {
         super(name, compositMode);
     }
-    down(point) {
+    down(config, point) {
         this.joints.length = 0;
         this.joints.push(point);
     }
-    move(point) {
+    move(config, point) {
         this.joints.push(point);
     }
-    up(point) {
+    up(config, point) {
     }
     draw(config, imgData) {
         const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
@@ -1518,6 +1650,83 @@ class CorrectionSolidPen extends SolidPen {
 class CustomPointerEvent extends CustomEvent {
 }
 ///////////////////////////////////////////////////////////////
+var ModalDialog;
+(function (ModalDialog) {
+    let dialogLayerCanvas;
+    let dialogLayerContext;
+    let draw;
+    let blockCnt = 0;
+    function init() {
+        dialogLayerCanvas = document.createElement("canvas");
+        dialogLayerCanvas.style.position = "absolute";
+        dialogLayerCanvas.style.left = "0";
+        dialogLayerCanvas.style.top = "0";
+        dialogLayerCanvas.style.zIndex = "999";
+        dialogLayerCanvas.style.width = "100%";
+        dialogLayerCanvas.style.height = "100%";
+        dialogLayerCanvas.style.backgroundColor = "rgba(0,0,0,0.5)";
+        dialogLayerCanvas.style.display = "none";
+        dialogLayerContext = dialogLayerCanvas.getContext("2d");
+        dialogLayerContext.imageSmoothingEnabled = false;
+        document.body.appendChild(dialogLayerCanvas);
+        window.addEventListener("resize", () => {
+            const displayWidth = dialogLayerCanvas.clientWidth;
+            const displayHeight = dialogLayerCanvas.clientHeight;
+            if (dialogLayerCanvas.width !== displayWidth || dialogLayerCanvas.height !== displayHeight) {
+                dialogLayerCanvas.width = displayWidth;
+                dialogLayerCanvas.height = displayHeight;
+            }
+            if (dialogLayerCanvas.style.display != "none") {
+                draw(dialogLayerCanvas, dialogLayerContext);
+            }
+        });
+    }
+    ModalDialog.init = init;
+    function block() {
+        if (blockCnt == 0) {
+            dialogLayerCanvas.width = dialogLayerCanvas.clientWidth;
+            dialogLayerCanvas.height = dialogLayerCanvas.clientHeight;
+            Input.pause = true;
+            dialogLayerCanvas.style.display = "inline";
+        }
+        blockCnt++;
+    }
+    ModalDialog.block = block;
+    function unblock() {
+        if (blockCnt > 0) {
+            blockCnt--;
+            if (blockCnt == 0) {
+                dialogLayerCanvas.style.display = "none";
+                Input.pause = false;
+            }
+        }
+    }
+    ModalDialog.unblock = unblock;
+    function alert(caption) {
+        block();
+        draw = (canvas, context) => {
+            const left = ~~((canvas.width - 200) / 2);
+            const top = ~~((canvas.height - 100) / 2);
+            context.fillStyle = "rgb(255,255,255)";
+            context.fillRect(left, top, 200, 100);
+        };
+        draw(dialogLayerCanvas, dialogLayerContext);
+        dialogLayerCanvas.style.display = "inline";
+        const click = (ev) => {
+            const left = ~~((dialogLayerCanvas.width - 200) / 2);
+            const top = ~~((dialogLayerCanvas.height - 100) / 2);
+            if (left <= ev.pageX && ev.pageX < left + 200 && top <= ev.pageY && ev.pageY < top + 100) {
+                dialogLayerCanvas.removeEventListener("click", click, true);
+                unblock();
+            }
+            ev.preventDefault();
+            ev.stopPropagation();
+        };
+        dialogLayerCanvas.addEventListener("click", click, true);
+    }
+    ModalDialog.alert = alert;
+})(ModalDialog || (ModalDialog = {}));
+///////////////////////////////////////////////////////////////
 var Input;
 (function (Input) {
     let eventEmitter = new Events.EventEmitter();
@@ -1533,6 +1742,7 @@ var Input;
     let maybeClickY = 0;
     let prevTimeStamp = 0;
     let prevInputType = "";
+    Input.pause = false;
     function init() {
         if (!window.TouchEvent) {
             console.log("TouchEvent is not supported by your browser.");
@@ -1552,10 +1762,10 @@ var Input;
             document.addEventListener('mousemove', evt => { evt.preventDefault(); }, false);
             document.addEventListener('mousedown', evt => { evt.preventDefault(); }, false);
             document.addEventListener('mouseup', evt => { evt.preventDefault(); }, false);
-            document.addEventListener('pointerdown', (ev) => eventEmitter.fire('pointerdown', ev));
-            document.addEventListener('pointermove', (ev) => eventEmitter.fire('pointermove', ev));
-            document.addEventListener('pointerup', (ev) => eventEmitter.fire('pointerup', ev));
-            document.addEventListener('pointerleave', (ev) => eventEmitter.fire('pointerleave', ev));
+            document.addEventListener('pointerdown', (ev) => ev.preventDefault() && (Input.pause || eventEmitter.fire('pointerdown', ev)));
+            document.addEventListener('pointermove', (ev) => ev.preventDefault() && (Input.pause || eventEmitter.fire('pointermove', ev)));
+            document.addEventListener('pointerup', (ev) => ev.preventDefault() && (Input.pause || eventEmitter.fire('pointerup', ev)));
+            document.addEventListener('pointerleave', (ev) => ev.preventDefault() && (Input.pause || eventEmitter.fire('pointerleave', ev)));
         }
         else {
             document.addEventListener('mousedown', pointerDown, false);
@@ -1571,11 +1781,14 @@ var Input;
         //document.addEventListener("mousedown", (...args: any[]) => eventEmitter.fire("mousedown", ...args));
         //document.addEventListener("mousemove", (...args: any[]) => eventEmitter.fire("mousemove", ...args));
         //document.addEventListener("mouseup", (...args: any[]) => { eventEmitter.fire("mouseup", ...args); });
-        document.addEventListener("wheel", (...args) => eventEmitter.fire("wheel", ...args));
+        document.addEventListener("wheel", (...args) => Input.pause || eventEmitter.fire("wheel", ...args));
     }
     Input.init = init;
     function checkEvent(e) {
         e.preventDefault();
+        if (Input.pause) {
+            return false;
+        }
         const istouch = e instanceof TouchEvent || (e instanceof PointerEvent && e.pointerType === "touch");
         const ismouse = e instanceof MouseEvent || ((e instanceof PointerEvent && (e.pointerType === "mouse" || e.pointerType === "pen")));
         if (istouch && prevInputType !== "touch") {
@@ -1671,6 +1884,7 @@ var Input;
 ///////////////////////////////////////////////////////////////
 var Painter;
 (function (Painter) {
+    ;
     let parentHtmlElement = null;
     let uiDispacher = null;
     /**
@@ -1696,7 +1910,7 @@ var Painter;
      * 作業レイヤー
      */
     let workLayerImgData = null;
-    function CreateLayer() {
+    function createLayer() {
         const previewCanvas = document.createElement("canvas");
         previewCanvas.width = previewCanvas.height = 50;
         const previewContext = previewCanvas.getContext("2d");
@@ -1761,6 +1975,8 @@ var Painter;
     let updateRequest = { overlay: false, view: false, gui: false };
     let updateTimerId = NaN;
     function init(parentHtmlElement, width, height) {
+        Input.init();
+        ModalDialog.init();
         parentHtmlElement = parentHtmlElement;
         currentLayer = 0;
         imageCanvas = document.createElement("canvas");
@@ -1768,9 +1984,9 @@ var Painter;
         imageCanvas.height = height;
         imageContext = imageCanvas.getContext("2d");
         imageContext.imageSmoothingEnabled = false;
-        imageLayerImgDatas = [CreateLayer()];
+        imageLayerImgDatas = [createLayer()];
         imageLayerCompositedImgData = imageContext.createImageData(width, height);
-        workLayerImgData = CreateLayer();
+        workLayerImgData = createLayer();
         viewCanvas = document.createElement("canvas");
         viewCanvas.style.position = "absolute";
         viewCanvas.style.left = "0";
@@ -1974,21 +2190,105 @@ var Painter;
                 color: 'rgb(255,255,255)',
                 fontColor: 'rgb(0,0,0)',
                 height: 13,
-                text: "save to bitmap"
+                text: "save imagedata",
             });
             top += 13 - 1;
             uiSaveButton.addEventListener("click", () => {
-                const blob = new Blob([new Uint8Array(imageLayerCompositedImgData.saveAsBmp())], { type: 'image/bmp' });
-                var blobURL = window.URL.createObjectURL(blob, { oneTimeOnly: true });
-                const element = document.createElement("a");
-                element.href = blobURL;
-                element.style.display = "none";
-                element.download = "image.bmp";
-                document.body.appendChild(element);
-                element.click();
-                document.body.removeChild(element);
+                ModalDialog.block();
+                const zip = new JSZip();
+                const config = {
+                    width: imageCanvas.width,
+                    height: imageCanvas.height,
+                    layers: []
+                };
+                for (let i = 0; i < imageLayerImgDatas.length; i++) {
+                    const layer = imageLayerImgDatas[i];
+                    config.layers.push({ image: `${i}.bmp`, compositMode: layer.compositMode });
+                }
+                zip.file("config.json", JSON.stringify(config));
+                const img = zip.folder("layers");
+                for (let i = 0; i < imageLayerImgDatas.length; i++) {
+                    const layer = imageLayerImgDatas[i];
+                    img.file(`${i}.bmp`, saveAsBmp(layer.imageData), { binary: true });
+                }
+                zip.generateAsync({
+                    type: "blob",
+                    compression: "DEFLATE",
+                    compressionOptions: {
+                        level: 9
+                    }
+                })
+                    .then((blob) => {
+                    saveFileToLocal("savedata.zip", blob);
+                    ModalDialog.unblock();
+                }, (reson) => {
+                    ModalDialog.unblock();
+                    ModalDialog.alert("save failed.");
+                });
             });
             uiToolboxWindow.addChild(uiSaveButton);
+            const uiLoadButton = new GUI.Button({
+                left: uiToolboxWindowTitle.left,
+                top: top,
+                width: uiToolboxWindowTitle.width,
+                color: 'rgb(255,255,255)',
+                fontColor: 'rgb(0,0,0)',
+                height: 13,
+                text: "load imagedata"
+            });
+            top += 13 - 1;
+            uiLoadButton.addEventListener("click", () => {
+                ModalDialog.block();
+                loadFileFromLocal("application/*").then((file) => {
+                    if (file == null) {
+                        return Promise.reject("cannot load fle");
+                    }
+                    const zip = new JSZip();
+                    return zip.loadAsync(file).then((zip) => {
+                        if (!zip.files["config.json"]) {
+                            return Promise.reject("config.json not found");
+                        }
+                        return zip.files["config.json"].async("string").then((data) => {
+                            const config = JSON.parse(data);
+                            if (config == null) {
+                                return Promise.reject("config.json is invalid");
+                            }
+                            if (config.layers.every(x => zip.files[`layers/${x.image}`] != null) == false) {
+                                return Promise.reject("layer data not found.");
+                            }
+                            return Promise.all(config.layers.map(x => zip.files[`layers/${x.image}`].async("arraybuffer").then(img => loadFromBmp(imageContext, img, { reqWidth: config.width, reqHeight: config.height })))).then(datas => {
+                                if (datas.some(x => x == null)) {
+                                    return Promise.reject("layer data is invalid.");
+                                }
+                                else {
+                                    imageCanvas.width = config.width;
+                                    imageCanvas.height = config.height;
+                                    imageLayerImgDatas.length = 0;
+                                    for (var i = 0; i < datas.length; i++) {
+                                        const layer = createLayer();
+                                        imageLayerImgDatas.push(layer);
+                                        layer.imageData = (datas[i]);
+                                        layer.compositMode = config.layers[i].compositMode;
+                                        UpdateLayerPreview(layer);
+                                    }
+                                    currentLayer = 0;
+                                    imageLayerCompositedImgData = imageContext.createImageData(width, height);
+                                    workLayerImgData = createLayer();
+                                    updateCompositLayer();
+                                    update({ gui: true, view: true, overlay: true });
+                                    return Promise.resolve();
+                                }
+                            });
+                        });
+                    });
+                }).then(() => {
+                    ModalDialog.unblock();
+                }, (reson) => {
+                    ModalDialog.unblock();
+                    ModalDialog.alert("load failed.");
+                });
+            });
+            uiToolboxWindow.addChild(uiLoadButton);
             uiToolboxWindow.height = top;
             uiDispacher.addChild(uiToolboxWindow);
         }
@@ -2016,8 +2316,8 @@ var Painter;
                 text: 'add',
             });
             uiLayerWindowAddLayerBtn.addEventListener("click", () => {
-                imageLayerImgDatas.splice(currentLayer, 0, CreateLayer());
-                update({ gui: true });
+                imageLayerImgDatas.splice(currentLayer, 0, createLayer());
+                update({ gui: true, view: true });
             });
             uiLayerWindow.addChild(uiLayerWindowAddLayerBtn);
             const uiLayerWindowCopyLayerBtn = new GUI.Button({
@@ -2027,6 +2327,15 @@ var Painter;
                 height: 12 + 2,
                 text: 'copy'
             });
+            uiLayerWindowCopyLayerBtn.addEventListener("click", () => {
+                const copiedLayer = createLayer();
+                copiedLayer.compositMode = imageLayerImgDatas[currentLayer].compositMode;
+                copiedLayer.imageData.data.set(imageLayerImgDatas[currentLayer].imageData.data);
+                imageLayerImgDatas.splice(currentLayer, 0, copiedLayer);
+                UpdateLayerPreview(copiedLayer);
+                updateCompositLayer();
+                update({ gui: true, view: true });
+            });
             uiLayerWindow.addChild(uiLayerWindowCopyLayerBtn);
             const uiLayerWindowDeleteLayerBtn = new GUI.Button({
                 left: uiLayerWindowTitle.left + 100,
@@ -2034,6 +2343,17 @@ var Painter;
                 width: 50,
                 height: 12 + 2,
                 text: 'delete'
+            });
+            uiLayerWindowDeleteLayerBtn.addEventListener("click", () => {
+                if (imageLayerImgDatas.length == 1) {
+                    return;
+                }
+                imageLayerImgDatas.splice(currentLayer, 1);
+                if (currentLayer == imageLayerImgDatas.length) {
+                    currentLayer -= 1;
+                }
+                updateCompositLayer();
+                update({ gui: true, view: true });
             });
             uiLayerWindow.addChild(uiLayerWindowDeleteLayerBtn);
             const uiLayerListBox = new GUI.ListBox({
@@ -2067,6 +2387,21 @@ var Painter;
                 const select = uiLayerListBox.getItemIndexByPosition(x, y);
                 currentLayer = select == -1 ? currentLayer : select;
                 update({ gui: true });
+            };
+            uiLayerListBox.dragItem = (from, to) => {
+                if (from == to || from + 1 == to) {
+                    // 動かさない
+                }
+                else {
+                    const target = imageLayerImgDatas[from];
+                    imageLayerImgDatas.splice(from, 1);
+                    if (from < to) {
+                        to -= 1;
+                    }
+                    imageLayerImgDatas.splice(to, 0, target);
+                    updateCompositLayer();
+                    update({ gui: true, view: true });
+                }
             };
             const orgUpdate = uiLayerListBox.update.bind(uiLayerListBox);
             uiLayerListBox.update = function () {
@@ -2130,7 +2465,7 @@ var Painter;
                     const onPenMove = (e) => {
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.move(p);
+                            currentTool.move(Painter.config, p);
                             workLayerImgData.imageData.clear();
                             workLayerImgData.compositMode = currentTool.compositMode;
                             currentTool.draw(Painter.config, workLayerImgData.imageData);
@@ -2143,7 +2478,7 @@ var Painter;
                         Input.off("pointermove", onPenMove);
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.up(p);
+                            currentTool.up(Painter.config, p);
                             workLayerImgData.imageData.clear();
                             workLayerImgData.compositMode = currentTool.compositMode;
                             currentTool.draw(Painter.config, workLayerImgData.imageData);
@@ -2159,7 +2494,7 @@ var Painter;
                         Input.on("pointermove", onPenMove);
                         Input.one("pointerup", onPenUp);
                         const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                        currentTool.down(p);
+                        currentTool.down(Painter.config, p);
                         workLayerImgData.imageData.clear();
                         workLayerImgData.compositMode = currentTool.compositMode;
                         currentTool.draw(Painter.config, workLayerImgData.imageData);
@@ -2312,7 +2647,6 @@ var Painter;
 })(Painter || (Painter = {}));
 ///////////////////////////////////////////////////////////////
 window.addEventListener("load", () => {
-    Input.init();
     Painter.init(document.body, 512, 512);
 });
 //# sourceMappingURL=tspaint.js.map
