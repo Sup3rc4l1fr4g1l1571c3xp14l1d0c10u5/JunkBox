@@ -11,8 +11,93 @@ interface WebGL2RenderingContext extends WebGLRenderingContext {
 }
 // ReSharper restore InconsistentNaming
 
+
+interface IPoint {
+    x: number;
+    y: number;
+}
+
+type Matrix3 = [number, number, number, number, number, number, number, number, number];
+
+module Matrix3 {
+    export function projection(width:number, height:number) : Matrix3 {
+        // Note: This matrix flips the Y axis so that 0 is at the top.
+        return [
+            2 / width, 0, 0,
+            0,  2 / height, 0,
+            -1,-1, 1
+        ];
+    }
+
+    export function identity(): Matrix3 {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        ];
+    }
+
+    export function translation(tx:number, ty:number) : Matrix3 {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            tx, ty, 1
+        ];
+    }
+
+    export function rotation(angleInRadians:number) : Matrix3 {
+        const c = Math.cos(angleInRadians);
+        const s = Math.sin(angleInRadians);
+        return [
+            c, -s, 0,
+            s, c, 0,
+            0, 0, 1
+        ];
+    }
+
+    export function scaling(sx:number, sy:number) : Matrix3 {
+        return [
+            sx, 0, 0,
+            0, sy, 0,
+            0, 0, 1
+        ];
+    }
+
+    export function multiply(a:Matrix3, b:Matrix3) : Matrix3 {
+        const a00 = a[0 * 3 + 0];
+        const a01 = a[0 * 3 + 1];
+        const a02 = a[0 * 3 + 2];
+        const a10 = a[1 * 3 + 0];
+        const a11 = a[1 * 3 + 1];
+        const a12 = a[1 * 3 + 2];
+        const a20 = a[2 * 3 + 0];
+        const a21 = a[2 * 3 + 1];
+        const a22 = a[2 * 3 + 2];
+        const b00 = b[0 * 3 + 0];
+        const b01 = b[0 * 3 + 1];
+        const b02 = b[0 * 3 + 2];
+        const b10 = b[1 * 3 + 0];
+        const b11 = b[1 * 3 + 1];
+        const b12 = b[1 * 3 + 2];
+        const b20 = b[2 * 3 + 0];
+        const b21 = b[2 * 3 + 1];
+        const b22 = b[2 * 3 + 2];
+        return [
+            b00 * a00 + b01 * a10 + b02 * a20,
+            b00 * a01 + b01 * a11 + b02 * a21,
+            b00 * a02 + b01 * a12 + b02 * a22,
+            b10 * a00 + b11 * a10 + b12 * a20,
+            b10 * a01 + b11 * a11 + b12 * a21,
+            b10 * a02 + b11 * a12 + b12 * a22,
+            b20 * a00 + b21 * a10 + b22 * a20,
+            b20 * a01 + b21 * a11 + b22 * a21,
+            b20 * a02 + b21 * a12 + b22 * a22
+        ];
+    }
+}
+
 class Shader {
-    protected constructor(public gl: WebGL2RenderingContext, public shader: WebGLShader, public shaderType: number) { }
+    constructor(public gl: WebGL2RenderingContext, public shader: WebGLShader, public shaderType: number) { }
 
     public static create(gl: WebGL2RenderingContext, shaderSource: string, shaderType: number): Shader {
         // Create the shader object
@@ -59,9 +144,8 @@ class Shader {
 
     }
 }
-
 class Program {
-    protected constructor(public gl: WebGL2RenderingContext, public program: WebGLProgram) { }
+    constructor(public gl: WebGL2RenderingContext, public program: WebGLProgram) { }
     public static create(gl: WebGL2RenderingContext, shaders: WebGLShader[], optAttribs?: string[], optLocations?: number[]) {
         const program = gl.createProgram();
         shaders.forEach(shader => {
@@ -97,13 +181,17 @@ class Program {
         return Program.create(gl, shaders.map((x) => x.shader), optAttribs, optLocations);
     }
 }
-class OffscreenTarget {
+
+class Surface {
     gl: WebGL2RenderingContext;
     texture: WebGLTexture;
     framebuffer: WebGLFramebuffer;
+    width: number;
+    height: number;
 
     private static createAndBindTexture(gl: WebGL2RenderingContext): WebGLTexture {
         const texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
 
         // Set up texture so we can render any size image and so we are
@@ -115,37 +203,70 @@ class OffscreenTarget {
         return texture;
     }
 
-
     constructor(gl: WebGL2RenderingContext, srcImage: HTMLImageElement);
     constructor(gl: WebGL2RenderingContext, width: number, height: number);
-    constructor(gl: WebGL2RenderingContext, srcImageOrWidth: HTMLImageElement | number, height?: number) {
+    constructor(gl: WebGL2RenderingContext, srcImageOrWidth: HTMLImageElement | ImageData | number, height?: number) {
         this.gl = gl;
 
-        // ƒtƒŒ[ƒ€ƒoƒbƒtƒ@ƒeƒNƒXƒ`ƒƒ‚ğ¶¬BƒsƒNƒZƒ‹ƒtƒH[ƒ}ƒbƒg‚ÍRGBA(8bit)B‰æ‘œƒTƒCƒY‚Íw’è‚³‚ê‚½‚à‚Ì‚ğg—pB
-        this.texture = OffscreenTarget.createAndBindTexture(gl);
+        // ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ç”Ÿæˆã€‚ãƒ”ã‚¯ã‚»ãƒ«ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã¯RGBA(8bit)ã€‚ç”»åƒã‚µã‚¤ã‚ºã¯æŒ‡å®šã•ã‚ŒãŸã‚‚ã®ã‚’ä½¿ç”¨ã€‚
+        this.texture = Surface.createAndBindTexture(gl);
         if (srcImageOrWidth instanceof HTMLImageElement) {
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, srcImageOrWidth as HTMLImageElement);
+            const img = srcImageOrWidth as HTMLImageElement;
+            this.width = img.width;
+            this.height = img.height;
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        } else if (srcImageOrWidth instanceof ImageData) {
+                const img = srcImageOrWidth as ImageData;
+                this.width = img.width;
+                this.height = img.height;
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
         } else {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, srcImageOrWidth, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            this.width = srcImageOrWidth;
+            this.height = height;
         }
 
-        // ƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğ¶¬‚µAƒeƒNƒXƒ`ƒƒ‚ÆŠÖ˜A‚Ã‚¯
+        // ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’ç”Ÿæˆã—ã€ãƒ†ã‚¯ã‚¹ãƒãƒ£ã¨é–¢é€£ã¥ã‘
         this.framebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+    }
+
+    clear(): void {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+        gl.viewport(0, 0, this.width, this.height);
+        gl.clearColor(0,0,0,0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
     }
 
 }
 class PixelBuffer {
     pbo: WebGLBuffer;
+    data: Uint8ClampedArray;
 
     constructor(public gl: WebGL2RenderingContext, public width: number, public height: number) {
         this.pbo = gl.createBuffer();
+        this.data = new Uint8ClampedArray(this.width * this.height * 4);
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
         gl.bufferData(gl.PIXEL_PACK_BUFFER, this.width * this.height * 4, gl.STREAM_READ);
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    capture(src: Surface): Uint8ClampedArray {
+        const gl = this.gl;
 
+        gl.bindFramebuffer(gl.FRAMEBUFFER, src.framebuffer);
+
+        // ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’ãƒ”ã‚¯ã‚»ãƒ«ãƒãƒƒãƒ•ã‚¡ã«ãƒ­ãƒ¼ãƒ‰
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+        gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, <ArrayBufferView><any>0);
+
+        // ãƒ”ã‚¯ã‚»ãƒ«ãƒãƒƒãƒ•ã‚¡ã‹ã‚‰CPUå´ã®é…åˆ—ã«ãƒ­ãƒ¼ãƒ‰
+        gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.data);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        return this.data;
     }
 }
 class ImageProcessing {
@@ -153,121 +274,111 @@ class ImageProcessing {
 
     positionBuffer: WebGLBuffer;
     texcoordBuffer: WebGLBuffer;
-    offscreenTargets: OffscreenTarget[];
 
-    pixelBuffer: PixelBuffer;
-
-    width: number;
-    height: number;
-    flipCnt: number;
-
-    // ƒtƒBƒ‹ƒ^ƒJ[ƒlƒ‹‚Ìd‚İ‡Œvid‚İ‡Œv‚ª0ˆÈ‰º‚Ìê‡‚Í1‚Æ‚·‚éj
-    private static  computeKernelWeight(kernel: number[]): number {
+    // ãƒ•ã‚£ãƒ«ã‚¿ã‚«ãƒ¼ãƒãƒ«ã®é‡ã¿åˆè¨ˆï¼ˆé‡ã¿åˆè¨ˆãŒ0ä»¥ä¸‹ã®å ´åˆã¯1ã¨ã™ã‚‹ï¼‰
+    private static computeKernelWeight(kernel: Float32Array): number {
         const weight = kernel.reduce((prev, curr) => prev + curr);
         return weight <= 0 ? 1 : weight;
     }
 
-    constructor(gl: WebGL2RenderingContext, image: HTMLImageElement) {
+    constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
-        this.width = image.width;
-        this.height = image.height;
 
-        // ’¸“_ƒoƒbƒtƒ@iÀ•Wj‚ğì¬
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆåº§æ¨™ï¼‰ã‚’ä½œæˆ
         this.positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-        {
-            const x1 = 0;
-            const x2 = image.width;
-            const y1 = 0;
-            const y2 = image.height;
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ï¼‰ã‚’ä½œæˆ
+        this.texcoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+
+    }
+
+    private setVertexPosition(array: number[]) {
+        const gl = this.gl;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+    }
+
+    private setTexturePosition(array: number[]) {
+        const gl = this.gl;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+    }
+
+    createBlankOffscreenTarget(width: number, height: number): Surface {
+        return new Surface(this.gl, width, height);
+    }
+    createOffscreenTargetFromImage(image: HTMLImageElement): Surface {
+        return new Surface(this.gl, image);
+    }
+
+    static createRectangle(x1: number, y1: number, x2: number, y2: number, target?: number[]): number[] {
+        if (target) {
+            Array.prototype.push.call(target,
                 x1, y1,
                 x2, y1,
                 x1, y2,
                 x1, y2,
                 x2, y1,
                 x2, y2
-            ]), gl.STATIC_DRAW);
+            );
+            return target;
+        } else {
+            return [
+                x1, y1,
+                x2, y1,
+                x1, y2,
+                x1, y2,
+                x2, y1,
+                x2, y2
+            ];
         }
-
-        // ’¸“_ƒoƒbƒtƒ@iƒeƒNƒXƒ`ƒƒÀ•Wj‚ğì¬
-        this.texcoordBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            0.0, 0.0,
-            1.0, 0.0,
-            0.0, 1.0,
-            0.0, 1.0,
-            1.0, 0.0,
-            1.0, 1.0
-        ]), gl.STATIC_DRAW);
-
-        // ƒtƒBƒ‹ƒ^‚Ì“ü—Í—p‚Æo—Í—p‚Æ‚È‚éƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğ¶¬
-        this.offscreenTargets = [
-            new OffscreenTarget(gl, image),                     // 0”Ô‚Í‰‰ñ‚É“ü—Í‘¤‚É‚È‚é‚Ì‚Åw’è‚³‚ê‚½‰æ‘œ‚ğƒ[ƒh‚µ‚Ä‚¨‚­
-            new OffscreenTarget(gl, image.width, image.height)  // 1”Ô‚Í‰‰ñ‚Éo—Í‘¤‚É‚È‚é‚Ì‚Å‹ó‚ÌƒeƒNƒXƒ`ƒƒ‚ğ¶¬
-        ];
-
-        // ƒtƒŠƒbƒvó‘Ô•Ï”‚ğ‰Šú‰»
-        this.flipCnt = 0;
-
-        //// ‰‰ZŒ‹‰Êæ“¾—p‚ÌƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ÆƒŒƒ“ƒ_[ƒoƒbƒtƒ@AƒsƒNƒZƒ‹ƒoƒbƒtƒ@‚ğ¶¬
-
-        //// ‹ó‚ÌƒŒƒ“ƒ_[ƒoƒbƒtƒ@‚ğ¶¬‚µAƒtƒH[ƒ}ƒbƒg‚ğİ’è
-        //this.renderbuffer = gl.createRenderbuffer();
-        //gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
-        //gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, this.width, this.height);
-
-        //// ƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğ¶¬‚µAƒŒƒ“ƒ_[ƒoƒbƒtƒ@‚ğƒJƒ‰[ƒoƒbƒtƒ@‚Æ‚µ‚ÄƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ÉƒAƒ^ƒbƒ`
-        //this.fbo = gl.createFramebuffer();
-        //gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-        //gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, this.renderbuffer);
-        //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-        // ƒsƒNƒZƒ‹ƒoƒbƒtƒ@‚ğ¶¬
-
-        this.pixelBuffer = new PixelBuffer(gl, this.width, this.height);
-
     }
-    applyKernel(kernel: number[], program: Program) {
+
+    applyKernel(dst: Surface, src: Surface, { kernel = null, program = null }: { kernel: Float32Array, program: Program }) {
         const gl = this.gl;
 
-        // arrtibute•Ï”‚ÌˆÊ’u‚ğæ“¾
+        // arrtibuteå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
         const positionLocation = gl.getAttribLocation(program.program, "a_position");
         const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
 
-        // uniform•Ï”‚ÌˆÊ’u‚ğæ“¾
-        const resolutionLocation = gl.getUniformLocation(program.program, "u_resolution");
+        // uniformå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        //const resolutionLocation = gl.getUniformLocation(program.program, "u_resolution");
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
         const textureSizeLocation = gl.getUniformLocation(program.program, "u_textureSize");
         const kernelLocation = gl.getUniformLocation(program.program, "u_kernel[0]");
         const kernelWeightLocation = gl.getUniformLocation(program.program, "u_kernelWeight");
+        const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
 
-        // ƒVƒF[ƒ_‚ğİ’è
+        // ã‚·ã‚§ãƒ¼ãƒ€ã‚’è¨­å®š
         gl.useProgram(program.program);
 
-        // ƒVƒF[ƒ_‚Ì’¸“_À•WAttribute‚ğ—LŒø‰»
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®é ‚ç‚¹åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
         gl.enableVertexAttribArray(positionLocation);
 
-        // ’¸“_ƒoƒbƒtƒ@iÀ•Wj‚ğİ’è
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆåº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
 
-        // ’¸“_À•WAttribute‚ÌˆÊ’uî•ñ‚ğİ’è
+        // é ‚ç‚¹åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
         gl.vertexAttribPointer(
             positionLocation,
             2,          // 2 components per iteration
             gl.FLOAT,   // the data is 32bit floats
             false,      // don't normalize the data
             0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
-            0,          // start at the beginning of the buffer
+            0           // start at the beginning of the buffer
         );
 
-        // ƒVƒF[ƒ_‚ÌƒeƒNƒXƒ`ƒƒÀ•WAttribute‚ğ—LŒø‰»
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
         gl.enableVertexAttribArray(texcoordLocation);
 
-        // ’¸“_ƒoƒbƒtƒ@iƒeƒNƒXƒ`ƒƒÀ•Wj‚ğİ’è
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
 
-        // ƒeƒNƒXƒ`ƒƒÀ•WAttribute‚ÌˆÊ’uî•ñ‚ğİ’è
+        // ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
         gl.vertexAttribPointer(
             texcoordLocation,
             2,          // 2 components per iteration
@@ -276,129 +387,278 @@ class ImageProcessing {
             0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
             0           // start at the beginning of the buffer
         );
-        // ƒeƒNƒXƒ`ƒƒƒTƒCƒYî•ñ‚ğ‚ğƒVƒF[ƒ_‚ÌUniform•Ï”‚Éİ’è
-        gl.uniform2f(textureSizeLocation, this.width, this.height);
 
-        // “ü—ÍŒ³‚Æ‚·‚éƒŒƒ“ƒ_ƒŠƒ“ƒOƒ^[ƒQƒbƒg‚ÌƒeƒNƒXƒ`ƒƒ‚ğ‘I‘ğ
-        gl.bindTexture(gl.TEXTURE_2D, this.offscreenTargets[(this.flipCnt) % 2].texture);
+        // å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
 
-        // o—Íæ‚Æ‚·‚éƒŒƒ“ƒ_ƒŠƒ“ƒOƒ^[ƒQƒbƒg‚ÌƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğ‘I‘ğ‚µAƒŒƒ“ƒ_ƒŠƒ“ƒO‰ğ‘œ“x‚Æƒrƒ…[ƒ|[ƒg‚ğİ’è
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.offscreenTargets[(this.flipCnt + 1) % 2].framebuffer);
-        gl.uniform2f(resolutionLocation, this.width, this.height);
-        gl.viewport(0, 0, this.width, this.height);
+        // ãƒ•ã‚£ãƒ«ã‚¿æ¼”ç®—ã§ä½¿ã†å…¥åŠ›ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚µã‚¤ã‚ºã‚’è¨­å®š
+        gl.uniform2f(textureSizeLocation, src.width, src.height);
 
-        // ƒJ[ƒlƒ‹ƒVƒF[ƒ_‚ğ“K—p‚µ‚½ƒIƒtƒXƒNƒŠ[ƒ“ƒŒƒ“ƒ_ƒŠƒ“ƒO‚ğÀs
+        // å…¥åŠ›å…ƒã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’é¸æŠ
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(texture0Lication, 0);
+
+        // å‡ºåŠ›å…ˆã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’é¸æŠã—ã€ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã‚’è¨­å®š
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+
+        // ã‚«ãƒ¼ãƒãƒ«ã‚·ã‚§ãƒ¼ãƒ€ã‚’é©ç”¨ã—ãŸã‚ªãƒ•ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚’å®Ÿè¡Œ
         gl.uniform1fv(kernelLocation, kernel);
         gl.uniform1f(kernelWeightLocation, ImageProcessing.computeKernelWeight(kernel));
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        // ƒXƒeƒbƒvƒJƒEƒ“ƒg‚ğXV
-        this.flipCnt++;
-
-        // ƒtƒBƒ‹ƒ^“K—pŠ®—¹
+        // ãƒ•ã‚£ãƒ«ã‚¿é©ç”¨å®Œäº†
 
     }
-    applyShader(program: Program) : void {
+    applyShader(dst: Surface, src: Surface, { program = null }: { program: Program }): void {
         const gl = this.gl;
-            // arrtibute•Ï”‚ÌˆÊ’u‚ğæ“¾
-            const positionLocation = gl.getAttribLocation(program.program, "a_position");
-            const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // arrtibuteå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
 
-            // uniform•Ï”‚ÌˆÊ’u‚ğæ“¾
-            const resolutionLocation = gl.getUniformLocation(program.program, "u_resolution");
-            const textureSizeLocation = gl.getUniformLocation(program.program, "u_textureSize");
+        // uniformå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
 
-            // ƒŒƒ“ƒ_ƒŠƒ“ƒOÀs
+        // ã‚·ã‚§ãƒ¼ãƒ€ã‚’è¨­å®š
+        gl.useProgram(program.program);
 
-            gl.useProgram(program.program);
-            // ƒVƒF[ƒ_‚Ì’¸“_À•WAttribute‚ğ—LŒø‰»
-            gl.enableVertexAttribArray(positionLocation);
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®é ‚ç‚¹åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
+        gl.enableVertexAttribArray(positionLocation);
 
-            // ’¸“_ƒoƒbƒtƒ@iÀ•Wj‚ğİ’è
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆåº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
 
-            // ’¸“_À•WAttribute‚ÌˆÊ’uî•ñ‚ğİ’è
-            gl.vertexAttribPointer(
-                positionLocation,
-                2,          // 2 components per iteration
-                gl.FLOAT,   // the data is 32bit floats
-                false,      // don't normalize the data
-                0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
-                0,          // start at the beginning of the buffer
-            );
+        // é ‚ç‚¹åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
+        gl.vertexAttribPointer(
+            positionLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
 
-            // ƒVƒF[ƒ_‚ÌƒeƒNƒXƒ`ƒƒÀ•WAttribute‚ğ—LŒø‰»
-            gl.enableVertexAttribArray(texcoordLocation);
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
+        gl.enableVertexAttribArray(texcoordLocation);
 
-            // ’¸“_ƒoƒbƒtƒ@iƒeƒNƒXƒ`ƒƒÀ•Wj‚ğİ’è
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
 
-            // ƒeƒNƒXƒ`ƒƒÀ•WAttribute‚ÌˆÊ’uî•ñ‚ğİ’è
-            gl.vertexAttribPointer(
-                texcoordLocation,
-                2,          // 2 components per iteration
-                gl.FLOAT,   // the data is 32bit floats
-                false,      // don't normalize the data
-                0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
-                0           // start at the beginning of the buffer
-            );
-            // ƒeƒNƒXƒ`ƒƒƒTƒCƒYî•ñ‚ğ‚ğƒVƒF[ƒ_‚ÌUniform•Ï”‚Éİ’è
-            gl.uniform2f(textureSizeLocation, this.width, this.height);
+        // ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
+        gl.vertexAttribPointer(
+            texcoordLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
 
-        // “ü—ÍŒ³‚Æ‚·‚éƒŒƒ“ƒ_ƒŠƒ“ƒOƒ^[ƒQƒbƒg‚ÌƒeƒNƒXƒ`ƒƒ‚ğ‘I‘ğ
-        gl.bindTexture(gl.TEXTURE_2D, this.offscreenTargets[(this.flipCnt) % 2].texture);
+        //// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚µã‚¤ã‚ºæƒ…å ±ã‚’ã‚’ã‚·ã‚§ãƒ¼ãƒ€ã®Uniformå¤‰æ•°ã«è¨­å®š
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
 
-        // o—Íæ‚Æ‚·‚éƒŒƒ“ƒ_ƒŠƒ“ƒOƒ^[ƒQƒbƒg‚ÌƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğ‘I‘ğ‚µAƒŒƒ“ƒ_ƒŠƒ“ƒO‰ğ‘œ“x‚Æƒrƒ…[ƒ|[ƒg‚ğİ’è
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.offscreenTargets[(this.flipCnt + 1) % 2].framebuffer);
-        gl.uniform2f(resolutionLocation, this.width, this.height);
-        gl.viewport(0, 0, this.width, this.height);
+        // å…¥åŠ›å…ƒã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’é¸æŠ
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(texture0Lication, 0);
 
-        // ƒIƒtƒXƒNƒŠ[ƒ“ƒŒƒ“ƒ_ƒŠƒ“ƒO‚ğÀs
+        if (dst == null) {
+            // ã‚ªãƒ•ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã«ã¯ã—ãªã„
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            if (gl.canvas.width !== gl.canvas.clientWidth || gl.canvas.height !== gl.canvas.clientHeight) {
+                gl.canvas.width = gl.canvas.clientWidth;
+                gl.canvas.height = gl.canvas.clientHeight;
+            }
+            gl.clearColor(0,0,0,0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            //const projectionMatrix = Matrix3.projection(gl.canvas.width, gl.canvas.height);
+            const projectionMatrix = Matrix3.multiply(Matrix3.scaling(1, -1), Matrix3.projection(gl.canvas.width, gl.canvas.height));
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        } else {
+            // å‡ºåŠ›å…ˆã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’é¸æŠã—ã€ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°è§£åƒåº¦ã¨ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã‚’è¨­å®š
+            gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+            const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, dst.width, dst.height);
+        }
+
+        // ã‚ªãƒ•ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚’å®Ÿè¡Œ
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        // ƒXƒeƒbƒvƒJƒEƒ“ƒg‚ğXV
-        this.flipCnt++;
-
-        // “K—pŠ®—¹
+        // é©ç”¨å®Œäº†
 
     }
-    download(): Uint8Array {
+
+    drawLines(dst: Surface, { program = null, vertexes = null, size = null, color = null }: { program: Program, vertexes: Float32Array, size: number, color: [number, number, number, number] }): void {
         const gl = this.gl;
 
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-            console.log("framebuffer with RGB8 color buffer is incomplete");
-            return null;
-        } else {
-            const data = new Uint8Array(this.width * this.height * 4);
+        // arrtibuteå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
 
-            // ƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚ğƒsƒNƒZƒ‹ƒoƒbƒtƒ@‚Éƒ[ƒh
-            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pixelBuffer.pbo);
-            gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, <null>0);
+        // uniformå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const startLocation = gl.getUniformLocation(program.program, "u_start");
+        const endLocation = gl.getUniformLocation(program.program, "u_end");
+        const sizeLocation = gl.getUniformLocation(program.program, "u_size");
+        const colorLocation = gl.getUniformLocation(program.program, "u_color");
+        //const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
 
-            // ƒsƒNƒZƒ‹ƒoƒbƒtƒ@‚©‚çCPU‘¤‚Ì”z—ñ‚Éƒ[ƒh
-            gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-            gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, data);
-            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        // ã‚·ã‚§ãƒ¼ãƒ€ã‚’è¨­å®š
+        gl.useProgram(program.program);
 
-            return data;
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®é ‚ç‚¹åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
+        gl.enableVertexAttribArray(positionLocation);
+
+        // å…¥åŠ›å…ƒã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã¯ãªã—
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        //gl.uniform1i(texture0Lication, 0);
+
+        // å‡ºåŠ›å…ˆã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’é¸æŠã—ã€ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°è§£åƒåº¦ã¨ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã‚’è¨­å®š
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        
+        // è‰²ã‚’è¨­å®š
+        gl.uniform4fv(colorLocation, color);
+
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆåº§æ¨™ï¼‰ã‚’ãƒ¯ãƒ¼ã‚¯ãƒãƒƒãƒ•ã‚¡ã«åˆ‡ã‚Šæ›¿ãˆã‚‹ãŒã€é ‚ç‚¹æƒ…å ±ã¯å¾Œã§è¨­å®š
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+
+        // é ‚ç‚¹åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
+        gl.vertexAttribPointer(
+            positionLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+
+        const len = ~~(vertexes.length / 2) - 1;
+
+        // ã‚µã‚¤ã‚ºã‚’è¨­å®š
+        gl.uniform1f(sizeLocation, size / 2);
+
+        // çŸ©å½¢è¨­å®š
+        for (let i = 0; i < len; i++) {
+            const x1 = vertexes[i * 2 + 0] + 0.5;
+            const y1 = vertexes[i * 2 + 1] + 0.5;
+            const x2 = vertexes[i * 2 + 2] + 0.5;
+            const y2 = vertexes[i * 2 + 3] + 0.5;
+
+            const left = Math.min(x1, x2) - size * 2;
+            const top = Math.min(y1, y2) - size * 2;
+            const right = Math.max(x1, x2) + size * 2;
+            const bottom = Math.max(y1, y2) + size * 2;
+
+            gl.uniform2f(startLocation, x1, y1);
+            gl.uniform2f(endLocation, x2, y2);
+
+            this.setVertexPosition(ImageProcessing.createRectangle(left, top, right, bottom));
+
+            // ã‚«ãƒ¼ãƒãƒ«ã‚·ã‚§ãƒ¼ãƒ€ã‚’é©ç”¨ã—ãŸã‚ªãƒ•ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚’å®Ÿè¡Œ
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
 
     }
 
+    composit(dst: Surface, front: Surface, back: Surface, program: Program) {
+        const gl = this.gl;
+        // arrtibuteå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+
+        // uniformå¤‰æ•°ã®ä½ç½®ã‚’å–å¾—
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const texture0Lication = gl.getUniformLocation(program.program, 'u_front');
+        const texture1Lication = gl.getUniformLocation(program.program, 'u_back');
+
+        // ã‚·ã‚§ãƒ¼ãƒ€ã‚’è¨­å®š
+        gl.useProgram(program.program);
+
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®é ‚ç‚¹åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
+        gl.enableVertexAttribArray(positionLocation);
+
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆåº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, front.width, front.height));
+
+        // é ‚ç‚¹åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
+        gl.vertexAttribPointer(
+            positionLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+        // ã‚·ã‚§ãƒ¼ãƒ€ã®ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã‚’æœ‰åŠ¹åŒ–
+        gl.enableVertexAttribArray(texcoordLocation);
+
+        // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ï¼ˆãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ï¼‰ã‚’è¨­å®š
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+
+        // ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™Attributeã®ä½ç½®æƒ…å ±ã‚’è¨­å®š
+        gl.vertexAttribPointer(
+            texcoordLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+
+        //// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚µã‚¤ã‚ºæƒ…å ±ã‚’ã‚’ã‚·ã‚§ãƒ¼ãƒ€ã®Uniformå¤‰æ•°ã«è¨­å®š
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
+
+        // å…¥åŠ›å…ƒã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’é¸æŠ
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, front.texture);
+        gl.uniform1i(texture0Lication, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, back.texture);
+        gl.uniform1i(texture1Lication, 1);
+
+        // å‡ºåŠ›å…ˆã¨ã™ã‚‹ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã®ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’é¸æŠã—ã€ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°è§£åƒåº¦ã¨ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã‚’è¨­å®š
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+
+        // ã‚ªãƒ•ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚’å®Ÿè¡Œ
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        // é©ç”¨å®Œäº†
+    }
+
+    createPixelBuffer(width: number, height: number): PixelBuffer {
+        return new PixelBuffer(this.gl, width, height);
+    }
+
 }
 
-// ƒtƒBƒ‹ƒ^ƒJ[ƒlƒ‹
-const kernels: { [name: string]: number[] } = {
-    normal: [
+// ãƒ•ã‚£ãƒ«ã‚¿ã‚«ãƒ¼ãƒãƒ«
+const kernels: { [name: string]: Float32Array } = {
+    normal: new Float32Array([
         0, 0, 0,
         0, 1, 0,
         0, 0, 0
-    ],
-    gaussianBlur: [
+    ]),
+    gaussianBlur: new Float32Array([
         0.045, 0.122, 0.045,
         0.122, 0.332, 0.122,
         0.045, 0.122, 0.045
-    ],
+    ]),
 }
 
 function main() {
@@ -408,7 +668,9 @@ function main() {
 }
 
 function render(image: HTMLImageElement) {
-    const canvas1 = document.getElementById("can1") as HTMLCanvasElement;
+
+    const canvas1 = document.getElementById("can2") as HTMLCanvasElement;
+    //const canvas1 = document.createElement("canvas") as HTMLCanvasElement;
     const gl = canvas1.getContext('webgl2') as WebGL2RenderingContext;
 
     const canvas2 = document.getElementById("can2") as HTMLCanvasElement;
@@ -417,39 +679,77 @@ function render(image: HTMLImageElement) {
     if (!gl) {
         console.error("context does not exist");
     } else {
-
-        // ƒtƒBƒ‹ƒ^ƒVƒF[ƒ_‚ğ“Ç‚İ‚İ
+        // ãƒ•ã‚£ãƒ«ã‚¿ã‚·ã‚§ãƒ¼ãƒ€ã‚’èª­ã¿è¾¼ã¿
         const program = Program.loadShaderById(gl, ["2d-vertex-shader", "2d-fragment-shader"], [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]);
         const program2 = Program.loadShaderById(gl, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]);
+        const program3 = Program.loadShaderById(gl, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]);
+        const program4 = Program.loadShaderById(gl, ["2d-vertex-shader-4", "2d-fragment-shader-4"], [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]);
+        const program5 = Program.loadShaderById(gl, ["2d-vertex-shader-5", "2d-fragment-shader-5"], [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]);
 
         const s0 = Date.now();
-        const ip = new ImageProcessing(gl, image);
+        const ip = new ImageProcessing(gl);
+
         console.log("initialize time: ", Date.now() - s0);
+
+        // ä½œæ¥­ã‚¨ãƒªã‚¢ãªã©ã‚’ä½œã‚‹
+        const t1 = ip.createOffscreenTargetFromImage(image);
         
-        //// ƒtƒBƒ‹ƒ^‚ğ“K—p
+        const t2 = ip.createBlankOffscreenTarget(image.width, image.height);
+        const t3 = ip.createBlankOffscreenTarget(image.width, image.height);
+        const t4 = ip.createBlankOffscreenTarget(image.width, image.height);
+        const ret = ip.createPixelBuffer(image.width, image.height);
+
+        // ãƒ•ã‚£ãƒ«ã‚¿ã‚’é©ç”¨
         const s1 = Date.now();
-        ip.applyKernel(kernels["gaussianBlur"], program);
+        //ip.applyKernel(t2, t1, { kernel: kernels["gaussianBlur"], program: program });
         console.log("gaussianBlur time: ", Date.now() - s1);
 
+        // ã‚·ã‚§ãƒ¼ãƒ€ã‚’é©ç”¨
         const s2 = Date.now();
-        ip.applyShader(program2);
+        //ip.applyShader(t1, t2, { program: program2 });
         console.log("swap r and b time: ", Date.now() - s2);
 
-        // ƒŒƒ“ƒ_ƒŠƒ“ƒOŒ‹‰Ê‚ğImageData‚Æ‚µ‚Äæ“¾
+        // ãƒ–ãƒ©ã‚·ã‚’æƒ³å®šã—ãŸç·šå¼•ã
         const s3 = Date.now();
-        const data = ip.download();
-        console.log("capture rendering data: ", Date.now() - s3);
+        ip.drawLines(t3, { program: program3, vertexes: new Float32Array([100, 100, 150, 150]), size: 5, color: [0, 0, 1, 0.1] });
+        console.log("drawline: ", Date.now() - s3);
 
-        // CPU‘¤‚Ì”z—ñ‚©‚çcanvas‚É“]‘—
+        // ãƒ¬ã‚¤ãƒ¤ãƒ¼åˆæˆ
         const s4 = Date.now();
+        ip.composit(t4, t3, t2, program4);
+        console.log("composit layer: ", Date.now() - s4);
+
+        //// æ¶ˆã—ã‚´ãƒ åˆæˆï¼ˆãƒ¬ã‚¤ãƒ¤ãƒ¼åˆæˆã®ç‰¹æ®Šå½¢ï¼‰
+        //const s4 = Date.now();
+        //ip.composit(t4, t3, t2, program5);
+        //console.log("eraser: ", Date.now() - s4);
+        /*
+        // ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°çµæœã‚’Uint8Arrayã¨ã—ã¦å–å¾—
+        const s5 = Date.now();
+        const data = ret.capture(t4);
+        console.log("capture rendering data: ", Date.now() - s5);
+
+        // Uint8Arrayã‹ã‚‰canvasã«è»¢é€
+        const s6 = Date.now();
         const imageData = ctx.createImageData(image.width, image.height);
         imageData.data.set(data);
-        console.log("copy to context: ", Date.now() - s4);
+        console.log("copy to context: ", Date.now() - s6);
 
         ctx.putImageData(imageData, 0, 0);
+
+        //*/
+        // WebGL ã®æç”»çµæœã‚’ HTML ã«æ­£ã—ãåˆæˆã™ã‚‹æ–¹æ³• ã‚ˆã‚Š
+        // http://webos-goodies.jp/archives/overlaying_webgl_on_html.html
+        gl.enable(gl.BLEND);
+        gl.blendEquation(gl.FUNC_ADD);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ZERO);
+        // canvasã«ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°
+        ip.applyShader(null, t3, { program: program2 });
+
+
         return;
     }
 }
 
 window.requestAnimationFrame(main);
-

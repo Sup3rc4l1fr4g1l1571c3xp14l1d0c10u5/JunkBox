@@ -6,8 +6,6 @@
     <meta content="noindex, nofollow, noarchive" name="robots" />
     <title></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="./jszip.js"></script>
-    <script src="./tspaint.js"></script>
     <script id="2d-vertex-shader" type="x-shader/x-vertex">
         attribute vec2 a_position;
         attribute vec2 a_texCoord;
@@ -17,11 +15,11 @@
         varying vec2 v_texCoord;
 
         void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
+            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            v_texCoord = a_texCoord;
         }
     </script>
-    <script id="2d-fragment-shader" type="x-shader/x-fragment">
+<script id="2d-fragment-shader" type="x-shader/x-fragment">
         precision mediump float;
 
         // our texture
@@ -58,8 +56,8 @@
         varying vec2 v_texCoord;
 
         void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
+            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            v_texCoord = a_texCoord;
         }
     </script>
     <script id="2d-fragment-shader-2" type="x-shader/x-fragment">
@@ -84,8 +82,8 @@
         //varying vec2 v_texCoord;
 
         void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        //v_texCoord = a_texCoord;
+            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            //v_texCoord = a_texCoord;
         }
     </script>
     <script id="2d-fragment-shader-3" type="x-shader/x-fragment">
@@ -98,7 +96,7 @@
         uniform vec2  u_end;
         uniform float u_size;
         //varying vec2 v_resolution;
-
+        
         void main() {
         vec2 a = u_start;
         vec2 b = u_end;
@@ -124,11 +122,11 @@
         varying vec2 v_texCoord;
 
         void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
+            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            v_texCoord = a_texCoord;
         }
     </script>
-    <script id="2d-fragment-shader-4" type="x-shader/x-fragment">
+<script id="2d-fragment-shader-4" type="x-shader/x-fragment">
         precision mediump float;
 
         // our texture
@@ -164,20 +162,20 @@
 
         }
     </script>
-    <script id="2d-vertex-shader-5" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
+<script id="2d-vertex-shader-5" type="x-shader/x-vertex">
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
 
-        uniform mat3 u_matrix;
+    uniform mat3 u_matrix;
 
-        varying vec2 v_texCoord;
+    varying vec2 v_texCoord;
 
-        void main() {
+    void main() {
         gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
         v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-5" type="x-shader/x-fragment">
+    }
+</script>
+<script id="2d-fragment-shader-5" type="x-shader/x-fragment">
         precision mediump float;
 
         // our texture
@@ -199,16 +197,17 @@
         float A = alpha_3;
         vec3 C;
         if (A == 0.0) {
-        C = vec3(0,0,0);
+            C = vec3(0,0,0);
         } else {
-        C = C_b;
+            C = C_b;
         }
-        gl_FragColor = vec4(C, A);
+        gl_FragColor = vec4(C,A);
 
         }
     </script>
-
+<script src="./glcanvas.js"></script>   
 </head>
-    <body>
-    </body>
+<body>
+    <canvas id="can2" width="256" height="256" style="border: 1px solid black; background-color: green;"></canvas>
+</body>
 </html>

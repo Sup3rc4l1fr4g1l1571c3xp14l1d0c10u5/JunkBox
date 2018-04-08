@@ -33,6 +33,26 @@ function loadFileFromLocal(accept) {
                 return;
             }
         };
+        element.onabort = (ev) => {
+            reject("cannot load file.");
+            return;
+        };
+        element.onended = (ev) => {
+            reject("cannot load file.");
+            return;
+        };
+        element.onerror = (ev) => {
+            reject("cannot load file.");
+            return;
+        };
+        element.oninput = (ev) => {
+            reject("cannot load file.");
+            return;
+        };
+        element.oninvalid = (ev) => {
+            reject("cannot load file.");
+            return;
+        };
         element.click();
         document.body.removeChild(element);
     });
@@ -161,130 +181,526 @@ function hsv2rgb([h, s, v]) {
         return [rr, gg, bb];
     }
 }
-var CompositMode;
-(function (CompositMode) {
-    CompositMode[CompositMode["Normal"] = 0] = "Normal";
-    CompositMode[CompositMode["Add"] = 1] = "Add";
-    CompositMode[CompositMode["Sub"] = 2] = "Sub";
-    CompositMode[CompositMode["SubAlpha"] = 3] = "SubAlpha";
-    CompositMode[CompositMode["Mul"] = 4] = "Mul";
-    CompositMode[CompositMode["Screen"] = 5] = "Screen";
-})(CompositMode || (CompositMode = {}));
-ImageData.prototype.clear = function () {
-    this.data.fill(0);
-};
-ImageData.prototype.pointSet = function (x0, y0, [r, g, b, a]) {
-    if (0 <= x0 && x0 < this.width && 0 <= y0 && y0 < this.height) {
-        const off = (y0 * this.width + x0) * 4;
-        this.data[off + 0] = r;
-        this.data[off + 1] = g;
-        this.data[off + 2] = b;
-        this.data[off + 3] = a;
+var Matrix3;
+(function (Matrix3) {
+    function projection(width, height) {
+        // Note: This matrix flips the Y axis so that 0 is at the top.
+        return [
+            2 / width, 0, 0,
+            0, 2 / height, 0,
+            -1, -1, 1
+        ];
     }
-};
-ImageData.prototype.putMask = function (left, top, mask, w, h, color) {
-    const dst = { left: left, top: top, right: left + w, bottom: top + h };
-    const src = { left: 0, top: 0, right: w, bottom: h };
-    // clipping 
-    if (dst.left < 0) {
-        src.left += (-dst.left);
-        dst.left = 0;
+    Matrix3.projection = projection;
+    function identity() {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        ];
     }
-    if (dst.right >= this.width) {
-        src.right -= (this.width - dst.right);
-        dst.right = this.width;
+    Matrix3.identity = identity;
+    function translation(tx, ty) {
+        return [
+            1, 0, 0,
+            0, 1, 0,
+            tx, ty, 1
+        ];
     }
-    if (dst.top < 0) {
-        src.top += (-dst.top);
-        dst.top = 0;
+    Matrix3.translation = translation;
+    function rotation(angleInRadians) {
+        const c = Math.cos(angleInRadians);
+        const s = Math.sin(angleInRadians);
+        return [
+            c, -s, 0,
+            s, c, 0,
+            0, 0, 1
+        ];
     }
-    if (dst.bottom >= this.height) {
-        src.bottom -= (this.height - dst.bottom);
-        dst.bottom = this.height;
+    Matrix3.rotation = rotation;
+    function scaling(sx, sy) {
+        return [
+            sx, 0, 0,
+            0, sy, 0,
+            0, 0, 1
+        ];
     }
-    const width = dst.right - dst.left;
-    const height = dst.bottom - dst.top;
-    const dstData = this.data;
-    const [r, g, b, a] = color;
-    let offDst = (dst.top * this.width + dst.left) * 4;
-    const stepDst = this.width * 4;
-    let offSrc = (src.top) * w + src.left;
-    const stepSrc = w;
-    for (let y = 0; y < height; y++) {
-        let scanDst = offDst;
-        offDst += stepDst;
-        let scanSrc = offSrc;
-        offSrc += stepSrc;
-        for (let x = 0; x < width; x++) {
-            if (mask[scanSrc]) {
-                dstData[scanDst + 0] = r;
-                dstData[scanDst + 1] = g;
-                dstData[scanDst + 2] = b;
-                dstData[scanDst + 3] = a;
+    Matrix3.scaling = scaling;
+    function multiply(a, b) {
+        const a00 = a[0 * 3 + 0];
+        const a01 = a[0 * 3 + 1];
+        const a02 = a[0 * 3 + 2];
+        const a10 = a[1 * 3 + 0];
+        const a11 = a[1 * 3 + 1];
+        const a12 = a[1 * 3 + 2];
+        const a20 = a[2 * 3 + 0];
+        const a21 = a[2 * 3 + 1];
+        const a22 = a[2 * 3 + 2];
+        const b00 = b[0 * 3 + 0];
+        const b01 = b[0 * 3 + 1];
+        const b02 = b[0 * 3 + 2];
+        const b10 = b[1 * 3 + 0];
+        const b11 = b[1 * 3 + 1];
+        const b12 = b[1 * 3 + 2];
+        const b20 = b[2 * 3 + 0];
+        const b21 = b[2 * 3 + 1];
+        const b22 = b[2 * 3 + 2];
+        return [
+            b00 * a00 + b01 * a10 + b02 * a20,
+            b00 * a01 + b01 * a11 + b02 * a21,
+            b00 * a02 + b01 * a12 + b02 * a22,
+            b10 * a00 + b11 * a10 + b12 * a20,
+            b10 * a01 + b11 * a11 + b12 * a21,
+            b10 * a02 + b11 * a12 + b12 * a22,
+            b20 * a00 + b21 * a10 + b22 * a20,
+            b20 * a01 + b21 * a11 + b22 * a21,
+            b20 * a02 + b21 * a12 + b22 * a22
+        ];
+    }
+    Matrix3.multiply = multiply;
+})(Matrix3 || (Matrix3 = {}));
+///////////////////////////////////////////////////////////////
+class Shader {
+    constructor(gl, shader, shaderType) {
+        this.gl = gl;
+        this.shader = shader;
+        this.shaderType = shaderType;
+    }
+    static create(gl, shaderSource, shaderType) {
+        // Create the shader object
+        const shader = gl.createShader(shaderType);
+        // Load the shader source
+        gl.shaderSource(shader, shaderSource);
+        // Compile the shader
+        gl.compileShader(shader);
+        // Check the compile status
+        const compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+        if (!compiled) {
+            // Something went wrong during compilation; get the error
+            const lastError = gl.getShaderInfoLog(shader);
+            console.error("*** Error compiling shader '" + shader + "':" + lastError);
+            gl.deleteShader(shader);
+            return null;
+        }
+        return new Shader(gl, shader, shaderType);
+    }
+    static loadShaderById(gl, id, optShaderType) {
+        const shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            throw ("*** Error: unknown element `" + id + "`");
+        }
+        const shaderSource = shaderScript.text;
+        let shaderType = optShaderType;
+        if (!optShaderType) {
+            if (shaderScript.type === "x-shader/x-vertex") {
+                shaderType = gl.VERTEX_SHADER;
             }
-            scanSrc += 1;
-            scanDst += 4;
+            else if (shaderScript.type === "x-shader/x-fragment") {
+                shaderType = gl.FRAGMENT_SHADER;
+            }
+            else if (shaderType !== gl.VERTEX_SHADER && shaderType !== gl.FRAGMENT_SHADER) {
+                throw ("*** Error: unknown shader type");
+            }
+        }
+        return Shader.create(gl, shaderSource, shaderType);
+    }
+}
+///////////////////////////////////////////////////////////////
+class Program {
+    constructor(gl, program) {
+        this.gl = gl;
+        this.program = program;
+    }
+    static create(gl, shaders, optAttribs, optLocations) {
+        const program = gl.createProgram();
+        shaders.forEach(shader => {
+            gl.attachShader(program, shader);
+        });
+        if (optAttribs) {
+            optAttribs.forEach((attrib, ndx) => {
+                gl.bindAttribLocation(program, optLocations ? optLocations[ndx] : ndx, attrib);
+            });
+        }
+        gl.linkProgram(program);
+        // Check the link status
+        const linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+        if (!linked) {
+            // something went wrong with the link
+            const lastError = gl.getProgramInfoLog(program);
+            console.error("Error in program linking:" + lastError);
+            gl.deleteProgram(program);
+            return null;
+        }
+        return new Program(gl, program);
+    }
+    static loadShaderById(gl, ids, shaderTypes, optAttribs, optLocations) {
+        const shaders = [];
+        for (let ii = 0; ii < ids.length; ++ii) {
+            shaders.push(Shader.loadShaderById(gl, ids[ii], shaderTypes[ii]));
+        }
+        return Program.create(gl, shaders.map((x) => x.shader), optAttribs, optLocations);
+    }
+}
+///////////////////////////////////////////////////////////////
+class Surface {
+    static createAndBindTexture(gl) {
+        const texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        // Set up texture so we can render any size image and so we are
+        // working with pixels.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        return texture;
+    }
+    constructor(gl, srcImageOrWidth, height) {
+        this.gl = gl;
+        // フレームバッファテクスチャを生成。ピクセルフォーマットはRGBA(8bit)。画像サイズは指定されたものを使用。
+        this.texture = Surface.createAndBindTexture(gl);
+        if (srcImageOrWidth instanceof HTMLImageElement) {
+            const img = srcImageOrWidth;
+            this.width = img.width;
+            this.height = img.height;
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        }
+        else if (srcImageOrWidth instanceof ImageData) {
+            const img = srcImageOrWidth;
+            this.width = img.width;
+            this.height = img.height;
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        }
+        else {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, srcImageOrWidth, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            this.width = srcImageOrWidth;
+            this.height = height;
+        }
+        // フレームバッファを生成し、テクスチャと関連づけ
+        this.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+    }
+    clear() {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+        gl.viewport(0, 0, this.width, this.height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    }
+}
+///////////////////////////////////////////////////////////////
+class PixelBuffer {
+    constructor(gl, width, height) {
+        this.gl = gl;
+        this.width = width;
+        this.height = height;
+        this.pbo = gl.createBuffer();
+        this.data = new Uint8ClampedArray(this.width * this.height * 4);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, this.width * this.height * 4, gl.STREAM_READ);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    capture(src) {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, src.framebuffer);
+        // フレームバッファをピクセルバッファにロード
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+        gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+        // ピクセルバッファからCPU側の配列にロード
+        gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.data);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        return this.data;
+    }
+}
+///////////////////////////////////////////////////////////////
+class ImageProcessing {
+    // フィルタカーネルの重み合計（重み合計が0以下の場合は1とする）
+    static computeKernelWeight(kernel) {
+        const weight = kernel.reduce((prev, curr) => prev + curr);
+        return weight <= 0 ? 1 : weight;
+    }
+    constructor(gl) {
+        this.gl = gl;
+        // 頂点バッファ（座標）を作成
+        this.positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // 頂点バッファ（テクスチャ座標）を作成
+        this.texcoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+    }
+    setVertexPosition(array) {
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+    }
+    setTexturePosition(array) {
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+    }
+    createBlankOffscreenTarget(width, height) {
+        return new Surface(this.gl, width, height);
+    }
+    createOffscreenTargetFromImage(image) {
+        return new Surface(this.gl, image);
+    }
+    static createRectangle(x1, y1, x2, y2, target) {
+        if (target) {
+            Array.prototype.push.call(target, x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2);
+            return target;
+        }
+        else {
+            return [
+                x1, y1,
+                x2, y1,
+                x1, y2,
+                x1, y2,
+                x2, y1,
+                x2, y2
+            ];
         }
     }
-};
-ImageData.prototype.composition = function (src) {
-    // precheck
-    if (this.width != src.imageData.width || this.height != src.imageData.height) {
-        throw new Error("size missmatch");
+    applyKernel(dst, src, { kernel = null, program = null }) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // uniform変数の位置を取得
+        //const resolutionLocation = gl.getUniformLocation(program.program, "u_resolution");
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const textureSizeLocation = gl.getUniformLocation(program.program, "u_textureSize");
+        const kernelLocation = gl.getUniformLocation(program.program, "u_kernel[0]");
+        const kernelWeightLocation = gl.getUniformLocation(program.program, "u_kernelWeight");
+        const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+        // テクスチャ座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // 変換行列を設定
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        // フィルタ演算で使う入力テクスチャサイズを設定
+        gl.uniform2f(textureSizeLocation, src.width, src.height);
+        // 入力元とするレンダリングターゲットのテクスチャを選択
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(texture0Lication, 0);
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、ビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+        // カーネルシェーダを適用したオフスクリーンレンダリングを実行
+        gl.uniform1fv(kernelLocation, kernel);
+        gl.uniform1f(kernelWeightLocation, ImageProcessing.computeKernelWeight(kernel));
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        // フィルタ適用完了
     }
-    // operation
-    const dataLen = this.height * this.width * 4;
-    const dstData = this.data;
-    const srcData = src.imageData.data;
-    switch (src.compositMode) {
-        case CompositMode.Normal:
-            for (let j = 0; j < dataLen; j += 4) {
-                const sr = srcData[j + 0];
-                const sg = srcData[j + 1];
-                const sb = srcData[j + 2];
-                const sa = srcData[j + 3] / 255;
-                const dr = dstData[j + 0];
-                const dg = dstData[j + 1];
-                const db = dstData[j + 2];
-                const da = dstData[j + 3] / 255;
-                const na = sa + da - (sa * da);
-                const ra = ~~(na * 255 + 0.5);
-                let rr = dr;
-                let rg = dg;
-                let rb = db;
-                if (na > 0) {
-                    const dasa = da * (1.0 - sa);
-                    rr = ~~((sr * sa + dr * dasa) / na + 0.5);
-                    rg = ~~((sg * sa + dg * dasa) / na + 0.5);
-                    rb = ~~((sb * sa + db * dasa) / na + 0.5);
-                }
-                dstData[j + 0] = rr;
-                dstData[j + 1] = rg;
-                dstData[j + 2] = rb;
-                dstData[j + 3] = ra;
-            }
-            break;
-        case CompositMode.Add:
-            break;
-        case CompositMode.Mul:
-            break;
-        case CompositMode.Screen:
-            break;
-        case CompositMode.Sub:
-            break;
-        case CompositMode.SubAlpha:
-            for (let j = 0; j < dataLen; j += 4) {
-                const sa = srcData[j + 3];
-                const da = dstData[j + 3];
-                const na = (da * (255 - sa)) / 255;
-                const ra = ~~(na + 0.5);
-                dstData[j + 3] = ra;
-            }
-            break;
+    applyShader(dst, src, { program = null }) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+        // テクスチャ座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        //// テクスチャサイズ情報ををシェーダのUniform変数に設定
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
+        // 入力元とするレンダリングターゲットのテクスチャを選択
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(texture0Lication, 0);
+        if (dst == null) {
+            // オフスクリーンレンダリングにはしない
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            const projectionMatrix = Matrix3.multiply(Matrix3.scaling(1, -1), Matrix3.projection(gl.canvas.width, gl.canvas.height));
+            // WebGL の描画結果を HTML に正しく合成する方法 より
+            // http://webos-goodies.jp/archives/overlaying_webgl_on_html.html
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.BLEND);
+            gl.blendEquation(gl.FUNC_ADD);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ZERO);
+            // 
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            // レンダリングを実行
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.disable(gl.BLEND);
+        }
+        else {
+            // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+            gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+            const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, dst.width, dst.height);
+            // オフスクリーンレンダリングを実行
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        // 適用完了
     }
-};
+    drawLines(dst, { program = null, vertexes = null, size = null, color = null }) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const startLocation = gl.getUniformLocation(program.program, "u_start");
+        const endLocation = gl.getUniformLocation(program.program, "u_end");
+        const sizeLocation = gl.getUniformLocation(program.program, "u_size");
+        const colorLocation = gl.getUniformLocation(program.program, "u_color");
+        //const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 入力元とするレンダリングターゲットはなし
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        //gl.uniform1i(texture0Lication, 0);
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        // 色を設定
+        gl.uniform4fv(colorLocation, color.map(x => x / 255));
+        // 頂点バッファ（座標）をワークバッファに切り替えるが、頂点情報は後で設定
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        const len = ~~(vertexes.length / 2) - 1;
+        // サイズを設定
+        gl.uniform1f(sizeLocation, size / 2);
+        // 矩形設定
+        for (let i = 0; i < len; i++) {
+            const x1 = vertexes[i * 2 + 0] + 0.5;
+            const y1 = vertexes[i * 2 + 1] + 0.5;
+            const x2 = vertexes[i * 2 + 2] + 0.5;
+            const y2 = vertexes[i * 2 + 3] + 0.5;
+            const left = Math.min(x1, x2) - size * 2;
+            const top = Math.min(y1, y2) - size * 2;
+            const right = Math.max(x1, x2) + size * 2;
+            const bottom = Math.max(y1, y2) + size * 2;
+            gl.uniform2f(startLocation, x1, y1);
+            gl.uniform2f(endLocation, x2, y2);
+            this.setVertexPosition(ImageProcessing.createRectangle(left, top, right, bottom));
+            // カーネルシェーダを適用したオフスクリーンレンダリングを実行
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+    }
+    composit(dst, front, back, program) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const texture0Lication = gl.getUniformLocation(program.program, 'u_front');
+        const texture1Lication = gl.getUniformLocation(program.program, 'u_back');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, front.width, front.height));
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+        // テクスチャ座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        //// テクスチャサイズ情報ををシェーダのUniform変数に設定
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
+        // 入力元とするレンダリングターゲットのテクスチャを選択
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, front.texture);
+        gl.uniform1i(texture0Lication, 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, back.texture);
+        gl.uniform1i(texture1Lication, 1);
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+        const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (st !== gl.FRAMEBUFFER_COMPLETE) {
+            console.log(st);
+        }
+        // オフスクリーンレンダリングを実行
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        // 適用完了
+    }
+    createPixelBuffer(width, height) {
+        return new PixelBuffer(this.gl, width, height);
+    }
+}
 ///////////////////////////////////////////////////////////////
 function saveAsBmp(imageData) {
+    const pixelData = new PixelBuffer(imageData.gl, imageData.width, imageData.height);
+    const pixels = pixelData.capture(imageData);
     const bitmapData = new ArrayBuffer(14 + 40 + (imageData.width * imageData.height * 4)); // sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
     //
     // BITMAPFILEHEADER
@@ -318,10 +734,10 @@ function saveAsBmp(imageData) {
         let scan = (imageData.height - 1 - y) * imageData.width * 4;
         let base = y * imageData.width * 4;
         for (let x = 0; x < imageData.width; x++) {
-            viewOfBitmapPixelData.setUint8(base + 0, imageData.data[scan + 2]); // B
-            viewOfBitmapPixelData.setUint8(base + 1, imageData.data[scan + 1]); // G
-            viewOfBitmapPixelData.setUint8(base + 2, imageData.data[scan + 0]); // R
-            viewOfBitmapPixelData.setUint8(base + 3, imageData.data[scan + 3]); // A
+            viewOfBitmapPixelData.setUint8(base + 0, pixels[scan + 2]); // B
+            viewOfBitmapPixelData.setUint8(base + 1, pixels[scan + 1]); // G
+            viewOfBitmapPixelData.setUint8(base + 2, pixels[scan + 0]); // R
+            viewOfBitmapPixelData.setUint8(base + 3, pixels[scan + 3]); // A
             base += 4;
             scan += 4;
         }
@@ -329,7 +745,7 @@ function saveAsBmp(imageData) {
     return bitmapData;
 }
 ;
-function loadFromBmp(context, bitmapData, { reqWidth = -1, reqHeight = -1 }) {
+function loadFromBmp(ip, bitmapData, { reqWidth = -1, reqHeight = -1 }) {
     const dataLength = bitmapData.byteLength;
     //
     // BITMAPFILEHEADER
@@ -375,24 +791,25 @@ function loadFromBmp(context, bitmapData, { reqWidth = -1, reqHeight = -1 }) {
         (biCirImportant != 0)) {
         return null;
     }
-    const imageData = context.createImageData(biWidth, biHeight);
     //
     // IMAGEDATA
     //
+    const pixeldata = new Uint8ClampedArray(biWidth * biHeight * 4);
     const viewOfBitmapPixelData = new DataView(bitmapData, bfOffBits, biWidth * biHeight * 4);
     for (let y = 0; y < biHeight; y++) {
         let scan = (biHeight - 1 - y) * biWidth * 4;
         let base = y * biWidth * 4;
         for (let x = 0; x < biWidth; x++) {
-            imageData.data[scan + 2] = viewOfBitmapPixelData.getUint8(base + 0); // B
-            imageData.data[scan + 1] = viewOfBitmapPixelData.getUint8(base + 1); // G
-            imageData.data[scan + 0] = viewOfBitmapPixelData.getUint8(base + 2); // R
-            imageData.data[scan + 3] = viewOfBitmapPixelData.getUint8(base + 3); // A
+            pixeldata[scan + 2] = viewOfBitmapPixelData.getUint8(base + 0); // B
+            pixeldata[scan + 1] = viewOfBitmapPixelData.getUint8(base + 1); // G
+            pixeldata[scan + 0] = viewOfBitmapPixelData.getUint8(base + 2); // R
+            pixeldata[scan + 3] = viewOfBitmapPixelData.getUint8(base + 3); // A
             base += 4;
             scan += 4;
         }
     }
-    return imageData;
+    const surface = ip.createOffscreenTargetFromImage(new ImageData(pixeldata, biWidth, biHeight));
+    return surface;
 }
 var IPoint;
 (function (IPoint) {
@@ -1512,28 +1929,6 @@ var GUI;
     GUI.HorizontalSlider = HorizontalSlider;
 })(GUI || (GUI = {}));
 ///////////////////////////////////////////////////////////////
-var Brushes;
-(function (Brushes) {
-    function createSolidBrush(imgData, color, size) {
-        if (size <= 1) {
-            return function (x0, y0) { imgData.pointSet(x0, y0, color); };
-        }
-        else {
-            const w = (size * 2 - 1);
-            const h = (size * 2 - 1);
-            const r = size - 1;
-            const mask = new Uint8Array(w * h);
-            Topology.drawCircle(r, r, size, (x1, x2, y) => { for (let i = x1; i <= x2; i++) {
-                mask[w * y + i] = 1;
-            } });
-            return function (x0, y0) {
-                imgData.putMask(x0 - r, y0 - r, mask, w, h, color);
-            };
-        }
-    }
-    Brushes.createSolidBrush = createSolidBrush;
-})(Brushes || (Brushes = {}));
-///////////////////////////////////////////////////////////////
 class HSVColorWheelUI extends GUI.Control {
     get rgb() {
         const r = this.hsvColorWhell.rgb;
@@ -1568,31 +1963,28 @@ class HSVColorWheelUI extends GUI.Control {
 }
 ///////////////////////////////////////////////////////////////
 class SolidPen {
-    constructor(name, compositMode) {
+    constructor(name, shader, compositMode) {
         this.name = name;
         this.joints = [];
+        this.shader = shader;
         this.compositMode = compositMode;
     }
     down(config, point) {
         this.joints.length = 0;
-        this.joints.push(point);
+        this.joints.push(point.x, point.y);
     }
     move(config, point) {
-        this.joints.push(point);
+        this.joints.push(point.x, point.y);
     }
     up(config, point) {
     }
-    draw(config, imgData) {
-        const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
-        const len = this.joints.length;
-        if (len === 1) {
-            Topology.drawLine(this.joints[0], this.joints[0], brush);
-        }
-        else {
-            for (let i = 1; i < len; i++) {
-                Topology.drawLine(this.joints[i - 1], this.joints[i - 0], brush);
-            }
-        }
+    draw(config, ip, imgData) {
+        ip.drawLines(imgData, {
+            program: this.shader,
+            vertexes: new Float32Array(this.joints),
+            color: config.penColor,
+            size: config.penSize
+        });
     }
 }
 ///////////////////////////////////////////////////////////////
@@ -1601,8 +1993,8 @@ class CorrectionSolidPen extends SolidPen {
     movingAverage(m, start) {
         const ret = { x: 0, y: 0 };
         for (let i = 0; i < m; i++) {
-            ret.x += this.joints[start].x;
-            ret.y += this.joints[start].y;
+            ret.x += this.joints[start * 2 + 0];
+            ret.y += this.joints[start * 2 + 1];
             start++;
         }
         ret.x = ~~(ret.x / m);
@@ -1610,42 +2002,45 @@ class CorrectionSolidPen extends SolidPen {
         return ret;
     }
     ;
-    constructor(name, compositMode) {
-        super(name, compositMode);
+    constructor(name, shader, compositMode) {
+        super(name, shader, compositMode);
     }
-    down(config, point) {
-        this.joints.length = 0;
-        this.joints.push(point);
-    }
-    move(config, point) {
-        this.joints.push(point);
-    }
-    up(config, point) {
-    }
-    draw(config, imgData) {
-        const brush = Brushes.createSolidBrush(imgData, config.penColor, config.penSize);
-        if (this.joints.length === 1) {
-            Topology.drawLine(this.joints[0], this.joints[0], brush);
-        }
-        else if (this.joints.length <= config.penCorrectionValue) {
-            for (let i = 1; i < this.joints.length; i++) {
-                Topology.drawLine(this.joints[i - 1], this.joints[i - 0], brush);
-            }
+    draw(config, ip, imgData) {
+        if (~~(this.joints.length / 2) <= config.penCorrectionValue) {
+            ip.drawLines(imgData, {
+                program: this.shader,
+                vertexes: new Float32Array(this.joints),
+                color: config.penColor,
+                size: config.penSize
+            });
         }
         else {
+            const corrected = [];
             let prev = this.movingAverage(config.penCorrectionValue, 0);
-            Topology.drawLine(this.joints[0], prev, brush);
-            const len = this.joints.length - config.penCorrectionValue;
+            corrected.push(prev.x);
+            corrected.push(prev.y);
+            const len = ~~(this.joints.length / 2) - config.penCorrectionValue;
             for (let i = 1; i < len; i++) {
                 const avg = this.movingAverage(config.penCorrectionValue, i);
-                Topology.drawLine(prev, avg, brush);
+                corrected.push(avg.x);
+                corrected.push(avg.y);
                 prev = avg;
             }
-            Topology.drawLine(prev, this.joints[this.joints.length - 1], brush);
+            ip.drawLines(imgData, {
+                program: this.shader,
+                vertexes: new Float32Array(corrected),
+                color: config.penColor,
+                size: config.penSize
+            });
         }
     }
 }
 ;
+var CompositMode;
+(function (CompositMode) {
+    CompositMode[CompositMode["Normal"] = 0] = "Normal";
+    CompositMode[CompositMode["Erase"] = 1] = "Erase";
+})(CompositMode || (CompositMode = {}));
 ///////////////////////////////////////////////////////////////
 class CustomPointerEvent extends CustomEvent {
 }
@@ -1677,7 +2072,9 @@ var ModalDialog;
                 dialogLayerCanvas.height = displayHeight;
             }
             if (dialogLayerCanvas.style.display != "none") {
-                draw(dialogLayerCanvas, dialogLayerContext);
+                if (draw != null) {
+                    draw(dialogLayerCanvas, dialogLayerContext);
+                }
             }
         });
     }
@@ -1897,6 +2294,9 @@ var Painter;
      */
     let imageCanvas = null;
     let imageContext = null;
+    let glCanvas = null;
+    let glContext = null;
+    let imageProcessing = null;
     /**
      * レイヤー結合結果
      */
@@ -1916,7 +2316,7 @@ var Painter;
         const previewContext = previewCanvas.getContext("2d");
         const previewData = previewContext.createImageData(50, 50);
         return {
-            imageData: imageContext.createImageData(imageCanvas.width, imageCanvas.height),
+            imageData: imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
             previewCanvas: previewCanvas,
             previewContext: previewContext,
             previewData: previewData,
@@ -1928,23 +2328,25 @@ var Painter;
         const sh = layer.imageData.height;
         const pw = layer.previewData.width;
         const ph = layer.previewData.height;
-        const dstData = layer.previewData.data;
-        let dst = 0;
-        const srcData = layer.imageData.data;
-        for (let y = 0; y < ph; y++) {
-            const sy = ~~(y * sh / ph);
-            for (let x = 0; x < ph; x++) {
-                const sx = ~~(x * sw / pw);
-                dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
-                dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
-                dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
-                dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
-                dst += 4;
-            }
-        }
-        layer.previewContext.putImageData(layer.previewData, 0, 0);
-        update({ gui: true });
         return layer;
+        // 後で実装
+        //const dstData = layer.previewData.data;
+        //let dst = 0;
+        //const srcData = layer.imageData.data;
+        //for (let y = 0; y < ph; y++) {
+        //    const sy = ~~(y * sh / ph);
+        //    for (let x = 0; x < ph; x++) {
+        //        const sx = ~~(x * sw / pw);
+        //        dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
+        //        dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
+        //        dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
+        //        dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
+        //        dst += 4;
+        //    }
+        //}
+        //layer.previewContext.putImageData(layer.previewData, 0, 0);
+        //update({ gui: true });
+        //return layer;
     }
     /**
      * 作画画面ビュー用
@@ -1958,11 +2360,7 @@ var Painter;
     let overlayContext = null;
     let canvasOffsetX = 0;
     let canvasOffsetY = 0;
-    let tools = [
-        new SolidPen("SolidPen", CompositMode.Normal),
-        new CorrectionSolidPen("SolidPen2", CompositMode.Normal),
-        new SolidPen("Eraser", CompositMode.SubAlpha)
-    ];
+    let tools = [];
     let currentTool = null;
     Painter.config = {
         scale: 1,
@@ -1974,6 +2372,10 @@ var Painter;
     };
     let updateRequest = { overlay: false, view: false, gui: false };
     let updateTimerId = NaN;
+    let penShader = null;
+    let normalBlendShader = null;
+    let eraserBlendShader = null;
+    let copyShader = null;
     function init(parentHtmlElement, width, height) {
         Input.init();
         ModalDialog.init();
@@ -1982,10 +2384,12 @@ var Painter;
         imageCanvas = document.createElement("canvas");
         imageCanvas.width = width;
         imageCanvas.height = height;
-        imageContext = imageCanvas.getContext("2d");
-        imageContext.imageSmoothingEnabled = false;
+        glContext = imageCanvas.getContext('webgl2');
+        imageProcessing = new ImageProcessing(glContext);
+        //imageContext = imageCanvas.getContext("2d");
+        //imageContext.imageSmoothingEnabled = false;
         imageLayerImgDatas = [createLayer()];
-        imageLayerCompositedImgData = imageContext.createImageData(width, height);
+        imageLayerCompositedImgData = imageProcessing.createBlankOffscreenTarget(width, height);
         workLayerImgData = createLayer();
         viewCanvas = document.createElement("canvas");
         viewCanvas.style.position = "absolute";
@@ -2018,6 +2422,13 @@ var Painter;
         updateRequest = { gui: false, overlay: false, view: false };
         updateTimerId = NaN;
         //uiDispacher.addEventListener("update", () => { update({ gui: true }); return true; });
+        //const program = Program.loadShaderById(glContext, ["2d-vertex-shader", "2d-fragment-shader"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        //const program2 = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        penShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        normalBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-4", "2d-fragment-shader-4"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        eraserBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-5", "2d-fragment-shader-5"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        copyShader = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        tools.push(new SolidPen("SolidPen", penShader, CompositMode.Normal), new CorrectionSolidPen("SolidPen2", penShader, CompositMode.Normal), new SolidPen("Eraser", penShader, CompositMode.Erase));
         window.addEventListener("resize", () => resize());
         setupMouseEvent();
         {
@@ -2256,7 +2667,7 @@ var Painter;
                             if (config.layers.every(x => zip.files[`layers/${x.image}`] != null) == false) {
                                 return Promise.reject("layer data not found.");
                             }
-                            return Promise.all(config.layers.map(x => zip.files[`layers/${x.image}`].async("arraybuffer").then(img => loadFromBmp(imageContext, img, { reqWidth: config.width, reqHeight: config.height })))).then(datas => {
+                            return Promise.all(config.layers.map(x => zip.files[`layers/${x.image}`].async("arraybuffer").then(img => loadFromBmp(imageProcessing, img, { reqWidth: config.width, reqHeight: config.height })))).then(datas => {
                                 if (datas.some(x => x == null)) {
                                     return Promise.reject("layer data is invalid.");
                                 }
@@ -2272,7 +2683,7 @@ var Painter;
                                         UpdateLayerPreview(layer);
                                     }
                                     currentLayer = 0;
-                                    imageLayerCompositedImgData = imageContext.createImageData(width, height);
+                                    imageLayerCompositedImgData = imageProcessing.createBlankOffscreenTarget(width, height);
                                     workLayerImgData = createLayer();
                                     updateCompositLayer();
                                     update({ gui: true, view: true, overlay: true });
@@ -2330,7 +2741,7 @@ var Painter;
             uiLayerWindowCopyLayerBtn.addEventListener("click", () => {
                 const copiedLayer = createLayer();
                 copiedLayer.compositMode = imageLayerImgDatas[currentLayer].compositMode;
-                copiedLayer.imageData.data.set(imageLayerImgDatas[currentLayer].imageData.data);
+                imageProcessing.applyShader(copiedLayer.imageData, imageLayerImgDatas[currentLayer].imageData, { program: copyShader });
                 imageLayerImgDatas.splice(currentLayer, 0, copiedLayer);
                 UpdateLayerPreview(copiedLayer);
                 updateCompositLayer();
@@ -2415,13 +2826,41 @@ var Painter;
         resize();
     }
     Painter.init = init;
+    function getCompositShader(mode) {
+        if (mode == CompositMode.Erase) {
+            return eraserBlendShader;
+        }
+        else {
+            return normalBlendShader;
+        }
+    }
     function updateCompositLayer() {
         imageLayerCompositedImgData.clear();
-        for (let i = imageLayerImgDatas.length - 1; i >= 0; i--) {
-            imageLayerCompositedImgData.composition(imageLayerImgDatas[i]);
-            if (i == currentLayer) {
-                imageLayerCompositedImgData.composition(workLayerImgData);
+        if (imageLayerImgDatas.length == 1) {
+            imageProcessing.composit(imageLayerCompositedImgData, workLayerImgData.imageData, imageLayerImgDatas[0].imageData, getCompositShader(workLayerImgData.compositMode));
+        }
+        else {
+            let step = 0;
+            const tmp = [
+                imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
+                imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height)
+            ];
+            if (currentLayer == imageLayerImgDatas.length - 1) {
+                imageProcessing.composit(tmp[1], workLayerImgData.imageData, imageLayerImgDatas[imageLayerImgDatas.length - 1].imageData, normalBlendShader);
             }
+            else {
+                imageProcessing.applyShader(tmp[1], imageLayerImgDatas[imageLayerImgDatas.length - 1].imageData, { program: copyShader });
+            }
+            for (let i = imageLayerImgDatas.length - 2; i >= 0; i--) {
+                imageProcessing.composit(tmp[step % 2], imageLayerImgDatas[i].imageData, tmp[(step + 1) % 2], normalBlendShader);
+                step++;
+                if (i == currentLayer) {
+                    imageProcessing.composit(tmp[step % 2], workLayerImgData.imageData, tmp[(step + 1) % 2], getCompositShader(workLayerImgData.compositMode));
+                    step++;
+                }
+            }
+            imageProcessing.applyShader(imageLayerCompositedImgData, tmp[(step + 1) % 2], { program: copyShader });
+            // Todo: free buffer
         }
     }
     function setupMouseEvent() {
@@ -2467,8 +2906,7 @@ var Painter;
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
                             currentTool.move(Painter.config, p);
                             workLayerImgData.imageData.clear();
-                            workLayerImgData.compositMode = currentTool.compositMode;
-                            currentTool.draw(Painter.config, workLayerImgData.imageData);
+                            currentTool.draw(Painter.config, imageProcessing, workLayerImgData.imageData);
                             updateCompositLayer();
                             update({ view: true });
                         }
@@ -2480,9 +2918,10 @@ var Painter;
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
                             currentTool.up(Painter.config, p);
                             workLayerImgData.imageData.clear();
-                            workLayerImgData.compositMode = currentTool.compositMode;
-                            currentTool.draw(Painter.config, workLayerImgData.imageData);
-                            imageLayerImgDatas[currentLayer].imageData.composition(workLayerImgData);
+                            currentTool.draw(Painter.config, imageProcessing, workLayerImgData.imageData);
+                            const composited = imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height);
+                            imageProcessing.composit(composited, workLayerImgData.imageData, imageLayerImgDatas[currentLayer].imageData, getCompositShader(workLayerImgData.compositMode));
+                            imageLayerImgDatas[currentLayer].imageData = composited;
                             workLayerImgData.imageData.clear();
                             UpdateLayerPreview(imageLayerImgDatas[currentLayer]);
                             updateCompositLayer();
@@ -2497,7 +2936,7 @@ var Painter;
                         currentTool.down(Painter.config, p);
                         workLayerImgData.imageData.clear();
                         workLayerImgData.compositMode = currentTool.compositMode;
-                        currentTool.draw(Painter.config, workLayerImgData.imageData);
+                        currentTool.draw(Painter.config, imageProcessing, workLayerImgData.imageData);
                         updateCompositLayer();
                         update({ view: true });
                     }
@@ -2604,7 +3043,7 @@ var Painter;
                     updateRequest.overlay = false;
                 }
                 if (updateRequest.view) {
-                    imageContext.putImageData(imageLayerCompositedImgData, 0, 0);
+                    imageProcessing.applyShader(null, imageLayerCompositedImgData, { program: copyShader });
                     viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
                     viewContext.fillStyle = "rgb(198,208,224)";
                     viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
