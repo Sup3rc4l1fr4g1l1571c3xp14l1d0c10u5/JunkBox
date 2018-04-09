@@ -6,6 +6,7 @@
     <meta content="noindex, nofollow, noarchive" name="robots" />
     <title></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--script src="https://console.re/connector.js" data-channel="tsjq" id="consolerescript"></!script-->
     <script src="./jszip.js"></script>
     <script src="./tspaint.js"></script>
     <script id="2d-vertex-shader" type="x-shader/x-vertex">
@@ -108,8 +109,8 @@
         vec2 v = c - a;
         float r = clamp(dot(u,v) / dot(u,u), 0.0, 1.0);
         vec2 p = a + r * u;
-
-        if (distance(p, c) > u_size) { discard; }
+        float dist = distance(p, c);
+        if (dist > u_size) { discard; }
 
         gl_FragColor = u_color;
 
@@ -131,11 +132,9 @@
     <script id="2d-fragment-shader-4" type="x-shader/x-fragment">
         precision mediump float;
 
-        // our texture
         uniform sampler2D u_front;
         uniform sampler2D u_back;
 
-        // the texCoords passed in from the vertex shader.
         varying vec2 v_texCoord;
 
         void main() {
@@ -156,9 +155,9 @@
         float A = alpha_1 + alpha_2 + alpha_3;
         vec3 C;
         if (A == 0.0) {
-            C = vec3(0,0,0);
+        C = vec3(0,0,0);
         } else {
-            C = ((alpha_1 * C_r) + (alpha_2 * C_f) + (alpha_3 * C_b)) / A;
+        C = ((alpha_1 * C_r) + (alpha_2 * C_f) + (alpha_3 * C_b)) / A;
         }
         gl_FragColor = vec4(C,A);
 
@@ -180,11 +179,9 @@
     <script id="2d-fragment-shader-5" type="x-shader/x-fragment">
         precision mediump float;
 
-        // our texture
         uniform sampler2D u_front;
         uniform sampler2D u_back;
 
-        // the texCoords passed in from the vertex shader.
         varying vec2 v_texCoord;
 
         void main() {
@@ -207,8 +204,112 @@
 
         }
     </script>
+    <script id="2d-vertex-shader-6" type="x-shader/x-vertex">
+        attribute vec2 a_position;
 
+        uniform mat3 u_matrix;
+
+        void main() {
+        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+        }
+    </script>
+    <script id="2d-fragment-shader-6" type="x-shader/x-fragment">
+        precision mediump float;
+
+        void main() {
+        vec2 rads = step(0.0, cos(radians(gl_FragCoord.xy * 360.0/16.0)));
+        float c = (255.0 - abs(rads.x - rads.y) * 32.0) / 255.0;
+        gl_FragColor = vec4(c, c, c, 1.0);
+        }
+    </script>
+    <script id="2d-vertex-shader-7" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+        attribute vec2 a_texCoord;
+
+        uniform mat3 u_matrix;
+
+        varying vec2 v_texCoord;
+
+        void main() {
+        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+        v_texCoord = a_texCoord;
+        }
+    </script>
+    <script id="2d-fragment-shader-7" type="x-shader/x-fragment">
+        // https://qiita.com/yuba/items/2f35d1e5e162f44fc1b3
+        // https://qiita.com/edo_m18/items/71f6064f3355be7e4f45
+        precision mediump float;
+
+        uniform vec4  u_color;
+        uniform vec2  u_start;
+        uniform vec2  u_end;
+        uniform float u_size;
+        uniform float u_aliasSize;
+        //varying vec2 v_resolution;
+
+        uniform sampler2D u_front;
+
+        varying vec2 v_texCoord;
+
+        void main() {
+        vec4 f = texture2D(u_front, v_texCoord);
+
+        vec2 a = u_start;
+        vec2 b = u_end;
+        vec2 c = gl_FragCoord.xy;
+
+        vec2 u = b - a;
+        vec2 v = c - a;
+        float r = clamp(dot(u,v) / dot(u,u), 0.0, 1.0);
+        vec2 p = a + r * u;
+        float dist = distance(p, c);
+
+        if (dist > u_size) {
+        gl_FragColor = f;
+        } else if (u_aliasSize == 0.0) {
+        gl_FragColor = u_color;
+        } else {
+        float threadthold = u_size - u_aliasSize;
+        if (dist <= threadthold) {
+        gl_FragColor = u_color;
+        } else {
+        float na = (1.0-(dist-threadthold)/u_aliasSize)*u_color.a;
+        gl_FragColor = vec4(u_color.rgb, max(f.a, na));
+        }
+        }
+
+        }
+    </script>
+    <script id="2d-vertex-shader-8" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+        attribute vec2 a_texCoord;
+
+        uniform mat3 u_matrix;
+
+        varying vec2 v_texCoord;
+
+        void main() {
+        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+        v_texCoord = a_texCoord;
+        }
+    </script>
+    <script id="2d-fragment-shader-8" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform vec4  u_color;
+
+        uniform sampler2D u_front;
+
+        varying vec2 v_texCoord;
+
+        void main() {
+        vec4 f = texture2D(u_front, v_texCoord);
+
+        gl_FragColor = vec4(u_color.rgb, max(f.a, u_color.a));
+
+        }
+    </script>
 </head>
-    <body>
-    </body>
+<body>
+</body>
 </html>

@@ -21,40 +21,24 @@ function loadFileFromLocal(accept) {
         element.style.display = "none";
         element.accept = accept;
         document.body.appendChild(element);
-        element.onchange = (ev) => {
-            element.onchange = null;
-            const file = (element.files.length != 0) ? element.files[0] : null;
-            if (file == null) {
-                reject("cannot load file.");
-                return;
-            }
-            else {
-                resolve(file);
-                return;
-            }
+        element.onclick = () => {
+            const handler = () => {
+                element.onclick = null;
+                window.onfocus = null;
+                document.body.removeChild(element);
+                const file = (element.files.length != 0) ? element.files[0] : null;
+                if (file == null) {
+                    reject("cannot load file.");
+                    return;
+                }
+                else {
+                    resolve(file);
+                    return;
+                }
+            };
+            window.onfocus = handler;
         };
-        element.onabort = (ev) => {
-            reject("cannot load file.");
-            return;
-        };
-        element.onended = (ev) => {
-            reject("cannot load file.");
-            return;
-        };
-        element.onerror = (ev) => {
-            reject("cannot load file.");
-            return;
-        };
-        element.oninput = (ev) => {
-            reject("cannot load file.");
-            return;
-        };
-        element.oninvalid = (ev) => {
-            reject("cannot load file.");
-            return;
-        };
-        element.click();
-        document.body.removeChild(element);
+        setTimeout(() => { element.click(); });
     });
 }
 ;
@@ -432,12 +416,12 @@ class ImageProcessing {
     setVertexPosition(array) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STREAM_DRAW);
     }
     setTexturePosition(array) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STREAM_DRAW);
     }
     createBlankOffscreenTarget(width, height) {
         return new Surface(this.gl, width, height);
@@ -583,34 +567,18 @@ class ImageProcessing {
         }
         // 適用完了
     }
-    drawLines(dst, { program = null, vertexes = null, size = null, color = null }) {
+    applyShaderUpdate(dst, { program = null }) {
         const gl = this.gl;
         // arrtibute変数の位置を取得
         const positionLocation = gl.getAttribLocation(program.program, "a_position");
         // uniform変数の位置を取得
         const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
-        const startLocation = gl.getUniformLocation(program.program, "u_start");
-        const endLocation = gl.getUniformLocation(program.program, "u_end");
-        const sizeLocation = gl.getUniformLocation(program.program, "u_size");
-        const colorLocation = gl.getUniformLocation(program.program, "u_color");
-        //const texture0Lication = gl.getUniformLocation(program.program, 'texture0');
         // シェーダを設定
         gl.useProgram(program.program);
         // シェーダの頂点座標Attributeを有効化
         gl.enableVertexAttribArray(positionLocation);
-        // 入力元とするレンダリングターゲットはなし
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        //gl.uniform1i(texture0Lication, 0);
-        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
-        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
-        gl.viewport(0, 0, dst.width, dst.height);
-        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
-        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
-        // 色を設定
-        gl.uniform4fv(colorLocation, color.map(x => x / 255));
-        // 頂点バッファ（座標）をワークバッファに切り替えるが、頂点情報は後で設定
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, dst.width, dst.height));
         // 頂点座標Attributeの位置情報を設定
         gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
         gl.FLOAT, // the data is 32bit floats
@@ -618,25 +586,185 @@ class ImageProcessing {
         0, // 0 = move forward size * sizeof(type) each iteration to get the next position
         0 // start at the beginning of the buffer
         );
+        if (dst == null) {
+            // オフスクリーンレンダリングにはしない
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            const projectionMatrix = Matrix3.multiply(Matrix3.scaling(1, -1), Matrix3.projection(gl.canvas.width, gl.canvas.height));
+            // WebGL の描画結果を HTML に正しく合成する方法 より
+            // http://webos-goodies.jp/archives/overlaying_webgl_on_html.html
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.BLEND);
+            gl.blendEquation(gl.FUNC_ADD);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ZERO);
+            // 
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            // レンダリングを実行
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.disable(gl.BLEND);
+        }
+        else {
+            // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+            gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+            const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+            gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+            gl.viewport(0, 0, dst.width, dst.height);
+            // オフスクリーンレンダリングを実行
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        // 適用完了
+    }
+    drawLines(dst, { program = null, vertexes = null, size = null, color = null, antialiasSize = null }) {
+        const gl = this.gl;
+        const tmp = this.createBlankOffscreenTarget(dst.width, dst.height);
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const startLocation = gl.getUniformLocation(program.program, "u_start");
+        const endLocation = gl.getUniformLocation(program.program, "u_end");
+        const sizeLocation = gl.getUniformLocation(program.program, "u_size");
+        const aliasSizeLocation = gl.getUniformLocation(program.program, "u_aliasSize");
+        const colorLocation = gl.getUniformLocation(program.program, "u_color");
+        const texture0Lication = gl.getUniformLocation(program.program, 'u_front');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // 色を設定
+        gl.uniform4fv(colorLocation, color.map(x => x / 255));
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 頂点座標Attributeの位置情報を設定
+        // 頂点情報は後で設定
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+        // テクスチャ座標Attributeの位置情報を設定
+        // テクスチャ座標は後で設定
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        const projectionMatrix = Matrix3.projection(tmp.width, tmp.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        // 入力元とするレンダリングターゲット=dst
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+        gl.uniform1i(texture0Lication, 0);
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, tmp.framebuffer);
+        gl.viewport(0, 0, tmp.width, tmp.height);
         const len = ~~(vertexes.length / 2) - 1;
         // サイズを設定
         gl.uniform1f(sizeLocation, size / 2);
+        gl.uniform1f(aliasSizeLocation, antialiasSize / 2);
         // 矩形設定
+        gl.clear(gl.COLOR_BUFFER_BIT);
         for (let i = 0; i < len; i++) {
             const x1 = vertexes[i * 2 + 0] + 0.5;
             const y1 = vertexes[i * 2 + 1] + 0.5;
             const x2 = vertexes[i * 2 + 2] + 0.5;
             const y2 = vertexes[i * 2 + 3] + 0.5;
-            const left = Math.min(x1, x2) - size * 2;
-            const top = Math.min(y1, y2) - size * 2;
-            const right = Math.max(x1, x2) + size * 2;
-            const bottom = Math.max(y1, y2) + size * 2;
+            const left = Math.min(x1, x2) - size;
+            const top = Math.min(y1, y2) - size;
+            const right = Math.max(x1, x2) + size;
+            const bottom = Math.max(y1, y2) + size;
             gl.uniform2f(startLocation, x1, y1);
             gl.uniform2f(endLocation, x2, y2);
+            // 頂点バッファ（テクスチャ座標）を設定
             this.setVertexPosition(ImageProcessing.createRectangle(left, top, right, bottom));
-            // カーネルシェーダを適用したオフスクリーンレンダリングを実行
+            // 頂点バッファ（テクスチャ座標）を設定
+            this.setTexturePosition(ImageProcessing.createRectangle(left / dst.width, top / dst.height, right / dst.width, bottom / dst.height));
+            // シェーダを適用したオフスクリーンレンダリングを実行
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            // レンダリング範囲をフィードバック
+            const clipedLeft = (left >= tmp.width) ? tmp.width - 1 : (left < 0) ? 0 : ~~left;
+            const clipedtop = (top >= tmp.height) ? tmp.height - 1 : (top < 0) ? 0 : ~~top;
+            const clipedRight = (right >= tmp.width) ? tmp.width - 1 : (right < 0) ? 0 : ~~right;
+            const clipedBottom = (bottom >= tmp.height) ? tmp.height - 1 : (bottom < 0) ? 0 : ~~bottom;
+            gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, clipedLeft, clipedtop, clipedLeft, clipedtop, clipedRight - clipedLeft, clipedBottom - clipedtop);
         }
+    }
+    fillRect(dst, { program = null, start = null, end = null, color = null }) {
+        const gl = this.gl;
+        const tmp = this.createBlankOffscreenTarget(dst.width, dst.height);
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const startLocation = gl.getUniformLocation(program.program, "u_start");
+        const endLocation = gl.getUniformLocation(program.program, "u_end");
+        const sizeLocation = gl.getUniformLocation(program.program, "u_size");
+        const aliasSizeLocation = gl.getUniformLocation(program.program, "u_aliasSize");
+        const colorLocation = gl.getUniformLocation(program.program, "u_color");
+        const texture0Lication = gl.getUniformLocation(program.program, 'u_front');
+        // シェーダを設定
+        gl.useProgram(program.program);
+        // 色を設定
+        gl.uniform4fv(colorLocation, color.map(x => x / 255));
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+        // 頂点座標Attributeの位置情報を設定
+        // 頂点情報は後で設定
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.vertexAttribPointer(positionLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+        // テクスチャ座標Attributeの位置情報を設定
+        // テクスチャ座標は後で設定
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
+        gl.FLOAT, // the data is 32bit floats
+        false, // don't normalize the data
+        0, // 0 = move forward size * sizeof(type) each iteration to get the next position
+        0 // start at the beginning of the buffer
+        );
+        const projectionMatrix = Matrix3.projection(tmp.width, tmp.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+        // 入力元とするレンダリングターゲット=dst
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+        gl.uniform1i(texture0Lication, 0);
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, tmp.framebuffer);
+        gl.viewport(0, 0, tmp.width, tmp.height);
+        // 矩形設定
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        const x1 = start.x + 0.5;
+        const y1 = start.y + 0.5;
+        const x2 = end.x + 0.5;
+        const y2 = end.y + 0.5;
+        const left = Math.min(x1, x2);
+        const top = Math.min(y1, y2);
+        const right = Math.max(x1, x2);
+        const bottom = Math.max(y1, y2);
+        gl.uniform2f(startLocation, x1, y1);
+        gl.uniform2f(endLocation, x2, y2);
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(left, top, right, bottom));
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(left / dst.width, top / dst.height, right / dst.width, bottom / dst.height));
+        // シェーダを適用したオフスクリーンレンダリングを実行
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        // レンダリング範囲をフィードバック
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, left, top, left, top, right - left, bottom - top);
     }
     composit(dst, front, back, program) {
         const gl = this.gl;
@@ -881,7 +1009,7 @@ class HSVColorWheel {
         this.canvas.width = width;
         this.canvas.height = height;
         this.context = this.canvas.getContext("2d");
-        this.imageData = this.context.createImageData(this.canvas.width, this.canvas.height);
+        this.imageData = new ImageData(this.canvas.width, this.canvas.height);
         this.wheelRadius = { min: wheelRadiusMin, max: wheelRadiusMax };
         this.svBoxSize = svBoxSize;
         this._hsv = [0, 0, 0];
@@ -1983,7 +2111,8 @@ class SolidPen {
             program: this.shader,
             vertexes: new Float32Array(this.joints),
             color: config.penColor,
-            size: config.penSize
+            size: config.penSize,
+            antialiasSize: config.antialiasSize
         });
     }
 }
@@ -2011,28 +2140,63 @@ class CorrectionSolidPen extends SolidPen {
                 program: this.shader,
                 vertexes: new Float32Array(this.joints),
                 color: config.penColor,
-                size: config.penSize
+                size: config.penSize,
+                antialiasSize: config.antialiasSize
             });
         }
         else {
             const corrected = [];
             let prev = this.movingAverage(config.penCorrectionValue, 0);
-            corrected.push(prev.x);
-            corrected.push(prev.y);
+            corrected.push(prev.x, prev.y);
             const len = ~~(this.joints.length / 2) - config.penCorrectionValue;
             for (let i = 1; i < len; i++) {
                 const avg = this.movingAverage(config.penCorrectionValue, i);
-                corrected.push(avg.x);
-                corrected.push(avg.y);
+                corrected.push(avg.x, avg.y);
                 prev = avg;
             }
             ip.drawLines(imgData, {
                 program: this.shader,
                 vertexes: new Float32Array(corrected),
                 color: config.penColor,
-                size: config.penSize
+                size: config.penSize,
+                antialiasSize: config.antialiasSize
             });
         }
+    }
+}
+///////////////////////////////////////////////////////////////
+class RectanglePen {
+    constructor(name, borderShader, fillShader, compositMode) {
+        this.name = name;
+        this.borderShader = borderShader;
+        this.fillShader = fillShader;
+        this.compositMode = compositMode;
+        this.start = null;
+        this.end = null;
+    }
+    down(config, point) {
+        this.start = point;
+        this.end = point;
+    }
+    move(config, point) {
+        this.end = point;
+    }
+    up(config, point) {
+    }
+    draw(config, ip, imgData) {
+        ip.drawLines(imgData, {
+            program: this.borderShader,
+            vertexes: new Float32Array([this.start.x, this.start.y, this.end.x, this.start.y, this.end.x, this.end.y, this.start.x, this.end.y, this.start.x, this.start.y]),
+            color: config.penColor,
+            size: config.penSize,
+            antialiasSize: config.antialiasSize
+        });
+        ip.fillRect(imgData, {
+            program: this.fillShader,
+            start: this.start,
+            end: this.end,
+            color: config.penColor,
+        });
     }
 }
 ;
@@ -2051,6 +2215,14 @@ var ModalDialog;
     let dialogLayerContext;
     let draw;
     let blockCnt = 0;
+    function resize() {
+        const displayWidth = dialogLayerCanvas.clientWidth;
+        const displayHeight = dialogLayerCanvas.clientHeight;
+        if (dialogLayerCanvas.width !== displayWidth || dialogLayerCanvas.height !== displayHeight) {
+            dialogLayerCanvas.width = displayWidth;
+            dialogLayerCanvas.height = displayHeight;
+        }
+    }
     function init() {
         dialogLayerCanvas = document.createElement("canvas");
         dialogLayerCanvas.style.position = "absolute";
@@ -2065,12 +2237,7 @@ var ModalDialog;
         dialogLayerContext.imageSmoothingEnabled = false;
         document.body.appendChild(dialogLayerCanvas);
         window.addEventListener("resize", () => {
-            const displayWidth = dialogLayerCanvas.clientWidth;
-            const displayHeight = dialogLayerCanvas.clientHeight;
-            if (dialogLayerCanvas.width !== displayWidth || dialogLayerCanvas.height !== displayHeight) {
-                dialogLayerCanvas.width = displayWidth;
-                dialogLayerCanvas.height = displayHeight;
-            }
+            resize();
             if (dialogLayerCanvas.style.display != "none") {
                 if (draw != null) {
                     draw(dialogLayerCanvas, dialogLayerContext);
@@ -2081,10 +2248,10 @@ var ModalDialog;
     ModalDialog.init = init;
     function block() {
         if (blockCnt == 0) {
+            dialogLayerCanvas.style.display = "inline";
             dialogLayerCanvas.width = dialogLayerCanvas.clientWidth;
             dialogLayerCanvas.height = dialogLayerCanvas.clientHeight;
             Input.pause = true;
-            dialogLayerCanvas.style.display = "inline";
         }
         blockCnt++;
     }
@@ -2328,25 +2495,24 @@ var Painter;
         const sh = layer.imageData.height;
         const pw = layer.previewData.width;
         const ph = layer.previewData.height;
+        const dstData = layer.previewData.data;
+        let dst = 0;
+        const pb = new PixelBuffer(layer.imageData.gl, sw, sh);
+        const srcData = pb.capture(layer.imageData);
+        for (let y = 0; y < ph; y++) {
+            const sy = ~~(y * sh / ph);
+            for (let x = 0; x < pw; x++) {
+                const sx = ~~(x * sw / pw);
+                dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
+                dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
+                dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
+                dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
+                dst += 4;
+            }
+        }
+        layer.previewContext.putImageData(layer.previewData, 0, 0);
+        update({ gui: true });
         return layer;
-        // 後で実装
-        //const dstData = layer.previewData.data;
-        //let dst = 0;
-        //const srcData = layer.imageData.data;
-        //for (let y = 0; y < ph; y++) {
-        //    const sy = ~~(y * sh / ph);
-        //    for (let x = 0; x < ph; x++) {
-        //        const sx = ~~(x * sw / pw);
-        //        dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
-        //        dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
-        //        dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
-        //        dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
-        //        dst += 4;
-        //    }
-        //}
-        //layer.previewContext.putImageData(layer.previewData, 0, 0);
-        //update({ gui: true });
-        //return layer;
     }
     /**
      * 作画画面ビュー用
@@ -2367,15 +2533,19 @@ var Painter;
         penSize: 5,
         penCorrectionValue: 10,
         penColor: [0, 0, 0, 64],
+        antialiasSize: 2,
         scrollX: 0,
         scrollY: 0,
     };
     let updateRequest = { overlay: false, view: false, gui: false };
     let updateTimerId = NaN;
-    let penShader = null;
+    //let penShader: Program = null;
+    let alphaPenShader = null;
     let normalBlendShader = null;
     let eraserBlendShader = null;
     let copyShader = null;
+    let checkerBoardShader = null;
+    let alphaFillShader = null;
     function init(parentHtmlElement, width, height) {
         Input.init();
         ModalDialog.init();
@@ -2424,11 +2594,15 @@ var Painter;
         //uiDispacher.addEventListener("update", () => { update({ gui: true }); return true; });
         //const program = Program.loadShaderById(glContext, ["2d-vertex-shader", "2d-fragment-shader"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         //const program2 = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
-        penShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        //penShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         normalBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-4", "2d-fragment-shader-4"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         eraserBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-5", "2d-fragment-shader-5"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         copyShader = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
-        tools.push(new SolidPen("SolidPen", penShader, CompositMode.Normal), new CorrectionSolidPen("SolidPen2", penShader, CompositMode.Normal), new SolidPen("Eraser", penShader, CompositMode.Erase));
+        checkerBoardShader = Program.loadShaderById(glContext, ["2d-vertex-shader-6", "2d-fragment-shader-6"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        alphaPenShader = Program.loadShaderById(glContext, ["2d-vertex-shader-7", "2d-fragment-shader-7"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        alphaFillShader = Program.loadShaderById(glContext, ["2d-vertex-shader-8", "2d-fragment-shader-8"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        updateCompositLayer();
+        tools.push(new SolidPen("SolidPen", alphaPenShader, CompositMode.Normal), new CorrectionSolidPen("SolidPen2", alphaPenShader, CompositMode.Normal), new SolidPen("Eraser", alphaPenShader, CompositMode.Erase), new RectanglePen("Rect", alphaPenShader, alphaFillShader, CompositMode.Normal));
         window.addEventListener("resize", () => resize());
         setupMouseEvent();
         {
@@ -2499,7 +2673,7 @@ var Painter;
                 color: 'rgb(255,255,255)',
                 fontColor: 'rgb(0,0,0)',
                 height: 12 * 3 + 2,
-                text: () => [`scale = ${Painter.config.scale}`, `penSize = ${Painter.config.penSize}`, `penColor = [${Painter.config.penColor.join(",")}]`].join("\n"),
+                text: () => [`scale = ${Painter.config.scale}`, `penSize = ${Painter.config.penSize}`, `antialiasSize = ${Painter.config.antialiasSize}`, `penColor = [${Painter.config.penColor.join(",")}]`].join("\n"),
             });
             uiInfoWindow.addChild(uiInfoWindowTitle);
             uiInfoWindow.addChild(uiInfoWindowBody);
@@ -2537,9 +2711,25 @@ var Painter;
                 update({ gui: true });
             });
             uiPenConfigWindow.addChild(uiPenSizeSlider);
-            const uiPenCorrectionSlider = new GUI.HorizontalSlider({
+            const uiAntialiasSizeSlider = new GUI.HorizontalSlider({
                 left: uiPenConfigWindowTitle.left,
                 top: uiPenSizeSlider.top + uiPenSizeSlider.height - 1,
+                width: uiPenConfigWindowTitle.width,
+                color: 'rgb(255,255,255)',
+                fontColor: 'rgb(0,0,0)',
+                text: (x) => `antialias:${x}`,
+                height: 13,
+                minValue: 0,
+                maxValue: 100,
+            });
+            uiAntialiasSizeSlider.addEventListener("changed", () => {
+                Painter.config.antialiasSize = uiAntialiasSizeSlider.value;
+                update({ gui: true });
+            });
+            uiPenConfigWindow.addChild(uiAntialiasSizeSlider);
+            const uiPenCorrectionSlider = new GUI.HorizontalSlider({
+                left: uiPenConfigWindowTitle.left,
+                top: uiAntialiasSizeSlider.top + uiAntialiasSizeSlider.height - 1,
                 width: uiPenConfigWindowTitle.width,
                 color: 'rgb(255,255,255)',
                 fontColor: 'rgb(0,0,0)',
@@ -2552,6 +2742,7 @@ var Painter;
                 Painter.config.penCorrectionValue = uiPenCorrectionSlider.value;
                 update({ gui: true });
             });
+            uiPenConfigWindow.height = uiPenCorrectionSlider.top + uiPenCorrectionSlider.height - 1;
             uiPenConfigWindow.addChild(uiPenCorrectionSlider);
             uiDispacher.addChild(uiPenConfigWindow);
         }
@@ -2836,15 +3027,15 @@ var Painter;
     }
     function updateCompositLayer() {
         imageLayerCompositedImgData.clear();
+        const tmp = [
+            imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
+            imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height)
+        ];
+        let step = 0;
         if (imageLayerImgDatas.length == 1) {
-            imageProcessing.composit(imageLayerCompositedImgData, workLayerImgData.imageData, imageLayerImgDatas[0].imageData, getCompositShader(workLayerImgData.compositMode));
+            imageProcessing.composit(tmp[(step + 1) % 2], workLayerImgData.imageData, imageLayerImgDatas[0].imageData, getCompositShader(workLayerImgData.compositMode));
         }
         else {
-            let step = 0;
-            const tmp = [
-                imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
-                imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height)
-            ];
             if (currentLayer == imageLayerImgDatas.length - 1) {
                 imageProcessing.composit(tmp[1], workLayerImgData.imageData, imageLayerImgDatas[imageLayerImgDatas.length - 1].imageData, normalBlendShader);
             }
@@ -2859,9 +3050,9 @@ var Painter;
                     step++;
                 }
             }
-            imageProcessing.applyShader(imageLayerCompositedImgData, tmp[(step + 1) % 2], { program: copyShader });
-            // Todo: free buffer
         }
+        imageProcessing.applyShaderUpdate(tmp[(step + 0) % 2], { program: checkerBoardShader });
+        imageProcessing.composit(imageLayerCompositedImgData, tmp[(step + 1) % 2], tmp[(step + 0) % 2], normalBlendShader);
     }
     function setupMouseEvent() {
         Input.on("pointerdown", (e) => {
@@ -3053,21 +3244,21 @@ var Painter;
                     viewContext.shadowBlur = 10;
                     viewContext.fillRect(canvasOffsetX + Painter.config.scrollX, canvasOffsetY + Painter.config.scrollY, imageCanvas.width * Painter.config.scale, imageCanvas.height * Painter.config.scale);
                     viewContext.shadowBlur = 0;
-                    viewContext.fillStyle = "rgb(224,224,224)";
-                    const l = canvasOffsetX + Painter.config.scrollX;
-                    const t = canvasOffsetY + Painter.config.scrollY;
-                    const w = imageCanvas.width * Painter.config.scale;
-                    const h = imageCanvas.height * Painter.config.scale;
-                    const grid = 8;
-                    const ww = ~~((w + grid - 1) / grid);
-                    const hh = ~~((h + grid - 1) / grid);
-                    for (let y = 0; y < hh; y++) {
-                        for (let x = 0; x < ww; x++) {
-                            if ((y & 1) != (x & 1)) {
-                                viewContext.fillRect(l + x * grid, t + y * grid, grid, grid);
-                            }
-                        }
-                    }
+                    //viewContext.fillStyle = "rgb(224,224,224)";
+                    //const l = canvasOffsetX + config.scrollX;
+                    //const t = canvasOffsetY + config.scrollY;
+                    //const w = imageCanvas.width * config.scale;
+                    //const h = imageCanvas.height * config.scale;
+                    //const grid: number = 8;
+                    //const ww = ~~((w + grid - 1) / grid);
+                    //const hh = ~~((h + grid - 1) / grid);
+                    //for (let y = 0; y < hh; y++) {
+                    //    for (let x = 0; x < ww; x++) {
+                    //        if ((y & 1) != (x & 1)) {
+                    //            viewContext.fillRect(l + x * grid, t + y * grid, grid, grid);
+                    //        }
+                    //    }
+                    //}
                     viewContext.imageSmoothingEnabled = false;
                     viewContext.drawImage(imageCanvas, 0, 0, imageCanvas.width, imageCanvas.height, canvasOffsetX + Painter.config.scrollX, canvasOffsetY + Painter.config.scrollY, imageCanvas.width * Painter.config.scale, imageCanvas.height * Painter.config.scale);
                     updateRequest.view = false;
