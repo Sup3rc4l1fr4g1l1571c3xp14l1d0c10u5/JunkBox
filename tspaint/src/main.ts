@@ -11,8 +11,10 @@ function saveFileToLocal(filename: string, blob: Blob): void {
     element.style.display = "none";
     element.download = filename;
     document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    setTimeout(() => {
+        element.click();
+        document.body.removeChild(element);
+    });
 }
 function loadFileFromLocal(accept: string): Promise<Blob> {
     return new Promise<Blob>((resolve, reject) => {
@@ -416,7 +418,6 @@ function hsv2rgb([h, s, v]: HSV): RGB {
 }
 ///////////////////////////////////////////////////////////////
 interface WebGL2RenderingContext extends WebGLRenderingContext {
-    //RGBA8: number;
     PIXEL_PACK_BUFFER: number;
     STREAM_READ: number;
     SYNC_GPU_COMMANDS_COMPLETE: number;
@@ -427,7 +428,6 @@ interface WebGL2RenderingContext extends WebGLRenderingContext {
 }
 ///////////////////////////////////////////////////////////////
 type Matrix3 = [number, number, number, number, number, number, number, number, number];
-
 module Matrix3 {
     export function projection(width: number, height: number): Matrix3 {
         // Note: This matrix flips the Y axis so that 0 is at the top.
@@ -505,33 +505,29 @@ module Matrix3 {
     }
 }
 ///////////////////////////////////////////////////////////////
-class Shader {
+interface IDisposable {
+    dispose(): void;
+}
+///////////////////////////////////////////////////////////////
+class Shader implements IDisposable {
     constructor(public gl: WebGL2RenderingContext, public shader: WebGLShader, public shaderType: number) { }
 
     public static create(gl: WebGL2RenderingContext, shaderSource: string, shaderType: number): Shader {
-        // Create the shader object
         const shader = gl.createShader(shaderType);
-
-        // Load the shader source
         gl.shaderSource(shader, shaderSource);
-
-        // Compile the shader
         gl.compileShader(shader);
-
-        // Check the compile status
         const compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
         if (!compiled) {
-            // Something went wrong during compilation; get the error
             const lastError = gl.getShaderInfoLog(shader);
             console.error("*** Error compiling shader '" + shader + "':" + lastError);
             gl.deleteShader(shader);
             return null;
+        } else {
+            return new Shader(gl, shader, shaderType);
         }
-
-        return new Shader(gl, shader, shaderType);
     }
 
-    public static loadShaderById(gl: WebGL2RenderingContext, id: string, optShaderType?: number) {
+    public static loadShaderById(gl: WebGL2RenderingContext, id: string, optShaderType?: number): Shader {
         const shaderScript: HTMLScriptElement = document.getElementById(id) as HTMLScriptElement;
         if (!shaderScript) {
             throw ("*** Error: unknown element `" + id + "`");
@@ -552,9 +548,15 @@ class Shader {
         return Shader.create(gl, shaderSource, shaderType);
 
     }
+    public dispose(): void {
+        this.gl.deleteShader(this.shader);
+        this.shader = null;
+        this.gl = null;
+        this.shaderType = NaN;
+    }
 }
 ///////////////////////////////////////////////////////////////
-class Program {
+class Program implements IDisposable {
     constructor(public gl: WebGL2RenderingContext, public program: WebGLProgram) { }
     public static create(gl: WebGL2RenderingContext, shaders: WebGLShader[], optAttribs?: string[], optLocations?: number[]) {
         const program = gl.createProgram();
@@ -590,67 +592,92 @@ class Program {
         }
         return Program.create(gl, shaders.map((x) => x.shader), optAttribs, optLocations);
     }
+    public dispose(): void {
+        this.gl.deleteProgram(this.program);
+        this.program = null;
+        this.gl = null;
+    }
 }
 ///////////////////////////////////////////////////////////////
-class Surface {
-    gl: WebGL2RenderingContext;
-    texture: WebGLTexture;
-    framebuffer: WebGLFramebuffer;
-    width: number;
-    height: number;
+class Surface implements IDisposable {
+    private _gl: WebGL2RenderingContext;
+    private _width: number;
+    private _height: number; 
+    private _texture: WebGLTexture;
+    private _framebuffer: WebGLFramebuffer;
 
-    private static createAndBindTexture(gl: WebGL2RenderingContext): WebGLTexture {
-        const texture = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-
-        // Set up texture so we can render any size image and so we are
-        // working with pixels.
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        return texture;
+    public get gl(): WebGL2RenderingContext {
+        return this._gl;
+    }
+    public get texture(): WebGLTexture {
+        return this._texture;
+    }
+    public get framebuffer(): WebGLFramebuffer {
+        return this._framebuffer;
+    }
+    public get width(): number {
+        return this._width;
+    }
+    public get height(): number {
+        return this._height;
     }
 
     constructor(gl: WebGL2RenderingContext, srcImage: HTMLImageElement | ImageData);
     constructor(gl: WebGL2RenderingContext, width: number, height: number);
     constructor(gl: WebGL2RenderingContext, srcImageOrWidth: HTMLImageElement | ImageData | number, height?: number) {
-        this.gl = gl;
+        this._gl = gl;
 
-        // フレームバッファテクスチャを生成。ピクセルフォーマットはRGBA(8bit)。画像サイズは指定されたものを使用。
-        this.texture = Surface.createAndBindTexture(gl);
+        // テクスチャを生成。ピクセルフォーマットはRGBA(8bit)。画像サイズは指定されたものを使用。
+        this._texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this._texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
         if (srcImageOrWidth instanceof HTMLImageElement) {
             const img = srcImageOrWidth as HTMLImageElement;
-            this.width = img.width;
-            this.height = img.height;
+            this._width = img.width;
+            this._height = img.height;
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
         } else if (srcImageOrWidth instanceof ImageData) {
             const img = srcImageOrWidth as ImageData;
-            this.width = img.width;
-            this.height = img.height;
+            this._width = img.width;
+            this._height = img.height;
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
         } else {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, srcImageOrWidth, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-            this.width = srcImageOrWidth;
-            this.height = height;
+            this._width = srcImageOrWidth;
+            this._height = height;
         }
 
         // フレームバッファを生成し、テクスチャと関連づけ
-        this.framebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+        this._framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this._framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._texture, 0);
     }
 
-    clear(): void {
-        const gl = this.gl;
+    public clear(): void {
+        const gl = this._gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-        gl.viewport(0, 0, this.width, this.height);
+        gl.viewport(0, 0, this._width, this._height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    }
+
+    public dispose(): void {
+        const gl = this._gl;
+        gl.deleteFramebuffer(this._framebuffer);
+        gl.deleteTexture(this._texture);
+        this._gl = null;
+        this._texture = null;
+        this._framebuffer = null;
+        this._width = NaN;
+        this._height = NaN;
     }
 }
 ///////////////////////////////////////////////////////////////
-class PixelBuffer {
+class PixelBuffer implements IDisposable  {
     pbo: WebGLBuffer;
     data: Uint8ClampedArray;
 
@@ -676,11 +703,18 @@ class PixelBuffer {
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
         return this.data;
     }
+    dispose(): void {
+        this.gl.deleteBuffer(this.pbo);
+        this.pbo = null;
+        this.data = null;
+        this.gl = null;
+        this.width = NaN;
+        this.height = NaN;
+
+    }
 }
 ///////////////////////////////////////////////////////////////
 class ImageProcessing {
-    gl: WebGL2RenderingContext;
-
     positionBuffer: WebGLBuffer;
     texcoordBuffer: WebGLBuffer;
 
@@ -690,8 +724,7 @@ class ImageProcessing {
         return weight <= 0 ? 1 : weight;
     }
 
-    constructor(gl: WebGL2RenderingContext) {
-        this.gl = gl;
+    constructor(public gl: WebGL2RenderingContext) {
 
         // 頂点バッファ（座標）を作成
         this.positionBuffer = gl.createBuffer();
@@ -1074,6 +1107,8 @@ class ImageProcessing {
             gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, clipedLeft, clipedtop, clipedLeft, clipedtop, clipedRight - clipedLeft, clipedBottom - clipedtop);
         }
 
+        tmp.dispose();
+
     }
 
     fillRect(dst: Surface, { program = null, start = null, end = null, color = null }: { program: Program, start: IPoint, end: IPoint, color: [number, number, number, number]}): void {
@@ -1173,6 +1208,8 @@ class ImageProcessing {
         // レンダリング範囲をフィードバック
         gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, left, top, left, top, right - left, bottom - top);
 
+        tmp.dispose();
+
     }
 
     composit(dst: Surface, front: Surface, back: Surface, program: Program) {
@@ -1252,48 +1289,146 @@ class ImageProcessing {
 
     }
 
-    createPixelBuffer(width: number, height: number): PixelBuffer {
-        return new PixelBuffer(this.gl, width, height);
-    }
+    compositUpdate(dst: Surface, src: Surface, program: Program, updateSrc:boolean = false) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
 
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const texture0Lication = gl.getUniformLocation(program.program, 'u_front');
+        const texture1Lication = gl.getUniformLocation(program.program, 'u_back');
+
+        // 出力先を生成
+        const tmp: Surface = this.createBlankOffscreenTarget(dst.width, dst.height);
+        tmp.clear();
+
+        // シェーダを設定
+        gl.useProgram(program.program);
+
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
+
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(
+            positionLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+
+        // テクスチャ座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(
+            texcoordLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+        const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+
+        //// テクスチャサイズ情報ををシェーダのUniform変数に設定
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
+
+        // 入力元とするレンダリングターゲットのテクスチャを選択
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(texture0Lication, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+        gl.uniform1i(texture1Lication, 1);
+
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, tmp.framebuffer);
+        gl.viewport(0, 0, tmp.width, tmp.height);
+
+        const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (st !== gl.FRAMEBUFFER_COMPLETE) {
+            console.log(st)
+        }
+
+        // オフスクリーンレンダリングを実行
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        // 適用完了
+
+        // レンダリング範囲をフィードバック
+        if (updateSrc) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        } else {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+        }
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, dst.width, dst.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        // 出力先を破棄
+        tmp.dispose();
+    }
 }
 ///////////////////////////////////////////////////////////////
+const sizeOfBitmapFileHeader: number = 14;
+const sizeOfBitmapInfoHeader: number = 40;
 function saveAsBmp(imageData: Surface): ArrayBuffer {
     const pixelData = new PixelBuffer(imageData.gl, imageData.width, imageData.height);
     const pixels = pixelData.capture(imageData);
+    const sizeOfImageData: number = imageData.width * imageData.height * 4;
 
-    const bitmapData: ArrayBuffer = new ArrayBuffer(14 + 40 + (imageData.width * imageData.height * 4)); // sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+    pixelData.dispose();
+
+    const bitmapData: ArrayBuffer = new ArrayBuffer(sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader + sizeOfImageData);
 
     //
     // BITMAPFILEHEADER
     //
-    const viewOfBitmapFileHeader: DataView = new DataView(bitmapData, 0, 14);
-    viewOfBitmapFileHeader.setUint16(0, 0x4D42, true);      // bfType : 'BM'
-    viewOfBitmapFileHeader.setUint32(2, 14 + 40 + (imageData.width * imageData.height * 4), true);   // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
-    viewOfBitmapFileHeader.setUint16(6, 0x0000, true);      // bfReserved1 : 0
-    viewOfBitmapFileHeader.setUint16(8, 0x0000, true);      // bfReserved2 : 0
-    viewOfBitmapFileHeader.setUint32(10, 14 + 40, true);    // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
+    const viewOfBitmapFileHeader: DataView = new DataView(bitmapData, 0, sizeOfBitmapFileHeader);
+    viewOfBitmapFileHeader.setUint16(0, 0x4D42, true);                                                              // bfType : 'BM'
+    viewOfBitmapFileHeader.setUint32(2, sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader + sizeOfImageData, true);   // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
+    viewOfBitmapFileHeader.setUint16(6, 0x0000, true);                                                              // bfReserved1 : 0
+    viewOfBitmapFileHeader.setUint16(8, 0x0000, true);                                                              // bfReserved2 : 0
+    viewOfBitmapFileHeader.setUint32(10, sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader, true);                    // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
 
     //
     // BITMAPINFOHEADER
     //
-    const viewOfBitmapInfoHeader: DataView = new DataView(bitmapData, 14, 40);
-    viewOfBitmapInfoHeader.setUint32(0, 40, true);          // biSize : sizeof(BITMAPINFOHEADER)
-    viewOfBitmapInfoHeader.setUint32(4, imageData.width, true);  // biWidth : data.width
-    viewOfBitmapInfoHeader.setUint32(8, imageData.height, true); // biHeight : data.height
-    viewOfBitmapInfoHeader.setUint16(12, 1, true);         // biPlanes : 1
-    viewOfBitmapInfoHeader.setUint16(14, 32, true);         // biBitCount : 32
-    viewOfBitmapInfoHeader.setUint32(16, 0, true);         // biCompression : 0
-    viewOfBitmapInfoHeader.setUint32(20, imageData.width * imageData.height * 4, true);         // biSizeImage : imageData.width * imageData.height * 4
-    viewOfBitmapInfoHeader.setUint32(24, 0, true);         // biXPixPerMeter : 0
-    viewOfBitmapInfoHeader.setUint32(28, 0, true);         // biYPixPerMeter : 0
-    viewOfBitmapInfoHeader.setUint32(32, 0, true);         // biClrUsed : 0
-    viewOfBitmapInfoHeader.setUint32(36, 0, true);         // biCirImportant : 0
+    const viewOfBitmapInfoHeader: DataView = new DataView(bitmapData, sizeOfBitmapFileHeader, sizeOfBitmapInfoHeader);
+    viewOfBitmapInfoHeader.setUint32(0, sizeOfBitmapInfoHeader, true);  // biSize : sizeof(BITMAPINFOHEADER)
+    viewOfBitmapInfoHeader.setUint32(4, imageData.width, true);         // biWidth : data.width
+    viewOfBitmapInfoHeader.setUint32(8, imageData.height, true);        // biHeight : data.height
+    viewOfBitmapInfoHeader.setUint16(12, 1, true);                      // biPlanes : 1
+    viewOfBitmapInfoHeader.setUint16(14, 32, true);                     // biBitCount : 32
+    viewOfBitmapInfoHeader.setUint32(16, 0, true);                      // biCompression : 0
+    viewOfBitmapInfoHeader.setUint32(20, sizeOfImageData, true);        // biSizeImage : sizeof(IMAGEDATA)
+    viewOfBitmapInfoHeader.setUint32(24, 0, true);                      // biXPixPerMeter : 0
+    viewOfBitmapInfoHeader.setUint32(28, 0, true);                      // biYPixPerMeter : 0
+    viewOfBitmapInfoHeader.setUint32(32, 0, true);                      // biClrUsed : 0
+    viewOfBitmapInfoHeader.setUint32(36, 0, true);                      // biCirImportant : 0
 
     //
     // IMAGEDATA
     //
-    const viewOfBitmapPixelData: DataView = new DataView(bitmapData, 14 + 40, imageData.width * imageData.height * 4);
+    const viewOfBitmapPixelData: DataView = new DataView(bitmapData, sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader, imageData.width * imageData.height * 4);
     for (let y = 0; y < imageData.height; y++) {
         let scan = (imageData.height - 1 - y) * imageData.width * 4;
         let base = y * imageData.width * 4;
@@ -1316,17 +1451,17 @@ function loadFromBmp(ip: ImageProcessing, bitmapData: ArrayBuffer, { reqWidth = 
     // BITMAPFILEHEADER
     //
     const reqSize = (reqWidth >= 0 && reqHeight >= 0) ? reqWidth * reqHeight * 4 : -1;
-    const viewOfBitmapFileHeader: DataView = new DataView(bitmapData, 0, 14);
+    const viewOfBitmapFileHeader: DataView = new DataView(bitmapData, 0, sizeOfBitmapFileHeader);
     const bfType = viewOfBitmapFileHeader.getUint16(0, true);       // bfType : 'BM'
     const bfSize = viewOfBitmapFileHeader.getUint32(2, true);       // bfSize :  sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(IMAGEDATA)
     const bfReserved1 = viewOfBitmapFileHeader.getUint16(6, true);  // bfReserved1 : 0
     const bfReserved2 = viewOfBitmapFileHeader.getUint16(8, true);  // bfReserved2 : 0
     const bfOffBits = viewOfBitmapFileHeader.getUint32(10, true);   // bfOffBits : sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
     if ((bfType != 0x4D42) ||
-        (bfSize < 14 + 40) || (bfSize != dataLength) || (reqSize != -1 && bfSize < 14 + 40 + reqSize) ||
+        (bfSize < sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader) || (bfSize != dataLength) || (reqSize != -1 && bfSize < sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader + reqSize) ||
         (bfReserved1 != 0) ||
         (bfReserved2 != 0) ||
-        (bfOffBits < 14 + 40) || (bfOffBits >= dataLength) || (reqSize != -1 && bfOffBits > dataLength - reqSize)
+        (bfOffBits < sizeOfBitmapFileHeader + sizeOfBitmapInfoHeader) || (bfOffBits >= dataLength) || (reqSize != -1 && bfOffBits > dataLength - reqSize)
     ) {
         return null;
     }
@@ -1334,20 +1469,20 @@ function loadFromBmp(ip: ImageProcessing, bitmapData: ArrayBuffer, { reqWidth = 
     //
     // BITMAPINFOHEADER
     //
-    const viewOfBitmapInfoHeader: DataView = new DataView(bitmapData, 14, 40);
-    const biSize = viewOfBitmapInfoHeader.getUint32(0, true);          // biSize : sizeof(BITMAPINFOHEADER)
-    const biWidth = viewOfBitmapInfoHeader.getUint32(4, true);  // biWidth : this.width
-    const biHeight = viewOfBitmapInfoHeader.getUint32(8, true); // biHeight : this.height
-    const biPlanes = viewOfBitmapInfoHeader.getUint16(12, true);         // biPlanes : 1
-    const biBitCount = viewOfBitmapInfoHeader.getUint16(14, true);         // biBitCount : 32
-    const biCompression = viewOfBitmapInfoHeader.getUint32(16, true);         // biCompression : 0
-    const biSizeImage = viewOfBitmapInfoHeader.getUint32(20, true);         // biSizeImage : this.width * this.height * 4
-    const biXPixPerMeter = viewOfBitmapInfoHeader.getUint32(24, true);         // biXPixPerMeter : 0
-    const biYPixPerMeter = viewOfBitmapInfoHeader.getUint32(28, true);         // biYPixPerMeter : 0
-    const biClrUsed = viewOfBitmapInfoHeader.getUint32(32, true);         // biClrUsed : 0
-    const biCirImportant = viewOfBitmapInfoHeader.getUint32(36, true);         // biCirImportant : 0
+    const viewOfBitmapInfoHeader: DataView = new DataView(bitmapData, sizeOfBitmapFileHeader, sizeOfBitmapInfoHeader);
+    const biSize = viewOfBitmapInfoHeader.getUint32(0, true);           // biSize : sizeof(BITMAPINFOHEADER)
+    const biWidth = viewOfBitmapInfoHeader.getUint32(4, true);          // biWidth : this.width
+    const biHeight = viewOfBitmapInfoHeader.getUint32(8, true);         // biHeight : this.height
+    const biPlanes = viewOfBitmapInfoHeader.getUint16(12, true);        // biPlanes : 1
+    const biBitCount = viewOfBitmapInfoHeader.getUint16(14, true);      // biBitCount : 32
+    const biCompression = viewOfBitmapInfoHeader.getUint32(16, true);   // biCompression : 0
+    const biSizeImage = viewOfBitmapInfoHeader.getUint32(20, true);     // biSizeImage : this.width * this.height * 4
+    const biXPixPerMeter = viewOfBitmapInfoHeader.getUint32(24, true);  // biXPixPerMeter : 0
+    const biYPixPerMeter = viewOfBitmapInfoHeader.getUint32(28, true);  // biYPixPerMeter : 0
+    const biClrUsed = viewOfBitmapInfoHeader.getUint32(32, true);       // biClrUsed : 0
+    const biCirImportant = viewOfBitmapInfoHeader.getUint32(36, true);  // biCirImportant : 0
     if (
-        (biSize != 40) ||
+        (biSize != sizeOfBitmapInfoHeader) ||
         (reqWidth >= 0 && biWidth != reqWidth) ||
         (reqHeight >= 0 && biHeight != reqHeight) ||
         (biPlanes != 1) ||
@@ -1385,61 +1520,6 @@ function loadFromBmp(ip: ImageProcessing, bitmapData: ArrayBuffer, { reqWidth = 
 interface IPoint {
     x: number;
     y: number;
-}
-namespace IPoint {
-    export function rotate(point: IPoint, rad: number) {
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-        const rx = point.x * cos - point.y * sin;
-        const ry = point.x * sin + point.y * cos;
-        return { x: rx, y: ry };
-    }
-}
-///////////////////////////////////////////////////////////////
-namespace Topology {
-    export function drawCircle(x0: number, y0: number, radius: number, hline: (x1: number, x2: number, y: number) => void): void {
-        let x = radius - 1;
-        let y = 0;
-        let dx = 1;
-        let dy = 1;
-        let err = dx - (radius * 2);
-
-        while (x >= y) {
-            hline(x0 - x, x0 + x, y0 + y);
-            hline(x0 - y, x0 + y, y0 + x);
-            hline(x0 - y, x0 + y, y0 - x);
-            hline(x0 - x, x0 + x, y0 - y);
-
-            if (err <= 0) {
-                y++;
-                err += dy;
-                dy += 2;
-            }
-
-            if (err > 0) {
-                x--;
-                dx += 2;
-                err += dx - (radius << 1);
-            }
-        }
-    }
-    export function drawLine({ x: x0, y: y0 }: IPoint, { x: x1, y: y1 }: IPoint, pset: (x: number, y: number) => void): void {
-        const dx: number = Math.abs(x1 - x0);
-        const dy: number = Math.abs(y1 - y0);
-        const sx: number = (x0 < x1) ? 1 : -1;
-        const sy: number = (y0 < y1) ? 1 : -1;
-        let err: number = dx - dy;
-
-        for (; ;) {
-            pset(x0, y0)
-            if (x0 === x1 && y0 === y1) {
-                break;
-            }
-            const e2 = 2 * err;
-            if (e2 > -dx) { err -= dy; x0 += sx; }
-            if (e2 < dy) { err += dx; y0 += sy; }
-        }
-    }
 }
 ///////////////////////////////////////////////////////////////
 class HSVColorWheel {
@@ -1483,7 +1563,6 @@ class HSVColorWheel {
             this.imageData.data[index + 0],
             this.imageData.data[index + 1],
             this.imageData.data[index + 2],
-            //this.imageData.data[index + 3],
         ];
     }
     private setPixel(x: number, y: number, color: RGB): void {
@@ -2975,6 +3054,9 @@ class HSVColorWheelUI extends GUI.Control {
         const r = this.hsvColorWhell.rgb;
         return r;
     }
+    public set rgb(value:RGB){
+        this.hsvColorWhell.rgb = value;
+    }
 
     constructor(
         {
@@ -3024,10 +3106,10 @@ class HSVColorWheelUI extends GUI.Control {
 interface Tool {
     name: string;
     compositMode: CompositMode;
-    down(config: IPainterConfig, point: IPoint): void;
-    move(config: IPainterConfig, point: IPoint): void;
-    up(config: IPainterConfig, point: IPoint): void;
-    draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface): void;
+    down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
+    move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
+    up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
+    draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish:boolean): void;
 }
 ///////////////////////////////////////////////////////////////
 class SolidPen implements Tool {
@@ -3044,19 +3126,19 @@ class SolidPen implements Tool {
         this.compositMode = compositMode;
     }
 
-    public down(config: IPainterConfig, point: IPoint): void {
+    public down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
         this.joints.length = 0;
         this.joints.push(point.x, point.y);
     }
 
-    public move(config: IPainterConfig, point: IPoint): void {
+    public move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
         this.joints.push(point.x, point.y);
     }
 
-    public up(config: IPainterConfig, point: IPoint): void {
+    public up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
     }
 
-    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface): void {
+    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
         ip.drawLines(imgData, {
             program: this.shader,
             vertexes: new Float32Array(this.joints),
@@ -3089,7 +3171,7 @@ class CorrectionSolidPen extends SolidPen {
 
     }
 
-    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface): void {
+    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
         if (~~(this.joints.length / 2) <= config.penCorrectionValue) {
             ip.drawLines(imgData, {
                 program: this.shader,
@@ -3140,19 +3222,19 @@ class RectanglePen implements Tool {
         this.end = null;
     }
 
-    public down(config: IPainterConfig, point: IPoint): void {
+    public down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
         this.start = point;
         this.end = point;
     }
 
-    public move(config: IPainterConfig, point: IPoint): void {
+    public move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
         this.end = point;
     }
 
-    public up(config: IPainterConfig, point: IPoint): void {
+    public up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
     }
 
-    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface): void {
+    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
         ip.drawLines(imgData, {
             program: this.borderShader,
             vertexes: new Float32Array([this.start.x, this.start.y, this.end.x, this.start.y, this.end.x, this.end.y, this.start.x, this.end.y, this.start.x, this.start.y]),
@@ -3173,6 +3255,75 @@ class RectanglePen implements Tool {
     }
 }
 ///////////////////////////////////////////////////////////////
+class FloodFill implements Tool {
+    public copyShader: Program;
+    public name: string;
+    public compositMode: CompositMode;
+    public surface: Surface;
+    constructor(name: string, copyShader: Program, compositMode: CompositMode) {
+        this.name = name;
+        this.copyShader = copyShader;
+        this.compositMode = compositMode;
+        this.surface = null;
+    }
+
+    public down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
+        let x = ~~point.x;
+        let y = ~~point.y;
+        const width = currentLayer.imageData.width;
+        const height = currentLayer.imageData.height;
+        const length = width * height * 4;
+        const pb = new PixelBuffer(currentLayer.imageData.gl, width, height);
+        const input = pb.capture(currentLayer.imageData);
+        const output = new ImageData(width, height);
+        output.data.fill(0);
+        const checked = new Uint8Array(width*height);
+        checked.fill(0);
+        pb.dispose();
+
+        const fillcolor = config.penColor;
+        const i = (y * width + x) * 4;
+        const targetcolor : RGBA = [input[i], input[i + 1], input[i + 2], input[i + 3]];
+
+        const q: number[] = [i];
+        while (q.length) {
+            const j = q.pop();
+            if (checked[~~(j / 4)] == 0) {
+                if (input[j + 0] == targetcolor[0] && input[j + 1] == targetcolor[1] && input[j + 2] == targetcolor[2] && input[j + 3] == targetcolor[3]) {
+                    output.data[j + 0] = fillcolor[0];
+                    output.data[j + 1] = fillcolor[1];
+                    output.data[j + 2] = fillcolor[2];
+                    output.data[j + 3] = fillcolor[3];
+                    if (j >= width * 4) { q.push(j - width * 4); }
+                    if (j < length - width * 4) { q.push(j + width * 4); }
+                    if (j >= 4) { q.push(j - 4); }
+                    if (j < length - 4) { q.push(j + 4); }
+                }
+                checked[~~(j / 4)] = 1;
+            }
+        }
+
+        this.surface = new Surface(currentLayer.imageData.gl, output);
+    }
+
+    public move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
+    }
+
+    public up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
+    }
+
+    public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
+        if (this.surface != null) {
+            imgData.gl.fenceSync(imgData.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+            ip.applyShader(imgData, this.surface, { program: this.copyShader });
+            if (finish && this.surface != null) {
+                this.surface.dispose();
+                this.surface = null;
+            }
+        }
+    }
+}
+///////////////////////////////////////////////////////////////
 interface IPainterConfig {
     scale: number;
     penSize: number;
@@ -3184,7 +3335,7 @@ interface IPainterConfig {
 };
 enum CompositMode {
     Normal,
-    Erase
+    Erase,
 }
 ///////////////////////////////////////////////////////////////
 interface Layer {
@@ -3486,19 +3637,18 @@ module Painter {
     /**
      * レイヤー結合結果
      */
-    let imageLayerCompositedImgData: Surface = null;
+    let imageLayerCompositedSurface: Surface = null;
 
     /**
      * 各レイヤー
      */
-    let currentLayer: number = -1;
-    let imageLayerImgDatas: Layer[] = [];
+    let imageCurrentLayer: number = -1;
+    let imageLayers: Layer[] = [];
 
     /**
      * 作業レイヤー
      */
-    let workLayerImgData: Layer = null;
-
+    let workLayer: Layer = null;
 
     function createLayer(): Layer {
         const previewCanvas = document.createElement("canvas");
@@ -3513,6 +3663,14 @@ module Painter {
             previewData: previewData,
             compositMode: CompositMode.Normal
         }
+    }
+
+    function disposeLayer(self: Layer): void {
+        self.imageData.dispose();
+        self.imageData = null;
+        self.previewCanvas = null;
+        self.previewContext = null;
+        self.previewData = null;
     }
 
     function UpdateLayerPreview(layer: Layer): Layer {
@@ -3537,6 +3695,8 @@ module Painter {
                 dst += 4;
             }
         }
+        pb.dispose();
+
         layer.previewContext.putImageData(layer.previewData, 0, 0);
         update({ gui: true });
         return layer;
@@ -3590,7 +3750,6 @@ module Painter {
 
         parentHtmlElement = parentHtmlElement;
 
-        currentLayer = 0;
 
         imageCanvas = document.createElement("canvas");
         imageCanvas.width = width;
@@ -3598,11 +3757,13 @@ module Painter {
         glContext = imageCanvas.getContext('webgl2') as WebGL2RenderingContext;
 
         imageProcessing = new ImageProcessing(glContext);
-        //imageContext = imageCanvas.getContext("2d");
-        //imageContext.imageSmoothingEnabled = false;
-        imageLayerImgDatas = [createLayer()];
-        imageLayerCompositedImgData = imageProcessing.createBlankOffscreenTarget(width, height);
-        workLayerImgData = createLayer();
+
+        imageLayers = [createLayer()];
+        imageCurrentLayer = 0;
+
+        imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
+
+        workLayer = createLayer();
             
         viewCanvas = document.createElement("canvas");
         viewCanvas.style.position = "absolute";
@@ -3639,10 +3800,6 @@ module Painter {
         updateRequest = { gui: false, overlay: false, view: false };
         updateTimerId = NaN;
 
-        //uiDispacher.addEventListener("update", () => { update({ gui: true }); return true; });
-
-
-
         //const program = Program.loadShaderById(glContext, ["2d-vertex-shader", "2d-fragment-shader"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         //const program2 = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         //penShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
@@ -3659,7 +3816,8 @@ module Painter {
             new SolidPen("SolidPen", alphaPenShader, CompositMode.Normal),
             new CorrectionSolidPen("SolidPen2", alphaPenShader, CompositMode.Normal),
             new SolidPen("Eraser", alphaPenShader, CompositMode.Erase),
-            new RectanglePen("Rect", alphaPenShader, alphaFillShader, CompositMode.Normal)
+            new RectanglePen("Rect", alphaPenShader, alphaFillShader, CompositMode.Normal),
+            new FloodFill("Fill", copyShader, CompositMode.Normal)
         );
 
         window.addEventListener("resize", () => resize());
@@ -3692,6 +3850,7 @@ module Painter {
                 config.penColor = <RGBA>ret;
                 update({ gui: true });
             }
+            uiHSVColorWheel.rgb = config.penColor;
             uiWheelWindow.addChild(uiHSVColorWheel);
 
             const uiAlphaSlider = new GUI.HorizontalSlider({
@@ -3705,6 +3864,7 @@ module Painter {
                 minValue: 0,
                 maxValue: 255,
             });
+            uiAlphaSlider.value = config.penColor[3];
             uiAlphaSlider.addEventListener("changed", () => {
                 config.penColor[3] = uiAlphaSlider.value;
                 update({ gui: true });
@@ -3776,6 +3936,7 @@ module Painter {
                 config.penSize = uiPenSizeSlider.value;
                 update({ gui: true });
             });
+            uiPenSizeSlider.value = config.penSize;
             uiPenConfigWindow.addChild(uiPenSizeSlider);
             const uiAntialiasSizeSlider = new GUI.HorizontalSlider({
                 left: uiPenConfigWindowTitle.left,
@@ -3792,6 +3953,7 @@ module Painter {
                 config.antialiasSize = uiAntialiasSizeSlider.value;
                 update({ gui: true });
             });
+            uiAntialiasSizeSlider.value = config.antialiasSize;
             uiPenConfigWindow.addChild(uiAntialiasSizeSlider);
             const uiPenCorrectionSlider = new GUI.HorizontalSlider({
                 left: uiPenConfigWindowTitle.left,
@@ -3808,6 +3970,7 @@ module Painter {
                 config.penCorrectionValue = uiPenCorrectionSlider.value;
                 update({ gui: true });
             });
+            uiPenCorrectionSlider.value = config.penCorrectionValue;
             uiPenConfigWindow.height = uiPenCorrectionSlider.top + uiPenCorrectionSlider.height - 1;
             uiPenConfigWindow.addChild(uiPenCorrectionSlider);
             uiDispacher.addChild(uiPenConfigWindow);
@@ -3843,7 +4006,7 @@ module Painter {
                 });
                 top += 13 - 1;
                 uiToolBtn.addEventListener("click", () => {
-                    for (var toolButton of toolButtons) {
+                    for (const toolButton of toolButtons) {
                         toolButton.color = (uiToolBtn == toolButton) ? 'rgb(192,255,255)' : 'rgb(255,255,255)';
                     }
                     currentTool = tool;
@@ -3870,15 +4033,15 @@ module Painter {
                     height: imageCanvas.height,
                     layers: []
                 };
-                for (let i = 0; i < imageLayerImgDatas.length; i++) {
-                    const layer = imageLayerImgDatas[i];
+                for (let i = 0; i < imageLayers.length; i++) {
+                    const layer = imageLayers[i];
                     config.layers.push({ image: `${i}.bmp`, compositMode: layer.compositMode });
                 }
 
                 zip.file("config.json", JSON.stringify(config));
                 const img = zip.folder("layers");
-                for (let i = 0; i < imageLayerImgDatas.length; i++) {
-                    const layer = imageLayerImgDatas[i];
+                for (let i = 0; i < imageLayers.length; i++) {
+                    const layer = imageLayers[i];
                     img.file(`${i}.bmp`, saveAsBmp(layer.imageData), { binary: true });
                 }
                 zip.generateAsync({
@@ -3939,19 +4102,22 @@ module Painter {
                                 } else {
                                     imageCanvas.width = config.width;
                                     imageCanvas.height = config.height;
-                                    imageLayerImgDatas.length = 0;
+                                    imageLayers.forEach(disposeLayer);
+                                    imageLayers.length = 0;
 
-                                    for (var i = 0; i < datas.length; i++) {
+                                    for (let i = 0; i < datas.length; i++) {
                                         const layer = createLayer();
-                                        imageLayerImgDatas.push(layer);
+                                        imageLayers.push(layer);
                                         layer.imageData = <any>(datas[i]);
                                         layer.compositMode = config.layers[i].compositMode;
                                         UpdateLayerPreview(layer);
                                     }
 
-                                    currentLayer = 0;
-                                    imageLayerCompositedImgData = imageProcessing.createBlankOffscreenTarget(width, height);
-                                    workLayerImgData = createLayer();
+                                    imageCurrentLayer = 0;
+                                    imageLayerCompositedSurface.dispose();
+                                    imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
+                                    disposeLayer(workLayer);
+                                    workLayer = createLayer();
                                     updateCompositLayer();
                                     update({ gui: true, view: true, overlay: true });
                                     return Promise.resolve();
@@ -3998,7 +4164,7 @@ module Painter {
                 text: 'add',
             });
             uiLayerWindowAddLayerBtn.addEventListener("click", () => {
-                imageLayerImgDatas.splice(currentLayer, 0, createLayer());
+                imageLayers.splice(imageCurrentLayer, 0, createLayer());
                 update({ gui: true, view: true });
             });
             uiLayerWindow.addChild(uiLayerWindowAddLayerBtn);
@@ -4012,9 +4178,9 @@ module Painter {
             });
             uiLayerWindowCopyLayerBtn.addEventListener("click", () => {
                 const copiedLayer = createLayer();
-                copiedLayer.compositMode = imageLayerImgDatas[currentLayer].compositMode;
-                imageProcessing.applyShader(copiedLayer.imageData, imageLayerImgDatas[currentLayer].imageData, { program: copyShader });
-                imageLayerImgDatas.splice(currentLayer, 0, copiedLayer);
+                copiedLayer.compositMode = imageLayers[imageCurrentLayer].compositMode;
+                imageProcessing.applyShader(copiedLayer.imageData, imageLayers[imageCurrentLayer].imageData, { program: copyShader });
+                imageLayers.splice(imageCurrentLayer, 0, copiedLayer);
                 UpdateLayerPreview(copiedLayer);
                 updateCompositLayer();
                 update({ gui: true, view: true });
@@ -4029,13 +4195,14 @@ module Painter {
                 text: 'delete'
             });
             uiLayerWindowDeleteLayerBtn.addEventListener("click", () => {
-                if (imageLayerImgDatas.length == 1) {
+                if (imageLayers.length == 1) {
                     return;
                 }
-                imageLayerImgDatas.splice(currentLayer, 1);
-                if (currentLayer == imageLayerImgDatas.length) {
-                    currentLayer -= 1;
+                const deleted: Layer[] = imageLayers.splice(imageCurrentLayer, 1);
+                if (imageCurrentLayer == imageLayers.length) {
+                    imageCurrentLayer -= 1;
                 }
+                deleted.forEach(disposeLayer);
                 updateCompositLayer();
                 update({ gui: true, view: true });
             });
@@ -4047,9 +4214,9 @@ module Painter {
                 width: uiLayerWindowTitle.width,
                 height: 48 * 4,
                 lineHeight: 48,
-                getItemCount: () => imageLayerImgDatas.length,
+                getItemCount: () => imageLayers.length,
                 drawItem: (context: CanvasRenderingContext2D, left: number, top: number, width: number, height: number, item: number) => {
-                    if (item == currentLayer) {
+                    if (item == imageCurrentLayer) {
                         context.fillStyle = `rgb(24,196,195)`;
                     } else {
                         context.fillStyle = `rgb(133,133,133)`;
@@ -4059,7 +4226,7 @@ module Painter {
                     context.lineWidth = 1;
                     context.fillStyle = `rgb(255,255,255)`;
                     context.fillRect(left, top, 50, 50);
-                    context.drawImage(imageLayerImgDatas[item].previewCanvas, 0, 0, 50, 50, left, top, 50, 50);
+                    context.drawImage(imageLayers[item].previewCanvas, 0, 0, 50, 50, left, top, 50, 50);
                     context.strokeRect(left, top, 50, 50);
                     context.strokeRect(left, top, width, height);
                 }
@@ -4069,19 +4236,19 @@ module Painter {
                 const x = ev.x - gx;
                 const y = ev.y - gy;
                 const select = uiLayerListBox.getItemIndexByPosition(x, y);
-                currentLayer = select == -1 ? currentLayer : select;
+                imageCurrentLayer = select == -1 ? imageCurrentLayer : select;
                 update({ gui: true });
             };
             uiLayerListBox.dragItem = (from: number, to: number) => {
                 if (from == to || from + 1 == to) {
                     // 動かさない
                 } else {
-                    const target = imageLayerImgDatas[from];
-                    imageLayerImgDatas.splice(from, 1);
+                    const target = imageLayers[from];
+                    imageLayers.splice(from, 1);
                     if (from < to) {
                         to -= 1;
                     }
-                    imageLayerImgDatas.splice(to, 0, target);
+                    imageLayers.splice(to, 0, target);
                     updateCompositLayer();
                     update({ gui: true, view: true });
                 }
@@ -4108,31 +4275,16 @@ module Painter {
     }
 
     function updateCompositLayer() {
-        imageLayerCompositedImgData.clear();
-        const tmp: Surface[] = [
-            imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
-            imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height)
-        ];
-        let step = 0;
-        if (imageLayerImgDatas.length == 1) {
-            imageProcessing.composit(tmp[(step + 1) % 2], workLayerImgData.imageData, imageLayerImgDatas[0].imageData, getCompositShader(workLayerImgData.compositMode));
-        } else {
-            if (currentLayer == imageLayerImgDatas.length - 1) {
-                imageProcessing.composit(tmp[1], workLayerImgData.imageData, imageLayerImgDatas[imageLayerImgDatas.length - 1].imageData, normalBlendShader);
+        imageLayerCompositedSurface.clear();
+        imageProcessing.applyShaderUpdate(imageLayerCompositedSurface, { program: checkerBoardShader });
+        for (let i = imageLayers.length - 1; i >= 0; i--) {
+            if (i == imageCurrentLayer) {
+                imageProcessing.compositUpdate(imageLayers[i].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode), true);
+                imageProcessing.compositUpdate(imageLayerCompositedSurface, workLayer.imageData, normalBlendShader);
             } else {
-                imageProcessing.applyShader(tmp[1], imageLayerImgDatas[imageLayerImgDatas.length - 1].imageData, { program: copyShader });
-            }
-            for (let i = imageLayerImgDatas.length - 2; i >= 0; i--) {
-                imageProcessing.composit(tmp[step % 2], imageLayerImgDatas[i].imageData, tmp[(step + 1) % 2], normalBlendShader);
-                step++;
-                if (i == currentLayer) {
-                    imageProcessing.composit(tmp[step % 2], workLayerImgData.imageData, tmp[(step + 1) % 2], getCompositShader(workLayerImgData.compositMode));
-                    step++;
-                }
+                imageProcessing.compositUpdate(imageLayerCompositedSurface, imageLayers[i].imageData, normalBlendShader);
             }
         }
-        imageProcessing.applyShaderUpdate(tmp[(step + 0) % 2], { program: checkerBoardShader });
-        imageProcessing.composit(imageLayerCompositedImgData, tmp[(step + 1) % 2], tmp[(step + 0) % 2], normalBlendShader);
     }
 
     function setupMouseEvent() {
@@ -4176,9 +4328,10 @@ module Painter {
                     const onPenMove = (e: CustomPointerEvent) => {
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.move(config, p);
-                            workLayerImgData.imageData.clear();
-                            currentTool.draw(config, imageProcessing, workLayerImgData.imageData);
+                            currentTool.move(config, p, imageLayers[imageCurrentLayer]);
+                            workLayer.imageData.clear();
+                            workLayer.compositMode = currentTool.compositMode;
+                            currentTool.draw(config, imageProcessing, workLayer.imageData, false);
                             updateCompositLayer();
                             update({ view: true });
                         }
@@ -4188,14 +4341,12 @@ module Painter {
                         Input.off("pointermove", onPenMove);
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.up(config, p);
-                            workLayerImgData.imageData.clear();
-                            currentTool.draw(config, imageProcessing, workLayerImgData.imageData);
-                            const composited = imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height);
-                            imageProcessing.composit(composited, workLayerImgData.imageData, imageLayerImgDatas[currentLayer].imageData, getCompositShader(workLayerImgData.compositMode));
-                            imageLayerImgDatas[currentLayer].imageData = composited;
-                            workLayerImgData.imageData.clear();
-                            UpdateLayerPreview(imageLayerImgDatas[currentLayer]);
+                            currentTool.up(config, p, imageLayers[imageCurrentLayer]);
+                            workLayer.imageData.clear();
+                            currentTool.draw(config, imageProcessing, workLayer.imageData, true);
+                            imageProcessing.compositUpdate(imageLayers[imageCurrentLayer].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode));
+                            workLayer.imageData.clear();
+                            UpdateLayerPreview(imageLayers[imageCurrentLayer]);
                             updateCompositLayer();
                             update({ view: true });
                         }
@@ -4206,10 +4357,10 @@ module Painter {
                         Input.on("pointermove", onPenMove);
                         Input.one("pointerup", onPenUp);
                         const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                        currentTool.down(config, p);
-                        workLayerImgData.imageData.clear();
-                        workLayerImgData.compositMode = currentTool.compositMode;
-                        currentTool.draw(config, imageProcessing, workLayerImgData.imageData);
+                        currentTool.down(config, p, imageLayers[imageCurrentLayer]);
+                        workLayer.imageData.clear();
+                        workLayer.compositMode = currentTool.compositMode;
+                        currentTool.draw(config, imageProcessing, workLayer.imageData, false);
                         updateCompositLayer();
                         update({ view: true });
                     }
@@ -4317,7 +4468,7 @@ module Painter {
                     updateRequest.overlay = false;
                 }
                 if (updateRequest.view) {
-                    imageProcessing.applyShader(null, imageLayerCompositedImgData, { program: copyShader });
+                    imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader });
                     viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
                     viewContext.fillStyle = "rgb(198,208,224)";
                     viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
@@ -4327,22 +4478,6 @@ module Painter {
                     viewContext.shadowBlur = 10;
                     viewContext.fillRect(canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
                     viewContext.shadowBlur = 0;
-
-                    //viewContext.fillStyle = "rgb(224,224,224)";
-                    //const l = canvasOffsetX + config.scrollX;
-                    //const t = canvasOffsetY + config.scrollY;
-                    //const w = imageCanvas.width * config.scale;
-                    //const h = imageCanvas.height * config.scale;
-                    //const grid: number = 8;
-                    //const ww = ~~((w + grid - 1) / grid);
-                    //const hh = ~~((h + grid - 1) / grid);
-                    //for (let y = 0; y < hh; y++) {
-                    //    for (let x = 0; x < ww; x++) {
-                    //        if ((y & 1) != (x & 1)) {
-                    //            viewContext.fillRect(l + x * grid, t + y * grid, grid, grid);
-                    //        }
-                    //    }
-                    //}
                     viewContext.imageSmoothingEnabled = false;
                     viewContext.drawImage(imageCanvas, 0, 0, imageCanvas.width, imageCanvas.height, canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
                     updateRequest.view = false;
