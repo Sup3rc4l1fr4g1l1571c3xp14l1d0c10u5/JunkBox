@@ -751,7 +751,9 @@ class ImageProcessing {
     }
 
     createBlankOffscreenTarget(width: number, height: number): Surface {
-        return new Surface(this.gl, width, height);
+        const surf = new Surface(this.gl, width, height);
+        surf.clear();
+        return surf;
     }
     createOffscreenTargetFromImage(image: HTMLImageElement | ImageData): Surface {
         return new Surface(this.gl, image);
@@ -854,7 +856,7 @@ class ImageProcessing {
         // フィルタ適用完了
 
     }
-    applyShader(dst: Surface, src: Surface, { program = null }: { program: Program }): void {
+    applyShader(dst: Surface, src: Surface, { program = null, matrix = null }: { program: Program, matrix?: Matrix3 }): void {
         const gl = this.gl;
         // arrtibute変数の位置を取得
         const positionLocation = gl.getAttribLocation(program.program, "a_position");
@@ -907,10 +909,14 @@ class ImageProcessing {
         gl.bindTexture(gl.TEXTURE_2D, src.texture);
         gl.uniform1i(texture0Lication, 0);
 
+        const projMat = (matrix == null)
+            ? Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), Matrix3.projection(gl.canvas.width, gl.canvas.height))
+            : Matrix3.multiply(Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), Matrix3.projection(gl.canvas.width, gl.canvas.height)), matrix);
+
         if (dst == null) {
             // オフスクリーンレンダリングにはしない
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            const projectionMatrix = Matrix3.multiply(Matrix3.scaling(1, -1), Matrix3.projection(gl.canvas.width, gl.canvas.height));
+            const projectionMatrix =  projMat;
             // WebGL の描画結果を HTML に正しく合成する方法 より
             // http://webos-goodies.jp/archives/overlaying_webgl_on_html.html
             gl.clearColor(0, 0, 0, 0);
@@ -928,7 +934,7 @@ class ImageProcessing {
         } else {
             // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
             gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
-            const projectionMatrix = Matrix3.projection(dst.width, dst.height);
+            const projectionMatrix = projMat;
             gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
             gl.viewport(0, 0, dst.width, dst.height);
             // オフスクリーンレンダリングを実行
@@ -3113,7 +3119,7 @@ interface Tool {
 }
 ///////////////////////////////////////////////////////////////
 class SolidPen implements Tool {
-    protected joints: number[];
+    protected joints: IPoint[];
 
     public shader: Program;
     public name: string;
@@ -3128,11 +3134,11 @@ class SolidPen implements Tool {
 
     public down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
         this.joints.length = 0;
-        this.joints.push(point.x, point.y);
+        this.joints.push(point);
     }
 
     public move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
-        this.joints.push(point.x, point.y);
+        this.joints.push(point);
     }
 
     public up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
@@ -3141,7 +3147,7 @@ class SolidPen implements Tool {
     public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
         ip.drawLines(imgData, {
             program: this.shader,
-            vertexes: new Float32Array(this.joints),
+            vertexes: new Float32Array(this.joints.reduce((s, x) => {s.push(x.x, x.y); return s; }, [])),
             color: config.penColor,
             size: config.penSize,
             antialiasSize: config.antialiasSize
@@ -3152,19 +3158,37 @@ class SolidPen implements Tool {
 }
 ///////////////////////////////////////////////////////////////
 class CorrectionSolidPen extends SolidPen {
-    // http://jsdo.it/kikuchy/zsWz
 
-    movingAverage(m: number, start: number): IPoint {
-        const ret = { x: 0, y: 0 };
-        for (let i = 0; i < m; i++) {
-            ret.x += this.joints[start * 2 + 0];
-            ret.y += this.joints[start * 2 + 1];
-            start++;
-        }
-        ret.x = ~~(ret.x / m);
-        ret.y = ~~(ret.y / m);
-        return ret;
-    };
+    // 単純ガウシアン重み付け補完
+    // https://www24.atwiki.jp/sigetch_2007/pages/18.html?pc_mode=1
+
+    static G_HIST_SIZE : number = 20;
+    sigma :number = 5;
+    weight1 :number = 1 / (Math.sqrt(2 * Math.PI) * this.sigma);
+    g_move_avg(stroke: IPoint[]): IPoint[] {
+        const hist: IPoint[] = [];
+        const new_stroke: IPoint[] = [];
+        stroke.forEach(val => {
+            const { x: x, y: y } = val;
+            hist.push({ x: x, y: y });
+            if (hist.length > CorrectionSolidPen.G_HIST_SIZE) { hist.shift(); }
+            let tx = 0;
+            let ty = 0;
+            let scale = 0;
+            hist.forEach((pos, ind) => {
+                const weight = 1 / this.weight1 * Math.exp(-(hist.length - 1 - ind) * (hist.length - 1 - ind) / (2 * this.sigma * this.sigma));
+                scale = scale + weight
+                tx = tx + weight * pos.x;
+                ty = ty + weight * pos.y;
+            });
+            tx /= scale;
+            ty /= scale;
+            new_stroke.push({ x: tx, y: ty });
+            //console.log(`x=${x}, y=${y}, scale=${scale},tx=${tx},ty=${ty}`);
+        });
+        return new_stroke;
+    }
+
 
     constructor(name: string, shader: Program, compositMode: CompositMode) {
         super(name, shader, compositMode);
@@ -3172,35 +3196,16 @@ class CorrectionSolidPen extends SolidPen {
     }
 
     public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
-        if (~~(this.joints.length / 2) <= config.penCorrectionValue) {
+        const newJoints = this.g_move_avg(this.joints);
             ip.drawLines(imgData, {
                 program: this.shader,
-                vertexes: new Float32Array(this.joints),
+                vertexes: new Float32Array(newJoints.reduce((s, x) => {s.push(x.x, x.y); return s; }, [])),
                 color: config.penColor,
                 size: config.penSize,
                 antialiasSize: config.antialiasSize
             }
             );
-        } else {
-            const corrected: number[] = [];
-            let prev: IPoint = this.movingAverage(config.penCorrectionValue, 0);
-            corrected.push(prev.x, prev.y);
-            const len = ~~(this.joints.length / 2) - config.penCorrectionValue;
-            for (let i = 1; i < len; i++) {
-                const avg = this.movingAverage(config.penCorrectionValue, i);
-                corrected.push(avg.x, avg.y);
-                prev = avg;
-            }
-            ip.drawLines(imgData, {
-                program: this.shader,
-                vertexes: new Float32Array(corrected),
-                color: config.penColor,
-                size: config.penSize,
-                antialiasSize: config.antialiasSize
-            }
-            );
-        }
-
+        console.log(this.joints.length);
     }
 }
 ///////////////////////////////////////////////////////////////
@@ -3281,26 +3286,97 @@ class FloodFill implements Tool {
         checked.fill(0);
         pb.dispose();
 
-        const fillcolor = config.penColor;
-        const i = (y * width + x) * 4;
-        const targetcolor : RGBA = [input[i], input[i + 1], input[i + 2], input[i + 3]];
+        const [fr,fg,fb,fa] = config.penColor;
+        const start = (y * width + x) * 4;
+        const [r,g,b,a]= [input[start], input[start + 1], input[start + 2], input[start + 3]];
 
-        const q: number[] = [i];
+        const q: number[] = [x,y];
+        const quadWidth = width * 4;
+
         while (q.length) {
-            const j = q.pop();
-            if (checked[~~(j / 4)] == 0) {
-                if (input[j + 0] == targetcolor[0] && input[j + 1] == targetcolor[1] && input[j + 2] == targetcolor[2] && input[j + 3] == targetcolor[3]) {
-                    output.data[j + 0] = fillcolor[0];
-                    output.data[j + 1] = fillcolor[1];
-                    output.data[j + 2] = fillcolor[2];
-                    output.data[j + 3] = fillcolor[3];
-                    if (j >= width * 4) { q.push(j - width * 4); }
-                    if (j < length - width * 4) { q.push(j + width * 4); }
-                    if (j >= 4) { q.push(j - 4); }
-                    if (j < length - 4) { q.push(j + 4); }
+
+            const y = q.pop();
+            const x = q.pop();
+            const i = (y * width + x);
+
+            let left = 0;
+            let right = width-1;
+
+            {// left-side
+                let j = i - 1;
+                let off = j * 4;
+                for (let xx = x - 1; xx >= 0; xx--) {
+                    if (checked[j] != 1 && input[off + 0] == r && input[off + 1] == g && input[off + 2] == b && input[off + 3] == a) {
+                        off -= 4;
+                        j--;
+                    } else {
+                        left = xx+1;
+                        break;
+                    }
                 }
-                checked[~~(j / 4)] = 1;
             }
+            {// right-side
+                let j = i + 1;
+                let off = j * 4;
+                for (let xx = x + 1; xx < width; xx++) {
+                    if (checked[j] != 1 && input[off + 0] == r && input[off + 1] == g && input[off + 2] == b && input[off + 3] == a) {
+                        off += 4;
+                        j++;
+                    } else {
+                        right = xx-1;
+                        break;
+                    }
+                }
+            }
+
+            {
+                let j = y * width + left;
+                let ju = j-width;
+                let jd = j+width;
+                let off = j * 4;
+                let offu = off - width * 4;
+                let offd = off + width * 4;
+                let flagUp = false;
+                let flagDown = false;
+                for (let xx = left; xx <= right; xx++) {
+
+                    output.data[off + 0] = fr;
+                    output.data[off + 1] = fg;
+                    output.data[off + 2] = fb;
+                    output.data[off + 3] = fa;
+                    checked[j] = 1;
+                    j++;
+                    off += 4;
+
+                    if (y > 0 && checked[ju] != 1 && input[offu + 0] == r && input[offu + 1] == g && input[offu + 2] == b && input[offu + 3] == a) {
+                        if (flagUp == false) {
+                            q.push(xx, y - 1);
+                            flagUp = true;
+                        }
+                    } else {
+                        if (flagUp == true) {
+                            flagUp = false;
+                        }
+                    }
+                    offu += 4;
+                    ju++;
+
+                    if (y < height - 1 && checked[jd] != 1 && input[offd + 0] == r && input[offd + 1] == g && input[offd + 2] == b && input[offd + 3] == a) {
+                        if (flagDown == false) {
+                            q.push(xx, y + 1);
+                            flagDown = true;
+                        }
+                    } else {
+                        if (flagDown == true) {
+                            flagDown = false;
+                        }
+                    }
+                    offd += 4;
+                    jd++;
+                }
+            }
+
+
         }
 
         this.surface = new Surface(currentLayer.imageData.gl, output);
@@ -3649,6 +3725,7 @@ module Painter {
      * 作業レイヤー
      */
     let workLayer: Layer = null;
+    let preCompositLayer: Layer = null;
 
     function createLayer(): Layer {
         const previewCanvas = document.createElement("canvas");
@@ -3674,33 +3751,52 @@ module Painter {
     }
 
     function UpdateLayerPreview(layer: Layer): Layer {
+
+        //const sw = layer.imageData.width;
+        //const sh = layer.imageData.height;
+        //const pw = layer.previewData.width;
+        //const ph = layer.previewData.height;
+        //
+        //const dstData = layer.previewData.data;
+        //let dst = 0;
+        //const pb = new PixelBuffer(layer.imageData.gl, sw, sh);
+        //const srcData = pb.capture(layer.imageData);
+        //
+        //for (let y = 0; y < ph; y++) {
+        //    const sy = ~~(y * sh / ph);
+        //    for (let x = 0; x < pw; x++) {
+        //        const sx = ~~(x * sw / pw);
+        //        dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
+        //        dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
+        //        dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
+        //        dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
+        //        dst += 4;
+        //    }
+        //}
+        //pb.dispose();
+
+        //layer.previewContext.putImageData(layer.previewData, 0, 0);
+        //update({ gui: true });
+        //return layer;
+
         const sw = layer.imageData.width;
         const sh = layer.imageData.height;
         const pw = layer.previewData.width;
         const ph = layer.previewData.height;
-
+        const pSurf = imageProcessing.createBlankOffscreenTarget(pw, ph);
+        imageProcessing.applyShader(pSurf, layer.imageData, { program: copyShader });
         const dstData = layer.previewData.data;
         let dst = 0;
-        const pb = new PixelBuffer(layer.imageData.gl, sw, sh);
-        const srcData = pb.capture(layer.imageData);
-
-        for (let y = 0; y < ph; y++) {
-            const sy = ~~(y * sh / ph);
-            for (let x = 0; x < pw; x++) {
-                const sx = ~~(x * sw / pw);
-                dstData[dst + 0] = srcData[(sy * sw + sx) * 4 + 0];
-                dstData[dst + 1] = srcData[(sy * sw + sx) * 4 + 1];
-                dstData[dst + 2] = srcData[(sy * sw + sx) * 4 + 2];
-                dstData[dst + 3] = srcData[(sy * sw + sx) * 4 + 3];
-                dst += 4;
-            }
-        }
-        pb.dispose();
-
-        layer.previewContext.putImageData(layer.previewData, 0, 0);
+        const pb = new PixelBuffer(pSurf.gl, pw, ph);
+        const srcData = pb.capture(pSurf);
+        
+        layer.previewContext.putImageData(new ImageData(srcData, pw, ph), 0, 0);
         update({ gui: true });
-        return layer;
 
+        pb.dispose();
+        pSurf.dispose();
+
+        return layer;
     }
 
     /**
@@ -3764,6 +3860,7 @@ module Painter {
         imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
 
         workLayer = createLayer();
+        preCompositLayer = createLayer();
             
         viewCanvas = document.createElement("canvas");
         viewCanvas.style.position = "absolute";
@@ -4118,6 +4215,8 @@ module Painter {
                                     imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
                                     disposeLayer(workLayer);
                                     workLayer = createLayer();
+                                    disposeLayer(preCompositLayer);
+                                    preCompositLayer = createLayer();
                                     updateCompositLayer();
                                     update({ gui: true, view: true, overlay: true });
                                     return Promise.resolve();
@@ -4279,8 +4378,9 @@ module Painter {
         imageProcessing.applyShaderUpdate(imageLayerCompositedSurface, { program: checkerBoardShader });
         for (let i = imageLayers.length - 1; i >= 0; i--) {
             if (i == imageCurrentLayer) {
-                imageProcessing.compositUpdate(imageLayers[i].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode), true);
-                imageProcessing.compositUpdate(imageLayerCompositedSurface, workLayer.imageData, normalBlendShader);
+                preCompositLayer.imageData.clear();
+                imageProcessing.composit(preCompositLayer.imageData, imageLayers[i].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode));
+                imageProcessing.compositUpdate(imageLayerCompositedSurface, preCompositLayer.imageData, normalBlendShader);
             } else {
                 imageProcessing.compositUpdate(imageLayerCompositedSurface, imageLayers[i].imageData, normalBlendShader);
             }
@@ -4456,6 +4556,16 @@ module Painter {
         return p;
     }
 
+
+    let prev: number = NaN;
+    function benchmark(msg?:string) {
+        const t = Date.now();
+        if (msg != null && !isNaN(prev)) {
+            console.log(msg, t - prev);
+        }
+        prev = t;
+    }
+
     export function update({ overlay = false, view = false, gui = false }: { overlay?: boolean, view?: boolean, gui?: boolean }) {
 
         updateRequest.overlay = updateRequest.overlay || overlay;
@@ -4468,7 +4578,33 @@ module Painter {
                     updateRequest.overlay = false;
                 }
                 if (updateRequest.view) {
-                    imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader });
+                    // 画面内領域のみを描画。スケール＋平行移動までGPUで実行
+                    const viewLeft = canvasOffsetX + config.scrollX;
+                    const viewTop = canvasOffsetY + config.scrollY;
+                    const viewWidth = imageCanvas.width * config.scale;
+                    const viewHeight = imageCanvas.height * config.scale;
+                    const viewRight = viewLeft + viewWidth;
+                    const viewBottom = viewTop + viewHeight;
+
+                    const clipedLeft = Math.max(viewLeft, 0);
+                    const clipedTop = Math.max(viewTop, 0);
+                    const clipedRight = Math.min(viewRight, viewCanvas.width);
+                    const clipedBottom = Math.min(viewBottom, viewCanvas.height);
+
+                    const srcLeft = Math.min(viewLeft, 0);
+                    const srcTop = Math.min(viewTop, 0);
+                    const srcWidth = Math.min(viewCanvas.width, viewWidth+ srcLeft);
+                    const srcHeight = Math.min(viewCanvas.height, viewHeight + srcTop);
+
+                    const transformMatrix = Matrix3.multiply(Matrix3.translation(srcLeft, srcTop), Matrix3.scaling(config.scale, config.scale));
+
+                    const originalWidth = imageCanvas.width;
+                    const originalHeight = imageCanvas.height;
+                    imageCanvas.width = srcWidth;
+                    imageCanvas.height = srcHeight;
+                    imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader, matrix: transformMatrix });
+
+                    viewCanvas.style.display = "none";
                     viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
                     viewContext.fillStyle = "rgb(198,208,224)";
                     viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
@@ -4476,11 +4612,34 @@ module Painter {
                     viewContext.shadowOffsetX = viewContext.shadowOffsetY = 0;
                     viewContext.shadowColor = "rgb(0,0,0)";
                     viewContext.shadowBlur = 10;
-                    viewContext.fillRect(canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
+                    viewContext.fillRect(viewLeft, viewTop, viewWidth, viewHeight);
                     viewContext.shadowBlur = 0;
                     viewContext.imageSmoothingEnabled = false;
-                    viewContext.drawImage(imageCanvas, 0, 0, imageCanvas.width, imageCanvas.height, canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
+                    //benchmark();
+                    viewContext.drawImage(imageCanvas, clipedLeft, clipedTop);
+                    //benchmark(`drawImage(${srcWidth}x${srcHeight}):`);
+                    imageCanvas.width = originalWidth;
+                    imageCanvas.height = originalHeight;
                     updateRequest.view = false;
+                    viewCanvas.style.display = "inline";
+
+                    //const s = Date.now();
+                    //imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader });
+                    //viewCanvas.style.display = "none";
+                    //viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
+                    //viewContext.fillStyle = "rgb(198,208,224)";
+                    //viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
+                    //viewContext.fillStyle = "rgb(255,255,255)";
+                    //viewContext.shadowOffsetX = viewContext.shadowOffsetY = 0;
+                    //viewContext.shadowColor = "rgb(0,0,0)";
+                    //viewContext.shadowBlur = 10;
+                    //viewContext.fillRect(canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
+                    //viewContext.shadowBlur = 0;
+                    //viewContext.imageSmoothingEnabled = false;
+                    //viewContext.drawImage(imageCanvas, 0, 0, imageCanvas.width, imageCanvas.height, canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
+                    //updateRequest.view = false;
+                    //viewCanvas.style.display = "inline";
+                    //console.log("update", Date.now() - s);
                 }
                 if (updateRequest.gui) {
                     uiContext.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
@@ -4495,7 +4654,7 @@ module Painter {
 }
 ///////////////////////////////////////////////////////////////
 window.addEventListener("load", () => {
-    Painter.init(document.body, 512, 512);
+    Painter.init(document.body, 1024, 1024);
 });
 ///////////////////////////////////////////////////////////////
 
