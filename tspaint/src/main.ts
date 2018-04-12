@@ -4,7 +4,6 @@
 "use strict";
 ///////////////////////////////////////////////////////////////
 function saveFileToLocal(filename: string, blob: Blob): void {
-    //const blob = new Blob([new Uint8Array(imageLayerCompositedImgData.saveAsBmp())], { type: 'image/bmp' });
     const blobURL = window.URL.createObjectURL(blob, { oneTimeOnly: true });
     const element: HTMLAnchorElement = document.createElement("a");
     element.href = blobURL;
@@ -26,7 +25,7 @@ function loadFileFromLocal(accept: string): Promise<Blob> {
         element.onclick = () => {
             const handler = () => {
                 element.onclick = null;
-                window.onfocus = null;
+                window.removeEventListener("focus", handler);
                 document.body.removeChild(element);
                 const file = (element.files.length != 0) ? element.files[0] : null;
                 if (file == null) {
@@ -37,9 +36,9 @@ function loadFileFromLocal(accept: string): Promise<Blob> {
                     return;
                 }
             };
-            window.onfocus = handler;
+            window.addEventListener("focus", handler);
         };
-        setTimeout(() => {element.click()});
+        setTimeout(() => { element.click() });
     });
 }
 ///////////////////////////////////////////////////////////////
@@ -258,7 +257,7 @@ declare var JSZip: {
     /**
      * Create JSZip instance
      */
-    new(): JSZip.JSZip;
+    new (): JSZip.JSZip;
     /**
      * Create JSZip instance
      * If no parameters given an empty zip archive will be created
@@ -266,7 +265,7 @@ declare var JSZip: {
      * @param data Serialized zip archive
      * @param options Description of the serialized zip archive
      */
-    new(data: any, options?: JSZip.JSZipLoadOptions): JSZip.JSZip;
+    new (data: any, options?: JSZip.JSZipLoadOptions): JSZip.JSZip;
 
     prototype: JSZip.JSZip;
     support: JSZip.JSZipSupport;
@@ -423,7 +422,7 @@ interface WebGL2RenderingContext extends WebGLRenderingContext {
     SYNC_GPU_COMMANDS_COMPLETE: number;
     fenceSync: (sync: number, flag: number) => void;
     getBufferSubData: (target: number, offset: number, buffer: any) => void;
-    uniformMatrix3fv(location: WebGLUniformLocation, transpose: boolean, value: Float32Array|number[]): void;
+    uniformMatrix3fv(location: WebGLUniformLocation, transpose: boolean, value: Float32Array | number[]): void;
     uniform4fv(location: WebGLUniformLocation, v: Float32Array | number[]): void;
 }
 ///////////////////////////////////////////////////////////////
@@ -602,7 +601,7 @@ class Program implements IDisposable {
 class Surface implements IDisposable {
     private _gl: WebGL2RenderingContext;
     private _width: number;
-    private _height: number; 
+    private _height: number;
     private _texture: WebGLTexture;
     private _framebuffer: WebGLFramebuffer;
 
@@ -655,14 +654,20 @@ class Surface implements IDisposable {
         // フレームバッファを生成し、テクスチャと関連づけ
         this._framebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._framebuffer);
+        gl.viewport(0, 0, this._width, this._height);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._texture, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     public clear(): void {
         const gl = this._gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         gl.viewport(0, 0, this._width, this._height);
+        if (this._width == 0 || this._height == 0) {
+            console.log();
+        }
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     public dispose(): void {
@@ -677,7 +682,7 @@ class Surface implements IDisposable {
     }
 }
 ///////////////////////////////////////////////////////////////
-class PixelBuffer implements IDisposable  {
+class PixelBuffer implements IDisposable {
     pbo: WebGLBuffer;
     data: Uint8ClampedArray;
 
@@ -692,6 +697,7 @@ class PixelBuffer implements IDisposable  {
         const gl = this.gl;
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, src.framebuffer);
+        gl.viewport(0, 0, this.width, this.height);
 
         // フレームバッファをピクセルバッファにロード
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
@@ -909,14 +915,14 @@ class ImageProcessing {
         gl.bindTexture(gl.TEXTURE_2D, src.texture);
         gl.uniform1i(texture0Lication, 0);
 
-        const projMat = (matrix == null)
-            ? Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), Matrix3.projection(gl.canvas.width, gl.canvas.height))
-            : Matrix3.multiply(Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), Matrix3.projection(gl.canvas.width, gl.canvas.height)), matrix);
+        const projMat = (dst == null) ? Matrix3.projection(gl.canvas.width, gl.canvas.height) : Matrix3.projection(dst.width, dst.height)
+        const projectionMatrix = (matrix == null)
+            ? Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), projMat)
+            : Matrix3.multiply(Matrix3.multiply(Matrix3.scaling(1, (dst == null) ? -1 : 1), projMat), matrix);;
 
         if (dst == null) {
             // オフスクリーンレンダリングにはしない
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            const projectionMatrix =  projMat;
             // WebGL の描画結果を HTML に正しく合成する方法 より
             // http://webos-goodies.jp/archives/overlaying_webgl_on_html.html
             gl.clearColor(0, 0, 0, 0);
@@ -934,7 +940,6 @@ class ImageProcessing {
         } else {
             // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
             gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
-            const projectionMatrix = projMat;
             gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
             gl.viewport(0, 0, dst.width, dst.height);
             // オフスクリーンレンダリングを実行
@@ -1088,10 +1093,10 @@ class ImageProcessing {
             const x2 = vertexes[i * 2 + 2] + 0.5;
             const y2 = vertexes[i * 2 + 3] + 0.5;
 
-            const left = Math.min(x1, x2) - size;
-            const top = Math.min(y1, y2) - size;
-            const right = Math.max(x1, x2) + size;
-            const bottom = Math.max(y1, y2) + size;
+            const left = (x1 < x2 ? x1 : x2) - size;
+            const top = (y1 < y2 ? y1 : y2) - size;
+            const right = (x1 > x2 ? x1 : x2)  + size;
+            const bottom = (y1 > y2 ? y1 : y2) + size;
 
             gl.uniform2f(startLocation, x1, y1);
             gl.uniform2f(endLocation, x2, y2);
@@ -1117,7 +1122,7 @@ class ImageProcessing {
 
     }
 
-    fillRect(dst: Surface, { program = null, start = null, end = null, color = null }: { program: Program, start: IPoint, end: IPoint, color: [number, number, number, number]}): void {
+    fillRect(dst: Surface, { program = null, start = null, end = null, color = null }: { program: Program, start: IPoint, end: IPoint, color: [number, number, number, number] }): void {
         const gl = this.gl;
 
         const tmp: Surface = this.createBlankOffscreenTarget(dst.width, dst.height);
@@ -1211,8 +1216,11 @@ class ImageProcessing {
         // シェーダを適用したオフスクリーンレンダリングを実行
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        // レンダリング範囲をフィードバック
-        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, left, top, left, top, right - left, bottom - top);
+        const cleft = (left < 0) ? 0 : (left > dst.width - 1) ? dst.width - 1 : left;
+        const ctop = (top < 0) ? 0 : (top > dst.height - 1) ? dst.height - 1 : top;
+        const cright = (right < 0) ? 0 : (right > dst.width - 1) ? dst.width - 1 : right;
+        const cbottom = (bottom < 0) ? 0 : (bottom > dst.height - 1) ? dst.height - 1 : bottom;
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, cleft, ctop, cleft, ctop, cright - cleft, cbottom - ctop);
 
         tmp.dispose();
 
@@ -1236,7 +1244,7 @@ class ImageProcessing {
         gl.enableVertexAttribArray(positionLocation);
 
         // 頂点バッファ（座標）を設定
-        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, front.width, front.height));
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, dst.width, dst.height));
 
         // 頂点座標Attributeの位置情報を設定
         gl.vertexAttribPointer(
@@ -1283,10 +1291,10 @@ class ImageProcessing {
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
         gl.viewport(0, 0, dst.width, dst.height);
 
-        const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-        if (st !== gl.FRAMEBUFFER_COMPLETE) {
-            console.log(st)
-        }
+        //const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        //if (st !== gl.FRAMEBUFFER_COMPLETE) {
+        //    console.log(st)
+        //}
 
         // オフスクリーンレンダリングを実行
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1295,7 +1303,7 @@ class ImageProcessing {
 
     }
 
-    compositUpdate(dst: Surface, src: Surface, program: Program, updateSrc:boolean = false) {
+    compositUpdate(dst: Surface, src: Surface, program: Program) {
         const gl = this.gl;
         // arrtibute変数の位置を取得
         const positionLocation = gl.getAttribLocation(program.program, "a_position");
@@ -1317,7 +1325,7 @@ class ImageProcessing {
         gl.enableVertexAttribArray(positionLocation);
 
         // 頂点バッファ（座標）を設定
-        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, src.width, src.height));
+        this.setVertexPosition(ImageProcessing.createRectangle(0, 0, dst.width, dst.height));
 
         // 頂点座標Attributeの位置情報を設定
         gl.vertexAttribPointer(
@@ -1364,10 +1372,10 @@ class ImageProcessing {
         gl.bindFramebuffer(gl.FRAMEBUFFER, tmp.framebuffer);
         gl.viewport(0, 0, tmp.width, tmp.height);
 
-        const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-        if (st !== gl.FRAMEBUFFER_COMPLETE) {
-            console.log(st)
-        }
+        //const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        //if (st !== gl.FRAMEBUFFER_COMPLETE) {
+        //    console.log(st)
+        //}
 
         // オフスクリーンレンダリングを実行
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1375,24 +1383,90 @@ class ImageProcessing {
         // 適用完了
 
         // レンダリング範囲をフィードバック
-        if (updateSrc) {
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, null);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, src.texture);
-        } else {
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, null);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, dst.texture);
-        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, dst.texture);
         gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, dst.width, dst.height);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
         // 出力先を破棄
         tmp.dispose();
     }
+
+    draw(dst: Surface, src: Surface, {program = null, start = null, end, matrix = null}: { program: Program, start: IPoint, end: IPoint, matrix: Matrix3 }) {
+        const gl = this.gl;
+        // arrtibute変数の位置を取得
+        const positionLocation = gl.getAttribLocation(program.program, "a_position");
+        const texcoordLocation = gl.getAttribLocation(program.program, "a_texCoord");
+
+        // uniform変数の位置を取得
+        const matrixLocation = gl.getUniformLocation(program.program, "u_matrix");
+        const textureLication = gl.getUniformLocation(program.program, 'u_front');
+
+        // シェーダを設定
+        gl.useProgram(program.program);
+
+        // シェーダの頂点座標Attributeを有効化
+        gl.enableVertexAttribArray(positionLocation);
+
+        // 頂点バッファ（座標）を設定
+        this.setVertexPosition(ImageProcessing.createRectangle(start.x, start.y, end.x, end.y));
+
+        // 頂点座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(
+            positionLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0           // start at the beginning of the buffer
+        );
+
+        // シェーダのテクスチャ座標Attributeを有効化
+        gl.enableVertexAttribArray(texcoordLocation);
+
+        // 頂点バッファ（テクスチャ座標）を設定
+        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+
+        // テクスチャ座標Attributeの位置情報を設定
+        gl.vertexAttribPointer(
+            texcoordLocation,
+            2,          // 2 components per iteration
+            gl.FLOAT,   // the data is 32bit floats
+            false,      // don't normalize the data
+            0 * 4,          // 0 = move forward size * sizeof(type) each iteration to get the next position
+            0 * 4           // start at the beginning of the buffer
+        );
+
+        const projMat = Matrix3.projection(dst.width, dst.height);
+        const projectionMatrix = (matrix == null) ? projMat : Matrix3.multiply(projMat, matrix);
+        gl.uniformMatrix3fv(matrixLocation, false, projectionMatrix);
+
+        //// テクスチャサイズ情報ををシェーダのUniform変数に設定
+        //gl.uniform2f(textureSizeLocation, this.width, this.height);
+
+        // 入力元とするレンダリングターゲットのテクスチャを選択
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, src.texture);
+        gl.uniform1i(textureLication, 0);
+
+        // 出力先とするレンダリングターゲットのフレームバッファを選択し、レンダリング解像度とビューポートを設定
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+
+        //const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        //if (st !== gl.FRAMEBUFFER_COMPLETE) {
+        //    console.log(st)
+        //}
+
+        // オフスクリーンレンダリングを実行
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    }
 }
+
+
 ///////////////////////////////////////////////////////////////
 const sizeOfBitmapFileHeader: number = 14;
 const sizeOfBitmapInfoHeader: number = 40;
@@ -2350,15 +2424,15 @@ namespace GUI {
             visible: boolean;
             enable: boolean;
         } = {
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px monospace",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-                visible: true,
-                enable: true,
-            };
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px monospace",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+            visible: true,
+            enable: true,
+        };
 
         public text: string | (() => string);
         public edgeColor: string;
@@ -2453,18 +2527,18 @@ namespace GUI {
             disableColor: string;
             disableFontColor: string;
         } = {
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px monospace",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-                visible: true,
-                enable: true,
-                disableEdgeColor: `rgb(34,34,34)`,
-                disableColor: `rgb(133,133,133)`,
-                disableFontColor: `rgb(192,192,192)`,
-            };
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px monospace",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+            visible: true,
+            enable: true,
+            disableEdgeColor: `rgb(34,34,34)`,
+            disableColor: `rgb(133,133,133)`,
+            disableFontColor: `rgb(192,192,192)`,
+        };
 
         public text: string | (() => string);
         public edgeColor: string;
@@ -2557,19 +2631,19 @@ namespace GUI {
             disableColor: string;
             disableFontColor: string;
         } = {
-                edgeColor: `rgb(12,34,98)`,
-                color: `rgb(24,133,196)`,
-                font: "10px monospace",
-                fontColor: `rgb(255,255,255)`,
-                textAlign: "left",
-                textBaseline: "top",
-                visible: true,
-                enable: true,
-                draggable: false,
-                disableEdgeColor: `rgb(34,34,34)`,
-                disableColor: `rgb(133,133,133)`,
-                disableFontColor: `rgb(192,192,192)`,
-            };
+            edgeColor: `rgb(12,34,98)`,
+            color: `rgb(24,133,196)`,
+            font: "10px monospace",
+            fontColor: `rgb(255,255,255)`,
+            textAlign: "left",
+            textBaseline: "top",
+            visible: true,
+            enable: true,
+            draggable: false,
+            disableEdgeColor: `rgb(34,34,34)`,
+            disableColor: `rgb(133,133,133)`,
+            disableFontColor: `rgb(192,192,192)`,
+        };
 
         public text: string | (() => string);
         public edgeColor: string;
@@ -3060,7 +3134,7 @@ class HSVColorWheelUI extends GUI.Control {
         const r = this.hsvColorWhell.rgb;
         return r;
     }
-    public set rgb(value:RGB){
+    public set rgb(value: RGB) {
         this.hsvColorWhell.rgb = value;
     }
 
@@ -3115,11 +3189,43 @@ interface Tool {
     down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
     move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
     up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void;
-    draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish:boolean): void;
+    draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void;
+}
+///////////////////////////////////////////////////////////////
+class Float32Buffer {
+    protected _array: Float32Array;
+    protected _length: number;
+    public get capacity(): number {
+        return this._array.length;
+    }
+    constructor(capacity: number) {
+        this._array = new Float32Array(capacity);
+        this._length = 0;
+    }
+    public grow(size: number): void {
+        if (this._array.length < size) {
+            const newBuffer = new Float32Array(size * 2);
+            newBuffer.set(this._array);
+            this._array = newBuffer;
+        }
+    }
+
+    public push(...value: number[]): void {
+        this.grow(this._length + value.length);
+        for (let i = 0; i < value.length; i++) {
+            this._array[this._length++] = value[i];
+        }
+    }
+    public getView(): Float32Array {
+        return new Float32Array(this._array.buffer, 0, this._length);
+    }
+    public clear(): void {
+        this._length = 0;
+    }
 }
 ///////////////////////////////////////////////////////////////
 class SolidPen implements Tool {
-    protected joints: IPoint[];
+    protected joints: Float32Buffer;
 
     public shader: Program;
     public name: string;
@@ -3127,18 +3233,18 @@ class SolidPen implements Tool {
 
     constructor(name: string, shader: Program, compositMode: CompositMode) {
         this.name = name;
-        this.joints = [];
+        this.joints = new Float32Buffer(256 * 2);
         this.shader = shader;
         this.compositMode = compositMode;
     }
 
     public down(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
-        this.joints.length = 0;
-        this.joints.push(point);
+        this.joints.clear();
+        this.joints.push(point.x, point.y);
     }
 
     public move(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
-        this.joints.push(point);
+        this.joints.push(point.x, point.y);
     }
 
     public up(config: IPainterConfig, point: IPoint, currentLayer: Layer): void {
@@ -3147,7 +3253,7 @@ class SolidPen implements Tool {
     public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
         ip.drawLines(imgData, {
             program: this.shader,
-            vertexes: new Float32Array(this.joints.reduce((s, x) => {s.push(x.x, x.y); return s; }, [])),
+            vertexes: this.joints.getView(),
             color: config.penColor,
             size: config.penSize,
             antialiasSize: config.antialiasSize
@@ -3158,54 +3264,54 @@ class SolidPen implements Tool {
 }
 ///////////////////////////////////////////////////////////////
 class CorrectionSolidPen extends SolidPen {
+    protected correctedJoints: Float32Buffer;
 
     // 単純ガウシアン重み付け補完
     // https://www24.atwiki.jp/sigetch_2007/pages/18.html?pc_mode=1
-
-    static G_HIST_SIZE : number = 20;
-    sigma :number = 5;
-    weight1 :number = 1 / (Math.sqrt(2 * Math.PI) * this.sigma);
-    g_move_avg(stroke: IPoint[]): IPoint[] {
-        const hist: IPoint[] = [];
-        const new_stroke: IPoint[] = [];
-        stroke.forEach(val => {
-            const { x: x, y: y } = val;
-            hist.push({ x: x, y: y });
-            if (hist.length > CorrectionSolidPen.G_HIST_SIZE) { hist.shift(); }
+    static g_move_avg(result: Float32Buffer, stroke: Float32Buffer, {sigma = 5, history = 20}: { sigma?: number, history?: number }): void {
+        result.clear();
+        const view: Float32Array = stroke.getView();
+        const len: number = ~~(view.length / 2);
+        const weight1: number = (Math.sqrt(2 * Math.PI) * sigma);
+        const sigma2 :number = (2 * sigma * sigma);
+        for (let i = 0; i < len; i++) {
+            const x = view[i * 2 + 0];
+            const y = view[i * 2 + 1];
             let tx = 0;
             let ty = 0;
             let scale = 0;
-            hist.forEach((pos, ind) => {
-                const weight = 1 / this.weight1 * Math.exp(-(hist.length - 1 - ind) * (hist.length - 1 - ind) / (2 * this.sigma * this.sigma));
+            const histlen = (i+1 > history) ? history : i+1;
+            let histPos = i-(histlen-1);
+            for (let j = 0; j < histlen; j++) {
+                const weight = weight1 * Math.exp(-(histlen - 1 - j) * (histlen - 1 - j) / sigma2);
                 scale = scale + weight
-                tx = tx + weight * pos.x;
-                ty = ty + weight * pos.y;
-            });
+                tx = tx + weight * view[histPos * 2 + 0];
+                ty = ty + weight * view[histPos * 2 + 1];
+                histPos++;
+            }
             tx /= scale;
             ty /= scale;
-            new_stroke.push({ x: tx, y: ty });
+            result.push(tx, ty);
             //console.log(`x=${x}, y=${y}, scale=${scale},tx=${tx},ty=${ty}`);
-        });
-        return new_stroke;
+        }
     }
 
 
     constructor(name: string, shader: Program, compositMode: CompositMode) {
         super(name, shader, compositMode);
-
+        this.correctedJoints = new Float32Buffer(this.joints.capacity);
     }
 
     public draw(config: IPainterConfig, ip: ImageProcessing, imgData: Surface, finish: boolean): void {
-        const newJoints = this.g_move_avg(this.joints);
-            ip.drawLines(imgData, {
-                program: this.shader,
-                vertexes: new Float32Array(newJoints.reduce((s, x) => {s.push(x.x, x.y); return s; }, [])),
-                color: config.penColor,
-                size: config.penSize,
-                antialiasSize: config.antialiasSize
-            }
-            );
-        console.log(this.joints.length);
+        CorrectionSolidPen.g_move_avg(this.correctedJoints, this.joints, {});
+        ip.drawLines(imgData, {
+            program: this.shader,
+            vertexes: this.correctedJoints.getView(),
+            color: config.penColor,
+            size: config.penSize,
+            antialiasSize: config.antialiasSize
+        }
+        );
     }
 }
 ///////////////////////////////////////////////////////////////
@@ -3282,15 +3388,15 @@ class FloodFill implements Tool {
         const input = pb.capture(currentLayer.imageData);
         const output = new ImageData(width, height);
         output.data.fill(0);
-        const checked = new Uint8Array(width*height);
+        const checked = new Uint8Array(width * height);
         checked.fill(0);
         pb.dispose();
 
-        const [fr,fg,fb,fa] = config.penColor;
+        const [fr, fg, fb, fa] = config.penColor;
         const start = (y * width + x) * 4;
-        const [r,g,b,a]= [input[start], input[start + 1], input[start + 2], input[start + 3]];
+        const [r, g, b, a] = [input[start], input[start + 1], input[start + 2], input[start + 3]];
 
-        const q: number[] = [x,y];
+        const q: number[] = [x, y];
         const quadWidth = width * 4;
 
         while (q.length) {
@@ -3300,7 +3406,7 @@ class FloodFill implements Tool {
             const i = (y * width + x);
 
             let left = 0;
-            let right = width-1;
+            let right = width - 1;
 
             {// left-side
                 let j = i - 1;
@@ -3310,7 +3416,7 @@ class FloodFill implements Tool {
                         off -= 4;
                         j--;
                     } else {
-                        left = xx+1;
+                        left = xx + 1;
                         break;
                     }
                 }
@@ -3323,7 +3429,7 @@ class FloodFill implements Tool {
                         off += 4;
                         j++;
                     } else {
-                        right = xx-1;
+                        right = xx - 1;
                         break;
                     }
                 }
@@ -3331,8 +3437,8 @@ class FloodFill implements Tool {
 
             {
                 let j = y * width + left;
-                let ju = j-width;
-                let jd = j+width;
+                let ju = j - width;
+                let jd = j + width;
                 let off = j * 4;
                 let offu = off - width * 4;
                 let offd = off + width * 4;
@@ -3734,7 +3840,7 @@ module Painter {
         const previewData = previewContext.createImageData(50, 50);
 
         return {
-            imageData: imageProcessing.createBlankOffscreenTarget(imageCanvas.width, imageCanvas.height),
+            imageData: imageProcessing.createBlankOffscreenTarget(imageLayerCompositedSurface.width, imageLayerCompositedSurface.height),
             previewCanvas: previewCanvas,
             previewContext: previewContext,
             previewData: previewData,
@@ -3784,12 +3890,14 @@ module Painter {
         const pw = layer.previewData.width;
         const ph = layer.previewData.height;
         const pSurf = imageProcessing.createBlankOffscreenTarget(pw, ph);
-        imageProcessing.applyShader(pSurf, layer.imageData, { program: copyShader });
+        const scale = Math.min(pw / sw, ph / sh);
+        const mat = Matrix3.scaling(scale, scale);
+        imageProcessing.applyShader(pSurf, layer.imageData, { program: copyShader, matrix: mat });
         const dstData = layer.previewData.data;
         let dst = 0;
         const pb = new PixelBuffer(pSurf.gl, pw, ph);
         const srcData = pb.capture(pSurf);
-        
+
         layer.previewContext.putImageData(new ImageData(srcData, pw, ph), 0, 0);
         update({ gui: true });
 
@@ -3802,8 +3910,8 @@ module Painter {
     /**
      * 作画画面ビュー用
      */
-    let viewCanvas: HTMLCanvasElement = null;
-    let viewContext: CanvasRenderingContext2D = null;
+    //let viewCanvas: HTMLCanvasElement = null;
+    //let viewContext: CanvasRenderingContext2D = null;
 
     /**
      * オーバーレイ用（矩形選択など描画とは関係ないガイド線などを描画する）
@@ -3836,6 +3944,7 @@ module Painter {
     let alphaPenShader: Program = null;
     let normalBlendShader: Program = null;
     let eraserBlendShader: Program = null;
+    let normalCopyShader: Program = null;
     let copyShader: Program = null;
     let checkerBoardShader: Program = null;
     let alphaFillShader: Program = null;
@@ -3846,31 +3955,34 @@ module Painter {
 
         parentHtmlElement = parentHtmlElement;
 
-
         imageCanvas = document.createElement("canvas");
-        imageCanvas.width = width;
-        imageCanvas.height = height;
+        imageCanvas.style.position = "absolute";
+        imageCanvas.style.left = "0";
+        imageCanvas.style.top = "0";
+        imageCanvas.style.width = "100%";
+        imageCanvas.style.height = "100%";
         glContext = imageCanvas.getContext('webgl2') as WebGL2RenderingContext;
+        parentHtmlElement.appendChild(imageCanvas);
 
         imageProcessing = new ImageProcessing(glContext);
 
+        imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
         imageLayers = [createLayer()];
         imageCurrentLayer = 0;
 
-        imageLayerCompositedSurface = imageProcessing.createBlankOffscreenTarget(width, height);
 
         workLayer = createLayer();
         preCompositLayer = createLayer();
-            
-        viewCanvas = document.createElement("canvas");
-        viewCanvas.style.position = "absolute";
-        viewCanvas.style.left = "0";
-        viewCanvas.style.top = "0";
-        viewCanvas.style.width = "100%";
-        viewCanvas.style.height = "100%";
-        viewContext = viewCanvas.getContext("2d");
-        viewContext.imageSmoothingEnabled = false;
-        parentHtmlElement.appendChild(viewCanvas);
+
+        //viewCanvas = document.createElement("canvas");
+        //viewCanvas.style.position = "absolute";
+        //viewCanvas.style.left = "0";
+        //viewCanvas.style.top = "0";
+        //viewCanvas.style.width = "100%";
+        //viewCanvas.style.height = "100%";
+        //viewContext = viewCanvas.getContext("2d");
+        //viewContext.imageSmoothingEnabled = false;
+        //parentHtmlElement.appendChild(viewCanvas);
 
         overlayCanvas = document.createElement("canvas");
         overlayCanvas.style.position = "absolute";
@@ -4126,8 +4238,8 @@ module Painter {
                 ModalDialog.block();
                 const zip = new JSZip();
                 const config: SaveDataConfig = {
-                    width: imageCanvas.width,
-                    height: imageCanvas.height,
+                    width: imageLayerCompositedSurface.width,
+                    height: imageLayerCompositedSurface.height,
                     layers: []
                 };
                 for (let i = 0; i < imageLayers.length; i++) {
@@ -4197,8 +4309,8 @@ module Painter {
                                 if (datas.some(x => x == null)) {
                                     return Promise.reject("layer data is invalid.");
                                 } else {
-                                    imageCanvas.width = config.width;
-                                    imageCanvas.height = config.height;
+                                    //imageCanvas.width = config.width;
+                                    //imageCanvas.height = config.height;
                                     imageLayers.forEach(disposeLayer);
                                     imageLayers.length = 0;
 
@@ -4379,7 +4491,7 @@ module Painter {
         for (let i = imageLayers.length - 1; i >= 0; i--) {
             if (i == imageCurrentLayer) {
                 preCompositLayer.imageData.clear();
-                imageProcessing.composit(preCompositLayer.imageData, imageLayers[i].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode));
+                imageProcessing.composit(preCompositLayer.imageData, workLayer.imageData, imageLayers[i].imageData, getCompositShader(workLayer.compositMode));
                 imageProcessing.compositUpdate(imageLayerCompositedSurface, preCompositLayer.imageData, normalBlendShader);
             } else {
                 imageProcessing.compositUpdate(imageLayerCompositedSurface, imageLayers[i].imageData, normalBlendShader);
@@ -4499,8 +4611,8 @@ module Painter {
                         config.scrollX = (config.scrollX * (config.scale + 1) / (config.scale));
                         config.scrollY = (config.scrollY * (config.scale + 1) / (config.scale));
                         config.scale += 1;
-                        canvasOffsetX = ~~((viewCanvas.width - imageCanvas.width * config.scale) / 2);
-                        canvasOffsetY = ~~((viewCanvas.height - imageCanvas.height * config.scale) / 2);
+                        canvasOffsetX = ~~((imageCanvas.width - imageLayerCompositedSurface.width * config.scale) / 2);
+                        canvasOffsetY = ~~((imageCanvas.height - imageLayerCompositedSurface.height * config.scale) / 2);
                         update({ overlay: true, view: true, gui: true });
                         return true;
                     }
@@ -4509,8 +4621,8 @@ module Painter {
                         config.scrollX = (config.scrollX * (config.scale - 1) / (config.scale));
                         config.scrollY = (config.scrollY * (config.scale - 1) / (config.scale));
                         config.scale -= 1;
-                        canvasOffsetX = ~~((viewCanvas.width - imageCanvas.width * config.scale) / 2);
-                        canvasOffsetY = ~~((viewCanvas.height - imageCanvas.height * config.scale) / 2);
+                        canvasOffsetX = ~~((imageCanvas.width - imageLayerCompositedSurface.width * config.scale) / 2);
+                        canvasOffsetY = ~~((imageCanvas.height - imageLayerCompositedSurface.height * config.scale) / 2);
                         update({ overlay: true, view: true, gui: true });
                         return true;
                     }
@@ -4533,18 +4645,18 @@ module Painter {
     }
 
     export function resize() {
-        const ret1 = resizeCanvas(viewCanvas);
+        const ret1 = resizeCanvas(imageCanvas);
         const ret2 = resizeCanvas(overlayCanvas);
         const ret3 = resizeCanvas(uiCanvas);
         if (ret1 || ret2) {
-            canvasOffsetX = ~~((viewCanvas.width - imageCanvas.width * config.scale) / 2);
-            canvasOffsetY = ~~((viewCanvas.height - imageCanvas.height * config.scale) / 2);
+            canvasOffsetX = ~~((imageCanvas.width - imageLayerCompositedSurface.width * config.scale) / 2);
+            canvasOffsetY = ~~((imageCanvas.height - imageLayerCompositedSurface.height * config.scale) / 2);
         }
         update({ view: (ret1 || ret2), gui: ret3 });
     }
 
     export function pointToClient(point: IPoint): IPoint {
-        const cr = viewCanvas.getBoundingClientRect();
+        const cr = imageCanvas.getBoundingClientRect();
         const sx = (point.x - (cr.left + window.pageXOffset));
         const sy = (point.y - (cr.top + window.pageYOffset));
         return { x: sx, y: sy };
@@ -4558,7 +4670,7 @@ module Painter {
 
 
     let prev: number = NaN;
-    function benchmark(msg?:string) {
+    function benchmark(msg?: string) {
         const t = Date.now();
         if (msg != null && !isNaN(prev)) {
             console.log(msg, t - prev);
@@ -4581,47 +4693,42 @@ module Painter {
                     // 画面内領域のみを描画。スケール＋平行移動までGPUで実行
                     const viewLeft = canvasOffsetX + config.scrollX;
                     const viewTop = canvasOffsetY + config.scrollY;
-                    const viewWidth = imageCanvas.width * config.scale;
-                    const viewHeight = imageCanvas.height * config.scale;
+                    const viewWidth = imageLayerCompositedSurface.width * config.scale;
+                    const viewHeight = imageLayerCompositedSurface.height * config.scale;
                     const viewRight = viewLeft + viewWidth;
                     const viewBottom = viewTop + viewHeight;
 
                     const clipedLeft = Math.max(viewLeft, 0);
                     const clipedTop = Math.max(viewTop, 0);
-                    const clipedRight = Math.min(viewRight, viewCanvas.width);
-                    const clipedBottom = Math.min(viewBottom, viewCanvas.height);
+                    const clipedRight = Math.min(viewRight, imageCanvas.width);
+                    const clipedBottom = Math.min(viewBottom, imageCanvas.height);
 
                     const srcLeft = Math.min(viewLeft, 0);
                     const srcTop = Math.min(viewTop, 0);
-                    const srcWidth = Math.min(viewCanvas.width, viewWidth+ srcLeft);
-                    const srcHeight = Math.min(viewCanvas.height, viewHeight + srcTop);
+                    const srcWidth = Math.min(imageCanvas.width, viewWidth + srcLeft);
+                    const srcHeight = Math.min(imageCanvas.height, viewHeight + srcTop);
 
-                    const transformMatrix = Matrix3.multiply(Matrix3.translation(srcLeft, srcTop), Matrix3.scaling(config.scale, config.scale));
+                    const transformMatrix = Matrix3.multiply(Matrix3.translation(viewLeft, viewTop), Matrix3.scaling(config.scale, config.scale));
 
-                    const originalWidth = imageCanvas.width;
-                    const originalHeight = imageCanvas.height;
-                    imageCanvas.width = srcWidth;
-                    imageCanvas.height = srcHeight;
-                    imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader, matrix: transformMatrix });
+                    //imageCanvas.style.display = "none";
+                    imageCanvas.width = document.body.clientWidth;
+                    imageCanvas.height = document.body.clientHeight;
+                    const viewSurface = new Surface(imageProcessing.gl, imageCanvas.width, imageCanvas.height);
+                    viewSurface.clear();
 
-                    viewCanvas.style.display = "none";
-                    viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
-                    viewContext.fillStyle = "rgb(198,208,224)";
-                    viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
-                    viewContext.fillStyle = "rgb(255,255,255)";
-                    viewContext.shadowOffsetX = viewContext.shadowOffsetY = 0;
-                    viewContext.shadowColor = "rgb(0,0,0)";
-                    viewContext.shadowBlur = 10;
-                    viewContext.fillRect(viewLeft, viewTop, viewWidth, viewHeight);
-                    viewContext.shadowBlur = 0;
-                    viewContext.imageSmoothingEnabled = false;
-                    //benchmark();
-                    viewContext.drawImage(imageCanvas, clipedLeft, clipedTop);
-                    //benchmark(`drawImage(${srcWidth}x${srcHeight}):`);
-                    imageCanvas.width = originalWidth;
-                    imageCanvas.height = originalHeight;
+                    const left = clipedLeft;
+                    const top = clipedTop;
+                    const right = clipedLeft + srcWidth;
+                    const bottom = clipedTop + srcHeight;
+                    imageProcessing.drawLines(viewSurface, { program: alphaPenShader, vertexes: new Float32Array([viewLeft, viewTop, viewRight, viewTop, viewRight, viewBottom, viewLeft, viewBottom, viewLeft, viewTop]), size: 20, color: [0, 0, 0, 255], antialiasSize: 40 });
+                    imageProcessing.draw(viewSurface, imageLayerCompositedSurface, {
+                        program: copyShader, matrix: transformMatrix,
+                        start: { x: 0, y: 0 }, end: { x: imageLayerCompositedSurface.width, y: imageLayerCompositedSurface.height },
+                    });
+                    imageProcessing.applyShader(null, viewSurface, { program: copyShader, matrix: Matrix3.identity() });
+                    viewSurface.dispose();
                     updateRequest.view = false;
-                    viewCanvas.style.display = "inline";
+                    //imageCanvas.style.display = "inline";
 
                     //const s = Date.now();
                     //imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader });
