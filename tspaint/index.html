@@ -85,38 +85,18 @@
 
         uniform mat3 u_matrix;
 
-        //varying vec2 v_texCoord;
-
+        varying vec2 v_texCoord;
         void main() {
         gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        //v_texCoord = a_texCoord;
+        v_texCoord = a_texCoord;
         }
     </script>
     <script id="2d-fragment-shader-3" type="x-shader/x-fragment">
-        // https://qiita.com/yuba/items/2f35d1e5e162f44fc1b3
-        // https://qiita.com/edo_m18/items/71f6064f3355be7e4f45
         precision mediump float;
-
+        varying vec2 v_texCoord;
         uniform vec4  u_color;
-        uniform vec2  u_start;
-        uniform vec2  u_end;
-        uniform float u_size;
-        //varying vec2 v_resolution;
-
         void main() {
-        vec2 a = u_start;
-        vec2 b = u_end;
-        vec2 c = gl_FragCoord.xy;
-
-        vec2 u = b - a;
-        vec2 v = c - a;
-        float r = clamp(dot(u,v) / dot(u,u), 0.0, 1.0);
-        vec2 p = a + r * u;
-        float dist = distance(p, c);
-        if (dist > u_size) { discard; }
-
         gl_FragColor = u_color;
-
         }
     </script>
     <script id="2d-vertex-shader-4" type="x-shader/x-vertex">

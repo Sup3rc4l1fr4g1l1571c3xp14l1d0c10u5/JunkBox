@@ -447,9 +447,11 @@ class ImageProcessing {
         // 頂点バッファ（座標）を作成
         this.positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, 256, gl.STREAM_DRAW);
         // 頂点バッファ（テクスチャ座標）を作成
         this.texcoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, 256, gl.STREAM_DRAW);
     }
     // フィルタカーネルの重み合計（重み合計が0以下の場合は1とする）
     static computeKernelWeight(kernel) {
@@ -459,12 +461,12 @@ class ImageProcessing {
     setVertexPosition(array) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STREAM_DRAW);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(array));
     }
     setTexturePosition(array) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(array), gl.STREAM_DRAW);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(array));
     }
     createBlankOffscreenTarget(width, height) {
         const surf = new Surface(this.gl, width, height);
@@ -965,7 +967,7 @@ class ImageProcessing {
         // シェーダのテクスチャ座標Attributeを有効化
         gl.enableVertexAttribArray(texcoordLocation);
         // 頂点バッファ（テクスチャ座標）を設定
-        this.setTexturePosition(ImageProcessing.createRectangle(0, 0, 1, 1));
+        this.setTexturePosition(ImageProcessing.createRectangle(start.x / src.width, start.y / src.height, end.x / src.width, end.y / src.height));
         // テクスチャ座標Attributeの位置情報を設定
         gl.vertexAttribPointer(texcoordLocation, 2, // 2 components per iteration
         gl.FLOAT, // the data is 32bit floats
@@ -991,6 +993,15 @@ class ImageProcessing {
         //}
         // オフスクリーンレンダリングを実行
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    copySurface(dst, src) {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, src.framebuffer);
+        gl.viewport(0, 0, dst.width, dst.height);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, dst.width, dst.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 }
 ///////////////////////////////////////////////////////////////
@@ -2239,14 +2250,28 @@ class SolidPen {
         this.shader = shader;
         this.compositMode = compositMode;
     }
-    down(config, point, currentLayer) {
+    down({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
         this.joints.clear();
         this.joints.push(point.x, point.y);
+        workLayer.imageData.clear();
+        workLayer.compositMode = this.compositMode;
+        this.draw(config, imageProcessing, workLayer.imageData, false);
+        workLayer.dirty = true;
     }
-    move(config, point, currentLayer) {
+    move({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
         this.joints.push(point.x, point.y);
+        workLayer.imageData.clear();
+        workLayer.compositMode = this.compositMode;
+        this.draw(config, imageProcessing, workLayer.imageData, false);
+        workLayer.dirty = true;
     }
-    up(config, point, currentLayer) {
+    up({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
+        workLayer.imageData.clear();
+        this.draw(config, imageProcessing, workLayer.imageData, true);
+        imageProcessing.compositUpdate(currentLayer.imageData, workLayer.imageData, Painter.getCompositShader(workLayer.compositMode));
+        workLayer.imageData.clear();
+        workLayer.dirty = true;
+        currentLayer.dirty = true;
     }
     draw(config, ip, imgData, finish) {
         ip.drawLines(imgData, {
@@ -2314,14 +2339,28 @@ class RectanglePen {
         this.start = null;
         this.end = null;
     }
-    down(config, point, currentLayer) {
+    down({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
         this.start = point;
         this.end = point;
+        workLayer.imageData.clear();
+        workLayer.compositMode = this.compositMode;
+        this.draw(config, imageProcessing, workLayer.imageData, false);
+        workLayer.dirty = true;
     }
-    move(config, point, currentLayer) {
+    move({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
         this.end = point;
+        workLayer.imageData.clear();
+        workLayer.compositMode = this.compositMode;
+        this.draw(config, imageProcessing, workLayer.imageData, false);
+        workLayer.dirty = true;
     }
-    up(config, point, currentLayer) {
+    up({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
+        workLayer.imageData.clear();
+        this.draw(config, imageProcessing, workLayer.imageData, true);
+        imageProcessing.compositUpdate(currentLayer.imageData, workLayer.imageData, Painter.getCompositShader(workLayer.compositMode));
+        workLayer.imageData.clear();
+        workLayer.dirty = true;
+        currentLayer.dirty = true;
     }
     draw(config, ip, imgData, finish) {
         ip.drawLines(imgData, {
@@ -2347,7 +2386,7 @@ class FloodFill {
         this.compositMode = compositMode;
         this.surface = null;
     }
-    down(config, point, currentLayer) {
+    down({ config = null, point = null, currentLayer = null, workLayer = null, imageProcessing = null }) {
         let x = ~~point.x;
         let y = ~~point.y;
         const width = currentLayer.imageData.width;
@@ -2446,10 +2485,17 @@ class FloodFill {
             }
         }
         this.surface = new Surface(currentLayer.imageData.gl, output);
+        workLayer.imageData.clear();
+        workLayer.compositMode = this.compositMode;
+        this.draw(config, imageProcessing, workLayer.imageData, true);
+        imageProcessing.compositUpdate(currentLayer.imageData, workLayer.imageData, Painter.getCompositShader(workLayer.compositMode));
+        workLayer.imageData.clear();
+        workLayer.dirty = true;
+        currentLayer.dirty = true;
     }
-    move(config, point, currentLayer) {
+    move({ config = null, point = null, currentLayer = null, workLayer = null, imageProcessing = null }) {
     }
-    up(config, point, currentLayer) {
+    up({ config = null, point = null, currentLayer = null, workLayer = null, imageProcessing = null }) {
     }
     draw(config, ip, imgData, finish) {
         if (this.surface != null) {
@@ -2459,6 +2505,186 @@ class FloodFill {
                 this.surface.dispose();
                 this.surface = null;
             }
+        }
+    }
+}
+///////////////////////////////////////////////////////////////
+var SelectMode;
+(function (SelectMode) {
+    SelectMode[SelectMode["none"] = 0] = "none";
+    SelectMode[SelectMode["selecting"] = 1] = "selecting";
+    SelectMode[SelectMode["selected"] = 2] = "selected";
+    SelectMode[SelectMode["dragging"] = 3] = "dragging";
+    SelectMode[SelectMode["dragged"] = 4] = "dragged";
+})(SelectMode || (SelectMode = {}));
+class SelectTool {
+    constructor(name, alphaPenShader, eraceShader, normalBlendShader, copyShader, compositMode) {
+        this.name = name;
+        this.alphaPenShader = alphaPenShader;
+        this.eraceShader = eraceShader;
+        this.normalBlendShader = normalBlendShader;
+        this.copyShader = copyShader;
+        this.compositMode = compositMode;
+        this.start = null;
+        this.end = null;
+        this.mode = SelectMode.none;
+        this.surface = null;
+        this.copyStart = null;
+        this.copyEnd = null;
+        this.copyTransformMatrix = Matrix3.identity();
+    }
+    down({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
+        if (this.mode == SelectMode.none) {
+            // 選択領域なし
+            this.mode = SelectMode.selecting;
+            this.start = point;
+            this.end = point;
+            overlayLayer.imageData.clear();
+            overlayLayer.compositMode = this.compositMode;
+            this.draw(config, imageProcessing, overlayLayer.imageData, false);
+            overlayLayer.dirty = true;
+        }
+        else if (this.mode == SelectMode.selected) {
+            // 選択済み
+            const left = Math.min(this.start.x, this.end.x);
+            const top = Math.min(this.start.y, this.end.y);
+            const right = Math.max(this.start.x, this.end.x);
+            const bottom = Math.max(this.start.y, this.end.y);
+            if (left <= point.x && point.x < right && top <= point.y && point.y < bottom) {
+                this.mode = SelectMode.dragging; // ドラッグ中へ
+                if (this.surface != null) {
+                    this.surface.dispose();
+                }
+                this.surface = new Surface(currentLayer.imageData.gl, currentLayer.imageData.width, currentLayer.imageData.height);
+                this.copyStart = { x: left, y: top };
+                this.copyEnd = { x: right, y: bottom };
+                this.copyLeftTop = { x: left, y: top };
+                this.copyWidth = right - left;
+                this.copyHeight = bottom - top;
+                this.copyTransformMatrix = Matrix3.identity(); //(left, top);
+                workLayer.imageData.clear();
+                imageProcessing.applyShader(this.surface, currentLayer.imageData, { program: this.copyShader });
+                imageProcessing.fillRect(currentLayer.imageData, { program: this.eraceShader, start: this.start, end: this.end, color: [0, 0, 0, 0] });
+                //imageProcessing.draw(workLayer.imageData, this.surface, { program: this.normalBlendShader, start: this.copyStart, end: this.copyEnd, matrix: this.copyTransformMatrix });
+                this.draw(config, imageProcessing, workLayer.imageData, false);
+                workLayer.dirty = true;
+                currentLayer.dirty = true;
+                overlayLayer.dirty = true;
+                this.dragStartPos = point;
+            }
+            else {
+                // 選択領域なしと同じ動作
+                this.mode = SelectMode.selecting;
+                this.start = point;
+                this.end = point;
+                overlayLayer.imageData.clear();
+                overlayLayer.compositMode = this.compositMode;
+                this.draw(config, imageProcessing, overlayLayer.imageData, false);
+                overlayLayer.dirty = true;
+            }
+        }
+        else if (this.mode == SelectMode.dragged) {
+            // ドラッグ後
+            const left = Math.min(this.start.x, this.end.x);
+            const top = Math.min(this.start.y, this.end.y);
+            const right = Math.max(this.start.x, this.end.x);
+            const bottom = Math.max(this.start.y, this.end.y);
+            if (left <= point.x && point.x < right && top <= point.y && point.y < bottom) {
+                this.mode = SelectMode.dragging;
+                this.dragStartPos = point;
+            }
+            else {
+                // 移動を確定させてから選択領域なしと同じ動作
+                if (this.start.x != this.end.x && this.start.y != this.end.y) {
+                    overlayLayer.imageData.clear();
+                    workLayer.imageData.clear();
+                    this.draw(config, imageProcessing, workLayer.imageData, false);
+                    imageProcessing.compositUpdate(currentLayer.imageData, workLayer.imageData, this.normalBlendShader);
+                    workLayer.imageData.clear();
+                    overlayLayer.imageData.clear();
+                    currentLayer.dirty = true;
+                }
+                // 
+                this.mode = SelectMode.selecting;
+                this.start = point;
+                this.end = point;
+                workLayer.imageData.clear();
+                overlayLayer.imageData.clear();
+                overlayLayer.compositMode = this.compositMode;
+                this.draw(config, imageProcessing, overlayLayer.imageData, false);
+                workLayer.dirty = true;
+                overlayLayer.dirty = true;
+            }
+        }
+    }
+    move({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
+        if (this.mode == SelectMode.selecting) {
+            // ドラッグ選択中
+            this.end = point;
+            overlayLayer.imageData.clear();
+            overlayLayer.compositMode = this.compositMode;
+            this.draw(config, imageProcessing, overlayLayer.imageData, false);
+            overlayLayer.dirty = true;
+        }
+        else if (this.mode == SelectMode.dragging) {
+            // ドラッグ移動中
+            const dx = point.x - this.dragStartPos.x;
+            const dy = point.y - this.dragStartPos.y;
+            this.dragStartPos = point;
+            this.copyTransformMatrix = Matrix3.multiply(Matrix3.translation(dx, dy), this.copyTransformMatrix);
+            overlayLayer.imageData.clear();
+            workLayer.imageData.clear();
+            this.draw(config, imageProcessing, workLayer.imageData, false);
+            workLayer.dirty = true;
+            overlayLayer.dirty = true;
+        }
+    }
+    up({ config = null, point = null, currentLayer = null, workLayer = null, overlayLayer = null, imageProcessing = null }) {
+        if (this.mode == SelectMode.selecting) {
+            // ドラッグ選択終了
+            this.end = point;
+            this.mode = SelectMode.selected;
+            overlayLayer.imageData.clear();
+            overlayLayer.compositMode = this.compositMode;
+            this.draw(config, imageProcessing, overlayLayer.imageData, false);
+            overlayLayer.dirty = true;
+        }
+        else if (this.mode == SelectMode.dragging) {
+            // ドラッグ移動終了
+            this.mode = SelectMode.dragged;
+            const dx = point.x - this.dragStartPos.x;
+            const dy = point.y - this.dragStartPos.y;
+            this.copyTransformMatrix = Matrix3.multiply(Matrix3.translation(dx, dy), this.copyTransformMatrix);
+            overlayLayer.imageData.clear();
+            workLayer.imageData.clear();
+            this.draw(config, imageProcessing, workLayer.imageData, false);
+            workLayer.dirty = true;
+            overlayLayer.dirty = true;
+        }
+    }
+    draw(config, ip, imgData, finish) {
+        if (this.mode == SelectMode.dragging || this.mode == SelectMode.dragged) {
+            const left = this.copyLeftTop.x;
+            const top = this.copyLeftTop.y;
+            const right = left + this.copyWidth;
+            const bottom = top + this.copyHeight;
+            ip.draw(imgData, this.surface, { program: this.copyShader, start: this.copyStart, end: this.copyEnd, matrix: this.copyTransformMatrix });
+            ip.drawLines(imgData, {
+                program: this.alphaPenShader,
+                vertexes: new Float32Array([left, top, right, top, right, bottom, left, bottom, left, top]),
+                color: [0, 0, 0, 255],
+                size: 1,
+                antialiasSize: 0
+            });
+        }
+        else if (this.mode == SelectMode.selecting || this.mode == SelectMode.selected) {
+            ip.drawLines(imgData, {
+                program: this.alphaPenShader,
+                vertexes: new Float32Array([this.start.x, this.start.y, this.end.x, this.start.y, this.end.x, this.end.y, this.start.x, this.end.y, this.start.x, this.start.y]),
+                color: [0, 0, 0, 255],
+                size: 1,
+                antialiasSize: 0
+            });
         }
     }
 }
@@ -2751,7 +2977,8 @@ var Painter;
             previewCanvas: previewCanvas,
             previewContext: previewContext,
             previewData: previewData,
-            compositMode: CompositMode.Normal
+            compositMode: CompositMode.Normal,
+            dirty: false
         };
     }
     function disposeLayer(self) {
@@ -2813,8 +3040,7 @@ var Painter;
     /**
      * オーバーレイ用（矩形選択など描画とは関係ないガイド線などを描画する）
      */
-    let overlayCanvas = null;
-    let overlayContext = null;
+    let overlayLayer = null;
     let canvasOffsetX = 0;
     let canvasOffsetY = 0;
     let tools = [];
@@ -2830,11 +3056,10 @@ var Painter;
     };
     let updateRequest = { overlay: false, view: false, gui: false };
     let updateTimerId = NaN;
-    //let penShader: Program = null;
+    let fillShader = null;
     let alphaPenShader = null;
     let normalBlendShader = null;
     let eraserBlendShader = null;
-    let normalCopyShader = null;
     let copyShader = null;
     let checkerBoardShader = null;
     let alphaFillShader = null;
@@ -2856,24 +3081,7 @@ var Painter;
         imageCurrentLayer = 0;
         workLayer = createLayer();
         preCompositLayer = createLayer();
-        //viewCanvas = document.createElement("canvas");
-        //viewCanvas.style.position = "absolute";
-        //viewCanvas.style.left = "0";
-        //viewCanvas.style.top = "0";
-        //viewCanvas.style.width = "100%";
-        //viewCanvas.style.height = "100%";
-        //viewContext = viewCanvas.getContext("2d");
-        //viewContext.imageSmoothingEnabled = false;
-        //parentHtmlElement.appendChild(viewCanvas);
-        overlayCanvas = document.createElement("canvas");
-        overlayCanvas.style.position = "absolute";
-        overlayCanvas.style.left = "0";
-        overlayCanvas.style.top = "0";
-        overlayCanvas.style.width = "100%";
-        overlayCanvas.style.height = "100%";
-        overlayContext = overlayCanvas.getContext("2d");
-        overlayContext.imageSmoothingEnabled = false;
-        parentHtmlElement.appendChild(overlayCanvas);
+        overlayLayer = createLayer();
         uiDispacher = new GUI.Control({});
         uiCanvas = document.createElement("canvas");
         uiCanvas.style.position = "absolute";
@@ -2888,7 +3096,7 @@ var Painter;
         updateTimerId = NaN;
         //const program = Program.loadShaderById(glContext, ["2d-vertex-shader", "2d-fragment-shader"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         //const program2 = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
-        //penShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
+        fillShader = Program.loadShaderById(glContext, ["2d-vertex-shader-3", "2d-fragment-shader-3"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         normalBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-4", "2d-fragment-shader-4"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         eraserBlendShader = Program.loadShaderById(glContext, ["2d-vertex-shader-5", "2d-fragment-shader-5"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         copyShader = Program.loadShaderById(glContext, ["2d-vertex-shader-2", "2d-fragment-shader-2"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
@@ -2896,7 +3104,7 @@ var Painter;
         alphaPenShader = Program.loadShaderById(glContext, ["2d-vertex-shader-7", "2d-fragment-shader-7"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         alphaFillShader = Program.loadShaderById(glContext, ["2d-vertex-shader-8", "2d-fragment-shader-8"], [glContext.VERTEX_SHADER, glContext.FRAGMENT_SHADER]);
         updateCompositLayer();
-        tools.push(new SolidPen("SolidPen", alphaPenShader, CompositMode.Normal), new CorrectionSolidPen("SolidPen2", alphaPenShader, CompositMode.Normal), new SolidPen("Eraser", alphaPenShader, CompositMode.Erase), new RectanglePen("Rect", alphaPenShader, alphaFillShader, CompositMode.Normal), new FloodFill("Fill", copyShader, CompositMode.Normal));
+        tools.push(new SolidPen("SolidPen", alphaPenShader, CompositMode.Normal), new CorrectionSolidPen("SolidPen2", alphaPenShader, CompositMode.Normal), new SolidPen("Eraser", alphaPenShader, CompositMode.Erase), new RectanglePen("Rect", alphaPenShader, alphaFillShader, CompositMode.Normal), new FloodFill("Fill", copyShader, CompositMode.Normal), new SelectTool("SelectBox", alphaPenShader, fillShader, normalBlendShader, copyShader, CompositMode.Normal));
         window.addEventListener("resize", () => resize());
         setupMouseEvent();
         {
@@ -3330,6 +3538,7 @@ var Painter;
             return normalBlendShader;
         }
     }
+    Painter.getCompositShader = getCompositShader;
     function updateCompositLayer() {
         imageLayerCompositedSurface.clear();
         imageProcessing.applyShaderUpdate(imageLayerCompositedSurface, { program: checkerBoardShader });
@@ -3342,6 +3551,24 @@ var Painter;
             else {
                 imageProcessing.compositUpdate(imageLayerCompositedSurface, imageLayers[i].imageData, normalBlendShader);
             }
+        }
+        imageProcessing.compositUpdate(imageLayerCompositedSurface, overlayLayer.imageData, normalBlendShader);
+    }
+    function checkUpdate(currentLayer, workLayer, overlayLayer) {
+        let updateView = false;
+        if (currentLayer.dirty) {
+            currentLayer.dirty = false;
+            UpdateLayerPreview(currentLayer);
+            updateView = true;
+        }
+        if (workLayer.dirty || overlayLayer.dirty) {
+            workLayer.dirty = false;
+            overlayLayer.dirty = false;
+            updateCompositLayer();
+            updateView = true;
+        }
+        if (updateView) {
+            update({ view: true });
         }
     }
     function setupMouseEvent() {
@@ -3385,12 +3612,15 @@ var Painter;
                     const onPenMove = (e) => {
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.move(Painter.config, p, imageLayers[imageCurrentLayer]);
-                            workLayer.imageData.clear();
-                            workLayer.compositMode = currentTool.compositMode;
-                            currentTool.draw(Painter.config, imageProcessing, workLayer.imageData, false);
-                            updateCompositLayer();
-                            update({ view: true });
+                            currentTool.move({
+                                config: Painter.config,
+                                point: p,
+                                currentLayer: imageLayers[imageCurrentLayer],
+                                workLayer: workLayer,
+                                overlayLayer: overlayLayer,
+                                imageProcessing: imageProcessing
+                            });
+                            checkUpdate(imageLayers[imageCurrentLayer], workLayer, overlayLayer);
                         }
                         return true;
                     };
@@ -3398,14 +3628,15 @@ var Painter;
                         Input.off("pointermove", onPenMove);
                         if (currentTool) {
                             const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                            currentTool.up(Painter.config, p, imageLayers[imageCurrentLayer]);
-                            workLayer.imageData.clear();
-                            currentTool.draw(Painter.config, imageProcessing, workLayer.imageData, true);
-                            imageProcessing.compositUpdate(imageLayers[imageCurrentLayer].imageData, workLayer.imageData, getCompositShader(workLayer.compositMode));
-                            workLayer.imageData.clear();
-                            UpdateLayerPreview(imageLayers[imageCurrentLayer]);
-                            updateCompositLayer();
-                            update({ view: true });
+                            currentTool.up({
+                                config: Painter.config,
+                                point: p,
+                                currentLayer: imageLayers[imageCurrentLayer],
+                                workLayer: workLayer,
+                                overlayLayer: overlayLayer,
+                                imageProcessing: imageProcessing
+                            });
+                            checkUpdate(imageLayers[imageCurrentLayer], workLayer, overlayLayer);
                         }
                         return true;
                     };
@@ -3413,12 +3644,15 @@ var Painter;
                         Input.on("pointermove", onPenMove);
                         Input.one("pointerup", onPenUp);
                         const p = pointToCanvas({ x: e.pageX, y: e.pageY });
-                        currentTool.down(Painter.config, p, imageLayers[imageCurrentLayer]);
-                        workLayer.imageData.clear();
-                        workLayer.compositMode = currentTool.compositMode;
-                        currentTool.draw(Painter.config, imageProcessing, workLayer.imageData, false);
-                        updateCompositLayer();
-                        update({ view: true });
+                        currentTool.down({
+                            config: Painter.config,
+                            point: p,
+                            currentLayer: imageLayers[imageCurrentLayer],
+                            workLayer: workLayer,
+                            overlayLayer: overlayLayer,
+                            imageProcessing: imageProcessing
+                        });
+                        checkUpdate(imageLayers[imageCurrentLayer], workLayer, overlayLayer);
                     }
                     return true;
                 }
@@ -3490,13 +3724,12 @@ var Painter;
     }
     function resize() {
         const ret1 = resizeCanvas(imageCanvas);
-        const ret2 = resizeCanvas(overlayCanvas);
         const ret3 = resizeCanvas(uiCanvas);
-        if (ret1 || ret2) {
+        if (ret1) {
             canvasOffsetX = ~~((imageCanvas.width - imageLayerCompositedSurface.width * Painter.config.scale) / 2);
             canvasOffsetY = ~~((imageCanvas.height - imageLayerCompositedSurface.height * Painter.config.scale) / 2);
         }
-        update({ view: (ret1 || ret2), gui: ret3 });
+        update({ view: (ret1), gui: ret3 });
     }
     Painter.resize = resize;
     function pointToClient(point) {
@@ -3564,24 +3797,6 @@ var Painter;
                     imageProcessing.applyShader(null, viewSurface, { program: copyShader, matrix: Matrix3.identity() });
                     viewSurface.dispose();
                     updateRequest.view = false;
-                    //imageCanvas.style.display = "inline";
-                    //const s = Date.now();
-                    //imageProcessing.applyShader(null, imageLayerCompositedSurface, { program: copyShader });
-                    //viewCanvas.style.display = "none";
-                    //viewContext.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
-                    //viewContext.fillStyle = "rgb(198,208,224)";
-                    //viewContext.fillRect(0, 0, viewCanvas.width, viewCanvas.height);
-                    //viewContext.fillStyle = "rgb(255,255,255)";
-                    //viewContext.shadowOffsetX = viewContext.shadowOffsetY = 0;
-                    //viewContext.shadowColor = "rgb(0,0,0)";
-                    //viewContext.shadowBlur = 10;
-                    //viewContext.fillRect(canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
-                    //viewContext.shadowBlur = 0;
-                    //viewContext.imageSmoothingEnabled = false;
-                    //viewContext.drawImage(imageCanvas, 0, 0, imageCanvas.width, imageCanvas.height, canvasOffsetX + config.scrollX, canvasOffsetY + config.scrollY, imageCanvas.width * config.scale, imageCanvas.height * config.scale);
-                    //updateRequest.view = false;
-                    //viewCanvas.style.display = "inline";
-                    //console.log("update", Date.now() - s);
                 }
                 if (updateRequest.gui) {
                     uiContext.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
