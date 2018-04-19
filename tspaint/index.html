@@ -8,7 +8,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!--script src="https://console.re/connector.js" data-channel="tsjq" id="consolerescript"></!script-->
     <style>
-        html,body{width:100%;height:100%;}
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden
+        }
     </style>
     <script src="./jszip.js"></script>
     <script src="./tspaint.js"></script>
@@ -53,7 +59,7 @@
         gl_FragColor = vec4((colorSum / u_kernelWeight).rgb, 1);
         }
     </script>
-    <script id="2d-vertex-shader-2" type="x-shader/x-vertex">
+    <script id="2d-vertex-shader-9" type="x-shader/x-vertex">
         attribute vec2 a_position;
         attribute vec2 a_texCoord;
 
@@ -66,70 +72,30 @@
         v_texCoord = a_texCoord;
         }
     </script>
-    <script id="2d-fragment-shader-2" type="x-shader/x-fragment">
-        precision mediump float;
-
-        // our texture
-        uniform sampler2D u_image;
-
-        // the texCoords passed in from the vertex shader.
-        varying vec2 v_texCoord;
-
-        void main() {
-        gl_FragColor = texture2D(u_image, v_texCoord);
-        }
-    </script>
-    <script id="2d-vertex-shader-3" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
-
-        uniform mat3 u_matrix;
-
-        varying vec2 v_texCoord;
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-3" type="x-shader/x-fragment">
-        precision mediump float;
-        varying vec2 v_texCoord;
-        uniform vec4  u_color;
-        void main() {
-        gl_FragColor = u_color;
-        }
-    </script>
-    <script id="2d-vertex-shader-4" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
-
-        uniform mat3 u_matrix;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-4" type="x-shader/x-fragment">
+    <script id="2d-fragment-shader-9" type="x-shader/x-fragment">
         precision mediump float;
 
         uniform sampler2D u_front;
         uniform sampler2D u_back;
 
+        uniform vec2 u_dstsize;
+        uniform int u_composit_mode;
+
+        uniform vec4  u_color;
+
+        uniform vec2  u_start;
+        uniform vec2  u_end;
+        uniform float u_size;
+        uniform float u_aliasSize;
+
         varying vec2 v_texCoord;
 
-        void main() {
-        vec4 f = texture2D(u_front, v_texCoord);
-        vec4 b = texture2D(u_back, v_texCoord);
-        float alpha_f = f.a;
-        float alpha_b = b.a;
-        vec3 C_f = f.rgb;
-        vec3 C_b = b.rgb;
-
-        // normal
-        vec3 C_r = C_f;
+        vec4 composit_normal(vec4 front, vec4 back, vec3 blended) {
+        float alpha_f = front.a;
+        float alpha_b = back.a;
+        vec3 C_f = front.rgb;
+        vec3 C_b = back.rgb;
+        vec3 C_r = blended;
 
         float alpha_1 = alpha_f * alpha_b;
         float alpha_2 = alpha_f * (1.0 - alpha_b);
@@ -142,37 +108,13 @@
         } else {
         C = ((alpha_1 * C_r) + (alpha_2 * C_f) + (alpha_3 * C_b)) / A;
         }
-        gl_FragColor = vec4(C,A);
-
+        return vec4(C,A);
         }
-    </script>
-    <script id="2d-vertex-shader-5" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
 
-        uniform mat3 u_matrix;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-5" type="x-shader/x-fragment">
-        precision mediump float;
-
-        uniform sampler2D u_front;
-        uniform sampler2D u_back;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        vec4 f = texture2D(u_front, v_texCoord);
-        vec4 b = texture2D(u_back, v_texCoord);
-        float alpha_f = f.a;
-        float alpha_b = b.a;
-        vec3 C_b = b.rgb;
+        vec4 composit_erase(vec4 front, vec4 back, vec3 blended) {
+        float alpha_f = front.a;
+        float alpha_b = back.a;
+        vec3 C_b = back.rgb;
 
         float alpha_3 = (1.0 - alpha_f) * alpha_b;
 
@@ -183,59 +125,28 @@
         } else {
         C = C_b;
         }
-        gl_FragColor = vec4(C, A);
-
+        return vec4(C, A);
         }
-    </script>
-    <script id="2d-vertex-shader-6" type="x-shader/x-vertex">
-        attribute vec2 a_position;
 
-        uniform mat3 u_matrix;
-
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+        vec4 composit_copyFront(vec4 front, vec4 back, vec3 blended) {
+        return front;
         }
-    </script>
-    <script id="2d-fragment-shader-6" type="x-shader/x-fragment">
-        precision mediump float;
 
-        void main() {
+        vec4 composit_copyColor(vec4 front, vec4 back, vec4 color) {
+        return color;
+        }
+
+        vec4 composit_maxAlpha(vec4 back, vec4 color) {
+        return vec4(color.rgb, max(back.a, color.a));
+        }
+
+        vec4 stencil_checkerBoard() {
         vec2 rads = step(0.0, cos(radians(gl_FragCoord.xy * 360.0/16.0)));
         float c = (255.0 - abs(rads.x - rads.y) * 32.0) / 255.0;
-        gl_FragColor = vec4(c, c, c, 1.0);
+        return vec4(c, c, c, 1.0);
         }
-    </script>
-    <script id="2d-vertex-shader-7" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
 
-        uniform mat3 u_matrix;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-7" type="x-shader/x-fragment">
-        // https://qiita.com/yuba/items/2f35d1e5e162f44fc1b3
-        // https://qiita.com/edo_m18/items/71f6064f3355be7e4f45
-        precision mediump float;
-
-        uniform vec4  u_color;
-        uniform vec2  u_start;
-        uniform vec2  u_end;
-        uniform float u_size;
-        uniform float u_aliasSize;
-        //varying vec2 v_resolution;
-
-        uniform sampler2D u_front;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        vec4 f = texture2D(u_front, v_texCoord);
+        vec4 stencil_Line(vec4 color) {
 
         vec2 a = u_start;
         vec2 b = u_end;
@@ -246,49 +157,49 @@
         float r = clamp(dot(u,v) / dot(u,u), 0.0, 1.0);
         vec2 p = a + r * u;
         float dist = distance(p, c);
+        float aaRate = u_aliasSize * 0.01;
 
-        if (dist > u_size) {
-        gl_FragColor = f;
-        } else if (u_aliasSize == 0.0) {
-        gl_FragColor = u_color;
-        } else {
-        float threadthold = u_size - u_aliasSize;
-        if (dist <= threadthold) {
-        gl_FragColor = u_color;
-        } else {
-        float na = (1.0-(dist-threadthold)/u_aliasSize)*u_color.a;
-        gl_FragColor = vec4(u_color.rgb, max(f.a, na));
-        }
+        float aa = 1.0 - clamp((dist - (u_size * aaRate)) / (u_size * (1.0-aaRate)),0.0,1.0);
+
+        return vec4(color.rgb, aa* color.a);
         }
 
+        vec3 blend_normal(vec4 front, vec4 back) {
+        return front.rgb;
         }
-    </script>
-    <script id="2d-vertex-shader-8" type="x-shader/x-vertex">
-        attribute vec2 a_position;
-        attribute vec2 a_texCoord;
-
-        uniform mat3 u_matrix;
-
-        varying vec2 v_texCoord;
-
-        void main() {
-        gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
-        v_texCoord = a_texCoord;
-        }
-    </script>
-    <script id="2d-fragment-shader-8" type="x-shader/x-fragment">
-        precision mediump float;
-
-        uniform vec4  u_color;
-
-        uniform sampler2D u_front;
-
-        varying vec2 v_texCoord;
 
         void main() {
         vec4 f = texture2D(u_front, v_texCoord);
+        vec4 b = texture2D(u_back, gl_FragCoord.xy / u_dstsize  );
 
-        gl_FragColor = vec4(u_color.rgb, max(f.a, u_color.a));
+        vec3 blended = blend_normal(f, b);
+
+        vec4 color;
+        if (u_composit_mode == 0) {
+        color = composit_normal(f, b, blended);
+        gl_FragColor = color;
+        } else if (u_composit_mode == 1) {
+        color = composit_erase(f, b, blended);
+        gl_FragColor = color;
+        } else if (u_composit_mode == 2) {
+        color = composit_copyFront(f, b, blended);
+        gl_FragColor = color;
+        } else if (u_composit_mode == 3) {
+        color = composit_maxAlpha(b, u_color);
+        gl_FragColor = color;
+        } else if (u_composit_mode == 4) {
+        color = stencil_checkerBoard();
+        color = composit_copyColor(f, b, color);
+        gl_FragColor = color;
+        } else if (u_composit_mode == 5) {
+        color = stencil_Line(u_color);
+        color = composit_maxAlpha(b, color);
+        gl_FragColor = color;
+        } else {
+        color = composit_copyFront(f, b, blended);
+        gl_FragColor = color;
+        }
+
 
         }
     </script>
