@@ -69,6 +69,11 @@ namespace AnsiCParser {
             End = end;
         }
 
+        public LocationRange(LocationRange other) {
+            Start = other.Start;
+            End = other.End;
+        }
+
         public override string ToString() {
             if (Start.FilePath == End.FilePath) {
                 return ($"{Start}-({End.Line},{End.Column})");

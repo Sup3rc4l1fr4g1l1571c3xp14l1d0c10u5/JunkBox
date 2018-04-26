@@ -743,38 +743,126 @@ namespace AnsiCParser {
                 var lhs = Peek(0);
                 var rhs = Peek(1);
 
-                LoadVariableAddress("%eax"); // lhs
+                CType.BitFieldType bft;
+                if (type.IsBitField(out bft)) {
+                    // ビットフィールドへの代入の場合
+                    LoadVariableAddress("%eax"); // lhs
+                    switch (bft.Type.Sizeof()) {
+                        case 1: {
+                                int offsetBit = bft.BitOffset;
+                                UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                UInt32 dstMask = ~(srcMask << (offsetBit));
+                                LoadI32("%ecx");    // 右辺式の値を取り出す
 
-                switch (type.Sizeof()) {
-                    case 1:
-                        LoadI32("%ecx");
-                        Emit("movb %cl, (%eax)");
-                        Emit("pushl %ecx");
-                        Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                        break;
-                    case 2:
-                        LoadI32("%ecx");
-                        Emit("movw %cx, (%eax)");
-                        Emit("pushl %ecx");
-                        Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                        break;
-                    case 3:
-                    case 4:
-                        LoadI32("%ecx"); // ToDo: float のコピーにLoadI32を転用しているのを修正
-                        Emit("movl %ecx, (%eax)");
-                        Emit("pushl %ecx");
-                        Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                        break;
-                    default:
-                        LoadValueToStack(rhs.Type);
-                        Emit("movl %esp, %esi");
-                        Emit($"movl ${type.Sizeof()}, %ecx");
-                        Emit("movl %eax, %edi");
-                        Emit("cld");
-                        Emit("rep movsb");
-                        Pop();
-                        Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                        break;
+                                if (!bft.IsUnsignedIntegerType()) {
+                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                }
+                                Emit("pushl %ecx");
+
+                                // ビットマスク処理と位置合わせをする
+                                Emit($"andl ${srcMask}, %ecx");
+                                Emit($"shll ${offsetBit}, %ecx");
+
+                                // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                Emit($"movb (%eax), %dl");
+                                Emit($"andb ${(byte)dstMask}, %dl");
+                                // ビットを結合させてから書き込む
+                                Emit($"orb  %dl, %cl");
+                                Emit($"movb %cl, (%eax)");
+                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                break;
+                            }
+                        case 2: {
+                                int offsetBit = bft.BitOffset;
+                                UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                UInt32 dstMask = ~(srcMask << (offsetBit));
+                                LoadI32("%ecx");    // 右辺式の値を取り出す
+
+                                if (!bft.IsUnsignedIntegerType()) {
+                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                }
+                                Emit("pushl %ecx");
+
+                                // ビットマスク処理と位置合わせをする
+                                Emit($"andl ${srcMask}, %ecx");
+                                Emit($"shll ${offsetBit}, %ecx");
+
+                                // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                Emit($"movw (%eax), %dx");
+                                Emit($"andw ${(UInt16)dstMask}, %dx");
+                                // ビットを結合させてから書き込む
+                                Emit($"orw  %dx, %cx");
+                                Emit($"movw %cx, (%eax)");
+                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                break;
+                            }
+                        case 3: 
+                        case 4: {
+                                int offsetBit = bft.BitOffset;
+                                UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                UInt32 dstMask = ~(srcMask << (offsetBit));
+                                LoadI32("%ecx");    // 右辺式の値を取り出す
+
+                                if (!bft.IsUnsignedIntegerType()) {
+                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                }
+                                Emit("pushl %ecx");
+
+                                // ビットマスク処理と位置合わせをする
+                                Emit($"andl ${srcMask}, %ecx");
+                                Emit($"shll ${offsetBit}, %ecx");
+
+                                // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                Emit($"movl (%eax), %edx");
+                                Emit($"andl ${(UInt16)dstMask}, %edx");
+                                // ビットを結合させてから書き込む
+                                Emit($"orl  %edx, %ecx");
+                                Emit($"movl %ecx, (%eax)");
+                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                break;
+                            }
+                        default:
+                            throw new NotSupportedException();
+                    }
+                } else {
+                    LoadVariableAddress("%eax"); // lhs
+                    switch (type.Sizeof()) {
+                        case 1:
+                            LoadI32("%ecx");
+                            Emit("movb %cl, (%eax)");
+                            Emit("pushl %ecx");
+                            Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
+                            break;
+                        case 2:
+                            LoadI32("%ecx");
+                            Emit("movw %cx, (%eax)");
+                            Emit("pushl %ecx");
+                            Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
+                            break;
+                        case 3:
+                        case 4:
+                            LoadI32("%ecx"); // ToDo: float のコピーにLoadI32を転用しているのを修正
+                            Emit("movl %ecx, (%eax)");
+                            Emit("pushl %ecx");
+                            Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
+                            break;
+                        default:
+                            LoadValueToStack(rhs.Type);
+                            Emit("movl %esp, %esi");
+                            Emit($"movl ${type.Sizeof()}, %ecx");
+                            Emit("movl %eax, %edi");
+                            Emit("cld");
+                            Emit("rep movsb");
+                            Pop();
+                            Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
+                            break;
+                    }
                 }
             }
 
@@ -924,300 +1012,338 @@ namespace AnsiCParser {
                 Emit("pushl $0");
             }
 
+            private void CastIntValueToInt(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsIntegerType());
+
+                CType.BasicType.TypeKind selftykind;
+                if (type.IsBasicType()) {
+                    selftykind = (type.Unwrap() as CType.BasicType).Kind;
+                } else if (type.IsEnumeratedType()) {
+                    selftykind = CType.BasicType.TypeKind.SignedInt;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                if (ret.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedLongLongInt, CType.BasicType.TypeKind.SignedLongLongInt)) {
+                    // 64bit型からのキャスト
+                    LoadI64("%eax", "%ecx");
+                    /* 符号の有無にかかわらず、切り捨てでよい？ */
+                    switch (selftykind) {
+                        case CType.BasicType.TypeKind.Char:
+                        case CType.BasicType.TypeKind.SignedChar:
+                            Emit("movsbl %al, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedShortInt:
+                            Emit("cwtl");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedInt:
+                        case CType.BasicType.TypeKind.SignedLongInt:
+                            // do nothing;
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedLongLongInt:
+                            Emit("pushl %ecx");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedChar:
+                            Emit("movzbl %al, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedShortInt:
+                            Emit("movzwl %ax, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedInt:
+                        case CType.BasicType.TypeKind.UnsignedLongInt:
+                            // do nothing;
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedLongLongInt:
+                            Emit("pushl %ecx");
+                            Emit("pushl %eax");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                } else {
+                    // 32bit以下の型からのキャスト
+                    LoadI32("%eax");
+                    switch (selftykind) {
+                        case CType.BasicType.TypeKind.Char:
+                        case CType.BasicType.TypeKind.SignedChar:
+                            Emit("movsbl %al, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedShortInt:
+                            Emit("movswl %ax, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedInt:
+                        case CType.BasicType.TypeKind.SignedLongInt:
+                            // do nothing;
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.SignedLongLongInt:
+                            if (ret.Type.IsUnsignedIntegerType()) {
+                                Emit("pushl $0");
+                                Emit("pushl %eax");
+                            } else {
+                                Emit("movl %eax, %edx");
+                                Emit("sarl $31, %edx");
+                                Emit("pushl %edx");
+                                Emit("pushl %eax");
+                            }
+
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedChar:
+                            Emit("movzbl %al, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedShortInt:
+                            Emit("movzwl %ax, %eax");
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedInt:
+                        case CType.BasicType.TypeKind.UnsignedLongInt:
+                            // do nothing;
+                            Emit("pushl %eax");
+                            break;
+                        case CType.BasicType.TypeKind.UnsignedLongLongInt:
+                            if (ret.Type.IsUnsignedIntegerType()) {
+                                Emit("pushl $0");
+                                Emit("pushl %eax");
+                            } else {
+                                Emit("movl %eax, %edx");
+                                Emit("sarl $31, %edx");
+                                Emit("pushl %edx");
+                                Emit("pushl %eax");
+                            }
+
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                }
+
+                Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+            }
+
+            private void CastPointerValueToPointer(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsPointerType() && type.IsPointerType());
+                Pop();
+                Push(new Value(ret) { Type = type });
+            }
+
+            private void CastArrayValueToPointer(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsArrayType() && type.IsPointerType());
+                Pop();
+                // 手抜き
+                if (ret.Kind == Value.ValueKind.Var) {
+                    ret = new Value { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                    Push(ret);
+                } else if (ret.Kind == Value.ValueKind.Ref) {
+                    ret = new Value { Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset };
+                    Push(ret);
+                } else if (ret.Kind == Value.ValueKind.Address) {
+                    ret = new Value { Kind = Value.ValueKind.Temp, Type = type };
+                    Push(ret);
+                } else {
+                    throw new NotImplementedException();
+                }
+            }
+
+            private void CastArrayValueToArray(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsArrayType() && type.IsArrayType());
+                Pop();
+                Push(new Value(ret) { Type = type });
+            }
+
+            private void CastIntValueToPointer(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsPointerType());
+                // Todo: 64bit int value -> 32bit pointer value の実装
+                Pop();
+                Push(new Value(ret) { Type = type });
+            }
+
+            private void CastPointerValueToInt(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsPointerType() && type.IsIntegerType());
+                // Todo: 32bit pointer value -> 64bit int value の実装
+                Pop();
+                Push(new Value(ret) { Type = type });
+            }
+
+            private void CastFloatingValueToFloating(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsRealFloatingType() && type.IsRealFloatingType());
+                FpuPush();
+                FpuPop(type);
+            }
+
+            private void CastFloatingValueToInt(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsRealFloatingType() && type.IsIntegerType());
+                FpuPush();
+
+                // double -> unsigned char
+                // 	movzwl <value>, %eax
+                //  movzbl %al, %eax
+                if (type.IsSignedIntegerType()) {
+                    // sp+[0..1] -> [fpucwの退避値]
+                    // sp+[2..3] -> [(精度=単精度, 丸め=ゼロ方向への丸め)を設定したfpucw]
+                    // sp+[4..7] -> [浮動小数点数の整数への変換結果、その後は、int幅での変換結果]
+                    switch (type.Sizeof()) {
+                        case 1:
+                            Emit("sub $8, %esp");
+                            Emit("fnstcw 0(%esp)");
+                            Emit("movzwl 0(%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistps 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("movzwl 4(%esp), %eax");
+                            Emit("movsbl %al, %eax");
+                            Emit("movl %eax, 4(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        case 2:
+                            Emit("sub $8, %esp");
+                            Emit("fnstcw 0(%esp)");
+                            Emit("movzwl 0(%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistps 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("movzwl 4(%esp), %eax");
+                            Emit("cwtl");
+                            Emit("movl %eax, 4(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        case 4:
+                            Emit("sub $8, %esp");
+                            Emit("fnstcw 0(%esp)");
+                            Emit("movzwl 0(%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistpl 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            //Emit($"movl 4(%esp), %eax");
+                            //Emit($"movl %eax, 4(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        case 8:
+                            Emit("sub $12, %esp");
+                            Emit("fnstcw 0(%esp)");
+                            Emit("movzwl 0(%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistpq 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                } else {
+                    switch (type.Sizeof()) {
+                        case 1:
+                            Emit("sub $8, %esp");
+                            Emit("fnstcw 0(%esp)");
+                            Emit("movzwl 0(%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistps 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("movzwl 4(%esp), %eax");
+                            Emit("movzbl %al, %eax");
+                            Emit("movl %eax, 4(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        case 2:
+                            Emit("sub $8, %esp");
+                            Emit("fnstcw (%esp)");
+                            Emit("movzwl (%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistps 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("movzwl 4(%esp), %eax");
+                            Emit("cwtl");
+                            Emit("movl %eax, 4(%esp)");
+                            Emit("add $4, %esp");
+                            break;
+                        case 4:
+                            Emit("sub $12, %esp");
+                            Emit("fnstcw (%esp)");
+                            Emit("movzwl (%esp), %eax");
+                            Emit("movb $12, %ah");
+                            Emit("movw %ax, 2(%esp)");
+                            Emit("fldcw 2(%esp)");
+                            Emit("fistpq 4(%esp)");
+                            Emit("fldcw 0(%esp)");
+                            Emit("movl 4(%esp), %eax");
+                            Emit("movl %eax, 8(%esp)");
+                            Emit("add $8, %esp");
+                            break;
+                        case 8:
+                            Emit("sub $8, %esp");
+                            Emit("fstpl (%esp)");
+                            Emit("call\t___fixunsdfdi");
+                            Emit("add $8, %esp");
+                            Emit("pushl %edx");
+                            Emit("pushl %eax");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                }
+
+                Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+            }
+
+            private void CastIntValueToFloating(CType type) {
+                Value ret = Peek(0);
+                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsRealFloatingType());
+                FpuPush();
+                FpuPop(type);
+            }
+
             public void CastTo(CType type) {
                 Value ret = Peek(0);
                 if (ret.Type.IsIntegerType() && type.IsIntegerType()) {
-                    CType.BasicType.TypeKind selftykind;
-                    if (type.IsBasicType()) {
-                        selftykind = (type.Unwrap() as CType.BasicType).Kind;
-                    }
-                    else if (type.IsEnumeratedType()) {
-                        selftykind = CType.BasicType.TypeKind.SignedInt;
-                    }
-                    else {
-                        throw new NotImplementedException();
-                    }
-
-                    if (ret.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedLongLongInt, CType.BasicType.TypeKind.SignedLongLongInt)) {
-                        // 64bit型からのキャスト
-                        LoadI64("%eax", "%ecx");
-                        /* 符号の有無にかかわらず、切り捨てでよい？ */
-                        switch (selftykind) {
-                            case CType.BasicType.TypeKind.Char:
-                            case CType.BasicType.TypeKind.SignedChar:
-                                Emit("movsbl %al, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedShortInt:
-                                Emit("cwtl");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedInt:
-                            case CType.BasicType.TypeKind.SignedLongInt:
-                                // do nothing;
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedLongLongInt:
-                                Emit("pushl %ecx");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedChar:
-                                Emit("movzbl %al, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedShortInt:
-                                Emit("movzwl %ax, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedInt:
-                            case CType.BasicType.TypeKind.UnsignedLongInt:
-                                // do nothing;
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedLongLongInt:
-                                Emit("pushl %ecx");
-                                Emit("pushl %eax");
-                                break;
-                            default:
-                                throw new NotImplementedException();
-                        }
-                    }
-                    else {
-                        // 32bit以下の型からのキャスト
-                        LoadI32("%eax");
-                        switch (selftykind) {
-                            case CType.BasicType.TypeKind.Char:
-                            case CType.BasicType.TypeKind.SignedChar:
-                                Emit("movsbl %al, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedShortInt:
-                                Emit("movswl %ax, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedInt:
-                            case CType.BasicType.TypeKind.SignedLongInt:
-                                // do nothing;
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.SignedLongLongInt:
-                                if (ret.Type.IsUnsignedIntegerType()) {
-                                    Emit("pushl $0");
-                                    Emit("pushl %eax");
-                                }
-                                else {
-                                    Emit("movl %eax, %edx");
-                                    Emit("sarl $31, %edx");
-                                    Emit("pushl %edx");
-                                    Emit("pushl %eax");
-                                }
-
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedChar:
-                                Emit("movzbl %al, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedShortInt:
-                                Emit("movzwl %ax, %eax");
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedInt:
-                            case CType.BasicType.TypeKind.UnsignedLongInt:
-                                // do nothing;
-                                Emit("pushl %eax");
-                                break;
-                            case CType.BasicType.TypeKind.UnsignedLongLongInt:
-                                if (ret.Type.IsUnsignedIntegerType()) {
-                                    Emit("pushl $0");
-                                    Emit("pushl %eax");
-                                }
-                                else {
-                                    Emit("movl %eax, %edx");
-                                    Emit("sarl $31, %edx");
-                                    Emit("pushl %edx");
-                                    Emit("pushl %eax");
-                                }
-
-                                break;
-                            default:
-                                throw new NotImplementedException();
-                        }
-                    }
-
-                    Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                }
-                else if (ret.Type.IsPointerType() && type.IsPointerType()) {
-                    Pop();
-                    Push(new Value(ret) {Type = type});
-                }
-                else if (ret.Type.IsArrayType() && type.IsPointerType()) {
-                    Pop();
-                    // 手抜き
-                    if (ret.Kind == Value.ValueKind.Var) {
-                        ret = new Value {Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset};
-                        Push(ret);
-                    }
-                    else if (ret.Kind == Value.ValueKind.Ref) {
-                        ret = new Value {Kind = Value.ValueKind.Ref, Type = type, Label = ret.Label, Offset = ret.Offset};
-                        Push(ret);
-                    }
-                    else if (ret.Kind == Value.ValueKind.Address) {
-                        ret = new Value {Kind = Value.ValueKind.Temp, Type = type};
-                        Push(ret);
-                    }
-                    else {
-                        throw new NotImplementedException();
-                    }
-                }
-                else if (ret.Type.IsArrayType() && type.IsArrayType()) {
-                    Pop();
-                    Push(new Value(ret) {Type = type});
-                }
-                else if (ret.Type.IsPointerType() && type.IsArrayType()) {
+                    CastIntValueToInt(type);
+                } else if (ret.Type.IsPointerType() && type.IsPointerType()) {
+                    CastPointerValueToPointer(type);
+                } else if (ret.Type.IsArrayType() && type.IsPointerType()) {
+                    CastArrayValueToPointer(type);
+                } else if (ret.Type.IsArrayType() && type.IsArrayType()) {
+                    CastArrayValueToArray(type);
+                } else if (ret.Type.IsPointerType() && type.IsArrayType()) {
                     throw new NotImplementedException();
-                }
-                else if (ret.Type.IsIntegerType() && type.IsPointerType()) {
-                    Pop();
-                    Push(new Value(ret) {Type = type});
-                }
-                else if (ret.Type.IsPointerType() && type.IsIntegerType()) {
-                    Pop();
-                    Push(new Value(ret) {Type = type});
-                }
-                else if (ret.Type.IsRealFloatingType() && type.IsRealFloatingType()) {
-                    FpuPush();
-                    FpuPop(type);
-                }
-                else if (ret.Type.IsRealFloatingType() && type.IsIntegerType()) {
-                    FpuPush();
-
-                    // double -> unsigned char
-                    // 	movzwl <value>, %eax
-                    //  movzbl %al, %eax
-                    if (type.IsSignedIntegerType()) {
-                        // sp+[0..1] -> [fpucwの退避値]
-                        // sp+[2..3] -> [(精度=単精度, 丸め=ゼロ方向への丸め)を設定したfpucw]
-                        // sp+[4..7] -> [浮動小数点数の整数への変換結果、その後は、int幅での変換結果]
-                        switch (type.Sizeof()) {
-                            case 1:
-                                Emit("sub $8, %esp");
-                                Emit("fnstcw 0(%esp)");
-                                Emit("movzwl 0(%esp), %eax");
-                                Emit("movb\t$12, %ah");
-                                Emit("movw\t%ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistps 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("movzwl 4(%esp), %eax");
-                                Emit("movsbl %al, %eax");
-                                Emit("movl %eax, 4(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            case 2:
-                                Emit("sub $8, %esp");
-                                Emit("fnstcw 0(%esp)");
-                                Emit("movzwl 0(%esp), %eax");
-                                Emit("movb\t$12, %ah");
-                                Emit("movw\t%ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistps 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("movzwl 4(%esp), %eax");
-                                Emit("cwtl");
-                                Emit("movl %eax, 4(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            case 4:
-                                Emit("sub $8, %esp");
-                                Emit("fnstcw 0(%esp)");
-                                Emit("movzwl 0(%esp), %eax");
-                                Emit("movb $12, %ah");
-                                Emit("movw\t%ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistpl 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                //Emit($"movl 4(%esp), %eax");
-                                //Emit($"movl %eax, 4(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            case 8:
-                                Emit("sub $12, %esp");
-                                Emit("fnstcw 0(%esp)");
-                                Emit("movzwl 0(%esp), %eax");
-                                Emit("movb $12, %ah");
-                                Emit("movw %ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistpq 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            default:
-                                throw new NotImplementedException();
-                        }
-                    }
-                    else {
-                        switch (type.Sizeof()) {
-                            case 1:
-                                Emit("sub $8, %esp");
-                                Emit("fnstcw 0(%esp)");
-                                Emit("movzwl 0(%esp), %eax");
-                                Emit("movb $12, %ah");
-                                Emit("movw %ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistps 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("movzwl 4(%esp), %eax");
-                                Emit("movzbl %al, %eax");
-                                Emit("movl %eax, 4(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            case 2:
-                                Emit("sub $8, %esp");
-                                Emit("fnstcw (%esp)");
-                                Emit("movzwl (%esp), %eax");
-                                Emit("movb $12, %ah");
-                                Emit("movw %ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistps 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("movzwl 4(%esp), %eax");
-                                Emit("cwtl");
-                                Emit("movl %eax, 4(%esp)");
-                                Emit("add $4, %esp");
-                                break;
-                            case 4:
-                                Emit("sub $12, %esp");
-                                Emit("fnstcw (%esp)");
-                                Emit("movzwl (%esp), %eax");
-                                Emit("movb $12, %ah");
-                                Emit("movw %ax, 2(%esp)");
-                                Emit("fldcw 2(%esp)");
-                                Emit("fistpq 4(%esp)");
-                                Emit("fldcw 0(%esp)");
-                                Emit("movl 4(%esp), %eax");
-                                Emit("movl %eax, 8(%esp)");
-                                Emit("add $8, %esp");
-                                break;
-                            case 8:
-                                Emit("sub $8, %esp");
-                                Emit("fstpl (%esp)");
-                                Emit("call\t___fixunsdfdi");
-                                Emit("add $8, %esp");
-                                Emit("pushl %edx");
-                                Emit("pushl %eax");
-                                break;
-                            default:
-                                throw new NotImplementedException();
-                        }
-                    }
-
-                    Push(new Value {Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count});
-                }
-                else if (ret.Type.IsIntegerType() && type.IsRealFloatingType()) {
-                    FpuPush();
-                    FpuPop(type);
-                }
-                else {
+                } else if (ret.Type.IsIntegerType() && type.IsPointerType()) {
+                    CastIntValueToPointer(type);
+                } else if (ret.Type.IsPointerType() && type.IsIntegerType()) {
+                    CastPointerValueToInt(type);
+                } else if (ret.Type.IsRealFloatingType() && type.IsRealFloatingType()) {
+                    CastFloatingValueToFloating(type);
+                } else if (ret.Type.IsRealFloatingType() && type.IsIntegerType()) {
+                    CastFloatingValueToInt(type);
+                } else if (ret.Type.IsIntegerType() && type.IsRealFloatingType()) {
+                    CastIntValueToFloating(type);
+                } else {
                     throw new NotImplementedException();
                 }
             }
@@ -1350,7 +1476,7 @@ namespace AnsiCParser {
                 return offset;
 #else
                 foreach (var m in st.Members) {
-                    if (m.Ident.Raw == member) {
+                    if (m.Ident != null && m.Ident.Raw == member) {
                         return m.Offset;
                     }
                 }
@@ -1510,51 +1636,113 @@ namespace AnsiCParser {
                         }
 
                         string op;
-                        if (valueType.IsSignedIntegerType() || valueType.IsBasicType(CType.BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
-                            switch (valueType.Sizeof()) {
-                                case 1:
-                                    op = "movsbl";
-                                    break;
-                                case 2:
-                                    op = "movswl";
-                                    break;
-                                case 4:
-                                    op = "movl";
-                                    break;
-                                default:
-                                    throw new NotImplementedException();
-                            }
-                        }
-                        else if (valueType.IsUnsignedIntegerType()) {
-                            switch (valueType.Sizeof()) {
-                                case 1:
-                                    op = "movzbl";
-                                    break;
-                                case 2:
-                                    op = "movzwl";
-                                    break;
-                                case 4:
-                                    op = "movl";
-                                    break;
-                                default:
-                                    throw new NotImplementedException();
-                            }
-                        }
-                        else if (valueType.IsBasicType(CType.BasicType.TypeKind.Float)) {
-                            op = "movl";
-                        }
-                        else if (valueType.IsPointerType() || valueType.IsArrayType()) {
-                            op = "movl";
-                        }
-                        else if (valueType.IsStructureType()) {
-                            op = "leal";
-                        }
-                        else {
-                            throw new NotImplementedException();
-                        }
+                        // ビットフィールドは特別扱い
+                        CType.BitFieldType bft;
+                            if (valueType.IsBitField(out bft)) {
+                                switch (bft.Type.Sizeof()) {
+                                    case 1: {
+                                            int offsetBit = bft.BitOffset;
+                                            UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                            UInt32 dstMask = ~(srcMask << (offsetBit));
 
-                        Emit($"{op} {src}, {register}");
-                        return;
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                            var byteReg = ToByteReg(register);
+                                            Emit($"movb (%eax), {byteReg}");
+                                            Emit($"shrl ${offsetBit}, {register}");
+                                            Emit($"andl ${srcMask}, {register}");
+
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                                Emit($"shll ${32 - bft.BitWidth}, {register}");
+                                                Emit($"sarl ${32 - bft.BitWidth}, {register}");
+                                            }
+
+                                            return;
+                                        }
+                                    case 2: {
+                                            int offsetBit = bft.BitOffset;
+                                            UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                            UInt32 dstMask = ~(srcMask << (offsetBit));
+
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                            var wordReg = ToWordReg(register);
+                                            Emit($"movw (%eax), {wordReg}");
+                                            Emit($"shrl ${offsetBit}, {register}");
+                                            Emit($"andl ${srcMask}, {register}");
+
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                                Emit($"shll ${32 - bft.BitWidth}, {register}");
+                                                Emit($"sarl ${32 - bft.BitWidth}, {register}");
+                                            }
+
+                                            return;
+
+                                        }
+                                    case 3:
+                                    case 4: {
+                                            int offsetBit = bft.BitOffset;
+                                            UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                            UInt32 dstMask = ~(srcMask << (offsetBit));
+
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                            Emit($"movl (%eax), {register}");
+                                            Emit($"shrl ${offsetBit}, {register}");
+                                            Emit($"andl ${srcMask}, {register}");
+
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                                Emit($"shll ${32 - bft.BitWidth}, {register}");
+                                                Emit($"sarl ${32 - bft.BitWidth}, {register}");
+                                            }
+
+                                            return;
+                                        }
+                                    default:
+                                        throw new NotSupportedException();
+                                }
+                            } else {
+                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(CType.BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
+                                    switch (valueType.Sizeof()) {
+                                        case 1:
+                                            op = "movsbl";
+                                            break;
+                                        case 2:
+                                            op = "movswl";
+                                            break;
+                                        case 4:
+                                            op = "movl";
+                                            break;
+                                        default:
+                                            throw new NotImplementedException();
+                                    }
+                                } else if (valueType.IsUnsignedIntegerType()) {
+                                    switch (valueType.Sizeof()) {
+                                        case 1:
+                                            op = "movzbl";
+                                            break;
+                                        case 2:
+                                            op = "movzwl";
+                                            break;
+                                        case 4:
+                                            op = "movl";
+                                            break;
+                                        default:
+                                            throw new NotImplementedException();
+                                    }
+                                } else if (valueType.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                                    op = "movl";
+                                } else if (valueType.IsPointerType() || valueType.IsArrayType()) {
+                                    op = "movl";
+                                } else if (valueType.IsStructureType()) {
+                                    op = "leal";
+                                } else {
+                                    throw new NotImplementedException();
+                                }
+
+                                Emit($"{op} {src}, {register}");
+                                return;
+                            }
                     }
                     case Value.ValueKind.Ref:
                         Emit($"leal {VarRefToAddrExpr(value)}, {register}");
@@ -3504,7 +3692,8 @@ namespace AnsiCParser {
             syntaxTreeCompileVisitor.Generator.Emit(s);
         }
 
-        public List<SyntaxTree.Expression> Values { get; } = new List<SyntaxTree.Expression>();
+        public List<Tuple<int, int, int, SyntaxTree.Expression>> Values { get; } = new List<Tuple<int, int, int, SyntaxTree.Expression>>();
+        public int CurrentOffset = 0;
 
         public FileScopeInitializerVisitor(SyntaxTreeCompileVisitor syntaxTreeCompileVisitor) {
             this.syntaxTreeCompileVisitor = syntaxTreeCompileVisitor;
@@ -3530,18 +3719,21 @@ namespace AnsiCParser {
                 Emit(".align 4");
                 Emit($"{self.LinkageObject.LinkageId}:");
                 foreach (var val in Values) {
-                    var v = val.Accept(this, value);
-                    switch (v.Kind) {
+                    var byteOffset = val.Item1;
+                    var bitOffset = val.Item2;
+                    var bitSize   = val.Item3;
+                    var cvalue = val.Item4.Accept(this, value);
+                    switch (cvalue.Kind) {
                         case SyntaxTreeCompileVisitor.Value.ValueKind.IntConst:
-                            switch (v.Type.Sizeof()) {
+                            switch (cvalue.Type.Sizeof()) {
                                 case 1:
-                                    Emit($".byte {(byte) v.IntConst}");
+                                    Emit($".byte {(byte) cvalue.IntConst}");
                                     break;
                                 case 2:
-                                    Emit($".word {(ushort) v.IntConst}");
+                                    Emit($".word {(ushort) cvalue.IntConst}");
                                     break;
                                 case 4:
-                                    Emit($".long {(uint) v.IntConst}");
+                                    Emit($".long {(uint) cvalue.IntConst}");
                                     break;
                                 default:
                                     throw new ArgumentOutOfRangeException();
@@ -3549,15 +3741,15 @@ namespace AnsiCParser {
 
                             break;
                         case SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst:
-                            switch (v.Type.Sizeof()) {
+                            switch (cvalue.Type.Sizeof()) {
                                 case 4: {
-                                    var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float) v.FloatConst), 0);
+                                    var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float) cvalue.FloatConst), 0);
                                     Emit($".long {dwords}");
                                     break;
                                 }
                                 case 8: {
-                                    var lo = BitConverter.ToUInt32(BitConverter.GetBytes((float) v.FloatConst), 0);
-                                    var hi = BitConverter.ToUInt32(BitConverter.GetBytes((float) v.FloatConst), 0);
+                                    var lo = BitConverter.ToUInt32(BitConverter.GetBytes((float) cvalue.FloatConst), 0);
+                                    var hi = BitConverter.ToUInt32(BitConverter.GetBytes((float) cvalue.FloatConst), 0);
 
                                     Emit($".long {lo}, {hi}");
                                     break;
@@ -3569,11 +3761,11 @@ namespace AnsiCParser {
                             break;
                         case SyntaxTreeCompileVisitor.Value.ValueKind.Var:
                         case SyntaxTreeCompileVisitor.Value.ValueKind.Ref:
-                            if (v.Label == null) {
+                            if (cvalue.Label == null) {
                                 throw new Exception("ファイルスコープオブジェクトの参照では無い。");
                             }
 
-                            Emit($".long {v.Label}+{v.Offset}");
+                            Emit($".long {cvalue.Label}+{cvalue.Offset}");
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -3784,11 +3976,25 @@ namespace AnsiCParser {
 
         public SyntaxTreeCompileVisitor.Value OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
             var ret = Evaluator.ConstantEval(self.Expr);
-            Values.Add(ret);
+            if (self.Type.IsBitField()) {
+                var bft = self.Type as CType.BitFieldType;
+                if (ret is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                    Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, ret));
+                    if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
+                        CurrentOffset += bft.Sizeof();
+                    }
+                } else {
+                    throw new Exception("ビットフィールドに代入できない値が使われている。");
+                }
+            } else {
+                Values.Add(Tuple.Create(CurrentOffset, -1, -1, ret));
+                CurrentOffset += self.Type.Sizeof();
+            }
             return value;
         }
 
         public SyntaxTreeCompileVisitor.Value OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
+
             foreach (var s in self.Inits) {
                 s.Accept(this, value);
             }
@@ -3797,16 +4003,19 @@ namespace AnsiCParser {
             var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.BaseType.Sizeof();
             while (filledSize > 0) {
                 if (filledSize >= 4) {
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1,(SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedLongInt)));
+                    CurrentOffset += 4;
                     filledSize -= 4;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedLongInt));
                 }
                 else if (filledSize >= 2) {
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedShortInt)));
+                    CurrentOffset += 2;
                     filledSize -= 2;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedShortInt));
                 }
                 else if (filledSize >= 1) {
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedChar)));
+                    CurrentOffset += 1;
                     filledSize -= 1;
-                    Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedChar));
                 }
             }
 
@@ -3814,29 +4023,101 @@ namespace AnsiCParser {
         }
 
         public SyntaxTreeCompileVisitor.Value OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
+            var start = Values.Count;
+
             foreach (var s in self.Inits) {
                 s.Accept(this, value);
             }
 
+
             var suType = self.Type.Unwrap() as CType.TaggedType.StructUnionType;
             if (suType.IsStructureType()) {
-                var filledSize = suType.Members.Skip(self.Inits.Count).Aggregate(0, (s, x) => s + x.Type.Sizeof());
-                while (filledSize > 0) {
-                    if (filledSize >= 4) {
-                        filledSize -= 4;
-                        Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedLongInt));
-                    }
-                    else if (filledSize >= 2) {
-                        filledSize -= 2;
-                        Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedShortInt));
-                    }
-                    else if (filledSize >= 1) {
-                        filledSize -= 1;
-                        Values.Add(new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedChar));
+                foreach (var x in suType.Members.Skip(self.Inits.Count)) {
+                    if (x.Type.IsBitField()) {
+                        var bft = x.Type as CType.BitFieldType;
+                        var bt = bft.Type as CType.BasicType;
+                        Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+                        if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
+                            CurrentOffset += bft.Sizeof();
+                        }
+                    } else {
+                        var fillSize = x.Type.Sizeof();
+                        while (fillSize > 0) {
+                            if (fillSize >= 4) {
+                                fillSize -= 4;
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedLongInt)));
+                                CurrentOffset += 4;
+                            } else if (fillSize >= 2) {
+                                fillSize -= 2;
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedShortInt)));
+                                CurrentOffset += 4;
+                            } else if (fillSize >= 1) {
+                                fillSize -= 1;
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.UnsignedChar)));
+                                CurrentOffset += 4;
+                            }
+                        }
                     }
                 }
             }
 
+            var end = Values.Count;
+
+            var i = start;
+            while (i < Values.Count) {
+                var val = Values[i];
+                var byteOffset = val.Item1;
+                var bitOffset = val.Item2;
+                var bitSize = val.Item3;
+                var expr = val.Item4;
+                if (bitSize == -1) {
+                    i++;
+                    continue;
+                }
+                ulong v = 0;
+
+                while (i < Values.Count && Values[i].Item1 == byteOffset) {
+                    var cvalue = Values[i].Item4.Accept(this, value);
+                    var bOffset = Values[i].Item2;
+                    var bSize = Values[i].Item3;
+                    if (cvalue.Kind != SyntaxTreeCompileVisitor.Value.ValueKind.IntConst) {
+                        // ビットフィールド中に定数式以外が使われている。
+                        throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
+                    }
+                    ulong bits = 0;
+                    switch (cvalue.Type.Sizeof()) {
+                        case 1:
+                            if (cvalue.Type.IsUnsignedIntegerType()) {
+                                bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+                            } else {
+                                bits = (ulong)(((byte)(((byte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+                            }
+                            break;
+                        case 2:
+                            if (cvalue.Type.IsUnsignedIntegerType()) {
+                                bits = (ulong)(((ushort)(((short)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+                            } else {
+                                bits = (ulong)(((ushort)(((ushort)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+                            }
+                            break;
+                        case 4:
+                            if (cvalue.Type.IsUnsignedIntegerType()) {
+                                bits = (ulong)(((uint)(((int)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+                            } else {
+                                bits = (ulong)(((uint)(((uint)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+                            }
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                    v |= bits << bOffset;
+                    Values.RemoveAt(i);
+                }
+                Values.Insert(i, Tuple.Create(byteOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as CType.BasicType).Kind)));
+
+                i++;
+                
+            }
             return value;
         }
 

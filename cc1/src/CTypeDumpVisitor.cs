@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace AnsiCParser {
+    /// <summary>
+    /// S式書式でCTypeを文字列化する
+    /// </summary>
     public class CTypeDumpVisitor : CTypeVisitor.IVisitor<Cell, Cell> {
         private HashSet<CType> visited = new HashSet<CType>();
 
@@ -88,7 +91,7 @@ namespace AnsiCParser {
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
             if (visited.Contains(self) == false) {
                 visited.Add(self);
-                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.Offset.ToString(), x.BitOffset.ToString(), x.BitSize.ToString())).ToArray()) : Cell.Nil);
+                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.Offset.ToString())).ToArray()) : Cell.Nil);
             } else {
                 return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName);
             }
@@ -129,8 +132,15 @@ namespace AnsiCParser {
             }
             return Cell.Create("type-qual", Cell.Create(qual.ToArray()), self.Type.Accept(this, null));
         }
+        public Cell OnBitFieldType(CType.BitFieldType self, Cell value) {
+            visited.Add(self);
+            return Cell.Create("bitfield", self.Type.Accept(this, null), self.BitOffset.ToString(), self.BitWidth.ToString());
+        }
     }
 
+    /// <summary>
+    /// C言語書式でCTypeを文字列化する
+    /// </summary>
     public class CTypeDumpVisitor2 : CTypeVisitor.IVisitor<string, string> {
 
         private HashSet<CType> visited = new HashSet<CType>();
@@ -273,7 +283,14 @@ namespace AnsiCParser {
                 return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName}";
             } else {
                 visited.Add(self);
-                var members = string.Join(" ", self.Members.Select(x => $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((x.BitSize != -1) ? " : " + x.BitSize.ToString() : "")};"));
+                var members = string.Join(" ", self.Members.Select(x => {
+                    CType.BitFieldType bft;
+                    if (x.Type.IsBitField(out bft)) {
+                        return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((bft.BitWidth != -1) ? " : " + bft.BitWidth.ToString() : "")};";
+                    } else {
+                        return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")};";
+                    }
+                }));
                 return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} {{ {members} }}" + (String.IsNullOrEmpty(value) ? "" : (" " + value));
             }
         }
@@ -310,7 +327,11 @@ namespace AnsiCParser {
             if (self.Qualifier.HasFlag(TypeQualifier.Invalid)) {
                 qual.Add("invalid");
             }
-            return string.Join(" ", qual) + self.Type.Accept(this, value);
+            qual.Add(self.Type.Accept(this, value));
+            return string.Join(" ", qual);//
+        }
+        public string OnBitFieldType(CType.BitFieldType self, string value) {
+            return $"{self.Type.Accept(this, "")}{((self.BitWidth != -1) ? " : " + self.BitWidth.ToString() : "")};";
         }
     }
 }

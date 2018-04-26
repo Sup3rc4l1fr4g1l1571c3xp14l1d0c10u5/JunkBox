@@ -55,49 +55,58 @@ namespace AnsiCParser {
         /// <param name="decl"></param>
         /// <param name="isDefine"></param>
         /// <returns></returns>
-        private LinkageObject AddLinkageObject(LinkageKind linkage, SyntaxTree.Declaration decl, bool isDefine) {
+        private LinkageObject AddLinkageObject(Token ident, LinkageKind linkage, SyntaxTree.Declaration decl, bool isDefine) {
             switch (linkage) {
                 case LinkageKind.ExternalLinkage:
-                case LinkageKind.InternalLinkage:
-                    // 外部もしくは内部結合なので再定義チェック
-                    LinkageObject value;
-                    if (_linkageTable.TryGetValue(decl.Ident, out value)) {
-                        if (value.Linkage != linkage) {
-                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
+                case LinkageKind.InternalLinkage: {
+                        // 外部もしくは内部結合なので再定義チェック
+                        LinkageObject value;
+                        if (_linkageTable.TryGetValue(decl.Ident, out value)) {
+                            if (value.Linkage != linkage) {
+                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
+                            }
+                            if (Specification.IsCompatible(value.Type, decl.Type) == false) {
+                                throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, "オブジェクトの型が以前のオブジェクトと一致しない");
+                            }
+                            if (value.Definition != null && isDefine) {
+                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクトは既に実体をもっています");
+                            }
+                        } else {
+                            value = new LinkageObject(decl.Ident, decl.Type, linkage);
+                            _linkageTable[decl.Ident] = value;
+                            _linkageList.Add(value);
                         }
-                        if (Specification.IsCompatible(value.Type, decl.Type) == false) {
-                            throw new CompilerException.TypeMissmatchError(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "オブジェクトの型が以前のオブジェクトと一致しない");
+
+                        if (!isDefine) {
+                            // 仮定義
+                            value.TentativeDefinitions.Add(decl);
+                        } else {
+                            // 本定義
+                            if (value.Definition != null) {
+                                // 上記判定の結果、ここにはこないはず
+                                throw new CompilerException.InternalErrorException(ident.Start, ident.End, "リンケージオブジェクトの本定義が再度行われた（本処理系の不具合です。）");
+                            } else {
+                                value.Definition = decl;
+                            }
                         }
-                        if (value.Definition != null && isDefine) {
-                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "オブジェクトは既に実体をもっています");
-                        }
-                    } else {
-                        value = new LinkageObject(decl.Ident, decl.Type, linkage);
-                        _linkageTable[decl.Ident] = value;
-                        _linkageList.Add(value);
+
+                        return value;
                     }
 
-                    if (!isDefine) {
-                        // 仮定義
-                        value.TentativeDefinitions.Add(decl);
-                    } else if (value.Definition == null) {
-                        // 本定義
-                        value.Definition = decl;
+                case LinkageKind.NoLinkage: {
+                        // 無結合なので再定義チェックはしない。(名前表上で再定義のチェックは終わっているはず。)
+                        var value = new LinkageObject(decl.Ident, decl.Type, linkage);
+                        // static の場合は、staticなリンケージ名を生成して使う
+                        if (decl.StorageClass == AnsiCParser.StorageClassSpecifier.Static) {
+                            value.Definition = decl;
+                            value.LinkageId = $"{decl.Ident}.{_linkageList.Count}";
+                            _linkageList.Add(value);
+                        }
+                        return value;
                     }
 
-                    return value;
-                case LinkageKind.NoLinkage:
-                    // 無結合なので再定義チェックはしない。(名前表上で再定義のチェックは終わっているはず。)
-                    var v = new LinkageObject(decl.Ident, decl.Type, linkage);
-                    // static の場合は、staticなリンケージ名を生成して使う
-                    if (decl.StorageClass == AnsiCParser.StorageClassSpecifier.Static) {
-                        v.Definition = decl;
-                        v.LinkageId = $"{decl.Ident}.{_linkageList.Count}";
-                        _linkageList.Add(v);
-                    }
-                    return v;
                 default:
-                    throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "リンケージが指定されていません。");
+                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "リンケージが指定されていません。");
             }
         }
 
@@ -126,9 +135,9 @@ namespace AnsiCParser {
 
 
         /// <summary>
-        /// 暗黙的宣言の挿入を行うクロージャー
+        /// 暗黙的宣言の挿入対象となる宣言部
         /// </summary>
-        private readonly Stack<Func<SyntaxTree.Declaration, SyntaxTree.Declaration>> _insertImplictDeclarationOperatorStack = new Stack<Func<SyntaxTree.Declaration, SyntaxTree.Declaration>>();
+        private readonly Stack<List<SyntaxTree.Declaration>> _insertImplictDeclarationOperatorStack = new Stack<List<SyntaxTree.Declaration>>();
 
         /// <summary>
         ///  暗黙的関数宣言を挿入
@@ -140,7 +149,8 @@ namespace AnsiCParser {
             var storageClass = AnsiCParser.StorageClassSpecifier.Extern;
             var functionSpecifier = AnsiCParser.FunctionSpecifier.None;
             var funcDecl = FunctionDeclaration(ident, type, storageClass, functionSpecifier, ScopeKind.FileScope, false);
-            return _insertImplictDeclarationOperatorStack.Peek().Invoke(funcDecl);
+            _insertImplictDeclarationOperatorStack.Peek().Add(funcDecl);
+            return funcDecl;
         }
 
         /// <summary>
@@ -151,7 +161,8 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Declaration AddImplictTypeDeclaration(Token ident, CType type) {
             var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type);
-            return _insertImplictDeclarationOperatorStack.Peek().Invoke(typeDecl);
+            _insertImplictDeclarationOperatorStack.Peek().Add(typeDecl);
+            return typeDecl;
         }
 
         /// <summary>
@@ -191,7 +202,7 @@ namespace AnsiCParser {
                 case AnsiCParser.StorageClassSpecifier.Register:
                     if (scope == ScopeKind.FileScope) {
                         // 記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。
-                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
+                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
                     } else {
                         // 6.2.2 識別子の結合
                         // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
@@ -208,7 +219,7 @@ namespace AnsiCParser {
                         if (scope == ScopeKind.BlockScope) {
                             // 6.2.2 識別子の結合
                             // 関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである（6.7.1 参照）
-                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである");
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである");
                         }
                     }
                     if (scope == ScopeKind.FileScope && (type.IsObjectType() || type.IsFunctionType())) {
@@ -219,7 +230,7 @@ namespace AnsiCParser {
                         // 記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする
                         return LinkageKind.NoLinkage;  // 無結合
                     } else {
-                        throw new Exception("オブジェクト又は関数に対するファイル有効範囲の識別子の宣言、もしくは、記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクト、のどちらでもない識別子の宣言で static が使用されている。");
+                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクト又は関数に対するファイル有効範囲の識別子の宣言、もしくは、記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクト、のどちらでもない識別子の宣言で static が使用されている。");
                     }
                 case AnsiCParser.StorageClassSpecifier.None:
                     // 6.2.2 識別子の結合
@@ -588,18 +599,15 @@ namespace AnsiCParser {
             var start = _lexer.CurrentToken().Start;
             var ret = new SyntaxTree.TranslationUnit(LocationRange.Empty);
 
-            // 暗黙的宣言の処理スタックに追加処理を積む
-            _insertImplictDeclarationOperatorStack.Push((decl) => {
-                ret.Declarations.Add(decl);
-                return decl;
-            });
+            // 暗黙的宣言の処理スタックに追加対象の宣言リストを積む
+            _insertImplictDeclarationOperatorStack.Push(ret.Declarations);
 
             // 定義を全て解析
             while (IsExternalDeclaration(null, AnsiCParser.TypeSpecifier.None)) {
                 ret.Declarations.AddRange(ExternalDeclaration());
             }
 
-            // 暗黙的宣言の処理スタックから追加処理を外す
+            // 暗黙的宣言の処理スタックから宣言リストを外す
             _insertImplictDeclarationOperatorStack.Pop();
 
             // ファイル終端の確認
@@ -769,7 +777,7 @@ namespace AnsiCParser {
 
 
             // 未定義ラベルと未使用ラベルを調査
-            foreach (var scopeValue in _labelScope.GetEnumertor()) {
+            foreach (var scopeValue in _labelScope) {
                 if (scopeValue.Item2.Declaration == null && scopeValue.Item2.References.Any()) {
                     // 未定義のラベルが使われている。
                     scopeValue.Item2.References.ForEach(x => {
@@ -1197,6 +1205,10 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
+            if (_lexer.PeekToken('}')) {
+                // 空の構造体/共用体を使っている。
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().Start, $"空の構造体/共用体が宣言されていますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.2.5-20および、J.2未定義の動作を参照）。（捕捉：C++では空の構造体/共用体は認められています。）");
+            }
             var items = new List<CType.TaggedType.StructUnionType.MemberInfo>();
             items.AddRange(StructDeclaration());
             while (IsStructDeclaration()) {
@@ -1281,6 +1293,20 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        /// 6.7.2.1 型指定子型修飾子並び（ビットフィールド長を読み取る）
+        /// </summary>
+        /// <returns></returns>
+        private int BitFieldSize() {
+            var expr = ConstantExpression();
+            var ret = Evaluator.ConstantEval(expr);
+            int? size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+            if (size.HasValue == false || size < 0) {
+                throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールド長には0以上の定数式を指定してください。");
+            }
+            return size.Value;
+        }
+
+        /// <summary>
         /// 6.7.2.1 型指定子型修飾子並び（メンバ宣言子）
         /// </summary>
         /// <param name="type"></param>
@@ -1297,28 +1323,17 @@ namespace AnsiCParser {
                 }
 
                 // ビットフィールド部分(opt)
-                int? size = null;
-                if (_lexer.ReadTokenIf(':')) {
-                    var expr = ConstantExpression();
-                    var ret = Evaluator.ConstantEval(expr);
-                    size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
-                    if (size.HasValue == false || size < 0) {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドには0以上の定数式を指定してください。");
-                    }
-                }
+                int? size = _lexer.ReadTokenIf(':') ? BitFieldSize() : (int?)null;
 
-                return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, 0,0,size.HasValue ? size.Value : -1);
+                if (size.HasValue) {
+                    return new CType.TaggedType.StructUnionType.MemberInfo(ident, new CType.BitFieldType(ident, type, 0, size.Value), 0);
+                } else {
+                    return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, 0);
+                }
             } else if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
-                int? size = null;
-                var expr = ConstantExpression();
-                var ret = Evaluator.ConstantEval(expr);
-                size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
-                if (size.HasValue == false || size < 0) {
-                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドには0以上の定数式を指定してください。");
-                }
-
-                return new CType.TaggedType.StructUnionType.MemberInfo(null, type, 0, 0, size.HasValue ? size.Value : -1);
+                int size = BitFieldSize();
+                return new CType.TaggedType.StructUnionType.MemberInfo(null, new CType.BitFieldType(null, type, 0, size), 0);
             } else {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
@@ -1391,7 +1406,7 @@ namespace AnsiCParser {
                 var i = e.Value + 1;
                 if (IsEnumerator() == false) {
                     if (Mode == LanguageMode.C89) {
-                        Logger.Warning(t.Start, t.End, "列挙子並びの末尾のコンマを付けることができるのは c99 以降です。c89では使えません。");
+                        Logger.Warning(t.Start, t.End, "列挙子並びの末尾にコンマを付けることができるのは C99 以降です。C89では使えません。");
                     }
                     break;
                 }
@@ -1876,12 +1891,12 @@ namespace AnsiCParser {
                     stack.Add(new CType.StubType());
                     AbstractDeclarator(stack, index + 1);
                 } else if (_lexer.PeekToken(')') == false) {
-                    // ansi args
+                    // ANSI形式
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
-                    // k&r or ansi
+                    // K&R形式もしくは引数省略されたANSI形式（いわゆる曖昧な宣言）
                     stack[index] = new CType.FunctionType(null, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
@@ -1931,6 +1946,7 @@ namespace AnsiCParser {
 
         #region 6.7.8 初期化(初期化式の型検査)
         public static class InitializerChecker {
+
             private class InitializerIterator {
                 private readonly Stack<Tuple<SyntaxTree.Initializer, int>> inits = new Stack<Tuple<SyntaxTree.Initializer, int>>();
                 private SyntaxTree.Initializer initializer = null;
@@ -1940,9 +1956,9 @@ namespace AnsiCParser {
                     get; private set;
                 }
                 public InitializerIterator(SyntaxTree.Initializer it) {
-                    initializer = it;
+                    initializer = null;
                     index = -1;
-                    Current = null;
+                    Current = it;
                 }
 
                 public bool Next() {
@@ -1966,7 +1982,8 @@ namespace AnsiCParser {
                             return true;
                         }
                     } else {
-                        throw new Exception();
+                        Current = null;
+                        return false;
                     }
                 }
                 public bool Enter() {
@@ -1982,8 +1999,9 @@ namespace AnsiCParser {
                 }
                 public bool Leave() {
                     Current = initializer;
-                    initializer = inits.Peek().Item1;
-                    index = inits.Peek().Item2;
+                    var top = inits.Pop();
+                    initializer = top.Item1;
+                    index = top.Item2;
                     return true;
                 }
 
@@ -2022,173 +2040,307 @@ namespace AnsiCParser {
             }
 
             private static SyntaxTree.Initializer CheckInitializer2Simple(int depth, CType type, InitializerIterator it) {
-                var expr = it.AsSimpleInitializer().AssignmentExpression;
-                if (type.IsAggregateType() || type.IsUnionType()) {
-                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange.Start, it.Current.LocationRange.End, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
+                if (it.IsComplexInitializer()) {
+                    Logger.Warning(it.Current.LocationRange.Start, it.Current.LocationRange.End, "スカラー初期化子がブレースで囲まれています");
+                    it.Enter();
+                    it.Next();
+                    var ret = CheckInitializer2Simple(depth, type, it);
+                    if (it.Current != null) {
+                        Logger.Warning(it.Current.LocationRange.Start, it.Current.LocationRange.End, "スカラー初期化子内の要素が多すぎます");
+                    }
+                    it.Leave();
+                    return ret;
+                } else {
+                    var expr = it.AsSimpleInitializer().AssignmentExpression;
+                    if (type.IsAggregateType() || type.IsUnionType()) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange.Start, it.Current.LocationRange.End, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
+                    }
+                    // 単純代入の規則を適用して検証
+
+                    var assign = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(it.Current.LocationRange, type, expr);
+                    var ret = new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type, assign);
+                    it.Next();
+                    return ret;
+
                 }
-
-                // 単純代入の規則を適用して検証
-                var assign = SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(it.Current.LocationRange, type, expr);
-
-                var ret = new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type, assign);
-                it.Next();
-                return ret;
             }
 
-            private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it) {
-                if (it.IsComplexInitializer()) {
-                    var inits = it.AsComplexInitializer().Ret;
-                    var len = inits.Count;
-                    if (type.Length == -1) {
-                        if (depth != 1) {
-                            throw new Exception("ネストした可変配列を初期化しています。");
-                        }
-                        type.Length = len;
-                    } else if (type.Length < len) {
-                        throw new Exception("要素数が領域サイズよりも大きい");
+            /// <summary>
+            /// 配列型に対する複合初期化式
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayByComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+                var inits = it.AsComplexInitializer().Ret;
+                if (type.Length == -1) {
+                    if (depth != 1) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                    }
+                }
+
+                // 要素数分回す
+                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                var loc = it.Current.LocationRange;
+                it.Enter();
+                it.Next();
+                var i = 0;
+                for (i = 0; type.Length == -1 || i < type.Length; i++) {
+                    if (it.Current == null) {
+                        break;
+                    }
+                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                }
+                if (type.Length == -1) {
+                    type.Length = i;
+                }
+                it.Leave();
+
+                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+            }
+
+            /// <summary>
+            /// 配列型に対する単純初期化式（文字列が初期化子として与えられている場合で、初期化対象が文字配列型の場合）
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, CType.ArrayType type, InitializerIterator it) {
+                // 文字配列が対象の場合
+                var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
+                if (type.Length == -1) {
+                    if (depth != 1) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
                     }
                     // 要素数分回す
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
-                    it.Enter();
+                    var len = sexpr.Value.Count;
+                    foreach (var b in sexpr.Value) {
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                    }
+                    // 配列の長さを固定する。
+                    type.Length = len;
                     it.Next();
-                    for (var i = 0; type.Length == -1 || i < len; i++) {
-                        if (it.Current == null) {
-                            break;
-                        }
-                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                    }
-                    it.Leave();
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                } else if (it.IsSimpleInitializer()) {
-                    if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
-                        if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
-                            // 文字列式を用いた初期化
-                            var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
-                            // 初期化リスト内を舐めてる場合
-                            if (type.Length == -1) {
-                                if (depth != 1) {
-                                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
-                                }
-                                // 要素数分回す
-                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                                var loc = it.Current.LocationRange;
-                                var len = sexpr.Value.Count;
-                                foreach (var b in sexpr.Value) {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
-                                }
-                                // 配列の長さを固定する。
-                                type.Length = len;
-                                it.Next();
-                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                            } else {
-                                var len = sexpr.Value.Count;
-                                if (len > type.Length) {
-                                    Logger.Warning(sexpr.LocationRange, $"配列変数の要素数よりも長い文字列が初期化子として与えられているため、文字列末尾の {len - type.Length}バイトは無視され、終端文字なし文字列 (つまり、終端を示す 0 値のない文字列) が作成されます。");
-                                    len = type.Length;
-                                }
-                                // 要素数分回す
-                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                                var loc = it.Current.LocationRange;
-                                foreach (var b in sexpr.Value.Take(len)) {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
-                                }
-                                it.Next();
-                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                            }
-                        } else {
-                            if (type.Length == -1) {
-                                if (depth != 1) {
-                                    throw new Exception("ネストした可変配列を初期化しています。");
-                                }
-                                // 要素数分回す
-                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                                var loc = it.Current.LocationRange;
-                                var len = 0;
-                                while (it.Current != null) {
-                                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                                    len++;
-                                }
-                                // 配列の長さを固定する。
-                                type.Length = len;
-                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                            } else {
-                                var len = type.Length;
-                                // 要素数分回す
-                                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                                var loc = it.Current.LocationRange;
-                                while (it.Current != null && len > 0) {
-                                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                                    len--;
-                                }
-                                return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                            }
-                        }
-                    } else if (it.IsInComplexInitializer()) {
-                        // 初期化リスト内を舐めてる場合
-                        if (type.Length == -1) {
-                            if (depth != 1) {
-                                throw new Exception("ネストした可変配列を初期化しています。");
-                            }
-                            // 要素数分回す
-                            List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                            var loc = it.Current.LocationRange;
-                            var len = 0;
-                            while (it.Current != null) {
-                                assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                                len++;
-                            }
-                            // 配列の長さを固定する。
-                            type.Length = len;
-                            return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                        } else {
-                            var len = type.Length;
-                            // 要素数分回す
-                            List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                            var loc = it.Current.LocationRange;
-                            while (it.Current != null && len > 0) {
-                                assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
-                                len--;
-                            }
-                            return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
-                        }
+                } else {
+                    var len = sexpr.Value.Count;
+                    if (len > type.Length) {
+                        Logger.Warning(sexpr.LocationRange, $"配列変数の要素数よりも長い文字列が初期化子として与えられているため、文字列末尾の {len - type.Length}バイトは無視され、終端文字なし文字列 (つまり、終端を示す 0 値のない文字列) が作成されます。");
+                        len = type.Length;
                     }
-                    throw new Exception();
+                    // 要素数分回す
+                    List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                    var loc = it.Current.LocationRange;
+                    foreach (var b in sexpr.Value.Take(len)) {
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                    }
+                    it.Next();
+                    return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                }
+            }
+
+
+            /// <summary>
+            /// 配列型に対する単純初期化式（文字列が初期化子として与えられている場合で、初期化対象が文字配列型以外の場合）
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, CType.ArrayType type, InitializerIterator it) {
+                // 文字型以外が初期化対象の場合
+                if (type.Length == -1) {
+                    if (depth != 1) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                    }
+                    // 要素数分回す
+                    List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                    var loc = it.Current.LocationRange;
+                    var len = 0;
+                    while (it.Current != null) {
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        len++;
+                    }
+                    // 配列の長さを固定する。
+                    type.Length = len;
+                    return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                } else {
+                    var len = type.Length;
+                    // 要素数分回す
+                    List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                    var loc = it.Current.LocationRange;
+                    while (it.Current != null && len > 0) {
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        len--;
+                    }
+                    return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                }
+            }
+
+            /// <summary>
+            /// 配列型に対する単純初期化式（文字列が初期化子として与えられている場合）
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+                if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
+                    return CheckInitializerArrayByStringExpressionInitializerToCharArray(depth, type, it);
+                } else {
+                    return CheckInitializerArrayByStringExpressionInitializerToNotCharArray(depth, type, it);
+                }
+            }
+
+            /// <summary>
+            /// 配列型に対する単純初期化式（フラットな符号初期化式中の場合）
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+                if (type.Length == -1) {
+                    if (depth != 1) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                    }
+                    // 要素数分回す
+                    List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                    var loc = it.Current.LocationRange;
+                    var len = 0;
+                    while (it.Current != null) {
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        len++;
+                    }
+                    // 配列の長さを固定する。
+                    type.Length = len;
+                    return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                } else {
+                    var len = type.Length;
+                    // 要素数分回す
+                    List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                    var loc = it.Current.LocationRange;
+                    while (it.Current != null && len > 0) {
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        len--;
+                    }
+                    return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
+                }
+            }
+
+            /// <summary>
+            /// 配列型に対する単純初期化式
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+                if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
+                    return CheckInitializerArrayByStringExpressionInitializer(depth, type, it);
+                } else if (it.IsInComplexInitializer()) {
+                    return CheckInitializerArrayBySimpleInitializerInComplexInitializer(depth, type, it);
+                }
+                throw new Exception();
+            }
+
+            /// <summary>
+            /// 配列型に対する初期化式
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
+            private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it) {
+                if (it.IsComplexInitializer()) {
+                    return CheckInitializerArrayByComplexInitializer(depth, type, it);
+                } else if (it.IsSimpleInitializer()) {
+                    return CheckInitializerArrayBySimpleInitializer(depth, type, it);
                 } else {
                     throw new Exception();
                 }
             }
 
+            /// <summary>
+            /// 構造体型に対する初期化式
+            /// </summary>
+            /// <param name="depth"></param>
+            /// <param name="type"></param>
+            /// <param name="it"></param>
+            /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerStruct(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it) {
                 if (it.IsComplexInitializer()) {
-                    var inits = it.AsComplexInitializer().Ret;
-                    if (type.Members.Count < inits.Count) {
-                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えています。");
-                    }
+                    //var inits = it.AsComplexInitializer().Ret;
+                    //if (type.Members.Count < inits.Count) {
+                    //    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えています。");
+                    //}
                     // 要素数分回す
                     // Todo: ビットフィールドの初期化を作ること
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     it.Enter();
                     it.Next();
-                    for (var i = 0; i < inits.Count; i++) {
-                        assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                    for (var i = 0; i < type.Members.Count; i++) {
+                        if (it.Current == null) {
+                            break;
+                        }
+                        if (type.Members[i].Ident == null) {
+                            // padding
+                            if (type.Members[i].Type.IsBitField()) {
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((type.Members[i].Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                            } else {
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (type.Members[i].Type as CType.BasicType).Kind)));
+                            }
+                            continue;
+                        }
+                        if (type.Members[i].Type.IsBitField()) {
+                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                            //throw new Exception("Todo: ビットフィールドの初期化を作ること");
+                        } else {
+                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                        }
+                    }
+                    if (it.Current != null) {
+                        Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
                     }
                     it.Leave();
+                    it.Next();
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
                     // Todo: ビットフィールドの初期化を作ること
                     // 要素数分回す
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
-                    var loc = it.Current.LocationRange;
-                    for (var i = 0; i < type.Members.Count; i++) {
-                        if (it.Current == null) {
-                            break;
+                    if (it.Current != null) {
+                        var loc = it.Current.LocationRange;
+                        for (var i = 0; i < type.Members.Count; i++) {
+                            if (it.Current == null) {
+                                break;
+                            }
+                            if (type.Members[i].Ident == null) {
+                                // padding
+                                if (type.Members[i].Type.IsBitField()) {
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((type.Members[i].Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                                } else {
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (type.Members[i].Type as CType.BasicType).Kind)));
+                                }
+                                continue;
+                            }
+                            if (type.Members[i].Type.IsBitField()) {
+                                assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                                //throw new Exception("Todo: ビットフィールドの初期化を作ること");
+                            } else {
+                                assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                            }
                         }
-                        assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
+                        return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
+                    } else {
+                        return new SyntaxTree.Initializer.StructUnionAssignInitializer(LocationRange.Empty, type, assigns);
                     }
-                    return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
+
                 } else {
                     throw new Exception();
                 }
@@ -2197,17 +2349,26 @@ namespace AnsiCParser {
             private static SyntaxTree.Initializer CheckInitializerUnion(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it) {
                 if (it.IsComplexInitializer()) {
                     var inits = it.AsComplexInitializer().Ret;
-                    if (1 < inits.Count) {
-                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "共用体の初期化子が２つ以上指定されています。");
-                    }
+                    //if (1 < inits.Count) {
+                    //    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "共用体の初期化子が２つ以上指定されています。");
+                    //}
                     // Todo: ビットフィールドの初期化を作ること
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     it.Enter();
                     it.Next();
-                    assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
+                    if (type.Members[0].Type.IsBitField()) {
+                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
+                        //throw new Exception("Todo: ビットフィールドの初期化を作ること");
+                    } else {
+                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
+                    }
+                    if (it.Current != null) {
+                        Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
+                    }
                     it.Leave();
+                    it.Next();
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
@@ -2215,7 +2376,11 @@ namespace AnsiCParser {
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
-                    assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
+                    if (type.Members[0].Type.IsBitField()) {
+                        throw new Exception("Todo: ビットフィールドの初期化を作ること");
+                    } else {
+                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
+                    }
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else {
                     throw new Exception();
@@ -2224,11 +2389,10 @@ namespace AnsiCParser {
 
             public static SyntaxTree.Initializer CheckInitializer(CType type, SyntaxTree.Initializer init) {
                 var it = new InitializerIterator(init);
-                it.Next();
                 var ret =  CheckInitializerBase(0, type, it);
-                if (it.Current != null) {
-                    Logger.Warning(init.LocationRange, "初期化子の要素が多すぎます。");
-                }
+                //if (it.Current != null) {
+                //    Logger.Warning(init.LocationRange, "初期化子の要素が多すぎます。");
+                //}
                 return ret;
             }
         }
@@ -2254,6 +2418,8 @@ namespace AnsiCParser {
                 List<SyntaxTree.Initializer> ret = null;
                 if (_lexer.PeekToken('}') == false) {
                     ret = InitializerList();
+                } else {
+                    ret = new List<SyntaxTree.Initializer>();
                 }
                 var endToken = _lexer.ReadToken('}');
                 return new SyntaxTree.Initializer.ComplexInitializer(new LocationRange(startTok.Start, endToken.End), ret);
@@ -2392,10 +2558,7 @@ namespace AnsiCParser {
             var start = _lexer.ReadToken('{').Start;
             var decls = new List<SyntaxTree.Declaration>();
 
-            _insertImplictDeclarationOperatorStack.Push((decl) => {// ToDo: 共通化
-                decls.Add(decl);
-                return decl;
-            });
+            _insertImplictDeclarationOperatorStack.Push(decls);
 
             while (IsDeclaration()) {
                 var d = Declaration();
@@ -2469,7 +2632,7 @@ namespace AnsiCParser {
                 ss.LocationRange = new LocationRange(start, end);
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"選択文は if, switch の何れかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"選択文は if, switch のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         /// <summary>
@@ -2527,7 +2690,7 @@ namespace AnsiCParser {
                 ss.LocationRange = new LocationRange(start, end);
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"繰返し文は while, do, for の何れかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"繰返し文は while, do, for のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         /// <summary>
@@ -2586,7 +2749,7 @@ namespace AnsiCParser {
                 }
                 return new SyntaxTree.Statement.ReturnStatement(new LocationRange(start, end), expr);
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"分岐文は goto, continue, break, return の何れかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"分岐文は goto, continue, break, return のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         private void GnuAsmPart() {
@@ -2676,7 +2839,7 @@ namespace AnsiCParser {
                 if (value is SyntaxTree.Declaration.FunctionDeclaration) {
                     return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(new LocationRange(ident.Start, ident.End), ident.Raw, value as SyntaxTree.Declaration.FunctionDeclaration);
                 }
-                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"一次式として使える定義済み識別子は変数、列挙定数、関数の何れかですが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"一次式として使える定義済み識別子は変数、列挙定数、関数のいずれかですが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
             }
             if (IsConstant()) {
                 return Constant();
@@ -2907,7 +3070,7 @@ namespace AnsiCParser {
             }
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.SIZEOF)) {
                 if (_lexer.PeekToken('(')) {
-                    // どっちにも'('が出ることが出来るのでさらに先読みする（LL(*))
+                    // どちらにも'('の出現が許されるためさらに先読みを行う。
                     var saveCurrent = _lexer.Save();
                     _lexer.ReadToken('(');
                     if (IsTypeName()) {
@@ -2978,7 +3141,7 @@ namespace AnsiCParser {
                         throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
                 }
                 var rhs = CastExpression();
-                lhs = new SyntaxTree.Expression.MultiplicitiveExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
+                lhs = new SyntaxTree.Expression.MultiplicitiveExpression(op, lhs, rhs);
             }
             return lhs;
         }
@@ -3183,37 +3346,37 @@ namespace AnsiCParser {
 
                 switch (op.Raw) {
                     case "=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression(lhs, rhs);
                         break;
                     case "+=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN, lhs, rhs);
                         break;
                     case "-=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN, lhs, rhs);
                         break;
                     case "*=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN, lhs, rhs);
                         break;
                     case "/=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN, lhs, rhs);
                         break;
                     case "%=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN, lhs, rhs);
                         break;
                     case "&=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN, lhs, rhs);
                         break;
                     case "^=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN, lhs, rhs);
                         break;
                     case "|=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN, lhs, rhs);
                         break;
                     case "<<=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN, lhs, rhs);
                         break;
                     case ">>=":
-                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN, lhs, rhs);
+                        lhs = new SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN, lhs, rhs);
                         break;
                     default:
                         throw new CompilerException.InternalErrorException(op.Start, op.End, $"未定義の代入演算子 { op.Raw } があります。");
@@ -3455,10 +3618,10 @@ namespace AnsiCParser {
                 _lexer.NextToken();
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier) && IsTypeQualifier()) {
                 // 型修飾子
-                typeQualifier.Marge(TypeQualifier());
+                typeQualifier = typeQualifier.Marge(TypeQualifier());
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.FunctionSpecifier) && IsFunctionSpecifier()) {
                 // 関数修飾子
-                functionSpecifier.Marge(FunctionSpecifier());
+                functionSpecifier = functionSpecifier.Marge(FunctionSpecifier());
             } else {
                 throw new Exception("");
             }
@@ -3538,7 +3701,7 @@ namespace AnsiCParser {
             var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type, storageClass, functionSpecifier);
 
             // 結合スコープにオブジェクトを追加
-            funcDelc.LinkageObject = AddLinkageObject(linkage, funcDelc, (scope == ScopeKind.FileScope && isDefine));
+            funcDelc.LinkageObject = AddLinkageObject(ident, linkage, funcDelc, (scope == ScopeKind.FileScope && isDefine));
             _identScope.Add(ident.Raw, funcDelc);
 
             return funcDelc;
@@ -3631,12 +3794,14 @@ namespace AnsiCParser {
                     }
 
                     // 型適合のチェック
-                    if (Specification.IsCompatible(iv.Type.Unwrap(), type.Unwrap()) == false) {
-                        throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"既に宣言されている変数{ident.Raw}と型が適合しないため再宣言できません。");
+                    //if (Specification.IsCompatible(iv.Type.Unwrap(), type.Unwrap()) == false) {
+                    if (Specification.IsCompatible(iv.Type, type) == false) {
+                            throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"既に宣言されている変数{ident.Raw}と型が適合しないため再宣言できません。");
                     }
 
                     // 合成型を生成
-                    type = CType.CompositeType(iv.Type.Unwrap(), type.Unwrap());
+                    //type = CType.CompositeType(iv.Type.Unwrap(), type.Unwrap());
+                        type = CType.CompositeType(iv.Type, type);
                     System.Diagnostics.Debug.Assert(type != null);
 
                 }
@@ -3648,7 +3813,7 @@ namespace AnsiCParser {
 
             // 新たに変数宣言を作成
             var varDecl = new SyntaxTree.Declaration.VariableDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type, storageClass, initializer);
-            varDecl.LinkageObject = AddLinkageObject(linkage, varDecl, varDecl.Init != null);
+            varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, varDecl.Init != null);
             _identScope.Add(ident.Raw, varDecl);
             return varDecl;
         }

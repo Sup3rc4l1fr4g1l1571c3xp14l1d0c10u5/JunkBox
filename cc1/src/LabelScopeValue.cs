@@ -2,6 +2,7 @@ using System.Collections.Generic;
 
 namespace AnsiCParser {
     public class LabelScopeValue {
+
         /// <summary>
         /// ラベルの宣言地点
         /// </summary>

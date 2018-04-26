@@ -35,7 +35,23 @@ namespace AnsiCParser {
             if (self is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
                 return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
             }
+            // 初期化子の要素が定数ではありません等
             throw new NotSupportedException(self.GetType().Name);
+        }
+        private static long? AsLongValue(this SyntaxTree.Expression self) {
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant)self).Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant)self).Info.Value);
+            }
+            if (self is SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant) {
+                return (long)(((SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
+            }
+            return null;
         }
 
         /// <summary>
@@ -527,12 +543,22 @@ namespace AnsiCParser {
                 // 新しい型で表現できない場合，新しい型が符号無し整数型であれば，新しい型で表現しうる最大の数に1加えた数を加えること又は減じることを，新しい型の範囲に入るまで繰り返すことによって得られる値に変換する。
                 // そうでない場合，すなわち，新しい型が符号付き整数型であって，値がその型で表現できない場合は，結果が処理系定義の値となるか，又は処理系定義のシグナルを生成するかのいずれかとする。
                 if (self.Type.IsIntegerType() && self.Expr.Type.IsIntegerType()) {
-                    var v = self.Expr.Accept(this, value).LongValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    var e = self.Expr.Accept(this, value);
+                    var v = e.AsLongValue();
+                    if (v != null) {
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v.Value, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    } else {
+                        return e;
+                    }
                 }
                 if (self.Type.IsIntegerType() && self.Expr.Type.IsFloatingType()) {
-                    var v = self.Expr.Accept(this, value).LongValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    var e = self.Expr.Accept(this, value);
+                    var v = e.AsLongValue();
+                    if (v != null) {
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v.Value, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    } else {
+                        return e;
+                    }
                 }
 
 
@@ -654,7 +680,8 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTree.Expression value) {
-                return self;
+                //return self;
+                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
             }
 
             public SyntaxTree.Expression OnWhileStatement(SyntaxTree.Statement.WhileStatement self, SyntaxTree.Expression value) {

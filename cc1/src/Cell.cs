@@ -14,8 +14,6 @@ namespace AnsiCParser {
         /// </summary>
         public static Cell Nil { get; } = new ConsCell();
 
-
-
         /// <summary>
         /// コンスセル
         /// </summary>

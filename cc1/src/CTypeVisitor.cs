@@ -10,6 +10,7 @@ namespace AnsiCParser {
             TResult OnStructUnionType(CType.TaggedType.StructUnionType self, TArg value);
             TResult OnTypedefedType(CType.TypedefedType self, TArg value);
             TResult OnTypeQualifierType(CType.TypeQualifierType self, TArg value);
+            TResult OnBitFieldType(CType.BitFieldType self, TArg value);
         }
 
         private static TResult AcceptInner<TResult, TArg>(dynamic type, IVisitor<TResult, TArg> visitor, TArg value) {
@@ -46,6 +47,9 @@ namespace AnsiCParser {
         }
         public static TResult Accept<TResult, TArg>(this CType.TypeQualifierType self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnTypeQualifierType(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this CType.BitFieldType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnBitFieldType(self, value);
         }
     }
 }

@@ -594,6 +594,7 @@ namespace AnsiCParser {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
                 if (IntegerConversionRank(expr.Type) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                    // -> 元の型が unsigned int の場合のみ unsigned int 型に拡張。それ以外の場合は int型に拡張
                     if (expr.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int でないと表現できない
                         return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
@@ -1017,6 +1018,26 @@ namespace AnsiCParser {
                 }
 
                 if (targetType.IsIntegerType() && expr.Type.IsPointerType()) {
+                    // 任意のポインタ型は整数型に型変換できる。
+                    // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
+                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
+                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                }
+
+                CType elementType;
+                if (targetType.IsIntegerType() && expr.Type.IsArrayType(out elementType)) {
+                    // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
+                    // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
+                    // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
+                    // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
+
+                    // ToDo:アドレス付け可能な記憶域が実際に使われるかどうかにかかわらず，記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも，
+                    // （6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない。
+                    if (expr.HasStorageClassRegister()) {
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも（6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない");
+                    }
+                    expr = TypeConvert(targetType, new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr));
+                    
                     // 任意のポインタ型は整数型に型変換できる。
                     // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
                     // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
@@ -1457,5 +1478,27 @@ namespace AnsiCParser {
             }
 
         }
+
+        /// <summary>
+        /// 6.3.2.1 左辺値（lvalue）
+        /// オブジェクト型，又は void 以外の不完全型をもつ式
+        /// </summary>
+        /// <param name="expr"></param>
+        /// <returns></returns>
+
+        public static bool IsLvalue(SyntaxTree.Expression expr) {
+            return expr.IsLValue();
+        }
+
+        /// <summary>
+        /// 6.3.2.1 変更可能な左辺値（modifiable lvalue）
+        /// 配列型をもたず，不完全型をもたず， const 修飾型をもたない左辺値
+        /// </summary>
+        /// <param name="expr"></param>
+        public static bool IsModifiableLvalue(SyntaxTree.Expression expr) {
+            return expr.IsLValue() && !expr.Type.IsIncompleteType() && !expr.Type.IsArrayType() && expr.Type.GetTypeQualifier() != TypeQualifier.Const;
+        }
+
+
     }
 }

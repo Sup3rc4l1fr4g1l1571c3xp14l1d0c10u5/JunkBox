@@ -63,6 +63,14 @@ namespace AnsiCParser {
             }
 
             /// <summary>
+            /// 式が register 記憶クラス指定子を含むか
+            /// </summary>
+            /// <returns></returns>
+            public virtual bool HasStorageClassRegister() {
+                return false;
+            }
+
+            /// <summary>
             /// 6.5.1 一次式
             /// </summary>
             public abstract class PrimaryExpression : Expression {
@@ -92,7 +100,7 @@ namespace AnsiCParser {
 
                         public override CType Type {
                             get {
-                                throw new NotImplementedException();
+                                throw new InvalidOperationException();
                             }
                         }
                             
@@ -102,7 +110,6 @@ namespace AnsiCParser {
                         public override bool IsLValue() {
                             throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, "左辺値が必要な場所に未定義の識別子が登場しています。");
                         }
-
                     }
 
                     /// <summary>
@@ -120,7 +127,11 @@ namespace AnsiCParser {
                         public override bool IsLValue() {
                             // 6.5.1 一次式
                             // 識別子がオブジェクト（この場合，識別子は左辺値となる。）
-                            return true;
+                            return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
+                        }
+
+                        public override bool HasStorageClassRegister() {
+                            return Decl.StorageClass == StorageClassSpecifier.Register;
                         }
 
                         public VariableExpression(LocationRange locationRange, string ident, Declaration.VariableDeclaration decl) : base(locationRange, ident) {
@@ -143,7 +154,10 @@ namespace AnsiCParser {
                         public override bool IsLValue() {
                             // 6.5.1 一次式
                             // 識別子がオブジェクト（この場合，識別子は左辺値となる。）
-                            return true;
+                            return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
+                        }
+                        public override bool HasStorageClassRegister() {
+                            return Decl.StorageClass == StorageClassSpecifier.Register;
                         }
 
                         public ArgumentExpression(LocationRange locationRange, string ident, Declaration.ArgumentDeclaration decl) : base(locationRange, ident) {
@@ -206,6 +220,7 @@ namespace AnsiCParser {
                         public long Value {
                             get;
                         }
+
                         private CType ConstantType {
                             get;
                         }
@@ -239,6 +254,7 @@ namespace AnsiCParser {
 
 
                         }
+
                     }
 
                     /// <summary>
@@ -378,6 +394,9 @@ namespace AnsiCParser {
                         // 括弧の中の式が左辺値である場合，それは，左辺値とする
                         return ParenthesesExpression.IsLValue();
                     }
+                    public override bool HasStorageClassRegister() {
+                        return ParenthesesExpression.HasStorageClassRegister();
+                    }
 
                     public EnclosedInParenthesesExpression(LocationRange locationRange, Expression parenthesesExpression) : base(locationRange) {
                         ParenthesesExpression = parenthesesExpression;
@@ -449,7 +468,10 @@ namespace AnsiCParser {
                         }
                     }
                     public override bool IsLValue() {
-                        return Target.IsLValue();
+                        return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
+                    }
+                    public override bool HasStorageClassRegister() {
+                        return Target.HasStorageClassRegister();
                     }
 
                     public ArraySubscriptingExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
@@ -582,6 +604,11 @@ namespace AnsiCParser {
                     public override bool IsLValue() {
                         return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
                     }
+                    public override bool HasStorageClassRegister() {
+                        // 集成体又は共用体のオブジェクトが typedef 以外の記憶域クラス指定子を用いて宣言されたとき，結合に関するものを除いて，記憶域クラス指定子による性質をオブジェクトのメンバにも適用する。
+                        // また再帰的に集成体又は共用体であるすべてのメンバオブジェクトに適用する。
+                        return Expr.HasStorageClassRegister();
+                    }
 
                     public override CType Type {
                         get {
@@ -599,7 +626,7 @@ namespace AnsiCParser {
                         if (sType.Members == null) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, ".演算子の最初のオペランドの構造体/共用体が不完全型です。");
                         }
-                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
+                        var memberInfo = sType.Members.FirstOrDefault(x => x.Ident != null && x.Ident.Raw == ident.Raw);
                         if (memberInfo == null) {
                             throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $".演算子の2番目のオペランドは，その型のメンバの名前でなければならない。(メンバ名{ident.Raw}が見つかりません)");
                         }
@@ -703,6 +730,10 @@ namespace AnsiCParser {
                         return Expr.IsLValue();
                     }
 
+                    public override bool HasStorageClassRegister() {
+                        return Expr.HasStorageClassRegister();
+                    }
+
                     public UnaryPostfixExpression(LocationRange locationRange, OperatorKind op, Expression expr) : base(locationRange) {
                         // 制約  
                         // 後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならず，
@@ -752,6 +783,9 @@ namespace AnsiCParser {
 
                 public override bool IsLValue() {
                     return Expr.IsLValue();
+                }
+                public override bool HasStorageClassRegister() {
+                    return Expr.HasStorageClassRegister();
                 }
 
                 public UnaryPrefixExpression(LocationRange locationRange, OperatorKind op, Expression expr) : base(locationRange) {
@@ -804,11 +838,11 @@ namespace AnsiCParser {
                         // ok
                     } else if (
                         expr.IsLValue() &&  // オペランドは，左辺値
-                        !(  // ToDo: ビットフィールドでもない
-                            (expr is Expression.PostfixExpression.MemberDirectAccess && ((Expression.PostfixExpression.MemberDirectAccess)expr).MemberInfo.BitSize != -1) || 
-                            (expr is Expression.PostfixExpression.MemberIndirectAccess && ((Expression.PostfixExpression.MemberIndirectAccess)expr).MemberInfo.BitSize != -1)
-                        )
-                        // ToDo: register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
+                        (!(  // ToDo: ビットフィールドでもない
+                            (expr is Expression.PostfixExpression.MemberDirectAccess && ((Expression.PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) || 
+                            (expr is Expression.PostfixExpression.MemberIndirectAccess && ((Expression.PostfixExpression.MemberIndirectAccess)expr).Type.IsBitField())
+                        )) &&
+                        !expr.HasStorageClassRegister()// register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
                     ) {
 
                     } else {
@@ -871,6 +905,7 @@ namespace AnsiCParser {
                     return true;
                     //Expr.IsLValue();
                 }
+
                 public UnaryReferenceExpression(LocationRange locationRange, Expression expr) : base(locationRange) {
                     // 暗黙の型変換
                     expr = Specification.ImplicitConversion(null, expr);
@@ -1071,6 +1106,9 @@ namespace AnsiCParser {
                     }
 
                 }
+                public override bool HasStorageClassRegister() {
+                    return Expr.HasStorageClassRegister();
+                }
             }
 
 
@@ -1099,7 +1137,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public MultiplicitiveExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                public MultiplicitiveExpression(OperatorKind op, Expression lhs, Expression rhs) : base(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End)) {
                     // 制約 
                     // 各オペランドは，算術型をもたなければならない。
                     // %演算子のオペランドは，整数型をもたなければならない
@@ -1769,7 +1807,7 @@ namespace AnsiCParser {
                             } else if (lType.IsBoolType() && rhs != null && rhs.Type.IsPointerType()) {
                                 // - 左オペランドの型が_Bool 型であり，かつ右オペランドがポインタである。
                             } else {
-                                throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "代入元と代入先の間で単純代入の条件を満たしていない。");
+                                throw new CompilerException.SpecificationErrorException(locationRange, "代入元と代入先の間で単純代入の条件を満たしていない。");
                             }
                         }
 
@@ -1798,16 +1836,16 @@ namespace AnsiCParser {
 
                     }
 
-                    public SimpleAssignmentExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                    public SimpleAssignmentExpression(Expression lhs, Expression rhs) : base(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End)) {
 
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
                             // ToDo: 変更可能であることをチェック
-                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
                         // 代入の制約条件と意味規則を適用する
-                        rhs = ApplyAssignmentRule(locationRange, lhs.Type, rhs);
+                        rhs = ApplyAssignmentRule(this.LocationRange, lhs.Type, rhs);
 
                         Lhs = lhs;
                         Rhs = rhs;
@@ -1828,12 +1866,12 @@ namespace AnsiCParser {
                     public OperatorKind Op {
                         get;
                     }
-                    public CompoundAssignmentExpression(LocationRange locationRange, OperatorKind op, Expression lhs, Expression rhs) : base(locationRange) {
+                    public CompoundAssignmentExpression(OperatorKind op, Expression lhs, Expression rhs) : base(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End)) {
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
                         if (!lhs.IsLValue()) {
                             // ToDo: 変更可能であることをチェック
-                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
+                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
 
                         // 制約(複合代入)
@@ -1849,7 +1887,7 @@ namespace AnsiCParser {
                                     } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                                         // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
                                     } else {
-                                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
+                                        throw new CompilerException.SpecificationErrorException(LocationRange, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
                                     }
                                     break;
                                 }
@@ -1864,17 +1902,17 @@ namespace AnsiCParser {
                                     // %演算子のオペランドは，整数型をもたなければならない
                                     if (op == OperatorKind.MOD_ASSIGN) {
                                         if (!lhs.Type.IsIntegerType()) {
-                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
                                         }
                                         if (!rhs.Type.IsIntegerType()) {
-                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
                                         }
                                     } else {
                                         if (!lhs.Type.IsArithmeticType()) {
-                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
+                                            throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
                                         }
                                         if (!rhs.Type.IsArithmeticType()) {
-                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，算術型をもたなければならない。");
+                                            throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
                                         }
                                     }
                                     break;
@@ -1893,10 +1931,10 @@ namespace AnsiCParser {
                                     // 制約(6.5.12 ビット単位の OR 演算子)
                                     // 各オペランドの型は，整数型でなければならない。
                                     if (!lhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange.Start, lhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     if (!rhs.Type.IsIntegerType()) {
-                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange.Start, rhs.LocationRange.End, "各オペランドは，整数型をもたなければならない。");
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
                                     }
                                     break;
                                 }
@@ -1938,6 +1976,10 @@ namespace AnsiCParser {
                         return Expressions.Last().Type;
                     }
                 }
+                public override bool HasStorageClassRegister() {
+                    return Expressions.Last().HasStorageClassRegister();
+                }
+
                 public CommaExpression(LocationRange locationRange) : base(locationRange) {
                     // 意味規則 
                     // コンマ演算子は，左オペランドをボイド式として評価する。
@@ -2044,7 +2086,7 @@ namespace AnsiCParser {
                 }
 
                 public override bool IsLValue() {
-                    return Expr.IsLValue();
+                    return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
                 }
 
                 public TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {

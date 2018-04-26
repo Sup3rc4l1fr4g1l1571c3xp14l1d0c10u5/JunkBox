@@ -1,12 +1,14 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace AnsiCParser {
+
     /// <summary>
-    /// 名前空間
+    /// 各種名前空間
     /// </summary>
     /// <typeparam name="TValue"></typeparam>
-    public class Scope<TValue> {
+    public class Scope<TValue> : IEnumerable<Tuple<string, TValue>> {
         /// <summary>
         /// 空のスコープ
         /// </summary>
@@ -18,26 +20,25 @@ namespace AnsiCParser {
         public Scope<TValue> Parent { get; } = Empty;
 
         /// <summary>
-        /// 登録されている要素
+        /// スコープに登録されている要素
         /// </summary>
         private readonly List<Tuple<string, TValue>> _entries = new List<Tuple<string, TValue>>();
 
         /// <summary>
-        /// このスコープの全要素
+        /// コンストラクタ
         /// </summary>
-        public IEnumerable<Tuple<string, TValue>> GetEnumertor() {
-            return _entries;
-        }
-
         private Scope() {
         }
 
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
         protected Scope(Scope<TValue> parent) {
             Parent = parent;
         }
 
         /// <summary>
-        /// 新しいスコープを作って返す。
+        /// 新しくネストしたスコープを作って返す。
         /// </summary>
         /// <returns></returns>
         public Scope<TValue> Extend() {
@@ -45,7 +46,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 現在のスコープに要素を登録する
+        /// スコープに要素を登録する
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="value"></param>
@@ -54,44 +55,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 指定した名前の要素が存在するか調べる。
-        /// </summary>
-        /// <param name="ident"></param>
-        /// <returns></returns>
-        public bool ContainsKey(string ident) {
-            var it = this;
-            while (it != Empty) {
-                if (it._entries.FindLast(x => x.Item1 == ident) != null) {
-                    return true;
-                }
-                it = it.Parent;
-            }
-            return false;
-        }
-
-
-        /// <summary>
-        /// 指定した名前の要素が存在するなら取得する。
-        /// </summary>
-        /// <param name="ident"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        public bool TryGetValue(string ident, out TValue value) {
-            var it = this;
-            while (it != Empty) {
-                var val = it._entries.FindLast(x => x.Item1 == ident);
-                if (val != null) {
-                    value = val.Item2;
-                    return true;
-                }
-                it = it.Parent;
-            }
-            value = default(TValue);
-            return false;
-        }
-
-        /// <summary>
-        /// 指定した名前と型の要素が存在するなら取得する。
+        /// 指定した名前と型の要素がこのスコープもしくは上位のスコープに存在するなら取得する。
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="value"></param>
@@ -116,7 +80,8 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 指定した名前の要素が存在するなら取得する。さらに、現在のスコープにあるかどうかも調べる。
+        /// 指定した名前の要素がこのスコープもしくは上位のスコープに存在するなら取得する。
+        /// さらに、現在のスコープにあるかどうかも調べる。
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="value"></param>
@@ -138,19 +103,20 @@ namespace AnsiCParser {
             return false;
         }
 
-        public bool IsGlobalScope() {
-            return Parent == Empty;
+        #region IEnumerable<Tuple<string, TValue>>の実装
+
+        public IEnumerator<Tuple<string, TValue>> GetEnumerator() {
+            foreach (var entry in _entries) {
+                yield return entry;
+            }
         }
 
-        public Scope<TValue> GetGlobalScope() {
-            var it = this;
-            if (it == Empty) {
-                throw new Exception("");
+        IEnumerator IEnumerable.GetEnumerator() {
+            foreach (var entry in _entries) {
+                yield return entry;
             }
-            while (it.Parent != Empty) {
-                it = it.Parent;
-            }
-            return it;
         }
+        #endregion
+
     }
 }

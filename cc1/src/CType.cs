@@ -164,6 +164,13 @@ namespace AnsiCParser {
         public static BasicType CreateSignedInt() {
             return new BasicType(BasicType.TypeKind.SignedInt);
         }
+        public static BasicType CreateUnsignedLongInt() {
+            return new BasicType(BasicType.TypeKind.UnsignedLongInt);
+        }
+
+        public static BasicType CreateSignedLongInt() {
+            return new BasicType(BasicType.TypeKind.SignedLongInt);
+        }
 
         public static BasicType CreateFloat() {
             return new BasicType(BasicType.TypeKind.Float);
@@ -201,7 +208,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public TypeQualifier GetTypeQualifier() {
             if (this is TypeQualifierType) {
-                return ((TypeQualifierType) this).Qualifier;
+                return ((TypeQualifierType)this).Qualifier;
             }
             return TypeQualifier.None;
         }
@@ -212,7 +219,20 @@ namespace AnsiCParser {
         /// <returns></returns>
         public CType WrapTypeQualifier(TypeQualifier typeQualifier) {
             if (typeQualifier != TypeQualifier.None) {
-                return new TypeQualifierType(UnwrapTypeQualifier(), GetTypeQualifier() | typeQualifier);
+                CType elementType;
+                int len;
+                if (this.IsArrayType(out elementType, out len)) {
+                    // 6.7.3 型修飾子
+                    // 配列型の指定が型修飾子を含む場合，それは要素の型を修飾するだけで，その配列型を修飾するのではない
+                    // const int a[16] は (const int)の配列
+                    // 紛らわしいケース
+                    // - typedef int A[16]; A const x; -> const A型ではなく、const int の配列
+                    // - const int A[15][24] -> (const int [15])[24]や (const int [15][24])ではなく、 const intの配列
+                    var tq = elementType.GetTypeQualifier();
+                    return new ArrayType(len, elementType.WrapTypeQualifier(tq | typeQualifier));
+                } else {
+                    return new TypeQualifierType(UnwrapTypeQualifier(), GetTypeQualifier() | typeQualifier);
+                }
             }
             return this;
         }
@@ -262,7 +282,25 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        ///     型別名と型修飾を無視した型を得る。
+        /// ビットフィールドなら真
+        /// </summary>
+        /// <returns></returns>
+        public bool IsBitField() {
+            return this is BitFieldType;
+        }
+
+        public bool IsBitField(out BitFieldType bft) {
+            if (this is BitFieldType) {
+                bft = (this as BitFieldType);
+                return true;
+            } else {
+                bft = null;
+                return false;
+            }
+        }
+
+        /// <summary>
+        ///     型別名と型修飾（とビットフィールド修飾）を無視した型を得る。
         /// </summary>
         /// <returns></returns>
         public CType Unwrap() {
@@ -274,6 +312,10 @@ namespace AnsiCParser {
                 }
                 if (self is TypeQualifierType) {
                     self = (self as TypeQualifierType).Type;
+                    continue;
+                }
+                if (self is BitFieldType) {
+                    self = (self as BitFieldType).Type;
                     continue;
                 }
                 break;
@@ -348,7 +390,9 @@ namespace AnsiCParser {
                 Kind = kind;
             }
 
-            public TypeKind Kind { get; }
+            public TypeKind Kind {
+                get;
+            }
 
             private static TypeKind ToKind(TypeSpecifier typeSpecifier) {
                 switch (typeSpecifier) {
@@ -494,9 +538,13 @@ namespace AnsiCParser {
                 IsAnonymous = isAnonymous;
             }
 
-            public string TagName { get; }
+            public string TagName {
+                get;
+            }
 
-            public bool IsAnonymous { get; }
+            public bool IsAnonymous {
+                get;
+            }
 
             /// <summary>
             ///     構造体・共用体型
@@ -511,125 +559,258 @@ namespace AnsiCParser {
                     Kind = kind;
                 }
 
-                public StructOrUnion Kind { get; }
+                public StructOrUnion Kind {
+                    get;
+                }
 
-                public List<MemberInfo> Members { get; internal set; }
+                public List<MemberInfo> Members {
+                    get; internal set;
+                }
+
+                private int size = 0;
 
                 protected override void Fixup(CType type) {
                     for (var i = 0; i < Members.Count; i++) {
                         var member = Members[i];
                         if (member.Type is StubType) {
-                            Members[i] = new MemberInfo(member.Ident, type, 0, 0, member.BitSize);
-                        }
-                        else {
+                            Members[i] = new MemberInfo(member.Ident, type, 0);
+                        } else {
                             member.Type.Fixup(type);
                         }
                     }
-                    //foreach (var member in Members) {
-                    //    member.Type.Fixup(type);
-                    //}
+                }
+
+                private static int align_padding(int n, int align) {
+                    return (align - (n % align)) % align;
+                }
+
+                private class StructLayouter {
+
+
+                    private int alignof(CType type) {
+                        switch (type.Sizeof()) {
+                            case 1:
+                                return 1;
+                            case 2:
+                                return 2;
+                            default:
+                                return 4;
+                        }
+                    }
+
+                    private int padof(int value, int align) {
+                        return (align - (value % align)) % align;
+                    }
+                    private int align_padding(int n, int align) {
+                        return (align - (n % align)) % align;
+                    }
+
+
+
+                    public StructLayouter() {
+                    }
+
+                    private bool IsEqualBitField(CType t1, CType t2) {
+                        if (t1.IsBasicType() && t2.IsBasicType()) {
+                            return (t1.Unwrap() as CType.BasicType).Kind == (t1.Unwrap() as CType.BasicType).Kind;
+                        }
+                        return false;
+                    }
+
+                    private List<MemberInfo> CreateBitMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, int bitpos, int bitsize) {
+                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bytepos + bitsize) {
+                            throw new Exception("");
+                        } else {
+                            result.Add(new MemberInfo(ident, new BitFieldType(ident, ty, bitpos, bitsize), bytepos));
+                            return result;
+                        }
+                    }
+                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, int bitpos, int bitsize) {
+                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof()*8 < bitpos + bitsize) {
+                            throw new Exception("");
+                        } else {
+                            result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitpos, bitsize), bytepos));
+                            return result;
+                        }
+                    }
+                    private List<MemberInfo> CreateBytePaddingMemberInfo(List<MemberInfo> result, int size, int bytepos) {
+                        CType ty;
+                        switch (size) {
+                            case 1:
+                                ty = CType.CreateUnsignedChar();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                break;
+                            case 2:
+                                ty = CType.CreateUnsignedShortInt();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                break;
+                            case 3:
+                                ty = CType.CreateUnsignedChar();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                ty = CType.CreateUnsignedShortInt();
+                                result.Add(new MemberInfo(null, ty, bytepos+1));
+                                break;
+                            case 4:
+                                ty = CType.CreateUnsignedLongInt();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                break;
+                            default:
+                                throw new Exception("");
+                        }
+                        return result;
+                    }
+                    private List<MemberInfo> CreateMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, int bitpos, int bitsize) {
+                        if (bitsize == -1) {
+                            result.Add(new MemberInfo(ident, ty, bytepos));
+                            return result;
+                        } else {
+                            result.Add(new MemberInfo(ident, new BitFieldType(ident, ty, bitpos, bitsize), bytepos));
+                            return result;
+                        }
+                    }
+                    public Tuple<int, List<MemberInfo>> Run(List<MemberInfo> members) {
+                        var result = new List<MemberInfo>();
+
+                        CType current_bitfield_type = null;
+                        var current_bitfield_capacity = 0;
+                        var current_bitfield_size = 0;
+                        var current_byte_position = 0;
+
+                        foreach (var member in members) {
+                            CType.BitFieldType bft;
+
+                            var size = member.Type.Sizeof();
+                            var name = member.Ident;
+                            var bit = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
+                            var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
+
+                            // 今のバイト領域を終了するか？
+                            if ((current_bitfield_type != null) && (bit == 0)) {
+                                if ((current_bitfield_size % 8) > 0) {
+                                    var pad = padof(current_bitfield_size, 8);
+                                    result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, pad);
+                                    current_bitfield_size += pad;
+                                    if (current_bitfield_capacity != current_bitfield_size) {
+                                        current_byte_position += current_bitfield_capacity / 8;
+                                        current_bitfield_type = null;
+                                        current_bitfield_capacity = 0;
+                                        current_bitfield_size = 0;
+                                    }
+                                    continue;
+                                }
+                            }
+
+                            // 今のビットフィールド領域を終了するか？
+                            if (((current_bitfield_type != null) && (!IsEqualBitField(type, current_bitfield_type))) || // 型が違う
+                               ((current_bitfield_type != null) && (bit == -1))) { // ビットフィールドではない
+                                // ビットフィールドの終了
+                                if (current_bitfield_capacity - current_bitfield_size > 0) {
+                                    result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                                }
+                                    current_byte_position += current_bitfield_capacity / 8;
+                                current_bitfield_type = null;
+                                current_bitfield_capacity = 0;
+                                current_bitfield_size = 0;
+                            } else if ((current_bitfield_type != null) && (bit > 0) && (current_bitfield_capacity < current_bitfield_size + bit)) { // 今の領域があふれる
+                                result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                                // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
+                                current_byte_position += current_bitfield_capacity / 8;
+                                //current_bitfield_type = null;
+                                //current_bitfield_capacity = 0;
+                                current_bitfield_size = 0;
+                            }
+
+                            // アライメント挿入が必要？
+                            if (current_bitfield_type == null) {
+                                var pad = padof(current_byte_position, Math.Min(Settings.PackSize, alignof(type)));
+                                if (pad > 0) {
+                                    result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
+                                }
+                                current_byte_position += pad;
+                            }
+
+                            if (bit == -1) {
+                                // 普通のフィールド
+                                result = CreateMemberInfo(result, type, name, current_byte_position, 0, -1);
+                                current_byte_position += size;
+                            } else if (bit > 0) {
+                                // ビットフィールド
+                                if (current_bitfield_type == null) {
+                                    current_bitfield_type = type;
+                                    current_bitfield_capacity = size * 8;
+                                    current_bitfield_size = 0; // 念のため
+                                }
+                                result = CreateMemberInfo(result, type, name, current_byte_position, current_bitfield_size, bit);
+                                current_bitfield_size += bit;
+                            } else {
+                                // 境界の処理には到達しないはず
+                            }
+                        }
+                        // ビットフィールドが終端していないなら終端させる
+                        if (current_bitfield_type != null) {
+                            var pad = current_bitfield_capacity - current_bitfield_size;
+                            if (pad > 0) {
+                                result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                            }
+                            current_byte_position += current_bitfield_capacity / 8;
+                            current_bitfield_type = null;
+                            current_bitfield_capacity = 0;
+                            current_bitfield_size = 0;
+                        }
+
+                        // 構造体のサイズをアライメントにそろえる
+                        var structure_alignment = Settings.PackSize;
+                        if ((current_byte_position % structure_alignment) > 0) {
+                            var pad = padof(current_byte_position, structure_alignment);
+                            result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
+                            current_byte_position += pad;
+                        }
+
+                        return Tuple.Create(current_byte_position, result);
+
+                    }
                 }
 
                 public void Build() {
-                    int offset = 0;
-                    int bitOffset = 0;
-                    int bitsizeMax = 0;
 
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
-                        Members = Members.Select(x => {
-                            if (x.BitSize <= 0) {
-                                // 非ビットフィールド/ビットフィールド境界
-                                offset += bitsizeMax / 8;
-                                bitOffset = 0;
-                                bitsizeMax = 0;
-                                var ret = new MemberInfo(x.Ident, x.Type, offset, 0, x.BitSize);
-                                offset += x.Type.Sizeof();
-                                return ret;
-                            } else {
-                                // ビットフィールド
-                                if (bitOffset + x.BitSize > bitsizeMax) {
-                                    // 今の空きに追加すると溢れる場合
-                                    offset += bitsizeMax / 8;
-                                    bitOffset = 0;
-                                    bitsizeMax = 0;
-                                }
-                                var ret = new MemberInfo(x.Ident, x.Type, offset, bitOffset, x.BitSize);
-                                if (bitsizeMax == 0) {
-                                    bitsizeMax = x.Type.Sizeof();
-                                }
-                                bitOffset += x.BitSize;
-                                if (bitsizeMax == bitOffset) {
-                                    offset += bitsizeMax / 8;
-                                    bitOffset = 0;
-                                    bitsizeMax = 0;
-                                }
-                                return ret;
-                            }
-                        }).ToList();
+                        // ビットフィールド部分のレイアウトを決定
+                        List<MemberInfo> layoutedMembers = new List<MemberInfo>();
+
+                        var layouter = new StructLayouter();
+                        var ret = layouter.Run(Members);
+                        size = ret.Item1;
+                        Members = ret.Item2;
+
                     } else {
                         // 共用体型の場合は登録時のままでいい
+                        size = Members.Max(x => x.Type.Sizeof());
+
                     }
 
                 }
 
                 public override int Sizeof() {
-                    if (Kind == StructOrUnion.Struct) {
-                        var l = Members.Last();
-                        return l.Offset + l.Type.Sizeof();
-                    }
-                    else {
-                        return Members.Max(x => x.Type.Sizeof());
-                    }
+                    return size;
                 }
 
                 public class MemberInfo {
-                    public MemberInfo(Token ident, CType type, int offset, int bitOffset, int bitSize) {
-                        if (bitSize >= 0) {
-                            // 制約
-                            // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
-                            //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
-                            //   - 値が 0 の場合，その宣言に宣言子があってはならない。
-                            // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
-                            if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) {
-                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
-                            }
-                            if (bitSize > type.Sizeof() * 8) {
-                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
-                            }
-                            if (bitSize == 0) {
-                                // 値が 0 の場合，その宣言に宣言子があってはならない。
-                                // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
-                                // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
-                                if (ident != null) {
-                                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
-                                }
-                            }
-                            Ident = ident;
-                            Type = type;
-                            Offset = offset;
-                            BitOffset = bitOffset;
-                            BitSize = bitSize;
-                        } else {
-                            Ident = ident;
-                            Type = type;
-                            Offset = offset;
-                            BitOffset = 0;
-                            BitSize = -1;
-                        }
+                    public MemberInfo(Token ident, CType type, int offset/*, int bitOffset, int bitSize*/) {
+                        Ident = ident;
+                        Type = type;
+                        Offset = offset;
                     }
 
-                    public Token Ident { get; }
+                    public Token Ident {
+                        get;
+                    }
 
-                    public CType Type { get; }
+                    public CType Type {
+                        get;
+                    }
 
                     public int Offset {
-                        get;
-                    }
-                    public int BitOffset {
-                        get;
-                    }
-                    public int BitSize {
                         get;
                     }
                 }
@@ -643,7 +824,9 @@ namespace AnsiCParser {
                 }
 
 
-                public List<MemberInfo> Members { get; set; }
+                public List<MemberInfo> Members {
+                    get; set;
+                }
 
                 protected override void Fixup(CType type) {
                 }
@@ -667,11 +850,17 @@ namespace AnsiCParser {
                         Value = value;
                     }
 
-                    public Token Ident { get; }
+                    public Token Ident {
+                        get;
+                    }
 
-                    public EnumType ParentType { get; }
+                    public EnumType ParentType {
+                        get;
+                    }
 
-                    public int Value { get; }
+                    public int Value {
+                        get;
+                    }
                 }
             }
         }
@@ -714,7 +903,9 @@ namespace AnsiCParser {
             ///     仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
             /// </summary>
             public ArgumentInfo[] Arguments {
-                get { return _arguments; }
+                get {
+                    return _arguments;
+                }
                 set {
                     if (value != null) {
                         // 6.7.5.3 関数宣言子（関数原型を含む）
@@ -751,18 +942,21 @@ namespace AnsiCParser {
             /// <summary>
             ///     戻り値型
             /// </summary>
-            public CType ResultType { get; private set; }
+            public CType ResultType {
+                get; private set;
+            }
 
             /// <summary>
             ///     可変長引数の有無
             /// </summary>
-            public bool HasVariadic { get; }
+            public bool HasVariadic {
+                get;
+            }
 
             protected override void Fixup(CType type) {
                 if (ResultType is StubType) {
                     ResultType = type;
-                }
-                else {
+                } else {
                     ResultType.Fixup(type);
                 }
                 // 関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。
@@ -834,12 +1028,20 @@ namespace AnsiCParser {
                     Range = range;
                 }
 
-                public Token Ident { get; set; }
-                public LocationRange Range { get; set;}
-                public StorageClassSpecifier StorageClass { get; }
+                public Token Ident {
+                    get; set;
+                }
+                public LocationRange Range {
+                    get; set;
+                }
+                public StorageClassSpecifier StorageClass {
+                    get;
+                }
 
                 // 関数型として外から見える引数型
-                public CType Type { get; set; }
+                public CType Type {
+                    get; set;
+                }
             }
         }
 
@@ -851,13 +1053,14 @@ namespace AnsiCParser {
                 BaseType = type;
             }
 
-            public CType BaseType { get; private set; }
+            public CType BaseType {
+                get; private set;
+            }
 
             protected override void Fixup(CType type) {
                 if (BaseType is StubType) {
                     BaseType = type;
-                }
-                else {
+                } else {
                     BaseType.Fixup(type);
                 }
             }
@@ -880,15 +1083,18 @@ namespace AnsiCParser {
             /// <summary>
             ///     配列長(-1は指定無し)
             /// </summary>
-            public int Length { get; set; }
+            public int Length {
+                get; set;
+            }
 
-            public CType BaseType { get; private set; }
+            public CType BaseType {
+                get; private set;
+            }
 
             protected override void Fixup(CType type) {
                 if (BaseType is StubType) {
                     BaseType = type;
-                }
-                else {
+                } else {
                     BaseType.Fixup(type);
                 }
             }
@@ -908,9 +1114,13 @@ namespace AnsiCParser {
                 Type = type;
             }
 
-            public Token Ident { get; }
+            public Token Ident {
+                get;
+            }
 
-            public CType Type { get; }
+            public CType Type {
+                get;
+            }
 
             public override int Sizeof() {
                 return Type.Sizeof();
@@ -927,15 +1137,18 @@ namespace AnsiCParser {
                 Qualifier = qualifier;
             }
 
-            public CType Type { get; private set; }
+            public CType Type {
+                get; private set;
+            }
 
-            public TypeQualifier Qualifier { get; set; }
+            public TypeQualifier Qualifier {
+                get; set;
+            }
 
             protected override void Fixup(CType type) {
                 if (Type is StubType) {
                     Type = type;
-                }
-                else {
+                } else {
                     Type.Fixup(type);
                 }
             }
@@ -946,6 +1159,65 @@ namespace AnsiCParser {
 
         }
 
+        /// <summary>
+        /// ビットフィールド型
+        /// </summary>
+        public class BitFieldType : CType {
+            public int BitOffset {
+                get;
+                set;
+            }
+            public int BitWidth {
+                get;
+            }
+            public BitFieldType(Token ident, CType type, int bitOffset, int bitWidth) {
+                if (bitWidth >= 0) {
+                    // 制約
+                    // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。
+                    //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
+                    //   - 値が 0 の場合，その宣言に宣言子があってはならない。
+                    // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
+
+                    //if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) {
+                    if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt)) {
+                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
+                    }
+                    if (bitWidth > type.Sizeof() * 8) {
+                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
+                    }
+                    if (bitWidth == 0) {
+                        // 値が 0 の場合，その宣言に宣言子があってはならない。
+                        // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
+                        // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
+                        if (ident != null) {
+                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
+                        }
+                    }
+                }
+
+                this.Type = type;
+                this.BitOffset = bitOffset;
+                this.BitWidth = bitWidth;
+            }
+
+            public CType Type {
+                get; private set;
+            }
+
+
+            protected override void Fixup(CType type) {
+                if (Type is StubType) {
+                    Type = type;
+                } else {
+                    Type.Fixup(type);
+                }
+            }
+
+            public override int Sizeof() {
+                return Type.Sizeof();
+                //throw new Exception("ビットフィールドに対してsizeofは使えない。");
+            }
+        }
 
         /// <summary>
         /// 6.2.7適合型及び合成型
@@ -975,7 +1247,15 @@ namespace AnsiCParser {
                 if (ret == null) {
                     return null;
                 }
-                return new TypeQualifierType(ret, ta1.Qualifier);
+                if (ret.IsArrayType()) {
+                    // 6.7.3 型修飾子
+                    // 配列型の指定が型修飾子を含む場合，それは要素の型を修飾するだけで，その配列型を修飾するのではない
+                    var arrayType = ret as ArrayType;
+                    
+                    return new ArrayType(arrayType.Length, arrayType.BaseType.WrapTypeQualifier(ta1.Qualifier));
+                    } else {
+                    return new TypeQualifierType(ret, ta1.Qualifier);
+                }
             }
             if (t1 is TypedefedType) {
 
@@ -996,7 +1276,7 @@ namespace AnsiCParser {
                 }
                 return new PointerType(ret);
             }
-            if ((t1.IsStructureType() && t2.IsStructureType()) ||(t1.IsUnionType() && t2.IsUnionType())) {
+            if ((t1.IsStructureType() && t2.IsStructureType()) || (t1.IsUnionType() && t2.IsUnionType())) {
                 var ta1 = t1 as TaggedType.StructUnionType;
                 var ta2 = t2 as TaggedType.StructUnionType;
                 if (ta1.Kind != ta1.Kind) {
@@ -1021,17 +1301,23 @@ namespace AnsiCParser {
                     if (ta1.Members[i].Offset != ta2.Members[i].Offset) {
                         return null;
                     }
-                    if (ta1.Members[i].BitOffset != ta2.Members[i].BitOffset) {
+                    if (ta1.Members[i].Type.IsBitField() != ta2.Members[i].Type.IsBitField()) {
                         return null;
                     }
-                    if (ta1.Members[i].BitSize != ta2.Members[i].BitSize) {
-                        return null;
+                    BitFieldType bft1, bft2;
+                    if (ta1.Members[i].Type.IsBitField(out bft1) == true && ta2.Members[i].Type.IsBitField(out bft2) == true) {
+                        if (bft1.BitOffset != bft2.BitOffset) {
+                            return null;
+                        }
+                        if (bft1.BitWidth != bft2.BitWidth) {
+                            return null;
+                        }
                     }
                     var composited = CompositeType(ta1.Members[i].Type, ta2.Members[i].Type);
                     if (composited == null) {
                         return null;
                     }
-                    newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].Offset, ta1.Members[i].BitOffset, ta1.Members[i].BitSize));
+                    newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].Offset));
                 }
                 newType.Members = newMembers;
                 return newType;
@@ -1131,13 +1417,13 @@ namespace AnsiCParser {
             return CheckContainOldStyleArgument(t1, new HashSet<CType>());
         }
 
-        private static bool CheckContainOldStyleArgument(CType t1,HashSet<CType> checkedType) {
+        private static bool CheckContainOldStyleArgument(CType t1, HashSet<CType> checkedType) {
             if (checkedType.Contains(t1)) {
                 return false;
             }
             checkedType.Add(t1);
             for (;;) {
-                    if (t1 is TypeQualifierType) {
+                if (t1 is TypeQualifierType) {
                     t1 = (t1 as TypeQualifierType).Type;
                     continue;
                 }
@@ -1175,5 +1461,6 @@ namespace AnsiCParser {
                 return false;
             }
         }
+
     }
 }

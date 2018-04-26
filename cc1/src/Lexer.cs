@@ -510,7 +510,7 @@ namespace AnsiCParser {
         private int _inputPos;
 
         /// <summary>
-        /// 読み取り位置が行頭の場合には真になる。前処理指令用。
+        /// 読み取り位置が行頭の場合には真になる。前処理指令認識用。
         /// </summary>
         private bool _beginOfLine;
 
@@ -703,12 +703,28 @@ namespace AnsiCParser {
                     var str = Substring(start, end);
                     IncPos(1);
 
-                    var match = Regex.Match(str, @"^#\s*(line\s+)?(?<line>\d+)\s+""(?<file>(\\""|[^""])*)""(\s+(\d+)){0,3}\s*$");
-                    if (match.Success) {
+                    {
                         // line 指令
-                        this._filepath = match.Groups["file"].Value;
-                        this._line = int.Parse(match.Groups["line"].Value);
-                        this._column = 1;
+                        var match = Regex.Match(str, @"^#\s*(line\s+)?(?<line>\d+)\s+""(?<file>(\\""|[^""])*)""(\s+(\d+)){0,3}\s*$");
+                        if (match.Success) {
+                            this._filepath = match.Groups["file"].Value;
+                            this._line = int.Parse(match.Groups["line"].Value);
+                            this._column = 1;
+                            goto rescan;
+                        }
+                    }
+                    {
+                        // pragma pack 指令
+                        // プラグマ後の最初の struct、union、宣言から有効
+                        var match = Regex.Match(str, @"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[1|2|4])?\s*\)|\s*\s*(?<packsize>[1|2|4])?\s*)?\s*)$");
+                        if (match.Success) {
+                            if (match.Groups["packsize"].Success) {
+                                Settings.PackSize = int.Parse(match.Groups["packsize"].Value);
+                            } else {
+                                Settings.PackSize = Settings.DefaultPackSize;
+                            }
+                            goto rescan;
+                        }
                     }
                     goto rescan;
                 } else {
