@@ -586,7 +586,7 @@ namespace AnsiCParser {
         /// ファイル終端
         /// </summary>
         private void EoF() {
-            if (!_lexer.is_eof()) {
+            if (!_lexer.IsEoF()) {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ファイルが正しく終端していません。");
             }
         }

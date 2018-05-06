@@ -393,7 +393,7 @@ namespace AnsiCParser {
         /// ファイル終端なら真
         /// </summary>
         /// <returns></returns>
-        public bool is_eof() {
+        public bool IsEoF() {
             return _tokens[_currentTokenPos].Kind == Token.TokenKind.EOF;
         }
 
@@ -987,7 +987,7 @@ namespace AnsiCParser {
         public bool PeekNextToken(params Token.TokenKind[] candidates) {
             if (_tokens.Count <= _currentTokenPos + 1) {
                 ScanToken();
-                if (is_eof()) {
+                if (IsEoF()) {
                     return false;
                 }
             }
