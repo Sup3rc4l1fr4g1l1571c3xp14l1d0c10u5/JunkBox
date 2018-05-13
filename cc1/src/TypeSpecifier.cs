@@ -26,4 +26,24 @@ namespace AnsiCParser {
         CIMask = 0x0C00,
         Invalid = 0x1000,
     }
+    public static class TypeSpecifierExt {
+        public static string TypeFlagToCString(this TypeSpecifier self, LocationRange range) {
+            switch (self.TypeFlag()) {
+                case TypeSpecifier.Void:
+                    return "void";
+                case TypeSpecifier.Char:
+                    return "char";
+                case TypeSpecifier.Int:
+                    return "int";
+                case TypeSpecifier.Float:
+                    return "float";
+                case TypeSpecifier.Double:
+                    return "double";
+                case TypeSpecifier._Bool:
+                    return "_Bool";
+                default:
+                    throw new CompilerException.InternalErrorException(range, "型指定子の基本型部分が設定されていない。（おそらく本処理系の実装ミス）");
+            }
+        }
+    }
 }

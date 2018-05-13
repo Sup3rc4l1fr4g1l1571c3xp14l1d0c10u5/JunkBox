@@ -393,7 +393,7 @@ namespace AnsiCParser {
         /// ファイル終端なら真
         /// </summary>
         /// <returns></returns>
-        public bool IsEoF() {
+        public bool is_eof() {
             return _tokens[_currentTokenPos].Kind == Token.TokenKind.EOF;
         }
 
@@ -783,7 +783,8 @@ namespace AnsiCParser {
                 } else if (RegexDecimal.IsMatch(str)) {
                     _tokens.Add(new Token(Token.TokenKind.DECIAML_CONSTANT, start, end, str));
                 } else {
-                    throw new Exception();
+//                    throw new Exception();
+                    _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
                 }
                 return;
             } else if (Peek("'")) {
@@ -987,7 +988,7 @@ namespace AnsiCParser {
         public bool PeekNextToken(params Token.TokenKind[] candidates) {
             if (_tokens.Count <= _currentTokenPos + 1) {
                 ScanToken();
-                if (IsEoF()) {
+                if (is_eof()) {
                     return false;
                 }
             }

@@ -37,6 +37,14 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        /// 型情報の deep copy を作る
+        /// </summary>
+        /// <returns></returns>
+        public abstract CType Duplicate();
+
+
+
+        /// <summary>
         ///     型のサイズを取得
         /// </summary>
         /// <returns></returns>
@@ -49,7 +57,7 @@ namespace AnsiCParser {
         /// <param name="t2"></param>
         /// <returns></returns>
         public static bool IsEqual(CType t1, CType t2) {
-            for (; ; ) {
+            for (;;) {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
                 }
@@ -305,7 +313,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public CType Unwrap() {
             var self = this;
-            for (; ; ) {
+            for (;;) {
                 if (self is TypedefedType) {
                     self = (self as TypedefedType).Type;
                     continue;
@@ -381,6 +389,10 @@ namespace AnsiCParser {
                 Float_Imaginary,
                 Double_Imaginary,
                 LongDouble_Imaginary
+            }
+
+            public override CType Duplicate() {
+                return new BasicType(this.Kind);
             }
 
             public BasicType(TypeSpecifier typeSpecifier) : this(ToKind(typeSpecifier)) {
@@ -569,6 +581,13 @@ namespace AnsiCParser {
 
                 private int size = 0;
 
+                public override CType Duplicate() {
+                    var ret = new StructUnionType(this.Kind, this.TagName, this.IsAnonymous);
+                    ret.Members = this.Members.Select(x => x.Duplicate()).ToList();
+                    ret.size = this.size;
+                    return ret;
+                }
+
                 protected override void Fixup(CType type) {
                     for (var i = 0; i < Members.Count; i++) {
                         var member = Members[i];
@@ -580,10 +599,14 @@ namespace AnsiCParser {
                     }
                 }
 
+                private static int align_padding(int n, int align) {
+                    return (align - (n % align)) % align;
+                }
+
                 private class StructLayouter {
 
 
-                    private int AlignOf(CType type) {
+                    private int alignof(CType type) {
                         switch (type.Sizeof()) {
                             case 1:
                                 return 1;
@@ -594,8 +617,11 @@ namespace AnsiCParser {
                         }
                     }
 
-                    private int PaddingOf(int value, int align) {
+                    private int padof(int value, int align) {
                         return (align - (value % align)) % align;
+                    }
+                    private int align_padding(int n, int align) {
+                        return (align - (n % align)) % align;
                     }
 
 
@@ -619,7 +645,7 @@ namespace AnsiCParser {
                         }
                     }
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, int bitpos, int bitsize) {
-                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bitpos + bitsize) {
+                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof()*8 < bitpos + bitsize) {
                             throw new Exception("");
                         } else {
                             result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitpos, bitsize), bytepos));
@@ -641,7 +667,7 @@ namespace AnsiCParser {
                                 ty = CType.CreateUnsignedChar();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 ty = CType.CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                result.Add(new MemberInfo(null, ty, bytepos+1));
                                 break;
                             case 4:
                                 ty = CType.CreateUnsignedLongInt();
@@ -680,7 +706,7 @@ namespace AnsiCParser {
                             // 今のバイト領域を終了するか？
                             if ((current_bitfield_type != null) && (bit == 0)) {
                                 if ((current_bitfield_size % 8) > 0) {
-                                    var pad = PaddingOf(current_bitfield_size, 8);
+                                    var pad = padof(current_bitfield_size, 8);
                                     result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, pad);
                                     current_bitfield_size += pad;
                                     if (current_bitfield_capacity != current_bitfield_size) {
@@ -700,7 +726,7 @@ namespace AnsiCParser {
                                 if (current_bitfield_capacity - current_bitfield_size > 0) {
                                     result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
                                 }
-                                current_byte_position += current_bitfield_capacity / 8;
+                                    current_byte_position += current_bitfield_capacity / 8;
                                 current_bitfield_type = null;
                                 current_bitfield_capacity = 0;
                                 current_bitfield_size = 0;
@@ -715,7 +741,7 @@ namespace AnsiCParser {
 
                             // アライメント挿入が必要？
                             if (current_bitfield_type == null) {
-                                var pad = PaddingOf(current_byte_position, Math.Min(Settings.PackSize, AlignOf(type)));
+                                var pad = padof(current_byte_position, Math.Min(Settings.PackSize, alignof(type)));
                                 if (pad > 0) {
                                     result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
                                 }
@@ -754,7 +780,7 @@ namespace AnsiCParser {
                         // 構造体のサイズをアライメントにそろえる
                         var structure_alignment = Settings.PackSize;
                         if ((current_byte_position % structure_alignment) > 0) {
-                            var pad = PaddingOf(current_byte_position, structure_alignment);
+                            var pad = padof(current_byte_position, structure_alignment);
                             result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
                             current_byte_position += pad;
                         }
@@ -806,6 +832,10 @@ namespace AnsiCParser {
                     public int Offset {
                         get;
                     }
+
+                    public MemberInfo Duplicate() {
+                        return new MemberInfo(Ident, Type.Duplicate(), Offset);
+                    }
                 }
             }
 
@@ -816,6 +846,12 @@ namespace AnsiCParser {
                 public EnumType(string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
                 }
 
+
+                public override CType Duplicate() {
+                    var ret = new EnumType(this.TagName, this.IsAnonymous);
+                    ret.Members = this.Members.Select(x => x.Duplicate()).ToList();
+                    return ret;
+                }
 
                 public List<MemberInfo> Members {
                     get; set;
@@ -854,6 +890,10 @@ namespace AnsiCParser {
                     public int Value {
                         get;
                     }
+
+                    public MemberInfo Duplicate() {
+                        return new MemberInfo(this.ParentType, this.Ident, this.Value);
+                    }
                 }
             }
         }
@@ -864,6 +904,9 @@ namespace AnsiCParser {
         public class StubType : CType {
             public override int Sizeof() {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型のサイズを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
+            }
+            public override CType Duplicate() {
+                return new StubType();
             }
 
         }
@@ -887,6 +930,12 @@ namespace AnsiCParser {
                 ResultType = resultType;
                 HasVariadic = hasVariadic;
             }
+
+            public override CType Duplicate() {
+                var ret = new FunctionType(this.Arguments?.Select(x => x.Duplicate()).ToList(), this.HasVariadic, this.ResultType.Duplicate());
+                return ret;
+            }
+
 
             /// <summary>
             ///     引数の情報
@@ -1035,6 +1084,10 @@ namespace AnsiCParser {
                 public CType Type {
                     get; set;
                 }
+
+                public ArgumentInfo Duplicate() {
+                    return new ArgumentInfo(Range, Ident, StorageClass, Type.Duplicate());
+                }
             }
         }
 
@@ -1044,6 +1097,11 @@ namespace AnsiCParser {
         public class PointerType : CType {
             public PointerType(CType type) {
                 BaseType = type;
+            }
+
+            public override CType Duplicate() {
+                var ret = new PointerType(this.BaseType);
+                return ret;
             }
 
             public CType BaseType {
@@ -1071,6 +1129,11 @@ namespace AnsiCParser {
             public ArrayType(int length, CType type) {
                 Length = length;
                 BaseType = type;
+            }
+
+            public override CType Duplicate() {
+                var ret = new ArrayType(this.Length, this.BaseType);
+                return ret;
             }
 
             /// <summary>
@@ -1107,6 +1170,11 @@ namespace AnsiCParser {
                 Type = type;
             }
 
+            public override CType Duplicate() {
+                var ret = new TypedefedType(this.Ident, this.Type.Duplicate());
+                return ret;
+            }
+
             public Token Ident {
                 get;
             }
@@ -1128,6 +1196,11 @@ namespace AnsiCParser {
             public TypeQualifierType(CType type, TypeQualifier qualifier) {
                 Type = type;
                 Qualifier = qualifier;
+            }
+
+            public override CType Duplicate() {
+                var ret = new TypeQualifierType(this.Type.Duplicate(), this.Qualifier);
+                return ret;
             }
 
             public CType Type {
@@ -1160,9 +1233,11 @@ namespace AnsiCParser {
                 get;
                 set;
             }
+
             public int BitWidth {
                 get;
             }
+
             public BitFieldType(Token ident, CType type, int bitOffset, int bitWidth) {
                 if (bitWidth >= 0) {
                     // 制約
@@ -1173,17 +1248,17 @@ namespace AnsiCParser {
 
                     //if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) {
                     if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt)) {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
                     }
                     if (bitWidth > type.Sizeof() * 8) {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
                     }
                     if (bitWidth == 0) {
                         // 値が 0 の場合，その宣言に宣言子があってはならない。
                         // 宣言子がなく，コロン及び幅だけをもつビットフィールド宣言は，名前のないビットフィールドを示す。
                         // この特別な場合として，幅が 0 のビットフィールド構造体メンバは，前のビットフィールド（もしあれば）が割り付けられていた単位に，それ以上のビットフィールドを詰め込まないことを指定する。
                         if (ident != null) {
-                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
+                            throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの幅の値が 0 の場合，その宣言に宣言子(名前)があってはならない");
                         }
                     }
                 }
@@ -1192,6 +1267,14 @@ namespace AnsiCParser {
                 this.BitOffset = bitOffset;
                 this.BitWidth = bitWidth;
             }
+
+                                    public override CType Duplicate() {
+                var ret = new BitFieldType(/* dummy */null, this.Type.Duplicate(), this.BitOffset, this.BitWidth);
+                return ret;
+            }
+
+
+
 
             public CType Type {
                 get; private set;
@@ -1244,9 +1327,9 @@ namespace AnsiCParser {
                     // 6.7.3 型修飾子
                     // 配列型の指定が型修飾子を含む場合，それは要素の型を修飾するだけで，その配列型を修飾するのではない
                     var arrayType = ret as ArrayType;
-
+                    
                     return new ArrayType(arrayType.Length, arrayType.BaseType.WrapTypeQualifier(ta1.Qualifier));
-                } else {
+                    } else {
                     return new TypeQualifierType(ret, ta1.Qualifier);
                 }
             }
@@ -1415,7 +1498,7 @@ namespace AnsiCParser {
                 return false;
             }
             checkedType.Add(t1);
-            for (; ; ) {
+            for (;;) {
                 if (t1 is TypeQualifierType) {
                     t1 = (t1 as TypeQualifierType).Type;
                     continue;

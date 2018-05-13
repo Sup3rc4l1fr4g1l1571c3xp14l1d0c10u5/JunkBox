@@ -738,10 +738,10 @@ namespace AnsiCParser {
                         // 制約  
                         // 後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならず，
                         // 変更可能な左辺値でなければならない。
-                        if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
+                        if (!expr.IsLValue()) {
+                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "変更可能な左辺値でなければならない。");
+                        } else if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならない。");
-                        } else if (!expr.IsLValue()) {
-                            throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "変更可能な左辺値でなければならない。変更可能な左辺値でなければならない。");
                         }
 
                         // 意味規則  
@@ -1840,8 +1840,7 @@ namespace AnsiCParser {
 
                         // 制約(代入演算子(代入式))
                         // 代入演算子の左オペランドは，変更可能な左辺値でなければならない。
-                        if (!lhs.IsLValue()) {
-                            // ToDo: 変更可能であることをチェック
+                        if (Specification.IsModifiableLvalue(lhs) == false) {
                             throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
                         // 代入の制約条件と意味規則を適用する

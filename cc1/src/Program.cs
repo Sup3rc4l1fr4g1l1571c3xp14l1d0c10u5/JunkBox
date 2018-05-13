@@ -68,7 +68,7 @@ namespace AnsiCParser {
                     astFile = System.IO.Path.ChangeExtension(arg, "ast");
                 }
                 try {
-                    var ret = new Parser(System.IO.File.ReadAllText(arg)).Parse();
+                    var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
                     using (var o = new System.IO.StreamWriter(astFile)) {
                         o.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
                     }
@@ -96,7 +96,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c")).Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\TestPrograms\FunctionPointer.c"), "<Debug>").Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();
@@ -106,5 +106,5 @@ namespace AnsiCParser {
                 visitor.WriteCode(o);
             }
         }
-    }
+    }   
 }

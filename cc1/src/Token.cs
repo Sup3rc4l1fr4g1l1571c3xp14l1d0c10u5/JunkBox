@@ -101,6 +101,14 @@ namespace AnsiCParser {
         public Location End {
             get;
         }
+
+        /// <summary>
+        /// トークンの元ソース上での位置範囲
+        /// </summary>
+        public LocationRange Range {
+            get { return new LocationRange(this.Start, this.End); }
+        }
+
         /// <summary>
         /// トークンの元文字列
         /// </summary>

@@ -37,6 +37,7 @@ namespace AnsiCParser {
          *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。
          *    EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
          *    浮動小数点数の場合はFPUスタックのトップに結果をセットする
+         *    long long型の結果はedx:eaxに格納される
          *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
          *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
          *  - スタックポインタの処理は呼び出し側で行う。
@@ -372,11 +373,11 @@ namespace AnsiCParser {
                         Push(new Value {Kind = Value.ValueKind.IntConst, Type = CType.CreatePtrDiffT(), IntConst = ((lhs.Offset - rhs.Offset) / elemType.Sizeof())});
                     }
                     else {
+                        // (rhs - lhs) / sizeof(elemType)
                         LoadPointer("%ecx"); // rhs = ptr
                         LoadPointer("%eax"); // lhs = ptr
                         Emit("subl %ecx, %eax");
                         Emit("cltd");
-                        Emit("movl %eax, %edx");
                         Emit($"movl ${elemType.Sizeof()}, %ecx");
                         Emit("idivl %ecx");
                         Emit("pushl %eax");
@@ -1343,6 +1344,10 @@ namespace AnsiCParser {
                     CastFloatingValueToInt(type);
                 } else if (ret.Type.IsIntegerType() && type.IsRealFloatingType()) {
                     CastIntValueToFloating(type);
+                } else if (ret.Type.IsStructureType() && type.IsStructureType()) {
+                    // キャスト不要
+                } else if (ret.Type.IsUnionType() && type.IsUnionType()) {
+                    // キャスト不要
                 } else {
                     throw new NotImplementedException();
                 }
@@ -1486,6 +1491,7 @@ namespace AnsiCParser {
 
             public void DirectMember(CType type, string member) {
                 var obj = Peek(0);
+
                 int offset = GetMemberOffset(obj.Type, member);
                 LoadVariableAddress("%eax");
                 Emit($"addl ${offset}, %eax");
@@ -1735,7 +1741,7 @@ namespace AnsiCParser {
                                 } else if (valueType.IsPointerType() || valueType.IsArrayType()) {
                                     op = "movl";
                                 } else if (valueType.IsStructureType()) {
-                                    op = "leal";
+                                    op = "movl";    // ここmovlでOK?
                                 } else {
                                     throw new NotImplementedException();
                                 }
@@ -2042,6 +2048,9 @@ namespace AnsiCParser {
                         break;
                     case Value.ValueKind.Address:
                         Emit($"popl {reg}");
+                        break;
+                    case Value.ValueKind.Temp:
+                        Emit($"movl %esp, {reg}");
                         break;
                     default:
                         throw new NotImplementedException();
@@ -2831,7 +2840,7 @@ namespace AnsiCParser {
                 int offset = 8; // prev return position
 
                 // 戻り値領域へのポインタ
-                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && !ft.ResultType.IsRealFloatingType()) {
+                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt))) {
                     offset += 4;
                 }
 
@@ -2980,7 +2989,15 @@ namespace AnsiCParser {
         }
 
         public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Value value) {
-            throw new NotImplementedException();
+            bool needDiscard = false;
+            foreach (var e in self.Expressions) {
+                if (needDiscard) {
+                    Generator.Discard(); // スタック上の結果を捨てる
+                }
+                e.Accept(this, value);
+                needDiscard = !e.Type.IsVoidType();
+            }
+            return value;
         }
 
         public Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, Value value) {
@@ -3138,6 +3155,33 @@ namespace AnsiCParser {
             var funcType = self.Expr.Type.GetBasePointerType().Unwrap() as CType.FunctionType;
 
             Generator.Call(self.Type, funcType, self.Args.Count, g => { self.Expr.Accept(this, value); }, (g, i) => { self.Args[i].Accept(this, value); });
+
+
+            // 戻り値が構造体型/共用体型の場合、スタック上に配置すると不味いのでテンポラリ変数を確保してコピーする
+            var obj = Generator.Peek(0);
+            if (obj.Kind == Value.ValueKind.Temp && (obj.Type.IsStructureType() || obj.Type.IsUnionType())) {
+                int size = CodeGenerator.StackAlign(obj.Type.Sizeof());
+                _localScopeTotalSize += size;
+                var ident = $"<temp:{_localScope.Count()}>";
+                var tp = Tuple.Create((string)null, -_localScopeTotalSize);
+                _localScope.Add(ident, tp);
+                Generator.Emit($"// temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={obj.Type.ToString()}");
+
+                if (size <= 4) {
+                    Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %esi");
+                    Generator.Emit("pop (%esi)");
+                } else {
+                    Generator.Emit($"movl %esp, %esi");
+                    Generator.Emit($"addl ${size}, %esp");
+                    Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %edi");
+                    Generator.Emit($"movl ${size}, %ecx");
+                    Generator.Emit("cld");
+                    Generator.Emit("rep movsb");
+                }
+                Generator.Pop();
+                Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = obj.Type, Label = tp.Item1, Offset = tp.Item2 });
+
+            }
 
             //return new Value() { kIND = self.Type.IsVoidType() ? Value.ValueKind.Void : Value.ValueKind.Temp, Type = self.Type };
             return value;
@@ -3392,7 +3436,14 @@ namespace AnsiCParser {
         }
 
         public Value OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, Value value) {
-            throw new NotImplementedException();
+            // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
+            // 共用体は初期化式が一つのはず
+            Value v = new Value(value);
+            foreach (var member in self.Type.Members.Zip(self.Inits,Tuple.Create)) {
+                member.Item2.Accept(this, v);
+                v.Offset += member.Item1.Type.Sizeof();
+            }
+            return new Value {Kind = Value.ValueKind.Void};
         }
 
         public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, Value value) {
@@ -3443,9 +3494,9 @@ namespace AnsiCParser {
                 }
             }
 
-            if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
-                _maxLocalScopeTotalSize = _localScopeTotalSize;
-            }
+            //if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
+            //    _maxLocalScopeTotalSize = _localScopeTotalSize;
+            //}
 
             foreach (var x in self.Decls) {
                 x.Accept(this, value);
@@ -3453,6 +3504,10 @@ namespace AnsiCParser {
 
             foreach (var x in self.Stmts) {
                 x.Accept(this, value);
+            }
+
+            if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
+                _maxLocalScopeTotalSize = _localScopeTotalSize;
             }
 
             Generator.Emit("// leave scope");
@@ -3748,8 +3803,8 @@ namespace AnsiCParser {
                                     break;
                                 }
                                 case 8: {
-                                    var lo = BitConverter.ToUInt32(BitConverter.GetBytes((float) cvalue.FloatConst), 0);
-                                    var hi = BitConverter.ToUInt32(BitConverter.GetBytes((float) cvalue.FloatConst), 0);
+                                    var lo = BitConverter.ToUInt32(BitConverter.GetBytes((double) cvalue.FloatConst), 0);
+                                    var hi = BitConverter.ToUInt32(BitConverter.GetBytes((double) cvalue.FloatConst), 4);
 
                                     Emit($".long {lo}, {hi}");
                                     break;
@@ -3862,7 +3917,7 @@ namespace AnsiCParser {
         }
 
         public SyntaxTreeCompileVisitor.Value OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
+            return new SyntaxTreeCompileVisitor.Value {Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type};
         }
 
         public SyntaxTreeCompileVisitor.Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeCompileVisitor.Value value) {

@@ -52,9 +52,24 @@ namespace AnsiCParser {
     /// ソースコード中の範囲を示す位置情報
     /// </summary>
     public class LocationRange {
-            /// <summary>
-            /// 範囲の開始地点
-            /// </summary>
+
+        /// <summary>
+        /// 組込み型等の位置を示す
+        /// </summary>
+        public static LocationRange Builtin {
+            get {
+                var callerFrame = new System.Diagnostics.StackFrame(1);
+                var fileName = callerFrame.GetFileName();
+                var line = callerFrame.GetFileLineNumber();
+                var column = callerFrame.GetFileColumnNumber();
+                var location = new Location(fileName, line, column, -1);
+                return new LocationRange(location, location);
+            }
+        }
+
+        /// <summary>
+        /// 範囲の開始地点
+        /// </summary>
         public Location Start { get; }
 
         /// <summary>
@@ -62,7 +77,12 @@ namespace AnsiCParser {
         /// </summary>
         public Location End { get; }
 
-        public static readonly LocationRange Empty = new LocationRange(Location.Empty, Location.Empty);
+        /// <summary>
+        /// 空の位置情報
+        /// </summary>
+        public static readonly LocationRange Empty = new LocationRange(Location.Empty);
+
+        public LocationRange(Location start) : this(start,start){}
 
         public LocationRange(Location start, Location end) {
             Start = start;

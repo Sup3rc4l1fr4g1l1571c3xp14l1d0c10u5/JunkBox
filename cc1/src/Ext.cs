@@ -29,7 +29,7 @@ namespace AnsiCParser {
             return TypeSpecifier.SignMask & self;
         }
 
-        public static TypeSpecifier Marge(this TypeSpecifier self, TypeSpecifier other) {
+        public static TypeSpecifier Marge(this TypeSpecifier self, TypeSpecifier other, LocationRange range) {
             TypeSpecifier type = TypeSpecifier.None;
 
             if (self.TypeFlag() == TypeSpecifier.None) {
@@ -37,7 +37,7 @@ namespace AnsiCParser {
             } else if (other.TypeFlag() == TypeSpecifier.None) {
                 type = self.TypeFlag();
             } else if (self.TypeFlag() != other.TypeFlag()) {
-                throw new Exception();
+                throw new CompilerException.SpecificationErrorException(range, $"{self.TypeFlagToCString(range)}と{other.TypeFlagToCString(range)}は組み合わせられない型指定子です。");
             }
 
             TypeSpecifier size = TypeSpecifier.None;

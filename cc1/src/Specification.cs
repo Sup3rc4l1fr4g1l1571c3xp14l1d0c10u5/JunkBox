@@ -98,6 +98,7 @@ namespace AnsiCParser {
         ///   void型                                完全にすることのできない不完全型とする
         ///   大きさの分からない配列型              それ以降のその型の識別子の宣言（内部結合又は外部結合をもつ）で大きさを指定することによって，完全となる
         ///   内容の分からない構造体型又は共用体型  同じ有効範囲のそれ以降の同じ構造体タグ又は共用体タグの宣言で，内容を定義することによって，その型のすべての宣言に関し完全となる
+        ///   内容が定義されていない列挙型          同じ有効範囲のそれ以降の同じ列挙型タグの宣言で，内容を定義することによって，その型のすべての宣言に関し完全となる
         /// </remarks>
         public static bool IsIncompleteType(this CType self) {
             var unwrappedSelf = self.Unwrap();
@@ -121,6 +122,13 @@ namespace AnsiCParser {
                     return true;
                 }
                 return sut.Members.Any(x => IsIncompleteType(x.Type));
+            }
+            // 内容の分からない列挙型型
+            if (unwrappedSelf is CType.TaggedType.EnumType) {
+                var sut = unwrappedSelf as CType.TaggedType.EnumType;
+                if (sut.Members == null) {
+                    return true;
+                }
             }
             return false;
         }
@@ -1497,6 +1505,15 @@ namespace AnsiCParser {
         /// <param name="expr"></param>
         public static bool IsModifiableLvalue(SyntaxTree.Expression expr) {
             return expr.IsLValue() && !expr.Type.IsIncompleteType() && !expr.Type.IsArrayType() && expr.Type.GetTypeQualifier() != TypeQualifier.Const;
+        }
+
+        /// <summary>
+        /// 6.3.2.1 変更可能な左辺値（modifiable lvalue）
+        /// 配列型をもたず，不完全型をもたず， const 修飾型をもたない左辺値
+        /// </summary>
+        /// <param name="expr"></param>
+        public static bool IsModifiableLvalue(CType type, bool inInitialize = false) {
+            return (!type.IsIncompleteType()) && (!type.IsArrayType()) && (inInitialize || (type.GetTypeQualifier() != TypeQualifier.Const));
         }
 
 

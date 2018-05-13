@@ -63,13 +63,13 @@ namespace AnsiCParser {
                         LinkageObject value;
                         if (_linkageTable.TryGetValue(decl.Ident, out value)) {
                             if (value.Linkage != linkage) {
-                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
+                                throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
                             }
                             if (Specification.IsCompatible(value.Type, decl.Type) == false) {
                                 throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, "オブジェクトの型が以前のオブジェクトと一致しない");
                             }
                             if (value.Definition != null && isDefine) {
-                                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクトは既に実体をもっています");
+                                throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクトは既に実体をもっています");
                             }
                         } else {
                             value = new LinkageObject(decl.Ident, decl.Type, linkage);
@@ -106,7 +106,7 @@ namespace AnsiCParser {
                     }
 
                 default:
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "リンケージが指定されていません。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "リンケージが指定されていません。");
             }
         }
 
@@ -160,7 +160,7 @@ namespace AnsiCParser {
         /// <param name="type"></param>
         /// <returns></returns>
         private SyntaxTree.Declaration AddImplictTypeDeclaration(Token ident, CType type) {
-            var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type);
+            var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(ident.Range, ident.Raw, type);
             _insertImplictDeclarationOperatorStack.Peek().Add(typeDecl);
             return typeDecl;
         }
@@ -170,12 +170,11 @@ namespace AnsiCParser {
         /// </summary>
         private readonly Lexer _lexer;
 
-        public Parser(string s) {
-            _lexer = new Lexer(s, "<built-in>");
+        public Parser(string source, string fileName = "<built-in>") {
+            _lexer = new Lexer(source, fileName);
 
             // GCCの組み込み型の設定
-            _identScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration(null, "__builtin_va_list", CType.CreatePointer(new CType.BasicType(AnsiCParser.TypeSpecifier.Void))));
-
+            _identScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration(LocationRange.Builtin, "__builtin_va_list", CType.CreatePointer(new CType.BasicType(AnsiCParser.TypeSpecifier.Void))));
         }
 
         /// <summary>
@@ -202,7 +201,7 @@ namespace AnsiCParser {
                 case AnsiCParser.StorageClassSpecifier.Register:
                     if (scope == ScopeKind.FileScope) {
                         // 記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
                     } else {
                         // 6.2.2 識別子の結合
                         // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
@@ -219,7 +218,7 @@ namespace AnsiCParser {
                         if (scope == ScopeKind.BlockScope) {
                             // 6.2.2 識別子の結合
                             // 関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである（6.7.1 参照）
-                            throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである");
+                            throw new CompilerException.SpecificationErrorException(ident.Range, "関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである");
                         }
                     }
                     if (scope == ScopeKind.FileScope && (type.IsObjectType() || type.IsFunctionType())) {
@@ -230,7 +229,7 @@ namespace AnsiCParser {
                         // 記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする
                         return LinkageKind.NoLinkage;  // 無結合
                     } else {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "オブジェクト又は関数に対するファイル有効範囲の識別子の宣言、もしくは、記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクト、のどちらでもない識別子の宣言で static が使用されている。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクト又は関数に対するファイル有効範囲の識別子の宣言、もしくは、記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクト、のどちらでもない識別子の宣言で static が使用されている。");
                     }
                 case AnsiCParser.StorageClassSpecifier.None:
                     // 6.2.2 識別子の結合
@@ -354,7 +353,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant IntegerConstant() {
             if (IsIntegerConstant() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"整数定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"整数定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
             }
 
             // 10進定数は基数 10，8進定数は基数 8，16進定数は基数 16 で値を計算する。
@@ -399,7 +398,7 @@ namespace AnsiCParser {
 
             CType.BasicType.TypeKind[] candidates;
             if (candidateTable.TryGetValue(suffix.ToUpper(), out candidates) == false) {
-                throw new CompilerException.SyntaxErrorException(token.Start, token.End, "整数定数のサフィックスが不正です。");
+                throw new CompilerException.SyntaxErrorException(token.Range, "整数定数のサフィックスが不正です。");
             }
 
             var originalSigned = Convert.ToInt64(body, radix);
@@ -411,34 +410,50 @@ namespace AnsiCParser {
             foreach (var candidate in candidates) {
                 switch (candidate) {
                     case CType.BasicType.TypeKind.SignedInt: {
-                            var v = Convert.ToInt32(body, radix);
-                            if (v == originalSigned) {
-                                value = unchecked((Int64)v);
-                                break;
+                            try {
+                                var v = Convert.ToInt32(body, radix);
+                                if (v == originalSigned) {
+                                    value = unchecked((Int64)v);
+                                    break;
+                                }
+                            } catch (OverflowException) {
+                                // 大きすぎる。
                             }
                             continue;
                         }
                     case CType.BasicType.TypeKind.UnsignedInt: {
-                            var v = Convert.ToUInt32(body, radix);
-                            if (v == originalUnsigned) {
-                                value = unchecked((Int64)v);
-                                break;
+                            try {
+                                var v = Convert.ToUInt32(body, radix);
+                                if (v == originalUnsigned) {
+                                    value = unchecked((Int64)v);
+                                    break;
+                                }
+                            } catch (OverflowException) {
+                                // 大きすぎる。
                             }
                             continue;
                         }
                     case CType.BasicType.TypeKind.SignedLongInt: {
-                            var v = Convert.ToInt32(body, radix);
-                            if (v == originalSigned) {
-                                value = unchecked((Int64)v);
-                                break;
+                            try {
+                                var v = Convert.ToInt32(body, radix);
+                                if (v == originalSigned) {
+                                    value = unchecked((Int64)v);
+                                    break;
+                                }
+                            } catch (OverflowException) {
+                                // 大きすぎる。
                             }
                             continue;
                         }
                     case CType.BasicType.TypeKind.UnsignedLongInt: {
-                            var v = Convert.ToUInt32(body, radix);
-                            if (v == originalUnsigned) {
-                                value = unchecked((Int64)v);
-                                break;
+                            try {
+                                var v = Convert.ToUInt32(body, radix);
+                                if (v == originalUnsigned) {
+                                    value = unchecked((Int64)v);
+                                    break;
+                                }
+                            } catch (OverflowException) {
+                                // 大きすぎる。
                             }
                             continue;
                         }
@@ -467,7 +482,7 @@ namespace AnsiCParser {
 
             _lexer.NextToken();
 
-            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(new LocationRange(token.Start, token.End), token.Raw, value, selectedType);
+            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(token.Range, token.Raw, value, selectedType);
         }
 
         /// <summary>
@@ -484,7 +499,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant FloatingConstant() {
             if (IsFloatingConstant() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"浮動小数点定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"浮動小数点定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
             }
             var token = _lexer.CurrentToken();
             var m = Lexer.ScanFloat(token.Raw);
@@ -501,10 +516,10 @@ namespace AnsiCParser {
                     type = CType.BasicType.TypeKind.Double;
                     break;
                 default:
-                    throw new CompilerException.SyntaxErrorException(token.Start, token.End, "浮動小数点定数のサフィックスが不正です。");
+                    throw new CompilerException.SyntaxErrorException(token.Range, "浮動小数点定数のサフィックスが不正です。");
             }
             _lexer.NextToken();
-            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(new LocationRange(token.Start, token.End), token.Raw, value, type);
+            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(token.Range, token.Raw, value, type);
         }
 
         /// <summary>
@@ -531,10 +546,10 @@ namespace AnsiCParser {
             var ident = Identifier(false);
             SyntaxTree.Declaration.EnumMemberDeclaration value;
             if (_identScope.TryGetValue(ident.Raw, out value) == false) {
-                throw new CompilerException.SyntaxErrorException(ident.Start, ident.End, $"列挙定数 { _lexer.CurrentToken().Raw } は未宣言です。");
+                throw new CompilerException.SyntaxErrorException(ident.Range, $"列挙定数 { _lexer.CurrentToken().Raw } は未宣言です。");
             }
             var el = value.MemberInfo.ParentType.Members.First(x => x.Ident.Raw == ident.Raw);
-            return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(new LocationRange(ident.Start, ident.End), el);
+            return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(ident.Range, el);
         }
 
         /// <summary>
@@ -551,11 +566,11 @@ namespace AnsiCParser {
         /// <returns></returns>
         private SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant CharacterConstant() {
             if (IsCharacterConstant() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"文字定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"文字定数があるべき場所に {_lexer.CurrentToken().Raw } があります。");
             }
             var token = _lexer.CurrentToken();
             _lexer.NextToken();
-            return new SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant(new LocationRange(token.Start, token.End), token.Raw);
+            return new SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant(token.Range, token.Raw);
         }
 
         /// <summary>
@@ -572,7 +587,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private string StringLiteral() {
             if (IsStringLiteral() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"文字列リテラルがあるべき場所に {_lexer.CurrentToken().Raw } があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"文字列リテラルがあるべき場所に {_lexer.CurrentToken().Raw } があります。");
             }
             var ret = _lexer.CurrentToken().Raw;
             _lexer.NextToken();
@@ -586,8 +601,8 @@ namespace AnsiCParser {
         /// ファイル終端
         /// </summary>
         private void EoF() {
-            if (!_lexer.IsEoF()) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ファイルが正しく終端していません。");
+            if (!_lexer.is_eof()) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ファイルが正しく終端していません。");
             }
         }
 
@@ -673,7 +688,7 @@ namespace AnsiCParser {
             // 関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない
             // (これは，関数定義の型を typedef から受け継ぐことはできないことを意味する。)。
             if (type.UnwrapTypeQualifier() is CType.TypedefedType) {
-                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない。");
+                throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない。");
             }
             var ftype = type.Unwrap() as CType.FunctionType;
             System.Diagnostics.Debug.Assert(ftype != null);
@@ -685,7 +700,7 @@ namespace AnsiCParser {
                 // 識別子並び: なし
                 // 宣言並び: あり
                 // -> 仮引数用の宣言並びがあるのに、識別子並びがない
-                throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "K&R形式の関数定義において仮引数型並びがあるのに、識別並びが空です。");
+                throw new CompilerException.SpecificationErrorException(ident.Range, "K&R形式の関数定義において仮引数型並びがあるのに、識別並びが空です。");
             } else if (ftype.Arguments == null && argmuents == null) {
                 // 識別子並び: なし
                 // 仮引数型並び: なし
@@ -698,13 +713,13 @@ namespace AnsiCParser {
                 if (ftype.GetFunctionStyle() != CType.FunctionType.FunctionStyle.OldStyle) {
                     // 仮引数型並び、もしくは識別子並びの省略、もしくは識別子並びと仮引数型並びの混在である。
                     // 識別子並び中に型名を記述してしまった場合もこのエラーになる
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
                 }
 
                 // 識別子並びの中に無いものが宣言並びにあるか調べる
                 if (argmuents.Select(x => x.Item1).Except(ftype.Arguments.Select(x => x.Ident), (x, y) => x.Raw == y.Raw).Any()) {
                     // 識別子並び中の要素以外が宣言並びにある。
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "識別子並び中の要素以外が宣言並びにある。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子並び中の要素以外が宣言並びにある。");
                 }
 
                 // K&R形式の識別子並びに宣言並びの型情報を既定の実引数拡張を伴って反映させる。
@@ -716,7 +731,7 @@ namespace AnsiCParser {
                     if (dic.ContainsKey(x.Ident.Raw)) {
                         var dapType = dic[x.Ident.Raw].Item2.DefaultArgumentPromotion();
                         if (CType.IsEqual(dapType, dic[x.Ident.Raw].Item2) == false) {
-                            throw new CompilerException.TypeMissmatchError(x.Ident.Start, x.Ident.End, $"仮引数 {x.Ident.Raw} は既定の実引数拡張で型が変化します。");
+                            throw new CompilerException.TypeMissmatchError(x.Ident.Range, $"仮引数 {x.Ident.Raw} は既定の実引数拡張で型が変化します。");
                         }
                         return new CType.FunctionType.ArgumentInfo(x.Range, x.Ident, dic[x.Ident.Raw].Item3, dic[x.Ident.Raw].Item2.DefaultArgumentPromotion());
                     } else {
@@ -742,11 +757,11 @@ namespace AnsiCParser {
                     default:
                         // 識別子並びと仮引数型並びの混在である。
                         // 識別子並び中に型名を記述してしまった場合もこのエラーになる
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
                 }
 
             } else {
-                throw new CompilerException.InternalErrorException(ident.Start, ident.End, "ありえない。バグかなにかでは？");
+                throw new CompilerException.InternalErrorException(ident.Range, "ありえない。バグかなにかでは？");
             }
 
             // 6.9.1 関数定義
@@ -766,7 +781,7 @@ namespace AnsiCParser {
                     if (arg.Ident == null) {
                         throw new CompilerException.SpecificationErrorException(arg.Range, $"関数定義では引数名を省略することはできません。");
                     }
-                    _identScope.Add(arg.Ident.Raw, new SyntaxTree.Declaration.ArgumentDeclaration(new LocationRange(arg.Ident.Start, arg.Ident.End), arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
+                    _identScope.Add(arg.Ident.Raw, new SyntaxTree.Declaration.ArgumentDeclaration(arg.Ident.Range, arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
                 }
             }
 
@@ -786,7 +801,7 @@ namespace AnsiCParser {
                 }
                 if (scopeValue.Item2.Declaration != null && !scopeValue.Item2.References.Any()) {
                     // 未参照のラベルが使われている。
-                    Logger.Warning(scopeValue.Item2.Declaration.LocationRange.Start, scopeValue.Item2.Declaration.LocationRange.End, $"ラベル {scopeValue.Item1} は定義されていますがどこからも参照されていません。");
+                    Logger.Warning(scopeValue.Item2.Declaration.LocationRange, $"ラベル {scopeValue.Item1} は定義されていますがどこからも参照されていません。");
                 }
             }
 
@@ -846,7 +861,7 @@ namespace AnsiCParser {
             if (!(storageClass == AnsiCParser.StorageClassSpecifier.Register || storageClass == AnsiCParser.StorageClassSpecifier.None)) {
                 // 6.9.1 
                 // 制約 宣言並びの中の宣言は，register 以外の記憶域クラス指定子及び初期化を含んではならない。
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "宣言並びの中の宣言は，register 以外の記憶域クラス指定子を含んではならない。");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "宣言並びの中の宣言は，register 以外の記憶域クラス指定子を含んではならない。");
             }
 
             // 初期化宣言子並び
@@ -856,7 +871,7 @@ namespace AnsiCParser {
                     var declaration = OldStyleFunctionArgumentInitDeclarator(baseType, storageClass);
                     // 宣言子並びは無結合なので再定義できない。
                     if (decls.Any(x => x.Item1.Raw == declaration.Item1.Raw)) {
-                        throw new CompilerException.SpecificationErrorException(declaration.Item1.Start, declaration.Item1.End, $"宣言並び中で識別子{declaration.Item1}が再定義されました。");
+                        throw new CompilerException.SpecificationErrorException(declaration.Item1.Range, $"宣言並び中で識別子{declaration.Item1}が再定義されました。");
                     }
                     decls.Add(declaration);
                 } while (_lexer.ReadTokenIf(','));
@@ -879,20 +894,20 @@ namespace AnsiCParser {
             type = CType.Resolve(type, stack);
 
             if (CType.CheckContainOldStyleArgument(type)) {
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数型中に型の無い仮引数名があります");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "関数型中に型の無い仮引数名があります");
             }
 
             if (_lexer.ReadTokenIf('=')) {
                 // 初期化子を伴う宣言
                 // 宣言並びの中の宣言は初期化を含んではならない
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "宣言並びの中の宣言は初期化を含んではならない。");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "宣言並びの中の宣言は初期化を含んではならない。");
             } else if (storageClass != AnsiCParser.StorageClassSpecifier.Register && storageClass != AnsiCParser.StorageClassSpecifier.None) {
                 // 6.9.1 
                 // 制約 宣言並びの中の宣言は，register 以外の記憶域クラス指定子及び初期化を含んではならない。
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "宣言並びの中の宣言は，register 以外の記憶域クラス指定子を含んではならない。");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "宣言並びの中の宣言は，register 以外の記憶域クラス指定子を含んではならない。");
             } else if (type.IsFunctionType()) {
                 // 仮引数を“～型を返却する関数”とする宣言は，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整する。
-                Logger.Warning(ident.Start, ident.End, $"仮引数{ident}は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
+                Logger.Warning(ident.Range, $"仮引数{ident}は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
                 return Tuple.Create(ident, (CType)CType.CreatePointer(type), storageClass);
             } else {
                 return Tuple.Create(ident, type, storageClass);
@@ -910,7 +925,7 @@ namespace AnsiCParser {
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
 
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
             }
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
 
@@ -946,7 +961,7 @@ namespace AnsiCParser {
                     // 6.7.5.3 関数宣言子（関数原型を含む）
                     // 関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。
                     // 脚注　関数宣言で古い形式は使えない。
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。");
                 }
 
                 if (storageClass == AnsiCParser.StorageClassSpecifier.Typedef) {
@@ -1002,7 +1017,7 @@ namespace AnsiCParser {
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
 
             if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, ref functionSpecifier, ReadDeclarationSpecifierPartFlag.DeclarationSpecifiers) < 1) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "記憶クラス指定子 /型指定子/型修飾子が一つ以上指定されている必要がある。");
             }
             System.Diagnostics.Debug.Assert(functionSpecifier == AnsiCParser.FunctionSpecifier.None);
 
@@ -1145,11 +1160,11 @@ namespace AnsiCParser {
                         _tagScope.Add(ident, structUnionType);
                         AddImplictTypeDeclaration(token, structUnionType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
+                        throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Members != null) {
-                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に完全型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
                         structUnionType = (tagType as CType.TaggedType.StructUnionType);
@@ -1168,9 +1183,9 @@ namespace AnsiCParser {
                         _tagScope.Add(ident, tagType);
                         AddImplictTypeDeclaration(token, tagType);
                     } else if (!(tagType is CType.TaggedType.StructUnionType)) {
-                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
-                        throw new CompilerException.SpecificationErrorException(token.Start, token.End, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
+                        throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
                     } else {
                         // 既に定義されているものが完全型・不完全型問わず何もしない。
                     }
@@ -1187,7 +1202,7 @@ namespace AnsiCParser {
 
                 // タグ名前表に追加する
                 _tagScope.Add(ident, structUnionType);
-                AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), structUnionType);
+                AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().End, ident), structUnionType);
 
                 // メンバ宣言並びを解析する
                 _lexer.ReadToken('{');
@@ -1207,7 +1222,7 @@ namespace AnsiCParser {
         private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
             if (_lexer.PeekToken('}')) {
                 // 空の構造体/共用体を使っている。
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().Start, $"空の構造体/共用体が宣言されていますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.2.5-20および、J.2未定義の動作を参照）。（捕捉：C++では空の構造体/共用体は認められています。）");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, $"空の構造体/共用体が宣言されていますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.2.5-20および、J.2未定義の動作を参照）。（捕捉：C++では空の構造体/共用体は認められています。）");
             }
             var items = new List<CType.TaggedType.StructUnionType.MemberInfo>();
             items.AddRange(StructDeclaration());
@@ -1319,7 +1334,7 @@ namespace AnsiCParser {
                 Declarator(ref ident, stack, 0);
                 type = CType.Resolve(type, stack);
                 if (CType.CheckContainOldStyleArgument(type)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"関数型中に型の無い仮引数名 {ident.Raw} があります");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"関数型中に型の無い仮引数名 {ident.Raw} があります");
                 }
 
                 // ビットフィールド部分(opt)
@@ -1335,7 +1350,7 @@ namespace AnsiCParser {
                 int size = BitFieldSize();
                 return new CType.TaggedType.StructUnionType.MemberInfo(null, new CType.BitFieldType(null, type, 0, size), 0);
             } else {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
         }
 
@@ -1364,17 +1379,21 @@ namespace AnsiCParser {
                     AddImplictTypeDeclaration(ident, taggedType);
 
                 } else if (!(taggedType is CType.TaggedType.EnumType)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"列挙型 {ident.Raw} は既に構造体/共用体として定義されています。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に構造体/共用体として定義されています。");
                 } else {
 
                 }
                 if (_lexer.ReadTokenIf('{')) {
                     if ((taggedType as CType.TaggedType.EnumType).Members != null) {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
                         (taggedType as CType.TaggedType.EnumType).Members = EnumeratorList(taggedType as CType.TaggedType.EnumType);
                         _lexer.ReadToken('}');
+                    }
+                } else {
+                    if ((taggedType as CType.TaggedType.EnumType).Members == null) {
+                        throw new CompilerException.SpecificationErrorException(ident.Range, $"不完全型の列挙型 {ident.Raw} を使用していますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.7.2.3の制約を参照）。（捕捉：GNU拡張では不完全型の列挙型の前方宣言を認めています。）");
                     }
                 }
                 return taggedType;
@@ -1398,7 +1417,13 @@ namespace AnsiCParser {
             var ret = new List<CType.TaggedType.EnumType.MemberInfo>();
             enumType.Members = ret;
             var e = Enumerator(enumType, 0);
-            var decl = new SyntaxTree.Declaration.EnumMemberDeclaration(new LocationRange(e.Ident.Start, e.Ident.End), e);
+            SyntaxTree.Declaration prevDecl;
+            bool isCurrent;
+            if (_identScope.TryGetValue(e.Ident.Raw, out prevDecl, out isCurrent) && isCurrent) {
+                // 6.7.2.2 脚注(107) : したがって、同じ有効範囲で宣言された列挙定数の識別子は，互いに違っていなければならず，通常の宣言子で宣言された他の識別子とも違っていなければならない。
+                throw new CompilerException.SpecificationErrorException(e.Ident.Range, $"列挙定数の識別子 {e.Ident.Raw} が宣言されていますが、識別子 {e.Ident.Raw} は既に {prevDecl.LocationRange.ToString()} で使用されています。C言語の標準規格では同じ有効範囲で宣言された列挙定数の識別子は，互いに違っていなければならず，通常の宣言子で宣言された他の識別子とも違っていなければならず、再定義は認められていません。");
+            }
+            var decl = new SyntaxTree.Declaration.EnumMemberDeclaration(e.Ident.Range, e);
             _identScope.Add(e.Ident.Raw, decl);
             ret.Add(e);
             Token t;
@@ -1406,12 +1431,12 @@ namespace AnsiCParser {
                 var i = e.Value + 1;
                 if (IsEnumerator() == false) {
                     if (Mode == LanguageMode.C89) {
-                        Logger.Warning(t.Start, t.End, "列挙子並びの末尾にコンマを付けることができるのは C99 以降です。C89では使えません。");
+                        Logger.Warning(t.Range, "列挙子並びの末尾にコンマを付けることができるのは C99 以降です。C89では使えません。");
                     }
                     break;
                 }
                 e = Enumerator(enumType, i);
-                decl = new SyntaxTree.Declaration.EnumMemberDeclaration(new LocationRange(e.Ident.Start, e.Ident.End), e);
+                decl = new SyntaxTree.Declaration.EnumMemberDeclaration(e.Ident.Range, e);
                 _identScope.Add(e.Ident.Raw, decl);
                 ret.Add(e);
             }
@@ -1552,7 +1577,7 @@ namespace AnsiCParser {
         /// <param name="index"></param>
         private void DirectDeclarator(ref Token ident, List<CType> stack, int index) {
             if (IsDirectDeclarator() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"宣言子が来るべき場所に{_lexer.CurrentToken().Raw}があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"宣言子が来るべき場所に{_lexer.CurrentToken().Raw}があります。");
             }
             if (_lexer.ReadTokenIf('(')) {
                 stack.Add(new CType.StubType());
@@ -1585,7 +1610,7 @@ namespace AnsiCParser {
                     MoreDirectDeclarator(stack, index);
                 } else if (is_identifier_list()) {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(new LocationRange(x.Start, x.End), x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
                     _lexer.ReadToken(')');
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                     MoreDirectDeclarator(stack, index);
@@ -1651,7 +1676,7 @@ namespace AnsiCParser {
             // 6.7.5.3 関数宣言子（関数原型を含む)
             // 制約 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
             if (storageClass != AnsiCParser.StorageClassSpecifier.None && storageClass != AnsiCParser.StorageClassSpecifier.Register) {
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
             }
 
             Token ident = null;
@@ -1661,7 +1686,7 @@ namespace AnsiCParser {
                 baseType = CType.Resolve(baseType, stack);
             }
             if (CType.CheckContainOldStyleArgument(baseType)) {
-                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "関数型中に型の無い仮引数名があります");
+                throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "関数型中に型の無い仮引数名があります");
             }
             var end = _lexer.CurrentToken().Start;
             return new CType.FunctionType.ArgumentInfo(new LocationRange(start, end), ident, storageClass, baseType);
@@ -1755,7 +1780,7 @@ namespace AnsiCParser {
                     stack[index] = new CType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(new LocationRange(x.Start, x.End), x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
                     stack[index] = new CType.FunctionType(args, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
@@ -1767,7 +1792,7 @@ namespace AnsiCParser {
                     var ret = Evaluator.ConstantEval(expr);
                     var size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
                     if (size.HasValue == false || size < 0) {
-                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "配列の要素数には０以上の整数を指定してください。");
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "配列の要素数には０以上の整数を指定してください。");
                     }
                     len = size.Value;
                 }
@@ -2027,33 +2052,35 @@ namespace AnsiCParser {
                 }
             }
 
-            private static SyntaxTree.Initializer CheckInitializerBase(int depth, CType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerBase(int depth, CType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.IsArrayType()) {
-                    return CheckInitializerArray(depth + 1, type.Unwrap() as CType.ArrayType, it);
+                    return CheckInitializerArray(depth + 1, type.Unwrap() as CType.ArrayType, it, isLocalVariableInit);
                 } else if (type.IsStructureType()) {
-                    return CheckInitializerStruct(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it);
+                    return CheckInitializerStruct(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it, isLocalVariableInit);
                 } else if (type.IsUnionType()) {
-                    return CheckInitializerUnion(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it);
+                    return CheckInitializerUnion(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it, isLocalVariableInit);
                 } else {
-                    return CheckInitializer2Simple(depth, type, it);
+                    return CheckInitializer2Simple(depth, type, it, isLocalVariableInit);
                 }
             }
 
-            private static SyntaxTree.Initializer CheckInitializer2Simple(int depth, CType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializer2Simple(int depth, CType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
-                    Logger.Warning(it.Current.LocationRange.Start, it.Current.LocationRange.End, "スカラー初期化子がブレースで囲まれています");
+                    Logger.Warning(it.Current.LocationRange, "スカラー初期化子がブレースで囲まれています");
                     it.Enter();
                     it.Next();
-                    var ret = CheckInitializer2Simple(depth, type, it);
+                    var ret = CheckInitializer2Simple(depth, type, it, isLocalVariableInit);
                     if (it.Current != null) {
-                        Logger.Warning(it.Current.LocationRange.Start, it.Current.LocationRange.End, "スカラー初期化子内の要素が多すぎます");
+                        Logger.Warning(it.Current.LocationRange, "スカラー初期化子内の要素が多すぎます");
                     }
                     it.Leave();
                     return ret;
                 } else {
                     var expr = it.AsSimpleInitializer().AssignmentExpression;
                     if (type.IsAggregateType() || type.IsUnionType()) {
-                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange.Start, it.Current.LocationRange.End, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
+                        if (isLocalVariableInit == false) {
+                            throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
+                        }
                     }
                     // 単純代入の規則を適用して検証
 
@@ -2072,7 +2099,7 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 var inits = it.AsComplexInitializer().Ret;
                 if (type.Length == -1) {
                     if (depth != 1) {
@@ -2090,13 +2117,15 @@ namespace AnsiCParser {
                     if (it.Current == null) {
                         break;
                     }
-                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
                 }
                 if (type.Length == -1) {
-                    type.Length = i;
+                    // 配列の長さをハメた新しい配列型を作る
+                    //type = new CType.ArrayType(i, type.BaseType);
+                    type.Length = i;    // これは元の方を書き換えてしまうのでやってはダメ。
                 }
                 it.Leave();
-
+                it.Next();
                 return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
             }
 
@@ -2107,7 +2136,7 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字配列が対象の場合
                 var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
                 if (type.Length == -1) {
@@ -2121,8 +2150,9 @@ namespace AnsiCParser {
                     foreach (var b in sexpr.Value) {
                         assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
                     }
-                    // 配列の長さを固定する。
-                    type.Length = len;
+                    // 配列の長さをハメた新しい配列型を作る
+                    //type = new CType.ArrayType(len, type.BaseType);
+                    type.Length = len;    // これは元の方を書き換えてしまうのでやってはダメ。
                     it.Next();
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
                 } else {
@@ -2150,7 +2180,7 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字型以外が初期化対象の場合
                 if (type.Length == -1) {
                     if (depth != 1) {
@@ -2161,11 +2191,12 @@ namespace AnsiCParser {
                     var loc = it.Current.LocationRange;
                     var len = 0;
                     while (it.Current != null) {
-                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
                         len++;
                     }
-                    // 配列の長さを固定する。
-                    type.Length = len;
+                    // 配列の長さをハメた新しい配列型を作る
+                    //type = new CType.ArrayType(len, type.BaseType);
+                    type.Length = len;    // これは元の方を書き換えてしまうのでやってはダメ。
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
                 } else {
                     var len = type.Length;
@@ -2173,7 +2204,7 @@ namespace AnsiCParser {
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     while (it.Current != null && len > 0) {
-                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
                         len--;
                     }
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -2187,11 +2218,11 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
-                    return CheckInitializerArrayByStringExpressionInitializerToCharArray(depth, type, it);
+                    return CheckInitializerArrayByStringExpressionInitializerToCharArray(depth, type, it, isLocalVariableInit);
                 } else {
-                    return CheckInitializerArrayByStringExpressionInitializerToNotCharArray(depth, type, it);
+                    return CheckInitializerArrayByStringExpressionInitializerToNotCharArray(depth, type, it, isLocalVariableInit);
                 }
             }
 
@@ -2202,7 +2233,7 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.Length == -1) {
                     if (depth != 1) {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
@@ -2212,11 +2243,12 @@ namespace AnsiCParser {
                     var loc = it.Current.LocationRange;
                     var len = 0;
                     while (it.Current != null) {
-                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
                         len++;
                     }
-                    // 配列の長さを固定する。
-                    type.Length = len;
+                    // 配列の長さをハメた新しい配列型を作る
+                    //type = new CType.ArrayType(len, type.BaseType);
+                    type.Length = len;    // これは元の方を書き換えてしまうのでやってはダメ。
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
                 } else {
                     var len = type.Length;
@@ -2224,7 +2256,7 @@ namespace AnsiCParser {
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     while (it.Current != null && len > 0) {
-                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it));
+                        assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
                         len--;
                     }
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -2238,11 +2270,11 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
-                    return CheckInitializerArrayByStringExpressionInitializer(depth, type, it);
+                    return CheckInitializerArrayByStringExpressionInitializer(depth, type, it, isLocalVariableInit);
                 } else if (it.IsInComplexInitializer()) {
-                    return CheckInitializerArrayBySimpleInitializerInComplexInitializer(depth, type, it);
+                    return CheckInitializerArrayBySimpleInitializerInComplexInitializer(depth, type, it, isLocalVariableInit);
                 }
                 throw new Exception();
             }
@@ -2254,11 +2286,11 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
-                    return CheckInitializerArrayByComplexInitializer(depth, type, it);
+                    return CheckInitializerArrayByComplexInitializer(depth, type, it, isLocalVariableInit);
                 } else if (it.IsSimpleInitializer()) {
-                    return CheckInitializerArrayBySimpleInitializer(depth, type, it);
+                    return CheckInitializerArrayBySimpleInitializer(depth, type, it, isLocalVariableInit);
                 } else {
                     throw new Exception();
                 }
@@ -2271,14 +2303,9 @@ namespace AnsiCParser {
             /// <param name="type"></param>
             /// <param name="it"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerStruct(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerStruct(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
-                    //var inits = it.AsComplexInitializer().Ret;
-                    //if (type.Members.Count < inits.Count) {
-                    //    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えています。");
-                    //}
                     // 要素数分回す
-                    // Todo: ビットフィールドの初期化を作ること
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     it.Enter();
@@ -2296,12 +2323,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                        if (type.Members[i].Type.IsBitField()) {
-                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
-                            //throw new Exception("Todo: ビットフィールドの初期化を作ること");
-                        } else {
-                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
-                        }
+                        assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it, isLocalVariableInit));
                     }
                     if (it.Current != null) {
                         Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
@@ -2311,7 +2333,6 @@ namespace AnsiCParser {
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
-                    // Todo: ビットフィールドの初期化を作ること
                     // 要素数分回す
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     if (it.Current != null) {
@@ -2329,41 +2350,32 @@ namespace AnsiCParser {
                                 }
                                 continue;
                             }
-                            if (type.Members[i].Type.IsBitField()) {
-                                assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
-                                //throw new Exception("Todo: ビットフィールドの初期化を作ること");
-                            } else {
-                                assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it));
-                            }
+                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it, isLocalVariableInit));
                         }
                         return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                     } else {
                         return new SyntaxTree.Initializer.StructUnionAssignInitializer(LocationRange.Empty, type, assigns);
                     }
-
+                } else if (it.IsSimpleInitializer()) {
+                    if (isLocalVariableInit) {
+                        return CheckInitializer2Simple(depth, type, it, isLocalVariableInit);   // 単純初期化に丸投げ
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, " 初期化子の要素が定数ではありません。");
+                    }
                 } else {
                     throw new Exception();
                 }
             }
 
-            private static SyntaxTree.Initializer CheckInitializerUnion(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it) {
+            private static SyntaxTree.Initializer CheckInitializerUnion(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
                     var inits = it.AsComplexInitializer().Ret;
-                    //if (1 < inits.Count) {
-                    //    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "共用体の初期化子が２つ以上指定されています。");
-                    //}
-                    // Todo: ビットフィールドの初期化を作ること
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     it.Enter();
                     it.Next();
-                    if (type.Members[0].Type.IsBitField()) {
-                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
-                        //throw new Exception("Todo: ビットフィールドの初期化を作ること");
-                    } else {
-                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
-                    }
+                    assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it, isLocalVariableInit));
                     if (it.Current != null) {
                         Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
                     }
@@ -2372,27 +2384,19 @@ namespace AnsiCParser {
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else if (it.IsInComplexInitializer()) {
                     // 初期化リスト内を舐めてる場合
-                    // Todo: ビットフィールドの初期化を作ること
                     // 最初の要素とのみチェック
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
-                    if (type.Members[0].Type.IsBitField()) {
-                        throw new Exception("Todo: ビットフィールドの初期化を作ること");
-                    } else {
-                        assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it));
-                    }
+                    assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it, isLocalVariableInit));
                     return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                 } else {
                     throw new Exception();
                 }
             }
 
-            public static SyntaxTree.Initializer CheckInitializer(CType type, SyntaxTree.Initializer init) {
+            public static SyntaxTree.Initializer CheckInitializer(CType type, SyntaxTree.Initializer init, bool isLocalVariableInit) {
                 var it = new InitializerIterator(init);
-                var ret =  CheckInitializerBase(0, type, it);
-                //if (it.Current != null) {
-                //    Logger.Warning(init.LocationRange, "初期化子の要素が多すぎます。");
-                //}
+                var ret = CheckInitializerBase(0, type, it, isLocalVariableInit);
                 return ret;
             }
         }
@@ -2403,9 +2407,9 @@ namespace AnsiCParser {
         /// 6.7.8 初期化
         /// </summary>
         /// <returns></returns>
-        private SyntaxTree.Initializer Initializer(CType type) {
+        private SyntaxTree.Initializer Initializer(CType type, bool isLocalVariableInit) {
             var init = InitializerItem();
-            return InitializerChecker.CheckInitializer(type, init);
+            return InitializerChecker.CheckInitializer(type, init, isLocalVariableInit);
         }
 
         /// <summary>
@@ -2493,7 +2497,7 @@ namespace AnsiCParser {
             Token tok;
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.CASE)) {
                 if (_switchScope.Any() == false) {
-                    throw new CompilerException.SpecificationErrorException(tok.Start, tok.End, $"caseラベルがswitch文外にあります。");
+                    throw new CompilerException.SpecificationErrorException(tok.Range, $"caseラベルがswitch文外にあります。");
                 }
                 var expr = ConstantExpression();
                 var value = Evaluator.ConstantEval(expr);
@@ -2519,7 +2523,7 @@ namespace AnsiCParser {
                 return caseStatement;
             } else if (_lexer.ReadTokenIf(out tok, Token.TokenKind.DEFAULT)) {
                 if (_switchScope.Any() == false) {
-                    throw new CompilerException.SpecificationErrorException(tok.Start, tok.End, $"defaultラベルがswitch文外にあります。");
+                    throw new CompilerException.SpecificationErrorException(tok.Range, $"defaultラベルがswitch文外にあります。");
                 }
                 _lexer.ReadToken(':');
                 var stmt = Statement();
@@ -2538,9 +2542,9 @@ namespace AnsiCParser {
                     _labelScope.Add(ident.Raw, value);
                 } else if (value.Declaration != null) {
                     // 既に宣言済みなのでエラー
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"ラベル {ident.Raw} はすでに {value.Declaration.LocationRange.ToString()} で宣言されています。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"ラベル {ident.Raw} はすでに {value.Declaration.LocationRange.ToString()} で宣言されています。");
                 }
-                var labelStmt = new SyntaxTree.Statement.GenericLabeledStatement(new LocationRange(ident.Start, ident.End), ident.Raw, stmt);
+                var labelStmt = new SyntaxTree.Statement.GenericLabeledStatement(ident.Range, ident.Raw, stmt);
                 value.SetDeclaration(labelStmt);
                 return labelStmt;
             }
@@ -2591,7 +2595,7 @@ namespace AnsiCParser {
             SyntaxTree.Statement ret;
             Token tok;
             if (_lexer.PeekToken(out tok, ';')) {
-                ret = new SyntaxTree.Statement.EmptyStatement(new LocationRange(tok.Start, tok.End));
+                ret = new SyntaxTree.Statement.EmptyStatement(tok.Range);
             } else {
                 var expr = Expression();
                 ret = new SyntaxTree.Statement.ExpressionStatement(expr.LocationRange, expr);
@@ -2632,7 +2636,7 @@ namespace AnsiCParser {
                 ss.LocationRange = new LocationRange(start, end);
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"選択文は if, switch のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"選択文は if, switch のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         /// <summary>
@@ -2690,7 +2694,7 @@ namespace AnsiCParser {
                 ss.LocationRange = new LocationRange(start, end);
                 return ss;
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"繰返し文は while, do, for のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"繰返し文は while, do, for のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         /// <summary>
@@ -2716,7 +2720,7 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf(Token.TokenKind.CONTINUE)) {
                 _lexer.ReadToken(';');
                 if (_continueScope.Any() == false || _continueScope.Peek() == null) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ループ文の外で continue 文が使われています。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ループ文の外で continue 文が使われています。");
                 }
                 var end = _lexer.CurrentToken().End;
                 return new SyntaxTree.Statement.ContinueStatement(new LocationRange(start, end), _continueScope.Peek());
@@ -2724,7 +2728,7 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf(Token.TokenKind.BREAK)) {
                 _lexer.ReadToken(';');
                 if (_breakScope.Any() == false || _breakScope.Peek() == null) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "ループ文/switch文の外で break 文が使われています。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ループ文/switch文の外で break 文が使われています。");
                 }
                 var end = _lexer.CurrentToken().End;
                 return new SyntaxTree.Statement.BreakStatement(new LocationRange(start, end), _breakScope.Peek());
@@ -2739,7 +2743,7 @@ namespace AnsiCParser {
                 _currentFuncDecl.Type.IsFunctionType(out ft);
                 if (ft.ResultType.IsVoidType()) {
                     if (expr != null) {
-                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "戻り値型が void 型の関数中で、値を返すreturn文が使われています。");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "戻り値型が void 型の関数中で、値を返すreturn文が使われています。");
                     } else {
                         return new SyntaxTree.Statement.ReturnStatement(new LocationRange(start, end), null);
                     }
@@ -2749,7 +2753,7 @@ namespace AnsiCParser {
                 }
                 return new SyntaxTree.Statement.ReturnStatement(new LocationRange(start, end), expr);
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"分岐文は goto, continue, break, return のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"分岐文は goto, continue, break, return のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         private void GnuAsmPart() {
@@ -2765,13 +2769,13 @@ namespace AnsiCParser {
                     if (parens.Peek() == '(') {
                         parens.Pop();
                     } else {
-                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 丸括弧閉じ ) が使用されていますが、対応する丸括弧開き ( がありません。");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "GCC拡張インラインアセンブラ構文中で 丸括弧閉じ ) が使用されていますが、対応する丸括弧開き ( がありません。");
                     }
                 } else if (_lexer.PeekToken(']')) {
                     if (parens.Peek() == '[') {
                         parens.Pop();
                     } else {
-                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, "GCC拡張インラインアセンブラ構文中で 角括弧閉じ ] が使用されていますが、対応する角括弧開き [ がありません。");
+                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "GCC拡張インラインアセンブラ構文中で 角括弧閉じ ] が使用されていますが、対応する角括弧開き [ がありません。");
                     }
                 }
                 _lexer.NextToken();
@@ -2782,7 +2786,7 @@ namespace AnsiCParser {
         /// X.X.X GCC拡張インラインアセンブラ
         /// </summary>
         /// <returns></returns>
-            private SyntaxTree.Statement GnuAsmStatement() {
+        private SyntaxTree.Statement GnuAsmStatement() {
 
             var start = _lexer.CurrentToken().Start;
             Logger.Warning(start, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
@@ -2825,21 +2829,21 @@ namespace AnsiCParser {
                 SyntaxTree.Declaration value;
                 if (_identScope.TryGetValue(ident.Raw, out value) == false) {
                     Logger.Warning(ident.Start, ident.End, $"未定義の識別子 {ident.Raw} が一次式として利用されています。");
-                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression(new LocationRange(ident.Start, ident.End), ident.Raw);
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression(ident.Range, ident.Raw);
                 }
                 if (value is SyntaxTree.Declaration.VariableDeclaration) {
-                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression(new LocationRange(ident.Start, ident.End), ident.Raw, value as SyntaxTree.Declaration.VariableDeclaration);
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression(ident.Range, ident.Raw, value as SyntaxTree.Declaration.VariableDeclaration);
                 }
                 if (value is SyntaxTree.Declaration.ArgumentDeclaration) {
-                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression(new LocationRange(ident.Start, ident.End), ident.Raw, value as SyntaxTree.Declaration.ArgumentDeclaration);
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression(ident.Range, ident.Raw, value as SyntaxTree.Declaration.ArgumentDeclaration);
                 }
                 if (value is SyntaxTree.Declaration.EnumMemberDeclaration) {
-                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(new LocationRange(ident.Start, ident.End), (value as SyntaxTree.Declaration.EnumMemberDeclaration).MemberInfo);
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant(ident.Range, (value as SyntaxTree.Declaration.EnumMemberDeclaration).MemberInfo);
                 }
                 if (value is SyntaxTree.Declaration.FunctionDeclaration) {
-                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(new LocationRange(ident.Start, ident.End), ident.Raw, value as SyntaxTree.Declaration.FunctionDeclaration);
+                    return new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(ident.Range, ident.Raw, value as SyntaxTree.Declaration.FunctionDeclaration);
                 }
-                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"一次式として使える定義済み識別子は変数、列挙定数、関数のいずれかですが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+                throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"一次式として使える定義済み識別子は変数、列挙定数、関数のいずれかですが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
             }
             if (IsConstant()) {
                 return Constant();
@@ -2855,7 +2859,7 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken('{')) {
                     // gcc statement expression
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"GCC拡張構文である複文式(statement expression)には対応していません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"GCC拡張構文である複文式(statement expression)には対応していません。");
                     //var statements = CompoundStatement();
                     //_lexer.ReadToken(')');
                     //var end = _lexer.CurrentToken().End;
@@ -2868,7 +2872,7 @@ namespace AnsiCParser {
                     return expr;
                 }
             }
-            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"一次式となる要素があるべき場所に { _lexer.CurrentToken().Raw } があります。");
+            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"一次式となる要素があるべき場所に { _lexer.CurrentToken().Raw } があります。");
         }
 
         /// <summary>
@@ -2910,7 +2914,7 @@ namespace AnsiCParser {
                 return EnumerationConstant();
             }
 
-            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"定数があるべき場所に { _lexer.CurrentToken().Raw } があります。");
+            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"定数があるべき場所に { _lexer.CurrentToken().Raw } があります。");
         }
 
         /// <summary>
@@ -2934,7 +2938,7 @@ namespace AnsiCParser {
                 // 6.5.2.1 配列の添字付け
                 var index = Expression();
                 _lexer.ReadToken(']');
-                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression(new LocationRange(tok.Start, tok.End), expr, index));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression(tok.Range, expr, index));
             }
             if (_lexer.ReadTokenIf(out tok, '(')) {
                 // 6.5.2.2 関数呼出し
@@ -2946,17 +2950,17 @@ namespace AnsiCParser {
                     if (Mode == LanguageMode.C89) {
                         var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
                         var decl = AddImplictFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new CType.FunctionType(null, false, CType.CreateSignedInt()));
-                        expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(new LocationRange(tok.Start, tok.End), identExpr.Ident, decl as SyntaxTree.Declaration.FunctionDeclaration);
+                        expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(tok.Range, identExpr.Ident, decl as SyntaxTree.Declaration.FunctionDeclaration);
                     } else {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, "未定義の識別子を関数として用いています。");
                     }
                 }
-                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(new LocationRange(tok.Start, tok.End), expr, args));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(tok.Range, expr, args));
             }
             if (_lexer.ReadTokenIf(out tok, '.')) {
                 // 6.5.2.3 構造体及び共用体のメンバ
                 var ident = Identifier(false);
-                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberDirectAccess(new LocationRange(tok.Start, tok.End), expr, ident));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberDirectAccess(tok.Range, expr, ident));
             }
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.PTR_OP)) {
                 // 6.5.2.3 構造体及び共用体のメンバ
@@ -2968,7 +2972,7 @@ namespace AnsiCParser {
                     expr = new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(baseType), expr);
                 }
 
-                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess(new LocationRange(tok.Start, tok.End), expr, ident));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess(tok.Range, expr, ident));
             }
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
                 // 6.5.2.4 後置増分及び後置減分演算子
@@ -2981,9 +2985,9 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "たぶん実装ミスです。");
+                        throw new CompilerException.InternalErrorException(tok.Range, "たぶん実装ミスです。");
                 }
-                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression(new LocationRange(tok.Start, tok.End), op, expr));
+                return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression(tok.Range, op, expr));
             }
             // 6.5.2.5 複合リテラル
             {
@@ -3037,7 +3041,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "たぶん実装ミスです。");
+                        throw new CompilerException.InternalErrorException(tok.Range, "たぶん実装ミスです。");
                 }
 
                 //_lexer.NextToken();
@@ -3138,7 +3142,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
+                        throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
                 var rhs = CastExpression();
                 lhs = new SyntaxTree.Expression.MultiplicitiveExpression(op, lhs, rhs);
@@ -3163,7 +3167,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
+                        throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
                 var rhs = MultiplicitiveExpression();
                 lhs = new SyntaxTree.Expression.AdditiveExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
@@ -3188,7 +3192,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.ShiftExpression.OperatorKind.Right;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
+                        throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
 
                 var rhs = AdditiveExpression();
@@ -3220,7 +3224,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterOrEqual;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
+                        throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
                 var rhs = ShiftExpression();
                 lhs = new SyntaxTree.Expression.RelationalExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
@@ -3245,7 +3249,7 @@ namespace AnsiCParser {
                         op = SyntaxTree.Expression.EqualityExpression.OperatorKind.NotEqual;
                         break;
                     default:
-                        throw new CompilerException.InternalErrorException(tok.Start, tok.End, "");
+                        throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
                 var rhs = RelationalExpression();
                 lhs = new SyntaxTree.Expression.EqualityExpression(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End), op, lhs, rhs);
@@ -3399,7 +3403,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private Token AssignmentOperator() {
             if (IsAssignmentOperator() == false) {
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"代入演算子があるべき場所に { _lexer.CurrentToken().Raw } があります。");
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"代入演算子があるべき場所に { _lexer.CurrentToken().Raw } があります。");
             }
             var ret = _lexer.CurrentToken();
             _lexer.NextToken();
@@ -3536,43 +3540,43 @@ namespace AnsiCParser {
         private bool IsDeclarationSpecifierPart(CType type, TypeSpecifier typeSpecifier, ReadDeclarationSpecifierPartFlag flags) {
             if (IsStorageClassSpecifier()) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.StorageClassSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは記憶クラス指定子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは記憶クラス指定子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsTypeSpecifier() && type == null) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは型指定子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは型指定子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsStructOrUnionSpecifier() && type == null) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは構造体共用体指定子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは構造体共用体指定子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsEnumSpecifier() && type == null) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは列挙型指定子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは列挙型指定子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは型定義名 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは型定義名 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsTypeQualifier()) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは型修飾子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは型修飾子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
             if (IsFunctionSpecifier()) {
                 if (!flags.HasFlag(ReadDeclarationSpecifierPartFlag.FunctionSpecifier)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Start, _lexer.CurrentToken().End, $"ここでは関数修飾子 { _lexer.CurrentToken().Raw } は使えません。");
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ここでは関数修飾子 { _lexer.CurrentToken().Raw } は使えません。");
                 }
                 return true;
             }
@@ -3592,7 +3596,8 @@ namespace AnsiCParser {
                 storageClass = storageClass.Marge(StorageClassSpecifier());
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsTypeSpecifier()) {
                 // 型指定子（予約語）
-                typeSpecifier = typeSpecifier.Marge(TypeSpecifier());
+                var range = _lexer.CurrentToken().Range;
+                typeSpecifier = typeSpecifier.Marge(TypeSpecifier(), range);
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeSpecifier) && IsStructOrUnionSpecifier()) {
                 // 型指定子（構造体指定子もしくは共用体指定子）
                 if (type != null) {
@@ -3645,7 +3650,7 @@ namespace AnsiCParser {
 
                 if (storageClass != AnsiCParser.StorageClassSpecifier.None
                     && storageClass != AnsiCParser.StorageClassSpecifier.Extern) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "ローカルスコープ中での関数宣言に指定することができない記憶クラス指定子 extern が指定されている。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "ローカルスコープ中での関数宣言に指定することができない記憶クラス指定子 extern が指定されている。");
                 }
             }
 
@@ -3664,13 +3669,13 @@ namespace AnsiCParser {
                 // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
                 // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
                 if ((linkage == LinkageKind.NoLinkage || iv.LinkageObject.Linkage == LinkageKind.NoLinkage) && isCurrent == true) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
                 }
 
                 // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
                 if ((iv.LinkageObject.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
                     || (iv.LinkageObject.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"翻訳単位の中で同じ識別子 {ident.Raw} が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"翻訳単位の中で同じ識別子 {ident.Raw} が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
                 }
 
                 var prevType = type;
@@ -3686,7 +3691,7 @@ namespace AnsiCParser {
                 if (scope == ScopeKind.FileScope && isDefine) {
                     var prevFd = (iv as SyntaxTree.Declaration.FunctionDeclaration);
                     if (prevFd.Body != null) {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "すでに本体を持っている関数を再定義しています。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "すでに本体を持っている関数を再定義しています。");
                     }
                     var compoundFt = type.Unwrap() as CType.FunctionType;
                     var ft = (prevType.Unwrap() as CType.FunctionType);
@@ -3698,7 +3703,7 @@ namespace AnsiCParser {
                 // 以前の宣言は可視ではない
             }
 
-            var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type, storageClass, functionSpecifier);
+            var funcDelc = new SyntaxTree.Declaration.FunctionDeclaration(ident.Range, ident.Raw, type, storageClass, functionSpecifier);
 
             // 結合スコープにオブジェクトを追加
             funcDelc.LinkageObject = AddLinkageObject(ident, linkage, funcDelc, (scope == ScopeKind.FileScope && isDefine));
@@ -3724,13 +3729,13 @@ namespace AnsiCParser {
                 if (isCurrent) {
                     // 型名は無結合であるため、再宣言できない
                     if (iv is SyntaxTree.Declaration.TypeDeclaration) {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"{ident.Raw} は既に型宣言名として宣言されています。（型の再定義はC11以降の機能。）");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, $"{ident.Raw} は既に型宣言名として宣言されています。（型の再定義はC11以降の機能。）");
                     } else {
-                        throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"{ident.Raw} は宣言済みです。");
+                        throw new CompilerException.SpecificationErrorException(ident.Range, $"{ident.Raw} は宣言済みです。");
                     }
                 }
             }
-            var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type);
+            var typeDecl = new SyntaxTree.Declaration.TypeDeclaration(ident.Range, ident.Raw, type);
             _identScope.Add(ident.Raw, typeDecl);
             return typeDecl;
         }
@@ -3752,17 +3757,21 @@ namespace AnsiCParser {
 
                 if (type.IsFunctionType()) {
                     // 関数型は変数のように初期化できない。なぜなら、それは関数宣言だから。
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "関数型を持つ宣言子に対して初期化子を設定しています。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "関数型を持つ宣言子に対して初期化子を設定しています。");
                 }
 
                 // 6.7.8 初期化
                 // 識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。
                 if ((scope == ScopeKind.BlockScope) && (linkage == LinkageKind.InternalLinkage || linkage == LinkageKind.ExternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。");
                 }
 
+                // 不完全型の配列は初期化式で完全型に書き換えられるため、複製する
+                type = type.Duplicate();
+
                 // 初期化子を読み取る
-                initializer = Initializer(type);
+                // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
+                initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == LinkageKind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
 
             }
 
@@ -3778,13 +3787,13 @@ namespace AnsiCParser {
                 // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
                 // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
                 if ((linkage == LinkageKind.NoLinkage || iv.LinkageObject.Linkage == LinkageKind.NoLinkage) && isCurrent == true) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
                 }
 
                 // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
                 if ((iv.LinkageObject.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
                     || (iv.LinkageObject.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"翻訳単位の中で同じ識別子{ident.Raw}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"翻訳単位の中で同じ識別子{ident.Raw}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
                 }
 
                 if (linkage != LinkageKind.NoLinkage) {
@@ -3796,12 +3805,12 @@ namespace AnsiCParser {
                     // 型適合のチェック
                     //if (Specification.IsCompatible(iv.Type.Unwrap(), type.Unwrap()) == false) {
                     if (Specification.IsCompatible(iv.Type, type) == false) {
-                            throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"既に宣言されている変数{ident.Raw}と型が適合しないため再宣言できません。");
+                        throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"既に宣言されている変数{ident.Raw}と型が適合しないため再宣言できません。");
                     }
 
                     // 合成型を生成
                     //type = CType.CompositeType(iv.Type.Unwrap(), type.Unwrap());
-                        type = CType.CompositeType(iv.Type, type);
+                    type = CType.CompositeType(iv.Type, type);
                     System.Diagnostics.Debug.Assert(type != null);
 
                 }
@@ -3812,7 +3821,7 @@ namespace AnsiCParser {
             }
 
             // 新たに変数宣言を作成
-            var varDecl = new SyntaxTree.Declaration.VariableDeclaration(new LocationRange(ident.Start, ident.End), ident.Raw, type, storageClass, initializer);
+            var varDecl = new SyntaxTree.Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass, initializer);
             varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, varDecl.Init != null);
             _identScope.Add(ident.Raw, varDecl);
             return varDecl;
@@ -3888,7 +3897,7 @@ namespace AnsiCParser {
 
                     // 外部オブジェクト定義 ( 関数プロトタイプ宣言にGCC拡張インラインアセンブラがくっついてくる場合もあるでここで読み飛ばす）
                     if (tok.Kind == Token.TokenKind.__ASM__) {
-                        Logger.Warning(tok.Start, tok.End, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
+                        Logger.Warning(tok.Range, "GCC拡張インラインアセンブラ構文には対応していません。ざっくりと読み飛ばします。");
                         GnuAsmPart();
                     }
 
@@ -3916,7 +3925,7 @@ namespace AnsiCParser {
                     //  - 記憶域クラス指定子がなし、もしくは static のもの
                     // 仮定義された識別子に対する外部定義を含まない場合、翻訳単位の末尾に合成型で0の初期化子付き宣言があるとして扱う
 
-                    for (;;) {
+                    for (; ; ) {
                         var decl = FunctionOrVariableOrTypedefDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None, scope);
                         decls.Add(decl);
 
