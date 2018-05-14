@@ -128,7 +128,7 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, SyntaxTree.Expression value) {
-                throw new Exception();
+                throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中で引数変数は利用できません。");
             }
 
             public SyntaxTree.Expression OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, SyntaxTree.Expression value) {
@@ -186,7 +186,7 @@ namespace AnsiCParser {
                                 throw new NotSupportedException();
                         }
                     } else if (self.Type.Unwrap().IsPointerType()) {
-                        return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
+                        return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, self.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
                     } else {
                         throw new NotSupportedException();
                     }
@@ -340,7 +340,7 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, SyntaxTree.Expression value) {
-                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
+                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, CType.CreatePointer(self.Type), new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
             }
 
             public SyntaxTree.Expression OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, SyntaxTree.Expression value) {
@@ -681,7 +681,7 @@ namespace AnsiCParser {
 
             public SyntaxTree.Expression OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTree.Expression value) {
                 //return self;
-                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
+                return new SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, CType.CreatePointer(self.Type), new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, CType.BasicType.TypeKind.SignedInt));
             }
 
             public SyntaxTree.Expression OnWhileStatement(SyntaxTree.Statement.WhileStatement self, SyntaxTree.Expression value) {

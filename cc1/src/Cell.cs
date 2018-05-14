@@ -18,7 +18,7 @@ namespace AnsiCParser {
         /// コンスセル
         /// </summary>
         public class ConsCell : Cell {
-            public Cell Car {
+            public Cell Car {   
                 get;
             }
             public Cell Cdr {
@@ -74,7 +74,7 @@ namespace AnsiCParser {
                 } else if (arg is Location) {
                     chain = new ConsCell(Create((arg as Location).FilePath, (arg as Location).Line, (arg as Location).Column), chain);
                 } else if (arg is LocationRange) {
-                    chain = new ConsCell(Create((arg as LocationRange).Start.FilePath, (arg as LocationRange).Start.Line, (arg as LocationRange).Start.Column, (arg as LocationRange).End.FilePath, (arg as LocationRange).End.Line, (arg as LocationRange).End.Column), chain);
+                    chain = new ConsCell(Create((arg as LocationRange).Start.FilePath??"builtin", (arg as LocationRange).Start.Line, (arg as LocationRange).Start.Column, (arg as LocationRange).End.FilePath??"builtin", (arg as LocationRange).End.Line, (arg as LocationRange).End.Column), chain);
                 } else {
                     throw new Exception();
                 }

@@ -40,6 +40,7 @@ namespace AnsiCParser {
          *    long long型の結果はedx:eaxに格納される
          *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
          *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
+         *    （なので、EBX, ESI, EDI は呼び出され側の先頭でスタックに退避している）
          *  - スタックポインタの処理は呼び出し側で行う。
          *  - 引数・戻り値領域の開放は呼び出し側で行う
          *  
@@ -2771,6 +2772,8 @@ namespace AnsiCParser {
                     }
                 }
 
+                Emit("popl %edi");
+                Emit("popl %esi");
                 Emit("popl %ebx");
                 Emit("movl %ebp, %esp");
                 Emit("popl %ebp");
@@ -2870,11 +2873,15 @@ namespace AnsiCParser {
                 Generator.Emit("pushl %ebp");
                 Generator.Emit("movl %esp, %ebp");
                 Generator.Emit("pushl %ebx");
+                Generator.Emit("pushl %esi");
+                Generator.Emit("pushl %edi");
                 var c = Generator.Emit(".error \"Stack size is need backpatch.\""); // スタックサイズは仮置き
-                _localScopeTotalSize = 4; // pushl %ebx分
-                _maxLocalScopeTotalSize = 4;
+                _localScopeTotalSize = 4*3; // %ebx,%esi,%edi分
+                _maxLocalScopeTotalSize = 4*3;
                 self.Body.Accept(this, value);
-                c.Body = $"subl ${_maxLocalScopeTotalSize - 4}, %esp"; // スタックサイズをバックパッチ
+                c.Body = $"subl ${_maxLocalScopeTotalSize - 4*3}, %esp"; // スタックサイズをバックパッチ
+                Generator.Emit("popl %edi");
+                Generator.Emit("popl %esi");
                 Generator.Emit("popl %ebx");
                 Generator.Emit("movl %ebp, %esp");
                 Generator.Emit("popl %ebp");
@@ -3790,6 +3797,9 @@ namespace AnsiCParser {
                                 case 4:
                                     Emit($".long {(uint) cvalue.IntConst}");
                                     break;
+                                case 8:
+                                    Emit($".long {(UInt64) cvalue.IntConst & 0xFFFFFFFFUL}, {(UInt64) (cvalue.IntConst >> 32)  & 0xFFFFFFFFUL}");
+                                    break;
                                 default:
                                     throw new ArgumentOutOfRangeException();
                             }
@@ -3940,7 +3950,10 @@ namespace AnsiCParser {
 
             if (self.Identifier is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
                 var f = self.Identifier as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
-                return new SyntaxTreeCompileVisitor.Value {Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int) self.Offset.Value, Type = self.Type};
+                return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+            }
+            if (self.Identifier == null) {
+                return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = (int)self.Offset.Value, Type = self.Type };
             }
 
             throw new NotImplementedException();

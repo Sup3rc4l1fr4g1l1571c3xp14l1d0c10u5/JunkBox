@@ -408,17 +408,21 @@ namespace AnsiCParser {
                 /// アドレス定数(定数式の解釈結果として得られる構文ノード)
                 /// </summary>
                 public class AddressConstantExpression : PrimaryExpression {
+                    private CType addressType {
+                        get;
+                    }
 
                     public override CType Type {
                         get {
-                            return CType.CreatePointer(Identifier.Type);
+                            return addressType;
                         }
                     }
                     public IdentifierExpression Identifier { get; }
                     public Constant.IntegerConstant Offset { get; }
 
-                    public AddressConstantExpression(LocationRange locationRange, IdentifierExpression identifier, Constant.IntegerConstant offset) : base(locationRange) {
+                    public AddressConstantExpression(LocationRange locationRange, IdentifierExpression identifier, CType type, Constant.IntegerConstant offset) : base(locationRange) {
                         Identifier = identifier;
+                        addressType = type;
                         Offset = offset;
                     }
 
