@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 
 namespace AnsiCParser {
+
     public class SyntaxTreeCompileVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
         /*
          * +------+----------------------+
@@ -4254,3 +4255,4 @@ namespace AnsiCParser {
         }
     }
 }
+

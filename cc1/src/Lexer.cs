@@ -10,6 +10,16 @@ namespace AnsiCParser {
     public class Lexer {
 
         /// <summary>
+        /// line 指令に一致する正規表現。
+        /// </summary>
+        private static Regex RegexLineDirective { get; } = new Regex(@"^#\s*(line\s+)?(?<line>\d+)\s+""(?<file>(\\""|[^""])*)""(\s+(\d+)){0,3}\s*$");
+
+        /// <summary>
+        /// pragma pack 指令に一致する正規表現。
+        /// </summary>
+        private static Regex RegexPackDirective { get; } = new Regex(@"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[1|2|4])?\s*\)|\s*\s*(?<packsize>[1|2|4])?\s*)?\s*)$");
+
+        /// <summary>
         /// 10進数文字に一致する正規表現。
         /// </summary>
         private static string D { get; } = @"\d";
@@ -705,7 +715,7 @@ namespace AnsiCParser {
 
                     {
                         // line 指令
-                        var match = Regex.Match(str, @"^#\s*(line\s+)?(?<line>\d+)\s+""(?<file>(\\""|[^""])*)""(\s+(\d+)){0,3}\s*$");
+                        var match = RegexLineDirective.Match(str);
                         if (match.Success) {
                             this._filepath = match.Groups["file"].Value;
                             this._line = int.Parse(match.Groups["line"].Value);
@@ -716,7 +726,7 @@ namespace AnsiCParser {
                     {
                         // pragma pack 指令
                         // プラグマ後の最初の struct、union、宣言から有効
-                        var match = Regex.Match(str, @"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[1|2|4])?\s*\)|\s*\s*(?<packsize>[1|2|4])?\s*)?\s*)$");
+                        var match = RegexPackDirective.Match(str);
                         if (match.Success) {
                             if (match.Groups["packsize"].Success) {
                                 Settings.PackSize = int.Parse(match.Groups["packsize"].Value);

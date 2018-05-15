@@ -1408,7 +1408,8 @@ namespace AnsiCParser {
                     // - 一方のオペランドがポインタで他方が空ポインタ定数である。
 
                     if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                        // 両オペランドは算術型をもつ。
+                        // 両オペランドが算術型をもつ場合，通常の算術型変換を適用する。
+                        Specification.UsualArithmeticConversion(ref lhs, ref rhs);
                     } else {
                         // ポインタ型への暗黙的型変換を試みる
                         var lhsPtr = Specification.ToPointerTypeExpr(lhs);

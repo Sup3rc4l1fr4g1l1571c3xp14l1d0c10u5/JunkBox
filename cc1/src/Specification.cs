@@ -705,9 +705,6 @@ namespace AnsiCParser {
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
             }
-            if (btLhs.Kind == btRhs.Kind) {
-                return btLhs;
-            }
 
             // まず，一方のオペランドの対応する実数型が long double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が long double となるように型変換する。
             // そうでない場合，一方のオペランドの対応する実数型が double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が double となるように型変換する。

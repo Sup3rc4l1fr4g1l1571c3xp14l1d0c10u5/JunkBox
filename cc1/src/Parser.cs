@@ -361,7 +361,7 @@ namespace AnsiCParser {
                     break;
                 case 10:
                     foreach (var ch in s) {
-                        if ("01234567890".IndexOf(ch) == -1) {
+                        if ("0123456789".IndexOf(ch) == -1) {
                             throw new FormatException($"十進数に使えない文字{ch}が含まれています。");
                         }
                         ret = ret * 10 + (ch - '0');
@@ -369,7 +369,7 @@ namespace AnsiCParser {
                     break;
                 case 16:
                     foreach (var ch in s) {
-                        if ("01234567890".IndexOf(ch) != -1) {
+                        if ("0123456789".IndexOf(ch) != -1) {
                             ret = ret * 16 + (ch - '0');
                         } else if ("ABCDEF".IndexOf(ch) != -1) {
                             ret = ret * 16 + (ch - 'A' + 10);
@@ -399,7 +399,7 @@ namespace AnsiCParser {
                     break;
                 case 10:
                     foreach (var ch in s) {
-                        if ("01234567890".IndexOf(ch) == -1) {
+                        if ("0123456789".IndexOf(ch) == -1) {
                             throw new FormatException($"十進数に使えない文字{ch}が含まれています。");
                         }
                         ret = ret * 10 + (UInt64)(ch - '0');
@@ -407,7 +407,7 @@ namespace AnsiCParser {
                     break;
                 case 16:
                     foreach (var ch in s) {
-                        if ("01234567890".IndexOf(ch) != -1) {
+                        if ("0123456789".IndexOf(ch) != -1) {
                             ret = ret * 16 + (UInt64)(ch - '0');
                         } else if ("ABCDEF".IndexOf(ch) != -1) {
                             ret = ret * 16 + (UInt64)(ch - 'A' + 10);
@@ -2638,16 +2638,17 @@ namespace AnsiCParser {
         _insertImplictDeclarationOperatorStack.Push(decls);
 
         if (funcName != null) {
-            // C99 __func__
+            // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
             var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
             var tyConstStr = new CType.TypeQualifierType(new CType.PointerType(new CType.TypeQualifierType(CType.CreateChar(), AnsiCParser.TypeQualifier.Const)), AnsiCParser.TypeQualifier.Const);
             var varDecl = new SyntaxTree.Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static, new SyntaxTree.Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string>() { "\"" + funcName + "\"" })));
             _identScope.Add("__func__", varDecl);
             decls.Add(varDecl);
-            //ResolveLinkage(tok, tyConstStr, AnsiCParser.StorageClassSpecifier.Static, ScopeKind.BlockScope);
             varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, varDecl.Init != null);
 
         }
+
+        // ToDo: C99対応の場合はDeclarationをStatementにしないといけない
 
         while (IsDeclaration()) {
             var d = Declaration();

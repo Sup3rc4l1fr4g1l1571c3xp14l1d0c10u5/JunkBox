@@ -96,7 +96,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\CF3-master\testsuite\EXP_1\tmp\00_test.i"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
             Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
 
             var v = new SyntaxTreeCompileVisitor.Value();
