@@ -8,61 +8,61 @@ namespace AnsiCParser {
     /// </summary>
     public class CTypeDumpVisitor : CTypeVisitor.IVisitor<Cell, Cell> {
         private HashSet<CType> visited = new HashSet<CType>();
-
+        
         public Cell OnArrayType(CType.ArrayType self, Cell value) {
             visited.Add(self);
-            return Cell.Create("array", self.Length.ToString(), self.BaseType.Accept(this, null));
+            return Util.makeList(Util.makeSym("array"), Util.makeNum(self.Length), self.BaseType.Accept(this, null));
         }
 
         public Cell OnBasicType(CType.BasicType self, Cell value) {
             visited.Add(self);
             switch (self.Kind) {
                 case CType.BasicType.TypeKind.KAndRImplicitInt:
-                    return Cell.Create("int");
+                    return Util.makeList(Util.makeSym("int"));
                 case CType.BasicType.TypeKind.Void:
-                    return Cell.Create("void");
+                    return Util.makeList(Util.makeSym("void"));
                 case CType.BasicType.TypeKind.Char:
-                    return Cell.Create("char");
+                    return Util.makeList(Util.makeSym("char"));
                 case CType.BasicType.TypeKind.SignedChar:
-                    return Cell.Create("signed-char");
+                    return Util.makeList(Util.makeSym("signed-char"));
                 case CType.BasicType.TypeKind.UnsignedChar:
-                    return Cell.Create("unsigned-char");
+                    return Util.makeList(Util.makeSym("unsigned-char"));
                 case CType.BasicType.TypeKind.SignedShortInt:
-                    return Cell.Create("signed-short-int");
+                    return Util.makeList(Util.makeSym("signed-short-int"));
                 case CType.BasicType.TypeKind.UnsignedShortInt:
-                    return Cell.Create("unsigned-short-int");
+                    return Util.makeList(Util.makeSym("unsigned-short-int"));
                 case CType.BasicType.TypeKind.SignedInt:
-                    return Cell.Create("signed-int");
+                    return Util.makeList(Util.makeSym("signed-int"));
                 case CType.BasicType.TypeKind.UnsignedInt:
-                    return Cell.Create("unsigned-int");
+                    return Util.makeList(Util.makeSym("unsigned-int"));
                 case CType.BasicType.TypeKind.SignedLongInt:
-                    return Cell.Create("signed-long-int");
+                    return Util.makeList(Util.makeSym("signed-long-int"));
                 case CType.BasicType.TypeKind.UnsignedLongInt:
-                    return Cell.Create("unsigned-long-int");
+                    return Util.makeList(Util.makeSym("unsigned-long-int"));
                 case CType.BasicType.TypeKind.SignedLongLongInt:
-                    return Cell.Create("signed-long-long-int");
+                    return Util.makeList(Util.makeSym("signed-long-long-int"));
                 case CType.BasicType.TypeKind.UnsignedLongLongInt:
-                    return Cell.Create("unsigned-long-long-int");
+                    return Util.makeList(Util.makeSym("unsigned-long-long-int"));
                 case CType.BasicType.TypeKind.Float:
-                    return Cell.Create("float");
+                    return Util.makeList(Util.makeSym("float"));
                 case CType.BasicType.TypeKind.Double:
-                    return Cell.Create("double");
+                    return Util.makeList(Util.makeSym("double"));
                 case CType.BasicType.TypeKind.LongDouble:
-                    return Cell.Create("long-double");
+                    return Util.makeList(Util.makeSym("long-double"));
                 case CType.BasicType.TypeKind._Bool:
-                    return Cell.Create("_Bool");
+                    return Util.makeList(Util.makeSym("_Bool"));
                 case CType.BasicType.TypeKind.Float_Complex:
-                    return Cell.Create("float-_Complex");
+                    return Util.makeList(Util.makeSym("float-_Complex"));
                 case CType.BasicType.TypeKind.Double_Complex:
-                    return Cell.Create("double-_Complex");
+                    return Util.makeList(Util.makeSym("double-_Complex"));
                 case CType.BasicType.TypeKind.LongDouble_Complex:
-                    return Cell.Create("long-double-_Complex");
+                    return Util.makeList(Util.makeSym("long-double-_Complex"));
                 case CType.BasicType.TypeKind.Float_Imaginary:
-                    return Cell.Create("float-_Imaginary");
+                    return Util.makeList(Util.makeSym("float-_Imaginary"));
                 case CType.BasicType.TypeKind.Double_Imaginary:
-                    return Cell.Create("double-_Imaginary");
+                    return Util.makeList(Util.makeSym("double-_Imaginary"));
                 case CType.BasicType.TypeKind.LongDouble_Imaginary:
-                    return Cell.Create("long-double-_Imaginary");
+                    return Util.makeList(Util.makeSym("long-double-_Imaginary"));
                 default:
                     throw new Exception();
 
@@ -72,39 +72,79 @@ namespace AnsiCParser {
         public Cell OnEnumType(CType.TaggedType.EnumType self, Cell value) {
             if (visited.Contains(self) == false && self.Members != null) {
                 visited.Add(self);
-                return Cell.Create("enum", self.TagName, Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Value.ToString())).ToArray()));
+                return Util.makeList(
+                    Util.makeSym("enum"), Util.makeStr(self.TagName), 
+                    Util.makeList(
+                        self.Members.Select(x => 
+                            Util.makeCons(
+                                Util.makeStr(x.Ident?.Raw ?? ""), 
+                                Util.makeStr(x.Value.ToString())
+                            )
+                        ).ToArray()
+                    )
+                );
             } else {
-                return Cell.Create("enum", self.TagName);
+                return Util.makeList(Util.makeSym("enum"), Util.makeStr(self.TagName));
             }
         }
 
         public Cell OnFunctionType(CType.FunctionType self, Cell value) {
                 visited.Add(self);
-            return Cell.Create("func", self.ResultType.ToString(), self.Arguments != null ? Cell.Create(self.Arguments.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.StorageClass.ToString(), x.Type.Accept(this, null))).ToArray()) : Cell.Nil);
+            return Util.makeList(
+                Util.makeSym("func"), Util.makeStr(self.ResultType.ToString()), 
+                self.Arguments != null 
+                    ? Util.makeList(
+                        self.Arguments.Select(x => 
+                            Util.makeCons(
+                                Util.makeStr(x.Ident?.Raw ?? ""), 
+                                Util.makeStr(x.StorageClass.ToString()), 
+                                x.Type.Accept(this, null)
+                            )
+                        ).ToArray()
+                    ) 
+                    : Util.Nil
+            );
         }
 
         public Cell OnPointerType(CType.PointerType self, Cell value) {
                 visited.Add(self);
-            return Cell.Create("pointer", self.BaseType.Accept(this, null));
+            return Util.makeList(Util.makeSym("pointer"), self.BaseType.Accept(this, null));
         }
 
         public Cell OnStructUnionType(CType.TaggedType.StructUnionType self, Cell value) {
             if (visited.Contains(self) == false) {
                 visited.Add(self);
-                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName, self.Members != null ? Cell.Create(self.Members.Select(x => Cell.Create(x.Ident?.Raw ?? "", x.Type.Accept(this, null), x.Offset.ToString())).ToArray()) : Cell.Nil);
+                return Util.makeList(
+                    Util.makeSym(self.IsStructureType() ? "struct" : "union"), 
+                    Util.makeStr(self.TagName), 
+                    self.Members != null 
+                        ? Util.makeList(
+                            self.Members.Select(x => 
+                                Util.makeCons(
+                                    Util.makeStr(x.Ident?.Raw ?? ""), 
+                                    x.Type.Accept(this, null), 
+                                    Util.makeNum(x.Offset)
+                                )
+                            ).ToArray()
+                          ) 
+                        : Util.Nil
+                );
             } else {
-                return Cell.Create(self.IsStructureType() ? "struct" : "union", self.TagName);
+                return Util.makeList(
+                    Util.makeSym(self.IsStructureType() ? "struct" : "union"), 
+                    Util.makeStr(self.TagName)
+                );
             }
         }
 
         public Cell OnStubType(CType.StubType self, Cell value) {
             visited.Add(self);
-            return Cell.Create("$");
+            return Util.makeList(Util.makeSym("$"));
         }
 
         public Cell OnTypedefedType(CType.TypedefedType self, Cell value) {
             visited.Add(self);
-            return Cell.Create("typedef", self.Ident?.Raw);
+            return Util.makeList(Util.makeSym("typedef"), Util.makeStr(self.Ident?.Raw));
         }
 
         public Cell OnTypeQualifierType(CType.TypeQualifierType self, Cell value) {
@@ -130,12 +170,22 @@ namespace AnsiCParser {
             if (self.Qualifier.HasFlag(TypeQualifier.Invalid)) {
                 qual.Add("invalid");
             }
-            return Cell.Create("type-qual", Cell.Create(qual.ToArray()), self.Type.Accept(this, null));
+            return Util.makeList(
+                Util.makeSym("type-qual"), 
+                Util.makeList(qual.ToArray().Select(x => Util.makeStr(x)).ToArray()), 
+                self.Type.Accept(this, null)
+            );
         }
         public Cell OnBitFieldType(CType.BitFieldType self, Cell value) {
             visited.Add(self);
-            return Cell.Create("bitfield", self.Type.Accept(this, null), self.BitOffset.ToString(), self.BitWidth.ToString());
+            return Util.makeList(
+                Util.makeSym("bitfield"), 
+                self.Type.Accept(this, null), 
+                Util.makeNum(self.BitOffset), 
+                Util.makeNum(self.BitWidth)
+            );
         }
+
     }
 
     /// <summary>

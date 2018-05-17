@@ -93,7 +93,7 @@ namespace AnsiCParser {
         /// <param name="exp"></param>
         /// <param name="suffix"></param>
         /// <returns></returns>
-        public static double ParseHeximalFloat(string fact, string exp, string suffix) {
+        public static double ParseHeximalFloat(LocationRange range, string fact, string exp, string suffix) {
             // 小数点の初期位置を決める
             var dp = fact.IndexOf('.');
             string fs;
@@ -116,14 +116,14 @@ namespace AnsiCParser {
             }
 
             // 仮数部が0の場合は特別扱い
-            if (Convert.ToUInt64(fs, 16) == 0) {
+            if (Lexer.ToUInt64(range, fs, 16) == 0) {
                 return 0;
             }
 
             if (suffix == "f") {
                 // float 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0',8).ToArray())).Substring(0, 8);
-                var f = Convert.ToUInt32(fs, 16);
+                var f = Lexer.ToUInt32(range, fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 31)) == 0) {
                     f <<= 1;
@@ -143,7 +143,7 @@ namespace AnsiCParser {
             } else {
                 // double 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0', 16).ToArray())).Substring(0, 16);
-                var f = Convert.ToUInt64(fs, 16);
+                var f = Lexer.ToUInt64(range, fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 63)) == 0) {
                     f <<= 1;
@@ -201,6 +201,95 @@ namespace AnsiCParser {
                 throw new Exception();
             }
             return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+        }
+
+        /// <summary>
+        /// 符号なし整数文字列を数値として読み取る
+        /// </summary>
+        /// <param name="range"></param>
+        /// <param name="s"></param>
+        /// <param name="radix"></param>
+        /// <returns></returns>
+        private static System.Numerics.BigInteger Read(LocationRange range, string s, int radix) {
+            System.Numerics.BigInteger ret = 0;
+            switch (radix) {
+                case 8:
+                    foreach (var ch in s) {
+                        if ("01234567".IndexOf(ch) == -1) {
+                            throw new CompilerException.SpecificationErrorException(range, $"八進数に使えない文字{ch}が含まれています。");
+                        }
+                        ret = ret * 8 + (ch - '0');
+                    }
+                    break;
+                case 10:
+                    foreach (var ch in s) {
+                        if ("0123456789".IndexOf(ch) == -1) {
+                            throw new CompilerException.SpecificationErrorException(range, $"十進数に使えない文字{ch}が含まれています。");
+                        }
+                        ret = ret * 10 + (ch - '0');
+                    }
+                    break;
+                case 16:
+                    foreach (var ch in s) {
+                        if ("0123456789".IndexOf(ch) != -1) {
+                            ret = ret * 16 + (ch - '0');
+                        } else if ("ABCDEF".IndexOf(ch) != -1) {
+                            ret = ret * 16 + (ch - 'A' + 10);
+                        } else if ("abcdef".IndexOf(ch) != -1) {
+                            ret = ret * 16 + (ch - 'a' + 10);
+                        } else {
+                            throw new CompilerException.SpecificationErrorException(range, $"十六進数に使えない文字{ch}が含まれています。");
+                        }
+                    }
+                    break;
+                default:
+                    throw new CompilerException.SpecificationErrorException(range, $"{radix}は対応していない基数です。");
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// 32bit符号付き数値読み取り (Convert.ToInt32は桁あふれエラーを起こすため)
+        /// </summary>
+        /// <param name="s"></param>
+        /// <param name="radix"></param>
+        /// <returns></returns>
+        public static Int32 ToInt32(LocationRange range, string s, int radix) {
+            var ret = Read(range, s, radix).ToByteArray();
+            return BitConverter.ToInt32(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00),4)).ToArray(),0);
+        }
+
+        /// <summary>
+        /// 32bit符号無し数値読み取り (Convert.ToUInt32は桁あふれエラーを起こすため)
+        /// </summary>
+        /// <param name="s"></param>
+        /// <param name="radix"></param>
+        /// <returns></returns>
+        public static UInt32 ToUInt32(LocationRange range, string s, int radix) {
+            var ret = Read(range, s, radix).ToByteArray();
+            return BitConverter.ToUInt32(ret.Concat(Enumerable.Repeat((byte)0,4)).ToArray(),0);
+        }
+
+        /// <summary>
+        /// 64bit符号付き数値読み取り (Convert.ToInt64は桁あふれエラーを起こすため)
+        /// </summary>
+        /// <param name="s"></param>
+        /// <param name="radix"></param>
+        /// <returns></returns>
+        public static Int64 ToInt64(LocationRange range, string s, int radix) {
+            var ret = Read(range, s, radix).ToByteArray();
+            return BitConverter.ToInt64(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00),8)).ToArray(),0);
+        }
+
+        /// <summary>
+        /// 64bit符号無し数値読み取り (Convert.ToUInt64は桁あふれエラーを起こすため)
+        /// </summary>
+        /// <param name="s"></param>
+        /// <param name="radix"></param>
+        /// <returns></returns>
+        public static UInt64 ToUInt64(LocationRange range, string s, int radix) {
+            var ret = Read(range, s, radix).ToByteArray();
+            return BitConverter.ToUInt64(ret.Concat(Enumerable.Repeat((byte)0,8)).ToArray(),0);
         }
 
         /// <summary>

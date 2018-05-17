@@ -42,8 +42,6 @@ namespace AnsiCParser {
         /// <returns></returns>
         public abstract CType Duplicate();
 
-
-
         /// <summary>
         ///     型のサイズを取得
         /// </summary>
@@ -57,7 +55,7 @@ namespace AnsiCParser {
         /// <param name="t2"></param>
         /// <returns></returns>
         public static bool IsEqual(CType t1, CType t2) {
-            for (;;) {
+            for (; ; ) {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
                 }
@@ -313,7 +311,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public CType Unwrap() {
             var self = this;
-            for (;;) {
+            for (; ; ) {
                 if (self is TypedefedType) {
                     self = (self as TypedefedType).Type;
                     continue;
@@ -645,7 +643,7 @@ namespace AnsiCParser {
                         }
                     }
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, int bitpos, int bitsize) {
-                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof()*8 < bitpos + bitsize) {
+                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bitpos + bitsize) {
                             throw new Exception("");
                         } else {
                             result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitpos, bitsize), bytepos));
@@ -667,7 +665,7 @@ namespace AnsiCParser {
                                 ty = CType.CreateUnsignedChar();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 ty = CType.CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos+1));
+                                result.Add(new MemberInfo(null, ty, bytepos + 1));
                                 break;
                             case 4:
                                 ty = CType.CreateUnsignedLongInt();
@@ -726,7 +724,7 @@ namespace AnsiCParser {
                                 if (current_bitfield_capacity - current_bitfield_size > 0) {
                                     result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
                                 }
-                                    current_byte_position += current_bitfield_capacity / 8;
+                                current_byte_position += current_bitfield_capacity / 8;
                                 current_bitfield_type = null;
                                 current_bitfield_capacity = 0;
                                 current_bitfield_size = 0;
@@ -1268,7 +1266,7 @@ namespace AnsiCParser {
                 this.BitWidth = bitWidth;
             }
 
-                                    public override CType Duplicate() {
+            public override CType Duplicate() {
                 var ret = new BitFieldType(/* dummy */null, this.Type.Duplicate(), this.BitOffset, this.BitWidth);
                 return ret;
             }
@@ -1327,9 +1325,9 @@ namespace AnsiCParser {
                     // 6.7.3 型修飾子
                     // 配列型の指定が型修飾子を含む場合，それは要素の型を修飾するだけで，その配列型を修飾するのではない
                     var arrayType = ret as ArrayType;
-                    
+
                     return new ArrayType(arrayType.Length, arrayType.BaseType.WrapTypeQualifier(ta1.Qualifier));
-                    } else {
+                } else {
                     return new TypeQualifierType(ret, ta1.Qualifier);
                 }
             }
@@ -1498,7 +1496,7 @@ namespace AnsiCParser {
                 return false;
             }
             checkedType.Add(t1);
-            for (;;) {
+            for (; ; ) {
                 if (t1 is TypeQualifierType) {
                     t1 = (t1 as TypeQualifierType).Type;
                     continue;
