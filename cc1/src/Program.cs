@@ -70,7 +70,7 @@ namespace AnsiCParser {
                 try {
                     var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
                     using (var o = new System.IO.StreamWriter(astFile)) {
-                        o.WriteLine(ret.Accept(new SyntaxTreeDumpVisitor(), null).ToString());
+                        o.WriteLine(ret.Accept(new SyntaxTreeToSExprVisitor(), null).ToString());
                     }
 
                     if (flag_SyntaxOnly == false) {
@@ -97,7 +97,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
                         var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c"), "<Debug>").Parse();
-            var sexpr = ret.Accept(new SyntaxTreeDumpVisitor(), null);
+            var sexpr = ret.Accept(new SyntaxTreeToSExprVisitor(), null);
 
             var interpreter = new Lisp.SchemeInterpreter();
             interpreter.InterpreterWantsToPrint += (s,e) => Console.Write(e.WhatToPrint);

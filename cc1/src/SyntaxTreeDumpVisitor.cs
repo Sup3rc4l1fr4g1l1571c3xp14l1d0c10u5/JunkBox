@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 
 namespace AnsiCParser {
-    public class SyntaxTreeDumpVisitor : SyntaxTreeVisitor.IVisitor<Lisp.Pair, Lisp.Pair> {
+    public class SyntaxTreeToSExprVisitor : SyntaxTreeVisitor.IVisitor<Lisp.Pair, Lisp.Pair> {
         private static Lisp.Pair LocationRangeToCons(LocationRange lr) {
             return Lisp.Util.makeCons(
                 Lisp.Util.makeList(
