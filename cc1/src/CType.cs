@@ -33,7 +33,7 @@ namespace AnsiCParser {
         }
 
         public override string ToString() {
-            return this.Accept(new CTypeDumpVisitor2(), "");
+            return this.Accept(new CTypeToStringVisitor(), "");
         }
 
         /// <summary>

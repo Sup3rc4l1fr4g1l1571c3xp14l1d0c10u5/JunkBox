@@ -70,7 +70,7 @@ namespace AnsiCParser {
                 try {
                     var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
                     using (var o = new System.IO.StreamWriter(astFile)) {
-                        o.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
+                        o.WriteLine(ret.Accept(new SyntaxTreeDumpVisitor(), null).ToString());
                     }
 
                     if (flag_SyntaxOnly == false) {
@@ -96,8 +96,43 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
-            Console.WriteLine(Cell.PrettyPrint(ret.Accept(new SyntaxTreeDumpVisitor(), null)));
+                        var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c"), "<Debug>").Parse();
+            var sexpr = ret.Accept(new SyntaxTreeDumpVisitor(), null);
+
+            var interpreter = new Lisp.SchemeInterpreter();
+            interpreter.InterpreterWantsToPrint += (s,e) => Console.Write(e.WhatToPrint);
+            interpreter.Evaluate($"(define ast '{new Lisp.Writer(false).Write(sexpr)})");
+            interpreter.Evaluate(@"(define repl (lambda () (let ((expr (begin (display ""cc1> "") (read (standard-input-port))))) (begin (write (eval expr)) (newline) (repl)))))");
+            interpreter.Evaluate(@"
+(define pp (lambda (s)
+  (define do-indent (lambda (level)
+    (dotimes (_ level) (write-char #\space))))
+  (define pp-parenl (lambda ()
+    (write-char #\()))
+  (define pp-parenr (lambda ()
+    (write-char #\))))
+  (define pp-atom (lambda (e prefix)
+    (when prefix (write-char #\space))
+    (write e)))
+  (define pp-list (lambda (s level prefix)
+    (and prefix (do-indent level))
+    (pp-parenl)
+    (let loop ((s s)
+               (prefix #f))
+      (if (null? s)
+          (pp-parenr)
+          (let ((e (car s)))
+            (if (list? e)
+                (begin (and prefix (newline))
+                       (pp-list e (+ level 1) prefix))
+                (pp-atom e prefix))
+            (loop (cdr s) #t))))))
+  (if (list? s)
+      (pp-list s 0 #f)
+      (write s))
+  (newline)))
+");
+            interpreter.Evaluate(@"(repl)");
 
             var v = new SyntaxTreeCompileVisitor.Value();
             using (var o = new System.IO.StreamWriter(@"..\..\test.s")) {

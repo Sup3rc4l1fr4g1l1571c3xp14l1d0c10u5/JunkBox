@@ -10,11 +10,7 @@ namespace AnsiCParser {
         /// </summary>
         public static LocationRange Builtin {
             get {
-                var callerFrame = new System.Diagnostics.StackFrame(1);
-                var fileName = callerFrame.GetFileName();
-                var line = callerFrame.GetFileLineNumber();
-                var column = callerFrame.GetFileColumnNumber();
-                var location = new Location(fileName, line, column, -1);
+                var location = new Location("<built-in>", 1, 1, 0);
                 return new LocationRange(location, location);
             }
         }
@@ -37,11 +33,15 @@ namespace AnsiCParser {
         public LocationRange(Location start) : this(start,start){}
 
         public LocationRange(Location start, Location end) {
+            System.Diagnostics.Debug.Assert(start.FilePath != null);
+            System.Diagnostics.Debug.Assert(end.FilePath != null);
             Start = start;
             End = end;
         }
 
         public LocationRange(LocationRange other) {
+            System.Diagnostics.Debug.Assert(other.Start.FilePath != null);
+            System.Diagnostics.Debug.Assert(other.End.FilePath != null);
             Start = other.Start;
             End = other.End;
         }
