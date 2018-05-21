@@ -408,21 +408,14 @@ namespace AnsiCParser {
                 /// アドレス定数(定数式の解釈結果として得られる構文ノード)
                 /// </summary>
                 public class AddressConstantExpression : PrimaryExpression {
-                    private CType addressType {
-                        get;
-                    }
 
-                    public override CType Type {
-                        get {
-                            return addressType;
-                        }
-                    }
+                    public override CType Type { get; }
                     public IdentifierExpression Identifier { get; }
                     public Constant.IntegerConstant Offset { get; }
 
                     public AddressConstantExpression(LocationRange locationRange, IdentifierExpression identifier, CType type, Constant.IntegerConstant offset) : base(locationRange) {
                         Identifier = identifier;
-                        addressType = type;
+                        Type = type;
                         Offset = offset;
                     }
 
@@ -842,7 +835,7 @@ namespace AnsiCParser {
                         // ok
                     } else if (
                         expr.IsLValue() &&  // オペランドは，左辺値
-                        (!(  // ToDo: ビットフィールドでもない
+                        (!(  // ビットフィールドでない
                             (expr is Expression.PostfixExpression.MemberDirectAccess && ((Expression.PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) || 
                             (expr is Expression.PostfixExpression.MemberIndirectAccess && ((Expression.PostfixExpression.MemberIndirectAccess)expr).Type.IsBitField())
                         )) &&
@@ -1849,7 +1842,7 @@ namespace AnsiCParser {
                             throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "代入演算子の左オペランドは，変更可能な左辺値でなければならない。");
                         }
                         // 代入の制約条件と意味規則を適用する
-                        rhs = ApplyAssignmentRule(this.LocationRange, lhs.Type, rhs);
+                        rhs = ApplyAssignmentRule(LocationRange, lhs.Type, rhs);
 
                         Lhs = lhs;
                         Rhs = rhs;

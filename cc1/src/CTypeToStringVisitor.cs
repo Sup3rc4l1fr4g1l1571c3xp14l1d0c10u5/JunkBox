@@ -17,7 +17,7 @@ namespace AnsiCParser {
 
         public string OnBasicType(CType.BasicType self, string value) {
             visited.Add(self);
-            var str = "";
+            string str;
             switch (self.Kind) {
                 case CType.BasicType.TypeKind.KAndRImplicitInt:
                     str = "int";

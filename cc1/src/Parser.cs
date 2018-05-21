@@ -51,6 +51,7 @@ namespace AnsiCParser {
         /// <summary>
         /// リンケージオブジェクトの生成とリンケージ表への登録
         /// </summary>
+        /// <param name="ident"></param>
         /// <param name="linkage"></param>
         /// <param name="decl"></param>
         /// <param name="isDefine"></param>
@@ -131,7 +132,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 現在解析中の関数定義
         /// </summary>
-        private SyntaxTree.Declaration.FunctionDeclaration _currentFuncDecl = null;
+        private SyntaxTree.Declaration.FunctionDeclaration _currentFuncDecl;
 
 
         /// <summary>
@@ -782,7 +783,7 @@ namespace AnsiCParser {
             if (ftype.Arguments != null) {
                 foreach (var arg in ftype.Arguments) {
                     if (arg.Ident == null) {
-                        throw new CompilerException.SpecificationErrorException(arg.Range, $"関数定義では引数名を省略することはできません。");
+                        throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
                     }
                     _identScope.Add(arg.Ident.Raw, new SyntaxTree.Declaration.ArgumentDeclaration(arg.Ident.Range, arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
                 }
@@ -797,9 +798,7 @@ namespace AnsiCParser {
             foreach (var scopeValue in _labelScope) {
                 if (scopeValue.Item2.Declaration == null && scopeValue.Item2.References.Any()) {
                     // 未定義のラベルが使われている。
-                    scopeValue.Item2.References.ForEach(x => {
-                        throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。");
-                    });
+                    scopeValue.Item2.References.ForEach(x => throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。"));
                 }
                 if (scopeValue.Item2.Declaration != null && !scopeValue.Item2.References.Any()) {
                     // 未参照のラベルが使われている。
@@ -1088,7 +1087,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 匿名型に割り当てる名前を生成するためのカウンター
         /// </summary>
-        private int anony = 0;
+        private int _anonymousNameCounter;
 
         /// <summary>
         /// 6.7.2 型指定子
@@ -1197,7 +1196,7 @@ namespace AnsiCParser {
                 // 識別子を伴わない匿名の完全型の宣言
 
                 // 名前を生成
-                var ident = $"${kind}_{anony++}";
+                var ident = $"${kind}_{_anonymousNameCounter++}";
 
                 // 型情報を生成する
                 var structUnionType = new CType.TaggedType.StructUnionType(kind, ident, true);
@@ -1400,7 +1399,7 @@ namespace AnsiCParser {
                 }
                 return taggedType;
             } else {
-                var ident = $"$enum_{anony++}";
+                var ident = $"$enum_{_anonymousNameCounter++}";
                 var etype = new CType.TaggedType.EnumType(ident, true);
                 _tagScope.Add(ident, etype);
                 AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), etype);
@@ -1423,7 +1422,7 @@ namespace AnsiCParser {
             bool isCurrent;
             if (_identScope.TryGetValue(e.Ident.Raw, out prevDecl, out isCurrent) && isCurrent) {
                 // 6.7.2.2 脚注(107) : したがって、同じ有効範囲で宣言された列挙定数の識別子は，互いに違っていなければならず，通常の宣言子で宣言された他の識別子とも違っていなければならない。
-                throw new CompilerException.SpecificationErrorException(e.Ident.Range, $"列挙定数の識別子 {e.Ident.Raw} が宣言されていますが、識別子 {e.Ident.Raw} は既に {prevDecl.LocationRange.ToString()} で使用されています。C言語の標準規格では同じ有効範囲で宣言された列挙定数の識別子は，互いに違っていなければならず，通常の宣言子で宣言された他の識別子とも違っていなければならず、再定義は認められていません。");
+                throw new CompilerException.SpecificationErrorException(e.Ident.Range, $"列挙定数の識別子 {e.Ident.Raw} が宣言されていますが、識別子 {e.Ident.Raw} は既に {prevDecl.LocationRange} で使用されています。C言語の標準規格では同じ有効範囲で宣言された列挙定数の識別子は，互いに違っていなければならず，通常の宣言子で宣言された他の識別子とも違っていなければならず、再定義は認められていません。");
             }
             var decl = new SyntaxTree.Declaration.EnumMemberDeclaration(e.Ident.Range, e);
             _identScope.Add(e.Ident.Raw, decl);
@@ -1975,37 +1974,37 @@ namespace AnsiCParser {
         public static class InitializerChecker {
 
             private class InitializerIterator {
-                private readonly Stack<Tuple<SyntaxTree.Initializer, int>> inits = new Stack<Tuple<SyntaxTree.Initializer, int>>();
-                private SyntaxTree.Initializer initializer = null;
-                private int index = -1;
+                private readonly Stack<Tuple<SyntaxTree.Initializer, int>> _inits = new Stack<Tuple<SyntaxTree.Initializer, int>>();
+                private SyntaxTree.Initializer _initializer;
+                private int _index;
 
                 public SyntaxTree.Initializer Current {
                     get; private set;
                 }
                 public InitializerIterator(SyntaxTree.Initializer it) {
-                    initializer = null;
-                    index = -1;
+                    _initializer = null;
+                    _index = -1;
                     Current = it;
                 }
 
                 public bool Next() {
-                    if (initializer is SyntaxTree.Initializer.ComplexInitializer) {
-                        var ini = (SyntaxTree.Initializer.ComplexInitializer)initializer;
-                        if (ini.Ret.Count == index + 1) {
+                    if (_initializer is SyntaxTree.Initializer.ComplexInitializer) {
+                        var ini = (SyntaxTree.Initializer.ComplexInitializer)_initializer;
+                        if (ini.Ret.Count == _index + 1) {
                             Current = null;
                             return false;
                         } else {
-                            index++;
-                            Current = ini.Ret[index];
+                            _index++;
+                            Current = ini.Ret[_index];
                             return true;
                         }
-                    } else if (initializer is SyntaxTree.Initializer.SimpleInitializer) {
-                        if (index != -1) {
+                    } else if (_initializer is SyntaxTree.Initializer.SimpleInitializer) {
+                        if (_index != -1) {
                             Current = null;
                             return false;
                         } else {
-                            Current = initializer;
-                            index = 0;
+                            Current = _initializer;
+                            _index = 0;
                             return true;
                         }
                     } else {
@@ -2015,9 +2014,9 @@ namespace AnsiCParser {
                 }
                 public bool Enter() {
                     if (Current is SyntaxTree.Initializer.ComplexInitializer) {
-                        inits.Push(Tuple.Create(initializer, index));
-                        initializer = Current;
-                        index = -1;
+                        _inits.Push(Tuple.Create(_initializer, _index));
+                        _initializer = Current;
+                        _index = -1;
                         Current = null;
                         return true;
                     } else {
@@ -2025,10 +2024,10 @@ namespace AnsiCParser {
                     }
                 }
                 public bool Leave() {
-                    Current = initializer;
-                    var top = inits.Pop();
-                    initializer = top.Item1;
-                    index = top.Item2;
+                    Current = _initializer;
+                    var top = _inits.Pop();
+                    _initializer = top.Item1;
+                    _index = top.Item2;
                     return true;
                 }
 
@@ -2040,7 +2039,7 @@ namespace AnsiCParser {
                     return Current is SyntaxTree.Initializer.ComplexInitializer;
                 }
                 public bool IsInComplexInitializer() {
-                    return initializer is SyntaxTree.Initializer.ComplexInitializer;
+                    return _initializer is SyntaxTree.Initializer.ComplexInitializer;
                 }
                 public SyntaxTree.Initializer.SimpleInitializer AsSimpleInitializer() {
                     return Current as SyntaxTree.Initializer.SimpleInitializer;
@@ -2048,9 +2047,6 @@ namespace AnsiCParser {
 
                 public SyntaxTree.Initializer.ComplexInitializer AsComplexInitializer() {
                     return Current as SyntaxTree.Initializer.ComplexInitializer;
-                }
-                public SyntaxTree.Initializer.ComplexInitializer AsInComplexInitializer() {
-                    return initializer as SyntaxTree.Initializer.ComplexInitializer;
                 }
             }
 
@@ -2110,11 +2106,11 @@ namespace AnsiCParser {
                 }
 
                 // 要素数分回す
-                List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
+                var assigns = new List<SyntaxTree.Initializer>();
                 var loc = it.Current.LocationRange;
                 it.Enter();
                 it.Next();
-                var i = 0;
+                int i;
                 for (i = 0; type.Length == -1 || i < type.Length; i++) {
                     if (it.Current == null) {
                         break;
@@ -2136,6 +2132,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字配列が対象の場合
@@ -2149,7 +2146,7 @@ namespace AnsiCParser {
                     var loc = it.Current.LocationRange;
                     var len = sexpr.Value.Count;
                     foreach (var b in sexpr.Value) {
-                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, CType.BasicType.TypeKind.UnsignedChar)));
                     }
                     // 型の長さを確定させる
                     type.Length = len;
@@ -2165,7 +2162,7 @@ namespace AnsiCParser {
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     foreach (var b in sexpr.Value.Take(len)) {
-                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{(byte)b,0:X2}", (byte)b, CType.BasicType.TypeKind.UnsignedChar)));
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, CType.BasicType.TypeKind.UnsignedChar)));
                     }
                     it.Next();
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -2179,6 +2176,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字型以外が初期化対象の場合
@@ -2216,6 +2214,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
@@ -2231,6 +2230,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.Length == -1) {
@@ -2267,6 +2267,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
@@ -2283,6 +2284,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
@@ -2300,6 +2302,7 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
             private static SyntaxTree.Initializer CheckInitializerStruct(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
@@ -2308,20 +2311,20 @@ namespace AnsiCParser {
                     var loc = it.Current.LocationRange;
                     it.Enter();
                     it.Next();
-                    for (var i = 0; i < type.Members.Count; i++) {
+                    foreach (var member in type.Members) {
                         if (it.Current == null) {
                             break;
                         }
-                        if (type.Members[i].Ident == null) {
+                        if (member.Ident == null) {
                             // padding
-                            if (type.Members[i].Type.IsBitField()) {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((type.Members[i].Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                            if (member.Type.IsBitField()) {
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
                             } else {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (type.Members[i].Type as CType.BasicType).Kind)));
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as CType.BasicType).Kind)));
                             }
                             continue;
                         }
-                        assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it, isLocalVariableInit));
+                        assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));
                     }
                     if (it.Current != null) {
                         Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
@@ -2335,20 +2338,20 @@ namespace AnsiCParser {
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     if (it.Current != null) {
                         var loc = it.Current.LocationRange;
-                        for (var i = 0; i < type.Members.Count; i++) {
+                        foreach (var member in type.Members) {
                             if (it.Current == null) {
                                 break;
                             }
-                            if (type.Members[i].Ident == null) {
+                            if (member.Ident == null) {
                                 // padding
-                                if (type.Members[i].Type.IsBitField()) {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((type.Members[i].Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                                if (member.Type.IsBitField()) {
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
                                 } else {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, type.Members[i].Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (type.Members[i].Type as CType.BasicType).Kind)));
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as CType.BasicType).Kind)));
                                 }
                                 continue;
                             }
-                            assigns.Add(CheckInitializerBase(depth, type.Members[i].Type, it, isLocalVariableInit));
+                            assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));
                         }
                         return new SyntaxTree.Initializer.StructUnionAssignInitializer(loc, type, assigns);
                     } else {
@@ -2356,7 +2359,7 @@ namespace AnsiCParser {
                     }
                 } else if (it.IsSimpleInitializer()) {
                     if (isLocalVariableInit) {
-                        return CheckInitializer2Simple(depth, type, it, isLocalVariableInit);   // 単純初期化に丸投げ
+                        return CheckInitializer2Simple(depth, type, it, true);   // 単純初期化に丸投げ
                     } else {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, " 初期化子の要素が定数ではありません。");
                     }
@@ -2417,7 +2420,7 @@ namespace AnsiCParser {
         private SyntaxTree.Initializer InitializerItem() {
             Token startTok;
             if (_lexer.ReadTokenIf(out startTok, '{')) {
-                List<SyntaxTree.Initializer> ret = null;
+                List<SyntaxTree.Initializer> ret;
                 if (_lexer.PeekToken('}') == false) {
                     ret = InitializerList();
                 } else {
@@ -2495,14 +2498,14 @@ namespace AnsiCParser {
             Token tok;
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.CASE)) {
                 if (_switchScope.Any() == false) {
-                    throw new CompilerException.SpecificationErrorException(tok.Range, $"caseラベルがswitch文外にあります。");
+                    throw new CompilerException.SpecificationErrorException(tok.Range, "caseラベルがswitch文外にあります。");
                 }
                 var expr = ConstantExpression();
                 var value = Evaluator.ConstantEval(expr);
                 if (value.Type.IsIntegerType() == false) {
-                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"caseラベルの値が整数定数値ではありません。");
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, "caseラベルの値が整数定数値ではありません。");
                 }
-                long v = 0;
+                long v;
                 if (value is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
                     v = (value as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value;
                 } else if (value is SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant) {
@@ -2521,7 +2524,7 @@ namespace AnsiCParser {
                 return caseStatement;
             } else if (_lexer.ReadTokenIf(out tok, Token.TokenKind.DEFAULT)) {
                 if (_switchScope.Any() == false) {
-                    throw new CompilerException.SpecificationErrorException(tok.Range, $"defaultラベルがswitch文外にあります。");
+                    throw new CompilerException.SpecificationErrorException(tok.Range, "defaultラベルがswitch文外にあります。");
                 }
                 _lexer.ReadToken(':');
                 var stmt = Statement();

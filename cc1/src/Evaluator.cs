@@ -90,18 +90,18 @@ namespace AnsiCParser {
                 if (self.Type.IsRealFloatingType()) {
                     switch (self.Op) {
                         case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", lhs.DoubleValue() + rhs.DoubleValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() + rhs.DoubleValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", lhs.DoubleValue() - rhs.DoubleValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() - rhs.DoubleValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else if (self.Type.IsIntegerType()) {
                     switch (self.Op) {
                         case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", lhs.LongValue() + rhs.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() + rhs.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", lhs.LongValue() - rhs.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() - rhs.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -120,7 +120,7 @@ namespace AnsiCParser {
                 if (lhs != 0) {
                     ret = self.Rhs.Accept(this, value).LongValue() == 0 ? 0 : 1;
                 }
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret, (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, SyntaxTree.Expression value) {
@@ -154,7 +154,7 @@ namespace AnsiCParser {
                     long reti = (ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant).Value;
 
                     if (self.Type.Unwrap() is CType.BasicType) {
-                        var bt = (self.Type.Unwrap() as CType.BasicType).Kind;
+                        var bt = ((CType.BasicType) self.Type.Unwrap()).Kind;
                         switch (bt) {
                             case CType.BasicType.TypeKind.Char:
                             case CType.BasicType.TypeKind.SignedChar:
@@ -194,7 +194,7 @@ namespace AnsiCParser {
                     double reti = (ret as SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant).Value;
 
                     if (self.Type.Unwrap() is CType.BasicType) {
-                        var bt = (self.Type.Unwrap() as CType.BasicType).Kind;
+                        var bt = ((CType.BasicType) self.Type.Unwrap()).Kind;
                         switch (bt) {
                             case CType.BasicType.TypeKind.Char:
                             case CType.BasicType.TypeKind.SignedChar:
@@ -287,13 +287,13 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTree.Expression value) {
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", self.Info.Value, (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Info.Value, ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, SyntaxTree.Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
-                var ret = false;
+                bool ret;
                 if (lhs.Type.IsRealFloatingType() || rhs.Type.IsRealFloatingType()) {
                     ret = lhs.DoubleValue() == rhs.DoubleValue();
                 } else {
@@ -301,9 +301,9 @@ namespace AnsiCParser {
                 }
                 switch (self.Op) {
                     case SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     case SyntaxTree.Expression.EqualityExpression.OperatorKind.NotEqual:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     default:
                         throw new Exception();
                 }
@@ -314,7 +314,7 @@ namespace AnsiCParser {
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
                     var ret = lhs.LongValue() ^ rhs.LongValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((CType.BasicType) self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -324,7 +324,7 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTree.Expression value) {
-                return self as SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant;
+                return self;
             }
 
             public SyntaxTree.Expression OnForStatement(SyntaxTree.Statement.ForStatement self, SyntaxTree.Expression value) {
@@ -364,7 +364,7 @@ namespace AnsiCParser {
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
                     var ret = lhs.LongValue() | rhs.LongValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((CType.BasicType) self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -384,7 +384,7 @@ namespace AnsiCParser {
                     var rhs = self.Rhs.Accept(this, value);
                     ret = rhs.LongValue() != 0;
                 }
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, SyntaxTree.Expression value) {
@@ -394,7 +394,7 @@ namespace AnsiCParser {
                     var rhs = self.Rhs.Accept(this, value);
                     ret = rhs.LongValue() != 0;
                 }
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, SyntaxTree.Expression value) {
@@ -412,9 +412,9 @@ namespace AnsiCParser {
                 if (self.Type.IsRealFloatingType()) {
                     switch (self.Op) {
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", lhs.DoubleValue() * rhs.DoubleValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() * rhs.DoubleValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", lhs.DoubleValue() / rhs.DoubleValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() / rhs.DoubleValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
                             throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中で浮動小数点数の剰余算が行われています。");
                         default:
@@ -423,11 +423,11 @@ namespace AnsiCParser {
                 } else if (self.Type.IsIntegerType()) {
                     switch (self.Op) {
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", lhs.LongValue() * rhs.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() * rhs.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", lhs.LongValue() / rhs.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() / rhs.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
-                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", lhs.LongValue() % rhs.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                            return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() % rhs.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -454,13 +454,13 @@ namespace AnsiCParser {
                 }
                 switch (self.Op) {
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", (le && !ge) ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le && !ge) ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterThan:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", (!le && ge) ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le && ge) ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessOrEqual:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", (le) ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le) ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", (!le) ? 1 : 0, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le) ? 1 : 0, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     default:
                         throw new Exception();
                 }
@@ -485,7 +485,7 @@ namespace AnsiCParser {
                         default:
                             throw new Exception();
                     }
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v, ((CType.BasicType) self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -503,11 +503,11 @@ namespace AnsiCParser {
             }
 
             public SyntaxTree.Expression OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, SyntaxTree.Expression value) {
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", self.Type.Sizeof(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.Sizeof(), ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, SyntaxTree.Expression value) {
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", self.TypeOperand.Sizeof(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.Sizeof(), ((CType.BasicType) self.Type.Unwrap()).Kind);
             }
 
             public SyntaxTree.Expression OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, SyntaxTree.Expression value) {
@@ -532,7 +532,7 @@ namespace AnsiCParser {
                 if (self.Type.IsBoolType()) {
                     if (self.Expr.Type.IsScalarType()) {
                         var ret = self.Expr.Accept(this, value).LongValue() == 0 ? 0 : 1;
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret, CType.BasicType.TypeKind._Bool);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, CType.BasicType.TypeKind._Bool);
                     } else {
                         throw new CompilerException.SpecificationErrorException(self.LocationRange, "スカラ値以外を_Bool 型に変換しようとした。");
                     }
@@ -546,7 +546,7 @@ namespace AnsiCParser {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v.Value, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }
@@ -555,7 +555,7 @@ namespace AnsiCParser {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", v.Value, (self.Type.Unwrap() as CType.BasicType).Kind);
+                        return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, ((CType.BasicType) self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }
@@ -576,11 +576,11 @@ namespace AnsiCParser {
                 // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
                 if (self.Type.IsFloatingType() && self.Expr.Type.IsIntegerType()) {
                     var v = self.Expr.Accept(this, value).DoubleValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((CType.BasicType) self.Type.Unwrap()).Kind);
                 }
                 if (self.Type.IsFloatingType() && self.Expr.Type.IsFloatingType()) {
                     var v = self.Expr.Accept(this, value).DoubleValue();
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", v, (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((CType.BasicType) self.Type.Unwrap()).Kind);
                 }
 
                 // 6.3.1.6 複素数型  
@@ -632,9 +632,9 @@ namespace AnsiCParser {
             public SyntaxTree.Expression OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, SyntaxTree.Expression value) {
                 var ret = self.Expr.Accept(this, value);
                 if (ret.Type.IsRealFloatingType()) {
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, $"", -ret.DoubleValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", -ret.DoubleValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                 } else if (ret.Type.IsIntegerType()) {
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", -ret.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", -ret.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                 } else {
                     throw new Exception();
                 }
@@ -643,7 +643,7 @@ namespace AnsiCParser {
             public SyntaxTree.Expression OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, SyntaxTree.Expression value) {
                 var ret = self.Expr.Accept(this, value);
                 if (ret.Type.IsIntegerType()) {
-                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ~ret.LongValue(), (self.Type.Unwrap() as CType.BasicType).Kind);
+                    return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ~ret.LongValue(), ((CType.BasicType) self.Type.Unwrap()).Kind);
                 } else {
                     throw new Exception();
                 }
@@ -652,7 +652,7 @@ namespace AnsiCParser {
 
             public SyntaxTree.Expression OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, SyntaxTree.Expression value) {
                 var ret = self.Expr.Accept(this, value);
-                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, $"", ret.LongValue() == 0 ? 1 : 0, CType.BasicType.TypeKind.SignedInt);
+                return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret.LongValue() == 0 ? 1 : 0, CType.BasicType.TypeKind.SignedInt);
             }
 
             public SyntaxTree.Expression OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, SyntaxTree.Expression value) {

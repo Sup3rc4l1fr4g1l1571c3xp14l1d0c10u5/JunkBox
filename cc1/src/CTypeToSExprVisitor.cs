@@ -7,15 +7,15 @@ namespace AnsiCParser {
     /// CTypeをS式化する
     /// </summary>
     public class CTypeToSExprVisitor : CTypeVisitor.IVisitor<Lisp.Pair, Lisp.Pair> {
-        private HashSet<CType> visited = new HashSet<CType>();
+        private readonly HashSet<CType> _visited = new HashSet<CType>();
 
         public Lisp.Pair OnArrayType(CType.ArrayType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(Lisp.Util.makeSym("array"), Lisp.Util.makeNum(self.Length), self.BaseType.Accept(this, null));
         }
 
         public Lisp.Pair OnBasicType(CType.BasicType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             switch (self.Kind) {
                 case CType.BasicType.TypeKind.KAndRImplicitInt:
                     return Lisp.Util.makeList(Lisp.Util.makeSym("int"));
@@ -70,8 +70,8 @@ namespace AnsiCParser {
         }
 
         public Lisp.Pair OnEnumType(CType.TaggedType.EnumType self, Lisp.Pair value) {
-            if (visited.Contains(self) == false && self.Members != null) {
-                visited.Add(self);
+            if (_visited.Contains(self) == false && self.Members != null) {
+                _visited.Add(self);
                 return Lisp.Util.makeList(
                     Lisp.Util.makeSym("enum"), Lisp.Util.makeStr(self.TagName),
                     Lisp.Util.makeList(
@@ -80,7 +80,7 @@ namespace AnsiCParser {
                                 Lisp.Util.makeStr(x.Ident?.Raw ?? ""),
                                 Lisp.Util.makeStr(x.Value.ToString())
                             )
-                        ).ToArray()
+                        ).Cast<object>().ToArray()
                     )
                 );
             } else {
@@ -89,7 +89,7 @@ namespace AnsiCParser {
         }
 
         public Lisp.Pair OnFunctionType(CType.FunctionType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(
                 Lisp.Util.makeSym("func"), Lisp.Util.makeStr(self.ResultType.ToString()),
                 self.Arguments != null
@@ -100,20 +100,20 @@ namespace AnsiCParser {
                                 Lisp.Util.makeSym(x.StorageClass.ToString().ToLower()),
                                 x.Type.Accept(this, null)
                             )
-                        ).ToArray()
+                        ).Cast<object>().ToArray()
                     )
                     : Lisp.Util.Nil
             );
         }
 
         public Lisp.Pair OnPointerType(CType.PointerType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(Lisp.Util.makeSym("pointer"), self.BaseType.Accept(this, null));
         }
 
         public Lisp.Pair OnStructUnionType(CType.TaggedType.StructUnionType self, Lisp.Pair value) {
-            if (visited.Contains(self) == false) {
-                visited.Add(self);
+            if (_visited.Contains(self) == false) {
+                _visited.Add(self);
                 return Lisp.Util.makeList(
                     Lisp.Util.makeSym(self.IsStructureType() ? "struct" : "union"),
                     Lisp.Util.makeStr(self.TagName),
@@ -125,7 +125,7 @@ namespace AnsiCParser {
                                     x.Type.Accept(this, null),
                                     Lisp.Util.makeNum(x.Offset)
                                 )
-                            ).ToArray()
+                            ).Cast<object>().ToArray()
                           )
                         : Lisp.Util.Nil
                 );
@@ -138,12 +138,12 @@ namespace AnsiCParser {
         }
 
         public Lisp.Pair OnStubType(CType.StubType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(Lisp.Util.makeSym("$"));
         }
 
         public Lisp.Pair OnTypedefedType(CType.TypedefedType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(Lisp.Util.makeSym("typedef"), Lisp.Util.makeStr(self.Ident?.Raw));
         }
 
@@ -174,12 +174,12 @@ namespace AnsiCParser {
 
             return Lisp.Util.makeList(
                 Lisp.Util.makeSym("type-qual"),
-                Lisp.Util.makeList(qual.ToArray().Select(x => Lisp.Util.makeSym(x)).ToArray()),
+                Lisp.Util.makeList(qual.ToArray().Select(Lisp.Util.makeSym).Cast<object>().ToArray()),
                 self.Type.Accept(this, null)
             );
         }
         public Lisp.Pair OnBitFieldType(CType.BitFieldType self, Lisp.Pair value) {
-            visited.Add(self);
+            _visited.Add(self);
             return Lisp.Util.makeList(
                 Lisp.Util.makeSym("bitfield"),
                 self.Type.Accept(this, null),

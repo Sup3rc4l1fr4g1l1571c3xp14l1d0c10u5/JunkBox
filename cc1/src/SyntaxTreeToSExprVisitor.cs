@@ -65,7 +65,7 @@ namespace AnsiCParser {
             Lisp.Util.makeSym("array-assign-init"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new CTypeToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).ToArray())
+            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
@@ -118,7 +118,7 @@ namespace AnsiCParser {
             Lisp.Util.makeSym("comma-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new CTypeToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Expressions.Select(x => x.Accept(this, value)).ToArray())
+            Lisp.Util.makeList(self.Expressions.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
@@ -174,10 +174,11 @@ namespace AnsiCParser {
             Lisp.Util.makeSym("compound-stmt"),
             LocationRangeToCons(self.LocationRange),
             Lisp.Util.makeList(
-            self.Decls
-            .Select(x => x.Accept(this, value))
-            .Concat(self.Stmts.Select(x => x.Accept(this, value)))
-            .ToArray()
+                self.Decls
+                    .Select(x => x.Accept(this, value))
+                    .Concat(self.Stmts.Select(x => x.Accept(this, value)))
+                    .Cast<object>()
+                    .ToArray()
             )
             );
         }
@@ -315,7 +316,7 @@ namespace AnsiCParser {
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new CTypeToSExprVisitor(), null),
             self.Expr.Accept(this, value),
-            Lisp.Util.makeList(self.Args.Select(x => x.Accept(this, value)).ToArray())
+            Lisp.Util.makeList(self.Args.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
@@ -563,7 +564,7 @@ namespace AnsiCParser {
             Lisp.Util.makeSym("string-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new CTypeToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Strings.Select(x => Lisp.Util.makeStr(x)).ToArray())
+            Lisp.Util.makeList(self.Strings.Select(Lisp.Util.makeStr).ToArray())
             );
         }
 
@@ -572,7 +573,7 @@ namespace AnsiCParser {
             Lisp.Util.makeSym("struct-union-assign-init"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new CTypeToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).ToArray()));
+            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray()));
         }
 
         public Lisp.Pair OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Lisp.Pair value) {
@@ -597,10 +598,10 @@ namespace AnsiCParser {
                                 Lisp.Util.makeSym(x.Linkage.ToString()),
                                 x.Type.Accept(new CTypeToSExprVisitor(), value)
                             )
-                        ).ToArray()
+                        ).Cast<object>().ToArray()
                     )
                 ),
-                Lisp.Util.makeList(self.Declarations.Select(x => x.Accept(this, value)).ToArray())
+                Lisp.Util.makeList(self.Declarations.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 

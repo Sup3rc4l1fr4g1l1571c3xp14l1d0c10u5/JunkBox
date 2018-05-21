@@ -625,7 +625,14 @@ namespace AnsiCParser {
                 });
                 AddFunction("write-char", (char a) => { Print(ObjectToString((char)a, true)); return undefinedSymbol; });
 
-                AddFunction<object>("eval", (object o) => { try { return this.Eval(o); } catch (Exception e) { return undefinedSymbol; } });
+                AddFunction<object>("eval", (object o) => {
+                    try {
+                        return this.Eval(o);
+                    }
+                    catch (Exception e) {
+                        Print(e.Message);
+                        return undefinedSymbol;
+                    } });
 
                 Evaluate(initScript);
             }

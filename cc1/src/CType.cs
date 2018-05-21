@@ -32,6 +32,10 @@ namespace AnsiCParser {
             throw new ApplicationException();
         }
 
+        /// <summary>
+        /// C言語書式で型の文字列表現を取得する
+        /// </summary>
+        /// <returns></returns>
         public override string ToString() {
             return this.Accept(new CTypeToStringVisitor(), "");
         }
@@ -577,13 +581,13 @@ namespace AnsiCParser {
                     get; internal set;
                 }
 
-                private int size = 0;
+                private int _size;
 
                 public override CType Duplicate() {
-                    var ret = new StructUnionType(this.Kind, this.TagName, this.IsAnonymous);
-                    ret.Members = this.Members.Select(x => x.Duplicate()).ToList();
-                    ret.size = this.size;
-                    return ret;
+                    return new StructUnionType(Kind, TagName, IsAnonymous) {
+                        Members = Members.Select(x => x.Duplicate()).ToList(),
+                        _size = _size
+                    };
                 }
 
                 protected override void Fixup(CType type) {
@@ -597,14 +601,9 @@ namespace AnsiCParser {
                     }
                 }
 
-                private static int align_padding(int n, int align) {
-                    return (align - (n % align)) % align;
-                }
 
                 private class StructLayouter {
-
-
-                    private int alignof(CType type) {
+                    private int AlignOf(CType type) {
                         switch (type.Sizeof()) {
                             case 1:
                                 return 1;
@@ -615,33 +614,17 @@ namespace AnsiCParser {
                         }
                     }
 
-                    private int padof(int value, int align) {
+                    private int PaddingOf(int value, int align) {
                         return (align - (value % align)) % align;
-                    }
-                    private int align_padding(int n, int align) {
-                        return (align - (n % align)) % align;
-                    }
-
-
-
-                    public StructLayouter() {
                     }
 
                     private bool IsEqualBitField(CType t1, CType t2) {
                         if (t1.IsBasicType() && t2.IsBasicType()) {
-                            return (t1.Unwrap() as CType.BasicType).Kind == (t1.Unwrap() as CType.BasicType).Kind;
+                            return (t1.Unwrap() as BasicType).Kind == (t1.Unwrap() as BasicType).Kind;
                         }
                         return false;
                     }
 
-                    private List<MemberInfo> CreateBitMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, int bitpos, int bitsize) {
-                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bytepos + bitsize) {
-                            throw new Exception("");
-                        } else {
-                            result.Add(new MemberInfo(ident, new BitFieldType(ident, ty, bitpos, bitsize), bytepos));
-                            return result;
-                        }
-                    }
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, int bitpos, int bitsize) {
                         if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bitpos + bitsize) {
                             throw new Exception("");
@@ -654,21 +637,21 @@ namespace AnsiCParser {
                         CType ty;
                         switch (size) {
                             case 1:
-                                ty = CType.CreateUnsignedChar();
+                                ty = CreateUnsignedChar();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 break;
                             case 2:
-                                ty = CType.CreateUnsignedShortInt();
+                                ty = CreateUnsignedShortInt();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 break;
                             case 3:
-                                ty = CType.CreateUnsignedChar();
+                                ty = CreateUnsignedChar();
                                 result.Add(new MemberInfo(null, ty, bytepos));
-                                ty = CType.CreateUnsignedShortInt();
+                                ty = CreateUnsignedShortInt();
                                 result.Add(new MemberInfo(null, ty, bytepos + 1));
                                 break;
                             case 4:
-                                ty = CType.CreateUnsignedLongInt();
+                                ty = CreateUnsignedLongInt();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 break;
                             default:
@@ -688,13 +671,13 @@ namespace AnsiCParser {
                     public Tuple<int, List<MemberInfo>> Run(List<MemberInfo> members) {
                         var result = new List<MemberInfo>();
 
-                        CType current_bitfield_type = null;
-                        var current_bitfield_capacity = 0;
-                        var current_bitfield_size = 0;
-                        var current_byte_position = 0;
+                        CType currentBitfieldType = null;
+                        var currentBitfieldCapacity = 0;
+                        var currentBitfieldSize = 0;
+                        var currentBytePosition = 0;
 
                         foreach (var member in members) {
-                            CType.BitFieldType bft;
+                            BitFieldType bft;
 
                             var size = member.Type.Sizeof();
                             var name = member.Ident;
@@ -702,88 +685,88 @@ namespace AnsiCParser {
                             var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
 
                             // 今のバイト領域を終了するか？
-                            if ((current_bitfield_type != null) && (bit == 0)) {
-                                if ((current_bitfield_size % 8) > 0) {
-                                    var pad = padof(current_bitfield_size, 8);
-                                    result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, pad);
-                                    current_bitfield_size += pad;
-                                    if (current_bitfield_capacity != current_bitfield_size) {
-                                        current_byte_position += current_bitfield_capacity / 8;
-                                        current_bitfield_type = null;
-                                        current_bitfield_capacity = 0;
-                                        current_bitfield_size = 0;
+                            if ((currentBitfieldType != null) && (bit == 0)) {
+                                if ((currentBitfieldSize % 8) > 0) {
+                                    var pad = PaddingOf(currentBitfieldSize, 8);
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, pad);
+                                    currentBitfieldSize += pad;
+                                    if (currentBitfieldCapacity != currentBitfieldSize) {
+                                        currentBytePosition += currentBitfieldCapacity / 8;
+                                        currentBitfieldType = null;
+                                        currentBitfieldCapacity = 0;
+                                        currentBitfieldSize = 0;
                                     }
                                     continue;
                                 }
                             }
 
                             // 今のビットフィールド領域を終了するか？
-                            if (((current_bitfield_type != null) && (!IsEqualBitField(type, current_bitfield_type))) || // 型が違う
-                               ((current_bitfield_type != null) && (bit == -1))) { // ビットフィールドではない
+                            if (((currentBitfieldType != null) && (!IsEqualBitField(type, currentBitfieldType))) || // 型が違う
+                               ((currentBitfieldType != null) && (bit == -1))) { // ビットフィールドではない
                                 // ビットフィールドの終了
-                                if (current_bitfield_capacity - current_bitfield_size > 0) {
-                                    result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                                if (currentBitfieldCapacity - currentBitfieldSize > 0) {
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
                                 }
-                                current_byte_position += current_bitfield_capacity / 8;
-                                current_bitfield_type = null;
-                                current_bitfield_capacity = 0;
-                                current_bitfield_size = 0;
-                            } else if ((current_bitfield_type != null) && (bit > 0) && (current_bitfield_capacity < current_bitfield_size + bit)) { // 今の領域があふれる
-                                result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                                currentBytePosition += currentBitfieldCapacity / 8;
+                                currentBitfieldType = null;
+                                currentBitfieldCapacity = 0;
+                                currentBitfieldSize = 0;
+                            } else if ((currentBitfieldType != null) && (bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) { // 今の領域があふれる
+                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
                                 // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
-                                current_byte_position += current_bitfield_capacity / 8;
+                                currentBytePosition += currentBitfieldCapacity / 8;
                                 //current_bitfield_type = null;
                                 //current_bitfield_capacity = 0;
-                                current_bitfield_size = 0;
+                                currentBitfieldSize = 0;
                             }
 
                             // アライメント挿入が必要？
-                            if (current_bitfield_type == null) {
-                                var pad = padof(current_byte_position, Math.Min(Settings.PackSize, alignof(type)));
+                            if (currentBitfieldType == null) {
+                                var pad = PaddingOf(currentBytePosition, Math.Min(Settings.PackSize, AlignOf(type)));
                                 if (pad > 0) {
-                                    result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
+                                    result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                 }
-                                current_byte_position += pad;
+                                currentBytePosition += pad;
                             }
 
                             if (bit == -1) {
                                 // 普通のフィールド
-                                result = CreateMemberInfo(result, type, name, current_byte_position, 0, -1);
-                                current_byte_position += size;
+                                result = CreateMemberInfo(result, type, name, currentBytePosition, 0, -1);
+                                currentBytePosition += size;
                             } else if (bit > 0) {
                                 // ビットフィールド
-                                if (current_bitfield_type == null) {
-                                    current_bitfield_type = type;
-                                    current_bitfield_capacity = size * 8;
-                                    current_bitfield_size = 0; // 念のため
+                                if (currentBitfieldType == null) {
+                                    currentBitfieldType = type;
+                                    currentBitfieldCapacity = size * 8;
+                                    currentBitfieldSize = 0; // 念のため
                                 }
-                                result = CreateMemberInfo(result, type, name, current_byte_position, current_bitfield_size, bit);
-                                current_bitfield_size += bit;
+                                result = CreateMemberInfo(result, type, name, currentBytePosition, currentBitfieldSize, bit);
+                                currentBitfieldSize += bit;
                             } else {
                                 // 境界の処理には到達しないはず
                             }
                         }
                         // ビットフィールドが終端していないなら終端させる
-                        if (current_bitfield_type != null) {
-                            var pad = current_bitfield_capacity - current_bitfield_size;
+                        if (currentBitfieldType != null) {
+                            var pad = currentBitfieldCapacity - currentBitfieldSize;
                             if (pad > 0) {
-                                result = CreateBitPaddingMemberInfo(result, current_bitfield_type, current_byte_position, current_bitfield_size, (current_bitfield_capacity - current_bitfield_size));
+                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
                             }
-                            current_byte_position += current_bitfield_capacity / 8;
-                            current_bitfield_type = null;
-                            current_bitfield_capacity = 0;
-                            current_bitfield_size = 0;
+                            currentBytePosition += currentBitfieldCapacity / 8;
+                            currentBitfieldType = null;
+                            currentBitfieldCapacity = 0;
+                            currentBitfieldSize = 0;
                         }
 
                         // 構造体のサイズをアライメントにそろえる
-                        var structure_alignment = Settings.PackSize;
-                        if ((current_byte_position % structure_alignment) > 0) {
-                            var pad = padof(current_byte_position, structure_alignment);
-                            result = CreateBytePaddingMemberInfo(result, pad, current_byte_position);
-                            current_byte_position += pad;
+                        var structureAlignment = Settings.PackSize;
+                        if ((currentBytePosition % structureAlignment) > 0) {
+                            var pad = PaddingOf(currentBytePosition, structureAlignment);
+                            result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
+                            currentBytePosition += pad;
                         }
 
-                        return Tuple.Create(current_byte_position, result);
+                        return Tuple.Create(currentBytePosition, result);
 
                     }
                 }
@@ -793,23 +776,21 @@ namespace AnsiCParser {
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
                         // ビットフィールド部分のレイアウトを決定
-                        List<MemberInfo> layoutedMembers = new List<MemberInfo>();
-
                         var layouter = new StructLayouter();
                         var ret = layouter.Run(Members);
-                        size = ret.Item1;
+                        _size = ret.Item1;
                         Members = ret.Item2;
 
                     } else {
                         // 共用体型の場合は登録時のままでいい
-                        size = Members.Max(x => x.Type.Sizeof());
+                        _size = Members.Max(x => x.Type.Sizeof());
 
                     }
 
                 }
 
                 public override int Sizeof() {
-                    return size;
+                    return _size;
                 }
 
                 public class MemberInfo {
@@ -846,8 +827,9 @@ namespace AnsiCParser {
 
 
                 public override CType Duplicate() {
-                    var ret = new EnumType(this.TagName, this.IsAnonymous);
-                    ret.Members = this.Members.Select(x => x.Duplicate()).ToList();
+                    var ret = new EnumType(TagName, IsAnonymous) {
+                        Members = Members.Select(x => x.Duplicate()).ToList()
+                    };
                     return ret;
                 }
 
@@ -890,7 +872,7 @@ namespace AnsiCParser {
                     }
 
                     public MemberInfo Duplicate() {
-                        return new MemberInfo(this.ParentType, this.Ident, this.Value);
+                        return new MemberInfo(ParentType, Ident, Value);
                     }
                 }
             }
@@ -930,7 +912,7 @@ namespace AnsiCParser {
             }
 
             public override CType Duplicate() {
-                var ret = new FunctionType(this.Arguments?.Select(x => x.Duplicate()).ToList(), this.HasVariadic, this.ResultType.Duplicate());
+                var ret = new FunctionType(Arguments?.Select(x => x.Duplicate()).ToList(), HasVariadic, ResultType.Duplicate());
                 return ret;
             }
 
@@ -1098,7 +1080,7 @@ namespace AnsiCParser {
             }
 
             public override CType Duplicate() {
-                var ret = new PointerType(this.BaseType);
+                var ret = new PointerType(BaseType);
                 return ret;
             }
 
@@ -1130,7 +1112,7 @@ namespace AnsiCParser {
             }
 
             public override CType Duplicate() {
-                var ret = new ArrayType(this.Length, this.BaseType);
+                var ret = new ArrayType(Length, BaseType);
                 return ret;
             }
 
@@ -1169,7 +1151,7 @@ namespace AnsiCParser {
             }
 
             public override CType Duplicate() {
-                var ret = new TypedefedType(this.Ident, this.Type.Duplicate());
+                var ret = new TypedefedType(Ident, Type.Duplicate());
                 return ret;
             }
 
@@ -1197,7 +1179,7 @@ namespace AnsiCParser {
             }
 
             public override CType Duplicate() {
-                var ret = new TypeQualifierType(this.Type.Duplicate(), this.Qualifier);
+                var ret = new TypeQualifierType(Type.Duplicate(), Qualifier);
                 return ret;
             }
 
@@ -1261,13 +1243,13 @@ namespace AnsiCParser {
                     }
                 }
 
-                this.Type = type;
-                this.BitOffset = bitOffset;
-                this.BitWidth = bitWidth;
+                Type = type;
+                BitOffset = bitOffset;
+                BitWidth = bitWidth;
             }
 
             public override CType Duplicate() {
-                var ret = new BitFieldType(/* dummy */null, this.Type.Duplicate(), this.BitOffset, this.BitWidth);
+                var ret = new BitFieldType(/* dummy */null, Type.Duplicate(), BitOffset, BitWidth);
                 return ret;
             }
 
@@ -1447,8 +1429,8 @@ namespace AnsiCParser {
                     var newArguments = new List<FunctionType.ArgumentInfo>();
                     for (var i = 0; i < ta1.Arguments.Length; i++) {
                         // 既定の実引数拡張を適用
-                        var pt1 = Specification.DefaultArgumentPromotion(ta1.Arguments[i].Type);
-                        var pt2 = Specification.DefaultArgumentPromotion(ta2.Arguments[i].Type);
+                        var pt1 = ta1.Arguments[i].Type.DefaultArgumentPromotion();
+                        var pt2 = ta2.Arguments[i].Type.DefaultArgumentPromotion();
                         var newArgument = CompositeType(pt1, pt2);
                         if (newArgument == null) {
                             return null;
