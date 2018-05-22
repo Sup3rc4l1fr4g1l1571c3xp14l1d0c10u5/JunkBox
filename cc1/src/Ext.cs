@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
     public static class Ext {

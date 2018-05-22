@@ -1492,19 +1492,19 @@ namespace AnsiCParser {
             switch (_lexer.CurrentToken().Kind) {
                 case Token.TokenKind.CONST:
                     _lexer.NextToken();
-                    return AnsiCParser.TypeQualifier.Const;
+                    return DataType.TypeQualifier.Const;
                 case Token.TokenKind.VOLATILE:
                     _lexer.NextToken();
-                    return AnsiCParser.TypeQualifier.Volatile;
+                    return DataType.TypeQualifier.Volatile;
                 case Token.TokenKind.RESTRICT:
                     _lexer.NextToken();
-                    return AnsiCParser.TypeQualifier.Restrict;
+                    return DataType.TypeQualifier.Restrict;
                 case Token.TokenKind.NEAR:
                     _lexer.NextToken();
-                    return AnsiCParser.TypeQualifier.Near;
+                    return DataType.TypeQualifier.Near;
                 case Token.TokenKind.FAR:
                     _lexer.NextToken();
-                    return AnsiCParser.TypeQualifier.Far;
+                    return DataType.TypeQualifier.Far;
                 default:
                     throw new Exception();
             }
@@ -1843,7 +1843,7 @@ namespace AnsiCParser {
         private void Pointer(List<CType> stack, int index) {
             _lexer.ReadToken('*');
             stack[index] = CType.CreatePointer(stack[index]);
-            TypeQualifier typeQualifier = AnsiCParser.TypeQualifier.None;
+            TypeQualifier typeQualifier = DataType.TypeQualifier.None;
             while (IsTypeQualifier()) {
                 typeQualifier = typeQualifier.Marge(TypeQualifier());
             }
@@ -2570,7 +2570,7 @@ namespace AnsiCParser {
             if (funcName != null) {
                 // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
                 var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
-                var tyConstStr = new DataType.TypeQualifierType(new DataType.PointerType(new DataType.TypeQualifierType(CType.CreateChar(), AnsiCParser.TypeQualifier.Const)), AnsiCParser.TypeQualifier.Const);
+                var tyConstStr = new DataType.TypeQualifierType(new DataType.PointerType(new DataType.TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
                 var varDecl = new SyntaxTree.Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static, new SyntaxTree.Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string>() { "\"" + funcName + "\"" })));
                 _identScope.Add("__func__", varDecl);
                 decls.Add(varDecl);
@@ -3521,7 +3521,7 @@ namespace AnsiCParser {
             int n = 0;
             var start = _lexer.CurrentToken().Start;
             TypeSpecifier typeSpecifier = AnsiCParser.TypeSpecifier.None;
-            TypeQualifier typeQualifier = AnsiCParser.TypeQualifier.None;
+            TypeQualifier typeQualifier = DataType.TypeQualifier.None;
             while (IsDeclarationSpecifierPart(type, typeSpecifier, flags)) {
                 ReadDeclarationSpecifierPart(ref type, ref storageClass, ref typeSpecifier, ref typeQualifier, ref functionSpecifier, flags);
                 n++;
