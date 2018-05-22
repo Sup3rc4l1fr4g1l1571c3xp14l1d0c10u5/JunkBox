@@ -64,13 +64,12 @@ namespace AnsiCParser {
                 if (outputFile == null) {
                     outputFile = System.IO.Path.ChangeExtension(arg, "s");
                 }
-                if (astFile == null) {
-                    astFile = System.IO.Path.ChangeExtension(arg, "ast");
-                }
                 try {
                     var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
-                    using (var o = new System.IO.StreamWriter(astFile)) {
-                        o.WriteLine(ret.Accept(new SyntaxTreeToSExprVisitor(), null).ToString());
+                    if (astFile != null) {
+                        using (var o = new System.IO.StreamWriter(astFile)) {
+                            o.WriteLine(ret.Accept(new SyntaxTreeToSExprVisitor(), null).ToString());
+                        }
                     }
 
                     if (flag_SyntaxOnly == false) {

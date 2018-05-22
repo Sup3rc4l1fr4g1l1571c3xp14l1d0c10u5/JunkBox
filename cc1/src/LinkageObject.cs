@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
     /// <summary>
@@ -56,10 +57,10 @@ namespace AnsiCParser {
         // 
         // - 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
 
-        static private int IdCnt = 0;
+        private static int _idCnt;
 
         public LinkageObject(string ident, CType type, LinkageKind linakge) {
-            Id = IdCnt++;
+            Id = _idCnt++;
             Ident = ident;
             Type = type;
             Linkage = linakge;

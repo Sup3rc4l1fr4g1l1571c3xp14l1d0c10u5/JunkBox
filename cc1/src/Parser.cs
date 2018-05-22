@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
 
@@ -31,7 +32,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 名前空間(構造体、共用体、列挙体のタグ名)
         /// </summary>
-        private Scope<CType.TaggedType> _tagScope = Scope<CType.TaggedType>.Empty.Extend();
+        private Scope<DataType.TaggedType> _tagScope = Scope<DataType.TaggedType>.Empty.Extend();
 
         /// <summary>
         /// 名前空間(通常の識別子（変数、関数、引数、列挙定数、Typedef名)
@@ -175,7 +176,7 @@ namespace AnsiCParser {
             _lexer = new Lexer(source, fileName);
 
             // GCCの組み込み型の設定
-            _identScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration(LocationRange.Builtin, "__builtin_va_list", CType.CreatePointer(new CType.BasicType(AnsiCParser.TypeSpecifier.Void))));
+            _identScope.Add("__builtin_va_list", new SyntaxTree.Declaration.TypeDeclaration(LocationRange.Builtin, "__builtin_va_list", CType.CreatePointer(new DataType.BasicType(AnsiCParser.TypeSpecifier.Void))));
         }
 
         /// <summary>
@@ -327,25 +328,25 @@ namespace AnsiCParser {
         /// <summary>
         /// 8進定数 又は 16進定数の型候補表
         /// </summary>
-        private static readonly Dictionary<string, CType.BasicType.TypeKind[]> CandidateTypeTableHexOrOct = new Dictionary<string, CType.BasicType.TypeKind[]> {
-            {"LLU", new[] { CType.BasicType.TypeKind.UnsignedLongLongInt }},
-            {"LL", new[] { CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt }},
-            {"LU", new[] { CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt }},
-            {"L", new[] { CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt }},
-            {"U", new[] { CType.BasicType.TypeKind.UnsignedInt, CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt }},
-            {"", new[] { CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt, CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt }},
+        private static readonly Dictionary<string, DataType.BasicType.TypeKind[]> CandidateTypeTableHexOrOct = new Dictionary<string, DataType.BasicType.TypeKind[]> {
+            {"LLU", new[] { DataType.BasicType.TypeKind.UnsignedLongLongInt }},
+            {"LL", new[] { DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt }},
+            {"LU", new[] { DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt }},
+            {"L", new[] { DataType.BasicType.TypeKind.SignedLongInt, DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt }},
+            {"U", new[] { DataType.BasicType.TypeKind.UnsignedInt, DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt }},
+            {"", new[] { DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.UnsignedInt, DataType.BasicType.TypeKind.SignedLongInt, DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt }},
         };
 
         /// <summary>
         /// 10進定数の型候補表
         /// </summary>
-        private static readonly Dictionary<string, CType.BasicType.TypeKind[]> CandidateTypeTableDigit = new Dictionary<string, CType.BasicType.TypeKind[]> {
-            { "LLU", new[] { CType.BasicType.TypeKind.UnsignedLongLongInt } },
-            { "LL", new[] { CType.BasicType.TypeKind.SignedLongLongInt } },
-            { "LU", new[] { CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt } },
-            { "L", new[] { CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt } },
-            { "U", new[] { CType.BasicType.TypeKind.UnsignedInt, CType.BasicType.TypeKind.UnsignedLongInt, CType.BasicType.TypeKind.UnsignedLongLongInt } },
-            { "", new[] { CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.SignedLongInt, CType.BasicType.TypeKind.SignedLongLongInt } },
+        private static readonly Dictionary<string, DataType.BasicType.TypeKind[]> CandidateTypeTableDigit = new Dictionary<string, DataType.BasicType.TypeKind[]> {
+            { "LLU", new[] { DataType.BasicType.TypeKind.UnsignedLongLongInt } },
+            { "LL", new[] { DataType.BasicType.TypeKind.SignedLongLongInt } },
+            { "LU", new[] { DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt } },
+            { "L", new[] { DataType.BasicType.TypeKind.SignedLongInt, DataType.BasicType.TypeKind.SignedLongLongInt } },
+            { "U", new[] { DataType.BasicType.TypeKind.UnsignedInt, DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt } },
+            { "", new[] { DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.SignedLongInt, DataType.BasicType.TypeKind.SignedLongLongInt } },
         };
 
 
@@ -365,7 +366,7 @@ namespace AnsiCParser {
             string body;
             string suffix;
             int radix;
-            Dictionary<string, CType.BasicType.TypeKind[]> candidateTable;
+            Dictionary<string, DataType.BasicType.TypeKind[]> candidateTable;
             switch (token.Kind) {
                 case Token.TokenKind.HEXIMAL_CONSTANT: {
                         // 16進定数
@@ -399,7 +400,7 @@ namespace AnsiCParser {
 
             }
 
-            CType.BasicType.TypeKind[] candidates;
+            DataType.BasicType.TypeKind[] candidates;
             if (candidateTable.TryGetValue(suffix.ToUpper(), out candidates) == false) {
                 throw new CompilerException.SyntaxErrorException(token.Range, "整数定数のサフィックスが不正です。");
             }
@@ -409,11 +410,11 @@ namespace AnsiCParser {
             var originalUnsigned = Lexer.ToUInt64(token.Range, body, radix);
             Int64 value = 0;
 
-            CType.BasicType.TypeKind selectedType = 0;
+            DataType.BasicType.TypeKind selectedType = 0;
             System.Diagnostics.Debug.Assert(candidates.Length > 0);
             foreach (var candidate in candidates) {
                 switch (candidate) {
-                    case CType.BasicType.TypeKind.SignedInt: {
+                    case DataType.BasicType.TypeKind.SignedInt: {
                             try {
                                 var v = Lexer.ToInt32(token.Range, body, radix);
                                 if (v == originalSigned) {
@@ -425,7 +426,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                    case CType.BasicType.TypeKind.UnsignedInt: {
+                    case DataType.BasicType.TypeKind.UnsignedInt: {
                             try {
                                 var v = Lexer.ToUInt32(token.Range, body, radix);
                                 if (v == originalUnsigned) {
@@ -437,7 +438,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                    case CType.BasicType.TypeKind.SignedLongInt: {
+                    case DataType.BasicType.TypeKind.SignedLongInt: {
                             try {
                                 var v = Lexer.ToInt32(token.Range, body, radix);
                                 if (v == originalSigned) {
@@ -449,7 +450,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                    case CType.BasicType.TypeKind.UnsignedLongInt: {
+                    case DataType.BasicType.TypeKind.UnsignedLongInt: {
                             try {
                                 var v = Lexer.ToUInt32(token.Range, body, radix);
                                 if (v == originalUnsigned) {
@@ -461,7 +462,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                    case CType.BasicType.TypeKind.SignedLongLongInt: {
+                    case DataType.BasicType.TypeKind.SignedLongLongInt: {
                             var v = Lexer.ToInt64(token.Range, body, radix);
                             if (v == originalSigned) {
                                 value = unchecked((Int64)v);
@@ -469,7 +470,7 @@ namespace AnsiCParser {
                             }
                             continue;
                         }
-                    case CType.BasicType.TypeKind.UnsignedLongLongInt: {
+                    case DataType.BasicType.TypeKind.UnsignedLongLongInt: {
                             var v = Lexer.ToUInt64(token.Range, body, radix);
                             if (v == originalUnsigned) {
                                 value = unchecked((Int64)v);
@@ -508,16 +509,16 @@ namespace AnsiCParser {
             var token = _lexer.CurrentToken();
             var m = Lexer.ScanFloat(token.Raw);
             var value = m.Item1 == 10 ? Convert.ToDouble(m.Item2) : Lexer.ParseHeximalFloat(token.Range, m.Item2, m.Item3, m.Item4);
-            CType.BasicType.TypeKind type;
+            DataType.BasicType.TypeKind type;
             switch (m.Item4.ToUpper()) {
                 case "F":
-                    type = CType.BasicType.TypeKind.Float;
+                    type = DataType.BasicType.TypeKind.Float;
                     break;
                 case "L":
-                    type = CType.BasicType.TypeKind.LongDouble;
+                    type = DataType.BasicType.TypeKind.LongDouble;
                     break;
                 case "":
-                    type = CType.BasicType.TypeKind.Double;
+                    type = DataType.BasicType.TypeKind.Double;
                     break;
                 default:
                     throw new CompilerException.SyntaxErrorException(token.Range, "浮動小数点定数のサフィックスが不正です。");
@@ -691,10 +692,10 @@ namespace AnsiCParser {
 
             // 関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない
             // (これは，関数定義の型を typedef から受け継ぐことはできないことを意味する。)。
-            if (type.UnwrapTypeQualifier() is CType.TypedefedType) {
+            if (type.UnwrapTypeQualifier() is DataType.TypedefedType) {
                 throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない。");
             }
-            var ftype = type.Unwrap() as CType.FunctionType;
+            var ftype = type.Unwrap() as DataType.FunctionType;
             System.Diagnostics.Debug.Assert(ftype != null);
 
             // 宣言並びがあるなら読み取る
@@ -709,12 +710,12 @@ namespace AnsiCParser {
                 // 識別子並び: なし
                 // 仮引数型並び: なし
                 // -> ANSI形式で引数無し(引数部がvoid)の関数定義（関数宣言時とは意味が違う）
-                ftype.Arguments = new CType.FunctionType.ArgumentInfo[0];
+                ftype.Arguments = new DataType.FunctionType.ArgumentInfo[0];
             } else if (ftype.Arguments != null && argmuents != null) {
                 // 識別子並びあり、仮引数並びあり。
 
                 // 関数宣言が古い形式であることを確認
-                if (ftype.GetFunctionStyle() != CType.FunctionType.FunctionStyle.OldStyle) {
+                if (ftype.GetFunctionStyle() != DataType.FunctionType.FunctionStyle.OldStyle) {
                     // 仮引数型並び、もしくは識別子並びの省略、もしくは識別子並びと仮引数型並びの混在である。
                     // 識別子並び中に型名を記述してしまった場合もこのエラーになる
                     throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
@@ -737,9 +738,9 @@ namespace AnsiCParser {
                         if (CType.IsEqual(dapType, dic[x.Ident.Raw].Item2) == false) {
                             throw new CompilerException.TypeMissmatchError(x.Ident.Range, $"仮引数 {x.Ident.Raw} は既定の実引数拡張で型が変化します。");
                         }
-                        return new CType.FunctionType.ArgumentInfo(x.Range, x.Ident, dic[x.Ident.Raw].Item3, dic[x.Ident.Raw].Item2.DefaultArgumentPromotion());
+                        return new DataType.FunctionType.ArgumentInfo(x.Range, x.Ident, dic[x.Ident.Raw].Item3, dic[x.Ident.Raw].Item2.DefaultArgumentPromotion());
                     } else {
-                        return new CType.FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion());
+                        return new DataType.FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion());
                     }
                 }).ToList();
 
@@ -750,12 +751,12 @@ namespace AnsiCParser {
 
                 // 関数宣言の形式を確認
                 switch (ftype.GetFunctionStyle()) {
-                    case CType.FunctionType.FunctionStyle.OldStyle:
+                    case DataType.FunctionType.FunctionStyle.OldStyle:
                         // 関数宣言が古い形式である
-                        ftype.Arguments = ftype.Arguments.Select(x => new CType.FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion())).ToArray();
+                        ftype.Arguments = ftype.Arguments.Select(x => new DataType.FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion())).ToArray();
                         break;
-                    case CType.FunctionType.FunctionStyle.NewStyle:
-                    case CType.FunctionType.FunctionStyle.AmbiguityStyle:
+                    case DataType.FunctionType.FunctionStyle.NewStyle:
+                    case DataType.FunctionType.FunctionStyle.AmbiguityStyle:
                         // 関数宣言が新しい形式、もしくは曖昧な形式
                         break;
                     default:
@@ -890,7 +891,7 @@ namespace AnsiCParser {
         private Tuple<Token, CType, StorageClassSpecifier> OldStyleFunctionArgumentInitDeclarator(CType type, StorageClassSpecifier storageClass) {
             // 宣言子
             Token ident = null;
-            List<CType> stack = new List<CType>() { new CType.StubType() };
+            List<CType> stack = new List<CType>() { new StubType() };
             Declarator(ref ident, stack, 0);
             type = CType.Resolve(type, stack);
 
@@ -957,8 +958,8 @@ namespace AnsiCParser {
                 // 初期化式を伴わないため、関数宣言、Typedef宣言、変数の仮定義のどれか
                 // オブジェクトに対する識別子の宣言が仮定義であり，内部結合をもつ場合，その宣言の型は不完全型であってはならない。
 
-                CType.FunctionType functionType;
-                if (type.IsFunctionType(out functionType) && functionType.GetFunctionStyle() == CType.FunctionType.FunctionStyle.OldStyle) {
+                DataType.FunctionType functionType;
+                if (type.IsFunctionType(out functionType) && functionType.GetFunctionStyle() == DataType.FunctionType.FunctionStyle.OldStyle) {
                     // 6.7.5.3 関数宣言子（関数原型を含む）
                     // 関数定義の一部でない関数宣言子における識別子並びは，空でなければならない。
                     // 脚注　関数宣言で古い形式は使えない。
@@ -1142,7 +1143,7 @@ namespace AnsiCParser {
         private CType StructOrUnionSpecifier() {
             // 構造体/共用体
             var tok = _lexer.ReadToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
-            var kind = tok.Kind == Token.TokenKind.STRUCT ? CType.TaggedType.StructUnionType.StructOrUnion.Struct : CType.TaggedType.StructUnionType.StructOrUnion.Union;
+            var kind = tok.Kind == Token.TokenKind.STRUCT ? DataType.TaggedType.StructUnionType.StructOrUnion.Struct : DataType.TaggedType.StructUnionType.StructOrUnion.Union;
 
             // 識別子の有無で分岐
             if (IsIdentifier(true)) {
@@ -1153,22 +1154,22 @@ namespace AnsiCParser {
                 // 波括弧の有無で分割
                 if (_lexer.ReadTokenIf('{')) {
                     // 識別子を伴う完全型の宣言
-                    CType.TaggedType tagType;
-                    CType.TaggedType.StructUnionType structUnionType;
+                    DataType.TaggedType tagType;
+                    DataType.TaggedType.StructUnionType structUnionType;
                     if (_tagScope.TryGetValue(ident, out tagType) == false) {
                         // タグ名前表に無い場合は新しく追加する。
-                        structUnionType = new CType.TaggedType.StructUnionType(kind, ident, false);
+                        structUnionType = new DataType.TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, structUnionType);
                         AddImplictTypeDeclaration(token, structUnionType);
-                    } else if (!(tagType is CType.TaggedType.StructUnionType)) {
+                    } else if (!(tagType is DataType.TaggedType.StructUnionType)) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
-                    } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
+                    } else if ((tagType as DataType.TaggedType.StructUnionType).Kind != kind) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
-                    } else if ((tagType as CType.TaggedType.StructUnionType).Members != null) {
+                    } else if ((tagType as DataType.TaggedType.StructUnionType).Members != null) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
-                        structUnionType = (tagType as CType.TaggedType.StructUnionType);
+                        structUnionType = (tagType as DataType.TaggedType.StructUnionType);
                     }
                     // メンバ宣言並びを解析する
                     structUnionType.Members = StructDeclarations();
@@ -1177,15 +1178,15 @@ namespace AnsiCParser {
                     return structUnionType;
                 } else {
                     // 不完全型の宣言
-                    CType.TaggedType tagType;
+                    DataType.TaggedType tagType;
                     if (_tagScope.TryGetValue(ident, out tagType) == false) {
                         // タグ名前表に無い場合は新しく追加する。
-                        tagType = new CType.TaggedType.StructUnionType(kind, ident, false);
+                        tagType = new DataType.TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, tagType);
                         AddImplictTypeDeclaration(token, tagType);
-                    } else if (!(tagType is CType.TaggedType.StructUnionType)) {
+                    } else if (!(tagType is DataType.TaggedType.StructUnionType)) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
-                    } else if ((tagType as CType.TaggedType.StructUnionType).Kind != kind) {
+                    } else if ((tagType as DataType.TaggedType.StructUnionType).Kind != kind) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に定義されていますが、構造体/共用体の種別が一致しません。");
                     } else {
                         // 既に定義されているものが完全型・不完全型問わず何もしない。
@@ -1199,7 +1200,7 @@ namespace AnsiCParser {
                 var ident = $"${kind}_{_anonymousNameCounter++}";
 
                 // 型情報を生成する
-                var structUnionType = new CType.TaggedType.StructUnionType(kind, ident, true);
+                var structUnionType = new DataType.TaggedType.StructUnionType(kind, ident, true);
 
                 // タグ名前表に追加する
                 _tagScope.Add(ident, structUnionType);
@@ -1220,12 +1221,12 @@ namespace AnsiCParser {
         /// 6.7.2.1 構造体指定子及び共用体指定子(メンバ宣言並び)
         /// </summary>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
+        private List<DataType.TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
             if (_lexer.PeekToken('}')) {
                 // 空の構造体/共用体を使っている。
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, $"空の構造体/共用体が宣言されていますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.2.5-20および、J.2未定義の動作を参照）。（捕捉：C++では空の構造体/共用体は認められています。）");
             }
-            var items = new List<CType.TaggedType.StructUnionType.MemberInfo>();
+            var items = new List<DataType.TaggedType.StructUnionType.MemberInfo>();
             items.AddRange(StructDeclaration());
             while (IsStructDeclaration()) {
                 items.AddRange(StructDeclaration());
@@ -1245,7 +1246,7 @@ namespace AnsiCParser {
         /// 6.7.2.1 構造体指定子及び共用体指定子(メンバ宣言)
         /// </summary>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclaration() {
+        private List<DataType.TaggedType.StructUnionType.MemberInfo> StructDeclaration() {
             CType baseType = SpecifierQualifiers();
             var ret = StructDeclaratorList(baseType);
             _lexer.ReadToken(';');
@@ -1299,8 +1300,8 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private List<CType.TaggedType.StructUnionType.MemberInfo> StructDeclaratorList(CType type) {
-            var ret = new List<CType.TaggedType.StructUnionType.MemberInfo>();
+        private List<DataType.TaggedType.StructUnionType.MemberInfo> StructDeclaratorList(CType type) {
+            var ret = new List<DataType.TaggedType.StructUnionType.MemberInfo>();
             ret.Add(StructDeclarator(type));
             while (_lexer.ReadTokenIf(',')) {
                 ret.Add(StructDeclarator(type));
@@ -1327,10 +1328,10 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private CType.TaggedType.StructUnionType.MemberInfo StructDeclarator(CType type) {
+        private DataType.TaggedType.StructUnionType.MemberInfo StructDeclarator(CType type) {
             if (IsDeclarator()) {
                 // 宣言子
-                List<CType> stack = new List<CType>() { new CType.StubType() };
+                List<CType> stack = new List<CType>() { new DataType.StubType() };
                 Token ident = null;
                 Declarator(ref ident, stack, 0);
                 type = CType.Resolve(type, stack);
@@ -1342,14 +1343,14 @@ namespace AnsiCParser {
                 int? size = _lexer.ReadTokenIf(':') ? BitFieldSize() : (int?)null;
 
                 if (size.HasValue) {
-                    return new CType.TaggedType.StructUnionType.MemberInfo(ident, new CType.BitFieldType(ident, type, 0, size.Value), 0);
+                    return new DataType.TaggedType.StructUnionType.MemberInfo(ident, new DataType.BitFieldType(ident, type, 0, size.Value), 0);
                 } else {
-                    return new CType.TaggedType.StructUnionType.MemberInfo(ident, type, 0);
+                    return new DataType.TaggedType.StructUnionType.MemberInfo(ident, type, 0);
                 }
             } else if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
                 int size = BitFieldSize();
-                return new CType.TaggedType.StructUnionType.MemberInfo(null, new CType.BitFieldType(null, type, 0, size), 0);
+                return new DataType.TaggedType.StructUnionType.MemberInfo(null, new DataType.BitFieldType(null, type, 0, size), 0);
             } else {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
             }
@@ -1372,35 +1373,35 @@ namespace AnsiCParser {
 
             if (IsIdentifier(true)) {
                 var ident = Identifier(true);
-                CType.TaggedType taggedType;
+                DataType.TaggedType taggedType;
                 if (_tagScope.TryGetValue(ident.Raw, out taggedType) == false) {
                     // タグ名前表に無い場合は新しく追加する。
-                    taggedType = new CType.TaggedType.EnumType(ident.Raw, false);
+                    taggedType = new DataType.TaggedType.EnumType(ident.Raw, false);
                     _tagScope.Add(ident.Raw, taggedType);
                     AddImplictTypeDeclaration(ident, taggedType);
 
-                } else if (!(taggedType is CType.TaggedType.EnumType)) {
+                } else if (!(taggedType is DataType.TaggedType.EnumType)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に構造体/共用体として定義されています。");
                 } else {
 
                 }
                 if (_lexer.ReadTokenIf('{')) {
-                    if ((taggedType as CType.TaggedType.EnumType).Members != null) {
+                    if ((taggedType as DataType.TaggedType.EnumType).Members != null) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
                     } else {
                         // 不完全型として定義されているので完全型にするために書き換え対象とする
-                        (taggedType as CType.TaggedType.EnumType).Members = EnumeratorList(taggedType as CType.TaggedType.EnumType);
+                        (taggedType as DataType.TaggedType.EnumType).Members = EnumeratorList(taggedType as DataType.TaggedType.EnumType);
                         _lexer.ReadToken('}');
                     }
                 } else {
-                    if ((taggedType as CType.TaggedType.EnumType).Members == null) {
+                    if ((taggedType as DataType.TaggedType.EnumType).Members == null) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, $"不完全型の列挙型 {ident.Raw} を使用していますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.7.2.3の制約を参照）。（捕捉：GNU拡張では不完全型の列挙型の前方宣言を認めています。）");
                     }
                 }
                 return taggedType;
             } else {
                 var ident = $"$enum_{_anonymousNameCounter++}";
-                var etype = new CType.TaggedType.EnumType(ident, true);
+                var etype = new DataType.TaggedType.EnumType(ident, true);
                 _tagScope.Add(ident, etype);
                 AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), etype);
                 _lexer.ReadToken('{');
@@ -1414,8 +1415,8 @@ namespace AnsiCParser {
         /// 6.7.2.2 列挙型指定子（列挙子並び）
         /// </summary>
         /// <param name="enumType"></param>
-        private List<CType.TaggedType.EnumType.MemberInfo> EnumeratorList(CType.TaggedType.EnumType enumType) {
-            var ret = new List<CType.TaggedType.EnumType.MemberInfo>();
+        private List<DataType.TaggedType.EnumType.MemberInfo> EnumeratorList(DataType.TaggedType.EnumType enumType) {
+            var ret = new List<DataType.TaggedType.EnumType.MemberInfo>();
             enumType.Members = ret;
             var e = Enumerator(enumType, 0);
             SyntaxTree.Declaration prevDecl;
@@ -1458,7 +1459,7 @@ namespace AnsiCParser {
         /// <param name="enumType"></param>
         /// <param name="i"></param>
         /// <returns></returns>
-        private CType.TaggedType.EnumType.MemberInfo Enumerator(CType.TaggedType.EnumType enumType, int i) {
+        private DataType.TaggedType.EnumType.MemberInfo Enumerator(DataType.TaggedType.EnumType enumType, int i) {
             var ident = Identifier(false);
             if (_lexer.ReadTokenIf('=')) {
                 var expr = ConstantExpression();
@@ -1472,7 +1473,7 @@ namespace AnsiCParser {
                 }
                 i = value.Value;
             }
-            return new CType.TaggedType.EnumType.MemberInfo(enumType, ident, i);
+            return new DataType.TaggedType.EnumType.MemberInfo(enumType, ident, i);
         }
 
         /// <summary>
@@ -1581,7 +1582,7 @@ namespace AnsiCParser {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"宣言子が来るべき場所に{_lexer.CurrentToken().Raw}があります。");
             }
             if (_lexer.ReadTokenIf('(')) {
-                stack.Add(new CType.StubType());
+                stack.Add(new DataType.StubType());
                 Declarator(ref ident, stack, index + 1);
                 _lexer.ReadToken(')');
             } else {
@@ -1607,20 +1608,20 @@ namespace AnsiCParser {
                 // 6.7.5.3 関数宣言子（関数原型を含む）
                 if (_lexer.ReadTokenIf(')')) {
                     // 識別子並びの省略
-                    stack[index] = new CType.FunctionType(null, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(null, false, stack[index]);
                     MoreDirectDeclarator(stack, index);
                 } else if (is_identifier_list()) {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => new DataType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new DataType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
                     _lexer.ReadToken(')');
-                    stack[index] = new CType.FunctionType(args, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(args, false, stack[index]);
                     MoreDirectDeclarator(stack, index);
                 } else {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
                     _lexer.ReadToken(')');
-                    stack[index] = new CType.FunctionType(args, vargs, stack[index]);
+                    stack[index] = new DataType.FunctionType(args, vargs, stack[index]);
                     MoreDirectDeclarator(stack, index);
 
                 }
@@ -1641,8 +1642,8 @@ namespace AnsiCParser {
         /// 6.7.5 宣言子(仮引数型並び)
         /// </summary>
         /// <returns></returns>
-        private List<CType.FunctionType.ArgumentInfo> ParameterTypeList(ref bool vargs) {
-            var items = new List<CType.FunctionType.ArgumentInfo>();
+        private List<DataType.FunctionType.ArgumentInfo> ParameterTypeList(ref bool vargs) {
+            var items = new List<DataType.FunctionType.ArgumentInfo>();
             items.Add(ParameterDeclaration());
             while (_lexer.ReadTokenIf(',')) {
                 if (_lexer.ReadTokenIf(Token.TokenKind.ELLIPSIS)) {
@@ -1667,7 +1668,7 @@ namespace AnsiCParser {
         /// 6.7.5 宣言子(仮引数並び)
         /// </summary>
         /// <returns></returns>
-        private CType.FunctionType.ArgumentInfo ParameterDeclaration() {
+        private DataType.FunctionType.ArgumentInfo ParameterDeclaration() {
             var start = _lexer.CurrentToken().Start;
 
             StorageClassSpecifier storageClass;
@@ -1682,7 +1683,7 @@ namespace AnsiCParser {
 
             Token ident = null;
             if (IsDeclaratorOrAbstractDeclarator()) {
-                List<CType> stack = new List<CType>() { new CType.StubType() };
+                List<CType> stack = new List<CType>() { new DataType.StubType() };
                 DeclaratorOrAbstractDeclarator(ref ident, stack, 0);
                 baseType = CType.Resolve(baseType, stack);
             }
@@ -1690,7 +1691,7 @@ namespace AnsiCParser {
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "関数型中に型の無い仮引数名があります");
             }
             var end = _lexer.CurrentToken().Start;
-            return new CType.FunctionType.ArgumentInfo(new LocationRange(start, end), ident, storageClass, baseType);
+            return new DataType.FunctionType.ArgumentInfo(new LocationRange(start, end), ident, storageClass, baseType);
 
         }
 
@@ -1741,15 +1742,15 @@ namespace AnsiCParser {
             } else if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken(')')) {
                     // 識別子並びの省略
-                    stack[index] = new CType.FunctionType(null, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(null, false, stack[index]);
                 } else if (IsParameterTypeList()) {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new CType.FunctionType(args, vargs, stack[index]);
+                    stack[index] = new DataType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // 直接宣言子 中の '(' 宣言子 ')'  もしくは 直接抽象宣言子 中の '(' 抽象宣言子 ')'
-                    stack.Add(new CType.StubType());
+                    stack.Add(new DataType.StubType());
                     DeclaratorOrAbstractDeclarator(ref ident, stack, index + 1);
                 }
                 _lexer.ReadToken(')');
@@ -1773,16 +1774,16 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken(')')) {
                     // 識別子並びの省略
-                    stack[index] = new CType.FunctionType(null, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(null, false, stack[index]);
                 } else if (IsParameterTypeList()) {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new CType.FunctionType(args, vargs, stack[index]);
+                    stack[index] = new DataType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new CType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new CType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
-                    stack[index] = new CType.FunctionType(args, false, stack[index]);
+                    var args = IdentifierList().Select(x => new DataType.FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new DataType.BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    stack[index] = new DataType.FunctionType(args, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
                 MoreDdOrDad(stack, index);
@@ -1868,7 +1869,7 @@ namespace AnsiCParser {
         private CType TypeName() {
             CType baseType = SpecifierQualifiers();
             if (IsAbstractDeclarator()) {
-                List<CType> stack = new List<CType>() { new CType.StubType() };
+                List<CType> stack = new List<CType>() { new DataType.StubType() };
                 AbstractDeclarator(stack, 0);
                 baseType = CType.Resolve(baseType, stack);
             }
@@ -1914,16 +1915,16 @@ namespace AnsiCParser {
         private void DirectAbstractDeclarator(List<CType> stack, int index) {
             if (_lexer.ReadTokenIf('(')) {
                 if (IsAbstractDeclarator()) {
-                    stack.Add(new CType.StubType());
+                    stack.Add(new DataType.StubType());
                     AbstractDeclarator(stack, index + 1);
                 } else if (_lexer.PeekToken(')') == false) {
                     // ANSI形式
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new CType.FunctionType(args, vargs, stack[index]);
+                    stack[index] = new DataType.FunctionType(args, vargs, stack[index]);
                 } else {
                     // K&R形式もしくは引数省略されたANSI形式（いわゆる曖昧な宣言）
-                    stack[index] = new CType.FunctionType(null, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(null, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
                 MoreDirectAbstractDeclarator(stack, index);
@@ -1949,9 +1950,9 @@ namespace AnsiCParser {
                 if (_lexer.PeekToken(')') == false) {
                     bool vargs = false;
                     var items = ParameterTypeList(ref vargs);
-                    stack[index] = new CType.FunctionType(items, vargs, stack[index]);
+                    stack[index] = new DataType.FunctionType(items, vargs, stack[index]);
                 } else {
-                    stack[index] = new CType.FunctionType(null, false, stack[index]);
+                    stack[index] = new DataType.FunctionType(null, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
                 MoreDirectAbstractDeclarator(stack, index);
@@ -2052,11 +2053,11 @@ namespace AnsiCParser {
 
             private static SyntaxTree.Initializer CheckInitializerBase(int depth, CType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.IsArrayType()) {
-                    return CheckInitializerArray(depth + 1, type.Unwrap() as CType.ArrayType, it, isLocalVariableInit);
+                    return CheckInitializerArray(depth + 1, type.Unwrap() as DataType.ArrayType, it, isLocalVariableInit);
                 } else if (type.IsStructureType()) {
-                    return CheckInitializerStruct(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it, isLocalVariableInit);
+                    return CheckInitializerStruct(depth, type.Unwrap() as DataType.TaggedType.StructUnionType, it, isLocalVariableInit);
                 } else if (type.IsUnionType()) {
-                    return CheckInitializerUnion(depth, type.Unwrap() as CType.TaggedType.StructUnionType, it, isLocalVariableInit);
+                    return CheckInitializerUnion(depth, type.Unwrap() as DataType.TaggedType.StructUnionType, it, isLocalVariableInit);
                 } else {
                     return CheckInitializer2Simple(depth, type, it, isLocalVariableInit);
                 }
@@ -2096,8 +2097,9 @@ namespace AnsiCParser {
             /// <param name="depth"></param>
             /// <param name="type"></param>
             /// <param name="it"></param>
+            /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByComplexInitializer(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 var inits = it.AsComplexInitializer().Ret;
                 if (type.Length == -1) {
                     if (depth != 1) {
@@ -2134,7 +2136,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字配列が対象の場合
                 var sexpr = it.AsSimpleInitializer().AssignmentExpression as SyntaxTree.Expression.PrimaryExpression.StringExpression;
                 if (type.Length == -1) {
@@ -2146,7 +2148,7 @@ namespace AnsiCParser {
                     var loc = it.Current.LocationRange;
                     var len = sexpr.Value.Count;
                     foreach (var b in sexpr.Value) {
-                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, CType.BasicType.TypeKind.UnsignedChar)));
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, DataType.BasicType.TypeKind.UnsignedChar)));
                     }
                     // 型の長さを確定させる
                     type.Length = len;
@@ -2162,7 +2164,7 @@ namespace AnsiCParser {
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
                     var loc = it.Current.LocationRange;
                     foreach (var b in sexpr.Value.Take(len)) {
-                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, CType.BasicType.TypeKind.UnsignedChar)));
+                        assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(loc, type.BaseType, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, DataType.BasicType.TypeKind.UnsignedChar)));
                     }
                     it.Next();
                     return new SyntaxTree.Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -2178,7 +2180,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializerToNotCharArray(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 // 文字型以外が初期化対象の場合
                 if (type.Length == -1) {
                     if (depth != 1) {
@@ -2216,8 +2218,8 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
-                if (type.BaseType.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar)) {
+            private static SyntaxTree.Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+                if (type.BaseType.IsBasicType(DataType.BasicType.TypeKind.Char, DataType.BasicType.TypeKind.SignedChar, DataType.BasicType.TypeKind.UnsignedChar)) {
                     return CheckInitializerArrayByStringExpressionInitializerToCharArray(depth, type, it, isLocalVariableInit);
                 } else {
                     return CheckInitializerArrayByStringExpressionInitializerToNotCharArray(depth, type, it, isLocalVariableInit);
@@ -2232,7 +2234,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializerInComplexInitializer(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (type.Length == -1) {
                     if (depth != 1) {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
@@ -2269,7 +2271,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArrayBySimpleInitializer(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.AsSimpleInitializer().AssignmentExpression is SyntaxTree.Expression.PrimaryExpression.StringExpression) {
                     return CheckInitializerArrayByStringExpressionInitializer(depth, type, it, isLocalVariableInit);
                 } else if (it.IsInComplexInitializer()) {
@@ -2286,7 +2288,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerArray(int depth, CType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerArray(int depth, DataType.ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
                     return CheckInitializerArrayByComplexInitializer(depth, type, it, isLocalVariableInit);
                 } else if (it.IsSimpleInitializer()) {
@@ -2304,7 +2306,7 @@ namespace AnsiCParser {
             /// <param name="it"></param>
             /// <param name="isLocalVariableInit"></param>
             /// <returns></returns>
-            private static SyntaxTree.Initializer CheckInitializerStruct(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerStruct(int depth, DataType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
                     // 要素数分回す
                     List<SyntaxTree.Initializer> assigns = new List<SyntaxTree.Initializer>();
@@ -2318,9 +2320,9 @@ namespace AnsiCParser {
                         if (member.Ident == null) {
                             // padding
                             if (member.Type.IsBitField()) {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as DataType.BitFieldType).Type as DataType.BasicType).Kind)));
                             } else {
-                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as CType.BasicType).Kind)));
+                                assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as DataType.BasicType).Kind)));
                             }
                             continue;
                         }
@@ -2345,9 +2347,9 @@ namespace AnsiCParser {
                             if (member.Ident == null) {
                                 // padding
                                 if (member.Type.IsBitField()) {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as CType.BitFieldType).Type as CType.BasicType).Kind)));
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as DataType.BitFieldType).Type as DataType.BasicType).Kind)));
                                 } else {
-                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as CType.BasicType).Kind)));
+                                    assigns.Add(new SyntaxTree.Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as DataType.BasicType).Kind)));
                                 }
                                 continue;
                             }
@@ -2368,7 +2370,7 @@ namespace AnsiCParser {
                 }
             }
 
-            private static SyntaxTree.Initializer CheckInitializerUnion(int depth, CType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
+            private static SyntaxTree.Initializer CheckInitializerUnion(int depth, DataType.TaggedType.StructUnionType type, InitializerIterator it, bool isLocalVariableInit) {
                 if (it.IsComplexInitializer()) {
                     var inits = it.AsComplexInitializer().Ret;
                     // 最初の要素とのみチェック
@@ -2568,7 +2570,7 @@ namespace AnsiCParser {
             if (funcName != null) {
                 // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
                 var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
-                var tyConstStr = new CType.TypeQualifierType(new CType.PointerType(new CType.TypeQualifierType(CType.CreateChar(), AnsiCParser.TypeQualifier.Const)), AnsiCParser.TypeQualifier.Const);
+                var tyConstStr = new DataType.TypeQualifierType(new DataType.PointerType(new DataType.TypeQualifierType(CType.CreateChar(), AnsiCParser.TypeQualifier.Const)), AnsiCParser.TypeQualifier.Const);
                 var varDecl = new SyntaxTree.Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static, new SyntaxTree.Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string>() { "\"" + funcName + "\"" })));
                 _identScope.Add("__func__", varDecl);
                 decls.Add(varDecl);
@@ -2753,7 +2755,7 @@ namespace AnsiCParser {
                 var end = _lexer.CurrentToken().End;
 
                 // 現在の関数の戻り値と型チェック
-                CType.FunctionType ft;
+                DataType.FunctionType ft;
                 _currentFuncDecl.Type.IsFunctionType(out ft);
                 if (ft.ResultType.IsVoidType()) {
                     if (expr != null) {
@@ -2974,7 +2976,7 @@ namespace AnsiCParser {
                     // K&RおよびC89/90では暗黙的関数宣言 extern int 識別子(); が現在の宣言ブロックの先頭で定義されていると仮定して翻訳する
                     if (Mode == LanguageMode.C89) {
                         var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
-                        var decl = AddImplictFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new CType.FunctionType(null, false, CType.CreateSignedInt()));
+                        var decl = AddImplictFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new DataType.FunctionType(null, false, CType.CreateSignedInt()));
                         expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(tok.Range, identExpr.Ident, decl as SyntaxTree.Declaration.FunctionDeclaration);
                     } else {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, "未定義の識別子を関数として用いています。");
@@ -3544,7 +3546,7 @@ namespace AnsiCParser {
                     if (Mode == LanguageMode.C89) {
                         // C90では互換性の観点からK&R動作が使える。
                         Logger.Warning(start, end, "型が省略された宣言は、暗黙的に signed int 型と見なします。");
-                        type = new CType.BasicType(CType.BasicType.TypeKind.SignedInt);
+                        type = new DataType.BasicType(DataType.BasicType.TypeKind.SignedInt);
                     } else {
                         // C99以降では
                         // 6.7.2 それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。
@@ -3552,7 +3554,7 @@ namespace AnsiCParser {
                         throw new CompilerException.SpecificationErrorException(start, end, "C99以降ではそれぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。");
                     }
                 } else {
-                    type = new CType.BasicType(typeSpecifier);
+                    type = new DataType.BasicType(typeSpecifier);
                 }
             }
 
@@ -3644,7 +3646,7 @@ namespace AnsiCParser {
                 if (type != null) {
                     throw new Exception("");
                 }
-                type = new CType.TypedefedType(_lexer.CurrentToken(), value.Type);
+                type = new DataType.TypedefedType(_lexer.CurrentToken(), value.Type);
                 _lexer.NextToken();
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier) && IsTypeQualifier()) {
                 // 型修飾子
@@ -3718,8 +3720,8 @@ namespace AnsiCParser {
                     if (prevFd.Body != null) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, "すでに本体を持っている関数を再定義しています。");
                     }
-                    var compoundFt = type.Unwrap() as CType.FunctionType;
-                    var ft = (prevType.Unwrap() as CType.FunctionType);
+                    var compoundFt = type.Unwrap() as DataType.FunctionType;
+                    var ft = (prevType.Unwrap() as DataType.FunctionType);
                     for (var i = 0; i < ft.Arguments.Length; i++) {
                         compoundFt.Arguments[i].Ident = ft.Arguments[i].Ident;
                     }
@@ -3902,7 +3904,7 @@ namespace AnsiCParser {
                 if (!baseType.IsStructureType() && !baseType.IsUnionType() && !baseType.IsEnumeratedType()) {
                     throw new CompilerException.SpecificationErrorException(start, end, "空の宣言は使用できません。");
                 }
-                CType.TaggedType.StructUnionType suType;
+                DataType.TaggedType.StructUnionType suType;
                 if ((baseType.IsStructureType(out suType) || baseType.IsUnionType(out suType)) && suType.IsAnonymous) {
                     throw new CompilerException.SpecificationErrorException(start, end, "無名構造体/共用体が宣言されていますが、そのインスタンスを定義していません。");
                 }
@@ -3912,7 +3914,7 @@ namespace AnsiCParser {
                 return decls;
             } else {
                 Token ident = null;
-                var stack = new List<CType>() { new CType.StubType() };
+                var stack = new List<CType>() { new DataType.StubType() };
                 Declarator(ref ident, stack, 0);
                 var type = CType.Resolve(baseType, stack);
                 var end = _lexer.CurrentToken().End;
@@ -3957,7 +3959,7 @@ namespace AnsiCParser {
                         if (_lexer.ReadTokenIf(',')) {
 
                             ident = null;
-                            stack = new List<CType>() { new CType.StubType() };
+                            stack = new List<CType>() { new DataType.StubType() };
                             Declarator(ref ident, stack, 0);
                             type = CType.Resolve(baseType, stack);
                             continue;

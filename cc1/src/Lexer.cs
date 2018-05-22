@@ -89,6 +89,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 16進浮動小数点形式を double 型に変換
         /// </summary>
+        /// <param name="range"></param>
         /// <param name="fact"></param>
         /// <param name="exp"></param>
         /// <param name="suffix"></param>
@@ -116,14 +117,14 @@ namespace AnsiCParser {
             }
 
             // 仮数部が0の場合は特別扱い
-            if (Lexer.ToUInt64(range, fs, 16) == 0) {
+            if (ToUInt64(range, fs, 16) == 0) {
                 return 0;
             }
 
             if (suffix == "f") {
                 // float 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0',8).ToArray())).Substring(0, 8);
-                var f = Lexer.ToUInt32(range, fs, 16);
+                var f = ToUInt32(range, fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 31)) == 0) {
                     f <<= 1;
@@ -143,7 +144,7 @@ namespace AnsiCParser {
             } else {
                 // double 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0', 16).ToArray())).Substring(0, 16);
-                var f = Lexer.ToUInt64(range, fs, 16);
+                var f = ToUInt64(range, fs, 16);
                 dp *= 4;
                 while ((f & (1UL << 63)) == 0) {
                     f <<= 1;
@@ -251,6 +252,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 32bit符号付き数値読み取り (Convert.ToInt32は桁あふれエラーを起こすため)
         /// </summary>
+        /// <param name="range"></param>
         /// <param name="s"></param>
         /// <param name="radix"></param>
         /// <returns></returns>
@@ -262,6 +264,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 32bit符号無し数値読み取り (Convert.ToUInt32は桁あふれエラーを起こすため)
         /// </summary>
+        /// <param name="range"></param>
         /// <param name="s"></param>
         /// <param name="radix"></param>
         /// <returns></returns>
@@ -273,6 +276,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 64bit符号付き数値読み取り (Convert.ToInt64は桁あふれエラーを起こすため)
         /// </summary>
+        /// <param name="range"></param>
         /// <param name="s"></param>
         /// <param name="radix"></param>
         /// <returns></returns>
@@ -284,6 +288,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 64bit符号無し数値読み取り (Convert.ToUInt64は桁あふれエラーを起こすため)
         /// </summary>
+        /// <param name="range"></param>
         /// <param name="s"></param>
         /// <param name="radix"></param>
         /// <returns></returns>
@@ -806,9 +811,9 @@ namespace AnsiCParser {
                         // line 指令
                         var match = RegexLineDirective.Match(str);
                         if (match.Success) {
-                            this._filepath = match.Groups["file"].Value;
-                            this._line = int.Parse(match.Groups["line"].Value);
-                            this._column = 1;
+                            _filepath = match.Groups["file"].Value;
+                            _line = int.Parse(match.Groups["line"].Value);
+                            _column = 1;
                             goto rescan;
                         }
                     }

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
     /// <summary>
@@ -8,10 +10,17 @@ namespace AnsiCParser {
     /// </summary>
     public abstract class SyntaxTree {
 
+        /// <summary>
+        /// 構文木の対応するソース範囲
+        /// </summary>
         public LocationRange LocationRange {
             get; set;
         }
 
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="locationRange"></param>
         protected SyntaxTree(LocationRange locationRange) {
             LocationRange = locationRange;
         }
@@ -187,7 +196,7 @@ namespace AnsiCParser {
                     /// 列挙定数式
                     /// </summary>
                     public class EnumerationConstant : IdentifierExpression {
-                        public CType.TaggedType.EnumType.MemberInfo Info {
+                        public TaggedType.EnumType.MemberInfo Info {
                             get;
                         }
                         public override CType Type {
@@ -196,7 +205,7 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public EnumerationConstant(LocationRange locationRange, CType.TaggedType.EnumType.MemberInfo info) : base(locationRange, info.Ident.Raw) {
+                        public EnumerationConstant(LocationRange locationRange, TaggedType.EnumType.MemberInfo info) : base(locationRange, info.Ident.Raw) {
                             Info = info;
                         }
                     }
@@ -230,11 +239,11 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public IntegerConstant(LocationRange locationRange, string str, long value, CType.BasicType.TypeKind kind) : base(locationRange) {
-                            var ctype = new CType.BasicType(kind);
+                        public IntegerConstant(LocationRange locationRange, string str, long value, BasicType.TypeKind kind) : base(locationRange) {
+                            var ctype = new BasicType(kind);
 
                             int lowerBits = 8 * ctype.Sizeof();
-                            System.Diagnostics.Debug.Assert(lowerBits > 0);
+                            Debug.Assert(lowerBits > 0);
 
                             int upperBits = (8 * sizeof(long)) - lowerBits;
 
@@ -242,7 +251,7 @@ namespace AnsiCParser {
 
                                 // 符号拡張を実行
                                 if (ctype.IsSignedIntegerType()) {
-                                    value = unchecked((value << upperBits) >> upperBits);
+                                    value = (value << upperBits) >> upperBits;
                                 } else {
                                     value = unchecked((long)((ulong)(value << upperBits) >> upperBits));
                                 }
@@ -282,9 +291,9 @@ namespace AnsiCParser {
                             Str = str;
                             ConstantType = CType.CreateChar();
 
-                            int[] i = new[] { 1 };
+                            int[] i = { 1 };
                             int value = 0;
-                            Lexer.CharIterator(() => str[i[0]], () => i[0]++, (b) => value = (value << 8) | b);
+                            Lexer.CharIterator(() => str[i[0]], () => i[0]++, b => value = (value << 8) | b);
                             Value = value;
                         }
 
@@ -313,10 +322,10 @@ namespace AnsiCParser {
                             }
                         }
 
-                        public FloatingConstant(LocationRange locationRange, string str, double value, CType.BasicType.TypeKind kind) : base(locationRange) {
-                            ConstantType = new CType.BasicType(kind);
+                        public FloatingConstant(LocationRange locationRange, string str, double value, BasicType.TypeKind kind) : base(locationRange) {
+                            ConstantType = new BasicType(kind);
                             Str = str;
-                            Value = kind == CType.BasicType.TypeKind.Float ? (float)value : value;
+                            Value = kind == BasicType.TypeKind.Float ? (float)value : value;
                         }
                     }
 
@@ -361,9 +370,9 @@ namespace AnsiCParser {
 
                         Value = new List<byte>();
                         foreach (var str in strings) {
-                            int[] i = new[] { 1 };
+                            int[] i = { 1 };
                             while (str[i[0]] != '"') {
-                                Lexer.CharIterator(() => str[i[0]], () => i[0]++, (b) => Value.Add(b));
+                                Lexer.CharIterator(() => str[i[0]], () => i[0]++, b => Value.Add(b));
                             }
                         }
                         Value.Add(0x00);
@@ -536,8 +545,8 @@ namespace AnsiCParser {
 
                         // 制約
                         // 呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない。
-                        CType referencedType;
-                        CType.FunctionType functionType;
+                        CType referencedType = null;
+                        FunctionType functionType = null;
                         if (expr.Type.IsPointerType(out referencedType) && referencedType.IsFunctionType(out functionType)) {
                             if (functionType.ResultType.IsVoidType() || (functionType.ResultType.IsObjectType() && !functionType.ResultType.IsArrayType())) {
                                 goto Valid;
@@ -594,7 +603,7 @@ namespace AnsiCParser {
                     private CType MemberType {
                         get;
                     }
-                    public CType.TaggedType.StructUnionType.MemberInfo MemberInfo {
+                    public TaggedType.StructUnionType.MemberInfo MemberInfo {
                         get;
                     }
 
@@ -616,7 +625,7 @@ namespace AnsiCParser {
                     public MemberDirectAccess(LocationRange locationRange, Expression expr, Token ident) : base(locationRange) {
                         // 制約  
                         // .演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならず，2 番目のオペランドは，その型のメンバの名前でなければならない
-                        CType.TaggedType.StructUnionType sType;
+                        TaggedType.StructUnionType sType;
                         if (!expr.Type.IsStructureType(out sType) && !expr.Type.IsUnionType(out sType)) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, ".演算子の最初のオペランドは，構造体型又は共用体型の修飾版又は非修飾版をもたなければならない。");
                         }
@@ -659,7 +668,7 @@ namespace AnsiCParser {
                     private CType MemberType {
                         get;
                     }
-                    public CType.TaggedType.StructUnionType.MemberInfo MemberInfo {
+                    public TaggedType.StructUnionType.MemberInfo MemberInfo {
                         get;
                     }
 
@@ -676,7 +685,7 @@ namespace AnsiCParser {
                     public MemberIndirectAccess(LocationRange locationRange, Expression expr, Token ident) : base(locationRange) {
                         // 制約  
                         // ->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならず，2 番目のオペランドは，指される型のメンバの名前でなければならない
-                        CType.TaggedType.StructUnionType sType;
+                        TaggedType.StructUnionType sType = null;
                         if (!(expr.Type.IsPointerType() && (expr.Type.GetBasePointerType().IsStructureType(out sType) || expr.Type.GetBasePointerType().IsUnionType(out sType)))) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "->演算子の最初のオペランドは，型“構造体の修飾版若しくは非修飾版へのポインタ”，又は型“共用体の修飾版若しくは非修飾版へのポインタ”をもたなければならない。");
                         }
@@ -737,7 +746,9 @@ namespace AnsiCParser {
                         // 変更可能な左辺値でなければならない。
                         if (!expr.IsLValue()) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "変更可能な左辺値でなければならない。");
-                        } else if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
+                        }
+
+                        if (!(expr.Type.IsRealType() || expr.Type.IsPointerType())) {
                             throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "後置増分演算子又は後置減分演算子のオペランドは，実数型又はポインタ型の修飾版又は非修飾版 をもたなければならない。");
                         }
 
@@ -836,8 +847,8 @@ namespace AnsiCParser {
                     } else if (
                         expr.IsLValue() &&  // オペランドは，左辺値
                         (!(  // ビットフィールドでない
-                            (expr is Expression.PostfixExpression.MemberDirectAccess && ((Expression.PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) || 
-                            (expr is Expression.PostfixExpression.MemberIndirectAccess && ((Expression.PostfixExpression.MemberIndirectAccess)expr).Type.IsBitField())
+                            (expr is PostfixExpression.MemberDirectAccess && ((PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) || 
+                            (expr is PostfixExpression.MemberIndirectAccess && ((PostfixExpression.MemberIndirectAccess)expr).Type.IsBitField())
                         )) &&
                         !expr.HasStorageClassRegister()// register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
                     ) {
@@ -1050,8 +1061,9 @@ namespace AnsiCParser {
 
                 public SizeofTypeExpression(LocationRange locationRange, CType operand) : base(locationRange) {
                     // 制約
-                    // sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。
-                    if (operand.IsIncompleteType() || operand.IsFunctionType()) {
+                    // sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，
+                    // 又はビットフィールドメンバを指し示す式に対して適用してはならない。
+                    if (operand.IsIncompleteType() || operand.IsFunctionType() || operand.IsBitField()) {
                         throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "sizeof 演算子は，関数型若しくは不完全型をもつ式，それらの型の名前を括弧で囲んだもの，又はビットフィールドメンバを指し示す式に対して適用してはならない。");
                     }
                     TypeOperand = operand;
@@ -1687,7 +1699,7 @@ namespace AnsiCParser {
                                 throw new CompilerException.SpecificationErrorException(thenExpr.LocationRange.Start, elseExpr.LocationRange.End, "条件演算子の第 2, 第 3 オペランドが適合する型ではない。");
                             }
                             var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
-                            System.Diagnostics.Debug.Assert(baseType != null);
+                            Debug.Assert(baseType != null);
                             TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                             baseType = baseType.WrapTypeQualifier(tq);
                             ResultType = CType.CreatePointer(baseType);
@@ -2096,7 +2108,7 @@ namespace AnsiCParser {
             /// 6.3.1.1 整数拡張（AST生成時に挿入）
             /// </summary>
             public class IntegerPromotionExpression : Expression {
-                private CType.BasicType Ty {
+                private BasicType Ty {
                     get;
                 }
                 public Expression Expr {
@@ -2108,7 +2120,7 @@ namespace AnsiCParser {
                     }
                 }
 
-                public IntegerPromotionExpression(LocationRange locationRange, CType.BasicType type, Expression expr) : base(locationRange) {
+                public IntegerPromotionExpression(LocationRange locationRange, BasicType type, Expression expr) : base(locationRange) {
                     Ty = type;
                     Expr = expr;
                 }
@@ -2271,14 +2283,14 @@ namespace AnsiCParser {
                 public List<Statement> Stmts {
                     get;
                 }
-                public Scope<CType.TaggedType> TagScope {
+                public Scope<TaggedType> TagScope {
                     get;
                 }
                 public Scope<Declaration> IdentScope {
                     get;
                 }
 
-                public CompoundStatement(LocationRange locationRange, List<Declaration> decls, List<Statement> stmts, Scope<CType.TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
+                public CompoundStatement(LocationRange locationRange, List<Declaration> decls, List<Statement> stmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
                     Decls = decls;
                     Stmts = stmts;
                     TagScope = tagScope;
@@ -2447,9 +2459,9 @@ namespace AnsiCParser {
 
             public class ArrayAssignInitializer : Initializer {
                 public List<Initializer> Inits { get; }
-                public CType.ArrayType Type { get; }
+                public ArrayType Type { get; }
 
-                public ArrayAssignInitializer(LocationRange locationRange, CType.ArrayType type, List<Initializer> inits) : base(locationRange) {
+                public ArrayAssignInitializer(LocationRange locationRange, ArrayType type, List<Initializer> inits) : base(locationRange) {
                     Type = type;
                     Inits = inits;
                 }
@@ -2457,9 +2469,9 @@ namespace AnsiCParser {
 
             public class StructUnionAssignInitializer : Initializer {
                 public List<Initializer> Inits { get; }
-                public CType.TaggedType.StructUnionType Type { get; }
+                public TaggedType.StructUnionType Type { get; }
 
-                public StructUnionAssignInitializer(LocationRange locationRange, CType.TaggedType.StructUnionType type, List<Initializer> inits) : base(locationRange) {
+                public StructUnionAssignInitializer(LocationRange locationRange, TaggedType.StructUnionType type, List<Initializer> inits) : base(locationRange) {
                     Type = type;
                     Inits = inits;
                 }
@@ -2540,12 +2552,12 @@ namespace AnsiCParser {
             ///     列挙定数として宣言された識別子は，型 int をもつ。
             /// </remarks>
             public class EnumMemberDeclaration : Declaration {
-                public EnumMemberDeclaration(LocationRange locationRange, CType.TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident.Raw, CType.CreateSignedInt(), StorageClassSpecifier.None) {
+                public EnumMemberDeclaration(LocationRange locationRange, TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident.Raw, CType.CreateSignedInt(), StorageClassSpecifier.None) {
                     MemberInfo = mi;
                     LinkageObject = new LinkageObject(mi.Ident.Raw, CType.CreateSignedInt(), LinkageKind.NoLinkage);
                 }
 
-                public CType.TaggedType.EnumType.MemberInfo MemberInfo {
+                public TaggedType.EnumType.MemberInfo MemberInfo {
                     get;
                 }
             }

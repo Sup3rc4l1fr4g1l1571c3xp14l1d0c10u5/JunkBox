@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
     public class SyntaxTreeToSExprVisitor : SyntaxTreeVisitor.IVisitor<Lisp.Pair, Lisp.Pair> {
@@ -25,7 +26,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(self.Op == SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -35,7 +36,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("and-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -45,7 +46,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("argument-declaration"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident),
             Lisp.Util.makeSym(self.StorageClass.ToString().ToLower())
             );
@@ -55,7 +56,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("arg-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident)
             );
         }
@@ -64,7 +65,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("array-assign-init"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
@@ -73,7 +74,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("array-subscript-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Target.Accept(this, value),
             self.Index.Accept(this, value)
             );
@@ -99,7 +100,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("cast-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
@@ -108,7 +109,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("char-const"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Str)
             );
         }
@@ -117,7 +118,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("comma-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeList(self.Expressions.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
@@ -163,7 +164,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -187,7 +188,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("cond-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.CondExpr.Accept(this, value),
             self.ThenExpr.Accept(this, value),
             self.ElseExpr.Accept(this, value)
@@ -228,7 +229,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("enclosed-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.ParenthesesExpression.Accept(this, value)
             );
         }
@@ -237,7 +238,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("address-constant"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Identifier.Accept(this, value),
             self.Offset.Accept(this, value)
             );
@@ -247,7 +248,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("enum-const"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident), Lisp.Util.makeNum(self.Info.Value)
             );
         }
@@ -265,7 +266,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -275,7 +276,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("xor-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -293,7 +294,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("float-const"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Str),
             Lisp.Util.makeFloat(self.Value)
             );
@@ -314,7 +315,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("call-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
             Lisp.Util.makeList(self.Args.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
@@ -324,7 +325,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("func-decl"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident),
             Lisp.Util.makeSym(self.StorageClass.ToString().ToLower()),
             Lisp.Util.makeSym(self.FunctionSpecifier.ToString().ToLower()),
@@ -337,7 +338,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("func-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident)
             );
         }
@@ -380,7 +381,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("or-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -390,7 +391,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("int-const"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Str),
             Lisp.Util.makeNum(self.Value)
             );
@@ -400,7 +401,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("intpromot-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
@@ -409,7 +410,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("logic-and-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -419,7 +420,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("logic-or-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -429,7 +430,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("member-direct-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
             Lisp.Util.makeStr(self.Ident.Raw)
             );
@@ -439,7 +440,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("member-indirect-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
             Lisp.Util.makeStr(self.Ident.Raw)
             );
@@ -461,7 +462,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value), self.Rhs.Accept(this, value)
             );
         }
@@ -485,7 +486,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -512,7 +513,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -522,7 +523,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("simple-assign-init"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
@@ -531,7 +532,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("assign-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
             self.Rhs.Accept(this, value)
             );
@@ -545,7 +546,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("sizeof-expr-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.ExprOperand.Accept(this, value)
             );
         }
@@ -554,8 +555,8 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("sizeof-type-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
-            self.TypeOperand.Accept(new CTypeToSExprVisitor(), null)
+            self.Type.Accept(new ToSExprVisitor(), null),
+            self.TypeOperand.Accept(new ToSExprVisitor(), null)
             );
         }
 
@@ -563,7 +564,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("string-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeList(self.Strings.Select(Lisp.Util.makeStr).ToArray())
             );
         }
@@ -572,7 +573,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("struct-union-assign-init"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray()));
         }
 
@@ -596,7 +597,7 @@ namespace AnsiCParser {
                                 Lisp.Util.makeStr($"{x.LinkageId}#{x.Id}"),
                                 LocationRangeToCons((x.Definition ?? x.TentativeDefinitions[0]).LocationRange),
                                 Lisp.Util.makeSym(x.Linkage.ToString()),
-                                x.Type.Accept(new CTypeToSExprVisitor(), value)
+                                x.Type.Accept(new ToSExprVisitor(), value)
                             )
                         ).Cast<object>().ToArray()
                     )
@@ -609,7 +610,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("type-conv"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -617,7 +618,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("type-decl"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident));
         }
 
@@ -625,7 +626,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("addr-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -633,7 +634,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("unary-minus-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -641,7 +642,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("unary-neg-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -649,7 +650,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("unary-not-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -657,7 +658,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("unary-plus-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -674,7 +675,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
@@ -691,7 +692,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
@@ -700,7 +701,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("ref-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
@@ -717,7 +718,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("var-decl"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident),
             Lisp.Util.makeSym(self.StorageClass.ToString().ToLower()),
             Lisp.Util.makeStr(self.LinkageObject == null ? "" : $"{self.LinkageObject.LinkageId}#{self.LinkageObject.Id}"),
@@ -729,7 +730,7 @@ namespace AnsiCParser {
             return Lisp.Util.makeList(
             Lisp.Util.makeSym("var-expr"),
             LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new CTypeToSExprVisitor(), null),
+            self.Type.Accept(new ToSExprVisitor(), null),
             Lisp.Util.makeStr(self.Ident)
             );
         }

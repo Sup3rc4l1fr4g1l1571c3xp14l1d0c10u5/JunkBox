@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AnsiCParser.DataType;
 
 namespace AnsiCParser {
     /// <summary>
@@ -75,12 +76,12 @@ namespace AnsiCParser {
         /// </remarks>
         public static bool IsFunctionType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            return unwrappedSelf is CType.FunctionType;
+            return unwrappedSelf is FunctionType;
         }
-        public static bool IsFunctionType(this CType self, out CType.FunctionType funcSelf) {
+        public static bool IsFunctionType(this CType self, out FunctionType funcSelf) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.FunctionType) {
-                funcSelf = unwrappedSelf as CType.FunctionType;
+            if (unwrappedSelf is FunctionType) {
+                funcSelf = unwrappedSelf as FunctionType;
                 return true;
             } else {
                 funcSelf = null;
@@ -103,29 +104,29 @@ namespace AnsiCParser {
         public static bool IsIncompleteType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             // void型  
-            if (unwrappedSelf is CType.BasicType) {
-                var bt = unwrappedSelf as CType.BasicType;
-                return bt.Kind == CType.BasicType.TypeKind.Void;
+            if (unwrappedSelf is DataType.BasicType) {
+                var bt = unwrappedSelf as DataType.BasicType;
+                return bt.Kind == DataType.BasicType.TypeKind.Void;
             }
             // 大きさの分からない配列型
-            if (unwrappedSelf is CType.ArrayType) {
-                var at = unwrappedSelf as CType.ArrayType;
+            if (unwrappedSelf is ArrayType) {
+                var at = unwrappedSelf as ArrayType;
                 if (at.Length == -1) {
                     return true;
                 }
                 return at.BaseType.IsIncompleteType();
             }
             // 内容の分からない構造体型又は共用体型
-            if (unwrappedSelf is CType.TaggedType.StructUnionType) {
-                var sut = unwrappedSelf as CType.TaggedType.StructUnionType;
+            if (unwrappedSelf is TaggedType.StructUnionType) {
+                var sut = unwrappedSelf as TaggedType.StructUnionType;
                 if (sut.Members == null) {
                     return true;
                 }
                 return sut.Members.Any(x => IsIncompleteType(x.Type));
             }
             // 内容の分からない列挙型型
-            if (unwrappedSelf is CType.TaggedType.EnumType) {
-                var sut = unwrappedSelf as CType.TaggedType.EnumType;
+            if (unwrappedSelf is TaggedType.EnumType) {
+                var sut = unwrappedSelf as TaggedType.EnumType;
                 if (sut.Members == null) {
                     return true;
                 }
@@ -139,14 +140,14 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsStandardSignedIntegerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.BasicType) {
-                var bt = unwrappedSelf as CType.BasicType;
+            if (unwrappedSelf is DataType.BasicType) {
+                var bt = unwrappedSelf as DataType.BasicType;
                 switch (bt.Kind) {
-                    case CType.BasicType.TypeKind.SignedChar:   // signed char
-                    case CType.BasicType.TypeKind.SignedShortInt:    // short int
-                    case CType.BasicType.TypeKind.SignedInt:    // int
-                    case CType.BasicType.TypeKind.SignedLongInt:    // long int
-                    case CType.BasicType.TypeKind.SignedLongLongInt:    // long long int
+                    case DataType.BasicType.TypeKind.SignedChar:   // signed char
+                    case DataType.BasicType.TypeKind.SignedShortInt:    // short int
+                    case DataType.BasicType.TypeKind.SignedInt:    // int
+                    case DataType.BasicType.TypeKind.SignedLongInt:    // long int
+                    case DataType.BasicType.TypeKind.SignedLongLongInt:    // long long int
                         return true;
                     default:
                         return false;
@@ -179,14 +180,14 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsStandardUnsignedIntegerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.BasicType) {
-                var bt = unwrappedSelf as CType.BasicType;
+            if (unwrappedSelf is DataType.BasicType) {
+                var bt = unwrappedSelf as DataType.BasicType;
                 switch (bt.Kind) {
-                    case CType.BasicType.TypeKind.UnsignedChar:         // unsigned char
-                    case CType.BasicType.TypeKind.UnsignedShortInt:     // unsigned short int
-                    case CType.BasicType.TypeKind.UnsignedInt:          // unsigned int
-                    case CType.BasicType.TypeKind.UnsignedLongInt:      // unsigned long int
-                    case CType.BasicType.TypeKind.UnsignedLongLongInt:  // unsigned long long int
+                    case DataType.BasicType.TypeKind.UnsignedChar:         // unsigned char
+                    case DataType.BasicType.TypeKind.UnsignedShortInt:     // unsigned short int
+                    case DataType.BasicType.TypeKind.UnsignedInt:          // unsigned int
+                    case DataType.BasicType.TypeKind.UnsignedLongInt:      // unsigned long int
+                    case DataType.BasicType.TypeKind.UnsignedLongLongInt:  // unsigned long long int
                         return true;
                     default:
                         return false;
@@ -232,7 +233,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsRealFloatingType(this CType self) {
-            return self.IsBasicType(CType.BasicType.TypeKind.Float, CType.BasicType.TypeKind.Double, CType.BasicType.TypeKind.LongDouble);
+            return self.IsBasicType(DataType.BasicType.TypeKind.Float, DataType.BasicType.TypeKind.Double, DataType.BasicType.TypeKind.LongDouble);
         }
 
         /// <summary>
@@ -240,7 +241,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsComplexType(this CType self) {
-            return self.IsBasicType(CType.BasicType.TypeKind.Float_Complex, CType.BasicType.TypeKind.Double_Complex, CType.BasicType.TypeKind.LongDouble_Complex);
+            return self.IsBasicType(DataType.BasicType.TypeKind.Float_Complex, DataType.BasicType.TypeKind.Double_Complex, DataType.BasicType.TypeKind.LongDouble_Complex);
         }
 
         /// <summary>
@@ -255,19 +256,19 @@ namespace AnsiCParser {
         /// 対応する実数型(corresponding real type)を取得
         /// </summary>
         /// <returns></returns>
-        public static CType.BasicType GetCorrespondingRealType(this CType self) {
+        public static DataType.BasicType GetCorrespondingRealType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf.IsRealFloatingType()) {
-                var bt = unwrappedSelf as CType.BasicType;
+                var bt = unwrappedSelf as DataType.BasicType;
                 return bt;
             } else if (unwrappedSelf.IsComplexType()) {
-                var bt = unwrappedSelf as CType.BasicType;
+                var bt = unwrappedSelf as DataType.BasicType;
                 switch (bt.Kind) {
-                    case CType.BasicType.TypeKind.Float_Complex:
+                    case DataType.BasicType.TypeKind.Float_Complex:
                         return CType.CreateFloat();
-                    case CType.BasicType.TypeKind.Double_Complex:
+                    case DataType.BasicType.TypeKind.Double_Complex:
                         return CType.CreateDouble();
-                    case CType.BasicType.TypeKind.LongDouble_Complex:
+                    case DataType.BasicType.TypeKind.LongDouble_Complex:
                         return CType.CreateLongDouble();
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "対応する実数型を持たない_Complex型です。（本実装に誤りがあるようです。）");
@@ -282,7 +283,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsBasicType(this CType self) {
-            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsFloatingType() || self.IsBasicType(CType.BasicType.TypeKind.Char);
+            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsFloatingType() || self.IsBasicType(DataType.BasicType.TypeKind.Char);
         }
 
         /// <summary>
@@ -290,7 +291,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsCharacterType(this CType self) {
-            return self.IsBasicType(CType.BasicType.TypeKind.Char, CType.BasicType.TypeKind.SignedChar, CType.BasicType.TypeKind.UnsignedChar);
+            return self.IsBasicType(DataType.BasicType.TypeKind.Char, DataType.BasicType.TypeKind.SignedChar, DataType.BasicType.TypeKind.UnsignedChar);
         }
 
         /// <summary>
@@ -298,7 +299,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsEnumeratedType(this CType self) {
-            return self.Unwrap() is CType.TaggedType.EnumType;
+            return self.Unwrap() is TaggedType.EnumType;
         }
 
         /// <summary>
@@ -306,7 +307,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsIntegerType(this CType self) {
-            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(CType.BasicType.TypeKind.Char);
+            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(DataType.BasicType.TypeKind.Char);
         }
 
         /// <summary>
@@ -331,7 +332,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsArrayType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            return unwrappedSelf is CType.ArrayType;
+            return unwrappedSelf is ArrayType;
         }
 
         /// <summary>
@@ -342,8 +343,8 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsArrayType(this CType self, out CType elementType) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.ArrayType) {
-                elementType = (unwrappedSelf as CType.ArrayType).BaseType;
+            if (unwrappedSelf is ArrayType) {
+                elementType = (unwrappedSelf as ArrayType).BaseType;
                 return true;
             } else {
                 elementType = null;
@@ -360,9 +361,9 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsArrayType(this CType self, out CType elementType, out int len) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.ArrayType) {
-                elementType = (unwrappedSelf as CType.ArrayType).BaseType;
-                len = (unwrappedSelf as CType.ArrayType).Length;
+            if (unwrappedSelf is ArrayType) {
+                elementType = (unwrappedSelf as ArrayType).BaseType;
+                len = (unwrappedSelf as ArrayType).Length;
                 return true;
             } else {
                 elementType = null;
@@ -377,12 +378,12 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsStructureType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct;
+            return (unwrappedSelf as TaggedType.StructUnionType)?.Kind == TaggedType.StructUnionType.StructOrUnion.Struct;
         }
-        public static bool IsStructureType(this CType self, out CType.TaggedType.StructUnionType suType) {
+        public static bool IsStructureType(this CType self, out TaggedType.StructUnionType suType) {
             var unwrappedSelf = self.Unwrap();
-            if ((unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct) {
-                suType = unwrappedSelf as CType.TaggedType.StructUnionType;
+            if ((unwrappedSelf as TaggedType.StructUnionType)?.Kind == TaggedType.StructUnionType.StructOrUnion.Struct) {
+                suType = unwrappedSelf as TaggedType.StructUnionType;
                 return true;
             } else {
                 suType = null;
@@ -396,12 +397,12 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsUnionType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            return (unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Union;
+            return (unwrappedSelf as TaggedType.StructUnionType)?.Kind == TaggedType.StructUnionType.StructOrUnion.Union;
         }
-        public static bool IsUnionType(this CType self, out CType.TaggedType.StructUnionType suType) {
+        public static bool IsUnionType(this CType self, out TaggedType.StructUnionType suType) {
             var unwrappedSelf = self.Unwrap();
-            if ((unwrappedSelf as CType.TaggedType.StructUnionType)?.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Union) {
-                suType = unwrappedSelf as CType.TaggedType.StructUnionType;
+            if ((unwrappedSelf as TaggedType.StructUnionType)?.Kind == TaggedType.StructUnionType.StructOrUnion.Union) {
+                suType = unwrappedSelf as TaggedType.StructUnionType;
                 return true;
             } else {
                 suType = null;
@@ -415,7 +416,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsPointerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            return unwrappedSelf is CType.PointerType;
+            return unwrappedSelf is PointerType;
         }
 
         /// <summary>
@@ -426,8 +427,8 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsPointerType(this CType self, out CType referencedType) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is CType.PointerType) {
-                referencedType = (unwrappedSelf as CType.PointerType).BaseType;
+            if (unwrappedSelf is PointerType) {
+                referencedType = (unwrappedSelf as PointerType).BaseType;
                 return true;
             } else {
                 referencedType = null;
@@ -501,7 +502,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsUnqualifiedType(this CType self) {
-            return !(self is CType.TypeQualifierType);
+            return !(self is TypeQualifierType);
         }
 
         /// <summary>
@@ -509,7 +510,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsQualifiedType(this CType self) {
-            return self is CType.TypeQualifierType;
+            return self is TypeQualifierType;
         }
 
         // 6.3 型変換
@@ -546,33 +547,33 @@ namespace AnsiCParser {
                     // すべての列挙型は，それぞれと適合する整数型と同じ順位をもたなければならない（6.7.2.2 参照）。
                     return -5;  // == signed int
                 } else {
-                    switch ((unwrappedSelf as CType.BasicType)?.Kind) {
-                        case CType.BasicType.TypeKind.SignedLongLongInt:
-                        case CType.BasicType.TypeKind.UnsignedLongLongInt:
+                    switch ((unwrappedSelf as DataType.BasicType)?.Kind) {
+                        case DataType.BasicType.TypeKind.SignedLongLongInt:
+                        case DataType.BasicType.TypeKind.UnsignedLongLongInt:
                             //long long = unsigned long long
                             //int64_t = uint64_t
                             return -1;
-                        case CType.BasicType.TypeKind.SignedLongInt:
-                        case CType.BasicType.TypeKind.UnsignedLongInt:
+                        case DataType.BasicType.TypeKind.SignedLongInt:
+                        case DataType.BasicType.TypeKind.UnsignedLongInt:
                             //long = unsigned long
                             return -3;
-                        case CType.BasicType.TypeKind.SignedInt:
-                        case CType.BasicType.TypeKind.UnsignedInt:
+                        case DataType.BasicType.TypeKind.SignedInt:
+                        case DataType.BasicType.TypeKind.UnsignedInt:
                             //int = unsigned int
                             //int32_t = uint32_t
                             return -5;
-                        case CType.BasicType.TypeKind.SignedShortInt:
-                        case CType.BasicType.TypeKind.UnsignedShortInt:
+                        case DataType.BasicType.TypeKind.SignedShortInt:
+                        case DataType.BasicType.TypeKind.UnsignedShortInt:
                             //short = unsigned short
                             //int16_t = uint16_t
                             return -7;
-                        case CType.BasicType.TypeKind.Char:
-                        case CType.BasicType.TypeKind.SignedChar:
-                        case CType.BasicType.TypeKind.UnsignedChar:
+                        case DataType.BasicType.TypeKind.Char:
+                        case DataType.BasicType.TypeKind.SignedChar:
+                        case DataType.BasicType.TypeKind.UnsignedChar:
                             //char = signed char = unsigned char
                             //int8_t = uint8_t
                             return -9;
-                        case CType.BasicType.TypeKind._Bool:
+                        case DataType.BasicType.TypeKind._Bool:
                             // bool
                             return -11;
                         default:
@@ -603,7 +604,7 @@ namespace AnsiCParser {
                 if (IntegerConversionRank(expr.Type) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                     // -> 元の型が unsigned int の場合のみ unsigned int 型に拡張。それ以外の場合は int型に拡張
-                    if (expr.Type.IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
+                    if (expr.Type.IsBasicType(DataType.BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int でないと表現できない
                         return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
                     } else {
@@ -616,15 +617,15 @@ namespace AnsiCParser {
                 }
             } else {
                 // ビットフィールドである
-                switch ((expr.Type.Unwrap() as CType.BasicType)?.Kind) {
+                switch ((expr.Type.Unwrap() as DataType.BasicType)?.Kind) {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
-                    case CType.BasicType.TypeKind._Bool:
+                    case DataType.BasicType.TypeKind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
                         return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
-                    case CType.BasicType.TypeKind.SignedInt:
+                    case DataType.BasicType.TypeKind.SignedInt:
                         // 無条件でint型に変換できる
                         return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
-                    case CType.BasicType.TypeKind.UnsignedInt:
+                    case DataType.BasicType.TypeKind.UnsignedInt:
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                         if (bitfield.Value == 4 * 8) {
                             // unsigned int でないと表現できない
@@ -655,7 +656,7 @@ namespace AnsiCParser {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型?
                 if (IntegerConversionRank(self) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if (self.IsBasicType(CType.BasicType.TypeKind.UnsignedInt)) {
+                    if (self.IsBasicType(DataType.BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int に拡張
                         return CType.CreateUnsignedInt();
                     } else {
@@ -667,7 +668,7 @@ namespace AnsiCParser {
                     return self;
                 }
             } else if (IsRealFloatingType(self)) {
-                if (self.IsBasicType(CType.BasicType.TypeKind.Float)) {
+                if (self.IsBasicType(DataType.BasicType.TypeKind.Float)) {
                     // double に拡張
                     return CType.CreateDouble();
                 } else {
@@ -699,8 +700,8 @@ namespace AnsiCParser {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
 
-            var btLhs = tyLhs as CType.BasicType;
-            var btRhs = tyRhs as CType.BasicType;
+            var btLhs = tyLhs as DataType.BasicType;
+            var btRhs = tyRhs as DataType.BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
@@ -714,28 +715,28 @@ namespace AnsiCParser {
             //  - 一方が long double で 他方が float _Complex なら float _Complex を long double _Complex にする。（結果の型は long double _Complex 型になる）
             //  - 一方が long double _Complex で 他方が float なら float を long double にする。（結果の型は long double _Complex 型になる）
             var realConversionPairTable = new[] {
-                Tuple.Create(CType.BasicType.TypeKind.LongDouble,CType.BasicType.TypeKind.LongDouble_Complex),
-                Tuple.Create(CType.BasicType.TypeKind.Double,CType.BasicType.TypeKind.Double_Complex),
-                Tuple.Create(CType.BasicType.TypeKind.Float,CType.BasicType.TypeKind.Float_Complex)
+                Tuple.Create(DataType.BasicType.TypeKind.LongDouble,DataType.BasicType.TypeKind.LongDouble_Complex),
+                Tuple.Create(DataType.BasicType.TypeKind.Double,DataType.BasicType.TypeKind.Double_Complex),
+                Tuple.Create(DataType.BasicType.TypeKind.Float,DataType.BasicType.TypeKind.Float_Complex)
             };
 
             foreach (var realConversionPair in realConversionPairTable) {
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
-                        var retTy = new CType.BasicType(realConversionPair.Item2);
+                        var retTy = new DataType.BasicType(realConversionPair.Item2);
                         rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
                         return retTy;
                     } else {
-                        rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange,new CType.BasicType(realConversionPair.Item1), rhs);
+                        rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange,new DataType.BasicType(realConversionPair.Item1), rhs);
                         return btLhs;
                     }
                 } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btLhs.IsComplexType()) {
-                        var retTy = new CType.BasicType(realConversionPair.Item2);
+                        var retTy = new DataType.BasicType(realConversionPair.Item2);
                         lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
                         return retTy;
                     } else {
-                        lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, new CType.BasicType(realConversionPair.Item1), lhs);
+                        lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, new DataType.BasicType(realConversionPair.Item1), lhs);
                         return btRhs;
                     }
                 }
@@ -748,8 +749,8 @@ namespace AnsiCParser {
             tyLhs = lhs.Type.Unwrap();
             tyRhs = rhs.Type.Unwrap();
 
-            btLhs = tyLhs as CType.BasicType;
-            btRhs = tyRhs as CType.BasicType;
+            btLhs = tyLhs as DataType.BasicType;
+            btRhs = tyRhs as DataType.BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型が基本型以外になっています。（本実装の誤りが原因だと思われます。）");
@@ -798,23 +799,23 @@ namespace AnsiCParser {
             }
 
             // そうでない場合，両方のオペランドを，符号付き整数型をもつオペランドの型に対応する符号無し整数型に変換する。
-            CType.BasicType.TypeKind tySignedKind = ((btLhs.IsSignedIntegerType()) ? btLhs : btRhs).Kind;
-            CType.BasicType.TypeKind tyUnsignedKind;
+            DataType.BasicType.TypeKind tySignedKind = ((btLhs.IsSignedIntegerType()) ? btLhs : btRhs).Kind;
+            DataType.BasicType.TypeKind tyUnsignedKind;
             switch (tySignedKind) {
-                case CType.BasicType.TypeKind.SignedInt:
-                    tyUnsignedKind = CType.BasicType.TypeKind.UnsignedInt;
+                case DataType.BasicType.TypeKind.SignedInt:
+                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedInt;
                     break;
-                case CType.BasicType.TypeKind.SignedLongInt:
-                    tyUnsignedKind = CType.BasicType.TypeKind.UnsignedLongInt;
+                case DataType.BasicType.TypeKind.SignedLongInt:
+                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedLongInt;
                     break;
-                case CType.BasicType.TypeKind.SignedLongLongInt:
-                    tyUnsignedKind = CType.BasicType.TypeKind.UnsignedLongLongInt;
+                case DataType.BasicType.TypeKind.SignedLongLongInt:
+                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedLongLongInt;
                     break;
                 default:
                     throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型がsigned int/signed long int/ signed long long int 型以外になっています。（本実装の誤りが原因だと思われます。）");
             }
 
-            var tyUnsigned = new CType.BasicType(tyUnsignedKind);
+            var tyUnsigned = new DataType.BasicType(tyUnsignedKind);
             lhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, tyUnsigned, lhs);
             rhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, tyUnsigned, rhs);
             return tyUnsigned;
@@ -843,9 +844,9 @@ namespace AnsiCParser {
             // 6.3.1.4 実浮動小数点型及び整数型 
             if (targetType != null) {
                 if (targetType.IsIntegerType() && !targetType.IsBoolType()) {
-                    if ((targetType.IsBasicType(CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt) || targetType.IsEnumeratedType()) 
+                    if ((targetType.IsBasicType(DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.UnsignedInt) || targetType.IsEnumeratedType()) 
                         && ((expr.Type.IntegerConversionRank() < -5)
-                          || (/*ToDo: bitfield check */  targetType.IsEnumeratedType() || expr.Type.IsBoolType() || expr.Type.IsBasicType(CType.BasicType.TypeKind.SignedInt, CType.BasicType.TypeKind.UnsignedInt) )
+                          || (/*ToDo: bitfield check */  targetType.IsEnumeratedType() || expr.Type.IsBoolType() || expr.Type.IsBasicType(DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.UnsignedInt) )
                            )
                     ) {
                         // 6.3.1.1 論理型，文字型及び整数型
@@ -920,7 +921,7 @@ namespace AnsiCParser {
             if (targetType != null) {
                 if (targetType.IsComplexType() && expr.Type.IsComplexType()) {
                     // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
-                    if ((targetType.Unwrap() as CType.BasicType).Kind == (expr.Type.Unwrap() as CType.BasicType).Kind) {
+                    if ((targetType.Unwrap() as DataType.BasicType).Kind == (expr.Type.Unwrap() as DataType.BasicType).Kind) {
                         return expr;
                     } else {
                         return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
@@ -1276,37 +1277,37 @@ namespace AnsiCParser {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
                 }
-                if (t1 is CType.TypedefedType || t2 is CType.TypedefedType) {
-                    if (t1 is CType.TypedefedType) {
-                        t1 = (t1 as CType.TypedefedType).Type;
+                if (t1 is TypedefedType || t2 is TypedefedType) {
+                    if (t1 is TypedefedType) {
+                        t1 = (t1 as TypedefedType).Type;
                     }
-                    if (t2 is CType.TypedefedType) {
-                        t2 = (t2 as CType.TypedefedType).Type;
+                    if (t2 is TypedefedType) {
+                        t2 = (t2 as TypedefedType).Type;
                     }
                     continue;
                 }
-                if ((t1 as CType.TypeQualifierType)?.Qualifier == TypeQualifier.None) {
-                    t1 = (t1 as CType.TypeQualifierType).Type;
+                if ((t1 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
+                    t1 = (t1 as TypeQualifierType).Type;
                     continue;
                 }
-                if ((t2 as CType.TypeQualifierType)?.Qualifier == TypeQualifier.None) {
-                    t2 = (t2 as CType.TypeQualifierType).Type;
+                if ((t2 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
+                    t2 = (t2 as TypeQualifierType).Type;
                     continue;
                 }
                 if (t1.GetType() != t2.GetType()) {
                     return false;
                 }
 
-                if (t1 is CType.BasicType && t2 is CType.BasicType) {
+                if (t1 is DataType.BasicType && t2 is DataType.BasicType) {
                     // 6.7.2 型指定子
                     // 型指定子の並びは，次に示すもののいずれか一つでなければならない。
-                    if ((t1 as CType.BasicType).Kind != (t2 as CType.BasicType).Kind) {
+                    if ((t1 as DataType.BasicType).Kind != (t2 as DataType.BasicType).Kind) {
                         return false;
                     }
                     return true;
                 }
 
-                if (t1 is CType.TaggedType.StructUnionType && t2 is CType.TaggedType.StructUnionType) {
+                if (t1 is TaggedType.StructUnionType && t2 is TaggedType.StructUnionType) {
                     // 6.7.2.1 構造体指定子及び共用体指定子
                     // 構造体型、及び共用体型は無結合であるため、構文上の誤りが無ければ単一翻訳単位内では同名＝同一型である。
                     // しかし、異なる翻訳単位間での規則も示されているためそちらで検証する
@@ -1318,29 +1319,29 @@ namespace AnsiCParser {
                     //   - 二つの列挙体については，対応するメンバは同じ値をもたなければならない。
 
                     // - 一方がタグ付きで宣言されている場合，もう一方も同じタグ付きで宣言されていなければならない。
-                    if ((t1 as CType.TaggedType.StructUnionType).Kind != (t2 as CType.TaggedType.StructUnionType).Kind) {
+                    if ((t1 as TaggedType.StructUnionType).Kind != (t2 as TaggedType.StructUnionType).Kind) {
                         return false;
-                    } else if ((t1 as CType.TaggedType.StructUnionType).IsAnonymous != (t2 as CType.TaggedType.StructUnionType).IsAnonymous) {
+                    } else if ((t1 as TaggedType.StructUnionType).IsAnonymous != (t2 as TaggedType.StructUnionType).IsAnonymous) {
                         return false;
-                    } else if ((t1 as CType.TaggedType.StructUnionType).TagName != (t2 as CType.TaggedType.StructUnionType).TagName) {
+                    } else if ((t1 as TaggedType.StructUnionType).TagName != (t2 as TaggedType.StructUnionType).TagName) {
                         return false;
                     }
 
-                    if ((t1 as CType.TaggedType.StructUnionType).Members != null && (t2 as CType.TaggedType.StructUnionType).Members != null) {
+                    if ((t1 as TaggedType.StructUnionType).Members != null && (t2 as TaggedType.StructUnionType).Members != null) {
                         // - 両方が完全型であれば，次に示す要求が新たに満たされなければならない。すなわち，両方のメンバの間に 1 対 1 の対応がつき，対応するメンバ同士が適合する型をもち，
                         //   更に対応するメンバの一方が名前付きで宣言されているならば，もう一方も同じ名前付きで宣言されていなければならない。
                         //   - 二つの構造体については，対応するメンバは同じ順序で宣言されていなければならない。
                         //   - 二つの構造体又は共用体については，対応するビットフィールドは同じ幅をもたなければならない。
 
                         // 両方のメンバの間に 1 対 1 の対応がつくか？
-                        if ((t1 as CType.TaggedType.StructUnionType).Members.Count != (t2 as CType.TaggedType.StructUnionType).Members.Count) {
+                        if ((t1 as TaggedType.StructUnionType).Members.Count != (t2 as TaggedType.StructUnionType).Members.Count) {
                             return false;
                         }
 
-                        int len = (t1 as CType.TaggedType.StructUnionType).Members.Count;
+                        int len = (t1 as TaggedType.StructUnionType).Members.Count;
                         for (var i = 0; i < len; i++) {
-                            var m1 = (t1 as CType.TaggedType.StructUnionType).Members[i];
-                            var m2 = (t2 as CType.TaggedType.StructUnionType).Members[i];
+                            var m1 = (t1 as TaggedType.StructUnionType).Members[i];
+                            var m2 = (t2 as TaggedType.StructUnionType).Members[i];
 
                             // 対応するメンバ同士が適合する型を持つか？
                             if (IsCompatible(m1.Type, m2.Type) == false) {
@@ -1363,33 +1364,33 @@ namespace AnsiCParser {
                 // 6.7.2.2 列挙型指定子
                 // それぞれの列挙型は，char，符号付き整数型又は符号無し整数型と適合する型とする。型の選択は，処理系定義とする(処理系はすべての列挙定数が指定された後で整数型の選択を行うことができる)。
                 // しかし，その型は列挙型のすべてのメンバの値を表現できなければならない。
-                if (t1 is CType.TaggedType.EnumType && t2 is CType.TaggedType.EnumType) {
+                if (t1 is TaggedType.EnumType && t2 is TaggedType.EnumType) {
                     return true;
-                } else if (t1 is CType.TaggedType.EnumType && t2 is CType.BasicType) {
+                } else if (t1 is TaggedType.EnumType && t2 is DataType.BasicType) {
                     // ToDo: 暫定的
-                    return (t2 as CType.BasicType).Kind == CType.BasicType.TypeKind.SignedInt;
-                } else if (t1 is CType.BasicType && t2 is CType.TaggedType.EnumType) {
+                    return (t2 as DataType.BasicType).Kind == DataType.BasicType.TypeKind.SignedInt;
+                } else if (t1 is DataType.BasicType && t2 is TaggedType.EnumType) {
                     // ToDo: 暫定的
-                    return (t1 as CType.BasicType).Kind == CType.BasicType.TypeKind.SignedInt;
+                    return (t1 as DataType.BasicType).Kind == DataType.BasicType.TypeKind.SignedInt;
                 }
 
                 // 6.7.3 型修飾子
                 // 二つの修飾型が適合するためには，双方が適合する型に同じ修飾を行ったものでなければならない。
                 // 型指定子又は型修飾子の並びにおける型修飾子の順序は，指定された型に影響を与えない。
-                if (t1 is CType.TypeQualifierType && t2 is CType.TypeQualifierType) {
-                    if ((t1 as CType.TypeQualifierType).Qualifier != (t2 as CType.TypeQualifierType).Qualifier) {
+                if (t1 is TypeQualifierType && t2 is TypeQualifierType) {
+                    if ((t1 as TypeQualifierType).Qualifier != (t2 as TypeQualifierType).Qualifier) {
                         return false;
                     }
-                    t1 = (t1 as CType.TypeQualifierType).Type;
-                    t2 = (t2 as CType.TypeQualifierType).Type;
+                    t1 = (t1 as TypeQualifierType).Type;
+                    t2 = (t2 as TypeQualifierType).Type;
                     continue;
                 }
 
                 // 6.7.5.1 ポインタ宣言子
                 // 二つのポインタ型が適合するためには，いずれも同一の修飾がなされていなければならず，かつ両者が適合する型へのポインタでなければならない。
-                if (t1 is CType.PointerType && t2 is CType.PointerType) {
-                    t1 = (t1 as CType.PointerType).BaseType;
-                    t2 = (t2 as CType.PointerType).BaseType;
+                if (t1 is PointerType && t2 is PointerType) {
+                    t1 = (t1 as PointerType).BaseType;
+                    t2 = (t2 as PointerType).BaseType;
                     continue;
                 }
 
@@ -1397,12 +1398,12 @@ namespace AnsiCParser {
                 // 二つの配列型が適合するためには，まず，両者が適合する要素型をもたなければならない。
                 // さらに，両者が配列の大きさを指定する整数定数式をもつ場合，それらの値は同じ定数値でなければならない。
                 // 二つの配列型が適合することを必要とする文脈で使われ，両者の大きさ指定子を評価した値が異なる場合，その動作は未定義とする。
-                if (t1 is CType.ArrayType && t2 is CType.ArrayType) {
-                    if (((t1 as CType.ArrayType).Length != -1 && (t2 as CType.ArrayType).Length != -1) && ((t1 as CType.ArrayType).Length != (t2 as CType.ArrayType).Length)) {
+                if (t1 is ArrayType && t2 is ArrayType) {
+                    if (((t1 as ArrayType).Length != -1 && (t2 as ArrayType).Length != -1) && ((t1 as ArrayType).Length != (t2 as ArrayType).Length)) {
                         return false;
                     }
-                    t1 = (t1 as CType.ArrayType).BaseType;
-                    t2 = (t2 as CType.ArrayType).BaseType;
+                    t1 = (t1 as ArrayType).BaseType;
+                    t2 = (t2 as ArrayType).BaseType;
                     continue;
                 }
 
@@ -1416,66 +1417,66 @@ namespace AnsiCParser {
                 //   さらに関数原型のほうの各仮引数の型は，対応する識別子の型に既定の実引数拡張を適用した結果の型と適合する。
                 //  （型の適合及び型の合成を判断するとき，関数型又は配列型で宣言される各仮引数は型調整後の型をもつものとして扱い，修飾型で宣言される各仮引数は宣言された型の非修飾版をもつものとして扱う。）
                 //
-                if (t1 is CType.FunctionType && t2 is CType.FunctionType) {
-                    if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments != null) {
-                        if ((t1 as CType.FunctionType).HasVariadic != (t2 as CType.FunctionType).HasVariadic) {
+                if (t1 is FunctionType && t2 is FunctionType) {
+                    if ((t1 as FunctionType).Arguments != null && (t2 as FunctionType).Arguments != null) {
+                        if ((t1 as FunctionType).HasVariadic != (t2 as FunctionType).HasVariadic) {
                             return false;
                         }
-                        if ((t1 as CType.FunctionType).Arguments.Length != (t2 as CType.FunctionType).Arguments.Length) {
+                        if ((t1 as FunctionType).Arguments.Length != (t2 as FunctionType).Arguments.Length) {
                             return false;
                         }
 
-                        int len = (t1 as CType.FunctionType).Arguments.Length;
+                        int len = (t1 as FunctionType).Arguments.Length;
                         for (var i = 0; i < len; i++) {
-                            var m1 = (t1 as CType.FunctionType).Arguments[i];
-                            var m2 = (t2 as CType.FunctionType).Arguments[i];
+                            var m1 = (t1 as FunctionType).Arguments[i];
+                            var m2 = (t2 as FunctionType).Arguments[i];
 
                             // 対応するメンバ同士が適合する型を持つか？
                             if (IsCompatible(m1.Type, m2.Type) == false) {
                                 return false;
                             }
                         }
-                        t1 = (t1 as CType.FunctionType).ResultType;
-                        t2 = (t2 as CType.FunctionType).ResultType;
+                        t1 = (t1 as FunctionType).ResultType;
+                        t2 = (t2 as FunctionType).ResultType;
                         continue;
-                    } else if ((t1 as CType.FunctionType).Arguments != null && (t2 as CType.FunctionType).Arguments == null) {
+                    } else if ((t1 as FunctionType).Arguments != null && (t2 as FunctionType).Arguments == null) {
                         // 新しい形式の関数宣言の後に古い形式の宣言が来た
 
                         // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
-                        if ((t1 as CType.FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
+                        if ((t1 as FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
                             return false;
                         }
                         // t1側は関数は引数部に省略記号を含まないとみなす
-                        if ((t1 as CType.FunctionType).HasVariadic == true) {
+                        if ((t1 as FunctionType).HasVariadic == true) {
                             return false;
                         }
-                        t1 = (t1 as CType.FunctionType).ResultType;
-                        t2 = (t2 as CType.FunctionType).ResultType;
+                        t1 = (t1 as FunctionType).ResultType;
+                        t2 = (t2 as FunctionType).ResultType;
                         continue;
-                    } else if ((t1 as CType.FunctionType).Arguments == null && (t2 as CType.FunctionType).Arguments != null) {
+                    } else if ((t1 as FunctionType).Arguments == null && (t2 as FunctionType).Arguments != null) {
                         // 古い形式の関数宣言の後に新しい形式の宣言が来た
                         // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
-                        if ((t2 as CType.FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
+                        if ((t2 as FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
                             return false;
                         }
                         // t2側は関数は引数部に省略記号を含まないとみなす
-                        if ((t2 as CType.FunctionType).HasVariadic == true) {
+                        if ((t2 as FunctionType).HasVariadic == true) {
                             return false;
                         }
-                        t1 = (t1 as CType.FunctionType).ResultType;
-                        t2 = (t2 as CType.FunctionType).ResultType;
+                        t1 = (t1 as FunctionType).ResultType;
+                        t2 = (t2 as FunctionType).ResultType;
                         continue;
-                    } else if ((t1 as CType.FunctionType).Arguments == null && (t2 as CType.FunctionType).Arguments == null) {
+                    } else if ((t1 as FunctionType).Arguments == null && (t2 as FunctionType).Arguments == null) {
                         // 古い形式（引数省略）同士なので引数については見ない。
-                        t1 = (t1 as CType.FunctionType).ResultType;
-                        t2 = (t2 as CType.FunctionType).ResultType;
+                        t1 = (t1 as FunctionType).ResultType;
+                        t2 = (t2 as FunctionType).ResultType;
                         continue;
                     } else {
                         return false;
                     }
                 }
 
-                if (t1 is CType.StubType && t2 is CType.StubType) {
+                if (t1 is StubType && t2 is StubType) {
                     throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型同士は適合できません。（本処理系の実装の誤りが原因です。）");
                 }
 
