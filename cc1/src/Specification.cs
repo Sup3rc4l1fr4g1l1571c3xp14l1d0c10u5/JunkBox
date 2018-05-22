@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AnsiCParser.DataType;
+using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
     /// <summary>
@@ -104,9 +105,9 @@ namespace AnsiCParser {
         public static bool IsIncompleteType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             // void型  
-            if (unwrappedSelf is DataType.BasicType) {
-                var bt = unwrappedSelf as DataType.BasicType;
-                return bt.Kind == DataType.BasicType.TypeKind.Void;
+            if (unwrappedSelf is BasicType) {
+                var bt = unwrappedSelf as BasicType;
+                return bt.Kind == BasicType.TypeKind.Void;
             }
             // 大きさの分からない配列型
             if (unwrappedSelf is ArrayType) {
@@ -140,14 +141,14 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsStandardSignedIntegerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is DataType.BasicType) {
-                var bt = unwrappedSelf as DataType.BasicType;
+            if (unwrappedSelf is BasicType) {
+                var bt = unwrappedSelf as BasicType;
                 switch (bt.Kind) {
-                    case DataType.BasicType.TypeKind.SignedChar:   // signed char
-                    case DataType.BasicType.TypeKind.SignedShortInt:    // short int
-                    case DataType.BasicType.TypeKind.SignedInt:    // int
-                    case DataType.BasicType.TypeKind.SignedLongInt:    // long int
-                    case DataType.BasicType.TypeKind.SignedLongLongInt:    // long long int
+                    case BasicType.TypeKind.SignedChar:   // signed char
+                    case BasicType.TypeKind.SignedShortInt:    // short int
+                    case BasicType.TypeKind.SignedInt:    // int
+                    case BasicType.TypeKind.SignedLongInt:    // long int
+                    case BasicType.TypeKind.SignedLongLongInt:    // long long int
                         return true;
                     default:
                         return false;
@@ -180,14 +181,14 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static bool IsStandardUnsignedIntegerType(this CType self) {
             var unwrappedSelf = self.Unwrap();
-            if (unwrappedSelf is DataType.BasicType) {
-                var bt = unwrappedSelf as DataType.BasicType;
+            if (unwrappedSelf is BasicType) {
+                var bt = unwrappedSelf as BasicType;
                 switch (bt.Kind) {
-                    case DataType.BasicType.TypeKind.UnsignedChar:         // unsigned char
-                    case DataType.BasicType.TypeKind.UnsignedShortInt:     // unsigned short int
-                    case DataType.BasicType.TypeKind.UnsignedInt:          // unsigned int
-                    case DataType.BasicType.TypeKind.UnsignedLongInt:      // unsigned long int
-                    case DataType.BasicType.TypeKind.UnsignedLongLongInt:  // unsigned long long int
+                    case BasicType.TypeKind.UnsignedChar:         // unsigned char
+                    case BasicType.TypeKind.UnsignedShortInt:     // unsigned short int
+                    case BasicType.TypeKind.UnsignedInt:          // unsigned int
+                    case BasicType.TypeKind.UnsignedLongInt:      // unsigned long int
+                    case BasicType.TypeKind.UnsignedLongLongInt:  // unsigned long long int
                         return true;
                     default:
                         return false;
@@ -233,7 +234,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsRealFloatingType(this CType self) {
-            return self.IsBasicType(DataType.BasicType.TypeKind.Float, DataType.BasicType.TypeKind.Double, DataType.BasicType.TypeKind.LongDouble);
+            return self.IsBasicType(BasicType.TypeKind.Float, BasicType.TypeKind.Double, BasicType.TypeKind.LongDouble);
         }
 
         /// <summary>
@@ -241,7 +242,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsComplexType(this CType self) {
-            return self.IsBasicType(DataType.BasicType.TypeKind.Float_Complex, DataType.BasicType.TypeKind.Double_Complex, DataType.BasicType.TypeKind.LongDouble_Complex);
+            return self.IsBasicType(BasicType.TypeKind.Float_Complex, BasicType.TypeKind.Double_Complex, BasicType.TypeKind.LongDouble_Complex);
         }
 
         /// <summary>
@@ -256,19 +257,19 @@ namespace AnsiCParser {
         /// 対応する実数型(corresponding real type)を取得
         /// </summary>
         /// <returns></returns>
-        public static DataType.BasicType GetCorrespondingRealType(this CType self) {
+        public static BasicType GetCorrespondingRealType(this CType self) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf.IsRealFloatingType()) {
-                var bt = unwrappedSelf as DataType.BasicType;
+                var bt = unwrappedSelf as BasicType;
                 return bt;
             } else if (unwrappedSelf.IsComplexType()) {
-                var bt = unwrappedSelf as DataType.BasicType;
+                var bt = unwrappedSelf as BasicType;
                 switch (bt.Kind) {
-                    case DataType.BasicType.TypeKind.Float_Complex:
+                    case BasicType.TypeKind.Float_Complex:
                         return CType.CreateFloat();
-                    case DataType.BasicType.TypeKind.Double_Complex:
+                    case BasicType.TypeKind.Double_Complex:
                         return CType.CreateDouble();
-                    case DataType.BasicType.TypeKind.LongDouble_Complex:
+                    case BasicType.TypeKind.LongDouble_Complex:
                         return CType.CreateLongDouble();
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "対応する実数型を持たない_Complex型です。（本実装に誤りがあるようです。）");
@@ -283,7 +284,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsBasicType(this CType self) {
-            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsFloatingType() || self.IsBasicType(DataType.BasicType.TypeKind.Char);
+            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsFloatingType() || self.IsBasicType(BasicType.TypeKind.Char);
         }
 
         /// <summary>
@@ -291,7 +292,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsCharacterType(this CType self) {
-            return self.IsBasicType(DataType.BasicType.TypeKind.Char, DataType.BasicType.TypeKind.SignedChar, DataType.BasicType.TypeKind.UnsignedChar);
+            return self.IsBasicType(BasicType.TypeKind.Char, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar);
         }
 
         /// <summary>
@@ -307,7 +308,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsIntegerType(this CType self) {
-            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(DataType.BasicType.TypeKind.Char);
+            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(BasicType.TypeKind.Char);
         }
 
         /// <summary>
@@ -547,33 +548,33 @@ namespace AnsiCParser {
                     // すべての列挙型は，それぞれと適合する整数型と同じ順位をもたなければならない（6.7.2.2 参照）。
                     return -5;  // == signed int
                 } else {
-                    switch ((unwrappedSelf as DataType.BasicType)?.Kind) {
-                        case DataType.BasicType.TypeKind.SignedLongLongInt:
-                        case DataType.BasicType.TypeKind.UnsignedLongLongInt:
+                    switch ((unwrappedSelf as BasicType)?.Kind) {
+                        case BasicType.TypeKind.SignedLongLongInt:
+                        case BasicType.TypeKind.UnsignedLongLongInt:
                             //long long = unsigned long long
                             //int64_t = uint64_t
                             return -1;
-                        case DataType.BasicType.TypeKind.SignedLongInt:
-                        case DataType.BasicType.TypeKind.UnsignedLongInt:
+                        case BasicType.TypeKind.SignedLongInt:
+                        case BasicType.TypeKind.UnsignedLongInt:
                             //long = unsigned long
                             return -3;
-                        case DataType.BasicType.TypeKind.SignedInt:
-                        case DataType.BasicType.TypeKind.UnsignedInt:
+                        case BasicType.TypeKind.SignedInt:
+                        case BasicType.TypeKind.UnsignedInt:
                             //int = unsigned int
                             //int32_t = uint32_t
                             return -5;
-                        case DataType.BasicType.TypeKind.SignedShortInt:
-                        case DataType.BasicType.TypeKind.UnsignedShortInt:
+                        case BasicType.TypeKind.SignedShortInt:
+                        case BasicType.TypeKind.UnsignedShortInt:
                             //short = unsigned short
                             //int16_t = uint16_t
                             return -7;
-                        case DataType.BasicType.TypeKind.Char:
-                        case DataType.BasicType.TypeKind.SignedChar:
-                        case DataType.BasicType.TypeKind.UnsignedChar:
+                        case BasicType.TypeKind.Char:
+                        case BasicType.TypeKind.SignedChar:
+                        case BasicType.TypeKind.UnsignedChar:
                             //char = signed char = unsigned char
                             //int8_t = uint8_t
                             return -9;
-                        case DataType.BasicType.TypeKind._Bool:
+                        case BasicType.TypeKind._Bool:
                             // bool
                             return -11;
                         default:
@@ -597,19 +598,19 @@ namespace AnsiCParser {
         /// - シフト演算子（ &lt;&lt; >> ）の各オペランド
         /// - 既定の実引数拡張中
         /// </remarks>
-        public static SyntaxTree.Expression IntegerPromotion(SyntaxTree.Expression expr, int? bitfield = null) {
+        public static Expression IntegerPromotion(Expression expr, int? bitfield = null) {
             if (bitfield.HasValue == false) {
                 // ビットフィールドではない
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
                 if (IntegerConversionRank(expr.Type) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                     // -> 元の型が unsigned int の場合のみ unsigned int 型に拡張。それ以外の場合は int型に拡張
-                    if (expr.Type.IsBasicType(DataType.BasicType.TypeKind.UnsignedInt)) {
+                    if (expr.Type.IsBasicType(BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int でないと表現できない
-                        return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
                     } else {
                         // signed int で表現できる
-                        return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                     }
                 } else {
                     // 拡張は不要
@@ -617,22 +618,22 @@ namespace AnsiCParser {
                 }
             } else {
                 // ビットフィールドである
-                switch ((expr.Type.Unwrap() as DataType.BasicType)?.Kind) {
+                switch ((expr.Type.Unwrap() as BasicType)?.Kind) {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
-                    case DataType.BasicType.TypeKind._Bool:
+                    case BasicType.TypeKind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
-                        return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
-                    case DataType.BasicType.TypeKind.SignedInt:
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                    case BasicType.TypeKind.SignedInt:
                         // 無条件でint型に変換できる
-                        return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
-                    case DataType.BasicType.TypeKind.UnsignedInt:
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                    case BasicType.TypeKind.UnsignedInt:
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                         if (bitfield.Value == 4 * 8) {
                             // unsigned int でないと表現できない
-                            return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
                         } else {
                             // signed int で表現できる
-                            return new SyntaxTree.Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                         }
                     default:
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
@@ -656,7 +657,7 @@ namespace AnsiCParser {
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型?
                 if (IntegerConversionRank(self) < -5) {
                     // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                    if (self.IsBasicType(DataType.BasicType.TypeKind.UnsignedInt)) {
+                    if (self.IsBasicType(BasicType.TypeKind.UnsignedInt)) {
                         // unsigned int に拡張
                         return CType.CreateUnsignedInt();
                     } else {
@@ -668,7 +669,7 @@ namespace AnsiCParser {
                     return self;
                 }
             } else if (IsRealFloatingType(self)) {
-                if (self.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                if (self.IsBasicType(BasicType.TypeKind.Float)) {
                     // double に拡張
                     return CType.CreateDouble();
                 } else {
@@ -696,12 +697,12 @@ namespace AnsiCParser {
         /// - 関係演算子（&lt; > &lt;= >=）、等価演算子（== !=）の算術型オペランドに、通常の算術型変換が適用される。
         /// - 条件演算子?:の第2・第3オペランドが算術型の場合、結果の型は、両オペランドに通常の算術型変換を適用後の型となる。
         /// </remarks>
-        public static CType UsualArithmeticConversion(ref SyntaxTree.Expression lhs, ref SyntaxTree.Expression rhs) {
+        public static CType UsualArithmeticConversion(ref Expression lhs, ref Expression rhs) {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
 
-            var btLhs = tyLhs as DataType.BasicType;
-            var btRhs = tyRhs as DataType.BasicType;
+            var btLhs = tyLhs as BasicType;
+            var btRhs = tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
@@ -715,28 +716,28 @@ namespace AnsiCParser {
             //  - 一方が long double で 他方が float _Complex なら float _Complex を long double _Complex にする。（結果の型は long double _Complex 型になる）
             //  - 一方が long double _Complex で 他方が float なら float を long double にする。（結果の型は long double _Complex 型になる）
             var realConversionPairTable = new[] {
-                Tuple.Create(DataType.BasicType.TypeKind.LongDouble,DataType.BasicType.TypeKind.LongDouble_Complex),
-                Tuple.Create(DataType.BasicType.TypeKind.Double,DataType.BasicType.TypeKind.Double_Complex),
-                Tuple.Create(DataType.BasicType.TypeKind.Float,DataType.BasicType.TypeKind.Float_Complex)
+                Tuple.Create(BasicType.TypeKind.LongDouble,BasicType.TypeKind.LongDouble_Complex),
+                Tuple.Create(BasicType.TypeKind.Double,BasicType.TypeKind.Double_Complex),
+                Tuple.Create(BasicType.TypeKind.Float,BasicType.TypeKind.Float_Complex)
             };
 
             foreach (var realConversionPair in realConversionPairTable) {
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
-                        var retTy = new DataType.BasicType(realConversionPair.Item2);
-                        rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
+                        var retTy = new BasicType(realConversionPair.Item2);
+                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
                         return retTy;
                     } else {
-                        rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange,new DataType.BasicType(realConversionPair.Item1), rhs);
+                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange,new BasicType(realConversionPair.Item1), rhs);
                         return btLhs;
                     }
                 } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btLhs.IsComplexType()) {
-                        var retTy = new DataType.BasicType(realConversionPair.Item2);
-                        lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
+                        var retTy = new BasicType(realConversionPair.Item2);
+                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
                         return retTy;
                     } else {
-                        lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, new DataType.BasicType(realConversionPair.Item1), lhs);
+                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, new BasicType(realConversionPair.Item1), lhs);
                         return btRhs;
                     }
                 }
@@ -749,8 +750,8 @@ namespace AnsiCParser {
             tyLhs = lhs.Type.Unwrap();
             tyRhs = rhs.Type.Unwrap();
 
-            btLhs = tyLhs as DataType.BasicType;
-            btRhs = tyRhs as DataType.BasicType;
+            btLhs = tyLhs as BasicType;
+            btRhs = tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型が基本型以外になっています。（本実装の誤りが原因だと思われます。）");
@@ -764,10 +765,10 @@ namespace AnsiCParser {
             // 整数変換順位の低い方の型を，高い方の型に変換する。
             if ((btLhs.IsSignedIntegerType() && btRhs.IsSignedIntegerType()) || (btLhs.IsUnsignedIntegerType() && btRhs.IsUnsignedIntegerType())) {
                 if (btLhs.IntegerConversionRank() < btRhs.IntegerConversionRank()) {
-                    lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
+                    lhs = new Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
                     return btRhs;
                 } else {
-                    rhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, btLhs, rhs);
+                    rhs = new Expression.TypeConversionExpression(lhs.LocationRange, btLhs, rhs);
                     return btLhs;
                 }
             }
@@ -777,10 +778,10 @@ namespace AnsiCParser {
             // そうでない場合，符号無し整数型をもつオペランドが，他方のオペランドの整数変換順位より高い又は等しい順位をもつならば，
             // 符号付き整数型をもつオペランドを，符号無し整数型をもつオペランドの型に変換する。
             if (btLhs.IsUnsignedIntegerType() && btLhs.IntegerConversionRank() >= btRhs.IntegerConversionRank()) {
-                rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, btLhs, rhs);
+                rhs = new Expression.TypeConversionExpression(rhs.LocationRange, btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsUnsignedIntegerType() && btRhs.IntegerConversionRank() >= btLhs.IntegerConversionRank()) {
-                lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
+                lhs = new Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
                 return btRhs;
             }
 
@@ -791,33 +792,33 @@ namespace AnsiCParser {
             // そうでない場合，符号付き整数型をもつオペランドの型が，符号無し整数型をもつオペランドの型のすべての値を表現できるならば，
             // 符号無し整数型をもつオペランドを，符号付き整数型をもつオペランドの型に変換する。
             if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.Sizeof() > btRhs.Sizeof()) {
-                rhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, btLhs, rhs);
+                rhs = new Expression.TypeConversionExpression(rhs.LocationRange, btLhs, rhs);
                 return btLhs;
             } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.Sizeof() > btLhs.Sizeof()) {
-                lhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
+                lhs = new Expression.TypeConversionExpression(lhs.LocationRange, btRhs, lhs);
                 return btRhs;
             }
 
             // そうでない場合，両方のオペランドを，符号付き整数型をもつオペランドの型に対応する符号無し整数型に変換する。
-            DataType.BasicType.TypeKind tySignedKind = ((btLhs.IsSignedIntegerType()) ? btLhs : btRhs).Kind;
-            DataType.BasicType.TypeKind tyUnsignedKind;
+            BasicType.TypeKind tySignedKind = ((btLhs.IsSignedIntegerType()) ? btLhs : btRhs).Kind;
+            BasicType.TypeKind tyUnsignedKind;
             switch (tySignedKind) {
-                case DataType.BasicType.TypeKind.SignedInt:
-                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedInt;
+                case BasicType.TypeKind.SignedInt:
+                    tyUnsignedKind = BasicType.TypeKind.UnsignedInt;
                     break;
-                case DataType.BasicType.TypeKind.SignedLongInt:
-                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedLongInt;
+                case BasicType.TypeKind.SignedLongInt:
+                    tyUnsignedKind = BasicType.TypeKind.UnsignedLongInt;
                     break;
-                case DataType.BasicType.TypeKind.SignedLongLongInt:
-                    tyUnsignedKind = DataType.BasicType.TypeKind.UnsignedLongLongInt;
+                case BasicType.TypeKind.SignedLongLongInt:
+                    tyUnsignedKind = BasicType.TypeKind.UnsignedLongLongInt;
                     break;
                 default:
                     throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型がsigned int/signed long int/ signed long long int 型以外になっています。（本実装の誤りが原因だと思われます。）");
             }
 
-            var tyUnsigned = new DataType.BasicType(tyUnsignedKind);
-            lhs = new SyntaxTree.Expression.TypeConversionExpression(rhs.LocationRange, tyUnsigned, lhs);
-            rhs = new SyntaxTree.Expression.TypeConversionExpression(lhs.LocationRange, tyUnsigned, rhs);
+            var tyUnsigned = new BasicType(tyUnsignedKind);
+            lhs = new Expression.TypeConversionExpression(rhs.LocationRange, tyUnsigned, lhs);
+            rhs = new Expression.TypeConversionExpression(lhs.LocationRange, tyUnsigned, rhs);
             return tyUnsigned;
 
         }
@@ -835,7 +836,7 @@ namespace AnsiCParser {
         /// 各演算子における型変換については，必要に応じて 6.5 に補足する。
         /// 適合する型へのオペランドの値の型変換は，値又は表現の変更を引き起こさない
         /// </remarks>
-        public static SyntaxTree.Expression TypeConvert(CType targetType, SyntaxTree.Expression expr) {
+        public static Expression TypeConvert(CType targetType, Expression expr) {
 
             // 6.3.1 算術オペランド
 
@@ -844,9 +845,9 @@ namespace AnsiCParser {
             // 6.3.1.4 実浮動小数点型及び整数型 
             if (targetType != null) {
                 if (targetType.IsIntegerType() && !targetType.IsBoolType()) {
-                    if ((targetType.IsBasicType(DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.UnsignedInt) || targetType.IsEnumeratedType()) 
+                    if ((targetType.IsBasicType(BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt) || targetType.IsEnumeratedType()) 
                         && ((expr.Type.IntegerConversionRank() < -5)
-                          || (/*ToDo: bitfield check */  targetType.IsEnumeratedType() || expr.Type.IsBoolType() || expr.Type.IsBasicType(DataType.BasicType.TypeKind.SignedInt, DataType.BasicType.TypeKind.UnsignedInt) )
+                          || (/*ToDo: bitfield check */  targetType.IsEnumeratedType() || expr.Type.IsBoolType() || expr.Type.IsBasicType(BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt) )
                            )
                     ) {
                         // 6.3.1.1 論理型，文字型及び整数型
@@ -863,7 +864,7 @@ namespace AnsiCParser {
                         // 6.3.1.4 実浮動小数点型及び整数型 
                         // 実浮動小数点型の有限の値を_Bool 型以外の整数型に型変換する場合，小数部を捨てる（すなわち，値を 0 方向に切り捨てる。）。
                         // 整数部の値が整数型で表現できない場合， その動作は未定義とする
-                        return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                        return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                     } else if (expr.Type.IsArithmeticType()) {
                         // 6.3.1.1 論理型，文字型及び整数型
                         // これら以外の型が整数拡張によって変わることはない。
@@ -886,7 +887,7 @@ namespace AnsiCParser {
                 if (targetType.IsBoolType()) {
                     // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
                     if (expr.Type.IsScalarType()) {
-                        return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                        return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                     } else if (expr.Type.IsBoolType()) {
                         return expr;
                     } else {
@@ -901,7 +902,7 @@ namespace AnsiCParser {
                     // 整数型の値を実浮動小数点型に型変換する場合，変換する値が新しい型で正確に表現できるとき，その値は変わらない。
                     // 変換する値が表現しうる値の範囲内にあるが正確に表現できないならば，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
                     // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
             }
 
@@ -913,7 +914,7 @@ namespace AnsiCParser {
                     // 変換する値がその新しい型で正確に表現できるならば，その値は変わらない。
                     // 変換する値が，表現しうる値の範囲内にあるが正確に表現できない場合，その結果は，その値より大きく最も近い表現可能な値，又はその値より小さく最も近い表現可能な値のいずれかを処理系定義の方法で選ぶ。
                     // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
             }
 
@@ -921,10 +922,10 @@ namespace AnsiCParser {
             if (targetType != null) {
                 if (targetType.IsComplexType() && expr.Type.IsComplexType()) {
                     // 複素数型の値を他の複素数型に変換する場合，実部と虚部の両方に，対応する実数型の変換規則を適用する。
-                    if ((targetType.Unwrap() as DataType.BasicType).Kind == (expr.Type.Unwrap() as DataType.BasicType).Kind) {
+                    if ((targetType.Unwrap() as BasicType).Kind == (expr.Type.Unwrap() as BasicType).Kind) {
                         return expr;
                     } else {
-                        return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                        return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                     }
                 }
             }
@@ -933,10 +934,10 @@ namespace AnsiCParser {
             if (targetType != null) {
                 if (targetType.IsComplexType() && expr.Type.IsRealType()) {
                     // 実数型の値を複素数型に変換する場合，複素数型の結果の実部は対応する実数型への変換規則により決定し，複素数型の結果の虚部は正の 0 又は符号無しの 0 とする。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 } else if (expr.Type.IsComplexType() && targetType.IsRealType()) {
                     // 複素数型の値を実数型に変換する場合，複素数型の値の虚部を捨て，実部の値を，対応する実数型の変換規則に基づいて変換する
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
             }
 
@@ -950,13 +951,13 @@ namespace AnsiCParser {
                         // 関数指示子（function designator）は，関数型をもつ式とする。
                         // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
                         // 型“～型を返す関数へのポインタ”をもつ式に変換する。
-                        return TypeConvert(targetType, new SyntaxTree.Expression.UnaryAddressExpression(expr.LocationRange, expr));
+                        return TypeConvert(targetType, new Expression.UnaryAddressExpression(expr.LocationRange, expr));
                     } else if (expr.Type.IsArrayType(out elementType)) {
                         // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
                         // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                         // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                         // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-                        return TypeConvert(targetType, new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr));
+                        return TypeConvert(targetType, new Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr));
                     }
                 }
             } else {
@@ -965,13 +966,13 @@ namespace AnsiCParser {
                     // 関数指示子（function designator）は，関数型をもつ式とする。
                     // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
                     // 型“～型を返す関数へのポインタ”をもつ式に変換する。
-                    return new SyntaxTree.Expression.UnaryAddressExpression(expr.LocationRange, expr);
+                    return new Expression.UnaryAddressExpression(expr.LocationRange, expr);
                 } else if (expr.Type.IsArrayType(out elementType)) {
                     // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
                     // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr);
                 }
             }
 
@@ -989,7 +990,7 @@ namespace AnsiCParser {
                     }
                 } else if (targetType.IsVoidType()) {
                     // 他の型の式をボイド式として評価する場合，その値又は指示子は捨てる。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
             }
 
@@ -1004,30 +1005,30 @@ namespace AnsiCParser {
                     // 値0をもつ整数定数式又はその定数式を型void* にキャストした式を，空ポインタ定数（null pointer constant） と呼ぶ。
                     // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
                     // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsQualifiedType()
                     && expr.Type.IsPointerType(out exprPointedType) && !exprPointedType.IsQualifiedType()
                     && CType.IsEqual(targetPointedType.Unwrap(), exprPointedType.Unwrap())) {
                     // 任意の型修飾子 q に対して非 q 修飾型へのポインタは，その型の q 修飾版へのポインタに型変換してもよい。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType() && expr.IsNullPointerConstant()) {
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType() && expr.Type.IsIntegerType()) {
                     // 整数は任意のポインタ型に型変換できる。
                     // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない。
                     // 結果が整数型で表現できなければ，その動作は未定義とする。
                     // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
                 if (targetType.IsIntegerType() && expr.Type.IsPointerType()) {
                     // 任意のポインタ型は整数型に型変換できる。
                     // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
                     // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
                 CType elementType;
@@ -1042,12 +1043,12 @@ namespace AnsiCParser {
                     if (expr.HasStorageClassRegister()) {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, "記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも（6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない");
                     }
-                    expr = TypeConvert(targetType, new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr));
+                    expr = TypeConvert(targetType, new Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr));
                     
                     // 任意のポインタ型は整数型に型変換できる。
                     // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
                     // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
                 if (targetType.IsPointerType(out targetPointedType) && (targetPointedType.IsObjectType() || targetPointedType.IsIncompleteType())
@@ -1064,14 +1065,14 @@ namespace AnsiCParser {
                             Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToString()} 変換先={targetType.ToString()} ");
                         }
                     }
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
                 if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsCharacterType()
                     && expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsObjectType()) {
                     // オブジェクトへのポインタを文字型へのポインタに型変換する場合，その結果はオブジェクトの最も低位のアドレスを指す。
                     // その結果をオブジェクトの大きさまで連続して増分すると，そのオブジェクトの残りのバイトへのポインタを順次生成できる。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
                 if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsFunctionType()
@@ -1082,7 +1083,7 @@ namespace AnsiCParser {
                     if (IsCompatible(targetPointedType, exprPointedType) == false && (targetPointedType.IsVoidType() == false && exprPointedType.IsVoidType() == false)) {
                         Logger.Warning(expr.LocationRange, $"互換性のないポインタ型への変換です。変換元={expr.Type.ToString()} 変換先={targetType.ToString()} ");
                     }
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
             } else {
@@ -1098,7 +1099,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 6.3 型変換(暗黙の型変換(implicit conversion))
         /// </summary>
-        public static SyntaxTree.Expression ImplicitConversion(CType targetType, SyntaxTree.Expression expr) {
+        public static Expression ImplicitConversion(CType targetType, Expression expr) {
             return TypeConvert(targetType, expr);
         }
 
@@ -1106,7 +1107,7 @@ namespace AnsiCParser {
         /// 6.3 型変換(明示的な型変換(explicit conversion))
         /// </summary>
         /// <returns></returns>
-        public static SyntaxTree.Expression ExplicitConversion(CType targetType, SyntaxTree.Expression expr) {
+        public static Expression ExplicitConversion(CType targetType, Expression expr) {
             return TypeConvert(targetType, expr);
         }
 
@@ -1132,16 +1133,16 @@ namespace AnsiCParser {
         /// <remarks>
         /// 値0をもつ整数定数式又はその定数式を型 void* にキャストした式を，空ポインタ定数（null pointer constant）と呼ぶ。
         /// </remarks>
-        public static bool IsNullPointerConstant(this SyntaxTree.Expression expr) {
+        public static bool IsNullPointerConstant(this Expression expr) {
 
             if (expr.Type.IsPointerType() && expr.Type.GetBasePointerType().IsVoidType()) {
                 for (;;) {
-                    if (expr is SyntaxTree.Expression.TypeConversionExpression) {
-                        expr = (expr as SyntaxTree.Expression.TypeConversionExpression).Expr;
+                    if (expr is Expression.TypeConversionExpression) {
+                        expr = (expr as Expression.TypeConversionExpression).Expr;
                         continue;
                     }
-                    if (expr is SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
-                        expr = (expr as SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression).ParenthesesExpression;
+                    if (expr is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                        expr = (expr as Expression.PrimaryExpression.EnclosedInParenthesesExpression).ParenthesesExpression;
                         continue;
                     }
                     break;
@@ -1150,8 +1151,8 @@ namespace AnsiCParser {
 
             // 整数定数式又はその定数式とあるので定数演算を試みる
             try {
-                var ret = Evaluator.ConstantEval(expr);
-                var value = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                var ret = ExpressionEvaluator.Eval(expr);
+                var value = (int?)(ret as Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
                 if (value.HasValue == false) {
                     return false;
                 }
@@ -1167,7 +1168,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        public static SyntaxTree.Expression ToPointerTypeExpr(SyntaxTree.Expression expr) {
+        public static Expression ToPointerTypeExpr(Expression expr) {
 
             // 6.3.2 他のオペランド
 
@@ -1178,13 +1179,13 @@ namespace AnsiCParser {
                     // 関数指示子（function designator）は，関数型をもつ式とする。
                     // 関数指示子が sizeof 演算子又は単項&演算子のオペランドである場合を除いて，型“～型を返す関数”をもつ関数指示子は，
                     // 型“～型を返す関数へのポインタ”をもつ式に変換する。
-                    return new SyntaxTree.Expression.UnaryAddressExpression(expr.LocationRange, expr);
+                    return new Expression.UnaryAddressExpression(expr.LocationRange, expr);
                 } else if (expr.Type.IsArrayType(out elementType)) {
                     // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
                     // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-                    return new SyntaxTree.Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr);
+                    return new Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(elementType), expr);
                 }
             }
 
@@ -1298,10 +1299,10 @@ namespace AnsiCParser {
                     return false;
                 }
 
-                if (t1 is DataType.BasicType && t2 is DataType.BasicType) {
+                if (t1 is BasicType && t2 is BasicType) {
                     // 6.7.2 型指定子
                     // 型指定子の並びは，次に示すもののいずれか一つでなければならない。
-                    if ((t1 as DataType.BasicType).Kind != (t2 as DataType.BasicType).Kind) {
+                    if ((t1 as BasicType).Kind != (t2 as BasicType).Kind) {
                         return false;
                     }
                     return true;
@@ -1366,12 +1367,12 @@ namespace AnsiCParser {
                 // しかし，その型は列挙型のすべてのメンバの値を表現できなければならない。
                 if (t1 is TaggedType.EnumType && t2 is TaggedType.EnumType) {
                     return true;
-                } else if (t1 is TaggedType.EnumType && t2 is DataType.BasicType) {
+                } else if (t1 is TaggedType.EnumType && t2 is BasicType) {
                     // ToDo: 暫定的
-                    return (t2 as DataType.BasicType).Kind == DataType.BasicType.TypeKind.SignedInt;
-                } else if (t1 is DataType.BasicType && t2 is TaggedType.EnumType) {
+                    return (t2 as BasicType).Kind == BasicType.TypeKind.SignedInt;
+                } else if (t1 is BasicType && t2 is TaggedType.EnumType) {
                     // ToDo: 暫定的
-                    return (t1 as DataType.BasicType).Kind == DataType.BasicType.TypeKind.SignedInt;
+                    return (t1 as BasicType).Kind == BasicType.TypeKind.SignedInt;
                 }
 
                 // 6.7.3 型修飾子
@@ -1492,7 +1493,7 @@ namespace AnsiCParser {
         /// <param name="expr"></param>
         /// <returns></returns>
 
-        public static bool IsLvalue(SyntaxTree.Expression expr) {
+        public static bool IsLvalue(Expression expr) {
             return expr.IsLValue();
         }
 
@@ -1501,7 +1502,7 @@ namespace AnsiCParser {
         /// 配列型をもたず，不完全型をもたず， const 修飾型をもたない左辺値
         /// </summary>
         /// <param name="expr"></param>
-        public static bool IsModifiableLvalue(SyntaxTree.Expression expr) {
+        public static bool IsModifiableLvalue(Expression expr) {
             return expr.IsLValue() && !expr.Type.IsIncompleteType() && !expr.Type.IsArrayType() && expr.Type.GetTypeQualifier() != TypeQualifier.Const;
         }
 

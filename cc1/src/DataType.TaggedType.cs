@@ -282,6 +282,10 @@ namespace DataType {
         /// <summary>
         ///     列挙型
         /// </summary>
+        /// <remarks>
+        ///  - 列挙型は，char，符号付き整数型又は符号無し整数型と適合する型とする。型の選択は，処理系定義とする。
+        /// （つまり、sizeof(列挙型) は 処理系定義の値になる。）
+        /// </remarks>
         public class EnumType : TaggedType {
             public EnumType(string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
             }

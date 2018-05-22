@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
     class Program {
@@ -15,7 +16,7 @@ namespace AnsiCParser {
         static void CommonMain(string[] args) {
             string outputFile = null;
             string astFile = null;
-            bool flag_SyntaxOnly = false;
+            bool flagSyntaxOnly = false;
             string outputEncoding = null;
 
             args = new CommandLineOptionsParser()
@@ -32,7 +33,7 @@ namespace AnsiCParser {
                     return true;
                 })
                 .Entry("-fsyntax-only", 0, (s) => {
-                    flag_SyntaxOnly = true;
+                    flagSyntaxOnly = true;
                     return true;
                 })
                 .Parse(args);
@@ -68,11 +69,11 @@ namespace AnsiCParser {
                     var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
                     if (astFile != null) {
                         using (var o = new System.IO.StreamWriter(astFile)) {
-                            o.WriteLine(ret.Accept(new SyntaxTreeToSExprVisitor(), null).ToString());
+                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
                         }
                     }
 
-                    if (flag_SyntaxOnly == false) {
+                    if (flagSyntaxOnly == false) {
                         using (var o = new System.IO.StreamWriter(outputFile)) {
                             var v = new SyntaxTreeCompileVisitor.Value();
                             var visitor = new SyntaxTreeCompileVisitor();
@@ -96,7 +97,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
                         var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c"), "<Debug>").Parse();
-            var sexpr = ret.Accept(new SyntaxTreeToSExprVisitor(), null);
+            var sexpr = ret.Accept(new ToSExprVisitor(), null);
 
             var interpreter = new Lisp.SchemeInterpreter();
             interpreter.InterpreterWantsToPrint += (s,e) => Console.Write(e.WhatToPrint);

@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AnsiCParser.DataType;
+using AnsiCParser.SyntaxTree;
+using VisitorExt = AnsiCParser.SyntaxTree.VisitorExt;
 
 namespace AnsiCParser {
 
-    public class SyntaxTreeCompileVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
+    public class SyntaxTreeCompileVisitor : VisitorExt.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
         /*
          * +------+----------------------+
          * | SP   | 未使用領域           |
@@ -215,8 +217,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("addl %eax, %ecx");
@@ -245,7 +247,7 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset + rhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%ecx", "%edx"); // rhs(loのみ使う)
                         } else {
                             LoadI32("%ecx"); // rhs = index
@@ -266,7 +268,7 @@ namespace AnsiCParser {
                         Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset + lhs.IntConst * elemType.Sizeof()) });
                     } else {
                         LoadPointer("%ecx"); // rhs = base
-                        if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%eax", "%edx"); // lhs(loのみ使う)
                         } else {
                             LoadI32("%eax"); // lhs = index
@@ -287,7 +289,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("subl %eax, %ecx");
@@ -316,7 +318,7 @@ namespace AnsiCParser {
                         Pop();
                         Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset - rhs.IntConst * elemType.Sizeof()) });
                     } else {
-                        if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%ecx", "%edx"); // rhs(loのみ使う)
                         } else {
                             LoadI32("%ecx"); // rhs = index
@@ -337,7 +339,7 @@ namespace AnsiCParser {
                         Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset - lhs.IntConst * elemType.Sizeof()) });
                     } else {
                         LoadPointer("%ecx"); // rhs = base
-                        if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                        if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%eax", "%edx"); // lhs(loのみ使う)
                         } else {
                             LoadI32("%eax"); // lhs = index
@@ -376,8 +378,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("pushl %edx"); // 12(%esp) : lhs.hi
@@ -431,7 +433,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt)) {
+                    if (type.IsBasicType(BasicType.TypeKind.SignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("pushl %ebx"); // 12(%esp) : rhs.hi
@@ -443,7 +445,7 @@ namespace AnsiCParser {
                         Emit("pushl %edx");
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("pushl %ebx"); // 12(%esp) : rhs.hi
@@ -487,7 +489,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt)) {
+                    if (type.IsBasicType(BasicType.TypeKind.SignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("pushl %ebx"); // 12(%esp) : rhs.hi
@@ -499,7 +501,7 @@ namespace AnsiCParser {
                         Emit("pushl %edx");
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("pushl %ebx"); // 12(%esp) : rhs.hi
@@ -535,7 +537,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("andl %ebx, %edx");
@@ -560,7 +562,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("orl %ebx, %edx");
@@ -585,7 +587,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx"); // rhs
                         LoadI64("%ecx", "%edx"); // lhs
                         Emit("xorl %ebx, %edx");
@@ -610,7 +612,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%ecx", "%ebx"); // rhs
                         LoadI64("%eax", "%edx"); // lhs
                         Emit("shldl %cl, %eax, %edx");
@@ -651,7 +653,7 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) || rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%ecx", "%ebx"); // rhs
                         LoadI64("%eax", "%edx"); // lhs
                         Emit("shrdl %cl, %edx, %eax");
@@ -699,7 +701,7 @@ namespace AnsiCParser {
                 var lhs = Peek(0);
                 var rhs = Peek(1);
 
-                DataType.BitFieldType bft;
+                BitFieldType bft;
                 if (type.IsBitField(out bft)) {
                     // ビットフィールドへの代入の場合
                     LoadVariableAddress("%eax"); // lhs
@@ -827,8 +829,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx");
                         LoadI64("%ecx", "%edx");
                         var lFalse = LabelAlloc();
@@ -882,8 +884,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%ebx");
                         LoadI64("%ecx", "%edx");
                         var lFalse = LabelAlloc();
@@ -964,52 +966,52 @@ namespace AnsiCParser {
                 Value ret = Peek(0);
                 System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsIntegerType());
 
-                DataType.BasicType.TypeKind selftykind;
+                BasicType.TypeKind selftykind;
                 if (type.IsBasicType()) {
-                    selftykind = (type.Unwrap() as DataType.BasicType).Kind;
+                    selftykind = (type.Unwrap() as BasicType).Kind;
                 } else if (type.IsEnumeratedType()) {
-                    selftykind = DataType.BasicType.TypeKind.SignedInt;
+                    selftykind = BasicType.TypeKind.SignedInt;
                 } else {
                     throw new NotImplementedException();
                 }
 
-                if (ret.Type.IsBasicType(DataType.BasicType.TypeKind.UnsignedLongLongInt, DataType.BasicType.TypeKind.SignedLongLongInt)) {
+                if (ret.Type.IsBasicType(BasicType.TypeKind.UnsignedLongLongInt, BasicType.TypeKind.SignedLongLongInt)) {
                     // 64bit型からのキャスト
                     LoadI64("%eax", "%ecx");
                     /* 符号の有無にかかわらず、切り捨てでよい？ */
                     switch (selftykind) {
-                        case DataType.BasicType.TypeKind.Char:
-                        case DataType.BasicType.TypeKind.SignedChar:
+                        case BasicType.TypeKind.Char:
+                        case BasicType.TypeKind.SignedChar:
                             Emit("movsbl %al, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedShortInt:
+                        case BasicType.TypeKind.SignedShortInt:
                             Emit("cwtl");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedInt:
-                        case DataType.BasicType.TypeKind.SignedLongInt:
+                        case BasicType.TypeKind.SignedInt:
+                        case BasicType.TypeKind.SignedLongInt:
                             // do nothing;
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedLongLongInt:
+                        case BasicType.TypeKind.SignedLongLongInt:
                             Emit("pushl %ecx");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedChar:
+                        case BasicType.TypeKind.UnsignedChar:
                             Emit("movzbl %al, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedShortInt:
+                        case BasicType.TypeKind.UnsignedShortInt:
                             Emit("movzwl %ax, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedInt:
-                        case DataType.BasicType.TypeKind.UnsignedLongInt:
+                        case BasicType.TypeKind.UnsignedInt:
+                        case BasicType.TypeKind.UnsignedLongInt:
                             // do nothing;
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedLongLongInt:
+                        case BasicType.TypeKind.UnsignedLongLongInt:
                             Emit("pushl %ecx");
                             Emit("pushl %eax");
                             break;
@@ -1020,21 +1022,21 @@ namespace AnsiCParser {
                     // 32bit以下の型からのキャスト
                     LoadI32("%eax");
                     switch (selftykind) {
-                        case DataType.BasicType.TypeKind.Char:
-                        case DataType.BasicType.TypeKind.SignedChar:
+                        case BasicType.TypeKind.Char:
+                        case BasicType.TypeKind.SignedChar:
                             Emit("movsbl %al, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedShortInt:
+                        case BasicType.TypeKind.SignedShortInt:
                             Emit("movswl %ax, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedInt:
-                        case DataType.BasicType.TypeKind.SignedLongInt:
+                        case BasicType.TypeKind.SignedInt:
+                        case BasicType.TypeKind.SignedLongInt:
                             // do nothing;
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.SignedLongLongInt:
+                        case BasicType.TypeKind.SignedLongLongInt:
                             if (ret.Type.IsUnsignedIntegerType()) {
                                 Emit("pushl $0");
                                 Emit("pushl %eax");
@@ -1046,20 +1048,20 @@ namespace AnsiCParser {
                             }
 
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedChar:
+                        case BasicType.TypeKind.UnsignedChar:
                             Emit("movzbl %al, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedShortInt:
+                        case BasicType.TypeKind.UnsignedShortInt:
                             Emit("movzwl %ax, %eax");
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedInt:
-                        case DataType.BasicType.TypeKind.UnsignedLongInt:
+                        case BasicType.TypeKind.UnsignedInt:
+                        case BasicType.TypeKind.UnsignedLongInt:
                             // do nothing;
                             Emit("pushl %eax");
                             break;
-                        case DataType.BasicType.TypeKind.UnsignedLongLongInt:
+                        case BasicType.TypeKind.UnsignedLongLongInt:
                             if (ret.Type.IsUnsignedIntegerType()) {
                                 Emit("pushl $0");
                                 Emit("pushl %eax");
@@ -1317,7 +1319,7 @@ namespace AnsiCParser {
                 Push(new Value { Kind = Value.ValueKind.Address, Type = type, StackPos = _stack.Count });
             }
 
-            public void Call(CType type, DataType.FunctionType funcType, int argnum, Action<CodeGenerator> fun, Action<CodeGenerator, int> args) {
+            public void Call(CType type, FunctionType funcType, int argnum, Action<CodeGenerator> fun, Action<CodeGenerator, int> args) {
                 /*
                  *  - 関数への引数は右から左の順でスタックに積まれる。
                  *    - 引数にはベースポインタ相対でアクセスする
@@ -1352,7 +1354,7 @@ namespace AnsiCParser {
                 }
 
                 // 戻り値が浮動小数点数型でもlong long型ではなく、eaxに入らないサイズならスタック上に格納先アドレスを積む
-                if (resultSize > 4 && !funcType.ResultType.IsRealFloatingType() && !funcType.ResultType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                if (resultSize > 4 && !funcType.ResultType.IsRealFloatingType() && !funcType.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     Emit($"leal {argSize + bakSize}(%esp), %eax");
                     Emit("push %eax");
                 }
@@ -1363,16 +1365,16 @@ namespace AnsiCParser {
 
                 if (funcType.ResultType.IsRealFloatingType()) {
                     // 浮動小数点数型の結果はFPUスタック上にある
-                    if (funcType.ResultType.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                    if (funcType.ResultType.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit($"fstps {(argSize + bakSize)}(%esp)");
-                    } else if (funcType.ResultType.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                    } else if (funcType.ResultType.IsBasicType(BasicType.TypeKind.Double)) {
                         Emit($"fstpl {(argSize + bakSize)}(%esp)");
                     } else {
                         throw new NotImplementedException();
                     }
 
                     Emit($"addl ${argSize}, %esp");
-                } else if (funcType.ResultType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                } else if (funcType.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     // long long型の結果はedx:eaxに格納される
                     Emit($"mov %eax, {(argSize + bakSize + 0)}(%esp)");
                     Emit($"mov %edx, {(argSize + bakSize + 4)}(%esp)");
@@ -1402,7 +1404,7 @@ namespace AnsiCParser {
             }
 
             private int GetMemberOffset(CType type, string member) {
-                var st = type.Unwrap() as DataType.TaggedType.StructUnionType;
+                var st = type.Unwrap() as TaggedType.StructUnionType;
                 if (st == null) {
                     throw new Exception("構造体/共用体型でない型に対してメンバの算出を試みました。");
                 }
@@ -1506,44 +1508,44 @@ namespace AnsiCParser {
                     case Value.ValueKind.IntConst: {
                             // 定数値をレジスタにロードする。
                             // 純粋な整数定数値の他に、整数定数値をポインタ型にキャストしたものもここに含む
-                            DataType.BasicType.TypeKind kind;
-                            if (valueType.Unwrap() is DataType.BasicType) {
-                                kind = (valueType.Unwrap() as DataType.BasicType).Kind;
+                            BasicType.TypeKind kind;
+                            if (valueType.Unwrap() is BasicType) {
+                                kind = (valueType.Unwrap() as BasicType).Kind;
                             } else if (valueType.IsEnumeratedType()) {
-                                kind = DataType.BasicType.TypeKind.SignedInt;
+                                kind = BasicType.TypeKind.SignedInt;
                             } else if (valueType.IsPointerType()) {
-                                kind = DataType.BasicType.TypeKind.UnsignedInt;
+                                kind = BasicType.TypeKind.UnsignedInt;
                             } else {
                                 throw new Exception("整数定数値の型が不正です");
                             }
                             switch (kind) {
-                                case DataType.BasicType.TypeKind.Char:
-                                case DataType.BasicType.TypeKind.SignedChar:
+                                case BasicType.TypeKind.Char:
+                                case BasicType.TypeKind.SignedChar:
                                     Emit($"movb ${value.IntConst}, {ToByteReg(register)}");
                                     Emit($"movsbl {ToByteReg(register)}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.UnsignedChar:
+                                case BasicType.TypeKind.UnsignedChar:
                                     Emit($"movb ${value.IntConst}, {ToByteReg(register)}");
                                     Emit($"movzbl {ToByteReg(register)}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.SignedShortInt:
+                                case BasicType.TypeKind.SignedShortInt:
                                     Emit($"movw ${value.IntConst}, {ToWordReg(register)}");
                                     Emit($"movswl {ToWordReg(register)}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.UnsignedShortInt:
+                                case BasicType.TypeKind.UnsignedShortInt:
                                     Emit($"movw ${value.IntConst}, {ToWordReg(register)}");
                                     Emit($"movzwl {ToWordReg(register)}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.SignedInt:
-                                case DataType.BasicType.TypeKind.SignedLongInt:
+                                case BasicType.TypeKind.SignedInt:
+                                case BasicType.TypeKind.SignedLongInt:
                                     Emit($"movl ${value.IntConst}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.UnsignedInt:
-                                case DataType.BasicType.TypeKind.UnsignedLongInt:
+                                case BasicType.TypeKind.UnsignedInt:
+                                case BasicType.TypeKind.UnsignedLongInt:
                                     Emit($"movl ${value.IntConst}, {register}");
                                     break;
-                                case DataType.BasicType.TypeKind.SignedLongLongInt:
-                                case DataType.BasicType.TypeKind.UnsignedLongLongInt:
+                                case BasicType.TypeKind.SignedLongLongInt:
+                                case BasicType.TypeKind.UnsignedLongLongInt:
                                 default:
                                     throw new Exception("32bitレジスタにロードできない定数値です。");
                             }
@@ -1581,7 +1583,7 @@ namespace AnsiCParser {
 
                             string op;
                             // ビットフィールドは特別扱い
-                            DataType.BitFieldType bft;
+                            BitFieldType bft;
                             if (valueType.IsBitField(out bft)) {
                                 switch (bft.Type.Sizeof()) {
                                     case 1: {
@@ -1646,7 +1648,7 @@ namespace AnsiCParser {
                                         throw new NotSupportedException();
                                 }
                             } else {
-                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(DataType.BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
+                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
                                     switch (valueType.Sizeof()) {
                                         case 1:
                                             op = "movsbl";
@@ -1674,7 +1676,7 @@ namespace AnsiCParser {
                                         default:
                                             throw new NotImplementedException();
                                     }
-                                } else if (valueType.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                                } else if (valueType.IsBasicType(BasicType.TypeKind.Float)) {
                                     op = "movl";
                                 } else if (valueType.IsPointerType() || valueType.IsArrayType()) {
                                     op = "movl";
@@ -1709,7 +1711,7 @@ namespace AnsiCParser {
                 switch (value.Kind) {
                     case Value.ValueKind.IntConst: {
                             // 定数値をレジスタにロードする。
-                            if (valueType.IsSignedIntegerType() || valueType.IsBasicType(DataType.BasicType.TypeKind.Char)) {
+                            if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char)) {
                                 switch (valueType.Sizeof()) {
                                     case 1:
                                         Emit($"movb ${value.IntConst}, {ToByteReg(regLo)}");
@@ -1801,12 +1803,12 @@ namespace AnsiCParser {
                                     throw new NotImplementedException();
                             }
 
-                            if (valueType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt, DataType.BasicType.TypeKind.Double)) {
+                            if (valueType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt, BasicType.TypeKind.Double)) {
                                 Emit($"movl {src(0)}, {regLo}");
                                 Emit($"movl {src(4)}, {regHi}");
                             } else {
                                 string op;
-                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(DataType.BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
+                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
                                     switch (valueType.Sizeof()) {
                                         case 1:
                                             op = "movsbl";
@@ -1834,7 +1836,7 @@ namespace AnsiCParser {
                                         default:
                                             throw new NotImplementedException();
                                     }
-                                } else if (valueType.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                                } else if (valueType.IsBasicType(BasicType.TypeKind.Float)) {
                                     op = "movl";
                                 } else if (valueType.IsPointerType() || valueType.IsArrayType()) {
                                     op = "movl";
@@ -1869,17 +1871,17 @@ namespace AnsiCParser {
                 }
 
                 rhs = Pop();
-                if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                if (rhs.Type.IsBasicType(BasicType.TypeKind.Float)) {
                     Emit("flds (%esp)");
                     Emit("addl $4, %esp");
-                } else if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                } else if (rhs.Type.IsBasicType(BasicType.TypeKind.Double)) {
                     Emit("fldl (%esp)");
                     Emit("addl $8, %esp");
                 } else if (rhs.Type.IsIntegerType()) {
-                    if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt)) {
+                    if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt)) {
                         Emit("fildq (%esp)");
                         Emit("addl $8, %esp");
-                    } else if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongLongInt)) {
                         Emit("fildq (%esp)");
                         Emit("cmpl $0, 4(%esp)");
                         var l = LabelAlloc();
@@ -1892,7 +1894,7 @@ namespace AnsiCParser {
                         Emit("faddp %st, %st(1)");
                         Label(l);
                         Emit("addl $8, %esp");
-                    } else if (rhs.Type.IsBasicType(DataType.BasicType.TypeKind.UnsignedLongInt, DataType.BasicType.TypeKind.UnsignedInt)) {
+                    } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.UnsignedInt)) {
                         Emit("pushl $0");
                         Emit("pushl 4(%esp)");
                         Emit("fildq (%esp)");
@@ -1911,11 +1913,11 @@ namespace AnsiCParser {
             /// </summary>
             /// <param name="ty"></param>
             public void FpuPop(CType ty) {
-                if (ty.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                if (ty.IsBasicType(BasicType.TypeKind.Float)) {
                     Emit("sub $4, %esp");
                     Emit("fstps (%esp)");
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = ty, StackPos = _stack.Count });
-                } else if (ty.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                } else if (ty.IsBasicType(BasicType.TypeKind.Double)) {
                     Emit("sub $8, %esp");
                     Emit("fstpl (%esp)");
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = ty, StackPos = _stack.Count });
@@ -1989,7 +1991,7 @@ namespace AnsiCParser {
                 switch (value.Kind) {
                     case Value.ValueKind.IntConst: {
                             // 定数値をスタックに積む
-                            if (valueType.IsSignedIntegerType() || valueType.IsBasicType(DataType.BasicType.TypeKind.Char)) {
+                            if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char)) {
                                 switch (valueType.Sizeof()) {
                                     case 1:
                                         Emit($"pushl ${unchecked((int)(sbyte)value.IntConst)}");
@@ -2042,11 +2044,11 @@ namespace AnsiCParser {
                     case Value.ValueKind.Temp:
                         break;
                     case Value.ValueKind.FloatConst: {
-                            if (value.Type.Unwrap().IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                            if (value.Type.Unwrap().IsBasicType(BasicType.TypeKind.Float)) {
                                 var bytes = BitConverter.GetBytes((float)value.FloatConst);
                                 var dword = BitConverter.ToUInt32(bytes, 0);
                                 Emit($"pushl ${dword}");
-                            } else if (value.Type.Unwrap().IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                            } else if (value.Type.Unwrap().IsBasicType(BasicType.TypeKind.Double)) {
                                 var bytes = BitConverter.GetBytes(value.FloatConst);
                                 var qwordlo = BitConverter.ToUInt32(bytes, 0);
                                 var qwordhi = BitConverter.ToUInt32(bytes, 4);
@@ -2159,11 +2161,11 @@ namespace AnsiCParser {
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if (type.IsRealFloatingType()) {
                     LoadVariableAddress("%eax");
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                    if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("flds (%eax)");
                         Emit("sub $4, %esp");
                         Emit("fsts (%esp)");
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.Double)) {
                         Emit("fldl (%eax)");
                         Emit("sub $8, %esp");
                         Emit("fstl (%esp)");
@@ -2173,9 +2175,9 @@ namespace AnsiCParser {
 
                     Emit("fld1");
                     Emit($"f{op}p");
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                    if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("fstps (%eax)");
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.Double)) {
                         Emit("fstpl (%eax)");
                     } else {
                         throw new NotImplementedException();
@@ -2249,8 +2251,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
                             GenCompare64("ja", "jb", "ja");
                         } else {
@@ -2286,8 +2288,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
                             GenCompare64("jb", "ja", "jb");
                         } else {
@@ -2323,8 +2325,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
                             GenCompare64("ja", "jb", "jae");
                         } else {
@@ -2360,8 +2362,8 @@ namespace AnsiCParser {
                 var lhs = Peek(1);
 
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    if (lhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt) ||
-                        rhs.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt) ||
+                        rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         if (lhs.Type.IsUnsignedIntegerType() && rhs.Type.IsUnsignedIntegerType()) {
                             GenCompare64("jb", "ja", "jbe");
                         } else {
@@ -2418,7 +2420,7 @@ namespace AnsiCParser {
             public void UnaryMinus(CType type) {
                 var operand = Peek(0);
                 if (operand.Type.IsIntegerType()) {
-                    if (operand.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (operand.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%edx");
                         Emit("negl	%eax");
                         Emit("adcl	$0, %edx");
@@ -2445,7 +2447,7 @@ namespace AnsiCParser {
             public void UnaryBitNot(CType type) {
                 var operand = Peek(0);
                 if (operand.Type.IsIntegerType()) {
-                    if (operand.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                    if (operand.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                         LoadI64("%eax", "%edx");
                         Emit("notl	%eax");
                         Emit("notl	%edx");
@@ -2465,7 +2467,7 @@ namespace AnsiCParser {
 
             public void UnaryLogicalNot(CType type) {
                 var operand = Peek(0);
-                if (operand.Type.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                if (operand.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     LoadI64("%eax", "%edx");
                     Emit("orl %edx, %eax");
                     Emit("cmpl $0, %eax");
@@ -2536,9 +2538,9 @@ namespace AnsiCParser {
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (type.IsRealFloatingType()) {
                     LoadVariableAddress("%eax");
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                    if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("flds (%eax)");
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.Double)) {
                         Emit("fldl (%eax)");
                     } else {
                         throw new NotImplementedException();
@@ -2546,11 +2548,11 @@ namespace AnsiCParser {
 
                     Emit("fld1");
                     Emit($"f{op}p");
-                    if (type.IsBasicType(DataType.BasicType.TypeKind.Float)) {
+                    if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("sub $4, %esp");
                         Emit("fsts (%esp)");
                         Emit("fstps (%eax)");
-                    } else if (type.IsBasicType(DataType.BasicType.TypeKind.Double)) {
+                    } else if (type.IsBasicType(BasicType.TypeKind.Double)) {
                         Emit("sub $8, %esp");
                         Emit("fstl (%esp)");
                         Emit("fstpl (%eax)");
@@ -2646,7 +2648,7 @@ namespace AnsiCParser {
             }
 
             public void Case(CType condType, long caseValue, string label) {
-                if (condType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                if (condType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     var bytes = BitConverter.GetBytes(caseValue);
                     var lo = BitConverter.ToUInt32(bytes, 0);
                     var hi = BitConverter.ToUInt32(bytes, 4);
@@ -2664,7 +2666,7 @@ namespace AnsiCParser {
             }
 
             public void Switch(CType condType, Action<CodeGenerator> p) {
-                if (condType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt)) {
+                if (condType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     LoadI64("%eax", "%edx");
                 } else {
                     LoadI32("%eax");
@@ -2695,18 +2697,18 @@ namespace AnsiCParser {
         public List<Tuple<string, byte[]>> DataBlock = new List<Tuple<string, byte[]>>();
 
 
-        public Value OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, Value value) {
+        public Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Value value) {
             throw new NotImplementedException();
         }
 
-        public Value OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, Value value) {
+        public Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, Value value) {
             if (self.Body != null) {
                 // 引数表
-                var ft = self.Type as DataType.FunctionType;
+                var ft = self.Type as FunctionType;
                 int offset = 8; // prev return position
 
                 // 戻り値領域へのポインタ
-                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(DataType.BasicType.TypeKind.SignedLongLongInt, DataType.BasicType.TypeKind.UnsignedLongLongInt))) {
+                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt))) {
                     offset += 4;
                 }
 
@@ -2755,12 +2757,12 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, Value value) {
+        public Value OnTypeDeclaration(Declaration.TypeDeclaration self, Value value) {
             // なにもしない
             return value;
         }
 
-        public Value OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, Value value) {
+        public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
             // ブロックスコープ変数
             if (self.LinkageObject.Linkage == LinkageKind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
                 if (self.Init != null) {
@@ -2777,14 +2779,14 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, Value value) {
+        public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Add:
+                case Expression.AdditiveExpression.OperatorKind.Add:
                     Generator.Add(self.Type);
                     break;
-                case SyntaxTree.Expression.AdditiveExpression.OperatorKind.Sub:
+                case Expression.AdditiveExpression.OperatorKind.Sub:
                     Generator.Sub(self.Type);
                     break;
             }
@@ -2792,46 +2794,46 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnAndExpression(SyntaxTree.Expression.BitExpression.AndExpression self, Value value) {
+        public Value OnAndExpression(Expression.BitExpression.AndExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             Generator.And(self.Type);
             return value;
         }
 
-        public Value OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
+        public Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
             self.Lhs.Accept(this, value);
             Generator.Dup(0);
             self.Rhs.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
                     Generator.Add(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
                     Generator.Sub(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
                     Generator.Mul(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
                     Generator.Div(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
                     Generator.Mod(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
                     Generator.And(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
                     Generator.Or(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
                     Generator.Xor(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
                     Generator.Shl(self.Type);
                     break;
-                case SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
+                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
                     Generator.Shr(self.Type);
                     break;
                 default:
@@ -2844,7 +2846,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
+        public Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
             self.Rhs.Accept(this, value);
             self.Lhs.Accept(this, value);
 
@@ -2852,13 +2854,13 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnCastExpression(SyntaxTree.Expression.CastExpression self, Value value) {
+        public Value OnCastExpression(Expression.CastExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.CastTo(self.Type);
             return value;
         }
 
-        public Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, Value value) {
+        public Value OnCommaExpression(Expression.CommaExpression self, Value value) {
             bool needDiscard = false;
             foreach (var e in self.Expressions) {
                 if (needDiscard) {
@@ -2870,7 +2872,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, Value value) {
+        public Value OnConditionalExpression(Expression.ConditionalExpression self, Value value) {
             self.CondExpr.Accept(this, value);
 
             var elseLabel = Generator.LabelAlloc();
@@ -2909,17 +2911,17 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, Value value) {
+        public Value OnEqualityExpression(Expression.EqualityExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.EqualityExpression.OperatorKind.Equal:
+                case Expression.EqualityExpression.OperatorKind.Equal:
                     Generator.Eq(self.Type);
                     break;
-                case SyntaxTree.Expression.EqualityExpression.OperatorKind.NotEqual:
+                case Expression.EqualityExpression.OperatorKind.NotEqual:
                     Generator.Ne(self.Type);
                     break;
-                case SyntaxTree.Expression.EqualityExpression.OperatorKind.None:
+                case Expression.EqualityExpression.OperatorKind.None:
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -2927,31 +2929,31 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnExclusiveOrExpression(SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, Value value) {
+        public Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             Generator.Xor(self.Type);
             return value;
         }
 
-        public Value OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, Value value) {
+        public Value OnGccStatementExpression(Expression.GccStatementExpression self, Value value) {
             throw new NotImplementedException();
         }
 
-        public Value OnInclusiveOrExpression(SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, Value value) {
+        public Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             Generator.Or(self.Type);
             return value;
         }
 
-        public Value OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, Value value) {
+        public Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.CastTo(self.Type);
             return value;
         }
 
-        public Value OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, Value value) {
+        public Value OnLogicalAndExpression(Expression.LogicalAndExpression self, Value value) {
             var labelFalse = Generator.LabelAlloc();
             var labelJunction = Generator.LabelAlloc();
             self.Lhs.Accept(this, value);
@@ -2967,7 +2969,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, Value value) {
+        public Value OnLogicalOrExpression(Expression.LogicalOrExpression self, Value value) {
             var labelTrue = Generator.LabelAlloc();
             var labelJunction = Generator.LabelAlloc();
             self.Lhs.Accept(this, value);
@@ -2983,17 +2985,17 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnMultiplicitiveExpression(SyntaxTree.Expression.MultiplicitiveExpression self, Value value) {
+        public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                case Expression.MultiplicitiveExpression.OperatorKind.Mul:
                     Generator.Mul(self.Type);
                     break;
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div:
+                case Expression.MultiplicitiveExpression.OperatorKind.Div:
                     Generator.Div(self.Type);
                     break;
-                case SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                case Expression.MultiplicitiveExpression.OperatorKind.Mod:
                     Generator.Mod(self.Type);
                     break;
                 default:
@@ -3003,14 +3005,14 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
+        public Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
             self.Target.Accept(this, value);
             self.Index.Accept(this, value);
             Generator.ArraySubscript(self.Type);
             return value;
         }
 
-        public Value OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, Value value) {
+        public Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Value value) {
             /*
              *  - 関数への引数は右から左の順でスタックに積まれる。
              *    - 引数にはベースポインタ相対でアクセスする
@@ -3019,7 +3021,7 @@ namespace AnsiCParser {
              *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
              *  - スタックポインタの処理は呼び出し側で行う。  
              */
-            var funcType = self.Expr.Type.GetBasePointerType().Unwrap() as DataType.FunctionType;
+            var funcType = self.Expr.Type.GetBasePointerType().Unwrap() as FunctionType;
 
             Generator.Call(self.Type, funcType, self.Args.Count, g => {
                 self.Expr.Accept(this, value);
@@ -3058,25 +3060,25 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, Value value) {
+        public Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Value value) {
             self.Expr.Accept(this, value);
             Generator.DirectMember(self.Type, self.Ident.Raw);
             return value;
         }
 
-        public Value OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
+        public Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
             self.Expr.Accept(this, value);
             Generator.IndirectMember(self.Type, self.Ident.Raw);
             return value;
         }
 
-        public Value OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
+        public Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
             self.Expr.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
+                case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
                     Generator.PostDec(self.Type);
                     break;
-                case SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
+                case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
                     Generator.PostInc(self.Type);
                     break;
                 default:
@@ -3086,51 +3088,51 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
+        public Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
             return value;
         }
 
-        public Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
+        public Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.FloatConst, Type = self.Type, FloatConst = self.Value });
             return value;
         }
 
-        public Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
+        public Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
             return value;
         }
 
-        public Value OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+        public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
             return self.ParenthesesExpression.Accept(this, value);
         }
 
-        public Value OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
+        public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
             self.Identifier.Accept(this, value);
             Generator.CalcConstAddressOffset(self.Type, self.Offset.Value);
             return value;
         }
 
-        public Value OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
+        public Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Info.Value });
             return value;
         }
 
-        public Value OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
+        public Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
             return value;
         }
 
-        public Value OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
+        public Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
             throw new NotImplementedException();
         }
 
-        public Value OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
+        public Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
             Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = null, Offset = _arguments[self.Ident] });
             return value;
         }
 
-        public Value OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
+        public Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
             if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                 Tuple<string, int> offset;
                 if (_localScope.TryGetValue(self.Ident, out offset)) {
@@ -3145,7 +3147,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, Value value) {
+        public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
             int no = DataBlock.Count;
             var label = $"D{no}";
             DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
@@ -3153,20 +3155,20 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, Value value) {
+        public Value OnRelationalExpression(Expression.RelationalExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
             switch (self.Op) {
-                case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterThan:
+                case Expression.RelationalExpression.OperatorKind.GreaterThan:
                     Generator.GreatThan(self.Type);
                     break;
-                case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessThan:
+                case Expression.RelationalExpression.OperatorKind.LessThan:
                     Generator.LessThan(self.Type);
                     break;
-                case SyntaxTree.Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
+                case Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
                     Generator.GreatOrEqual(self.Type);
                     break;
-                case SyntaxTree.Expression.RelationalExpression.OperatorKind.LessOrEqual:
+                case Expression.RelationalExpression.OperatorKind.LessOrEqual:
                     Generator.LessOrEqual(self.Type);
                     break;
                 default:
@@ -3176,15 +3178,15 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnShiftExpression(SyntaxTree.Expression.ShiftExpression self, Value value) {
+        public Value OnShiftExpression(Expression.ShiftExpression self, Value value) {
             self.Lhs.Accept(this, value);
             self.Rhs.Accept(this, value);
 
             switch (self.Op) {
-                case SyntaxTree.Expression.ShiftExpression.OperatorKind.Left:
+                case Expression.ShiftExpression.OperatorKind.Left:
                     Generator.Shl(self.Type);
                     break;
-                case SyntaxTree.Expression.ShiftExpression.OperatorKind.Right:
+                case Expression.ShiftExpression.OperatorKind.Right:
                     Generator.Shr(self.Type);
                     break;
                 default:
@@ -3194,62 +3196,62 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, Value value) {
+        public Value OnSizeofExpression(Expression.SizeofExpression self, Value value) {
             // todo: C99可変長配列型
             Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() });
             return value;
         }
 
-        public Value OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, Value value) {
+        public Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Value value) {
             // todo: C99可変長配列型
             Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() });
             return value;
         }
 
 
-        public Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, Value value) {
+        public Value OnTypeConversionExpression(Expression.TypeConversionExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.CastTo(self.Type);
             return value;
         }
 
-        public Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, Value value) {
+        public Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.Address(self.Type);
             return value;
         }
 
-        public Value OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, Value value) {
+        public Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.UnaryMinus(self.Type);
             return value;
         }
 
-        public Value OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, Value value) {
+        public Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.UnaryBitNot(self.Type);
             return value;
         }
 
-        public Value OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, Value value) {
+        public Value OnUnaryNotExpression(Expression.UnaryNotExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.UnaryLogicalNot(self.Type);
             return value;
         }
 
-        public Value OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, Value value) {
+        public Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Value value) {
             self.Expr.Accept(this, value);
             return value;
         }
 
-        public Value OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, Value value) {
+        public Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Value value) {
             self.Expr.Accept(this, value);
 
             switch (self.Op) {
-                case SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc:
+                case Expression.UnaryPrefixExpression.OperatorKind.Inc:
                     Generator.PreInc(self.Type);
                     break;
-                case SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec:
+                case Expression.UnaryPrefixExpression.OperatorKind.Dec:
                     Generator.PreDec(self.Type);
                     break;
                 default:
@@ -3259,21 +3261,21 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, Value value) {
+        public Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Value value) {
             self.Expr.Accept(this, value);
             Generator.Reference(self.Type);
             return value;
         }
 
-        public Value OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, Value value) {
+        public Value OnComplexInitializer(Initializer.ComplexInitializer self, Value value) {
             throw new Exception("来ないはず");
         }
 
-        public Value OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, Value value) {
+        public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
             throw new Exception("来ないはず");
         }
 
-        public Value OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, Value value) {
+        public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
             self.Expr.Accept(this, value);
             Generator.Push(value);
             Generator.Assign(self.Type);
@@ -3281,7 +3283,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, Value value) {
+        public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
             var elementSize = self.Type.BaseType.Sizeof();
             var v = new Value(value) { Type = self.Type.BaseType };
             foreach (var init in self.Inits) {
@@ -3303,7 +3305,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, Value value) {
+        public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
             // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
             // 共用体は初期化式が一つのはず
             Value v = new Value(value);
@@ -3314,14 +3316,14 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, Value value) {
+        public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var label = _breakTarget.Peek();
             Generator.Jmp(label);
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnCaseStatement(SyntaxTree.Statement.CaseStatement self, Value value) {
+        public Value OnCaseStatement(Statement.CaseStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var label = _switchLabelTableStack.Peek()[self];
             Generator.Label(label);
@@ -3333,14 +3335,14 @@ namespace AnsiCParser {
         private int _localScopeTotalSize;
         private int _maxLocalScopeTotalSize;
 
-        public Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, Value value) {
+        public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
 
             _localScope = _localScope.Extend();
             var prevLocalScopeSize = _localScopeTotalSize;
 
             Generator.Emit("// enter scope");
-            foreach (var x in self.Decls.Reverse<SyntaxTree.Declaration>()) {
+            foreach (var x in self.Decls.Reverse<Declaration>()) {
                 if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                     if (x.StorageClass == StorageClassSpecifier.Static) {
                         // static
@@ -3382,14 +3384,14 @@ namespace AnsiCParser {
             return value;
         }
 
-        public Value OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, Value value) {
+        public Value OnContinueStatement(Statement.ContinueStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var label = _continueTarget.Peek();
             Generator.Jmp(label);
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnDefaultStatement(SyntaxTree.Statement.DefaultStatement self, Value value) {
+        public Value OnDefaultStatement(Statement.DefaultStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var label = _switchLabelTableStack.Peek()[self];
             Generator.Label(label);
@@ -3397,7 +3399,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, Value value) {
+        public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var labelContinue = Generator.LabelAlloc();
             var labelBreak = Generator.LabelAlloc();
@@ -3416,19 +3418,19 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, Value value) {
+        public Value OnEmptyStatement(Statement.EmptyStatement self, Value value) {
             return new Value { Kind = Value.ValueKind.Void };
             //throw new NotImplementedException();
         }
 
-        public Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, Value value) {
+        public Value OnExpressionStatement(Statement.ExpressionStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             self.Expr.Accept(this, value);
             Generator.Discard();
             return value;
         }
 
-        public Value OnForStatement(SyntaxTree.Statement.ForStatement self, Value value) {
+        public Value OnForStatement(Statement.ForStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             // Initialize
             if (self.Init != null) {
@@ -3465,7 +3467,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, Value value) {
+        public Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             if (_genericLabels.ContainsKey(self.Ident) == false) {
                 _genericLabels[self.Ident] = Generator.LabelAlloc();
@@ -3476,7 +3478,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnGotoStatement(SyntaxTree.Statement.GotoStatement self, Value value) {
+        public Value OnGotoStatement(Statement.GotoStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             if (_genericLabels.ContainsKey(self.Label) == false) {
                 _genericLabels[self.Label] = Generator.LabelAlloc();
@@ -3486,7 +3488,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnIfStatement(SyntaxTree.Statement.IfStatement self, Value value) {
+        public Value OnIfStatement(Statement.IfStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             self.Cond.Accept(this, value);
             if (self.ElseStmt != null) {
@@ -3513,7 +3515,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, Value value) {
+        public Value OnReturnStatement(Statement.ReturnStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             self.Expr?.Accept(this, value);
             Generator.Return(self.Expr?.Type);
@@ -3521,15 +3523,15 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        private readonly Stack<Dictionary<SyntaxTree.Statement, string>> _switchLabelTableStack = new Stack<Dictionary<SyntaxTree.Statement, string>>();
+        private readonly Stack<Dictionary<Statement, string>> _switchLabelTableStack = new Stack<Dictionary<Statement, string>>();
 
-        public Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, Value value) {
+        public Value OnSwitchStatement(Statement.SwitchStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var labelBreak = Generator.LabelAlloc();
 
             self.Cond.Accept(this, value);
 
-            var labelDic = new Dictionary<SyntaxTree.Statement, string>();
+            var labelDic = new Dictionary<Statement, string>();
             Generator.Switch(self.Cond.Type, g => {
                 foreach (var caseLabel in self.CaseLabels) {
                     var caseValue = caseLabel.Value;
@@ -3556,7 +3558,7 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnWhileStatement(SyntaxTree.Statement.WhileStatement self, Value value) {
+        public Value OnWhileStatement(Statement.WhileStatement self, Value value) {
             Generator.Emit($"// {self.LocationRange}");
             var labelContinue = Generator.LabelAlloc();
             var labelBreak = Generator.LabelAlloc();
@@ -3577,16 +3579,16 @@ namespace AnsiCParser {
             return new Value { Kind = Value.ValueKind.Void };
         }
 
-        public Value OnTranslationUnit(SyntaxTree.TranslationUnit self, Value value) {
+        public Value OnTranslationUnit(TranslationUnit self, Value value) {
             foreach (var obj in self.LinkageTable) {
-                if (obj.Definition is SyntaxTree.Declaration.VariableDeclaration) {
+                if (obj.Definition is Declaration.VariableDeclaration) {
                     var visitor = new FileScopeInitializerVisitor(this);
                     obj.Definition?.Accept(visitor, value);
                 }
             }
 
             foreach (var obj in self.LinkageTable) {
-                if (!(obj.Definition is SyntaxTree.Declaration.VariableDeclaration)) {
+                if (!(obj.Definition is Declaration.VariableDeclaration)) {
                     obj.Definition?.Accept(this, value);
                 }
             }
@@ -3603,33 +3605,33 @@ namespace AnsiCParser {
         }
     }
 
-    public class FileScopeInitializerVisitor : SyntaxTreeVisitor.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
+    public class FileScopeInitializerVisitor : VisitorExt.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
         private SyntaxTreeCompileVisitor syntaxTreeCompileVisitor;
 
         public void Emit(string s) {
             syntaxTreeCompileVisitor.Generator.Emit(s);
         }
 
-        public List<Tuple<int, int, int, SyntaxTree.Expression>> Values { get; } = new List<Tuple<int, int, int, SyntaxTree.Expression>>();
+        public List<Tuple<int, int, int, Expression>> Values { get; } = new List<Tuple<int, int, int, Expression>>();
         public int CurrentOffset = 0;
 
         public FileScopeInitializerVisitor(SyntaxTreeCompileVisitor syntaxTreeCompileVisitor) {
             this.syntaxTreeCompileVisitor = syntaxTreeCompileVisitor;
         }
 
-        public SyntaxTreeCompileVisitor.Value OnArgumentDeclaration(SyntaxTree.Declaration.ArgumentDeclaration self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnFunctionDeclaration(SyntaxTree.Declaration.FunctionDeclaration self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnTypeDeclaration(SyntaxTree.Declaration.TypeDeclaration self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnTypeDeclaration(Declaration.TypeDeclaration self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnVariableDeclaration(SyntaxTree.Declaration.VariableDeclaration self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnVariableDeclaration(Declaration.VariableDeclaration self, SyntaxTreeCompileVisitor.Value value) {
             // ファイルスコープ変数
             if (self.Init != null) {
                 Emit(".section .data");
@@ -3701,110 +3703,110 @@ namespace AnsiCParser {
             return value;
         }
 
-        public SyntaxTreeCompileVisitor.Value OnAdditiveExpression(SyntaxTree.Expression.AdditiveExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnAdditiveExpression(Expression.AdditiveExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnAndExpression(SyntaxTree.Expression.BitExpression.AndExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnAndExpression(Expression.BitExpression.AndExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCompoundAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.CompoundAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSimpleAssignmentExpression(SyntaxTree.Expression.AssignmentExpression.SimpleAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCastExpression(SyntaxTree.Expression.CastExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCastExpression(Expression.CastExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCommaExpression(SyntaxTree.Expression.CommaExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCommaExpression(Expression.CommaExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnConditionalExpression(SyntaxTree.Expression.ConditionalExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnConditionalExpression(Expression.ConditionalExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnEqualityExpression(SyntaxTree.Expression.EqualityExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnEqualityExpression(Expression.EqualityExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnExclusiveOrExpression(SyntaxTree.Expression.BitExpression.ExclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnGccStatementExpression(SyntaxTree.Expression.GccStatementExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnGccStatementExpression(Expression.GccStatementExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnInclusiveOrExpression(SyntaxTree.Expression.BitExpression.InclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnIntegerPromotionExpression(SyntaxTree.Expression.IntegerPromotionExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnLogicalAndExpression(SyntaxTree.Expression.LogicalAndExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnLogicalAndExpression(Expression.LogicalAndExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnLogicalOrExpression(SyntaxTree.Expression.LogicalOrExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnLogicalOrExpression(Expression.LogicalOrExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnMultiplicitiveExpression(SyntaxTree.Expression.MultiplicitiveExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnArraySubscriptingExpression(SyntaxTree.Expression.PostfixExpression.ArraySubscriptingExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnFunctionCallExpression(SyntaxTree.Expression.PostfixExpression.FunctionCallExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnMemberDirectAccess(SyntaxTree.Expression.PostfixExpression.MemberDirectAccess self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnMemberIndirectAccess(SyntaxTree.Expression.PostfixExpression.MemberIndirectAccess self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryPostfixExpression(SyntaxTree.Expression.PostfixExpression.UnaryPostfixExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCharacterConstant(SyntaxTree.Expression.PrimaryExpression.Constant.CharacterConstant self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, SyntaxTreeCompileVisitor.Value value) {
             return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
         }
 
-        public SyntaxTreeCompileVisitor.Value OnFloatingConstant(SyntaxTree.Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeCompileVisitor.Value value) {
             return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = self.Value, Type = self.Type };
         }
 
-        public SyntaxTreeCompileVisitor.Value OnIntegerConstant(SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTreeCompileVisitor.Value value) {
             return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
         }
 
-        public SyntaxTreeCompileVisitor.Value OnEnclosedInParenthesesExpression(SyntaxTree.Expression.PrimaryExpression.EnclosedInParenthesesExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnAddressConstantExpression(SyntaxTree.Expression.PrimaryExpression.AddressConstantExpression self, SyntaxTreeCompileVisitor.Value value) {
-            if (self.Identifier is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
-                var f = self.Identifier as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
+        public SyntaxTreeCompileVisitor.Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, SyntaxTreeCompileVisitor.Value value) {
+            if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
+                var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
                 return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
             }
 
-            if (self.Identifier is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
-                var f = self.Identifier as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
+            if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
+                var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
                 return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
             }
             if (self.Identifier == null) {
@@ -3814,94 +3816,94 @@ namespace AnsiCParser {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnEnumerationConstant(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnFunctionExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUndefinedIdentifierExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnArgumentExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnVariableExpression(SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnStringExpression(SyntaxTree.Expression.PrimaryExpression.StringExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, SyntaxTreeCompileVisitor.Value value) {
             int no = syntaxTreeCompileVisitor.DataBlock.Count;
             var label = $"D{no}";
             syntaxTreeCompileVisitor.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
             return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = label, Offset = 0, Type = self.Type };
         }
 
-        public SyntaxTreeCompileVisitor.Value OnRelationalExpression(SyntaxTree.Expression.RelationalExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnRelationalExpression(Expression.RelationalExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnShiftExpression(SyntaxTree.Expression.ShiftExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnShiftExpression(Expression.ShiftExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSizeofExpression(SyntaxTree.Expression.SizeofExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnSizeofExpression(Expression.SizeofExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSizeofTypeExpression(SyntaxTree.Expression.SizeofTypeExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnTypeConversionExpression(SyntaxTree.Expression.TypeConversionExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnTypeConversionExpression(Expression.TypeConversionExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryAddressExpression(SyntaxTree.Expression.UnaryAddressExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryMinusExpression(SyntaxTree.Expression.UnaryMinusExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryNegateExpression(SyntaxTree.Expression.UnaryNegateExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryNotExpression(SyntaxTree.Expression.UnaryNotExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryNotExpression(Expression.UnaryNotExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryPlusExpression(SyntaxTree.Expression.UnaryPlusExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryPrefixExpression(SyntaxTree.Expression.UnaryPrefixExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnUnaryReferenceExpression(SyntaxTree.Expression.UnaryReferenceExpression self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnComplexInitializer(SyntaxTree.Initializer.ComplexInitializer self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnComplexInitializer(Initializer.ComplexInitializer self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSimpleInitializer(SyntaxTree.Initializer.SimpleInitializer self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnSimpleInitializer(Initializer.SimpleInitializer self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSimpleAssignInitializer(SyntaxTree.Initializer.SimpleAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
-            var ret = Evaluator.ConstantEval(self.Expr);
+        public SyntaxTreeCompileVisitor.Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
+            var ret = ExpressionEvaluator.Eval(self.Expr);
             if (self.Type.IsBitField()) {
-                var bft = self.Type as DataType.BitFieldType;
-                if (ret is SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant) {
+                var bft = self.Type as BitFieldType;
+                if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
                     Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, ret));
                     if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
                         CurrentOffset += bft.Sizeof();
@@ -3916,25 +3918,25 @@ namespace AnsiCParser {
             return value;
         }
 
-        public SyntaxTreeCompileVisitor.Value OnArrayAssignInitializer(SyntaxTree.Initializer.ArrayAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
 
             foreach (var s in self.Inits) {
                 s.Accept(this, value);
             }
 
-            var arrayType = self.Type.Unwrap() as DataType.ArrayType;
+            var arrayType = self.Type.Unwrap() as ArrayType;
             var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.BaseType.Sizeof();
             while (filledSize > 0) {
                 if (filledSize >= 4) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedLongInt)));
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
                     CurrentOffset += 4;
                     filledSize -= 4;
                 } else if (filledSize >= 2) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedShortInt)));
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
                     CurrentOffset += 2;
                     filledSize -= 2;
                 } else if (filledSize >= 1) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedChar)));
+                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
                     CurrentOffset += 1;
                     filledSize -= 1;
                 }
@@ -3943,7 +3945,7 @@ namespace AnsiCParser {
             return value;
         }
 
-        public SyntaxTreeCompileVisitor.Value OnStructUnionAssignInitializer(SyntaxTree.Initializer.StructUnionAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
             var start = Values.Count;
 
             foreach (var s in self.Inits) {
@@ -3951,13 +3953,13 @@ namespace AnsiCParser {
             }
 
 
-            var suType = self.Type.Unwrap() as DataType.TaggedType.StructUnionType;
+            var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
             if (suType.IsStructureType()) {
                 foreach (var x in suType.Members.Skip(self.Inits.Count)) {
                     if (x.Type.IsBitField()) {
-                        var bft = x.Type as DataType.BitFieldType;
-                        var bt = bft.Type as DataType.BasicType;
-                        Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+                        var bft = x.Type as BitFieldType;
+                        var bt = bft.Type as BasicType;
+                        Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
                         if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
                             CurrentOffset += bft.Sizeof();
                         }
@@ -3966,15 +3968,15 @@ namespace AnsiCParser {
                         while (fillSize > 0) {
                             if (fillSize >= 4) {
                                 fillSize -= 4;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedLongInt)));
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
                                 CurrentOffset += 4;
                             } else if (fillSize >= 2) {
                                 fillSize -= 2;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedShortInt)));
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
                                 CurrentOffset += 4;
                             } else if (fillSize >= 1) {
                                 fillSize -= 1;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, DataType.BasicType.TypeKind.UnsignedChar)));
+                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
                                 CurrentOffset += 4;
                             }
                         }
@@ -4034,7 +4036,7 @@ namespace AnsiCParser {
                     v |= bits << bOffset;
                     Values.RemoveAt(i);
                 }
-                Values.Insert(i, Tuple.Create(byteOffset, -1, -1, (SyntaxTree.Expression)new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as DataType.BasicType).Kind)));
+                Values.Insert(i, Tuple.Create(byteOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as BasicType).Kind)));
 
                 i++;
 
@@ -4042,67 +4044,67 @@ namespace AnsiCParser {
             return value;
         }
 
-        public SyntaxTreeCompileVisitor.Value OnBreakStatement(SyntaxTree.Statement.BreakStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnBreakStatement(Statement.BreakStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCaseStatement(SyntaxTree.Statement.CaseStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCaseStatement(Statement.CaseStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnCompoundStatement(SyntaxTree.Statement.CompoundStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnCompoundStatement(Statement.CompoundStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnContinueStatement(SyntaxTree.Statement.ContinueStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnContinueStatement(Statement.ContinueStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnDefaultStatement(SyntaxTree.Statement.DefaultStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnDefaultStatement(Statement.DefaultStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnDoWhileStatement(SyntaxTree.Statement.DoWhileStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnDoWhileStatement(Statement.DoWhileStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnEmptyStatement(SyntaxTree.Statement.EmptyStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnEmptyStatement(Statement.EmptyStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnExpressionStatement(SyntaxTree.Statement.ExpressionStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnExpressionStatement(Statement.ExpressionStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnForStatement(SyntaxTree.Statement.ForStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnForStatement(Statement.ForStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnGenericLabeledStatement(SyntaxTree.Statement.GenericLabeledStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnGotoStatement(SyntaxTree.Statement.GotoStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnGotoStatement(Statement.GotoStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnIfStatement(SyntaxTree.Statement.IfStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnIfStatement(Statement.IfStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnReturnStatement(SyntaxTree.Statement.ReturnStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnReturnStatement(Statement.ReturnStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnSwitchStatement(SyntaxTree.Statement.SwitchStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnSwitchStatement(Statement.SwitchStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnWhileStatement(SyntaxTree.Statement.WhileStatement self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnWhileStatement(Statement.WhileStatement self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
 
-        public SyntaxTreeCompileVisitor.Value OnTranslationUnit(SyntaxTree.TranslationUnit self, SyntaxTreeCompileVisitor.Value value) {
+        public SyntaxTreeCompileVisitor.Value OnTranslationUnit(TranslationUnit self, SyntaxTreeCompileVisitor.Value value) {
             throw new NotImplementedException();
         }
     }

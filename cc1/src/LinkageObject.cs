@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AnsiCParser.DataType;
+using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
     /// <summary>
@@ -98,12 +99,12 @@ namespace AnsiCParser {
         /// <summary>
         /// 仮宣言
         /// </summary>
-        public List<SyntaxTree.Declaration> TentativeDefinitions { get; } = new List<SyntaxTree.Declaration>();
+        public List<Declaration> TentativeDefinitions { get; } = new List<Declaration>();
 
         /// <summary>
         /// 本宣言
         /// </summary>
-        public SyntaxTree.Declaration Definition { get; set; }
+        public Declaration Definition { get; set; }
 
         /// <summary>
         /// リンケージを考慮した名前

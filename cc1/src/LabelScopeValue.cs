@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
     public class LabelScopeValue {
@@ -6,7 +7,7 @@ namespace AnsiCParser {
         /// <summary>
         /// ラベルの宣言地点
         /// </summary>
-        public SyntaxTree.Statement.GenericLabeledStatement Declaration {
+        public Statement.GenericLabeledStatement Declaration {
             get;
             internal set;
         }
@@ -14,15 +15,15 @@ namespace AnsiCParser {
         /// <summary>
         /// ラベルの参照地点リスト
         /// </summary>
-        public List<SyntaxTree.Statement.GotoStatement> References {
+        public List<Statement.GotoStatement> References {
             get;
-        } = new List<SyntaxTree.Statement.GotoStatement>();
+        } = new List<Statement.GotoStatement>();
 
         /// <summary>
         /// 宣言地点を設定
         /// </summary>
         /// <param name="labelStmt"></param>
-        public void SetDeclaration(SyntaxTree.Statement.GenericLabeledStatement labelStmt) {
+        public void SetDeclaration(Statement.GenericLabeledStatement labelStmt) {
             if (Declaration != null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "ラベルの宣言地点は既に設定済みです。（本処理系の誤りです。）");
             }
@@ -36,7 +37,7 @@ namespace AnsiCParser {
         /// 参照地点を追加
         /// </summary>
         /// <param name="gotoStmt"></param>
-        public void AddReference(SyntaxTree.Statement.GotoStatement gotoStmt) {
+        public void AddReference(Statement.GotoStatement gotoStmt) {
             References.Add(gotoStmt);
             if (Declaration != null) {
                 gotoStmt.Target = Declaration;

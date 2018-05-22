@@ -1,8 +1,8 @@
-namespace AnsiCParser {
+namespace AnsiCParser.SyntaxTree {
     /// <summary>
     /// 構文木
     /// </summary>
-    public abstract partial class SyntaxTree {
+    public abstract partial class Ast {
 
         /// <summary>
         /// 構文木の対応するソース範囲
@@ -15,7 +15,7 @@ namespace AnsiCParser {
         /// コンストラクタ
         /// </summary>
         /// <param name="locationRange"></param>
-        protected SyntaxTree(LocationRange locationRange) {
+        protected Ast(LocationRange locationRange) {
             LocationRange = locationRange;
         }
     }
