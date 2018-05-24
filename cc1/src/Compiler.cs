@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using AnsiCParser.DataType;
@@ -7,54 +8,12 @@ using AnsiCParser.SyntaxTree;
 using VisitorExt = AnsiCParser.SyntaxTree.VisitorExt;
 
 namespace AnsiCParser {
+    public class Compiler {
 
-    public class SyntaxTreeCompileVisitor : VisitorExt.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
-        /*
-         * +------+----------------------+
-         * | SP   | 未使用領域           |
-         * +------+----------------------+
-         * | +n   | ローカル変数領域     |
-         * +------+----------------------+
-         * | ・・・・・・・・            |
-         * +------+----------------------+
-         * | -1   | ローカル変数領域     |
-         * +------+----------------------+
-         * | BP   | 以前のSP             |
-         * +------+----------------------+
-         * | (※戻り値格納先アドレス)    |
-         * +------+----------------------+
-         * | +1   | 引数[0]              |
-         * +------+----------------------+
-         * | ・・・・・・・・            |
-         * +------+----------------------+
-         * | +n-1 | 引数[n-2]            |
-         * +------+----------------------+
-         * | +n   | 引数[n-1]            |
-         * +------+----------------------+
-         * 
-         */
 
-        /*
-         * Calling Convention: cdecl
-         *  - 関数への引数は右から左の順でスタックに積まれる。
-         *    - 引数にはベースポインタ相対でアクセスする
-         *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。
-         *    EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
-         *    浮動小数点数の場合はFPUスタックのトップに結果をセットする
-         *    long long型の結果はedx:eaxに格納される
-         *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
-         *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
-         *    （なので、EBX, ESI, EDI は呼び出され側の先頭でスタックに退避している）
-         *  - スタックポインタの処理は呼び出し側で行う。
-         *  - 引数・戻り値領域の開放は呼び出し側で行う
-         *  
-         */
-
-        /*
-         * コード生成:
-         *  - 基本はスタック計算機
-         */
-
+        /// <summary>
+        /// コード生成時の値(計算結果)を示すオブジェクト
+        /// </summary>
         public class Value {
             public enum ValueKind {
                 Void, // 式の結果はvoidである。
@@ -93,10 +52,17 @@ namespace AnsiCParser {
             // Temp/Address
             public int StackPos;
 
-
+            /// <summary>
+            /// コンストラクタ
+            /// </summary>
             public Value() {
             }
 
+
+            /// <summary>
+            /// コピーコンストラクタ
+            /// </summary>
+            /// <param name="ret"></param>
             public Value(Value ret) {
                 Kind = ret.Kind;
                 Type = ret.Type;
@@ -109,9 +75,9 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        ///     コード生成器(i386向け)
+        /// コード生成器(i386向け)
         /// </summary>
-        public class CodeGenerator {
+        protected class CodeGenerator {
             public class Code {
                 public string Body {
                     get; set;
@@ -964,7 +930,7 @@ namespace AnsiCParser {
 
             private void CastIntValueToInt(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsIntegerType());
+                Debug.Assert(ret.Type.IsIntegerType() && type.IsIntegerType());
 
                 BasicType.TypeKind selftykind;
                 if (type.IsBasicType()) {
@@ -1083,14 +1049,14 @@ namespace AnsiCParser {
 
             private void CastPointerValueToPointer(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsPointerType() && type.IsPointerType());
+                Debug.Assert(ret.Type.IsPointerType() && type.IsPointerType());
                 Pop();
                 Push(new Value(ret) { Type = type });
             }
 
             private void CastArrayValueToPointer(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsArrayType() && type.IsPointerType());
+                Debug.Assert(ret.Type.IsArrayType() && type.IsPointerType());
                 Pop();
                 // 手抜き
                 if (ret.Kind == Value.ValueKind.Var) {
@@ -1109,14 +1075,14 @@ namespace AnsiCParser {
 
             private void CastArrayValueToArray(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsArrayType() && type.IsArrayType());
+                Debug.Assert(ret.Type.IsArrayType() && type.IsArrayType());
                 Pop();
                 Push(new Value(ret) { Type = type });
             }
 
             private void CastIntValueToPointer(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsPointerType());
+                Debug.Assert(ret.Type.IsIntegerType() && type.IsPointerType());
                 // Todo: 64bit int value -> 32bit pointer value の実装
                 Pop();
                 Push(new Value(ret) { Type = type });
@@ -1124,7 +1090,7 @@ namespace AnsiCParser {
 
             private void CastPointerValueToInt(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsPointerType() && type.IsIntegerType());
+                Debug.Assert(ret.Type.IsPointerType() && type.IsIntegerType());
                 // Todo: 32bit pointer value -> 64bit int value の実装
                 Pop();
                 Push(new Value(ret) { Type = type });
@@ -1132,14 +1098,14 @@ namespace AnsiCParser {
 
             private void CastFloatingValueToFloating(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsRealFloatingType() && type.IsRealFloatingType());
+                Debug.Assert(ret.Type.IsRealFloatingType() && type.IsRealFloatingType());
                 FpuPush();
                 FpuPop(type);
             }
 
             private void CastFloatingValueToInt(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsRealFloatingType() && type.IsIntegerType());
+                Debug.Assert(ret.Type.IsRealFloatingType() && type.IsIntegerType());
                 FpuPush();
 
                 // double -> unsigned char
@@ -1266,7 +1232,7 @@ namespace AnsiCParser {
 
             private void CastIntValueToFloating(CType type) {
                 Value ret = Peek(0);
-                System.Diagnostics.Debug.Assert(ret.Type.IsIntegerType() && type.IsRealFloatingType());
+                Debug.Assert(ret.Type.IsIntegerType() && type.IsRealFloatingType());
                 FpuPush();
                 FpuPop(type);
             }
@@ -1321,13 +1287,13 @@ namespace AnsiCParser {
 
             public void Call(CType type, FunctionType funcType, int argnum, Action<CodeGenerator> fun, Action<CodeGenerator, int> args) {
                 /*
-                 *  - 関数への引数は右から左の順でスタックに積まれる。
-                 *    - 引数にはベースポインタ相対でアクセスする
-                 *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
-                 *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
-                 *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
-                 *  - スタックポインタの処理は呼び出し側で行う。  
-                 */
+                     *  - 関数への引数は右から左の順でスタックに積まれる。
+                     *    - 引数にはベースポインタ相対でアクセスする
+                     *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+                     *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
+                     *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
+                     *  - スタックポインタの処理は呼び出し側で行う。  
+                     */
 
                 int resultSize;
                 if (funcType.ResultType.IsVoidType()) {
@@ -1395,7 +1361,7 @@ namespace AnsiCParser {
                 Emit("popl %ecx");
                 Emit("popl %eax");
 
-                System.Diagnostics.Debug.Assert(_stack.Count >= argnum);
+                Debug.Assert(_stack.Count >= argnum);
                 for (int i = 0; i < argnum; i++) {
                     Pop(); // args
                 }
@@ -1932,7 +1898,7 @@ namespace AnsiCParser {
             /// <param name="reg"></param>
             public void LoadPointer(string reg) {
                 Value target = Pop();
-                System.Diagnostics.Debug.Assert(target.Type.IsPointerType());
+                Debug.Assert(target.Type.IsPointerType());
 
                 switch (target.Kind) {
                     case Value.ValueKind.Var:
@@ -2683,1433 +2649,1534 @@ namespace AnsiCParser {
 
         }
 
-
-        public readonly CodeGenerator Generator = new CodeGenerator();
-
-        private readonly Stack<string> _continueTarget = new Stack<string>();
-        private readonly Stack<string> _breakTarget = new Stack<string>();
-        private Dictionary<string, int> _arguments;
-        private Dictionary<string, string> _genericLabels;
-
         /// <summary>
-        ///     文字列リテラルなどの静的データ
+        /// コンパイラのコンテキスト
         /// </summary>
-        public List<Tuple<string, byte[]>> DataBlock = new List<Tuple<string, byte[]>>();
+        protected class Context {
 
+            /// <summary>
+            /// コード生成部
+            /// </summary>
+            public readonly CodeGenerator Generator = new CodeGenerator();
 
-        public Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Value value) {
-            throw new NotImplementedException();
+            /// <summary>
+            /// continue命令の移動先ラベルが格納されるスタック
+            /// </summary>
+            public readonly Stack<string> ContinueTarget = new Stack<string>();
+
+            /// <summary>
+            /// break命令の移動先ラベルが格納されるスタック
+            /// </summary>
+            public readonly Stack<string> BreakTarget = new Stack<string>();
+
+            /// <summary>
+            /// 現在の関数の引数とスタック位置を示す辞書
+            /// </summary>
+            public readonly Dictionary<string, int> Arguments = new Dictionary<string, int>();
+
+            /// <summary>
+            /// 現在の関数中の汎用ラベルを示す辞書
+            /// </summary>
+            public readonly Dictionary<string, string> GenericLabels = new Dictionary<string, string>();
+
+            /// <summary>
+            /// 文字列リテラルなどの静的データ
+            /// </summary>
+            public readonly List<Tuple<string, byte[]>> DataBlock = new List<Tuple<string, byte[]>>();
+
         }
 
-        public Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, Value value) {
-            if (self.Body != null) {
-                // 引数表
-                var ft = self.Type as FunctionType;
-                int offset = 8; // prev return position
-
-                // 戻り値領域へのポインタ
-                if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt))) {
-                    offset += 4;
-                }
-
-                // 引数（先頭から）
-                _arguments = new Dictionary<string, int>();
-                var vars = new List<string>();
-                foreach (var arg in ft.Arguments) {
-                    vars.Add($"//   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
-                    _arguments.Add(arg.Ident.Raw, offset);
-                    offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
-                }
-
-                // ラベル
-                _genericLabels = new Dictionary<string, string>();
-                Generator.Emit("");
-                Generator.Emit("// function: ");
-                Generator.Emit($"//   {self.Ident}");
-                Generator.Emit("// args: ");
-                vars.ForEach(x => Generator.Emit(x));
-                Generator.Emit("// return:");
-                Generator.Emit($"//   {ft.ResultType.ToString()}");
-                Generator.Emit("// location:");
-                Generator.Emit($"//   {self.LocationRange}");
-                Generator.Emit(".section .text");
-                Generator.Emit($".globl {self.LinkageObject.LinkageId}");
-                Generator.Emit($"{self.LinkageObject.LinkageId}:");
-                Generator.Emit("pushl %ebp");
-                Generator.Emit("movl %esp, %ebp");
-                Generator.Emit("pushl %ebx");
-                Generator.Emit("pushl %esi");
-                Generator.Emit("pushl %edi");
-                var c = Generator.Emit(".error \"Stack size is need backpatch.\""); // スタックサイズは仮置き
-                _localScopeTotalSize = 4 * 3; // %ebx,%esi,%edi分
-                _maxLocalScopeTotalSize = 4 * 3;
-                self.Body.Accept(this, value);
-                c.Body = $"subl ${_maxLocalScopeTotalSize - 4 * 3}, %esp"; // スタックサイズをバックパッチ
-                Generator.Emit("popl %edi");
-                Generator.Emit("popl %esi");
-                Generator.Emit("popl %ebx");
-                Generator.Emit("movl %ebp, %esp");
-                Generator.Emit("popl %ebp");
-                Generator.Emit("ret");
-                Generator.Emit("");
-            }
-
-            return value;
-        }
-
-        public Value OnTypeDeclaration(Declaration.TypeDeclaration self, Value value) {
-            // なにもしない
-            return value;
-        }
-
-        public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
-            // ブロックスコープ変数
-            if (self.LinkageObject.Linkage == LinkageKind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
-                if (self.Init != null) {
-                    Tuple<string, int> offset;
-                    if (_localScope.TryGetValue(self.Ident, out offset) == false) {
-                        throw new Exception("初期化対象変数が見つからない。");
-                    }
-
-                    Generator.Emit($"// {self.LocationRange}");
-                    return self.Init.Accept(this, new Value { Kind = Value.ValueKind.Var, Label = offset.Item1, Offset = offset.Item2, Type = self.Type });
-                }
-            }
-
-            return value;
-        }
-
-        public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case Expression.AdditiveExpression.OperatorKind.Add:
-                    Generator.Add(self.Type);
-                    break;
-                case Expression.AdditiveExpression.OperatorKind.Sub:
-                    Generator.Sub(self.Type);
-                    break;
-            }
-
-            return value;
-        }
-
-        public Value OnAndExpression(Expression.BitExpression.AndExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            Generator.And(self.Type);
-            return value;
-        }
-
-        public Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            Generator.Dup(0);
-            self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
-                    Generator.Add(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
-                    Generator.Sub(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
-                    Generator.Mul(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
-                    Generator.Div(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
-                    Generator.Mod(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
-                    Generator.And(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
-                    Generator.Or(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
-                    Generator.Xor(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
-                    Generator.Shl(self.Type);
-                    break;
-                case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
-                    Generator.Shr(self.Type);
-                    break;
-                default:
-                    throw new Exception("来ないはず");
-            }
-
-            Generator.Dup(1);
-            Generator.Assign(self.Type);
-            Generator.Discard();
-            return value;
-        }
-
-        public Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
-            self.Rhs.Accept(this, value);
-            self.Lhs.Accept(this, value);
-
-            Generator.Assign(self.Type);
-            return value;
-        }
-
-        public Value OnCastExpression(Expression.CastExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.CastTo(self.Type);
-            return value;
-        }
-
-        public Value OnCommaExpression(Expression.CommaExpression self, Value value) {
-            bool needDiscard = false;
-            foreach (var e in self.Expressions) {
-                if (needDiscard) {
-                    Generator.Discard(); // スタック上の結果を捨てる
-                }
-                e.Accept(this, value);
-                needDiscard = !e.Type.IsVoidType();
-            }
-            return value;
-        }
-
-        public Value OnConditionalExpression(Expression.ConditionalExpression self, Value value) {
-            self.CondExpr.Accept(this, value);
-
-            var elseLabel = Generator.LabelAlloc();
-            var junctionLabel = Generator.LabelAlloc();
-
-            Generator.JmpFalse(elseLabel);
-
-            self.ThenExpr.Accept(this, value);
-            if (self.Type.IsVoidType()) {
-                Generator.Discard(); // スタック上の結果を捨てる
-            } else {
-                Generator.LoadValueToStack(self.Type);
-                Generator.Pop();
-            }
-
-            Generator.Jmp(junctionLabel);
-            Generator.Label(elseLabel);
-
-            self.ElseExpr.Accept(this, value);
-            if (self.Type.IsVoidType()) {
-                // スタック上の結果を捨てる
-                Generator.Discard();
-            } else {
-                Generator.LoadValueToStack(self.Type);
-                Generator.Pop();
-            }
-
-            Generator.Label(junctionLabel);
-
-            if (self.Type.IsVoidType()) {
-                Generator.Push(new Value { Kind = Value.ValueKind.Void });
-            } else {
-                Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
-            }
-
-            return value;
-        }
-
-        public Value OnEqualityExpression(Expression.EqualityExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case Expression.EqualityExpression.OperatorKind.Equal:
-                    Generator.Eq(self.Type);
-                    break;
-                case Expression.EqualityExpression.OperatorKind.NotEqual:
-                    Generator.Ne(self.Type);
-                    break;
-                case Expression.EqualityExpression.OperatorKind.None:
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            return value;
-        }
-
-        public Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            Generator.Xor(self.Type);
-            return value;
-        }
-
-        public Value OnGccStatementExpression(Expression.GccStatementExpression self, Value value) {
-            throw new NotImplementedException();
-        }
-
-        public Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            Generator.Or(self.Type);
-            return value;
-        }
-
-        public Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.CastTo(self.Type);
-            return value;
-        }
-
-        public Value OnLogicalAndExpression(Expression.LogicalAndExpression self, Value value) {
-            var labelFalse = Generator.LabelAlloc();
-            var labelJunction = Generator.LabelAlloc();
-            self.Lhs.Accept(this, value);
-            Generator.JmpFalse(labelFalse);
-            self.Rhs.Accept(this, value);
-            Generator.JmpFalse(labelFalse);
-            Generator.EmitLoadTrue();
-            Generator.Jmp(labelJunction);
-            Generator.Label(labelFalse);
-            Generator.EmitLoadFalse();
-            Generator.Label(labelJunction);
-            Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
-            return value;
-        }
-
-        public Value OnLogicalOrExpression(Expression.LogicalOrExpression self, Value value) {
-            var labelTrue = Generator.LabelAlloc();
-            var labelJunction = Generator.LabelAlloc();
-            self.Lhs.Accept(this, value);
-            Generator.JmpTrue(labelTrue);
-            self.Rhs.Accept(this, value);
-            Generator.JmpTrue(labelTrue);
-            Generator.EmitLoadFalse();
-            Generator.Jmp(labelJunction);
-            Generator.Label(labelTrue);
-            Generator.EmitLoadTrue();
-            Generator.Label(labelJunction);
-            Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
-            return value;
-        }
-
-        public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                    Generator.Mul(self.Type);
-                    break;
-                case Expression.MultiplicitiveExpression.OperatorKind.Div:
-                    Generator.Div(self.Type);
-                    break;
-                case Expression.MultiplicitiveExpression.OperatorKind.Mod:
-                    Generator.Mod(self.Type);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            return value;
-        }
-
-        public Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
-            self.Target.Accept(this, value);
-            self.Index.Accept(this, value);
-            Generator.ArraySubscript(self.Type);
-            return value;
-        }
-
-        public Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Value value) {
+        protected class SyntaxTreeCompileVisitor : SyntaxTree.IVisitor<Value, Value> {
             /*
+             * +------+----------------------+
+             * | SP   | 未使用領域           |
+             * +------+----------------------+
+             * | +n   | ローカル変数領域     |
+             * +------+----------------------+
+             * | ・・・・・・・・            |
+             * +------+----------------------+
+             * | -1   | ローカル変数領域     |
+             * +------+----------------------+
+             * | BP   | 以前のSP             |
+             * +------+----------------------+
+             * | (※戻り値格納先アドレス)    |
+             * +------+----------------------+
+             * | +1   | 引数[0]              |
+             * +------+----------------------+
+             * | ・・・・・・・・            |
+             * +------+----------------------+
+             * | +n-1 | 引数[n-2]            |
+             * +------+----------------------+
+             * | +n   | 引数[n-1]            |
+             * +------+----------------------+
+             * 
+             */
+
+            /*
+             * Calling Convention: cdecl
              *  - 関数への引数は右から左の順でスタックに積まれる。
              *    - 引数にはベースポインタ相対でアクセスする
-             *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+             *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。
+             *    EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+             *    浮動小数点数の場合はFPUスタックのトップに結果をセットする
+             *    long long型の結果はedx:eaxに格納される
              *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
              *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
-             *  - スタックポインタの処理は呼び出し側で行う。  
+             *    （なので、EBX, ESI, EDI は呼び出され側の先頭でスタックに退避している）
+             *  - スタックポインタの処理は呼び出し側で行う。
+             *  - 引数・戻り値領域の開放は呼び出し側で行う
+             *  
              */
-            var funcType = self.Expr.Type.GetBasePointerType().Unwrap() as FunctionType;
 
-            Generator.Call(self.Type, funcType, self.Args.Count, g => {
-                self.Expr.Accept(this, value);
-            }, (g, i) => {
-                self.Args[i].Accept(this, value);
-            });
+            /// <summary>
+            /// コンパイラコンテキスト
+            /// </summary>
+            private readonly Context _context;
 
+            /*
+             * コード生成:
+             *  - 基本はスタック計算機
+             */
+            public SyntaxTreeCompileVisitor(Context context) {
+                _context = context;
+            }
 
-            // 戻り値が構造体型/共用体型の場合、スタック上に配置すると不味いのでテンポラリ変数を確保してコピーする
-            var obj = Generator.Peek(0);
-            if (obj.Kind == Value.ValueKind.Temp && (obj.Type.IsStructureType() || obj.Type.IsUnionType())) {
-                int size = CodeGenerator.StackAlign(obj.Type.Sizeof());
-                _localScopeTotalSize += size;
-                var ident = $"<temp:{_localScope.Count()}>";
-                var tp = Tuple.Create((string)null, -_localScopeTotalSize);
-                _localScope.Add(ident, tp);
-                Generator.Emit($"// temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={obj.Type.ToString()}");
+            public Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Value value) {
+                throw new NotImplementedException();
+            }
 
-                if (size <= 4) {
-                    Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %esi");
-                    Generator.Emit("pop (%esi)");
-                } else {
-                    Generator.Emit($"movl %esp, %esi");
-                    Generator.Emit($"addl ${size}, %esp");
-                    Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %edi");
-                    Generator.Emit($"movl ${size}, %ecx");
-                    Generator.Emit("cld");
-                    Generator.Emit("rep movsb");
+            public Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, Value value) {
+                if (self.Body != null) {
+                    // 引数表
+                    var ft = self.Type as FunctionType;
+                    int offset = 8; // prev return position
+
+                    // 戻り値領域へのポインタ
+                    if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt))) {
+                        offset += 4;
+                    }
+
+                    // 引数（先頭から）
+                    _context.Arguments.Clear();
+                    var vars = new List<string>();
+                    foreach (var arg in ft.Arguments) {
+                        vars.Add($"//   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
+                        _context.Arguments.Add(arg.Ident.Raw, offset);
+                        offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
+                    }
+
+                    // ラベル
+                    _context.GenericLabels.Clear();
+                    _context.Generator.Emit("");
+                    _context.Generator.Emit("// function: ");
+                    _context.Generator.Emit($"//   {self.Ident}");
+                    _context.Generator.Emit("// args: ");
+                    vars.ForEach(x => _context.Generator.Emit(x));
+                    _context.Generator.Emit("// return:");
+                    _context.Generator.Emit($"//   {ft.ResultType.ToString()}");
+                    _context.Generator.Emit("// location:");
+                    _context.Generator.Emit($"//   {self.LocationRange}");
+                    _context.Generator.Emit(".section .text");
+                    _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                    _context.Generator.Emit($"{self.LinkageObject.LinkageId}:");
+                    _context.Generator.Emit("pushl %ebp");
+                    _context.Generator.Emit("movl %esp, %ebp");
+                    _context.Generator.Emit("pushl %ebx");
+                    _context.Generator.Emit("pushl %esi");
+                    _context.Generator.Emit("pushl %edi");
+                    var c = _context.Generator.Emit(".error \"Stack size is need backpatch.\""); // スタックサイズは仮置き
+                    _localScopeTotalSize = 4 * 3; // %ebx,%esi,%edi分
+                    _maxLocalScopeTotalSize = 4 * 3;
+                    self.Body.Accept(this, value);  // 本体のコード生成を実行
+                    c.Body = $"subl ${_maxLocalScopeTotalSize - 4 * 3}, %esp // alloc stack"; // スタックサイズをバックパッチ
+                    _context.Generator.Emit("popl %edi");
+                    _context.Generator.Emit("popl %esi");
+                    _context.Generator.Emit("popl %ebx");
+                    _context.Generator.Emit("movl %ebp, %esp");
+                    _context.Generator.Emit("popl %ebp");
+                    _context.Generator.Emit("ret");
+                    _context.Generator.Emit("");
                 }
-                Generator.Pop();
-                Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = obj.Type, Label = tp.Item1, Offset = tp.Item2 });
 
+                return value;
             }
 
-            //return new Value() { kIND = self.Type.IsVoidType() ? Value.ValueKind.Void : Value.ValueKind.Temp, Type = self.Type };
-            return value;
-        }
-
-        public Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.DirectMember(self.Type, self.Ident.Raw);
-            return value;
-        }
-
-        public Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.IndirectMember(self.Type, self.Ident.Raw);
-            return value;
-        }
-
-        public Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            switch (self.Op) {
-                case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
-                    Generator.PostDec(self.Type);
-                    break;
-                case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
-                    Generator.PostInc(self.Type);
-                    break;
-                default:
-                    throw new NotImplementedException();
+            public Value OnTypeDeclaration(Declaration.TypeDeclaration self, Value value) {
+                // なにもしない
+                return value;
             }
 
-            return value;
-        }
-
-        public Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
-            return value;
-        }
-
-        public Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.FloatConst, Type = self.Type, FloatConst = self.Value });
-            return value;
-        }
-
-        public Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
-            return value;
-        }
-
-        public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
-            return self.ParenthesesExpression.Accept(this, value);
-        }
-
-        public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
-            self.Identifier.Accept(this, value);
-            Generator.CalcConstAddressOffset(self.Type, self.Offset.Value);
-            return value;
-        }
-
-        public Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Info.Value });
-            return value;
-        }
-
-        public Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
-            return value;
-        }
-
-        public Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
-            throw new NotImplementedException();
-        }
-
-        public Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
-            Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = null, Offset = _arguments[self.Ident] });
-            return value;
-        }
-
-        public Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
-            if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
-                Tuple<string, int> offset;
-                if (_localScope.TryGetValue(self.Ident, out offset)) {
-                    Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2 });
-                } else {
-                    throw new Exception("");
-                }
-            } else {
-                Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
-            }
-
-            return value;
-        }
-
-        public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
-            int no = DataBlock.Count;
-            var label = $"D{no}";
-            DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
-            Generator.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
-            return value;
-        }
-
-        public Value OnRelationalExpression(Expression.RelationalExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-            switch (self.Op) {
-                case Expression.RelationalExpression.OperatorKind.GreaterThan:
-                    Generator.GreatThan(self.Type);
-                    break;
-                case Expression.RelationalExpression.OperatorKind.LessThan:
-                    Generator.LessThan(self.Type);
-                    break;
-                case Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
-                    Generator.GreatOrEqual(self.Type);
-                    break;
-                case Expression.RelationalExpression.OperatorKind.LessOrEqual:
-                    Generator.LessOrEqual(self.Type);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            return value;
-        }
-
-        public Value OnShiftExpression(Expression.ShiftExpression self, Value value) {
-            self.Lhs.Accept(this, value);
-            self.Rhs.Accept(this, value);
-
-            switch (self.Op) {
-                case Expression.ShiftExpression.OperatorKind.Left:
-                    Generator.Shl(self.Type);
-                    break;
-                case Expression.ShiftExpression.OperatorKind.Right:
-                    Generator.Shr(self.Type);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            return value;
-        }
-
-        public Value OnSizeofExpression(Expression.SizeofExpression self, Value value) {
-            // todo: C99可変長配列型
-            Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() });
-            return value;
-        }
-
-        public Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Value value) {
-            // todo: C99可変長配列型
-            Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() });
-            return value;
-        }
-
-
-        public Value OnTypeConversionExpression(Expression.TypeConversionExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.CastTo(self.Type);
-            return value;
-        }
-
-        public Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.Address(self.Type);
-            return value;
-        }
-
-        public Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.UnaryMinus(self.Type);
-            return value;
-        }
-
-        public Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.UnaryBitNot(self.Type);
-            return value;
-        }
-
-        public Value OnUnaryNotExpression(Expression.UnaryNotExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.UnaryLogicalNot(self.Type);
-            return value;
-        }
-
-        public Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            return value;
-        }
-
-        public Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Value value) {
-            self.Expr.Accept(this, value);
-
-            switch (self.Op) {
-                case Expression.UnaryPrefixExpression.OperatorKind.Inc:
-                    Generator.PreInc(self.Type);
-                    break;
-                case Expression.UnaryPrefixExpression.OperatorKind.Dec:
-                    Generator.PreDec(self.Type);
-                    break;
-                default:
-                    throw new Exception("来ないはず");
-            }
-
-            return value;
-        }
-
-        public Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.Reference(self.Type);
-            return value;
-        }
-
-        public Value OnComplexInitializer(Initializer.ComplexInitializer self, Value value) {
-            throw new Exception("来ないはず");
-        }
-
-        public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
-            throw new Exception("来ないはず");
-        }
-
-        public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
-            self.Expr.Accept(this, value);
-            Generator.Push(value);
-            Generator.Assign(self.Type);
-            Generator.Discard();
-            return value;
-        }
-
-        public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
-            var elementSize = self.Type.BaseType.Sizeof();
-            var v = new Value(value) { Type = self.Type.BaseType };
-            foreach (var init in self.Inits) {
-                init.Accept(this, v);
-                switch (v.Kind) {
-                    case Value.ValueKind.Var:
-                        if (v.Label == null) {
-                            v.Offset += elementSize;
-                        } else {
-                            throw new NotImplementedException();
+            public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
+                // ブロックスコープ変数
+                if (self.LinkageObject.Linkage == LinkageKind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
+                    if (self.Init != null) {
+                        Tuple<string, int> offset;
+                        if (_localScope.TryGetValue(self.Ident, out offset) == false) {
+                            throw new Exception("初期化対象変数が見つからない。");
                         }
 
+                        _context.Generator.Emit($"// {self.LocationRange}");
+                        return self.Init.Accept(this, new Value { Kind = Value.ValueKind.Var, Label = offset.Item1, Offset = offset.Item2, Type = self.Type });
+                    }
+                }
+
+                return value;
+            }
+
+            public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.AdditiveExpression.OperatorKind.Add:
+                        _context.Generator.Add(self.Type);
+                        break;
+                    case Expression.AdditiveExpression.OperatorKind.Sub:
+                        _context.Generator.Sub(self.Type);
+                        break;
+                }
+
+                return value;
+            }
+
+            public Value OnAndExpression(Expression.BitExpression.AndExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                _context.Generator.And(self.Type);
+                return value;
+            }
+
+            public Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                _context.Generator.Dup(0);
+                self.Rhs.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
+                        _context.Generator.Add(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.SUB_ASSIGN:
+                        _context.Generator.Sub(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MUL_ASSIGN:
+                        _context.Generator.Mul(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.DIV_ASSIGN:
+                        _context.Generator.Div(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.MOD_ASSIGN:
+                        _context.Generator.Mod(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.AND_ASSIGN:
+                        _context.Generator.And(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.OR_ASSIGN:
+                        _context.Generator.Or(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.XOR_ASSIGN:
+                        _context.Generator.Xor(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.LEFT_ASSIGN:
+                        _context.Generator.Shl(self.Type);
+                        break;
+                    case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.RIGHT_ASSIGN:
+                        _context.Generator.Shr(self.Type);
+                        break;
+                    default:
+                        throw new Exception("来ないはず");
+                }
+
+                _context.Generator.Dup(1);
+                _context.Generator.Assign(self.Type);
+                _context.Generator.Discard();
+                return value;
+            }
+
+            public Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
+                self.Rhs.Accept(this, value);
+                self.Lhs.Accept(this, value);
+
+                _context.Generator.Assign(self.Type);
+                return value;
+            }
+
+            public Value OnCastExpression(Expression.CastExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.CastTo(self.Type);
+                return value;
+            }
+
+            public Value OnCommaExpression(Expression.CommaExpression self, Value value) {
+                bool needDiscard = false;
+                foreach (var e in self.Expressions) {
+                    if (needDiscard) {
+                        _context.Generator.Discard(); // スタック上の結果を捨てる
+                    }
+                    e.Accept(this, value);
+                    needDiscard = !e.Type.IsVoidType();
+                }
+                return value;
+            }
+
+            public Value OnConditionalExpression(Expression.ConditionalExpression self, Value value) {
+                self.CondExpr.Accept(this, value);
+
+                var elseLabel = _context.Generator.LabelAlloc();
+                var junctionLabel = _context.Generator.LabelAlloc();
+
+                _context.Generator.JmpFalse(elseLabel);
+
+                self.ThenExpr.Accept(this, value);
+                if (self.Type.IsVoidType()) {
+                    _context.Generator.Discard(); // スタック上の結果を捨てる
+                } else {
+                    _context.Generator.LoadValueToStack(self.Type);
+                    _context.Generator.Pop();
+                }
+
+                _context.Generator.Jmp(junctionLabel);
+                _context.Generator.Label(elseLabel);
+
+                self.ElseExpr.Accept(this, value);
+                if (self.Type.IsVoidType()) {
+                    // スタック上の結果を捨てる
+                    _context.Generator.Discard();
+                } else {
+                    _context.Generator.LoadValueToStack(self.Type);
+                    _context.Generator.Pop();
+                }
+
+                _context.Generator.Label(junctionLabel);
+
+                if (self.Type.IsVoidType()) {
+                    _context.Generator.Push(new Value { Kind = Value.ValueKind.Void });
+                } else {
+                    _context.Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
+                }
+
+                return value;
+            }
+
+            public Value OnEqualityExpression(Expression.EqualityExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.EqualityExpression.OperatorKind.Equal:
+                        _context.Generator.Eq(self.Type);
+                        break;
+                    case Expression.EqualityExpression.OperatorKind.NotEqual:
+                        _context.Generator.Ne(self.Type);
+                        break;
+                    case Expression.EqualityExpression.OperatorKind.None:
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+
+                return value;
+            }
+
+            public Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                _context.Generator.Xor(self.Type);
+                return value;
+            }
+
+            public Value OnGccStatementExpression(Expression.GccStatementExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                _context.Generator.Or(self.Type);
+                return value;
+            }
+
+            public Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.CastTo(self.Type);
+                return value;
+            }
+
+            public Value OnLogicalAndExpression(Expression.LogicalAndExpression self, Value value) {
+                var labelFalse = _context.Generator.LabelAlloc();
+                var labelJunction = _context.Generator.LabelAlloc();
+                self.Lhs.Accept(this, value);
+                _context.Generator.JmpFalse(labelFalse);
+                self.Rhs.Accept(this, value);
+                _context.Generator.JmpFalse(labelFalse);
+                _context.Generator.EmitLoadTrue();
+                _context.Generator.Jmp(labelJunction);
+                _context.Generator.Label(labelFalse);
+                _context.Generator.EmitLoadFalse();
+                _context.Generator.Label(labelJunction);
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
+                return value;
+            }
+
+            public Value OnLogicalOrExpression(Expression.LogicalOrExpression self, Value value) {
+                var labelTrue = _context.Generator.LabelAlloc();
+                var labelJunction = _context.Generator.LabelAlloc();
+                self.Lhs.Accept(this, value);
+                _context.Generator.JmpTrue(labelTrue);
+                self.Rhs.Accept(this, value);
+                _context.Generator.JmpTrue(labelTrue);
+                _context.Generator.EmitLoadFalse();
+                _context.Generator.Jmp(labelJunction);
+                _context.Generator.Label(labelTrue);
+                _context.Generator.EmitLoadTrue();
+                _context.Generator.Label(labelJunction);
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.Temp, Type = self.Type });
+                return value;
+            }
+
+            public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                        _context.Generator.Mul(self.Type);
+                        break;
+                    case Expression.MultiplicitiveExpression.OperatorKind.Div:
+                        _context.Generator.Div(self.Type);
+                        break;
+                    case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                        _context.Generator.Mod(self.Type);
                         break;
                     default:
                         throw new NotImplementedException();
                 }
+
+                return value;
             }
 
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
-            // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
-            // 共用体は初期化式が一つのはず
-            Value v = new Value(value);
-            foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
-                member.Item2.Accept(this, v);
-                v.Offset += member.Item1.Type.Sizeof();
+            public Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
+                self.Target.Accept(this, value);
+                self.Index.Accept(this, value);
+                _context.Generator.ArraySubscript(self.Type);
+                return value;
             }
-            return new Value { Kind = Value.ValueKind.Void };
-        }
 
-        public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var label = _breakTarget.Peek();
-            Generator.Jmp(label);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
+            public Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Value value) {
+                /*
+                 *  - 関数への引数は右から左の順でスタックに積まれる。
+                 *    - 引数にはベースポインタ相対でアクセスする
+                 *  - 関数の戻り値は EAXに格納できるサイズならば EAX に格納される。EAXに格納できないサイズならば、戻り値を格納する領域のアドレスを引数の上に積み、EAXを使わない。（※）
+                 *  - 呼び出された側の関数ではEAX, ECX, EDXのレジスタの元の値を保存することなく使用してよい。
+                 *    呼び出し側の関数では必要ならば呼び出す前にそれらのレジスタをスタック上などに保存する。
+                 *  - スタックポインタの処理は呼び出し側で行う。  
+                 */
+                var funcType = self.Expr.Type.GetBasePointerType().Unwrap() as FunctionType;
 
-        public Value OnCaseStatement(Statement.CaseStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var label = _switchLabelTableStack.Peek()[self];
-            Generator.Label(label);
-            self.Stmt.Accept(this, value);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
+                _context.Generator.Call(self.Type, funcType, self.Args.Count, g => {
+                    self.Expr.Accept(this, value);
+                }, (g, i) => {
+                    self.Args[i].Accept(this, value);
+                });
 
-        private Scope<Tuple<string, int>> _localScope = Scope<Tuple<string, int>>.Empty;
-        private int _localScopeTotalSize;
-        private int _maxLocalScopeTotalSize;
 
-        public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
+                // 戻り値が構造体型/共用体型の場合、スタック上に配置すると不味いのでテンポラリ変数を確保してコピーする
+                var obj = _context.Generator.Peek(0);
+                if (obj.Kind == Value.ValueKind.Temp && (obj.Type.IsStructureType() || obj.Type.IsUnionType())) {
+                    int size = CodeGenerator.StackAlign(obj.Type.Sizeof());
+                    _localScopeTotalSize += size;
+                    var ident = $"<temp:{_localScope.Count()}>";
+                    var tp = Tuple.Create((string)null, -_localScopeTotalSize);
+                    _localScope.Add(ident, tp);
+                    _context.Generator.Emit($"// temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={obj.Type.ToString()}");
 
-            _localScope = _localScope.Extend();
-            var prevLocalScopeSize = _localScopeTotalSize;
-
-            Generator.Emit("// enter scope");
-            foreach (var x in self.Decls.Reverse<Declaration>()) {
-                if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
-                    if (x.StorageClass == StorageClassSpecifier.Static) {
-                        // static
-                        _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
-                        Generator.Emit($"// static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                    if (size <= 4) {
+                        _context.Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %esi");
+                        _context.Generator.Emit("pop (%esi)");
                     } else {
-                        _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
-                        _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
-                        Generator.Emit($"// auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
+                        _context.Generator.Emit($"movl %esp, %esi");
+                        _context.Generator.Emit($"addl ${size}, %esp");
+                        _context.Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %edi");
+                        _context.Generator.Emit($"movl ${size}, %ecx");
+                        _context.Generator.Emit("cld");
+                        _context.Generator.Emit("rep movsb");
                     }
-                } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                    Generator.Emit($"// extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
-                    // externなのでスキップ
-                } else {
-                    throw new NotImplementedException();
+                    _context.Generator.Pop();
+                    _context.Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = obj.Type, Label = tp.Item1, Offset = tp.Item2 });
+
                 }
+
+                return value;
             }
 
-            //if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
-            //    _maxLocalScopeTotalSize = _localScopeTotalSize;
-            //}
-
-            foreach (var x in self.Decls) {
-                x.Accept(this, value);
+            public Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.DirectMember(self.Type, self.Ident.Raw);
+                return value;
             }
 
-            foreach (var x in self.Stmts) {
-                x.Accept(this, value);
+            public Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.IndirectMember(self.Type, self.Ident.Raw);
+                return value;
             }
 
-            if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
-                _maxLocalScopeTotalSize = _localScopeTotalSize;
+            public Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Dec:
+                        _context.Generator.PostDec(self.Type);
+                        break;
+                    case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
+                        _context.Generator.PostInc(self.Type);
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+
+                return value;
             }
 
-            Generator.Emit("// leave scope");
-
-            _localScopeTotalSize = prevLocalScopeSize;
-            _localScope = _localScope.Parent;
-            return value;
-        }
-
-        public Value OnContinueStatement(Statement.ContinueStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var label = _continueTarget.Peek();
-            Generator.Jmp(label);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnDefaultStatement(Statement.DefaultStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var label = _switchLabelTableStack.Peek()[self];
-            Generator.Label(label);
-            self.Stmt.Accept(this, value);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var labelContinue = Generator.LabelAlloc();
-            var labelBreak = Generator.LabelAlloc();
-
-            // Check Loop Condition
-            Generator.Label(labelContinue);
-            _continueTarget.Push(labelContinue);
-            _breakTarget.Push(labelBreak);
-            self.Stmt.Accept(this, value);
-            _continueTarget.Pop();
-            _breakTarget.Pop();
-
-            self.Cond.Accept(this, value);
-            Generator.JmpTrue(labelContinue);
-            Generator.Label(labelBreak);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnEmptyStatement(Statement.EmptyStatement self, Value value) {
-            return new Value { Kind = Value.ValueKind.Void };
-            //throw new NotImplementedException();
-        }
-
-        public Value OnExpressionStatement(Statement.ExpressionStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            self.Expr.Accept(this, value);
-            Generator.Discard();
-            return value;
-        }
-
-        public Value OnForStatement(Statement.ForStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            // Initialize
-            if (self.Init != null) {
-                self.Init.Accept(this, value);
-                Generator.Discard();
+            public Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
+                return value;
             }
 
-            var labelHead = Generator.LabelAlloc();
-            var labelContinue = Generator.LabelAlloc();
-            var labelBreak = Generator.LabelAlloc();
+            public Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.FloatConst, Type = self.Type, FloatConst = self.Value });
+                return value;
+            }
 
-            // Check Loop Condition
-            Generator.Label(labelHead);
-            if (self.Cond != null) {
+            public Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Value });
+                return value;
+            }
+
+            public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+                return self.ParenthesesExpression.Accept(this, value);
+            }
+
+            public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
+                self.Identifier.Accept(this, value);
+                _context.Generator.CalcConstAddressOffset(self.Type, self.Offset.Value);
+                return value;
+            }
+
+            public Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.Info.Value });
+                return value;
+            }
+
+            public Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
+                return value;
+            }
+
+            public Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = null, Offset = _context.Arguments[self.Ident] });
+                return value;
+            }
+
+            public Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
+                if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                    Tuple<string, int> offset;
+                    if (_localScope.TryGetValue(self.Ident, out offset)) {
+                        _context.Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2 });
+                    } else {
+                        throw new Exception("");
+                    }
+                } else {
+                    _context.Generator.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = self.Decl.LinkageObject.LinkageId, Offset = 0 });
+                }
+
+                return value;
+            }
+
+            public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
+                int no = _context.DataBlock.Count;
+                var label = $"D{no}";
+                _context.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
+                return value;
+            }
+
+            public Value OnRelationalExpression(Expression.RelationalExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+                switch (self.Op) {
+                    case Expression.RelationalExpression.OperatorKind.GreaterThan:
+                        _context.Generator.GreatThan(self.Type);
+                        break;
+                    case Expression.RelationalExpression.OperatorKind.LessThan:
+                        _context.Generator.LessThan(self.Type);
+                        break;
+                    case Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
+                        _context.Generator.GreatOrEqual(self.Type);
+                        break;
+                    case Expression.RelationalExpression.OperatorKind.LessOrEqual:
+                        _context.Generator.LessOrEqual(self.Type);
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+
+                return value;
+            }
+
+            public Value OnShiftExpression(Expression.ShiftExpression self, Value value) {
+                self.Lhs.Accept(this, value);
+                self.Rhs.Accept(this, value);
+
+                switch (self.Op) {
+                    case Expression.ShiftExpression.OperatorKind.Left:
+                        _context.Generator.Shl(self.Type);
+                        break;
+                    case Expression.ShiftExpression.OperatorKind.Right:
+                        _context.Generator.Shr(self.Type);
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+
+                return value;
+            }
+
+            public Value OnSizeofExpression(Expression.SizeofExpression self, Value value) {
+                // todo: C99可変長配列型
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() });
+                return value;
+            }
+
+            public Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Value value) {
+                // todo: C99可変長配列型
+                _context.Generator.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() });
+                return value;
+            }
+
+
+            public Value OnTypeConversionExpression(Expression.TypeConversionExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.CastTo(self.Type);
+                return value;
+            }
+
+            public Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.Address(self.Type);
+                return value;
+            }
+
+            public Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.UnaryMinus(self.Type);
+                return value;
+            }
+
+            public Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.UnaryBitNot(self.Type);
+                return value;
+            }
+
+            public Value OnUnaryNotExpression(Expression.UnaryNotExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.UnaryLogicalNot(self.Type);
+                return value;
+            }
+
+            public Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                return value;
+            }
+
+            public Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Value value) {
+                self.Expr.Accept(this, value);
+
+                switch (self.Op) {
+                    case Expression.UnaryPrefixExpression.OperatorKind.Inc:
+                        _context.Generator.PreInc(self.Type);
+                        break;
+                    case Expression.UnaryPrefixExpression.OperatorKind.Dec:
+                        _context.Generator.PreDec(self.Type);
+                        break;
+                    default:
+                        throw new Exception("来ないはず");
+                }
+
+                return value;
+            }
+
+            public Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.Reference(self.Type);
+                return value;
+            }
+
+            public Value OnComplexInitializer(Initializer.ComplexInitializer self, Value value) {
+                throw new Exception("来ないはず");
+            }
+
+            public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
+                throw new Exception("来ないはず");
+            }
+
+            public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
+                self.Expr.Accept(this, value);
+                _context.Generator.Push(value);
+                _context.Generator.Assign(self.Type);
+                _context.Generator.Discard();
+                return value;
+            }
+
+            public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
+                var elementSize = self.Type.BaseType.Sizeof();
+                var v = new Value(value) { Type = self.Type.BaseType };
+                foreach (var init in self.Inits) {
+                    init.Accept(this, v);
+                    switch (v.Kind) {
+                        case Value.ValueKind.Var:
+                            if (v.Label == null) {
+                                v.Offset += elementSize;
+                            } else {
+                                throw new NotImplementedException();
+                            }
+
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+                }
+
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
+                // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
+                // 共用体は初期化式が一つのはず
+                Value v = new Value(value);
+                foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
+                    member.Item2.Accept(this, v);
+                    v.Offset += member.Item1.Type.Sizeof();
+                }
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var label = _context.BreakTarget.Peek();
+                _context.Generator.Jmp(label);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnCaseStatement(Statement.CaseStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var label = _switchLabelTableStack.Peek()[self];
+                _context.Generator.Label(label);
+                self.Stmt.Accept(this, value);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            private Scope<Tuple<string, int>> _localScope = Scope<Tuple<string, int>>.Empty;
+            private int _localScopeTotalSize;
+            private int _maxLocalScopeTotalSize;
+
+            public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+
+                _localScope = _localScope.Extend();
+                var prevLocalScopeSize = _localScopeTotalSize;
+
+                _context.Generator.Emit("// enter scope");
+                foreach (var x in self.Decls.Reverse<Declaration>()) {
+                    if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                        if (x.StorageClass == StorageClassSpecifier.Static) {
+                            // static
+                            _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
+                            _context.Generator.Emit($"// static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        } else {
+                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
+                            _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
+                            _context.Generator.Emit($"// auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
+                        }
+                    } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                        _context.Generator.Emit($"// extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        // externなのでスキップ
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                foreach (var x in self.Decls) {
+                    x.Accept(this, value);
+                }
+
+                foreach (var x in self.Stmts) {
+                    x.Accept(this, value);
+                }
+
+                if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
+                    _maxLocalScopeTotalSize = _localScopeTotalSize;
+                }
+
+                _context.Generator.Emit("// leave scope");
+
+                _localScopeTotalSize = prevLocalScopeSize;
+                _localScope = _localScope.Parent;
+                return value;
+            }
+
+            public Value OnContinueStatement(Statement.ContinueStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var label = _context.ContinueTarget.Peek();
+                _context.Generator.Jmp(label);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnDefaultStatement(Statement.DefaultStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var label = _switchLabelTableStack.Peek()[self];
+                _context.Generator.Label(label);
+                self.Stmt.Accept(this, value);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var labelContinue = _context.Generator.LabelAlloc();
+                var labelBreak = _context.Generator.LabelAlloc();
+
+                // Check Loop Condition
+                _context.Generator.Label(labelContinue);
+                _context.ContinueTarget.Push(labelContinue);
+                _context.BreakTarget.Push(labelBreak);
+                self.Stmt.Accept(this, value);
+                _context.ContinueTarget.Pop();
+                _context.BreakTarget.Pop();
+
                 self.Cond.Accept(this, value);
-                Generator.JmpFalse(labelBreak);
+                _context.Generator.JmpTrue(labelContinue);
+                _context.Generator.Label(labelBreak);
+                return new Value { Kind = Value.ValueKind.Void };
             }
 
-            _continueTarget.Push(labelContinue);
-            _breakTarget.Push(labelBreak);
-            self.Stmt.Accept(this, value);
-            _continueTarget.Pop();
-            _breakTarget.Pop();
-
-            Generator.Label(labelContinue);
-            if (self.Update != null) {
-                self.Update.Accept(this, value);
-                Generator.Discard();
+            public Value OnEmptyStatement(Statement.EmptyStatement self, Value value) {
+                return new Value { Kind = Value.ValueKind.Void };
             }
 
-            Generator.Jmp(labelHead);
-            Generator.Label(labelBreak);
-
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            if (_genericLabels.ContainsKey(self.Ident) == false) {
-                _genericLabels[self.Ident] = Generator.LabelAlloc();
+            public Value OnExpressionStatement(Statement.ExpressionStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                self.Expr.Accept(this, value);
+                _context.Generator.Discard();
+                return value;
             }
 
-            Generator.Label(_genericLabels[self.Ident]);
-            self.Stmt.Accept(this, value);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnGotoStatement(Statement.GotoStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            if (_genericLabels.ContainsKey(self.Label) == false) {
-                _genericLabels[self.Label] = Generator.LabelAlloc();
-            }
-
-            Generator.Jmp(_genericLabels[self.Label]);
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnIfStatement(Statement.IfStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            self.Cond.Accept(this, value);
-            if (self.ElseStmt != null) {
-                var elseLabel = Generator.LabelAlloc();
-                var junctionLabel = Generator.LabelAlloc();
-
-                Generator.JmpFalse(elseLabel);
-
-                self.ThenStmt.Accept(this, value);
-                Generator.Jmp(junctionLabel);
-                Generator.Label(elseLabel);
-                self.ElseStmt.Accept(this, value);
-                Generator.Label(junctionLabel);
-            } else {
-                var junctionLabel = Generator.LabelAlloc();
-
-                Generator.JmpFalse(junctionLabel);
-
-                self.ThenStmt.Accept(this, value);
-                Generator.Label(junctionLabel);
-            }
-
-
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnReturnStatement(Statement.ReturnStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            self.Expr?.Accept(this, value);
-            Generator.Return(self.Expr?.Type);
-
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        private readonly Stack<Dictionary<Statement, string>> _switchLabelTableStack = new Stack<Dictionary<Statement, string>>();
-
-        public Value OnSwitchStatement(Statement.SwitchStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var labelBreak = Generator.LabelAlloc();
-
-            self.Cond.Accept(this, value);
-
-            var labelDic = new Dictionary<Statement, string>();
-            Generator.Switch(self.Cond.Type, g => {
-                foreach (var caseLabel in self.CaseLabels) {
-                    var caseValue = caseLabel.Value;
-                    var label = Generator.LabelAlloc();
-                    labelDic.Add(caseLabel, label);
-                    Generator.Case(self.Cond.Type, caseValue, label);
+            public Value OnForStatement(Statement.ForStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                // Initialize
+                if (self.Init != null) {
+                    self.Init.Accept(this, value);
+                    _context.Generator.Discard();
                 }
-            });
-            if (self.DefaultLabel != null) {
-                var label = Generator.LabelAlloc();
-                labelDic.Add(self.DefaultLabel, label);
-                Generator.Jmp(label);
-            } else {
-                Generator.Jmp(labelBreak);
-            }
 
-            _switchLabelTableStack.Push(labelDic);
-            _breakTarget.Push(labelBreak);
-            self.Stmt.Accept(this, value);
-            _breakTarget.Pop();
-            _switchLabelTableStack.Pop();
-            Generator.Label(labelBreak);
+                var labelHead = _context.Generator.LabelAlloc();
+                var labelContinue = _context.Generator.LabelAlloc();
+                var labelBreak = _context.Generator.LabelAlloc();
 
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnWhileStatement(Statement.WhileStatement self, Value value) {
-            Generator.Emit($"// {self.LocationRange}");
-            var labelContinue = Generator.LabelAlloc();
-            var labelBreak = Generator.LabelAlloc();
-
-            // Check Loop Condition
-            Generator.Label(labelContinue);
-            self.Cond.Accept(this, value);
-            Generator.JmpFalse(labelBreak);
-            _continueTarget.Push(labelContinue);
-            _breakTarget.Push(labelBreak);
-            self.Stmt.Accept(this, value);
-            _continueTarget.Pop();
-            _breakTarget.Pop();
-
-            Generator.Jmp(labelContinue);
-            Generator.Label(labelBreak);
-
-            return new Value { Kind = Value.ValueKind.Void };
-        }
-
-        public Value OnTranslationUnit(TranslationUnit self, Value value) {
-            foreach (var obj in self.LinkageTable) {
-                if (obj.Definition is Declaration.VariableDeclaration) {
-                    var visitor = new FileScopeInitializerVisitor(this);
-                    obj.Definition?.Accept(visitor, value);
+                // Check Loop Condition
+                _context.Generator.Label(labelHead);
+                if (self.Cond != null) {
+                    self.Cond.Accept(this, value);
+                    _context.Generator.JmpFalse(labelBreak);
                 }
-            }
 
-            foreach (var obj in self.LinkageTable) {
-                if (!(obj.Definition is Declaration.VariableDeclaration)) {
-                    obj.Definition?.Accept(this, value);
+                _context.ContinueTarget.Push(labelContinue);
+                _context.BreakTarget.Push(labelBreak);
+                self.Stmt.Accept(this, value);
+                _context.ContinueTarget.Pop();
+                _context.BreakTarget.Pop();
+
+                _context.Generator.Label(labelContinue);
+                if (self.Update != null) {
+                    self.Update.Accept(this, value);
+                    _context.Generator.Discard();
                 }
+
+                _context.Generator.Jmp(labelHead);
+                _context.Generator.Label(labelBreak);
+
+                return new Value { Kind = Value.ValueKind.Void };
             }
 
-            foreach (var data in DataBlock) {
-                Generator.Data(data.Item1, data.Item2);
+            public Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                if (_context.GenericLabels.ContainsKey(self.Ident) == false) {
+                    _context.GenericLabels[self.Ident] = _context.Generator.LabelAlloc();
+                }
+
+                _context.Generator.Label(_context.GenericLabels[self.Ident]);
+                self.Stmt.Accept(this, value);
+                return new Value { Kind = Value.ValueKind.Void };
             }
 
-            return value;
-        }
+            public Value OnGotoStatement(Statement.GotoStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                if (_context.GenericLabels.ContainsKey(self.Label) == false) {
+                    _context.GenericLabels[self.Label] = _context.Generator.LabelAlloc();
+                }
 
-        public void WriteCode(StreamWriter writer) {
-            Generator.Codes.ForEach(x => writer.WriteLine(x.ToString()));
-        }
-    }
+                _context.Generator.Jmp(_context.GenericLabels[self.Label]);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
 
-    public class FileScopeInitializerVisitor : VisitorExt.IVisitor<SyntaxTreeCompileVisitor.Value, SyntaxTreeCompileVisitor.Value> {
-        private SyntaxTreeCompileVisitor syntaxTreeCompileVisitor;
+            public Value OnIfStatement(Statement.IfStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                self.Cond.Accept(this, value);
+                if (self.ElseStmt != null) {
+                    var elseLabel = _context.Generator.LabelAlloc();
+                    var junctionLabel = _context.Generator.LabelAlloc();
 
-        public void Emit(string s) {
-            syntaxTreeCompileVisitor.Generator.Emit(s);
-        }
+                    _context.Generator.JmpFalse(elseLabel);
 
-        public List<Tuple<int, int, int, Expression>> Values { get; } = new List<Tuple<int, int, int, Expression>>();
-        public int CurrentOffset = 0;
+                    self.ThenStmt.Accept(this, value);
+                    _context.Generator.Jmp(junctionLabel);
+                    _context.Generator.Label(elseLabel);
+                    self.ElseStmt.Accept(this, value);
+                    _context.Generator.Label(junctionLabel);
+                } else {
+                    var junctionLabel = _context.Generator.LabelAlloc();
 
-        public FileScopeInitializerVisitor(SyntaxTreeCompileVisitor syntaxTreeCompileVisitor) {
-            this.syntaxTreeCompileVisitor = syntaxTreeCompileVisitor;
-        }
+                    _context.Generator.JmpFalse(junctionLabel);
 
-        public SyntaxTreeCompileVisitor.Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+                    self.ThenStmt.Accept(this, value);
+                    _context.Generator.Label(junctionLabel);
+                }
 
-        public SyntaxTreeCompileVisitor.Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
 
-        public SyntaxTreeCompileVisitor.Value OnTypeDeclaration(Declaration.TypeDeclaration self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+                return new Value { Kind = Value.ValueKind.Void };
+            }
 
-        public SyntaxTreeCompileVisitor.Value OnVariableDeclaration(Declaration.VariableDeclaration self, SyntaxTreeCompileVisitor.Value value) {
-            // ファイルスコープ変数
-            if (self.Init != null) {
-                Emit(".section .data");
-                self.Init.Accept(this, value);
-                Emit(".align 4");
-                Emit($"{self.LinkageObject.LinkageId}:");
-                foreach (var val in Values) {
-                    var byteOffset = val.Item1;
-                    var bitOffset = val.Item2;
-                    var bitSize = val.Item3;
-                    var cvalue = val.Item4.Accept(this, value);
-                    switch (cvalue.Kind) {
-                        case SyntaxTreeCompileVisitor.Value.ValueKind.IntConst:
-                            switch (cvalue.Type.Sizeof()) {
-                                case 1:
-                                    Emit($".byte {(byte)cvalue.IntConst}");
-                                    break;
-                                case 2:
-                                    Emit($".word {(ushort)cvalue.IntConst}");
-                                    break;
-                                case 4:
-                                    Emit($".long {(uint)cvalue.IntConst}");
-                                    break;
-                                case 8:
-                                    Emit($".long {(UInt64)cvalue.IntConst & 0xFFFFFFFFUL}, {(UInt64)(cvalue.IntConst >> 32) & 0xFFFFFFFFUL}");
-                                    break;
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
+            public Value OnReturnStatement(Statement.ReturnStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                self.Expr?.Accept(this, value);
+                _context.Generator.Return(self.Expr?.Type);
 
-                            break;
-                        case SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst:
-                            switch (cvalue.Type.Sizeof()) {
-                                case 4: {
-                                        var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)cvalue.FloatConst), 0);
-                                        Emit($".long {dwords}");
-                                        break;
-                                    }
-                                case 8: {
-                                        var lo = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 0);
-                                        var hi = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 4);
+                return new Value { Kind = Value.ValueKind.Void };
+            }
 
-                                        Emit($".long {lo}, {hi}");
-                                        break;
-                                    }
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
+            private readonly Stack<Dictionary<Statement, string>> _switchLabelTableStack = new Stack<Dictionary<Statement, string>>();
 
-                            break;
-                        case SyntaxTreeCompileVisitor.Value.ValueKind.Var:
-                        case SyntaxTreeCompileVisitor.Value.ValueKind.Ref:
-                            if (cvalue.Label == null) {
-                                throw new Exception("ファイルスコープオブジェクトの参照では無い。");
-                            }
+            public Value OnSwitchStatement(Statement.SwitchStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var labelBreak = _context.Generator.LabelAlloc();
 
-                            Emit($".long {cvalue.Label}+{cvalue.Offset}");
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
+                self.Cond.Accept(this, value);
+
+                var labelDic = new Dictionary<Statement, string>();
+                _context.Generator.Switch(self.Cond.Type, g => {
+                    foreach (var caseLabel in self.CaseLabels) {
+                        var caseValue = caseLabel.Value;
+                        var label = _context.Generator.LabelAlloc();
+                        labelDic.Add(caseLabel, label);
+                        _context.Generator.Case(self.Cond.Type, caseValue, label);
+                    }
+                });
+                if (self.DefaultLabel != null) {
+                    var label = _context.Generator.LabelAlloc();
+                    labelDic.Add(self.DefaultLabel, label);
+                    _context.Generator.Jmp(label);
+                } else {
+                    _context.Generator.Jmp(labelBreak);
+                }
+
+                _switchLabelTableStack.Push(labelDic);
+                _context.BreakTarget.Push(labelBreak);
+                self.Stmt.Accept(this, value);
+                _context.BreakTarget.Pop();
+                _switchLabelTableStack.Pop();
+                _context.Generator.Label(labelBreak);
+
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnWhileStatement(Statement.WhileStatement self, Value value) {
+                _context.Generator.Emit($"// {self.LocationRange}");
+                var labelContinue = _context.Generator.LabelAlloc();
+                var labelBreak = _context.Generator.LabelAlloc();
+
+                // Check Loop Condition
+                _context.Generator.Label(labelContinue);
+                self.Cond.Accept(this, value);
+                _context.Generator.JmpFalse(labelBreak);
+                _context.ContinueTarget.Push(labelContinue);
+                _context.BreakTarget.Push(labelBreak);
+                self.Stmt.Accept(this, value);
+                _context.ContinueTarget.Pop();
+                _context.BreakTarget.Pop();
+
+                _context.Generator.Jmp(labelContinue);
+                _context.Generator.Label(labelBreak);
+
+                return new Value { Kind = Value.ValueKind.Void };
+            }
+
+            public Value OnTranslationUnit(TranslationUnit self, Value value) {
+                foreach (var obj in self.LinkageTable) {
+                    if (obj.Definition is Declaration.VariableDeclaration) {
+                        var visitor = new FileScopeInitializerVisitor(_context);
+                        obj.Definition?.Accept(visitor, value);
                     }
                 }
-            } else {
-                Emit(".section .bss");
-                Emit(".align 4");
-                Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}");
+
+                foreach (var obj in self.LinkageTable) {
+                    if (!(obj.Definition is Declaration.VariableDeclaration)) {
+                        obj.Definition?.Accept(this, value);
+                    }
+                }
+
+                foreach (var data in _context.DataBlock) {
+                    _context.Generator.Data(data.Item1, data.Item2);
+                }
+
+                return value;
             }
 
-            return value;
+            public void WriteCode(StreamWriter writer) {
+                _context.Generator.Codes.ForEach(x => writer.WriteLine(x.ToString()));
+            }
         }
 
-        public SyntaxTreeCompileVisitor.Value OnAdditiveExpression(Expression.AdditiveExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+        protected class FileScopeInitializerVisitor : SyntaxTree.IVisitor<Value, Value> {
+            private readonly Context _context;
 
-        public SyntaxTreeCompileVisitor.Value OnAndExpression(Expression.BitExpression.AndExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCastExpression(Expression.CastExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCommaExpression(Expression.CommaExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnConditionalExpression(Expression.ConditionalExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnEqualityExpression(Expression.EqualityExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnGccStatementExpression(Expression.GccStatementExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnLogicalAndExpression(Expression.LogicalAndExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnLogicalOrExpression(Expression.LogicalOrExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, SyntaxTreeCompileVisitor.Value value) {
-            return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, SyntaxTreeCompileVisitor.Value value) {
-            return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.FloatConst, FloatConst = self.Value, Type = self.Type };
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, SyntaxTreeCompileVisitor.Value value) {
-            return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, SyntaxTreeCompileVisitor.Value value) {
-            if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
-                var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
-                return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+            public void Emit(string s) {
+                _context.Generator.Emit(s);
             }
 
-            if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
-                var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
-                return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+            /// <summary>
+            /// 初期化情報
+            /// </summary>
+            private struct ValueEntry {
+                public int ByteOffset { get; }
+                public int BitOffset { get; }
+                public int BitSize { get; }
+                public Expression Expr { get; }
+
+                public ValueEntry(int byteOffset, int bitOffset, int bitSize, Expression expr) {
+                    this.ByteOffset = byteOffset;
+                    this.BitOffset = bitOffset;
+                    this.BitSize = bitSize;
+                    this.Expr = expr;
+                }
             }
-            if (self.Identifier == null) {
-                return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.IntConst, IntConst = (int)self.Offset.Value, Type = self.Type };
+
+            /// <summary>
+            /// 初期化式を元に作成した初期化対象情報
+            /// </summary>
+            private readonly List<ValueEntry> _initValues = new List<ValueEntry>();
+
+            /// <summary>
+            /// 初期化式の対象バイトオフセット
+            /// </summary>
+            private int _currentOffsetByte = 0;
+
+            public FileScopeInitializerVisitor(Context context) {
+                _context = context;
             }
 
-            throw new NotImplementedException();
-        }
+            public Value OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Value value) {
+                throw new NotImplementedException();
+            }
 
-        public SyntaxTreeCompileVisitor.Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+            public Value OnFunctionDeclaration(Declaration.FunctionDeclaration self, Value value) {
+                throw new NotImplementedException();
+            }
 
-        public SyntaxTreeCompileVisitor.Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+            public Value OnTypeDeclaration(Declaration.TypeDeclaration self, Value value) {
+                throw new NotImplementedException();
+            }
 
-        public SyntaxTreeCompileVisitor.Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+            public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
+                // ファイルスコープ変数
+                if (self.Init != null) {
+                    Emit(".section .data");
+                    self.Init.Accept(this, value);
+                    Emit(".align 4");
+                    Emit($"{self.LinkageObject.LinkageId}:");
+                    foreach (var val in _initValues) {
+                        var byteOffset = val.ByteOffset;
+                        var bitOffset = val.BitOffset;
+                        var bitSize = val.BitSize;
+                        var cvalue = val.Expr.Accept(this, value);
+                        switch (cvalue.Kind) {
+                            case Value.ValueKind.IntConst:
+                                switch (cvalue.Type.Sizeof()) {
+                                    case 1:
+                                        Emit($".byte {(byte)cvalue.IntConst}");
+                                        break;
+                                    case 2:
+                                        Emit($".word {(ushort)cvalue.IntConst}");
+                                        break;
+                                    case 4:
+                                        Emit($".long {(uint)cvalue.IntConst}");
+                                        break;
+                                    case 8:
+                                        Emit($".long {(UInt64)cvalue.IntConst & 0xFFFFFFFFUL}, {(UInt64)(cvalue.IntConst >> 32) & 0xFFFFFFFFUL}");
+                                        break;
+                                    default:
+                                        throw new ArgumentOutOfRangeException();
+                                }
 
-        public SyntaxTreeCompileVisitor.Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+                                break;
+                            case Value.ValueKind.FloatConst:
+                                switch (cvalue.Type.Sizeof()) {
+                                    case 4: {
+                                            var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)cvalue.FloatConst), 0);
+                                            Emit($".long {dwords}");
+                                            break;
+                                        }
+                                    case 8: {
+                                            var lo = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 0);
+                                            var hi = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 4);
 
-        public SyntaxTreeCompileVisitor.Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
+                                            Emit($".long {lo}, {hi}");
+                                            break;
+                                        }
+                                    default:
+                                        throw new ArgumentOutOfRangeException();
+                                }
 
-        public SyntaxTreeCompileVisitor.Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, SyntaxTreeCompileVisitor.Value value) {
-            int no = syntaxTreeCompileVisitor.DataBlock.Count;
-            var label = $"D{no}";
-            syntaxTreeCompileVisitor.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
-            return new SyntaxTreeCompileVisitor.Value { Kind = SyntaxTreeCompileVisitor.Value.ValueKind.Ref, Label = label, Offset = 0, Type = self.Type };
-        }
+                                break;
+                            case Value.ValueKind.Var:
+                            case Value.ValueKind.Ref:
+                                if (cvalue.Label == null) {
+                                    throw new Exception("ファイルスコープオブジェクトの参照では無い。");
+                                }
 
-        public SyntaxTreeCompileVisitor.Value OnRelationalExpression(Expression.RelationalExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnShiftExpression(Expression.ShiftExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSizeofExpression(Expression.SizeofExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnTypeConversionExpression(Expression.TypeConversionExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryNotExpression(Expression.UnaryNotExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnComplexInitializer(Initializer.ComplexInitializer self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSimpleInitializer(Initializer.SimpleInitializer self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
-            var ret = ExpressionEvaluator.Eval(self.Expr);
-            if (self.Type.IsBitField()) {
-                var bft = self.Type as BitFieldType;
-                if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
-                    Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, ret));
-                    if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
-                        CurrentOffset += bft.Sizeof();
+                                Emit($".long {cvalue.Label}+{cvalue.Offset}");
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
                     }
                 } else {
-                    throw new Exception("ビットフィールドに代入できない値が使われている。");
+                    Emit(".section .bss");
+                    Emit(".align 4");
+                    Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}");
                 }
-            } else {
-                Values.Add(Tuple.Create(CurrentOffset, -1, -1, ret));
-                CurrentOffset += self.Type.Sizeof();
-            }
-            return value;
-        }
 
-        public SyntaxTreeCompileVisitor.Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
-
-            foreach (var s in self.Inits) {
-                s.Accept(this, value);
+                return value;
             }
 
-            var arrayType = self.Type.Unwrap() as ArrayType;
-            var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.BaseType.Sizeof();
-            while (filledSize > 0) {
-                if (filledSize >= 4) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                    CurrentOffset += 4;
-                    filledSize -= 4;
-                } else if (filledSize >= 2) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
-                    CurrentOffset += 2;
-                    filledSize -= 2;
-                } else if (filledSize >= 1) {
-                    Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
-                    CurrentOffset += 1;
-                    filledSize -= 1;
+            public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnAndExpression(Expression.BitExpression.AndExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCastExpression(Expression.CastExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCommaExpression(Expression.CommaExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnConditionalExpression(Expression.ConditionalExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnEqualityExpression(Expression.EqualityExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnGccStatementExpression(Expression.GccStatementExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnLogicalAndExpression(Expression.LogicalAndExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnLogicalOrExpression(Expression.LogicalOrExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Value value) {
+                return new Value { Kind = Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
+            }
+
+            public Value OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Value value) {
+                return new Value { Kind = Value.ValueKind.FloatConst, FloatConst = self.Value, Type = self.Type };
+            }
+
+            public Value OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Value value) {
+                return new Value { Kind = Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
+            }
+
+            public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
+                if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
+                    var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.FunctionExpression;
+                    return new Value { Kind = Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
                 }
+
+                if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.VariableExpression) {
+                    var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
+                    return new Value { Kind = Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
+                }
+                if (self.Identifier == null) {
+                    return new Value { Kind = Value.ValueKind.IntConst, IntConst = (int)self.Offset.Value, Type = self.Type };
+                }
+
+                throw new NotImplementedException();
             }
 
-            return value;
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, SyntaxTreeCompileVisitor.Value value) {
-            var start = Values.Count;
-
-            foreach (var s in self.Inits) {
-                s.Accept(this, value);
+            public Value OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Value value) {
+                throw new NotImplementedException();
             }
 
+            public Value OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Value value) {
+                throw new NotImplementedException();
+            }
 
-            var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
-            if (suType.IsStructureType()) {
-                foreach (var x in suType.Members.Skip(self.Inits.Count)) {
-                    if (x.Type.IsBitField()) {
-                        var bft = x.Type as BitFieldType;
-                        var bt = bft.Type as BasicType;
-                        Values.Add(Tuple.Create(CurrentOffset, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+            public Value OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
+                int no = _context.DataBlock.Count;
+                var label = $"D{no}";
+                _context.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
+                return new Value { Kind = Value.ValueKind.Ref, Label = label, Offset = 0, Type = self.Type };
+            }
+
+            public Value OnRelationalExpression(Expression.RelationalExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnShiftExpression(Expression.ShiftExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSizeofExpression(Expression.SizeofExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnTypeConversionExpression(Expression.TypeConversionExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryNotExpression(Expression.UnaryNotExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnComplexInitializer(Initializer.ComplexInitializer self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
+                var ret = ExpressionEvaluator.Eval(self.Expr);
+                if (self.Type.IsBitField()) {
+                    var bft = self.Type as BitFieldType;
+                    if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
+                        _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, ret));
                         if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
-                            CurrentOffset += bft.Sizeof();
+                            _currentOffsetByte += bft.Sizeof();
                         }
                     } else {
-                        var fillSize = x.Type.Sizeof();
-                        while (fillSize > 0) {
-                            if (fillSize >= 4) {
-                                fillSize -= 4;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                                CurrentOffset += 4;
-                            } else if (fillSize >= 2) {
-                                fillSize -= 2;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
-                                CurrentOffset += 4;
-                            } else if (fillSize >= 1) {
-                                fillSize -= 1;
-                                Values.Add(Tuple.Create(CurrentOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
-                                CurrentOffset += 4;
+                        throw new Exception("ビットフィールドに代入できない値が使われている。");
+                    }
+                } else {
+                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, ret));
+                    _currentOffsetByte += self.Type.Sizeof();
+                }
+                return value;
+            }
+
+            public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
+
+                foreach (var s in self.Inits) {
+                    s.Accept(this, value);
+                }
+
+                var arrayType = self.Type.Unwrap() as ArrayType;
+                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.BaseType.Sizeof();
+                while (filledSize > 0) {
+                    if (filledSize >= 4) {
+                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
+                        _currentOffsetByte += 4;
+                        filledSize -= 4;
+                    } else if (filledSize >= 2) {
+                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
+                        _currentOffsetByte += 2;
+                        filledSize -= 2;
+                    } else if (filledSize >= 1) {
+                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
+                        _currentOffsetByte += 1;
+                        filledSize -= 1;
+                    }
+                }
+
+                return value;
+            }
+
+            public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
+                var start = _initValues.Count;
+
+                foreach (var s in self.Inits) {
+                    s.Accept(this, value);
+                }
+
+
+                var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
+                if (suType.IsStructureType()) {
+                    foreach (var x in suType.Members.Skip(self.Inits.Count)) {
+                        if (x.Type.IsBitField()) {
+                            var bft = x.Type as BitFieldType;
+                            var bt = bft.Type as BasicType;
+                            _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+                            if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
+                                _currentOffsetByte += bft.Sizeof();
+                            }
+                        } else {
+                            var fillSize = x.Type.Sizeof();
+                            while (fillSize > 0) {
+                                if (fillSize >= 4) {
+                                    fillSize -= 4;
+                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
+                                    _currentOffsetByte += 4;
+                                } else if (fillSize >= 2) {
+                                    fillSize -= 2;
+                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
+                                    _currentOffsetByte += 4;
+                                } else if (fillSize >= 1) {
+                                    fillSize -= 1;
+                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
+                                    _currentOffsetByte += 4;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            var end = Values.Count;
+                var end = _initValues.Count;
 
-            var i = start;
-            while (i < Values.Count) {
-                var val = Values[i];
-                var byteOffset = val.Item1;
-                var bitOffset = val.Item2;
-                var bitSize = val.Item3;
-                var expr = val.Item4;
-                if (bitSize == -1) {
+                var i = start;
+                while (i < _initValues.Count) {
+                    var val = _initValues[i];
+                    var byteOffset = val.ByteOffset;
+                    var bitOffset = val.BitOffset;
+                    var bitSize = val.BitSize;
+                    var expr = val.Expr;
+                    if (bitSize == -1) {
+                        i++;
+                        continue;
+                    }
+                    ulong v = 0;
+
+                    while (i < _initValues.Count && _initValues[i].ByteOffset == byteOffset) {
+                        var cvalue = _initValues[i].Expr.Accept(this, value);
+                        var bOffset = _initValues[i].BitOffset;
+                        var bSize = _initValues[i].BitSize;
+                        if (cvalue.Kind != Value.ValueKind.IntConst) {
+                            // ビットフィールド中に定数式以外が使われている。
+                            throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
+                        }
+                        ulong bits = 0;
+                        switch (cvalue.Type.Sizeof()) {
+                            case 1:
+                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+                                    bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+                                } else {
+                                    bits = (ulong)(((byte)(((byte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+                                }
+                                break;
+                            case 2:
+                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+                                    bits = (ulong)(((ushort)(((short)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+                                } else {
+                                    bits = (ulong)(((ushort)(((ushort)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+                                }
+                                break;
+                            case 4:
+                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+                                    bits = (ulong)(((uint)(((int)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+                                } else {
+                                    bits = (ulong)(((uint)(((uint)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+                                }
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
+                        v |= bits << bOffset;
+                        _initValues.RemoveAt(i);
+                    }
+                    _initValues.Insert(i, new ValueEntry(byteOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as BasicType).Kind)));
+
                     i++;
-                    continue;
+
                 }
-                ulong v = 0;
-
-                while (i < Values.Count && Values[i].Item1 == byteOffset) {
-                    var cvalue = Values[i].Item4.Accept(this, value);
-                    var bOffset = Values[i].Item2;
-                    var bSize = Values[i].Item3;
-                    if (cvalue.Kind != SyntaxTreeCompileVisitor.Value.ValueKind.IntConst) {
-                        // ビットフィールド中に定数式以外が使われている。
-                        throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
-                    }
-                    ulong bits = 0;
-                    switch (cvalue.Type.Sizeof()) {
-                        case 1:
-                            if (cvalue.Type.IsUnsignedIntegerType()) {
-                                bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
-                            } else {
-                                bits = (ulong)(((byte)(((byte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
-                            }
-                            break;
-                        case 2:
-                            if (cvalue.Type.IsUnsignedIntegerType()) {
-                                bits = (ulong)(((ushort)(((short)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
-                            } else {
-                                bits = (ulong)(((ushort)(((ushort)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
-                            }
-                            break;
-                        case 4:
-                            if (cvalue.Type.IsUnsignedIntegerType()) {
-                                bits = (ulong)(((uint)(((int)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
-                            } else {
-                                bits = (ulong)(((uint)(((uint)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
-                            }
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-                    v |= bits << bOffset;
-                    Values.RemoveAt(i);
-                }
-                Values.Insert(i, Tuple.Create(byteOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as BasicType).Kind)));
-
-                i++;
-
+                return value;
             }
-            return value;
+
+            public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCaseStatement(Statement.CaseStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnContinueStatement(Statement.ContinueStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnDefaultStatement(Statement.DefaultStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnEmptyStatement(Statement.EmptyStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnExpressionStatement(Statement.ExpressionStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnForStatement(Statement.ForStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnGotoStatement(Statement.GotoStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnIfStatement(Statement.IfStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnReturnStatement(Statement.ReturnStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnSwitchStatement(Statement.SwitchStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnWhileStatement(Statement.WhileStatement self, Value value) {
+                throw new NotImplementedException();
+            }
+
+            public Value OnTranslationUnit(TranslationUnit self, Value value) {
+                throw new NotImplementedException();
+            }
         }
 
-        public SyntaxTreeCompileVisitor.Value OnBreakStatement(Statement.BreakStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCaseStatement(Statement.CaseStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnCompoundStatement(Statement.CompoundStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnContinueStatement(Statement.ContinueStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnDefaultStatement(Statement.DefaultStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnDoWhileStatement(Statement.DoWhileStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnEmptyStatement(Statement.EmptyStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnExpressionStatement(Statement.ExpressionStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnForStatement(Statement.ForStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnGotoStatement(Statement.GotoStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnIfStatement(Statement.IfStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnReturnStatement(Statement.ReturnStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnSwitchStatement(Statement.SwitchStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnWhileStatement(Statement.WhileStatement self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
-        }
-
-        public SyntaxTreeCompileVisitor.Value OnTranslationUnit(TranslationUnit self, SyntaxTreeCompileVisitor.Value value) {
-            throw new NotImplementedException();
+        public void Compile(Ast ret, StreamWriter o) {
+            var v = new Value();
+            var context = new Context();
+            var visitor = new SyntaxTreeCompileVisitor(context);
+            ret.Accept(visitor, v);
+            visitor.WriteCode(o);
         }
     }
-
 }
-
-
-

@@ -38,7 +38,7 @@ namespace AnsiCParser {
                 })
                 .Parse(args);
 
-            
+
             try {
                 if (outputEncoding != null) {
                     Console.OutputEncoding = System.Text.Encoding.GetEncoding(outputEncoding);
@@ -75,10 +75,8 @@ namespace AnsiCParser {
 
                     if (flagSyntaxOnly == false) {
                         using (var o = new System.IO.StreamWriter(outputFile)) {
-                            var v = new SyntaxTreeCompileVisitor.Value();
-                            var visitor = new SyntaxTreeCompileVisitor();
-                            ret.Accept(visitor, v);
-                            visitor.WriteCode(o);
+                            var compiler = new Compiler();
+                            compiler.Compile(ret, o);
                         }
                     }
                 } catch (Exception e) {
@@ -96,11 +94,11 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-                        var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest\00_assignment.c"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
             var sexpr = ret.Accept(new ToSExprVisitor(), null);
 
             var interpreter = new Lisp.SchemeInterpreter();
-            interpreter.InterpreterWantsToPrint += (s,e) => Console.Write(e.WhatToPrint);
+            interpreter.InterpreterWantsToPrint += (s, e) => Console.Write(e.WhatToPrint);
             interpreter.Evaluate($"(define ast '{new Lisp.Writer(false).Write(sexpr)})");
             interpreter.Evaluate(@"(define repl (lambda () (let ((expr (begin (display ""cc1> "") (read (standard-input-port))))) (begin (write (eval expr)) (newline) (repl)))))");
             interpreter.Evaluate(@"
@@ -132,14 +130,12 @@ namespace AnsiCParser {
       (write s))
   (newline)))
 ");
-            interpreter.Evaluate(@"(repl)");
+            //interpreter.Evaluate(@"(repl)");
 
-            var v = new SyntaxTreeCompileVisitor.Value();
             using (var o = new System.IO.StreamWriter(@"..\..\test.s")) {
-                var visitor = new SyntaxTreeCompileVisitor();
-                ret.Accept(visitor, v);
-                visitor.WriteCode(o);
+                var compiler = new Compiler();
+                compiler.Compile(ret, o);
             }
         }
-    }   
+    }
 }

@@ -1107,7 +1107,7 @@ namespace AnsiCParser.SyntaxTree {
         /// </summary>
         public class MultiplicitiveExpression : Expression {
             public enum OperatorKind {
-                None, Mul, Div, Mod
+                Mul, Div, Mod
             }
             public OperatorKind Op {
                 get;

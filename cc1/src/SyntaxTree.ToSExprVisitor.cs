@@ -3,7 +3,7 @@ using System.Linq;
 using AnsiCParser.DataType;
 
 namespace AnsiCParser.SyntaxTree {
-    public class ToSExprVisitor : VisitorExt.IVisitor<Lisp.Pair, Lisp.Pair> {
+    public class ToSExprVisitor : IVisitor<Lisp.Pair, Lisp.Pair> {
         private static Lisp.Pair LocationRangeToCons(LocationRange lr) {
             return Lisp.Util.makeCons(
                 Lisp.Util.makeList(

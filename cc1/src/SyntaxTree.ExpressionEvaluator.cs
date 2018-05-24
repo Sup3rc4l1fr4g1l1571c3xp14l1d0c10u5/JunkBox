@@ -68,7 +68,7 @@ namespace AnsiCParser.SyntaxTree {
         /// <summary>
         /// 定数式の評価を行うVisitor
         /// </summary>
-        private class SyntaxTreeConstantEvaluatorVisitor : VisitorExt.IVisitor<Expression, Expression> {
+        private class SyntaxTreeConstantEvaluatorVisitor : IVisitor<Expression, Expression> {
             // 6.6 定数式
             // 補足説明  
             // 定数式は，実行時ではなく翻訳時に評価することができる。したがって，定数を使用してよいところならばどこでも使用してよい。

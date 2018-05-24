@@ -4,6 +4,9 @@ using AnsiCParser.DataType;
 
 namespace AnsiCParser.SyntaxTree {
     public abstract class Statement : Ast {
+        /// <summary>
+        /// Goto文
+        /// </summary>
         public class GotoStatement : Statement {
             /// <summary>
             /// 参照ラベル名
@@ -24,6 +27,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Continue文
+        /// </summary>
         public class ContinueStatement : Statement {
             public Statement Stmt {
                 get;
@@ -34,6 +40,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Break文
+        /// </summary>
         public class BreakStatement : Statement {
             public Statement Stmt {
                 get;
@@ -44,6 +53,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Return文
+        /// </summary>
         public class ReturnStatement : Statement {
             public Expression Expr {
                 get;
@@ -54,6 +66,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// While文
+        /// </summary>
         public class WhileStatement : Statement {
             public Expression Cond {
                 get;
@@ -67,6 +82,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Do-While文
+        /// </summary>
         public class DoWhileStatement : Statement {
             public Statement Stmt {
                 get; set;
@@ -79,6 +97,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// For文(C89)
+        /// </summary>
         public class ForStatement : Statement {
             public Expression Init {
                 get;
@@ -100,6 +121,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// If文
+        /// </summary>
         public class IfStatement : Statement {
             public Expression Cond {
                 get;
@@ -118,6 +142,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Switch文
+        /// </summary>
         public class SwitchStatement : Statement {
             public Expression Cond {
                 get;
@@ -152,6 +179,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// 複文
+        /// </summary>
         public class CompoundStatement : Statement {
             public List<Declaration> Decls {
                 get;
@@ -174,11 +204,17 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// 空文
+        /// </summary>
         public class EmptyStatement : Statement {
             public EmptyStatement(LocationRange locationRange) : base(locationRange) {
             }
         }
 
+        /// <summary>
+        /// 式文
+        /// </summary>
         public class ExpressionStatement : Statement {
             public Expression Expr {
                 get;
@@ -189,6 +225,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Caseラベル付き文
+        /// </summary>
         public class CaseStatement : Statement {
             public Expression Expr {
                 get;
@@ -207,6 +246,10 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// Defaultラベル付き文
+        /// </summary>
+
         public class DefaultStatement : Statement {
             public Statement Stmt {
                 get;
@@ -217,6 +260,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// ラベル付き文
+        /// </summary>
         public class GenericLabeledStatement : Statement {
             public string Ident {
                 get;
@@ -231,6 +277,10 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="locationRange"></param>
         protected Statement(LocationRange locationRange) : base(locationRange) {
         }
     }
