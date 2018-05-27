@@ -909,12 +909,22 @@ namespace AnsiCParser {
             }
 
             public void JmpFalse(string label) {
+                if (Peek(0).Type.IsRealFloatingType()) {
+                    var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
+                    Push(value);
+                    Ne(CType.CreateSignedInt());
+                }
                 LoadI32("%eax");
                 Emit("cmpl $0, %eax");
                 Emit($"je {label}");
             }
 
             public void JmpTrue(string label) {
+                if (Peek(0).Type.IsRealFloatingType()) {
+                    var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
+                    Push(value);
+                    Ne(CType.CreateSignedInt());
+                }
                 LoadI32("%eax");
                 Emit("cmpl $0, %eax");
                 Emit($"jne {label}");
@@ -1519,13 +1529,61 @@ namespace AnsiCParser {
 
                             return;
                         }
-                    case Value.ValueKind.Temp:
-                        if (valueType.Sizeof() <= 4) {
-                            // スタックトップの値をレジスタにロード
-                            Emit($"popl {register}");
-                            return;
+                    case Value.ValueKind.Temp: {
+                        //if (valueType.Sizeof() <= 4) {
+                        //    // スタックトップの値をレジスタにロード
+                        //    Emit($"popl {register}");
+                        //    return;
+                        //} else {
+                        //    throw new NotImplementedException();
+                        //}
+                        BasicType.TypeKind kind;
+                        if (valueType.Unwrap() is BasicType) {
+                            kind = (valueType.Unwrap() as BasicType).Kind;
+                        } else if (valueType.IsEnumeratedType()) {
+                            kind = BasicType.TypeKind.SignedInt;
+                        } else if (valueType.IsPointerType()) {
+                            kind = BasicType.TypeKind.UnsignedInt;
                         } else {
-                            throw new NotImplementedException();
+                            throw new Exception("整数定数値の型が不正です");
+                        }
+                        switch (kind) {
+                            case BasicType.TypeKind.Char:
+                            case BasicType.TypeKind.SignedChar:
+                                Emit($"popl {register}");
+                                Emit($"movsbl {ToByteReg(register)}, {register}");
+                                break;
+                            case BasicType.TypeKind.UnsignedChar:
+                                Emit($"popl {register}");
+                                Emit($"movzbl {ToByteReg(register)}, {register}");
+                                break;
+                            case BasicType.TypeKind.SignedShortInt:
+                                Emit($"popl {register}");
+                                Emit($"movswl {ToWordReg(register)}, {register}");
+                                break;
+                            case BasicType.TypeKind.UnsignedShortInt:
+                                Emit($"popl {register}");
+                                Emit($"movzwl {ToWordReg(register)}, {register}");
+                                break;
+                            case BasicType.TypeKind.SignedInt:
+                            case BasicType.TypeKind.SignedLongInt:
+                                Emit($"popl {register}");
+                                break;
+                            case BasicType.TypeKind.UnsignedInt:
+                            case BasicType.TypeKind.UnsignedLongInt:
+                                Emit($"popl {register}");
+                                break;
+                            case BasicType.TypeKind.SignedLongLongInt:
+                            case BasicType.TypeKind.UnsignedLongLongInt:
+                            default:
+                                if (valueType.Sizeof() <= 4) {
+                                    Emit($"popl {register}");
+                                    break;
+                                }
+                                throw new Exception("32bitレジスタにロードできないテンポラリ値です。");
+                        }
+
+                        return;
                         }
                     case Value.ValueKind.FloatConst:
                         throw new NotImplementedException();
@@ -1836,18 +1894,22 @@ namespace AnsiCParser {
                     LoadValueToStack(rhs.Type);
                 }
 
-                rhs = Pop();
+                rhs = Peek(0);
                 if (rhs.Type.IsBasicType(BasicType.TypeKind.Float)) {
+                    rhs = Pop();
                     Emit("flds (%esp)");
                     Emit("addl $4, %esp");
                 } else if (rhs.Type.IsBasicType(BasicType.TypeKind.Double)) {
+                    rhs = Pop();
                     Emit("fldl (%esp)");
                     Emit("addl $8, %esp");
                 } else if (rhs.Type.IsIntegerType()) {
                     if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt)) {
+                        rhs = Pop();
                         Emit("fildq (%esp)");
                         Emit("addl $8, %esp");
                     } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongLongInt)) {
+                        rhs = Pop();
                         Emit("fildq (%esp)");
                         Emit("cmpl $0, 4(%esp)");
                         var l = LabelAlloc();
@@ -1861,11 +1923,14 @@ namespace AnsiCParser {
                         Label(l);
                         Emit("addl $8, %esp");
                     } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.UnsignedInt)) {
+                        rhs = Pop();
                         Emit("pushl $0");
                         Emit("pushl 4(%esp)");
                         Emit("fildq (%esp)");
                         Emit("addl $12, %esp");
                     } else {
+                        CastIntValueToInt(CType.CreateSignedInt());
+                        rhs = Pop();
                         Emit("fildl (%esp)");
                         Emit("addl $4, %esp");
                     }
@@ -2126,6 +2191,7 @@ namespace AnsiCParser {
 
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else if (type.IsRealFloatingType()) {
+                    Emit("fld1");
                     LoadVariableAddress("%eax");
                     if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("flds (%eax)");
@@ -2139,7 +2205,6 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                     }
 
-                    Emit("fld1");
                     Emit($"f{op}p");
                     if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("fstps (%eax)");
@@ -2433,7 +2498,11 @@ namespace AnsiCParser {
 
             public void UnaryLogicalNot(CType type) {
                 var operand = Peek(0);
-                if (operand.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
+                if (operand.Type.IsRealFloatingType()) {
+                    var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
+                    Push(value);
+                    Eq(CType.CreateSignedInt());
+                } else if (operand.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                     LoadI64("%eax", "%edx");
                     Emit("orl %edx, %eax");
                     Emit("cmpl $0, %eax");
@@ -2503,6 +2572,7 @@ namespace AnsiCParser {
 
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type });
                 } else if (type.IsRealFloatingType()) {
+                    Emit("fld1");
                     LoadVariableAddress("%eax");
                     if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("flds (%eax)");
@@ -2512,7 +2582,6 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                     }
 
-                    Emit("fld1");
                     Emit($"f{op}p");
                     if (type.IsBasicType(BasicType.TypeKind.Float)) {
                         Emit("sub $4, %esp");
@@ -2760,7 +2829,7 @@ namespace AnsiCParser {
                     _context.Arguments.Clear();
                     var vars = new List<string>();
                     foreach (var arg in ft.Arguments) {
-                        vars.Add($"//   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
+                        vars.Add($"#   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
                         _context.Arguments.Add(arg.Ident.Raw, offset);
                         offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
                     }
@@ -2768,14 +2837,14 @@ namespace AnsiCParser {
                     // ラベル
                     _context.GenericLabels.Clear();
                     _context.Generator.Emit("");
-                    _context.Generator.Emit("// function: ");
-                    _context.Generator.Emit($"//   {self.Ident}");
-                    _context.Generator.Emit("// args: ");
+                    _context.Generator.Emit("# function: ");
+                    _context.Generator.Emit($"#   {self.Ident}");
+                    _context.Generator.Emit("# args: ");
                     vars.ForEach(x => _context.Generator.Emit(x));
-                    _context.Generator.Emit("// return:");
-                    _context.Generator.Emit($"//   {ft.ResultType.ToString()}");
-                    _context.Generator.Emit("// location:");
-                    _context.Generator.Emit($"//   {self.LocationRange}");
+                    _context.Generator.Emit("# return:");
+                    _context.Generator.Emit($"#   {ft.ResultType.ToString()}");
+                    _context.Generator.Emit("# location:");
+                    _context.Generator.Emit($"#   {self.LocationRange}");
                     _context.Generator.Emit(".section .text");
                     _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
                     _context.Generator.Emit($"{self.LinkageObject.LinkageId}:");
@@ -2788,7 +2857,7 @@ namespace AnsiCParser {
                     _localScopeTotalSize = 4 * 3; // %ebx,%esi,%edi分
                     _maxLocalScopeTotalSize = 4 * 3;
                     self.Body.Accept(this, value);  // 本体のコード生成を実行
-                    c.Body = $"subl ${_maxLocalScopeTotalSize - 4 * 3}, %esp // alloc stack"; // スタックサイズをバックパッチ
+                    c.Body = $"subl ${_maxLocalScopeTotalSize - 4 * 3}, %esp # alloc stack"; // スタックサイズをバックパッチ
                     _context.Generator.Emit("popl %edi");
                     _context.Generator.Emit("popl %esi");
                     _context.Generator.Emit("popl %ebx");
@@ -2815,7 +2884,7 @@ namespace AnsiCParser {
                             throw new Exception("初期化対象変数が見つからない。");
                         }
 
-                        _context.Generator.Emit($"// {self.LocationRange}");
+                        _context.Generator.Emit($"# {self.LocationRange}");
                         return self.Init.Accept(this, new Value { Kind = Value.ValueKind.Var, Label = offset.Item1, Offset = offset.Item2, Type = self.Type });
                     }
                 }
@@ -3030,16 +3099,20 @@ namespace AnsiCParser {
             }
 
             public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
-                self.Lhs.Accept(this, value);
-                self.Rhs.Accept(this, value);
                 switch (self.Op) {
                     case Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                        self.Lhs.Accept(this, value);
+                        self.Rhs.Accept(this, value);
                         _context.Generator.Mul(self.Type);
                         break;
                     case Expression.MultiplicitiveExpression.OperatorKind.Div:
+                        self.Lhs.Accept(this, value);
+                        self.Rhs.Accept(this, value);
                         _context.Generator.Div(self.Type);
                         break;
                     case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                        self.Lhs.Accept(this, value);
+                        self.Rhs.Accept(this, value);
                         _context.Generator.Mod(self.Type);
                         break;
                     default:
@@ -3082,7 +3155,7 @@ namespace AnsiCParser {
                     var ident = $"<temp:{_localScope.Count()}>";
                     var tp = Tuple.Create((string)null, -_localScopeTotalSize);
                     _localScope.Add(ident, tp);
-                    _context.Generator.Emit($"// temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={obj.Type.ToString()}");
+                    _context.Generator.Emit($"# temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={obj.Type.ToString()}");
 
                     if (size <= 4) {
                         _context.Generator.Emit($"leal {-_localScopeTotalSize}(%ebp), %esi");
@@ -3360,14 +3433,14 @@ namespace AnsiCParser {
             }
 
             public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var label = _context.BreakTarget.Peek();
                 _context.Generator.Jmp(label);
                 return new Value { Kind = Value.ValueKind.Void };
             }
 
             public Value OnCaseStatement(Statement.CaseStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var label = _switchLabelTableStack.Peek()[self];
                 _context.Generator.Label(label);
                 self.Stmt.Accept(this, value);
@@ -3379,25 +3452,28 @@ namespace AnsiCParser {
             private int _maxLocalScopeTotalSize;
 
             public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
 
                 _localScope = _localScope.Extend();
                 var prevLocalScopeSize = _localScopeTotalSize;
 
-                _context.Generator.Emit("// enter scope");
+                _context.Generator.Emit("# enter scope");
                 foreach (var x in self.Decls.Reverse<Declaration>()) {
                     if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                         if (x.StorageClass == StorageClassSpecifier.Static) {
                             // static
                             _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
-                            _context.Generator.Emit($"// static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                            _context.Generator.Emit($"# static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         } else {
                             _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
                             _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
-                            _context.Generator.Emit($"// auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
+                            _context.Generator.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                         }
                     } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                        _context.Generator.Emit($"// extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        _context.Generator.Emit($"# extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        // externなのでスキップ
+                    } else if (x.LinkageObject.Linkage == LinkageKind.InternalLinkage) {
+                        _context.Generator.Emit($"# internal(filescope): name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         // externなのでスキップ
                     } else {
                         throw new NotImplementedException();
@@ -3416,7 +3492,7 @@ namespace AnsiCParser {
                     _maxLocalScopeTotalSize = _localScopeTotalSize;
                 }
 
-                _context.Generator.Emit("// leave scope");
+                _context.Generator.Emit("# leave scope");
 
                 _localScopeTotalSize = prevLocalScopeSize;
                 _localScope = _localScope.Parent;
@@ -3424,14 +3500,14 @@ namespace AnsiCParser {
             }
 
             public Value OnContinueStatement(Statement.ContinueStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var label = _context.ContinueTarget.Peek();
                 _context.Generator.Jmp(label);
                 return new Value { Kind = Value.ValueKind.Void };
             }
 
             public Value OnDefaultStatement(Statement.DefaultStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var label = _switchLabelTableStack.Peek()[self];
                 _context.Generator.Label(label);
                 self.Stmt.Accept(this, value);
@@ -3439,7 +3515,7 @@ namespace AnsiCParser {
             }
 
             public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var labelContinue = _context.Generator.LabelAlloc();
                 var labelBreak = _context.Generator.LabelAlloc();
 
@@ -3462,14 +3538,14 @@ namespace AnsiCParser {
             }
 
             public Value OnExpressionStatement(Statement.ExpressionStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 self.Expr.Accept(this, value);
                 _context.Generator.Discard();
                 return value;
             }
 
             public Value OnForStatement(Statement.ForStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 // Initialize
                 if (self.Init != null) {
                     self.Init.Accept(this, value);
@@ -3506,7 +3582,7 @@ namespace AnsiCParser {
             }
 
             public Value OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 if (_context.GenericLabels.ContainsKey(self.Ident) == false) {
                     _context.GenericLabels[self.Ident] = _context.Generator.LabelAlloc();
                 }
@@ -3517,7 +3593,7 @@ namespace AnsiCParser {
             }
 
             public Value OnGotoStatement(Statement.GotoStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 if (_context.GenericLabels.ContainsKey(self.Label) == false) {
                     _context.GenericLabels[self.Label] = _context.Generator.LabelAlloc();
                 }
@@ -3527,7 +3603,7 @@ namespace AnsiCParser {
             }
 
             public Value OnIfStatement(Statement.IfStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 self.Cond.Accept(this, value);
                 if (self.ElseStmt != null) {
                     var elseLabel = _context.Generator.LabelAlloc();
@@ -3554,7 +3630,7 @@ namespace AnsiCParser {
             }
 
             public Value OnReturnStatement(Statement.ReturnStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 self.Expr?.Accept(this, value);
                 _context.Generator.Return(self.Expr?.Type);
 
@@ -3564,7 +3640,7 @@ namespace AnsiCParser {
             private readonly Stack<Dictionary<Statement, string>> _switchLabelTableStack = new Stack<Dictionary<Statement, string>>();
 
             public Value OnSwitchStatement(Statement.SwitchStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var labelBreak = _context.Generator.LabelAlloc();
 
                 self.Cond.Accept(this, value);
@@ -3597,7 +3673,7 @@ namespace AnsiCParser {
             }
 
             public Value OnWhileStatement(Statement.WhileStatement self, Value value) {
-                _context.Generator.Emit($"// {self.LocationRange}");
+                _context.Generator.Emit($"# {self.LocationRange}");
                 var labelContinue = _context.Generator.LabelAlloc();
                 var labelBreak = _context.Generator.LabelAlloc();
 

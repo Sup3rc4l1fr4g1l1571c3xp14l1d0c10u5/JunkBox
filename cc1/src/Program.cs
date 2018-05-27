@@ -6,6 +6,11 @@ namespace AnsiCParser {
     class Program {
 
         static void Main(string[] args) {
+
+            //
+            // I Do Not Know C. 
+            //
+
             if (Debugger.IsAttached == false) {
                 CommonMain(args);
             } else {
@@ -13,82 +18,92 @@ namespace AnsiCParser {
             }
         }
 
+        private class CommandLineOptions {
+            public string outputFile = null;
+            public string astFile = null;
+            public bool flagSyntaxOnly = false;
+            public string outputEncoding = null;
+            public string[] args = null;
+
+            public void Validation(Action<string> act) {
+                // check outputEncoding
+                try {
+                    if (outputEncoding != null) {
+                        Console.OutputEncoding = System.Text.Encoding.GetEncoding(outputEncoding);
+                    }
+                } catch {
+                    act($"指定されたエンコーディング ${outputEncoding}は不正です。");
+                }
+
+                // check input source
+                if (args.Length == 0) {
+                    act("コンパイル対象のCソースファイルを１つ指定してください。");
+                } else if (args.Length > 1) {
+                    act("コンパイル対象のCソースファイルが２つ以上指定されています。");
+                } else if (System.IO.File.Exists(args[0]) == false) {
+                    act($"ファイル {args[0]} が見つかりません。処理を中止します。");
+                }
+
+                // check output
+                if (outputFile == null) {
+                    outputFile = System.IO.Path.ChangeExtension(args[0], "s");
+                }
+
+            }
+        }
+
         static void CommonMain(string[] args) {
-            string outputFile = null;
-            string astFile = null;
-            bool flagSyntaxOnly = false;
-            string outputEncoding = null;
 
-            args = new CommandLineOptionsParser()
-                .Entry("-o", 1, (s) => {
-                    outputFile = s[0];
+            var opts = new CommandLineOptionsParser<CommandLineOptions>()
+                .Entry("-o", 1, (t, s) => {
+                    t.outputFile = s[0];
                     return true;
                 })
-                .Entry("-ast", 1, (s) => {
-                    astFile = s[0];
+                .Entry("-ast", 1, (t, s) => {
+                    t.astFile = s[0];
                     return true;
                 })
-                .Entry("-console-output-encoding", 1, (s) => {
-                    outputEncoding = s[0];
+                .Entry("-console-output-encoding", 1, (t, s) => {
+                    t.outputEncoding = s[0];
                     return true;
                 })
-                .Entry("-fsyntax-only", 0, (s) => {
-                    flagSyntaxOnly = true;
+                .Entry("-fsyntax-only", 0, (t, s) => {
+                    t.flagSyntaxOnly = true;
                     return true;
                 })
-                .Parse(args);
+                .Default((t, s) => {
+                    t.args = s;
+                    return true;
+                })
+                .Parse(new CommandLineOptions(), args);
 
+            opts.Validation((e) => {
+                Logger.Error(e);
+                Environment.Exit(-1);
+            });
 
             try {
-                if (outputEncoding != null) {
-                    Console.OutputEncoding = System.Text.Encoding.GetEncoding(outputEncoding);
-                }
-            } catch {
-                Logger.Error($"指定されたエンコーディング ${outputEncoding}は不正です。");
-                Environment.Exit(-1);
-            }
-
-
-            if (args.Length == 0) {
-                Logger.Error("コンパイル対象のCソースファイルを１つ指定してください。");
-                Environment.Exit(-1);
-            } else if (args.Length > 1) {
-                Logger.Error("コンパイル対象のCソースファイルが２つ以上指定されています。");
-                Environment.Exit(-1);
-            } else {
-                var arg = args[0];
-
-                if (System.IO.File.Exists(arg) == false) {
-                    Logger.Error($"ファイル {arg} が見つかりません。処理を中止します。");
-                    Environment.Exit(-1);
-                }
-                if (outputFile == null) {
-                    outputFile = System.IO.Path.ChangeExtension(arg, "s");
-                }
-                try {
-                    var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
-                    if (astFile != null) {
-                        using (var o = new System.IO.StreamWriter(astFile)) {
-                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
-                        }
+                var ret = new Parser(System.IO.File.ReadAllText(opts.args[0]), opts.args[0]).Parse();
+                if (opts.astFile != null) {
+                    using (var o = new System.IO.StreamWriter(opts.astFile)) {
+                        o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
                     }
-
-                    if (flagSyntaxOnly == false) {
-                        using (var o = new System.IO.StreamWriter(outputFile)) {
-                            var compiler = new Compiler();
-                            compiler.Compile(ret, o);
-                        }
-                    }
-                } catch (Exception e) {
-                    if (e is CompilerException) {
-                        var ce = e as CompilerException;
-                        Logger.Error(ce.Start, ce.End, ce.Message);
-                    } else {
-                        Logger.Error(e.Message);
-                    }
-                    Logger.Error(e.StackTrace);
-                    Environment.Exit(-1);
                 }
+
+                if (opts.flagSyntaxOnly == false) {
+                    using (var o = new System.IO.StreamWriter(opts.outputFile)) {
+                        var compiler = new Compiler();
+                        compiler.Compile(ret, o);
+                    }
+                }
+            } catch (CompilerException e) {
+                Logger.Error(e.Start, e.End, e.Message);
+                Logger.Error(e.StackTrace);
+                Environment.Exit(-1);
+            } catch (Exception e) {
+                Logger.Error(e.Message);
+                Logger.Error(e.StackTrace);
+                Environment.Exit(-1);
             }
 
         }
@@ -136,6 +151,24 @@ namespace AnsiCParser {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);
             }
+/*
+float levelOneNodeOne(float *f) {
+	return  *f;
+}
+
+int main(void) {
+	float f = 1.0f;
+	printf("t4=%f\n", ( 31.0 ) / (
+                                // 0 ? (((1 > 0) ? 1 : -1))  // ok
+                                0 ? (((!levelOneNodeOne(&f) > 0) ? 1 : -1))  // bad
+                                  : (((32.0 > 0) ? (32.0) : (-(32.0))))
+                        ));
+
+	return 0;
+}
+*/
         }
     }
 }
+
+

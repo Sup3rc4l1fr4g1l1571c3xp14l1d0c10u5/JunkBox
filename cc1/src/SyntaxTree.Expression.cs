@@ -350,15 +350,17 @@ namespace AnsiCParser.SyntaxTree {
                     // Todo: WideChar未対応
 
                     Value = new List<byte>();
+                    var strParts = new List<string>();
                     foreach (var str in strings) {
                         int[] i = { 1 };
                         while (str[i[0]] != '"') {
                             Lexer.CharIterator(() => str[i[0]], () => i[0]++, b => Value.Add(b));
                         }
+                        strParts.Add(str.Substring(1, i[0] - 1));
                     }
                     Value.Add(0x00);
                     
-                    Strings = strings;
+                    Strings = strParts;
                     ConstantType = CType.CreateArray(Value.Count, CType.CreateChar());
                 }
             }
@@ -673,7 +675,7 @@ namespace AnsiCParser.SyntaxTree {
                     if (sType.Members == null) {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "->演算子の最初のオペランドの構造体/共用体が不完全型です。");
                     }
-                    var memberInfo = sType.Members.FirstOrDefault(x => x.Ident.Raw == ident.Raw);
+                    var memberInfo = sType.Members.FirstOrDefault(x => x.Ident != null && x.Ident.Raw == ident.Raw);
                     if (memberInfo == null) {
                         throw new CompilerException.SpecificationErrorException(ident.Start, ident.End, $"->演算子の2番目のオペランドは，その型のメンバの名前でなければならない。(メンバ名{ident.Raw}が見つかりません)");
                     }
@@ -852,7 +854,7 @@ namespace AnsiCParser.SyntaxTree {
                     // ToDo: ただし，その場合でも演算子に対する制約を適用し，結果は左辺値とならない。
                     expr = ((UnaryReferenceExpression)expr).Expr;
                     Expr = expr;
-                    ResultType = CType.CreatePointer(expr.Type);
+                    ResultType = expr.Type;
                 } else if (expr is PostfixExpression.ArraySubscriptingExpression) {
                     // 同様に，オペランドが[]演算子の結果の場合，単項&演算子と，[]演算子が暗黙に意味する単項*演算子は評価されず，
                     // &演算子を削除し[]演算子を+演算子に変更した場合と同じ結果となる。
@@ -1583,7 +1585,6 @@ namespace AnsiCParser.SyntaxTree {
                 // ビット単位の|演算子と異なり，||演算子は左から右への評価を保証する。
                 // 第 1 オペランドの評価の直後を副作用完了点とする。
                 // 第 1 オペランドの値が 0 と比較して等しくない場合，第 2 オペランドは評価しない
-
                 Lhs = lhs;
                 Rhs = rhs;
             }

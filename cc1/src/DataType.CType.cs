@@ -609,9 +609,9 @@ namespace AnsiCParser {
                         // 対応する仮引数の型が適合する?
                         var newArguments = new List<FunctionType.ArgumentInfo>();
                         for (var i = 0; i < ta1.Arguments.Length; i++) {
-                            // 既定の実引数拡張を適用
-                            var pt1 = ta1.Arguments[i].Type.DefaultArgumentPromotion();
-                            var pt2 = ta2.Arguments[i].Type.DefaultArgumentPromotion();
+                        //　
+                            var pt1 = ta1.Arguments[i].Type;
+                            var pt2 = ta2.Arguments[i].Type;
                             var newArgument = CompositeType(pt1, pt2);
                             if (newArgument == null) {
                                 return null;

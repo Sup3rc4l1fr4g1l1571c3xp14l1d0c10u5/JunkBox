@@ -6,14 +6,14 @@ namespace AnsiCParser {
     /// <summary>
     /// コマンドライン引数を解析する
     /// </summary>
-    public class CommandLineOptionsParser {
+    public class CommandLineOptionsParser<T> {
 
         /// <summary>
         /// コマンドライン引数に応じた処理を行うイベントハンドラ
         /// </summary>
         /// <param name="args">コマンドラインに渡された引数列</param>
         /// <returns>解析成功ならtrue, 解析失敗ならfalse</returns>
-        public delegate bool OptionHandler(String[] args);
+        public delegate bool OptionHandler(T t, String[] args);
 
         /// <summary>
         /// 引数についての定義
@@ -49,13 +49,29 @@ namespace AnsiCParser {
         private readonly Dictionary<String, OptionDefinition> _options = new Dictionary<String, OptionDefinition>();
 
         /// <summary>
+        /// デフォルト処理
+        /// </summary>
+        private OptionHandler _default = null;
+
+        /// <summary>
         /// 引数の定義を登録する
         /// </summary>
         /// <param name="name">引数文字列</param>
         /// <param name="argc">受け取る引数の数</param>
         /// <param name="handler">処理用のハンドラ</param>
-        public CommandLineOptionsParser Entry(string name, int argc, OptionHandler handler) {
+        public CommandLineOptionsParser<T> Entry(string name, int argc, OptionHandler handler) {
             _options.Add(name, new OptionDefinition(name, argc, handler));
+            return this;
+        }
+
+        /// <summary>
+        /// どれにも一致しなかった場合の処理
+        /// </summary>
+        /// <param name="name">引数文字列</param>
+        /// <param name="argc">受け取る引数の数</param>
+        /// <param name="handler">処理用のハンドラ</param>
+        public CommandLineOptionsParser<T> Default(OptionHandler handler) {
+            _default = handler;
             return this;
         }
 
@@ -102,10 +118,9 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="args">引数列</param>
         /// <returns>余りの引数列</returns>
-        public string[] Parse(string[] args) {
+        public T Parse(T t, string[] args) {
             using (IEnumerator<string> it = new List<string>(args).GetEnumerator()) {
 
-                var s = new List<string>();
                 while (it.MoveNext()) {
                     var key = it.Current;
                     OptionDefinition info;
@@ -120,16 +135,20 @@ namespace AnsiCParser {
                             }
                         }
                         var ary = tmp.ToArray();
-                        if (info.Handler(ary) == false) {
+                        if (info.Handler(t, ary) == false) {
                             throw new ArgumentFormatException(info.Name, ary);
                         }
                     } else {
-                        do {
-                            s.Add(it.Current);
-                        } while (it.MoveNext());
+                        var s = new List<string>();
+                        if (_default != null) {
+                            do {
+                                s.Add(it.Current);
+                            } while (it.MoveNext());
+                            _default(t, s.ToArray());
+                        }
                     }
                 }
-                return s.ToArray();
+                return t;
             }
         }
     }

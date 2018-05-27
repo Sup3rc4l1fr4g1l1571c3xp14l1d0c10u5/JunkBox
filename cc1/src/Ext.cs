@@ -87,12 +87,10 @@ namespace AnsiCParser {
                 this.Comparer = comparer;
             }
 
-            public Func<TSource, TSource, bool> Comparer {
-                get;
-            }
+            private Func<TSource, TSource, bool> Comparer { get; }
 
             public bool Equals(TSource x, TSource y) {
-                throw new NotImplementedException();
+                return Comparer(x, y);
             }
 
             public int GetHashCode(TSource obj) {

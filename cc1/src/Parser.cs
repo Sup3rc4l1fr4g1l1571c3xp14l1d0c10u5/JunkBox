@@ -803,7 +803,7 @@ namespace AnsiCParser {
             foreach (var scopeValue in _labelScope) {
                 if (scopeValue.Item2.Declaration == null && scopeValue.Item2.References.Any()) {
                     // 未定義のラベルが使われている。
-                    scopeValue.Item2.References.ForEach(x => throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。"));
+                    scopeValue.Item2.References.ForEach(x => { throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。"); });
                 }
                 if (scopeValue.Item2.Declaration != null && !scopeValue.Item2.References.Any()) {
                     // 未参照のラベルが使われている。
@@ -1165,8 +1165,12 @@ namespace AnsiCParser {
                     // 識別子を伴う完全型の宣言
                     TaggedType tagType;
                     TaggedType.StructUnionType structUnionType;
-                    if (_tagScope.TryGetValue(ident, out tagType) == false) {
-                        // タグ名前表に無い場合は新しく追加する。
+                    bool isCurrent;
+                    if (_tagScope.TryGetValue(ident, out tagType, out isCurrent) == false || isCurrent == false) {
+                        // タグ名前表に無い場合、もしくは外側のスコープで宣言されている場合は新しく追加する。
+                        if (tagType != null && isCurrent == false) {
+                            Logger.Warning(token.Range, $"構造体/共用体 タグ名 {ident} の宣言は外側のスコープで宣言されている同じタグ名の宣言を隠します。");
+                        }
                         structUnionType = new TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, structUnionType);
                         AddImplictTypeDeclaration(token, structUnionType);
