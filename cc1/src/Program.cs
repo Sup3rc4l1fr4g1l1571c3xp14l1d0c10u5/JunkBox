@@ -151,22 +151,7 @@ namespace AnsiCParser {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);
             }
-/*
-float levelOneNodeOne(float *f) {
-	return  *f;
-}
 
-int main(void) {
-	float f = 1.0f;
-	printf("t4=%f\n", ( 31.0 ) / (
-                                // 0 ? (((1 > 0) ? 1 : -1))  // ok
-                                0 ? (((!levelOneNodeOne(&f) > 0) ? 1 : -1))  // bad
-                                  : (((32.0 > 0) ? (32.0) : (-(32.0))))
-                        ));
-
-	return 0;
-}
-*/
         }
     }
 }

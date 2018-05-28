@@ -2509,15 +2509,16 @@ namespace AnsiCParser {
                     Emit("sete %al");
                     Emit("movzbl %al, %eax");
                     Emit("pushl %eax");
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = type });
                 } else {
                     LoadI32("%eax");
                     Emit("cmpl $0, %eax");
                     Emit("sete %al");
                     Emit("movzbl %al, %eax");
                     Emit("pushl %eax");
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = type });
                 }
 
-                Push(new Value { Kind = Value.ValueKind.Temp, Type = type });
             }
 
             private void PrefixOp(CType type, string op) {
@@ -2645,7 +2646,7 @@ namespace AnsiCParser {
                                 break;
                             case 2:
                                 LoadI32("%eax");
-                                Emit("movxwl %ax, %eax");
+                                Emit("movzwl %ax, %eax");
                                 break;
                             case 4:
                                 LoadI32("%eax");
