@@ -697,6 +697,7 @@ namespace AnsiCParser {
             if (type.UnwrapTypeQualifier() is TypedefedType) {
                 throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない。");
             }
+
             var ftype = type.Unwrap() as FunctionType;
             Debug.Assert(ftype != null);
 
@@ -769,6 +770,11 @@ namespace AnsiCParser {
                         throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義中でK&R形式の識別子並びとANSI形式の仮引数型並びが混在している");
                 }
 
+                // 関数型中に不完全型が無いことを確認する
+                if (/*ftype.ResultType.IsIncompleteType() || */ftype.Arguments.Any(x => x.Type.IsIncompleteType())) {
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "関数宣言中で不完全型を直接使うことはできません。");
+                }
+
             } else {
                 throw new CompilerException.InternalErrorException(ident.Range, "ありえない。バグかなにかでは？");
             }
@@ -779,7 +785,7 @@ namespace AnsiCParser {
             var funcdecl = FunctionDeclaration(ident, ftype, storageClass, functionSpecifier, ScopeKind.FileScope, true);
 
             // 各スコープを積む
-            _tagScope = _tagScope.Extend();
+            _tagScope = ftype.PrototypeScope ?? _tagScope.Extend();
             _identScope = _identScope.Extend();
             _labelScope = _labelScope.Extend();
             _currentFuncDecl = funcdecl;
@@ -1632,10 +1638,9 @@ namespace AnsiCParser {
                 } else {
                     // 仮引数型並び
                     bool vargs = false;
-                    // ToDo: 仮引数並びは新しい Function Prototype Scope で解析する
                     var args = ParameterTypeList(ref vargs);
+                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                     _lexer.ReadToken(')');
-                    stack[index] = new FunctionType(args, vargs, stack[index]);
                     MoreDirectDeclarator(stack, index);
 
                 }
@@ -1654,7 +1659,9 @@ namespace AnsiCParser {
         /// 6.7.5 宣言子(仮引数型並び)
         /// </summary>
         /// <returns></returns>
-        private List<FunctionType.ArgumentInfo> ParameterTypeList(ref bool vargs) {
+        private Tuple<Scope<TaggedType>, List<FunctionType.ArgumentInfo>> ParameterTypeList(ref bool vargs) {
+            var prototypeScope = _tagScope = _tagScope.Extend();
+
             var items = new List<FunctionType.ArgumentInfo>();
             items.Add(ParameterDeclaration());
             while (_lexer.ReadTokenIf(',')) {
@@ -1665,7 +1672,8 @@ namespace AnsiCParser {
 
                 items.Add(ParameterDeclaration());
             }
-            return items;
+            _tagScope = _tagScope .Parent;
+            return Tuple.Create(prototypeScope, items);
         }
 
         /// <summary>
@@ -1759,7 +1767,7 @@ namespace AnsiCParser {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args, vargs, stack[index]);
+                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                 } else {
                     // 直接宣言子 中の '(' 宣言子 ')'  もしくは 直接抽象宣言子 中の '(' 抽象宣言子 ')'
                     stack.Add(new StubType());
@@ -1791,7 +1799,7 @@ namespace AnsiCParser {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args, vargs, stack[index]);
+                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                 } else {
                     // 識別子並び
                     var args = IdentifierList().Select(x => new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
@@ -1931,7 +1939,7 @@ namespace AnsiCParser {
                     // ANSI形式
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args, vargs, stack[index]);
+                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                 } else {
                     // K&R形式もしくは引数省略されたANSI形式（いわゆる曖昧な宣言）
                     stack[index] = new FunctionType(null, false, stack[index]);
@@ -1959,8 +1967,8 @@ namespace AnsiCParser {
             } else if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken(')') == false) {
                     bool vargs = false;
-                    var items = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(items, vargs, stack[index]);
+                    var args = ParameterTypeList(ref vargs);
+                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                 } else {
                     stack[index] = new FunctionType(null, false, stack[index]);
                 }
@@ -3526,7 +3534,7 @@ namespace AnsiCParser {
                     if (scope == ScopeKind.FileScope) {
                         // 記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。
                         if (storageClass == AnsiCParser.StorageClassSpecifier.Auto || storageClass == AnsiCParser.StorageClassSpecifier.Register) {
-                            throw new CompilerException.Specificati　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　っっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっっｃonErrorException(start, end, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
+                            throw new CompilerException.SpecificationErrorException(start, end, "記憶域クラス指定子 auto 及び register が，外部宣言の宣言指定子列の中に現れてはならない。");
                         }
                     }
 

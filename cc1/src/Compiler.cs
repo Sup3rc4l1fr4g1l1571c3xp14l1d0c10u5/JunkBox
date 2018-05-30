@@ -2847,7 +2847,9 @@ namespace AnsiCParser {
                     _context.Generator.Emit("# location:");
                     _context.Generator.Emit($"#   {self.LocationRange}");
                     _context.Generator.Emit(".section .text");
-                    _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                        _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                    }
                     _context.Generator.Emit($"{self.LinkageObject.LinkageId}:");
                     _context.Generator.Emit("pushl %ebp");
                     _context.Generator.Emit("movl %esp, %ebp");
@@ -3776,6 +3778,9 @@ namespace AnsiCParser {
                     Emit(".section .data");
                     self.Init.Accept(this, value);
                     Emit(".align 4");
+                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                        _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                    }
                     Emit($"{self.LinkageObject.LinkageId}:");
                     foreach (var val in _initValues) {
                         var byteOffset = val.ByteOffset;
@@ -3836,6 +3841,9 @@ namespace AnsiCParser {
                 } else {
                     Emit(".section .bss");
                     Emit(".align 4");
+                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                        _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                    }
                     Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}");
                 }
 

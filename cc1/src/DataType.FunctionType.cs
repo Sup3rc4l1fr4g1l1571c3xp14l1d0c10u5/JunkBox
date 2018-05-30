@@ -10,8 +10,9 @@ namespace DataType {
     /// </summary>
     public class FunctionType : CType {
         private ArgumentInfo[] _arguments;
+            public Scope<TaggedType> PrototypeScope { get; }
 
-        public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType) {
+        public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType, Scope<TaggedType> prototypeScope = null) {
             // 6.7.5.3 関数宣言子（関数原型を含む）
             // 制約 
             // 関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。(返却値の型が確定するFixupメソッド中で行う)
@@ -23,6 +24,7 @@ namespace DataType {
             Arguments = arguments?.ToArray();
             ResultType = resultType;
             HasVariadic = hasVariadic;
+                PrototypeScope = prototypeScope;
         }
 
         public override CType Duplicate() {
