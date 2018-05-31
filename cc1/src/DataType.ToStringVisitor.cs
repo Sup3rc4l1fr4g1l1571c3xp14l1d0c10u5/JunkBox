@@ -127,8 +127,7 @@ namespace AnsiCParser {
                 var args = self.Arguments?.Select(x => StorageClassToString(x.StorageClass) + x.Type.Accept(this, x.Ident?.Raw ?? "")).ToList();
                 if (args == null) {
                     args = new List<string>();
-                }
-                else if (args.Count == 0) {
+                } else if (args.Count == 0) {
                     args.Add("void");
                 }
 
@@ -154,15 +153,19 @@ namespace AnsiCParser {
                 }
 
                 _visited.Add(self);
-                var members = string.Join(" ", self.Members.Select(x => {
-                    BitFieldType bft;
-                    if (x.Type.IsBitField(out bft)) {
-                        return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((bft.BitWidth != -1) ? " : " + bft.BitWidth.ToString() : "")};";
-                    }
+                if (self.Members != null) {
+                    var members = string.Join(" ", self.Members.Select(x => {
+                        BitFieldType bft;
+                        if (x.Type.IsBitField(out bft)) {
+                            return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")}{((bft.BitWidth != -1) ? " : " + bft.BitWidth.ToString() : "")};";
+                        }
 
-                    return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")};";
-                }));
-                return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} {{ {members} }}" + (String.IsNullOrEmpty(value) ? "" : (" " + value));
+                        return $"{x.Type.Accept(this, x.Ident?.Raw ?? "")};";
+                    }));
+                    return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} {{ {members} }}" + (String.IsNullOrEmpty(value) ? "" : (" " + value));
+                } else {
+                    return $"{(self.IsStructureType() ? "struct" : "union")} {self.TagName} " + (String.IsNullOrEmpty(value) ? "" : (" " + value));
+                }
             }
 
             public string OnStubType(StubType self, string value) {

@@ -1353,6 +1353,9 @@ namespace AnsiCParser {
                 Token ident = null;
                 Declarator(ref ident, stack, 0);
                 type = CType.Resolve(type, stack);
+                if (type.IsIncompleteType()) {
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"不完全型であるメンバを持つことはできません。");
+                }
                 if (CType.CheckContainOldStyleArgument(type)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"関数型中に型の無い仮引数名 {ident.Raw} があります");
                 }
