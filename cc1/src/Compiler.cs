@@ -1966,6 +1966,10 @@ namespace AnsiCParser {
                 Debug.Assert(target.Type.IsPointerType());
 
                 switch (target.Kind) {
+                    case Value.ValueKind.IntConst:
+                        // 定数値の場合 => mov命令で定数値をロード
+                        Emit($"movl ${unchecked((int)target.IntConst)}, {reg}");
+                        break;
                     case Value.ValueKind.Var:
                         // ポインタ型の変数 => mov命令で変数の値をロード
                         Emit($"movl {VarRefToAddrExpr(target)}, {reg}");

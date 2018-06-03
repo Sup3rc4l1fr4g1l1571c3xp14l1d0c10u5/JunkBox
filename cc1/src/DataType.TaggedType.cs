@@ -41,13 +41,18 @@ namespace DataType {
             public List<MemberInfo> Members {
                 get; internal set;
             }
+                /// <summary>
+                /// フレキシブル配列メンバを持つことを示す
+                /// </summary>
+                public bool HasFlexibleArrayMember { get; internal set; }
 
-            private int _size;
+                private int _size;
 
             public override CType Duplicate() {
                 return new StructUnionType(Kind, TagName, IsAnonymous) {
                     Members = Members.Select(x => x.Duplicate()).ToList(),
-                    _size = _size
+                    _size = _size,
+                    HasFlexibleArrayMember = HasFlexibleArrayMember
                 };
             }
 
@@ -239,9 +244,13 @@ namespace DataType {
                     // ビットフィールド部分のレイアウトを決定
                     var layouter = new StructLayouter();
                     var ret = layouter.Run(Members);
-                    _size = ret.Item1;
-                    Members = ret.Item2;
-
+                    if (this.HasFlexibleArrayMember) {
+                        _size = ret.Item1 - Members.Last().Type.Sizeof();   // フレキシブル配列メンバは最後の要素の型を無視する
+                        Members = ret.Item2;
+                    } else {
+                        _size = ret.Item1;
+                        Members = ret.Item2;
+                    }
                 } else {
                     // 共用体型の場合は登録時のままでいい
                     _size = Members.Max(x => x.Type.Sizeof());

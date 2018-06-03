@@ -123,7 +123,13 @@ namespace AnsiCParser {
                 if (sut.Members == null) {
                     return true;
                 }
+                if (sut.HasFlexibleArrayMember) {
+                return sut.Members.Take(sut.Members.Count-1).Any(x => IsIncompleteType(x.Type));
+
+                } else {
                 return sut.Members.Any(x => IsIncompleteType(x.Type));
+
+                }
             }
             // 内容の分からない列挙型型
             if (unwrappedSelf is TaggedType.EnumType) {

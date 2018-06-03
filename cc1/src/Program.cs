@@ -153,6 +153,109 @@ namespace AnsiCParser {
             }
 
         }
+
+#if false
+#pragma pack(8)
+
+// フレキシブル配列メンバは末尾にのみ置くことが出来る。
+struct hoge {
+	char str[];	// これはフレキシブル配列メンバ
+	int x;
+};
+
+
+// フレキシブル配列メンバ自体は不完全型であり、構造体型側がそれを特別扱いするルールになっている
+struct s { int n; double d[]; };
+
+struct ss { int n; double d[1]; };
+
+// タグ型の宣言はOK
+struct sss { 
+	struct s s1;
+};
+
+// 入れ子になっているフレキシブル配列メンバは初期化できないので以下のコードはエラーになる
+//struct sss sss_bad = {{1, {2.0} }}; 
+// こっちはOK
+struct sss sss_ok1 = { {1} };
+
+// これはポインタなのでOK
+struct sss *sss_ok2 = 0;
+
+// メンバにフレキシブル配列メンバを持つ構造体が複数あってもコンパイラは警告を出さない（gcc/clangでc99/c11どちらも）が
+// CertC DCL38-C では制約として、以下を定めている
+// ・フレキシブル配列メンバを含む構造体の配列は使えない
+// ・フレキシブル配列メンバを含む構造体は他の構造体の途中になるメンバとしては使用できない
+struct ssss { 
+	struct s s1;	// これのオフセット位置は +0 になる
+	struct s s2;	// これのオフセット位置は +sizeof(structs) になる。つまり、s1の末尾はs2と被った領域を示す。 
+};
+
+
+int main(void) {
+	{
+		// 規格書の例
+	unsigned long sz1 = sizeof(struct s);
+	unsigned long sz2 = (unsigned long)(&((struct s*)0)->d);
+	unsigned long sz3 = (unsigned long)(&((struct ss*)0)->d);
+
+
+	printf("sizeof(struct s) = %lu\n", sz1);
+	printf("offsetof(struct s, d) = %lu\n", sz2);
+	printf("offsetof(struct ss, d) = %lu\n", sz2);
+	
+	printf("sizeof(struct s) == offsetof(struct s, d) == offsetof(struct ss, d) = %d\n", sz1 == sz2 && sz2 == sz3);
+	}
+	
+
+	{
+		// フレキシブル配列メンバ自体は不完全型であって、構造体型側がそれを特別扱いしているだけなので
+		// 「sizeofは不完全型に適用できない」のルールが適用されてエラーとなる
+		/*
+		unsigned long sz4 = sizeof(((struct s*)0)->d);	// これがエラー
+		unsigned long sz5 = sizeof(((struct ss*)0)->d);	// これがエラー
+
+		printf("sizeof(struct s, d) = %lu\n", sz4);	
+		printf("sizeof(struct ss, d) = %lu\n", sz5);
+		//*/
+	}
+
+	{
+		static struct s x1 = {1, {2.0} };
+		static struct s x2 = {1, {2.0, 3.0} };
+		printf("sizeof(x1) = %lu\n", sizeof(x1));	// 当たり前だが変数のsizeofを求めた場合でも型が書き換わっているわけではないため sizeof(struct s)と同じ。
+		printf("sizeof(x2) = %lu\n", sizeof(x2));
+
+		printf("sizeof(x1) == sizeof(x2) = %d\n", sizeof(x1) == sizeof(x2));
+	}
+
+	{
+		// フレキシブル配列メンバはコンパイル時にサイズが決定しなければならないタイプの型なので
+		// auto変数の場合、それ単体で宣言できても初期化はできない。
+		//*
+		struct s x1;	// これはOK
+		struct s x2 = {1, {2.0} };	// これはNG
+		//*/
+	}
+
+	{
+		// どうしてCert-Cが規格に無い制約を定めているかの例
+		// うわぁ･･･酷い
+		unsigned long sssz1 = sizeof(struct ssss);
+		unsigned long sssz2 = (unsigned long)(&((struct ssss*)0)->s1.d);
+		unsigned long sssz3 = (unsigned long)(&((struct ssss*)0)->s2.d);
+
+		printf("sizeof(struct ssss) = %lu\n", sssz1);
+		printf("offsetof(struct ssss, s1.d) = %lu\n", sssz2);	// 領域が
+		printf("offsetof(struct ssss, s2.d) = %lu\n", sssz3);	// 被ってるやん！
+		
+		printf("sizeof(struct ssss) == offsetof(struct ssss, s1.d) == offsetof(struct ssss, s2.d) = %d\n", sssz1 == sssz2 && sssz2 == sssz3);
+	}
+	
+	return 0;
+}
+
+#endif
     }
 }
 

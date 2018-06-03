@@ -1191,7 +1191,9 @@ namespace AnsiCParser {
                         structUnionType = (tagType as TaggedType.StructUnionType);
                     }
                     // メンバ宣言並びを解析する
-                    structUnionType.Members = StructDeclarations();
+                    var ret = StructDeclarations(kind == TaggedType.StructUnionType.StructOrUnion.Union);
+                    structUnionType.HasFlexibleArrayMember = ret.Item1;
+                    structUnionType.Members = ret.Item2;
                     _lexer.ReadToken('}');
                     structUnionType.Build();
                     return structUnionType;
@@ -1226,7 +1228,9 @@ namespace AnsiCParser {
 
                 // メンバ宣言並びを解析する
                 _lexer.ReadToken('{');
-                structUnionType.Members = StructDeclarations();
+                var ret = StructDeclarations(kind == TaggedType.StructUnionType.StructOrUnion.Union);
+                structUnionType.HasFlexibleArrayMember = ret.Item1;
+                structUnionType.Members = ret.Item2;
                 _lexer.ReadToken('}');
 
                 structUnionType.Build();
@@ -1239,7 +1243,7 @@ namespace AnsiCParser {
         /// 6.7.2.1 構造体指定子及び共用体指定子(メンバ宣言並び)
         /// </summary>
         /// <returns></returns>
-        private List<TaggedType.StructUnionType.MemberInfo> StructDeclarations() {
+        private Tuple<bool,List<TaggedType.StructUnionType.MemberInfo>> StructDeclarations(bool isUnion) {
             if (_lexer.PeekToken('}')) {
                 // 空の構造体/共用体を使っている。
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, $"空の構造体/共用体が宣言されていますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.2.5-20および、J.2未定義の動作を参照）。（捕捉：C++では空の構造体/共用体は認められています。）");
@@ -1249,7 +1253,41 @@ namespace AnsiCParser {
             while (IsStructDeclaration()) {
                 items.AddRange(StructDeclaration());
             }
-            return items;
+
+            // 6.7.2.1
+            // 特別な場合として，二つ以上の名前付きメンバをもつ構造体の最後のメンバは，不完全配列型をもってもよい。これをフレキシブル配列メンバ（flexible array member）と呼ぶ。
+            bool hasFlexibleArrayMember = false;
+            if (items.Count >= 2) {
+                var lastItem = items.Last();
+                if (lastItem.Type.IsArrayType()) {
+                    var at = lastItem.Type as ArrayType;
+                    if (at.Length == -1) {
+                        if (isUnion == false) {
+                            // 最後の要素がフレキシブル配列メンバである
+                            hasFlexibleArrayMember = true;
+                        } else {
+                            throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, $"フレキシブル配列メンバがありますが、共用体型中では使えません。）");
+                        }
+                    }
+                }
+
+            }
+
+            if (hasFlexibleArrayMember) {
+                foreach (var item in items.Take(items.Count-1)) {
+                    if (item.Type.IsIncompleteType()) {
+                        throw new CompilerException.SpecificationErrorException(item.Ident.Range, $"不完全型であるメンバを持つことはできません。");
+                    }
+                }
+            } else {
+                foreach (var item in items) {
+                    if (item.Type.IsIncompleteType()) {
+                        throw new CompilerException.SpecificationErrorException(item.Ident.Range, $"不完全型であるメンバを持つことはできません。");
+                    }
+                }
+            }
+
+            return Tuple.Create(hasFlexibleArrayMember,items);
         }
 
         /// <summary>
@@ -1353,9 +1391,6 @@ namespace AnsiCParser {
                 Token ident = null;
                 Declarator(ref ident, stack, 0);
                 type = CType.Resolve(type, stack);
-                if (type.IsIncompleteType()) {
-                    throw new CompilerException.SpecificationErrorException(ident.Range, $"不完全型であるメンバを持つことはできません。");
-                }
                 if (CType.CheckContainOldStyleArgument(type)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"関数型中に型の無い仮引数名 {ident.Raw} があります");
                 }

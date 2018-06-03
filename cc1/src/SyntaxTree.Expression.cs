@@ -656,7 +656,11 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public override bool IsLValue() {
-                    return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
+                    // 6.5.2.3
+                    // ->演算子及び識別子を後ろに伴う後置式は，構造体又は共用体オブジェクトの一つのメンバを指し示す。
+                    // その値は，最初の式が指すオブジェクトの指定されたメンバの値とする。
+                    // その式は左辺値とする。 <---- とあるので、その式は左辺値
+                    return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);// && Expr.IsLValue();
                 }
 
                 public override CType Type {
