@@ -48,6 +48,14 @@ namespace AnsiCParser {
                 } else {
                     BaseType.Fixup(type);
                 }
+                // 6.2.5 (36) オブジェクト型は不完全型を含まないので，不完全型の配列は作ることができない。
+                // 「不完全配列」と「不完全型の配列」は違うので注意
+                if (BaseType.IsIncompleteType()) {
+                    throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "不完全型の配列を作ることはできない");
+                }
+                if (BaseType.Unwrap().IsContainFlexibleArrayMemberStruct()) {
+                    throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "フレキシブル配列メンバを持つ要素のの配列を作ることはできない");
+                }
             }
 
             /// <summary>

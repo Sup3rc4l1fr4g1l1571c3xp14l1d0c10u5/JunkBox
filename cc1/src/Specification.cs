@@ -1098,6 +1098,20 @@ namespace AnsiCParser {
                 }
             }
 
+            // 構造体・共用体
+            if (targetType != null) {
+                TaggedType.StructUnionType st1;
+                TaggedType.StructUnionType st2;
+                if (targetType.IsStructureType(out st1) && expr.Type.IsStructureType(out st2)) {
+                    if (Object.ReferenceEquals(st1,st2) == true) {
+                        return expr;
+                    }
+                }
+            } else {
+                if (expr.Type.IsStructureType()) {
+                    return expr;
+                }
+            }
             throw new CompilerException.SpecificationErrorException(expr.LocationRange, "型変換できない組み合わせを型変換しようとした");
 
         }

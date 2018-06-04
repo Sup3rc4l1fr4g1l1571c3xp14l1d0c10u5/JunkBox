@@ -48,7 +48,16 @@ namespace DataType {
 
                 private int _size;
 
-            public override CType Duplicate() {
+                /// <summary>
+                /// フレキシブル配列メンバを持つ構造体を含むか判定
+                /// </summary>
+                /// <returns></returns>
+                public override bool IsContainFlexibleArrayMemberStruct() {
+                    return HasFlexibleArrayMember || Members.Any(x => x.Type.IsContainFlexibleArrayMemberStruct());
+                }
+
+
+                public override CType Duplicate() {
                 return new StructUnionType(Kind, TagName, IsAnonymous) {
                     Members = Members.Select(x => x.Duplicate()).ToList(),
                     _size = _size,

@@ -2,7 +2,7 @@ using System;
 
 namespace AnsiCParser {
     internal static class Settings {
-        public static int DefaultPackSize { get; set; } = 4;  // gcc ‚Í 8 ‚È‚Ì‚É’ˆÓ
+        public static int DefaultPackSize { get; set; } = 4;  // gcc ã¯ 8 ãªã®ã«æ³¨æ„
         public static int PackSize { get; set; } = Settings.DefaultPackSize;
     }
 }

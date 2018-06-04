@@ -644,6 +644,9 @@ namespace AnsiCParser {
             // その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
             foreach (var entry in _linkageList) {
                 if (entry.Definition == null) {
+                    if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType())) {
+                        throw new CompilerException.SpecificationErrorException(entry.TentativeDefinitions.First().LocationRange, "不完全型のままの識別子があります。");
+                    }
                     if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
                         entry.Definition = entry.TentativeDefinitions[0];
                         entry.TentativeDefinitions.RemoveAt(0);
@@ -794,6 +797,9 @@ namespace AnsiCParser {
             if (ftype.Arguments != null) {
                 foreach (var arg in ftype.Arguments) {
                     if (arg.Ident == null) {
+                        throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
+                    }
+                    if (arg.Type.IsIncompleteType()) {
                         throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
                     }
                     _identScope.Add(arg.Ident.Raw, new Declaration.ArgumentDeclaration(arg.Ident.Range, arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
@@ -1253,6 +1259,18 @@ namespace AnsiCParser {
             while (IsStructDeclaration()) {
                 items.AddRange(StructDeclaration());
             }
+
+            // 「フレキシブル配列メンバを持つ構造体」を構造体のメンバにはできない。
+            // さらに、共用体のメンバにはできるが、その共用体を構造体のメンバにはできない。
+            // つまり、構造的に「フレキシブル配列メンバを持つ構造体」は構造体のメンバにできない。
+            if (isUnion == false) {
+                foreach (var item in items) {
+                    if (item.Type.IsContainFlexibleArrayMemberStruct()) {
+                        throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, $"フレキシブル配列メンバを持つ構造体を構造体が含むことはできません。（これは「フレキシブル配列メンバを持つ構造体」を共用体で包み、その共用体を構造体で包むような場合も禁止しています。）");
+                    }
+                }
+            }
+
 
             // 6.7.2.1
             // 特別な場合として，二つ以上の名前付きメンバをもつ構造体の最後のメンバは，不完全配列型をもってもよい。これをフレキシブル配列メンバ（flexible array member）と呼ぶ。
@@ -3429,7 +3447,11 @@ namespace AnsiCParser {
                 }
 
                 // 不完全型の配列は初期化式で完全型に書き換えられるため、複製する
-                type = type.Duplicate();
+                CType elementType;
+                int len;
+                if (type.Unwrap().IsArrayType(out elementType, out len) && len == -1) {
+                    type = type.Duplicate();
+                }
 
                 // 初期化子を読み取る
                 // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
@@ -3478,10 +3500,17 @@ namespace AnsiCParser {
                 }
                 // 前の変数を隠すことができるので、新しい宣言を作成
 
+            } else {
+                // オブジェクトの識別子が無結合で宣言されている場合，オブジェクトの型は，その宣言子の終わりまで に，又は初期化宣言子の終わりまで（その宣言子が初期化子をもつとき）に，完全になっていなければならない。
+                if (linkage == LinkageKind.NoLinkage) {
+                    if (type.IsIncompleteType()) {
+                        throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"不完全型の変数 {ident.Raw} が使われています。");
+                    }
+                }
             }
 
-            // 新たに変数宣言を作成
-            var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass, initializer);
+                // 新たに変数宣言を作成
+                var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass, initializer);
             varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, varDecl.Init != null);
             _identScope.Add(ident.Raw, varDecl);
             return varDecl;

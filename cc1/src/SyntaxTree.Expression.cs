@@ -548,9 +548,13 @@ namespace AnsiCParser.SyntaxTree {
                                 throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)と一致しない。");
                             }
                         }
+                        // 関数が呼び出される又は定義されるときには完全型になっていなければならない。
                         // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
                         for (var i = 0; i < functionType.Arguments.Length; i++) {
                             var targ = functionType.Arguments[i];
+                            if (targ.Type.IsIncompleteType()) {
+                                throw new CompilerException.SpecificationErrorException(targ.Range, $"呼び出し先の関数の引数が不完全型をもっています。");
+                            }
                             var lhs = targ.Type.UnwrapTypeQualifier();
                             var rhs = args[i];
                             args[i] = AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
@@ -1764,12 +1768,12 @@ namespace AnsiCParser.SyntaxTree {
                 /// <param name="lType"></param>
                 /// <param name="rhs"></param>
                 public static Expression ApplyAssignmentRule(LocationRange locationRange, CType lType, Expression rhs) {
-                    if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
-                        // 構造体・共用体については暗黙的型変換を用いない
-                    } else {
+                    //if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
+                    //    // 構造体・共用体については暗黙的型変換を用いない
+                    //} else {
                         // 代入元式に対して代入先型への(暗黙的)型変換を適用
                         rhs = Specification.ImplicitConversion(lType, rhs);
-                    }
+                    //}
 
                     // 制約 (単純代入)
                     // 次のいずれかの条件が成立しなければならない。

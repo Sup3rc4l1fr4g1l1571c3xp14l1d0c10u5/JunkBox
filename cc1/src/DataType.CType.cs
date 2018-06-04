@@ -717,6 +717,9 @@ namespace AnsiCParser {
                 }
             }
 
+            public virtual bool IsContainFlexibleArrayMemberStruct() {
+                return false;
+            }
         }
     }
 

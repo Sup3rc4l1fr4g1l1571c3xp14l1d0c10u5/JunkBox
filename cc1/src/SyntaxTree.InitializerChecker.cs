@@ -378,9 +378,13 @@ namespace AnsiCParser.SyntaxTree {
                 var loc = it.Current.LocationRange;
                 it.Enter();
                 it.Next();
+                var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
                 foreach (var member in type.Members) {
                     if (it.Current == null) {
                         break;
+                    }
+                    if (member == flexibleArrayMember) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");
                     }
                     if (member.Ident == null) {
                         // padding
@@ -407,9 +411,13 @@ namespace AnsiCParser.SyntaxTree {
                 List<Initializer> assigns = new List<Initializer>();
                 if (it.Current != null) {
                     var loc = it.Current.LocationRange;
+                    var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
                     foreach (var member in type.Members) {
                         if (it.Current == null) {
                             break;
+                        }
+                        if (member == flexibleArrayMember) {
+                            throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");
                         }
                         if (member.Ident == null) {
                             // padding

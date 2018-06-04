@@ -762,7 +762,28 @@ namespace AnsiCParser {
                 }
                 goto rescan;
             }
+            // ブロックコメントの処理(拡張)
+            if (Peek("```")) {
+                IncPos(3);
 
+                bool terminated = false;
+                while (_inputPos < _inputText.Length) {
+                    if (Peek("\\")) {
+                        IncPos(2);
+                    } else if (Peek("```")) {
+                        IncPos(3);
+                        terminated = true;
+                        break;
+                    } else {
+                        IncPos(1);
+                    }
+                }
+                if (terminated == false) {
+                    _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
+                    return;
+                }
+                goto rescan;
+            }
             // 行コメントの処理
             if (Peek("//")) {
                 IncPos(2);
