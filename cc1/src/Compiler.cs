@@ -2762,6 +2762,10 @@ namespace AnsiCParser {
 
         protected class SyntaxTreeCompileVisitor : SyntaxTree.IVisitor<Value, Value> {
             /*
+             * コード生成:
+             *  - スタック計算機
+             *  - とにかく元ASTに忠実なコードを作る
+             *
              * +------+----------------------+
              * | SP   | 未使用領域           |
              * +------+----------------------+
@@ -2807,10 +2811,6 @@ namespace AnsiCParser {
             /// </summary>
             private readonly Context _context;
 
-            /*
-             * コード生成:
-             *  - 基本はスタック計算機
-             */
             public SyntaxTreeCompileVisitor(Context context) {
                 _context = context;
             }

@@ -1,6 +1,6 @@
 namespace AnsiCParser.SyntaxTree {
     /// <summary>
-    /// 構文木
+    /// 抽象構文木基底クラス
     /// </summary>
     public abstract partial class Ast {
 

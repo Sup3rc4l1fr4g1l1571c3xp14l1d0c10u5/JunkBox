@@ -2147,7 +2147,6 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement LabeledStatement() {
-            var start = _lexer.CurrentToken().Start;
             Token tok;
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.CASE)) {
                 if (_switchScope.Any() == false) {
@@ -2171,8 +2170,7 @@ namespace AnsiCParser {
 
                 _lexer.ReadToken(':');
                 var stmt = Statement();
-                var end = _lexer.CurrentToken().End;
-                var caseStatement = new Statement.CaseStatement(new LocationRange(start, end), expr, v, stmt);
+                var caseStatement = new Statement.CaseStatement(new LocationRange(tok.Start, stmt.LocationRange.End), expr, v, stmt);
                 _switchScope.Peek().AddCaseStatement(caseStatement);
                 return caseStatement;
             }
@@ -2183,8 +2181,7 @@ namespace AnsiCParser {
                 }
                 _lexer.ReadToken(':');
                 var stmt = Statement();
-                var end = _lexer.CurrentToken().End;
-                var defaultStatement = new Statement.DefaultStatement(new LocationRange(start, end), stmt);
+                var defaultStatement = new Statement.DefaultStatement(new LocationRange(tok.Start, stmt.LocationRange.End), stmt);
                 _switchScope.Peek().SetDefaultLabel(defaultStatement);
                 return defaultStatement;
             } else {
@@ -2200,7 +2197,7 @@ namespace AnsiCParser {
                     // 既に宣言済みなのでエラー
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"ラベル {ident.Raw} はすでに {value.Declaration.LocationRange} で宣言されています。");
                 }
-                var labelStmt = new Statement.GenericLabeledStatement(ident.Range, ident.Raw, stmt);
+                var labelStmt = new Statement.GenericLabeledStatement(new LocationRange(ident.Start, stmt.LocationRange.End), ident.Raw, stmt);
                 value.SetDeclaration(labelStmt);
                 return labelStmt;
             }
@@ -2278,8 +2275,8 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement SelectionStatement() {
-            var start = _lexer.CurrentToken().Start;
-            if (_lexer.ReadTokenIf(Token.TokenKind.IF)) {
+            Token start;
+            if (_lexer.ReadTokenIf(out start, Token.TokenKind.IF)) {
                 _lexer.ReadToken('(');
                 var cond = Expression();
                 _lexer.ReadToken(')');
@@ -2288,21 +2285,20 @@ namespace AnsiCParser {
                 if (_lexer.ReadTokenIf(Token.TokenKind.ELSE)) {
                     elseStmt = Statement();
                 }
-                var end = _lexer.CurrentToken().End;
-                return new Statement.IfStatement(new LocationRange(start, end), cond, thenStmt, elseStmt);
+                return new Statement.IfStatement(new LocationRange(start.Start, (elseStmt ?? thenStmt).LocationRange.End), cond, thenStmt, elseStmt);
             }
-            if (_lexer.ReadTokenIf(Token.TokenKind.SWITCH)) {
+            if (_lexer.ReadTokenIf(out start, Token.TokenKind.SWITCH)) {
                 _lexer.ReadToken('(');
                 var cond = Expression();
                 _lexer.ReadToken(')');
-                var ss = new Statement.SwitchStatement(new LocationRange(start, start), cond);
+                var ss = new Statement.SwitchStatement(start.Range, cond);
                 _breakScope.Push(ss);
                 _switchScope.Push(ss);
                 ss.Stmt = Statement();
                 _switchScope.Pop();
                 _breakScope.Pop();
                 var end = _lexer.CurrentToken().End;
-                ss.LocationRange = new LocationRange(start, end);
+                ss.LocationRange = new LocationRange(start.Start, ss.LocationRange.End);
                 return ss;
             }
             throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"選択文は if, switch のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
@@ -2313,23 +2309,22 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement IterationStatement() {
-            var start = _lexer.CurrentToken().Start;
-            if (_lexer.ReadTokenIf(Token.TokenKind.WHILE)) {
+            Token start;
+            if (_lexer.ReadTokenIf(out start, Token.TokenKind.WHILE)) {
                 _lexer.ReadToken('(');
                 var cond = Expression();
                 _lexer.ReadToken(')');
-                var ss = new Statement.WhileStatement(new LocationRange(start, start), cond);
+                var ss = new Statement.WhileStatement(start.Range, cond);
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
                 ss.Stmt = Statement();
                 _breakScope.Pop();
                 _continueScope.Pop();
-                var end = _lexer.CurrentToken().End;
-                ss.LocationRange = new LocationRange(start, end);
+                ss.LocationRange = new LocationRange(start.Range.Start, ss.Stmt.LocationRange.End);
                 return ss;
             }
-            if (_lexer.ReadTokenIf(Token.TokenKind.DO)) {
-                var ss = new Statement.DoWhileStatement(new LocationRange(start, start));
+            if (_lexer.ReadTokenIf(out start, Token.TokenKind.DO)) {
+                var ss = new Statement.DoWhileStatement(start.Range);
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
                 ss.Stmt = Statement();
@@ -2338,13 +2333,12 @@ namespace AnsiCParser {
                 _lexer.ReadToken(Token.TokenKind.WHILE);
                 _lexer.ReadToken('(');
                 ss.Cond = Expression();
-                _lexer.ReadToken(')');
+                var end = _lexer.ReadToken(')');
                 _lexer.ReadToken(';');
-                var end = _lexer.CurrentToken().End;
                 ss.LocationRange = new LocationRange(start, end);
                 return ss;
             }
-            if (_lexer.ReadTokenIf(Token.TokenKind.FOR)) {
+            if (_lexer.ReadTokenIf(out start, Token.TokenKind.FOR)) {
                 _lexer.ReadToken('(');
 
                 var init = _lexer.PeekToken(';') ? null : Expression();
@@ -2353,14 +2347,13 @@ namespace AnsiCParser {
                 _lexer.ReadToken(';');
                 var update = _lexer.PeekToken(')') ? null : Expression();
                 _lexer.ReadToken(')');
-                var ss = new Statement.ForStatement(new LocationRange(start, start), init, cond, update);
+                var ss = new Statement.ForStatement(start.Range, init, cond, update);
                 _breakScope.Push(ss);
                 _continueScope.Push(ss);
                 ss.Stmt = Statement();
                 _breakScope.Pop();
                 _continueScope.Pop();
-                var end = _lexer.CurrentToken().End;
-                ss.LocationRange = new LocationRange(start, end);
+                ss.LocationRange = new LocationRange(start.Range.Start, ss.Stmt.LocationRange.End);
                 return ss;
             }
             throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"繰返し文は while, do, for のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
@@ -2371,8 +2364,10 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement JumpStatement() {
-            var start = _lexer.CurrentToken().Start;
+            var start = _lexer.CurrentToken();
+
             if (_lexer.ReadTokenIf(Token.TokenKind.GOTO)) {
+                // goto 文
                 var label = Identifier(true);
                 _lexer.ReadToken(';');
                 LabelScopeValue value;
@@ -2381,48 +2376,51 @@ namespace AnsiCParser {
                     value = new LabelScopeValue();
                     _labelScope.Add(label.Raw, value);
                 }
-                var end = _lexer.CurrentToken().End;
-                var gotoStmt = new Statement.GotoStatement(new LocationRange(start, end), label.Raw);
+                var gotoStmt = new Statement.GotoStatement(new LocationRange(start, label), label.Raw);
                 value.AddReference(gotoStmt);
                 return gotoStmt;
             }
             if (_lexer.ReadTokenIf(Token.TokenKind.CONTINUE)) {
+                // continue 文
                 _lexer.ReadToken(';');
                 if (_continueScope.Any() == false || _continueScope.Peek() == null) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ループ文の外で continue 文が使われています。");
+                    throw new CompilerException.SyntaxErrorException(start.Range, "ループ文の外で continue 文が使われています。");
                 }
-                var end = _lexer.CurrentToken().End;
-                return new Statement.ContinueStatement(new LocationRange(start, end), _continueScope.Peek());
+                return new Statement.ContinueStatement(start.Range, _continueScope.Peek());
             }
             if (_lexer.ReadTokenIf(Token.TokenKind.BREAK)) {
+                // break 文
                 _lexer.ReadToken(';');
                 if (_breakScope.Any() == false || _breakScope.Peek() == null) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ループ文/switch文の外で break 文が使われています。");
+                    throw new CompilerException.SyntaxErrorException(start.Range, "ループ文/switch文の外で break 文が使われています。");
                 }
-                var end = _lexer.CurrentToken().End;
-                return new Statement.BreakStatement(new LocationRange(start, end), _breakScope.Peek());
+                return new Statement.BreakStatement(start.Range, _breakScope.Peek());
             }
             if (_lexer.ReadTokenIf(Token.TokenKind.RETURN)) {
+                // return 文
                 var expr = _lexer.PeekToken(';') ? null : Expression();
                 _lexer.ReadToken(';');
-                var end = _lexer.CurrentToken().End;
 
                 // 現在の関数の戻り値と型チェック
                 FunctionType ft;
                 _currentFuncDecl.Type.IsFunctionType(out ft);
                 if (ft.ResultType.IsVoidType()) {
                     if (expr != null) {
-                        throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "戻り値型が void 型の関数中で、値を返すreturn文が使われています。");
+                        throw new CompilerException.SyntaxErrorException(new LocationRange(start.Start, expr.LocationRange.End), "戻り値型が void 型の関数中で、値を返すreturn文が使われています。");
+                    } else {
+                        return new Statement.ReturnStatement(start.Range, null);
                     }
-
-                    return new Statement.ReturnStatement(new LocationRange(start, end), null);
+                } else {
+                    if (expr == null) {
+                        throw new CompilerException.SyntaxErrorException(start.Range, "戻り値型が 非void 型の関数中で、値を返さないreturn文が使われています。");
+                    }
+                    if (CType.IsEqual(ft.ResultType, expr.Type) == false) {
+                        expr = Specification.TypeConvert(ft.ResultType, expr);
+                    }
+                    return new Statement.ReturnStatement(new LocationRange(start.Start, expr.LocationRange.End), expr);
                 }
-                if (CType.IsEqual(ft.ResultType, expr.Type) == false) {
-                    expr = Specification.TypeConvert(ft.ResultType, expr);
-                }
-                return new Statement.ReturnStatement(new LocationRange(start, end), expr);
             }
-            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"分岐文は goto, continue, break, return のいずれかで始まりますが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
+            throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"分岐文は goto, continue, break, return のいずれかで始まりますが、 { start.Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
         }
 
         private void GnuAsmPart() {
@@ -2470,17 +2468,16 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Expression Expression() {
-            var start = _lexer.CurrentToken().Start;
             var e = AssignmentExpression();
+            var start = e;
             if (_lexer.PeekToken(',')) {
-                var ce = new SyntaxTree.Expression.CommaExpression(new LocationRange(start, start));
+                var ce = new SyntaxTree.Expression.CommaExpression(start.LocationRange);
                 ce.Expressions.Add(e);
                 while (_lexer.ReadTokenIf(',')) {
                     e = AssignmentExpression();
                     ce.Expressions.Add(e);
                 }
-                var end = _lexer.CurrentToken().End;
-                ce.LocationRange = new LocationRange(start, end);
+                ce.LocationRange = new LocationRange(start.LocationRange.Start, ce.LocationRange.End);
                 return ce;
             }
 

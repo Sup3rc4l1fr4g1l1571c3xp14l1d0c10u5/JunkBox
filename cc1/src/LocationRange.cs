@@ -30,7 +30,7 @@ namespace AnsiCParser {
         /// </summary>
         public static readonly LocationRange Empty = new LocationRange(Location.Empty);
 
-        public LocationRange(Location start) : this(start,start){}
+        public LocationRange(Location location) : this(location, location) { }
 
         public LocationRange(Location start, Location end) {
             System.Diagnostics.Debug.Assert(start.FilePath != null);
@@ -38,6 +38,9 @@ namespace AnsiCParser {
             Start = start;
             End = end;
         }
+        public LocationRange(Token token) : this(token.Range) { }
+
+        public LocationRange(Token start, Token end) : this(start.Start, end.End) { }
 
         public LocationRange(LocationRange other) {
             System.Diagnostics.Debug.Assert(other.Start.FilePath != null);

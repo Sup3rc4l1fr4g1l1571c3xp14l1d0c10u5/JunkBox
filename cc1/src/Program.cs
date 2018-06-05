@@ -109,8 +109,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            //var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest2\tmp\73_arm64.i"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
             var sexpr = ret.Accept(new ToSExprVisitor(), null);
 
             var interpreter = new Lisp.SchemeInterpreter();
@@ -157,4 +156,19 @@ namespace AnsiCParser {
     }
 }
 
+
+/*
+ * C89 Features 
+ * - Lexer   : Complete
+ * - Parser  : Complete
+ * - Library : NO (now use glibc)
+ * C99 Features
+ * - __func__ : Complete
+ * - Line comment : Complete
+ * - Mix Statement and Declaration : Incomplete
+ * - Flexible array member : Complete
+ * - Variable length array : Not Supported. It's nothing, but harmful. 
+ * - Complex numbers : Not Supported
+ * - Imaginary numbers : Not Supported
+ */
 

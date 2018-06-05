@@ -4,7 +4,7 @@ namespace AnsiCParser.SyntaxTree {
 
     /// <inheritdoc />
     /// <summary>
-    /// 宣言
+    /// 宣言基底クラス
     /// </summary>
     public abstract class Declaration : Ast {
 
@@ -133,7 +133,7 @@ namespace AnsiCParser.SyntaxTree {
 
         /// <inheritdoc />
         /// <summary>
-        /// 型宣言
+        /// Typedef型宣言
         /// </summary>
         public class TypeDeclaration : Declaration {
             /// <summary>

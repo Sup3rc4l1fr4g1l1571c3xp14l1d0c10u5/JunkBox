@@ -61,7 +61,21 @@ namespace AnsiCParser {
         /// <param name="value"></param>
         /// <returns></returns>
         public bool TryGetValue<T>(string ident, out T value) where T : TValue {
+            bool isCurrent;
+            return TryGetValue(ident, out value, out isCurrent);
+        }
+
+        /// <summary>
+        /// 指定した名前の要素がこのスコープもしくは上位のスコープに存在するなら取得する。
+        /// さらに、現在のスコープにあるかどうかも調べる。
+        /// </summary>
+        /// <param name="ident"></param>
+        /// <param name="value"></param>
+        /// <param name="isCurrent"></param>
+        /// <returns></returns>
+        public bool TryGetValue<T>(string ident, out T value, out bool isCurrent) where T : TValue {
             var it = this;
+            isCurrent = true;
             while (it != Empty) {
                 var val = it._entries.FindLast(x => x.Item1 == ident);
                 if (val != null) {
@@ -74,32 +88,9 @@ namespace AnsiCParser {
                     }
                 }
                 it = it.Parent;
-            }
-            value = default(T);
-            return false;
-        }
-
-        /// <summary>
-        /// 指定した名前の要素がこのスコープもしくは上位のスコープに存在するなら取得する。
-        /// さらに、現在のスコープにあるかどうかも調べる。
-        /// </summary>
-        /// <param name="ident"></param>
-        /// <param name="value"></param>
-        /// <param name="isCurrent"></param>
-        /// <returns></returns>
-        public bool TryGetValue(string ident, out TValue value, out bool isCurrent) {
-            var it = this;
-            isCurrent = true;
-            while (it != Empty) {
-                var val = it._entries.FindLast(x => x.Item1 == ident);
-                if (val != null) {
-                    value = val.Item2;
-                    return true;
-                }
-                it = it.Parent;
                 isCurrent = false;
             }
-            value = default(TValue);
+            value = default(T);
             return false;
         }
 

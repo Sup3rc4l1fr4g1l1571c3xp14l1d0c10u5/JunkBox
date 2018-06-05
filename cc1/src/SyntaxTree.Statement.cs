@@ -180,7 +180,7 @@ namespace AnsiCParser.SyntaxTree {
         }
 
         /// <summary>
-        /// 複文
+        /// 複文(C89)
         /// </summary>
         public class CompoundStatement : Statement {
             public List<Declaration> Decls {

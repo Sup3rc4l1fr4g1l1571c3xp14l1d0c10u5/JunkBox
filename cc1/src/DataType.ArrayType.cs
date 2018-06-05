@@ -54,7 +54,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "不完全型の配列を作ることはできない");
                 }
                 if (BaseType.Unwrap().IsContainFlexibleArrayMemberStruct()) {
-                    throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "フレキシブル配列メンバを持つ要素のの配列を作ることはできない");
+                    throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "フレキシブル配列メンバを持つ要素の配列を作ることはできない");
                 }
             }
 

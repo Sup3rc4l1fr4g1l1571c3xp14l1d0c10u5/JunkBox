@@ -1033,7 +1033,8 @@ namespace AnsiCParser {
                 if (targetType.IsIntegerType() && expr.Type.IsPointerType()) {
                     // 任意のポインタ型は整数型に型変換できる。
                     // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
-                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
+                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
+                    Logger.Warning(expr.LocationRange, $"キャストなしでポインタ型を整数型に変換しています。");
                     return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
@@ -1044,7 +1045,7 @@ namespace AnsiCParser {
                     // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
                     // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
 
-                    // ToDo:アドレス付け可能な記憶域が実際に使われるかどうかにかかわらず，記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも，
+                    // アドレス付け可能な記憶域が実際に使われるかどうかにかかわらず，記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも，
                     // （6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない。
                     if (expr.HasStorageClassRegister()) {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, "記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも（6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない");
