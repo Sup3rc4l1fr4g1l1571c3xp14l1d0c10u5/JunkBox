@@ -1,4 +1,4 @@
-﻿
+
 namespace Hnx8.ReadJEnc
 {
     /// <summary>

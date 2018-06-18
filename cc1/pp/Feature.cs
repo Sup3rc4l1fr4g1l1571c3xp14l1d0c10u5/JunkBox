@@ -9,7 +9,7 @@ namespace CSCPP {
         Trigraphs,
 
         /// <summary>
-        /// 未定義のプリプロセッサディレクティブを出力に含めます。
+        /// 未定義のプリプロセッサ指令を出力に含めます。
         /// </summary>
         UnknownDirectives,
 

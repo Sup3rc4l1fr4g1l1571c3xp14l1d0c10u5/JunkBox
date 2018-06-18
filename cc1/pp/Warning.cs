@@ -19,5 +19,6 @@ namespace CSCPP
         ExtensionForVariadicMacro,
         Error,
         CertCCodingStandard,
+        UnspecifiedBehavior,
     }
 }

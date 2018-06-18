@@ -359,9 +359,9 @@ namespace CSCPP {
             #endregion
 
             if (CppContext.ErrorCount != 0) {
-                Console.Error.WriteLine($"プリプロセスに失敗しました。");
+                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} のプリプロセスに失敗しました。");
             } else {
-                Console.Error.WriteLine($"プリプロセスに成功しました。");
+                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} プリプロセスに成功しました。");
             }
             Console.Error.WriteLine($"  エラー: {CppContext.ErrorCount}件");
             Console.Error.WriteLine($"  警告: {CppContext.WarningCount}件");
@@ -655,7 +655,7 @@ options:
     UnknownPragmas
         認識出来ないプラグマが出現した場合に警告。
     UnknownDirectives
-        認識出来ないプリプロセッサディレクティブが出現した場合に警告。
+        認識出来ないプリプロセッサ指令が出現した場合に警告。
         本警告は -F オプションの UnknownDirectives と同時に使用する場合に限り有効。
     LineComment
         行コメントが出現した場合に警告。
@@ -701,6 +701,9 @@ options:
             [×] PRE30-C: 文字列連結によってユニバーサル文字名を作成しない
             [×] PRE31-C: 安全でないマクロの引数では副作用を避ける
             [△] PRE32-C: 関数形式マクロの呼出しのなかで前処理指令を使用しない
+    UnspecifiedBehavior
+        ISO/IEC 9899-1999で示されている以下の未規定動作について警告を出力します。
+            - ISO/IEC 9899-1999 6.10.3.2 意味規則: #演算子及び##演算子の評価順序は，未規定とする。
 
 -F<type>, -f<type>
     -F<type> は <type> で示される拡張機能を有効にします。
@@ -713,7 +716,7 @@ options:
     Trigraphs
         トライグラフを有効にします。
     UnknownDirectives
-        認識出来ないプリプロセッサディレクティブをエラー扱いせず、プリプロセス結果にそのまま出力します。
+        認識出来ないプリプロセッサ指令をエラー扱いせず、プリプロセス結果にそのまま出力します。
     OutputGccStyleLineDirective
         前処理結果に出力する行番号情報を GCC 形式の書式にします。
     LineComment

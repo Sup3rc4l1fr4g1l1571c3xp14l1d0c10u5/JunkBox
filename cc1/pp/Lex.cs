@@ -246,7 +246,7 @@ namespace CSCPP {
 
 
                 //
-                // 以降は条件コンパイルディレクティブの処理
+                // 以降は条件コンパイル指令の処理
                 //
 
                 Token hash = Token.make_keyword(c.position, (Token.Keyword)'#');
@@ -756,6 +756,15 @@ namespace CSCPP {
                 } else {
                     CppContext.Error(tok, $"{Token.KeywordToStr((Token.Keyword)id)} があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
+                unget_token(tok);
+                return Token.make_invalid(tok.Pos, "");
+            }
+            return tok;
+        }
+        public static Token ExceptKeyword(char id, Action<Token> failHandler) {
+            Token tok = LexToken();
+            if (!tok.IsKeyword(id)) {
+                failHandler(tok);
                 unget_token(tok);
                 return Token.make_invalid(tok.Pos, "");
             }

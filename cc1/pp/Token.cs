@@ -5,8 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace CSCPP
-{
+namespace CSCPP {
     public class Token {
         public override string ToString() {
             var sb = new StringBuilder();
@@ -71,12 +70,12 @@ namespace CSCPP
         public string ToRawString() {
             var sb = new StringBuilder();
             switch (Kind) {
-                case TokenKind.Ident  : return StrVal;
+                case TokenKind.Ident: return StrVal;
                 case TokenKind.Keyword: return KeywordToStr(KeywordVal);
-                case TokenKind.Number : return StrVal;
-                case TokenKind.Char   : return $"'{QuoteChar(StrVal)}'";
-                case TokenKind.String : return $"\"{QuoteStr(StrVal)}\"";
-                case TokenKind.EoF    : return "";
+                case TokenKind.Number: return StrVal;
+                case TokenKind.Char: return $"'{QuoteChar(StrVal)}'";
+                case TokenKind.String: return $"\"{QuoteStr(StrVal)}\"";
+                case TokenKind.EoF: return "";
                 case TokenKind.Invalid: return StrVal;
                 case TokenKind.MinCppToken: return ""; // not use
                 case TokenKind.NewLine: return "";
@@ -517,7 +516,7 @@ namespace CSCPP
         private static readonly string P = $@"([Pp][+-]?{D}+)";
         private static readonly string HP = $@"(0[xX])";
         private static readonly string H = $@"[a-fA-F0-9]";
-        private static readonly string[] FloatingNumberPatterns = new [] {
+        private static readonly string[] FloatingNumberPatterns = new[] {
             $@"{D}+{E}{FS}?",
             $@"{D}*\.{D}+{E}?{FS}?",
             $@"{D}+\.{E}?{FS}?",
@@ -525,10 +524,9 @@ namespace CSCPP
             $@"{HP}{H}*\.{H}+{P}{FS}?",
             $@"{HP}{H}+\.{P}{FS}?",
         };
-        private static readonly Regex RegexFloatingNumberPattern = new Regex("^" + String.Join("|", FloatingNumberPatterns.Select(x => $"(?:{x})")) + "$",RegexOptions.Compiled);
+        private static readonly Regex RegexFloatingNumberPattern = new Regex("^" + String.Join("|", FloatingNumberPatterns.Select(x => $"(?:{x})")) + "$", RegexOptions.Compiled);
 
-        public static BigInteger ToInt(Token t, string s)
-        {
+        public static IntMaxT ToInt(Token t, string s) {
             BigInteger value;
 
             Match m = RegexIntegerNumberPattern.Match(s);
@@ -536,7 +534,7 @@ namespace CSCPP
                 // 十六進数
                 // BigInteger.ParseとSystem.Globalization.NumberStyles.HexNumberを組み合わせると
                 // 最上位ビットが立っている場合は負数と見なす動作になるので対策として先頭に`0`を付与して解析
-                value = BigInteger.Parse("0"+m.Groups["hex"].Value, System.Globalization.NumberStyles.HexNumber);
+                value = BigInteger.Parse("0" + m.Groups["hex"].Value, System.Globalization.NumberStyles.HexNumber);
             } else if (m.Groups["oct"].Success) {
                 // 八進数
                 value = m.Groups["oct"].Value.Aggregate(new BigInteger(), (b, c) => b * 8 + c - '0');
@@ -547,41 +545,36 @@ namespace CSCPP
                 // 整数値として不正なもの。浮動小数点数かどうか判定してメッセージを変化させる
                 if (RegexFloatingNumberPattern.IsMatch(s)) {
                     CppContext.Error(t, $"プリプロセス指令の条件式中で浮動小数点定数 {s} が使われています。条件式中で使える定数は整数定値のみです。");
-                } else { 
-                    CppContext.Error(t, $"{s} は整数値として不正な書式です。");        
+                } else {
+                    CppContext.Error(t, $"{s} は整数値として不正な書式です。");
                 }
-                return 0;
+                return IntMaxT.CreateSigned(0);
             }
 
             string suffix = "";
-            if (m.Groups["suffix"].Success)
-            {
+            if (m.Groups["suffix"].Success) {
                 suffix = m.Groups[2].Value;
             }
 
             bool isUnsigned = suffix.ToUpper().Contains('U');    // 今は使っていないが将来的に使う予定がある
             int size = suffix.Count(x => x == 'L' || x == 'l');   // 0 is int, 1 is long, 2 is long long
 
-            switch (size) {
-                case 0:
-                case 1:
-                    if (0xFFFFFFFFU < value) {
-                        CppContext.Warning(t, $"定数 `{s}` は (unsigned) long の範囲を超えています。");
-                    }
-                    break;
-                case 2:
-                    if (CppContext.Features.Contains(Feature.LongLongConstant) == false) {
-                        CppContext.Error(t, $"64ビット型の定数値 `{s}` が使われています。64ビット型の定数値は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。64ビット型の定数値を有効にする場合は実行時引数に -FLongLongConstant を設定してください。");
-                    } else if (CppContext.Warnings.Contains(Warning.LongLongConstant)) {
-                        CppContext.Warning(t, $"64ビット型の定数値 `{s}` が使われています。");
-                    }
-                    if (0xFFFFFFFFFFFFFFFFUL < value) {
-                        CppContext.Warning(t, $"定数 `{s}` は (unsigned) long long の範囲を超えています。");
-                    }
-                    break;
+            // 値は uintmax_t として読み取る
+
+            if (CppContext.Features.Contains(Feature.LongLongConstant) == false) {
+                if (size == 2) {
+                    CppContext.Error(t, $"64ビット型の定数値 `{s}` が使われています。64ビット型の定数値は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。64ビット型の定数値を有効にする場合は実行時引数に -FLongLongConstant を設定してください。");
+                }
+            } else if (CppContext.Warnings.Contains(Warning.LongLongConstant)) {
+                if (size == 2) {
+                    CppContext.Warning(t, $"64ビット型の定数値 `{s}` が使われています。");
+                }
+            }
+            if (IntMaxT.UnsignedMaxValue < value) {
+                CppContext.Warning(t, $"定数 `{s}` は uintmax_t の範囲を超えています。");
             }
 
-            return value;
+            return IntMaxT.CreateUnsigned((ulong)value);
 
         }
 
