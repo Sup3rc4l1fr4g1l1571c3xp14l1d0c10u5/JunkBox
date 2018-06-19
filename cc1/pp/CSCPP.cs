@@ -9,11 +9,11 @@ namespace CSCPP {
     [StructLayout(LayoutKind.Explicit)]
     public struct IntMaxT {
         [FieldOffset(0)]
-        private Int32  Int32Value;
+        private Int32 Int32Value;
         [FieldOffset(0)]
         private UInt32 UInt32Value;
         [FieldOffset(0)]
-        private Int64  Int64Value;
+        private Int64 Int64Value;
         [FieldOffset(0)]
         private UInt64 UInt64Value;
 
@@ -28,378 +28,885 @@ namespace CSCPP {
             IsSigned = 0x02,
 
         }
-        public IntMaxT(Int32 value) : this () { Int32Value = value; Flag = Flags.IsSigned | Flags.Is32Bit;}
-        public IntMaxT(UInt32 value) : this () {UInt32Value = value; Flag = Flags.IsUnsigned | Flags.Is32Bit;}
-        public IntMaxT(Int64 value) : this () { Int64Value = value;Flag = Flags.IsSigned | Flags.Is64Bit;}
-        public IntMaxT(UInt64 value) : this () { UInt64Value = value;Flag = Flags.IsUnsigned | Flags.Is64Bit;}
+        public IntMaxT(Int32 value) : this() { Int32Value = value; Flag = Flags.IsSigned | Flags.Is32Bit; }
+        public IntMaxT(UInt32 value) : this() { UInt32Value = value; Flag = Flags.IsUnsigned | Flags.Is32Bit; }
+        public IntMaxT(Int64 value) : this() { Int64Value = value; Flag = Flags.IsSigned | Flags.Is64Bit; }
+        public IntMaxT(UInt64 value) : this() { UInt64Value = value; Flag = Flags.IsUnsigned | Flags.Is64Bit; }
         public bool Is32Bit() {
             return (Flag & Flags.Is64Bit) == 0;
         }
         public bool Is64Bit() {
             return (Flag & Flags.Is64Bit) != 0;
         }
+        public bool IsSigned() {
+            return (Flag & Flags.IsSigned) != 0;
+        }
         public bool IsUnsigned() {
             return (Flag & Flags.IsSigned) == 0;
         }
-
-        public Int32 AsInt32() {
-            return this.Int32Value;
+        public bool IsNegative {
+            get {
+                return IsSigned() && AsInt64() < 0;
+            }
         }
 
-        public UInt32 AsUInt32() {
-            return this.UInt32Value;
-        }
-        public Int64 AsInt64() {
-            return this.Int64Value;
-        }
-        public UInt64 AsUInt64() {
-            return this.UInt64Value;
+        public static void Test() {
+            {
+                // 変換前後で値が変化しない例
+                {
+                    // (int32)-1LL
+                    var i64min = new IntMaxT(-1L);
+                    bool overflow = false;
+                    Int32 ret = i64min.AsInt32((s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(!overflow);
+                }
+                {
+                    // (int32)(int64)LONG_MIN
+                    var i64min = new IntMaxT((long)Int32.MinValue);
+                    bool overflow = false;
+                    Int32 ret = i64min.AsInt32((s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(!overflow);
+                }
+            }
+            {
+                {
+                    // 変換前後で値が変化する例：(int32)LLONG_MIN 
+                    var i64min = new IntMaxT(long.MinValue);
+                    bool overflow = false;
+                    Int32 ret = i64min.AsInt32((s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(overflow);
+                }
+                {
+                    // 変換前後で値が変化する例：(Uint32)-1LL
+                    var i64min = new IntMaxT(-1L);
+                    bool overflow = false;
+                    UInt32 ret = i64min.AsUInt32((s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(overflow);
+                }
+            }
+            {
+                // オーバーフローする例
+                {
+                    var i64min = new IntMaxT(long.MinValue);
+                    var i64minus1 = new IntMaxT((long)-1);
+                    bool overflow = false;
+                    var ret = IntMaxT.Add(i64min, i64minus1, (s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(overflow);
+                }
+                {
+                    var i64max = new IntMaxT(long.MaxValue);
+                    var i64plus1 = new IntMaxT((long)1);
+                    bool overflow = false;
+                    var ret = IntMaxT.Add(i64max, i64plus1, (s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(overflow);
+                }
+                {
+                    var i64max = new IntMaxT(long.MaxValue);
+                    bool overflow = false;
+                    var ret = IntMaxT.Add(i64max, i64max, (s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(overflow);
+                }
+            }
+            {
+                // オーバーフローしない例
+                {
+                    var i64min = new IntMaxT(long.MinValue);
+                    var i64plus1 = new IntMaxT((long)1);
+                    bool overflow = false;
+                    var ret = IntMaxT.Add(i64min, i64plus1, (s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(!overflow);
+                }
+                {
+                    var i64max = new IntMaxT(long.MaxValue);
+                    var i64minus1 = new IntMaxT((long)-1);
+                    bool overflow = false;
+                    var ret = IntMaxT.Add(i64max, i64minus1, (s) => {
+                        Console.Error.WriteLine(s);
+                        overflow = true;
+                    });
+                    System.Diagnostics.Debug.Assert(!overflow);
+                }
+            }
         }
 
-        public static IntMaxT operator +(IntMaxT lhs, IntMaxT rhs) {
+        public Int32 AsInt32(Action<string> overflowHandler = null) {
+            if (this.Is64Bit() && this.IsSigned()) {
+                // int64_t -> int32_t
+                if (overflowHandler != null && (this.Int64Value < Int32.MinValue || Int32.MaxValue < this.Int64Value)) {
+                    overflowHandler("int64_t から int32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((Int32)this.Int64Value);
+            } else if (this.Is64Bit() && this.IsUnsigned()) {
+                // uint64_t -> int32_t
+                if (overflowHandler != null && (Int32.MaxValue < this.UInt64Value)) {
+                    overflowHandler("uint64_t から int32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((Int32)this.UInt64Value);
+            } else if (this.Is32Bit() && this.IsSigned()) {
+                // int32_t -> int32_t
+                // 変化なし
+                return unchecked((Int32)this.Int32Value);
+            } else if (this.Is32Bit() && this.IsUnsigned()) {
+                // uint32_t -> int32_t
+                if (overflowHandler != null && (Int32.MaxValue < this.UInt32Value)) {
+                    overflowHandler("uint32_t から int32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((Int32)this.UInt32Value);
+            } else {
+                throw new Exception("");
+            }
+        }
+
+        public UInt32 AsUInt32(Action<string> overflowHandler = null) {
+            if (this.Is64Bit() && this.IsSigned()) {
+                // int64_t -> uint32_t
+                if (overflowHandler != null && (this.Int64Value < UInt32.MinValue || UInt32.MaxValue < this.Int64Value)) {
+                    overflowHandler("int64_t から uint32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((UInt32)this.Int64Value);
+            } else if (this.Is64Bit() && this.IsUnsigned()) {
+                // uint64_t -> uint32_t
+                if (overflowHandler != null && (UInt32.MaxValue < this.UInt64Value)) {
+                    overflowHandler("uint64_t から uint32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((UInt32)this.UInt64Value);
+            } else if (this.Is32Bit() && this.IsSigned()) {
+                // int32_t -> uint32_t
+                if (overflowHandler != null && (this.Int32Value < UInt32.MinValue)) {
+                    overflowHandler("int32_t から uint32_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((UInt32)this.Int32Value);
+            } else if (this.Is32Bit() && this.IsUnsigned()) {
+                // uint32_t -> uint32_t
+                // 変化なし
+                return unchecked((UInt32)this.UInt32Value);
+            } else {
+                throw new Exception("");
+            }
+        }
+
+        public Int64 AsInt64(Action<string> overflowHandler = null) {
+            if (this.Is64Bit() && this.IsSigned()) {
+                // int64_t -> int64_t
+                // 変化なし
+                return unchecked((Int64)this.Int64Value);
+            } else if (this.Is64Bit() && this.IsUnsigned()) {
+                // uint64_t -> int64_t
+                if (overflowHandler != null && (Int64.MaxValue < this.UInt64Value)) {
+                    overflowHandler("uint64_t から int64_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((Int64)this.UInt64Value);
+            } else if (this.Is32Bit() && this.IsSigned()) {
+                // int32_t -> int64_t
+                // 上位型への変換
+                return unchecked((Int64)this.Int32Value);
+            } else if (this.Is32Bit() && this.IsUnsigned()) {
+                // uint32_t -> int64_t
+                // 上位型への変換
+                return unchecked((Int64)this.UInt32Value);
+            } else {
+                throw new Exception("");
+            }
+        }
+        public UInt64 AsUInt64(Action<string> overflowHandler = null) {
+            if (this.Is64Bit() && this.IsSigned()) {
+                // int64_t -> uint64_t
+                if (overflowHandler != null && (this.Int64Value < 0)) {
+                    overflowHandler("int64_t から uint64_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((UInt64)this.Int64Value);
+            } else if (this.Is64Bit() && this.IsUnsigned()) {
+                // uint64_t -> uint64_t
+                // 変化なし
+                return unchecked((UInt64)this.UInt64Value);
+            } else if (this.Is32Bit() && this.IsSigned()) {
+                // int32_t -> uint64_t
+                if (overflowHandler != null && (this.Int32Value < 0)) {
+                    overflowHandler("int32_t から uint64_t への変換でデータの消失 (切り捨て) が発生しました。");
+                }
+                return unchecked((UInt64)this.Int32Value);
+            } else if (this.Is32Bit() && this.IsUnsigned()) {
+                // uint32_t -> uint64_t
+                // 上位型への変換
+                return unchecked((UInt64)this.UInt32Value);
+            } else {
+                throw new Exception("");
+            }
+        }
+
+        public static IntMaxT Add(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() + rhs.AsUInt32()));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    if (right > 0 && left > UInt32.MaxValue - right) {
+                        overflowHandler($"{lhs} + {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt32)(left + right));
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() + rhs.AsInt32()));
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (right > 0 ? (left > Int32.MaxValue - right) : left < (Int32.MinValue - right)) {
+                        overflowHandler($"{lhs} + {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int32)(left + right));
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() + rhs.AsUInt64()));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    if (right > 0 && left > UInt64.MaxValue - right) {
+                        overflowHandler($"{lhs} + {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt64)(left + right));
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() + rhs.AsInt64()));
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (right > 0 ? (left > Int64.MaxValue - right) : left < (Int64.MinValue - right)) {
+                        overflowHandler($"{lhs} + {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int64)(left + right));
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator-(IntMaxT lhs, IntMaxT rhs) {
+        public static IntMaxT Sub(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() - rhs.AsUInt32()));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    if (right > 0 && left < UInt32.MinValue + right) {
+                        overflowHandler($"{lhs} - {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt32)(left - right));
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() - rhs.AsInt32()));
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (right > 0 ? (left < Int32.MinValue + right) : left > (Int32.MaxValue + right)) {
+                        overflowHandler($"{lhs} - {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int32)(left - right));
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() - rhs.AsUInt64()));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    if (right > 0 && left < UInt64.MinValue + right) {
+                        overflowHandler($"{lhs} - {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt64)(left - right));
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() - rhs.AsInt64()));
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (right > 0 ? (left < Int64.MinValue + right) : left > (Int64.MaxValue + right)) {
+                        overflowHandler($"{lhs} - {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int64)(left - right));
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator*(IntMaxT lhs, IntMaxT rhs) {
+        public static IntMaxT Mul(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() * rhs.AsUInt32()));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    if (right > 0 && (left > UInt32.MaxValue / right)) {
+                        overflowHandler($"{lhs} * {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt32)(left * right));
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() * rhs.AsInt32()));
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (right > 0 ? (left > Int32.MaxValue / right || left < Int32.MinValue / right)
+                                  : (right < -1 ? (left > Int32.MinValue / right || left < Int32.MaxValue / right)
+                                                : (right == -1 && left == Int32.MinValue))) {
+                        overflowHandler($"{lhs} * {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int32)(left * right));
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() * rhs.AsUInt64()));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    if (right > 0 && (left > UInt64.MaxValue / right)) {
+                        overflowHandler($"{lhs} * {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((UInt64)(left * right));
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() * rhs.AsInt64()));
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (right > 0 ? (left > Int64.MaxValue / right || left < Int64.MinValue / right)
+                                  : (right < -1 ? (left > Int64.MinValue / right || left < Int64.MaxValue / right)
+                                                : (right == -1 && left == Int64.MinValue))) {
+                        overflowHandler($"{lhs} * {rhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT((Int64)(left * right));
                 }
             }
             throw new Exception();
+
         }
-        public static IntMaxT operator/(IntMaxT lhs, IntMaxT rhs) {
+        public static IntMaxT Div(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() / rhs.AsUInt32()));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} / {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt32)(0));
+                    } else {
+                        return new IntMaxT((UInt32)(left / right));
+                    }
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() / rhs.AsInt32()));
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} / {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt32)(0));
+                    } else if ((left == Int32.MinValue) && (right == -1)) {
+                        overflowHandler($"{lhs} / {rhs} は演算結果がオーバーフローします。");
+                        return new IntMaxT((UInt32)(0));
+                    } else {
+                        return new IntMaxT((Int32)(left / right));
+                    }
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() / rhs.AsUInt64()));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} / {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt64)(0));
+                    } else {
+                        return new IntMaxT((UInt64)(left / right));
+                    }
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() / rhs.AsInt64()));
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} / {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt64)(0));
+                    } else if ((left == Int64.MinValue) && (right == -1)) {
+                        overflowHandler($"{lhs} / {rhs} は演算結果がオーバーフローします。");
+                        return new IntMaxT((UInt64)(0));
+                    } else {
+                        return new IntMaxT((Int64)(left / right));
+                    }
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator%(IntMaxT lhs, IntMaxT rhs) {
+        public static IntMaxT Mod(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() % rhs.AsUInt32()));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} % {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt32)(0));
+                    } else {
+                        return new IntMaxT((UInt32)(left % right));
+                    }
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() % rhs.AsInt32()));
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} % {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt32)(0));
+                    } else if ((left == Int32.MinValue) && (right == -1)) {
+                        overflowHandler($"{lhs} % {rhs} は演算結果がオーバーフローします。");
+                        return new IntMaxT((UInt32)(0));
+                    } else {
+                        return new IntMaxT((Int32)(left % right));
+                    }
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() % rhs.AsUInt64()));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} % {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt64)(0));
+                    } else {
+                        return new IntMaxT((UInt64)(left % right));
+                    }
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() % rhs.AsInt64()));
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (right == 0) {
+                        overflowHandler($"{lhs} % {rhs} はゼロ除算です。");
+                        return new IntMaxT((UInt64)(0));
+                    } else if ((left == Int64.MinValue) && (right == -1)) {
+                        overflowHandler($"{lhs} % {rhs} は演算結果がオーバーフローします。");
+                        return new IntMaxT((UInt64)(0));
+                    } else {
+                        return new IntMaxT((Int64)(left % right));
+                    }
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator>>(IntMaxT lhs, int rhs) {
+        public static IntMaxT ShiftRight(IntMaxT lhs, int rhs, Action<string> overflowHandler = null) {
+            if (rhs < 0) {
+                overflowHandler($"{lhs} >> {rhs} の右シフト数が負数です。");
+            }
+            if (lhs.Is32Bit()) {
+                if (rhs >= 32) {
+                    overflowHandler($"{lhs} >> {rhs} の右シフト数が左オペランドのビット幅以上です。");
+                }
+                if (lhs.IsUnsigned()) {
+                    var left = lhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(left >> rhs));
+                } else {
+                    var left = lhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} >> {rhs} の左オペランドが負数です。符号付きの負の数値の右シフト結果は実装依存の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(left >> rhs));
+                }
+            }
+            if (lhs.Is64Bit()) {
+                if (rhs >= 64) {
+                    overflowHandler($"{lhs} >> {rhs} の右シフト数が左オペランドのビット幅以上です。");
+                }
+                if (lhs.IsUnsigned()) {
+                    var left = lhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(left >> rhs));
+                } else {
+                    var left = lhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} >> {rhs} の左オペランドが負数です。符号付きの負の数値の右シフト結果は実装依存の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(left >> rhs));
+                }
+            }
+            throw new Exception();
+        }
+        public static IntMaxT ShiftLeft(IntMaxT lhs, int rhs, Action<string> overflowHandler = null) {
+            if (rhs < 0) {
+                overflowHandler($"{lhs} << {rhs} の左シフト数が負数です。");
+            }
+            if (lhs.Is32Bit()) {
+                if (rhs >= 32) {
+                    overflowHandler($"{lhs} << {rhs} の左シフト数が左オペランドのビット幅以上です。");
+                }
+                if (lhs.IsUnsigned()) {
+                    var left = lhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(left << rhs));
+                } else {
+                    var left = lhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} >> {rhs} の左オペランドが負数です。符号付きの負の数値の左シフト結果は実装依存の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(left << rhs));
+                }
+            }
+            if (lhs.Is64Bit()) {
+                if (rhs >= 64) {
+                    overflowHandler($"{lhs} << {rhs} の左シフト数が左オペランドのビット幅以上です。");
+                }
+                if (lhs.IsUnsigned()) {
+                    var left = lhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(left << rhs));
+                } else {
+                    var left = lhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} >> {rhs} の左オペランドが負数です。符号付きの負の数値の左シフト結果は実装依存の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(left << rhs));
+                }
+            }
+            throw new Exception();
+        }
+        public static IntMaxT BitAnd(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
+            if (lhs.Is32Bit() != rhs.Is32Bit()) {
+                throw new Exception();
+            }
+            if (lhs.Is32Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(left & right));
+                } else {
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} & {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} & {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(left & right));
+                }
+            }
+            if (lhs.Is64Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(left & right));
+                } else {
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} & {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} & {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(left & right));
+                }
+            }
+            throw new Exception();
+        }
+        public static IntMaxT BitOr(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
+            if (lhs.Is32Bit() != rhs.Is32Bit()) {
+                throw new Exception();
+            }
+            if (lhs.Is32Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(left | right));
+                } else {
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} | {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} | {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(left | right));
+                }
+            }
+            if (lhs.Is64Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(left | right));
+                } else {
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} | {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} | {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(left | right));
+                }
+            }
+            throw new Exception();
+        }
+        public static IntMaxT BitXor(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
+            if (lhs.Is32Bit() != rhs.Is32Bit()) {
+                throw new Exception();
+            }
+            if (lhs.Is32Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(left ^ right));
+                } else {
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} ^ {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} ^ {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(left ^ right));
+                }
+            }
+            if (lhs.Is64Bit()) {
+                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(left ^ right));
+                } else {
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"{lhs} ^ {rhs} の左オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    if (right < 0) {
+                        overflowHandler($"{lhs} ^ {rhs} の右オペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(left ^ right));
+                }
+            }
+            throw new Exception();
+        }
+        public static IntMaxT BitNot(IntMaxT lhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() >> rhs));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    return new IntMaxT((UInt32)(~left));
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() >> rhs));
+                    var left = lhs.AsInt32(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"~{lhs} のオペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int32)(~left));
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() >> rhs));
+                    var left = lhs.AsUInt64(overflowHandler);
+                    return new IntMaxT((UInt64)(~left));
                 } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() >> rhs));
+                    var left = lhs.AsInt64(overflowHandler);
+                    if (left < 0) {
+                        overflowHandler($"~{lhs} のオペランドが符号付きの負の数値です。符号付きの負の数値のビット単位の演算結果は処理系定義の結果となります。");
+                    }
+                    return new IntMaxT((Int64)(~left));
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator<<(IntMaxT lhs, int rhs) {
+        public static IntMaxT Neg(IntMaxT lhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() << rhs));
+                    var left = lhs.AsUInt32(overflowHandler);
+                    if (left > ((UInt32)Int32.MaxValue + 1U)) {
+                        overflowHandler($"-{lhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT(-unchecked((Int32)(left)));
                 } else {
-                    return new IntMaxT((Int32)(lhs.AsInt32() << rhs));
-                }
-            }
-            if (lhs.Is64Bit()) {
-                if (lhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() << rhs));
-                } else {
-                    return new IntMaxT((Int64)(lhs.AsInt64() << rhs));
-                }
-            }
-            throw new Exception();
-        }
-        public static IntMaxT operator &(IntMaxT lhs, IntMaxT rhs) {
-            if (lhs.Is32Bit() != rhs.Is32Bit()) {
-                throw new Exception();
-            }
-            if (lhs.Is32Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() & rhs.AsUInt32()));
-                } else {
-                    return new IntMaxT((UInt32)(lhs.AsInt32() & rhs.AsInt32()));
-                }
-            }
-            if (lhs.Is64Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() & rhs.AsUInt64()));
-                } else {
-                    return new IntMaxT((UInt64)(lhs.AsInt64() & rhs.AsInt64()));
-                }
-            }
-            throw new Exception();
-        }
-        public static IntMaxT operator |(IntMaxT lhs, IntMaxT rhs) {
-            if (lhs.Is32Bit() != rhs.Is32Bit()) {
-                throw new Exception();
-            }
-            if (lhs.Is32Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() | rhs.AsUInt32()));
-                } else {
-                    return new IntMaxT((UInt32)(lhs.AsInt32() | rhs.AsInt32()));
-                }
-            }
-            if (lhs.Is64Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() | rhs.AsUInt64()));
-                } else {
-                    return new IntMaxT((UInt64)(lhs.AsInt64() | rhs.AsInt64()));
-                }
-            }
-            throw new Exception();
-        }
-        public static IntMaxT operator ^(IntMaxT lhs, IntMaxT rhs) {
-            if (lhs.Is32Bit() != rhs.Is32Bit()) {
-                throw new Exception();
-            }
-            if (lhs.Is32Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt32)(lhs.AsUInt32() ^ rhs.AsUInt32()));
-                } else {
-                    return new IntMaxT((UInt32)(lhs.AsInt32() ^ rhs.AsInt32()));
-                }
-            }
-            if (lhs.Is64Bit()) {
-                if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return new IntMaxT((UInt64)(lhs.AsUInt64() ^ rhs.AsUInt64()));
-                } else {
-                    return new IntMaxT((UInt64)(lhs.AsInt64() ^ rhs.AsInt64()));
-                }
-            }
-            throw new Exception();
-        }
-        public static IntMaxT operator~(IntMaxT lhs) {
-            if (lhs.Is32Bit()) {
-                if (lhs.IsUnsigned()) {
-                    return new IntMaxT(~lhs.AsUInt32());
-                } else {
-                    return new IntMaxT(~lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    if (left == Int32.MinValue) {
+                        overflowHandler("-{lhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT(-unchecked((Int32)(left)));
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned()) {
-                    return new IntMaxT(~lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    if (left > ((UInt64)Int64.MaxValue + 1UL)) {
+                        overflowHandler($"-{lhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT(unchecked(-(Int64)(left)));
                 } else {
-                    return new IntMaxT(~lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    if (left == Int64.MinValue) {
+                        overflowHandler($"-{lhs} は演算結果がオーバーフローします。");
+                    }
+                    return new IntMaxT(unchecked(-(Int64)(left)));
                 }
             }
             throw new Exception();
         }
-        public static IntMaxT operator-(IntMaxT lhs) {
-            if (lhs.Is32Bit()) {
-                if (lhs.IsUnsigned()) {
-                    return new IntMaxT(-(Int32)lhs.AsUInt32());
-                } else {
-                    return new IntMaxT(-lhs.AsInt32());
-                }
-            }
-            if (lhs.Is64Bit()) {
-                if (lhs.IsUnsigned()) {
-                    return new IntMaxT(-(Int64)lhs.AsUInt64());
-                } else {
-                    return new IntMaxT(-lhs.AsInt64());
-                }
-            }
-            throw new Exception();
-        }
-        public static bool operator > (IntMaxT lhs, IntMaxT rhs) {
+        public static bool GreatThan(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() > lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left > right);
                 } else {
-                    return (lhs.AsInt32() > lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left > right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() > lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left > right);
                 } else {
-                    return (lhs.AsInt64() > lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left > right);
                 }
             }
             throw new Exception();
         }
-        public static bool operator < (IntMaxT lhs, IntMaxT rhs) {
+        public static bool LessThan(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() < lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left < right);
                 } else {
-                    return (lhs.AsInt32() < lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left < right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() < lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left < right);
                 } else {
-                    return (lhs.AsInt64() < lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left < right);
                 }
             }
             throw new Exception();
         }
-        public static bool operator >= (IntMaxT lhs, IntMaxT rhs) {
+        public static bool GreatEqual(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() >= lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left >= right);
                 } else {
-                    return (lhs.AsInt32() >= lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left >= right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() >= lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left >= right);
                 } else {
-                    return (lhs.AsInt64() >= lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left >= right);
                 }
             }
             throw new Exception();
         }
-        public static bool operator <= (IntMaxT lhs, IntMaxT rhs) {
+        public static bool LessEqual(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() <= lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left <= right);
                 } else {
-                    return (lhs.AsInt32() <= lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left <= right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() <= lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left <= right);
                 } else {
-                    return (lhs.AsInt64() <= lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left <= right);
                 }
             }
             throw new Exception();
         }
-        public static bool operator != (IntMaxT lhs, IntMaxT rhs) {
+        public static bool NotEqual(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() != lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left != right);
                 } else {
-                    return (lhs.AsInt32() != lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left != right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() != lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left != right);
                 } else {
-                    return (lhs.AsInt64() != lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left != right);
                 }
             }
             throw new Exception();
         }
-        public static bool operator == (IntMaxT lhs, IntMaxT rhs) {
+        public static bool Equal(IntMaxT lhs, IntMaxT rhs, Action<string> overflowHandler = null) {
             if (lhs.Is32Bit() != rhs.Is32Bit()) {
                 throw new Exception();
             }
             if (lhs.Is32Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt32() == lhs.AsUInt32());
+                    var left = lhs.AsUInt32(overflowHandler);
+                    var right = rhs.AsUInt32(overflowHandler);
+                    return (left == right);
                 } else {
-                    return (lhs.AsInt32() == lhs.AsInt32());
+                    var left = lhs.AsInt32(overflowHandler);
+                    var right = rhs.AsInt32(overflowHandler);
+                    return (left == right);
                 }
             }
             if (lhs.Is64Bit()) {
                 if (lhs.IsUnsigned() || rhs.IsUnsigned()) {
-                    return (lhs.AsUInt64() == lhs.AsUInt64());
+                    var left = lhs.AsUInt64(overflowHandler);
+                    var right = rhs.AsUInt64(overflowHandler);
+                    return (left == right);
                 } else {
-                    return (lhs.AsInt64() == lhs.AsInt64());
+                    var left = lhs.AsInt64(overflowHandler);
+                    var right = rhs.AsInt64(overflowHandler);
+                    return (left == right);
                 }
             }
             throw new Exception();
@@ -407,10 +914,10 @@ namespace CSCPP {
 
         public static bool Mode64 = false;
         public static IntMaxT CreateSigned(long v) {
-            return Mode64 ? new IntMaxT ((long)v) :  new IntMaxT ((int)v);
+            return Mode64 ? new IntMaxT((long)v) : new IntMaxT((int)v);
         }
         public static IntMaxT CreateUnsigned(ulong v) {
-            return Mode64 ? new IntMaxT ((ulong)v) :  new IntMaxT ((uint)v);
+            return Mode64 ? new IntMaxT((ulong)v) : new IntMaxT((uint)v);
         }
 
         public override bool Equals(object obj) {
@@ -426,13 +933,30 @@ namespace CSCPP {
             return -341342807 + EqualityComparer<object>.Default.GetHashCode(UInt64Value);
         }
 
-        public static long SignedMaxValue {get{ return Mode64 ? long.MaxValue : int.MaxValue;} }
-        public static long SignedMinValue {get{ return Mode64 ? long.MinValue : int.MinValue;} }
-        public static ulong UnsignedMaxValue {get{ return Mode64 ? ulong.MaxValue : uint.MaxValue;} }
-        public static ulong UnsignedMinValue {get{ return Mode64 ? ulong.MinValue : uint.MinValue;} }
 
-        public static IntMaxT ShiftMin { get { return IntMaxT.CreateSigned(0);} }
-        public static IntMaxT ShiftMax { get { return Mode64 ? IntMaxT.CreateSigned(63) : IntMaxT.CreateSigned(31);;} }
+        public static long SignedMaxValue { get { return Mode64 ? long.MaxValue : int.MaxValue; } }
+        public static long SignedMinValue { get { return Mode64 ? long.MinValue : int.MinValue; } }
+        public static ulong UnsignedMaxValue { get { return Mode64 ? ulong.MaxValue : uint.MaxValue; } }
+        public static ulong UnsignedMinValue { get { return Mode64 ? ulong.MinValue : uint.MinValue; } }
+
+        public override string ToString() {
+            if (Is32Bit()) {
+                if (IsUnsigned()) {
+                    return $"{AsUInt32()}UL";
+                } else {
+                    return $"{AsInt32()}L";
+                }
+            }
+            if (Is64Bit()) {
+                if (IsUnsigned()) {
+                    return $"{AsUInt64()}ULL";
+                } else {
+                    return $"{AsInt64()}LL";
+                }
+            }
+            throw new Exception();
+        }
+
     }
 
     public static class Cpp {
@@ -563,12 +1087,11 @@ namespace CSCPP {
             }
         }
 
-        static List<Token> read_one_arg(Macro.FuncMacro macro, ref bool end, bool readall, bool limit_space = false)
-        {
+        static List<Token> read_one_arg(Macro.FuncMacro macro, ref bool end, bool readall, bool limit_space = false) {
             List<Token> r = new List<Token>();
             int level = 0;
-            for (;;) {
-                Token tok = Lex.LexToken(handle_eof:true, limit_space: limit_space);
+            for (; ; ) {
+                Token tok = Lex.LexToken(handle_eof: true, limit_space: limit_space);
                 if (tok.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                     end = true;
@@ -621,15 +1144,13 @@ namespace CSCPP {
             }
         }
 
-        static List<List<Token>> do_read_args(Macro.FuncMacro macro, bool limit_space = false)
-        {
+        static List<List<Token>> do_read_args(Macro.FuncMacro macro, bool limit_space = false) {
             List<List<Token>> r = new List<List<Token>>();
             bool end = false;
             while (!end) {
                 bool inEllipsis = (macro.IsVarg && r.Count + 1 == macro.Args.Count);
                 var ret = read_one_arg(macro, ref end, inEllipsis, limit_space: limit_space);
-                if (ret == null)
-                {
+                if (ret == null) {
                     return null;
                 }
                 r.Add(ret);
@@ -640,8 +1161,7 @@ namespace CSCPP {
             return r;
         }
 
-        static List<List<Token>> read_args(Token tok, Macro.FuncMacro macro, bool limit_space = false)
-        {
+        static List<List<Token>> read_args(Token tok, Macro.FuncMacro macro, bool limit_space = false) {
             if (macro.Args.Count == 0 && PeekToken().IsKeyword(')')) {
                 // If a macro M has no parameter, argument list of M()
                 // is an empty list. If it has one parameter,
@@ -649,8 +1169,7 @@ namespace CSCPP {
                 return new List<List<Token>>();
             }
             List<List<Token>> args = do_read_args(macro, limit_space: limit_space);
-            if (args == null)
-            {
+            if (args == null) {
                 return null;
             }
             if (args.Count != macro.Args.Count) {
@@ -874,8 +1393,7 @@ namespace CSCPP {
         /// におけるexpandに対応するトークン読み取り処理
         /// </summary>
         /// <returns></returns>
-        static Token read_expand(bool limit_space = false)
-        {
+        static Token read_expand(bool limit_space = false) {
             // トークンを一つ読み取る
             Token tok = Lex.LexToken(limit_space: limit_space);
 
@@ -926,7 +1444,7 @@ namespace CSCPP {
                  * そうしないと6.10.3.5の例3で異なった結果が得られる 
                  */
                 List<Token> lookAHeads = new List<Token>();
-                for (;;) {
+                for (; ; ) {
                     var tok2 = Lex.LexToken(limit_space: limit_space);
                     if (tok2.IsKeyword('(')) {
                         // マクロ関数呼び出しである
@@ -947,7 +1465,7 @@ namespace CSCPP {
                 var args = read_args(tok, m, limit_space: limit_space);
                 if (args == null) {
                     // マクロ引数読み取りにエラーがあった場合は')'もしくは末尾まで読み飛ばし展開も行わない。
-                    for (;;) {
+                    for (; ; ) {
                         var tok2 = Lex.LexToken(limit_space: limit_space);
                         if (tok2.IsKeyword(')')) {
                             break;
@@ -997,11 +1515,10 @@ namespace CSCPP {
             });
 
             // 最初のトークン以外の空白位置も補正
-            expandedTokens.Skip(1).ToList().ForEach(x =>
-            {
+            expandedTokens.Skip(1).ToList().ForEach(x => {
                 var prevSpace = x.Space;
                 x.Space = new SpaceInfo();
-                x.Space.chunks.AddRange(prevSpace.chunks.Select(y => new SpaceInfo.Chunk() {Pos = tok.Pos, Space = y.Space} ));
+                x.Space.chunks.AddRange(prevSpace.chunks.Select(y => new SpaceInfo.Chunk() { Pos = tok.Pos, Space = y.Space }));
             });
 
             if (expandedTokens.Any()) {
@@ -1022,11 +1539,13 @@ namespace CSCPP {
 
         }
 
-        static bool read_funclike_macro_params(Macro m, List<Tuple<string, Token>> param) {
+        static bool read_funclike_macro_params(Macro m, List<Tuple<string, Token>> param, out Token lastTok) {
             int pos = 0;
-            for (;;) {
+            Token prevTok = null;
+            for (; ; ) {
                 Token tok = Lex.LexToken();
                 if (tok.IsKeyword(')')) {
+                    lastTok = tok;
                     return false;
                 }
 
@@ -1041,8 +1560,9 @@ namespace CSCPP {
                     }
                 }
                 if (tok.Kind == Token.TokenKind.NewLine) {
-                    CppContext.Error(m.GetPosition(), $"関数形式マクロ {m.GetName()} の宣言で仮引数宣言の括弧が閉じていません。");
+                    CppContext.Error(m.GetFirstPosition(), $"関数形式マクロ {m.GetName()} の宣言で仮引数宣言の括弧が閉じていません。");
                     Lex.unget_token(tok);
+                    lastTok = prevTok;
                     return false;
                 }
                 if (tok.IsKeyword(Token.Keyword.Ellipsis)) {
@@ -1052,7 +1572,7 @@ namespace CSCPP {
                         }
                         var tokVaArgs = Token.make_macro_token(pos, true, "__VA_ARGS__", tok.File);
                         param.Add(Tuple.Create("__VA_ARGS__", tokVaArgs));
-                        Lex.ExceptKeyword(')');
+                        lastTok = Lex.ExceptKeyword(')');
                         return true;
                     } else {
                         CppContext.Error(tok, $"関数形式マクロ {m.GetName()} は可変個引数マクロとして宣言されていますが、可変個引数マクロは ISO/IEC 9899-1999 以降で利用可能となった言語機能です。可変個引数マクロを有効にする場合は実行時引数に -FVariadicMacro を設定してください。");
@@ -1062,12 +1582,13 @@ namespace CSCPP {
                 if (tok.Kind != Token.TokenKind.Ident) {
                     CppContext.Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数(識別子)があるべき場所に {Token.TokenToStr(tok)} がありました。");
                     Lex.unget_token(tok);
+                    lastTok = prevTok;
                     return false;
                 }
 
                 string arg = tok.StrVal;
                 if (Lex.NextKeyword(Token.Keyword.Ellipsis)) {
-                    Lex.ExceptKeyword(')');
+                    lastTok = Lex.ExceptKeyword(')');
                     var tokArg = Token.make_macro_token(pos, true, arg, tok.File);
                     param.Add(Tuple.Create(arg, tokArg));
                     return true;
@@ -1078,6 +1599,7 @@ namespace CSCPP {
                     var tokArg = Token.make_macro_token(pos++, false, arg, tok.File);
                     param.Add(Tuple.Create(arg, tokArg));
                 }
+                prevTok = tok;
             }
         }
 
@@ -1098,7 +1620,7 @@ namespace CSCPP {
 
         static List<Token> read_funclike_macro_body(Macro m, List<Tuple<string, Token>> param) {
             List<Token> r = new List<Token>();
-            for (;;) {
+            for (; ; ) {
                 Token tok = Lex.LexToken();
                 if (tok.Kind == Token.TokenKind.NewLine) {
                     break;
@@ -1131,7 +1653,7 @@ namespace CSCPP {
             }
             return r;
         }
-    
+
         /// <summary>
         /// トークン列が (...) の形式の繰り返しとして妥当か調べて繰り返し回数を返す
         /// </summary>
@@ -1163,16 +1685,18 @@ namespace CSCPP {
             return (nest == 0) ? quotes : -1;
         }
 
-        static Token read_funclike_macro(Token name) {
+        static void read_funclike_macro(Token name) {
             List<Tuple<string, Token>> param = new List<Tuple<string, Token>>();
             Macro.FuncMacro macro = new Macro.FuncMacro(name, null, null, false);
-            bool isVarg = read_funclike_macro_params(macro, param);
+            Token lastToken;
+            bool isVarg = read_funclike_macro_params(macro, param, out lastToken);
 
             if (param.Count > 127) {
                 CppContext.Warning($"関数形式マクロ `{name}` の定義において仮引数が {param.Count} 個定義されています。ISO/IEC 9899 5.2.4.1 翻訳限界 で規定されている関数形式マクロの仮引数は 127 個ですので処理系依存の動作となります。");
             }
 
             List<Token> body = read_funclike_macro_body(macro, param);
+            macro.LastToken = (body.Any()) ? body.Last() : lastToken;
 
             if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
 
@@ -1213,7 +1737,7 @@ namespace CSCPP {
                             // ok
                             break;
                         }
-                        var locate = macro.GetPosition();
+                        var locate = macro.GetFirstPosition();
                         CppContext.Warning(locate, $"[PRE02-C] 関数形式マクロ {macro.GetName()} の置換リストが括弧で囲まれていません。");
                     }
                 } while (false);
@@ -1223,7 +1747,7 @@ namespace CSCPP {
                     if (body.Any()) {
                         var last = body.Last();
                         if (last.IsKeyword(';')) {
-                            var locate = macro.GetPosition();
+                            var locate = macro.GetFirstPosition();
                             CppContext.Warning(locate, $"[PRE11-C] 関数形式マクロ {macro.GetName()} の置換リストがセミコロンで終端されています。");
                         }
                     }
@@ -1245,7 +1769,7 @@ namespace CSCPP {
                     if (Macros.ContainsKey(name.StrVal) == true) {
                         // 同一定義の場合は再定義と見なさない
                         if (Macro.EqualDefine(pre, macro) == false) {
-                            var location = pre.GetPosition();
+                            var location = pre.GetFirstPosition();
                             CppContext.Warning(name, $"マクロ {name.StrVal} が再定義されました。以前のマクロ {name.StrVal} は {location} で定義されました。");
                         }
                     }
@@ -1260,13 +1784,12 @@ namespace CSCPP {
                 Macros[name.StrVal] = macro;
                 DefinedMacros.Add(macro);
             }
-            return new Token(name, Token.TokenKind.NewLine);
         }
 
         static void read_obj_macro(Token token) {
             var name = token.StrVal;
             List<Token> body = new List<Token>();
-            for (;;) {
+            for (; ; ) {
                 Token tok = Lex.LexToken();
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
                     break;
@@ -1276,7 +1799,7 @@ namespace CSCPP {
             }
             hashhash_check(body);
             var macro = new Macro.ObjectMacro(token, body);
-            var locate = macro.GetPosition();
+            var locate = macro.GetFirstPosition();
 
             if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
                 // PRE11-C: マクロ定義をセミコロンで終端しない
@@ -1290,11 +1813,32 @@ namespace CSCPP {
                 } while (false);
             }
 
-            if (name.Length > 63) {
-                CppContext.Warning(locate, $"マクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+            Macro pre = null;
+            Macros.TryGetValue(name, out pre);
+            if (pre is Macro.BuildinMacro) {
+                CppContext.Warning(token, $"マクロ {name} は再定義できません。");
+            } else {
+                if (CppContext.Warnings.Contains(Warning.RedefineMacro)) {
+                    // 再定義の判定が必要
+                    if (Macros.ContainsKey(name) == true) {
+                        // 同一定義の場合は再定義と見なさない
+                        if (Macro.EqualDefine(pre, macro) == false) {
+                            var location = pre.GetFirstPosition();
+                            CppContext.Warning(token, $"マクロ {name} が再定義されました。以前のマクロ {name} は {location} で定義されました。");
+                        }
+                    }
+                }
+
+                // 5.2.4.1 翻訳限界
+                // 内部識別子又はマクロ名において意味がある先頭の文字数［各国際文字名又は各ソース拡張文字は，1個の文字とみなす。］(63)
+                if (name.Length > 63) {
+                    CppContext.Warning(token, $"マクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                }
+
+                Macros[name] = macro;
+                DefinedMacros.Add(macro);
             }
-            Macros[name] = macro;
-            DefinedMacros.Add(macro);
+
         }
 
         /*
@@ -1303,7 +1847,7 @@ namespace CSCPP {
 
         static Token read_define(Token hash, Token tdefine) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            Token name = Lex.LexToken(limit_space : true);
+            Token name = Lex.LexToken(limit_space: true);
             if (name.Kind != Token.TokenKind.Ident) {
                 if (name.Kind == Token.TokenKind.NewLine || name.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(name, $"#define 指令の引数となる識別子がありません。");
@@ -1389,7 +1933,7 @@ namespace CSCPP {
 
         static List<Token> read_intexpr_line() {
             List<Token> r = new List<Token>();
-            for (;;) {
+            for (; ; ) {
                 Token tok = read_expand(limit_space: true);
                 if (tok.Kind == Token.TokenKind.NewLine) {
                     return r;
@@ -1493,7 +2037,7 @@ namespace CSCPP {
 
         private static byte[] read_escaped_char(Token tok, string str, ref int i) {
             System.Diagnostics.Debug.Assert(tok.Kind == Token.TokenKind.Char);
-            int c = str.ElementAtOrDefault(i+0);
+            int c = str.ElementAtOrDefault(i + 0);
             switch (c) {
                 case '\'':
                 case '"':
@@ -1510,7 +2054,7 @@ namespace CSCPP {
                 case 't': return new byte[] { (byte)'\t' };
                 case 'v': return new byte[] { (byte)'\v' };
                 case 'x': {
-                        int c2 = str.ElementAtOrDefault(i+1);
+                        int c2 = str.ElementAtOrDefault(i + 1);
                         if (!CType.IsXdigit(c2)) {
                             CppContext.Error(tok, $"\\x に続く文字 {(char)c2} は16進数表記で使える文字ではありません。\\xが無いものとして読みます。");
                             i += 1;
@@ -1519,12 +2063,12 @@ namespace CSCPP {
                             UInt32 r = 0;
                             bool over = false;
                             int j;
-                            for (j=0; i+j < str.Length; j++) {
+                            for (j = 0; i + j < str.Length; j++) {
                                 if (over == false && r > Byte.MaxValue) {
                                     over = true;
                                     CppContext.Error(tok, $"16進数文字表記 \\{str} は 文字定数の表現範囲(現時点では8bit整数値)を超えます。 ");
                                 }
-                                c2 = str.ElementAtOrDefault(i+1+j);
+                                c2 = str.ElementAtOrDefault(i + 1 + j);
                                 if ('0' <= c2 && c2 <= '9') { r = (r << 4) | (UInt32)(c2 - '0'); continue; }
                                 if ('a' <= c2 && c2 <= 'f') { r = (r << 4) | (UInt32)(c2 - 'a' + 10); continue; }
                                 if ('A' <= c2 && c2 <= 'F') { r = (r << 4) | (UInt32)(c2 - 'A' + 10); continue; }
@@ -1545,7 +2089,7 @@ namespace CSCPP {
                         UInt32 r = 0;
                         int j;
                         for (j = 0; j < 3; j++) {
-                            int c2 = str.ElementAtOrDefault(i+j);
+                            int c2 = str.ElementAtOrDefault(i + j);
                             if ('0' <= c2 && c2 <= '7') {
                                 r = (r << 3) | (UInt32)(c2 - '0');
                             } else {
@@ -1556,19 +2100,19 @@ namespace CSCPP {
                         return new byte[] { (byte)r };
                     }
                 default: {
-                    CppContext.Warning(tok, $"\\{(char)c} はISO/IEC 9899：1999で定められていないエスケープ文字です。" +
-                                            $"規格で定められていないエスケープ文字のうち、小文字は将来に向けての予約語、それ以外は処理系定義の動作となります(ISO/IEC 9899：1999 6.4.4.4 注釈(64) および 6.11.4 参照)。" +
-                                            $"本処理系では文字 `{(char)c}` として解釈します。");
-                    i += 1;
-                    return System.Text.Encoding.UTF8.GetBytes(new[] { (char)c });
-                }
+                        CppContext.Warning(tok, $"\\{(char)c} はISO/IEC 9899：1999で定められていないエスケープ文字です。" +
+                                                $"規格で定められていないエスケープ文字のうち、小文字は将来に向けての予約語、それ以外は処理系定義の動作となります(ISO/IEC 9899：1999 6.4.4.4 注釈(64) および 6.11.4 参照)。" +
+                                                $"本処理系では文字 `{(char)c}` として解釈します。");
+                        i += 1;
+                        return System.Text.Encoding.UTF8.GetBytes(new[] { (char)c });
+                    }
             }
 
         }
 
         private static IntMaxT Expr(int priority, int skip) {
             Token tok = Lex.LexToken(limit_space: true);
-
+            Action<string> handler = (s) => CppContext.Error(tok, s);
             IntMaxT lhs;
             if (tok.IsKeyword('(')) {
                 lhs = Expr(0, skip);
@@ -1582,20 +2126,20 @@ namespace CSCPP {
                     Lex.unget_token(tok);
                 }
             } else if (tok.IsKeyword('~')) {
-                lhs = ~Expr(11, skip);
+                lhs = IntMaxT.BitNot(Expr(11, skip), handler);
                 lhs = skip > 0 ? IntMaxT.CreateSigned(0L) : lhs;
             } else if (tok.IsKeyword('!')) {
-                lhs = (Expr(11, skip) == IntMaxT.CreateSigned(0L) ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L));
-                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)): lhs;
+                lhs = IntMaxT.Equal(Expr(11, skip), IntMaxT.CreateSigned(0L), handler) ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L);
+                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)) : lhs;
             } else if (tok.IsKeyword('+')) {
                 lhs = Expr(11, skip);
-                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)): lhs;
+                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)) : lhs;
             } else if (tok.IsKeyword('-')) {
-                lhs = -Expr(11, skip);
-                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)): lhs;
+                lhs = IntMaxT.Neg(Expr(11, skip), handler);
+                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)) : lhs;
             } else if (tok.Kind == Token.TokenKind.Number) {
                 lhs = Token.ToInt(tok, tok.StrVal);
-                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)): lhs;
+                lhs = skip > 0 ? (lhs.IsUnsigned() ? IntMaxT.CreateUnsigned(0UL) : IntMaxT.CreateSigned(0L)) : lhs;
             } else if (tok.Kind == Token.TokenKind.Char) {
                 lhs = IntMaxT.CreateUnsigned((ulong)parse_char(tok));
                 lhs = skip > 0 ? IntMaxT.CreateUnsigned(0UL) : lhs;
@@ -1609,16 +2153,17 @@ namespace CSCPP {
                 lhs = IntMaxT.CreateSigned(0L);
             } else {
                 if (skip == 0) {
-                    if (tok.Kind ==  Token.TokenKind.String)
-                    CppContext.Error(tok, $"プリプロセス指令の条件式中で 文字列リテラル は使用できません。");
+                    if (tok.Kind == Token.TokenKind.String)
+                        CppContext.Error(tok, $"プリプロセス指令の条件式中で 文字列リテラル は使用できません。");
                 } else {
                     CppContext.Error(tok, $"プリプロセス指令の条件式中で {Token.TokenToStr(tok)} は使用できません。");
                 }
                 lhs = IntMaxT.CreateSigned(0L);
             }
 
-            for (;;) {
+            for (; ; ) {
                 Token op = Lex.LexToken(limit_space: true);
+                Action<string> handler2 = (s) => CppContext.Error(op, s);
                 int pri = expr_priority(op); // 0 if not a binop.
                 if (pri == 0 || priority >= pri) {
                     Lex.unget_token(op);
@@ -1626,18 +2171,15 @@ namespace CSCPP {
                 }
                 if (op.Kind != Token.TokenKind.Keyword) {
                     CppContext.Error(op, $"演算子のあるべき場所に {Token.TokenToStr(op)} がありますが、これは演算子として定義されていません。");
-                lhs = IntMaxT.CreateSigned(0L);
+                    lhs = IntMaxT.CreateSigned(0L);
                 }
                 switch (op.KeywordVal) {
                     case (Token.Keyword)'/': {
                             IntMaxT rhs = Expr(pri, skip);
                             if (skip > 0) {
                                 lhs = IntMaxT.CreateSigned(0L);
-                            } else if (rhs == IntMaxT.CreateSigned(0L)) {
-                                CppContext.Error(op, "除算式の除数がゼロです。");
-                                lhs = IntMaxT.CreateSigned(0L);    // NaN相当のほうがいいのかね
                             } else {
-                                lhs = lhs / rhs;
+                                lhs = IntMaxT.Div(lhs, rhs, handler2);
                             }
                             break;
                         }
@@ -1645,52 +2187,49 @@ namespace CSCPP {
                             IntMaxT rhs = Expr(pri, skip);
                             if (skip > 0) {
                                 lhs = IntMaxT.CreateSigned(0L);
-                            } else if (rhs == IntMaxT.CreateSigned(0L)) {
-                                CppContext.Error(op, "剰余算式の除数がゼロです。");
-                                lhs = IntMaxT.CreateSigned(0L);
                             } else {
-                                lhs = lhs % rhs;
+                                lhs = IntMaxT.Mod(lhs, rhs, handler2);
                             }
                             break;
                         }
                     case (Token.Keyword)'*': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs * rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.Mul(lhs, rhs, handler2);
                             break;
                         }
                     case (Token.Keyword)'+': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs + rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.Add(lhs, rhs, handler2);
                             break;
                         }
                     case (Token.Keyword)'-': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs - rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.Sub(lhs, rhs, handler2);
                             break;
                         }
                     case (Token.Keyword)'<': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs < rhs ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L));
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (IntMaxT.LessThan(lhs, rhs, handler2) ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L));
                             break;
                         }
                     case (Token.Keyword)'>': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs > rhs ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L));
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (IntMaxT.GreatThan(lhs, rhs, handler2) ? IntMaxT.CreateSigned(1L) : IntMaxT.CreateSigned(0L));
                             break;
                         }
                     case (Token.Keyword)'&': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs & rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.BitAnd(lhs, rhs, handler2);
                             break;
                         }
                     case (Token.Keyword)'^': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs ^ rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.BitXor(lhs, rhs, handler2);
                             break;
                         }
                     case (Token.Keyword)'|': {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : (lhs | rhs);
+                            lhs = (skip > 0) ? IntMaxT.CreateSigned(0L) : IntMaxT.BitOr(lhs, rhs, handler2);
                             break;
                         }
 
@@ -1698,12 +2237,8 @@ namespace CSCPP {
                             IntMaxT rhs = Expr(pri, skip);
                             if (skip > 0) {
                                 lhs = IntMaxT.CreateSigned(0);
-                            } else if (rhs < IntMaxT.ShiftMin) {
-                                CppContext.Error(op, $"左シフトで{IntMaxT.ShiftMin}ビット未満のシフトは行えません。");
-                            } else if (rhs > IntMaxT.ShiftMax) {
-                                CppContext.Error(op, $"左シフトで{IntMaxT.ShiftMax}ビット以上のシフトは行えません。");
                             } else {
-                                lhs = lhs << rhs.AsInt32();
+                                lhs = IntMaxT.ShiftLeft(lhs, rhs.AsInt32(handler2), handler2);
                             }
                             break;
                         }
@@ -1711,41 +2246,37 @@ namespace CSCPP {
                             IntMaxT rhs = Expr(pri, skip);
                             if (skip > 0) {
                                 lhs = IntMaxT.CreateSigned(0);
-                            } else if (rhs < IntMaxT.ShiftMin) {
-                                CppContext.Error(op, "右シフトで0ビット未満のシフトは行えません。");
-                            } else if (rhs >= IntMaxT.ShiftMax) {
-                                CppContext.Error(op, "右シフトで64ビット以上のシフトは行えません。");
                             } else {
-                                lhs = lhs << rhs.AsInt32();
+                                lhs = IntMaxT.ShiftRight(lhs, rhs.AsInt32(handler2), handler2);
                             }
                             break;
                         }
                     case Token.Keyword.LessEqual: {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (lhs <= rhs ? 1 : 0));
+                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (IntMaxT.LessEqual(lhs, rhs, handler2) ? 1 : 0));
                             break;
                         }
                     case Token.Keyword.GreatEqual: {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (lhs >= rhs ? 1 : 0));
+                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (IntMaxT.GreatEqual(lhs, rhs, handler2) ? 1 : 0));
                             break;
                         }
                     case Token.Keyword.Equal: {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (lhs == rhs ? 1 : 0));
+                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (IntMaxT.Equal(lhs, rhs, handler2) ? 1 : 0));
                             break;
                         }
                     case Token.Keyword.NotEqual: {
                             IntMaxT rhs = Expr(pri, skip);
-                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (lhs != rhs ? 1 : 0));
+                            lhs = IntMaxT.CreateSigned((skip > 0) ? 0 : (IntMaxT.NotEqual(lhs, rhs, handler2) ? 1 : 0));
                             break;
                         }
                     case Token.Keyword.LogicalAnd:
                         // 短絡評価しなければならない
                         if (skip == 0) {
-                            if (lhs != IntMaxT.CreateSigned(0)) {
+                            if (IntMaxT.NotEqual(lhs, IntMaxT.CreateSigned(0))) {
                                 IntMaxT rhs = Expr(pri, skip);
-                                lhs = IntMaxT.CreateSigned(rhs != IntMaxT.CreateSigned(0) ? 1 : 0);
+                                lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
                                 lhs = IntMaxT.CreateSigned(0);
                             }
@@ -1756,12 +2287,12 @@ namespace CSCPP {
                         break;
                     case Token.Keyword.LogincalOr:
                         // 短絡評価しなければならない
-                        if (skip == 0 ) {
-                            if (lhs == IntMaxT.CreateSigned(0)) {
+                        if (skip == 0) {
+                            if (IntMaxT.Equal(lhs, IntMaxT.CreateSigned(0))) {
                                 IntMaxT rhs = Expr(pri, skip);
-                                lhs = IntMaxT.CreateSigned(rhs != IntMaxT.CreateSigned(0) ? 1 : 0);
+                                lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
-                                lhs = IntMaxT.CreateSigned(0);
+                                lhs = IntMaxT.CreateSigned(1);
                             }
                         } else {
                             Expr(pri, skip + 1);
@@ -1770,17 +2301,18 @@ namespace CSCPP {
                         break;
                     case (Token.Keyword)'?': {
                             // ３項演算子
-                            IntMaxT rhs1 = Expr(0, skip + (lhs == IntMaxT.CreateSigned(0) ? 1 : 0));
+                            var cond = IntMaxT.Equal(lhs, IntMaxT.CreateSigned(0));
+                            IntMaxT rhs1 = Expr(0, skip + (cond ? 0 : 1));
                             Token tok2 = Lex.LexToken();
                             if (tok2.IsKeyword(':') == false) {
                                 CppContext.Error(op, $"三項演算子の`:`があるべき場所に `{Token.TokenToStr(tok2)}` があります。");
                                 return IntMaxT.CreateSigned(0);
                             }
-                            IntMaxT rhs2 = Expr(0, skip + (lhs != IntMaxT.CreateSigned(0) ? 1 : 0));
+                            IntMaxT rhs2 = Expr(0, skip + (cond ? 1 : 0));
                             if (skip > 0) {
                                 lhs = IntMaxT.CreateSigned(0);
                             } else {
-                                lhs = (lhs != IntMaxT.CreateSigned(0)) ? rhs1 : rhs2;
+                                lhs = (cond) ? rhs1 : rhs2;
                             }
                             return lhs;
                         }
@@ -1807,7 +2339,7 @@ namespace CSCPP {
                         CppContext.Error(pretok, $@"プリプロセス指令の条件式中に不正な文字 `\x{(int)pretok.StrVal[0]:X2}` がありました。");
                     }
                 }
-                    exprtokens.Add(Token.make_eof(pretok.Pos));
+                exprtokens.Add(Token.make_eof(pretok.Pos));
                 Lex.unget_token(pretok);
                 foreach (var t in exprtokens.Reverse<Token>()) {
                     Lex.unget_token(t);
@@ -1825,7 +2357,7 @@ namespace CSCPP {
                 }
             }
             Lex.token_buffer_unstash();
-            return (expr != IntMaxT.CreateSigned(0));
+            return IntMaxT.NotEqual(expr, IntMaxT.CreateSigned(0));
         }
 
         static void do_read_if(bool isTrue) {
@@ -2093,7 +2625,7 @@ namespace CSCPP {
 
         static string read_error_message() {
             StringBuilder sb = new StringBuilder();
-            for (;;) {
+            for (; ; ) {
                 Token tok = Lex.LexToken(limit_space: true);
                 if (tok.Kind == Token.TokenKind.NewLine) { return sb.ToString(); }
                 if (tok.Kind == Token.TokenKind.EoF) { return sb.ToString(); }
@@ -2126,7 +2658,7 @@ namespace CSCPP {
         /// <param name="isGuillemet">パスが山括弧で括られている場合は真</param>
         /// <returns></returns>
         static string read_cpp_header_name(Token hash, out bool isGuillemet) {
-            
+
             /* 
              * ファイルパス部分の読み取り
              * <～>形式の場合は std が true に、"～"形式の場合は false になる
@@ -2174,7 +2706,7 @@ namespace CSCPP {
                 var sb = new StringBuilder();
                 bool saveComment = CppContext.Switchs.Contains("-C");
                 CppContext.Switchs.Remove("-C");
-                for (;;) {
+                for (; ; ) {
                     Token tok2 = read_expand();
                     if (tok2.Kind == Token.TokenKind.NewLine) {
                         CppContext.Error(tok, "ヘッダファイルが閉じられないまま行末に到達しました。");
@@ -2517,7 +3049,7 @@ namespace CSCPP {
                 }
                 List<Token> tokens = new List<Token> { hash, tpragma };
                 tokens.Add(tok);
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     tokens.Add(t);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
@@ -2537,7 +3069,7 @@ namespace CSCPP {
                         Once[path] = "1";
                         var t = Lex.LexToken(limit_space: true);
                         if (t.Kind != Token.TokenKind.NewLine && t.Kind != Token.TokenKind.EoF) {
-                            for (;;) {
+                            for (; ; ) {
                                 t = Lex.LexToken(limit_space: true);
                                 //t.Verbatim = true;
                                 if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
@@ -2552,7 +3084,7 @@ namespace CSCPP {
                         // とあるので素通しする。
                         List<Token> tokens = new List<Token> { hash, tpragma };
                         tokens.Add(tok);
-                        for (;;) {
+                        for (; ; ) {
                             Token t = Lex.LexToken(limit_space: true);
                             tokens.Add(t);
                             if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
@@ -2570,7 +3102,7 @@ namespace CSCPP {
                         }
                         List<Token> tokens = new List<Token> { hash, tpragma };
                         tokens.Add(tok);
-                        for (;;) {
+                        for (; ; ) {
                             Token t = Lex.LexToken(limit_space: true);
                             tokens.Add(t);
                             if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
@@ -2607,7 +3139,7 @@ namespace CSCPP {
                 } else {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
                 }
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2616,9 +3148,9 @@ namespace CSCPP {
                 return nl;
             }
             long line = long.Parse(tok.StrVal);
-            if (line <= 0 || 2147483647 < line ) {
+            if (line <= 0 || 2147483647 < line) {
                 CppContext.Error(tok, $"#line 指令の行番号に {tok.StrVal} が指定されていますが、 1 以上 2147483647 以下でなければなりません。");
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2637,7 +3169,7 @@ namespace CSCPP {
                 } else {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
                 }
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2667,18 +3199,18 @@ namespace CSCPP {
                 } else {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
                 }
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
                 }
                 return nl;
-            } else { 
+            } else {
                 long line = long.Parse(tok.StrVal);
                 if (line <= 0 || 2147483647 < line) {
                     CppContext.Error(tok, $"#line 指令の行番号に {tok.StrVal} が指定されていますが、 1 以上 2147483647 以下でなければなりません。");
-                    for (;;) {
+                    for (; ; ) {
                         Token t = Lex.LexToken(limit_space: true);
                         if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                             break;
@@ -2695,7 +3227,7 @@ namespace CSCPP {
                     } else {
                         CppContext.Error(tok, $"gcc 形式の line 指令で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
                     }
-                    for (;;) {
+                    for (; ; ) {
                         Token t = Lex.LexToken(limit_space: true);
                         if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                             break;
@@ -2729,7 +3261,7 @@ namespace CSCPP {
                 }
                 // 行末まで読み取って、マクロ展開禁止フラグを付けて押し戻す。
                 List<Token> buf = new List<Token> { tok };
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     buf.Add(t);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
@@ -2741,7 +3273,7 @@ namespace CSCPP {
                 return hash;
             } else {
                 CppContext.Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
-                for (;;) {
+                for (; ; ) {
                     Token t = Lex.LexToken(limit_space: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2766,36 +3298,36 @@ namespace CSCPP {
             Token tok = Lex.LexToken(limit_space: true);
             switch (tok.Kind) {
                 case Token.TokenKind.NewLine: {
-                    // 行末の場合、6.10.7で定義されている空指令
-                    return new Token(hash, Token.TokenKind.NewLine);
-                }
-                case Token.TokenKind.Number: {
-                    // 数字の場合、GCC拡張形式の行番号設定指令
-                    return ParseGccStyleLineDirective(hash, tok);
-                }
-                case Token.TokenKind.Ident: {
-                    // 識別子はプリプロセッサ指令
-                    switch (tok.StrVal) {
-                        case "define": return read_define(hash, tok);
-                        case "elif": return read_elif(hash, tok);
-                        case "else": return read_else(hash, tok);
-                        case "endif": return read_endif(hash, tok);
-                        case "error": return read_error(hash, tok);
-                        case "if": return read_if(hash, tok);
-                        case "ifdef": return read_ifdef(hash, tok);
-                        case "ifndef": return read_ifndef(hash, tok);
-                        case "include": return ParseIncludeDirective(hash, tok);
-                        case "line": return ParseLineDirective(hash, tok);
-                        case "pragma": return ParsePragmaDirective(hash, tok);
-                        case "undef": return read_undef(hash, tok);
-                        case "warning": return read_warning(hash, tok); // 非標準動作
+                        // 行末の場合、6.10.7で定義されている空指令
+                        return new Token(hash, Token.TokenKind.NewLine);
                     }
-                    goto default;    // 未知のプリプロセッサとして処理
-                }
+                case Token.TokenKind.Number: {
+                        // 数字の場合、GCC拡張形式の行番号設定指令
+                        return ParseGccStyleLineDirective(hash, tok);
+                    }
+                case Token.TokenKind.Ident: {
+                        // 識別子はプリプロセッサ指令
+                        switch (tok.StrVal) {
+                            case "define": return read_define(hash, tok);
+                            case "elif": return read_elif(hash, tok);
+                            case "else": return read_else(hash, tok);
+                            case "endif": return read_endif(hash, tok);
+                            case "error": return read_error(hash, tok);
+                            case "if": return read_if(hash, tok);
+                            case "ifdef": return read_ifdef(hash, tok);
+                            case "ifndef": return read_ifndef(hash, tok);
+                            case "include": return ParseIncludeDirective(hash, tok);
+                            case "line": return ParseLineDirective(hash, tok);
+                            case "pragma": return ParsePragmaDirective(hash, tok);
+                            case "undef": return read_undef(hash, tok);
+                            case "warning": return read_warning(hash, tok); // 非標準動作
+                        }
+                        goto default;    // 未知のプリプロセッサとして処理
+                    }
                 default: {
-                    // それら以外は未知のプリプロセッサとして処理
-                    return UnsupportedPreprocessorDirective(hash, tok);
-                }
+                        // それら以外は未知のプリプロセッサとして処理
+                        return UnsupportedPreprocessorDirective(hash, tok);
+                    }
             }
         }
 
@@ -2806,7 +3338,7 @@ namespace CSCPP {
         public static class SpecialMacros {
 
             private static List<Token> handle_stdc_macro(Macro.BuildinMacro m, Token tmpl) {
-                return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = "1" }}.ToList();
+                return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = "1" } }.ToList();
             }
             private static List<Token> handle_date_macro(Macro.BuildinMacro m, Token tmpl) {
                 return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = DateString } }.ToList();
@@ -2821,7 +3353,7 @@ namespace CSCPP {
             }
 
             private static List<Token> handle_line_macro(Macro.BuildinMacro m, Token tmpl) {
-                return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = $"{tmpl.File.Line}"} }.ToList();
+                return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = $"{tmpl.File.Line}" } }.ToList();
             }
 
 
@@ -2929,7 +3461,7 @@ namespace CSCPP {
         /// </summary>
         /// <returns></returns>
         public static Token ReadToken() {
-            for (;;) {
+            for (; ; ) {
                 var tok = read_expand();
 
                 if (tok.BeginOfLine && tok.IsKeyword('#') && tok.Hideset == null) {

@@ -3,22 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace CSCPP
-{
+namespace CSCPP {
     /// <summary>
     /// 宣言されたマクロを示す基底クラス
     /// </summary>
-    public abstract class Macro
-    {
-        private static long UniqueIdCount { get; set; }
-        public long UniqueId { get; }
+    public abstract class Macro {
+        private static long UniqueIdCount {
+            get; set;
+        }
+        public long UniqueId {
+            get;
+        }
         public bool Used { get; set; } = false;
 
         public abstract string GetName();
-        public abstract Position GetPosition();
+        public abstract Position GetFirstPosition();
+        public abstract Position GetLastPosition();
 
-        protected Macro()
-        {
+        protected Macro() {
             UniqueId = UniqueIdCount++;
         }
         public static bool IsObjectMacro(Macro macro) {
@@ -46,8 +48,12 @@ namespace CSCPP
 
         public static class LambdaComparer {
             private class LambdaComparerImpl<T> : IEqualityComparer<T> {
-                private Func<T, T, bool> EqualsPred { get; }
-                private Func<T, int> GetHashCodePred { get; }
+                private Func<T, T, bool> EqualsPred {
+                    get;
+                }
+                private Func<T, int> GetHashCodePred {
+                    get;
+                }
                 public bool Equals(T x, T y) {
                     return EqualsPred(x, y);
                 }
@@ -76,7 +82,12 @@ namespace CSCPP
         }
 
         protected static bool CompareToken(Token x, Token y) {
-            if (x.Kind != y.Kind) { return false; }
+            if (x.Kind != y.Kind) {
+                return false;
+            }
+            if (x.Space.Any() != y.Space.Any()) {
+                return false;
+            }
             switch (x.Kind) {
                 case Token.TokenKind.Keyword:
                     return x.KeywordVal == y.KeywordVal;
@@ -103,10 +114,13 @@ namespace CSCPP
         /// 定数型マクロ
         /// </summary>
         public class ObjectMacro : Macro {
-            public Token Name { get; }
-            public List<Token> Body { get; }
-            public ObjectMacro(Token name, List<Token> body)
-            {
+            public Token Name {
+                get;
+            }
+            public List<Token> Body {
+                get;
+            }
+            public ObjectMacro(Token name, List<Token> body) {
                 Name = name;
                 Body = new List<Token>(body);
             }
@@ -115,13 +129,21 @@ namespace CSCPP
                 return Name.StrVal;
             }
 
-            public override Position GetPosition()
-            {
+            public override Position GetFirstPosition() {
                 return Name.Pos;
             }
+            public override Position GetLastPosition() {
+                var last = Body.LastOrDefault();
+                if (last != null) {
+                    var p = last.Pos;
+                    return new CSCPP.Position(p.FileName, p.Line, p.Column + last.ToRawString().Length);
+                } else {
+                    var p = Name.Pos;
+                    return new CSCPP.Position(p.FileName, p.Line, p.Column + Name.StrVal.Length);
+                }
+            }
 
-            public override string ToString()
-            {
+            public override string ToString() {
                 var sb = new StringBuilder();
                 sb.AppendLine($"<ObjectMacro id='{UniqueId}' name='{Name.StrVal}'>");
                 sb.AppendLine("<Body>");
@@ -132,7 +154,9 @@ namespace CSCPP
                 return sb.ToString();
             }
             public static bool EqualDefine(ObjectMacro o, ObjectMacro n) {
-                if (o.Name.StrVal != n.Name.StrVal) { return false; }
+                if (o.Name.StrVal != n.Name.StrVal) {
+                    return false;
+                }
                 return o.Body.SequenceEqual(n.Body, LambdaComparer.Create<Token>(CompareToken));
             }
 
@@ -141,9 +165,10 @@ namespace CSCPP
         /// <summary>
         /// 関数型マクロ
         /// </summary>
-        public class FuncMacro : Macro
-        {
-            public Token Name { get; }
+        public class FuncMacro : Macro {
+            public Token Name {
+                get;
+            }
 
             /// <summary>
             /// マクロ引数(あとでFixupするのでreadonlyにはしない)
@@ -160,8 +185,12 @@ namespace CSCPP
             /// </summary>
             public bool IsVarg;
 
-            public FuncMacro(Token name, List<Token> body, List<Token> args, bool isVarg)
-            {
+            /// <summary>
+            /// 宣言の末尾のトークン(あとでFixupするのでreadonlyにはしない)
+            /// </summary>
+            public Token LastToken;
+
+            public FuncMacro(Token name, List<Token> body, List<Token> args, bool isVarg) {
                 Name = name;
                 Args = args;
                 Body = body?.ToList();
@@ -172,9 +201,12 @@ namespace CSCPP
                 return Name.StrVal;
             }
 
-            public override Position GetPosition()
-            {
+            public override Position GetFirstPosition() {
                 return Name.Pos;
+            }
+            public override Position GetLastPosition() {
+                var p = LastToken.Pos;
+                return new CSCPP.Position(p.FileName, p.Line, p.Column + LastToken.ToRawString().Length);
             }
 
             public override string ToString() {
@@ -191,8 +223,12 @@ namespace CSCPP
             }
 
             public static bool EqualDefine(FuncMacro o, FuncMacro n) {
-                if (o.Name.StrVal != n.Name.StrVal) { return false; }
-                if (o.IsVarg != n.IsVarg) { return false; }
+                if (o.Name.StrVal != n.Name.StrVal) {
+                    return false;
+                }
+                if (o.IsVarg != n.IsVarg) {
+                    return false;
+                }
                 return o.Args.SequenceEqual(n.Args, LambdaComparer.Create<Token>(CompareToken)) &&
                        o.Body.SequenceEqual(n.Body, LambdaComparer.Create<Token>(CompareToken));
             }
@@ -202,22 +238,26 @@ namespace CSCPP
         /// <summary>
         /// ビルトインマクロ
         /// </summary>
-        public class BuildinMacro : Macro
-        {
+        public class BuildinMacro : Macro {
             public delegate List<Token> BuiltinMacroHandler(BuildinMacro m, Token tok);
-            public string Name { get; }
-            public BuiltinMacroHandler Hander { get; }
-            public BuildinMacro(string name, BuiltinMacroHandler hander)
-            {
+            public string Name {
+                get;
+            }
+            public BuiltinMacroHandler Hander {
+                get;
+            }
+            public BuildinMacro(string name, BuiltinMacroHandler hander) {
                 Name = name;
                 Hander = hander;
             }
             public override string GetName() {
                 return Name;
             }
-            public override Position GetPosition()
-            {
-                return new Position("<builtin>", 1,1);
+            public override Position GetFirstPosition() {
+                return new Position("<builtin>", 1, 1);
+            }
+            public override Position GetLastPosition() {
+                return new Position("<builtin>", 1, 1);
             }
 
             public override string ToString() {

@@ -570,11 +570,15 @@ namespace CSCPP {
                     CppContext.Warning(t, $"64ビット型の定数値 `{s}` が使われています。");
                 }
             }
-            if (IntMaxT.UnsignedMaxValue < value) {
-                CppContext.Warning(t, $"定数 `{s}` は uintmax_t の範囲を超えています。");
-            }
 
-            return IntMaxT.CreateUnsigned((ulong)value);
+            if (isUnsigned || value > IntMaxT.SignedMaxValue) {
+                if (IntMaxT.UnsignedMaxValue < value) {
+                    CppContext.Warning(t, $"定数 `{s}` は uintmax_t の範囲を超えています。");
+                }
+                return IntMaxT.CreateUnsigned((ulong)(value & IntMaxT.UnsignedMaxValue));
+            } else {
+                return IntMaxT.CreateSigned((long)(value & IntMaxT.UnsignedMaxValue));
+            }
 
         }
 

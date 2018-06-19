@@ -692,7 +692,7 @@ namespace CSCPP {
 
             tok = do_read_token();
             if (tok.Kind != Token.TokenKind.EoF) {
-                CppContext.Error(p, $"マクロ {m.GetName()} 中のトークン連結演算子 ## の結果 {s} は不正なプリプロセッサトークンです。(マクロ {m.GetName()} は {m.GetPosition().ToString()} で宣言されています。)");
+                CppContext.Error(p, $"マクロ {m.GetName()} 中のトークン連結演算子 ## の結果 {s} は不正なプリプロセッサトークンです。(マクロ {m.GetName()} は {m.GetFirstPosition().ToString()} で宣言されています。)");
                 while (tok.Kind != Token.TokenKind.EoF) {
                     ret.Add(tok);
                     IsNextChar('\n');

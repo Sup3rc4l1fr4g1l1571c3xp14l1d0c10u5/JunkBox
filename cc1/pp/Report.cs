@@ -71,9 +71,9 @@ namespace CSCPP {
                 }
                 infos[0] = macro.UniqueId.ToString();
                 infos[1] = macro.GetName();
-                infos[2] = macro.GetPosition().FileName.ToString();
-                infos[3] = macro.GetPosition().Line;
-                infos[4] = macro.GetPosition().Column;
+                infos[2] = macro.GetFirstPosition().FileName.ToString();
+                infos[3] = macro.GetFirstPosition().Line;
+                infos[4] = macro.GetFirstPosition().Column;
                 if (Macro.IsObjectMacro(macro)) {
                     var omac = macro as Macro.ObjectMacro;
                     infos[5] = "オブジェクト形式マクロ";

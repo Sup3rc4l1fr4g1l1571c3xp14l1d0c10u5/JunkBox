@@ -6,10 +6,14 @@ using System.Linq;
 namespace CSCPP {
     public class Program {
         static int Main(string[] args) {
-            try {
+            if (System.Diagnostics.Debugger.IsAttached) {
+                IntMaxT.Test();
                 return Body(args);
-            } catch (Exception e) {
-                Console.Error.WriteLine($@"
+            } else {
+                try {
+                    return Body(args);
+                } catch (Exception e) {
+                    Console.Error.WriteLine($@"
 --------------------------------------------------------------------
 アプリケーションの実行中に例外が発生したためプログラムを終了します。
 お手数ですが以下の出力を添えて開発元までご連絡ください。
@@ -27,7 +31,8 @@ namespace CSCPP {
 {e.StackTrace}
 --------------------------------------------------------------------
 ");
-                return -1;
+                    return -1;
+                }
             }
         }
 
@@ -352,7 +357,7 @@ namespace CSCPP {
 
             if (CppContext.Warnings.Contains(Warning.UnusedMacros)) {
                 foreach (var macro in Cpp.EnumUnusedMacro()) {
-                    var loc = macro.GetPosition();
+                    var loc = macro.GetFirstPosition();
                     CppContext.Warning(loc, $"定義されたマクロ {macro.GetName()} は一度も参照されていません。");
                 }
             }
@@ -361,7 +366,7 @@ namespace CSCPP {
             if (CppContext.ErrorCount != 0) {
                 Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} のプリプロセスに失敗しました。");
             } else {
-                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} プリプロセスに成功しました。");
+                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} のプリプロセスに成功しました。");
             }
             Console.Error.WriteLine($"  エラー: {CppContext.ErrorCount}件");
             Console.Error.WriteLine($"  警告: {CppContext.WarningCount}件");
@@ -382,9 +387,11 @@ namespace CSCPP {
                             writer.WriteAttributeString("EndLine", log.Item5.ToString());
                             writer.WriteAttributeString("StartColumn", log.Item4.ToString());
                             writer.WriteAttributeString("StartLine", log.Item3.ToString());
-                            writer.WriteAttributeString("DefColumn", log.Item2.GetPosition().Column.ToString());
-                            writer.WriteAttributeString("DefLine", log.Item2.GetPosition().Line.ToString());
-                            writer.WriteAttributeString("DefFile", log.Item2.GetPosition().FileName);
+                            writer.WriteAttributeString("DefEndColumn", log.Item2.GetLastPosition().Column.ToString());
+                            writer.WriteAttributeString("DefEndLine", log.Item2.GetLastPosition().Line.ToString());
+                            writer.WriteAttributeString("DefStartColumn", log.Item2.GetFirstPosition().Column.ToString());
+                            writer.WriteAttributeString("DefStartLine", log.Item2.GetFirstPosition().Line.ToString());
+                            writer.WriteAttributeString("DefFile", log.Item2.GetFirstPosition().FileName);
                             writer.WriteAttributeString("UseColumn", log.Item1.Pos.Column.ToString());
                             writer.WriteAttributeString("UseLine", log.Item1.Pos.Line.ToString());
                             writer.WriteAttributeString("UseFile", log.Item1.Pos.FileName);
