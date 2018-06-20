@@ -43,10 +43,15 @@ namespace CSCPP
         /// </summary>
         public static HashSet<Report> Reports { get; } = new HashSet<Report>();
 
-#if true
-        public static Program.CppWriter CppWriter = null;
+        /// <summary>
+        /// 出力器(マクロ展開位置の正確な取得に使用)
+        /// </summary>
+        public static Program.CppWriter CppWriter { get; set; } = null;
+
+        /// <summary>
+        /// マクロ展開情報
+        /// </summary>
         public static List<Tuple<Token, Macro, int, int, int, int>> ExpandLog { get; } = new List<Tuple<Token, Macro, int, int, int, int>>();
-#endif
 
         /// <summary>
         /// プリプロセスエラー数

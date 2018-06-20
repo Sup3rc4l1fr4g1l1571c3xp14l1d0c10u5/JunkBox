@@ -5,24 +5,7 @@ using System.IO;
 using System.Linq;
 
 namespace CSCPP {
-        public struct Char {
-            public Position position {get;}
-            public int Value {get; }
-            public override string ToString() {
-                return $"{((char)Value)}";
-            }
-            public Char(Position pos, int value) {
-                position = pos;
-                Value = value;
-            }
-
-        public bool IsEof() {
-            return Value == -1;
-        }
-    }
     public static class Lex {
-
-
 
         // マクロ展開した要素を再度マクロ展開する時に使われる再挿入バッファのスタック
         private static Stack<List<Token>> Buffers { get; } = new Stack<List<Token>>();
