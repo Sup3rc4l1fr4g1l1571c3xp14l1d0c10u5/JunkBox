@@ -5,6 +5,9 @@ using System.IO;
 using System.Linq;
 
 namespace CSCPP {
+    /// <summary>
+    /// 文字
+    /// </summary>
     public struct Char {
         public Position position { get; }
         public int Value { get; }

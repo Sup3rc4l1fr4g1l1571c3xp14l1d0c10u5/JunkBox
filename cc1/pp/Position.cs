@@ -3,7 +3,7 @@ namespace CSCPP
     /// <summary>
     /// ファイル上の位置情報
     /// </summary>
-    public class Position
+    public struct Position
     {
 
         /// <summary>
@@ -21,6 +21,11 @@ namespace CSCPP
         /// </summary>
         public int Column { get; }
 
+        /// <summary>
+        /// 内部を示す位置情報
+        /// </summary>
+        public static Position Empty { get;} = new Position("<cscpp>", 1, 1);
+
         public override string ToString()
         {
             return $"{FileName} ({Line}, {Column})";
@@ -29,8 +34,6 @@ namespace CSCPP
         public Position(string name, long line, int column)
         {
             System.Diagnostics.Debug.Assert(name != null);
-            //System.Diagnostics.Debug.Assert(line > 0);
-            //System.Diagnostics.Debug.Assert(column > 0);
             FileName = name;
             Line = line;
             Column = column;

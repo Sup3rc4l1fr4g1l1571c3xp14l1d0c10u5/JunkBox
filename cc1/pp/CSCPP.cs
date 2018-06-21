@@ -4,7 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 
 namespace CSCPP {
-   public static class Cpp {
+    public static class Cpp {
         /// <summary>
         /// マクロの定義状況を示す辞書
         /// </summary>
@@ -25,8 +25,20 @@ namespace CSCPP {
         /// #pragma once が指定されているファイルを記録
         /// </summary>
         static Dictionary<string, string> Once { get; } = new Dictionary<string, string>();
+
+        /// <summary>
+        /// 予約語表
+        /// </summary>
         static Dictionary<string, Token.Keyword> Keywords { get; } = new Dictionary<string, Token.Keyword>();
+
+        /// <summary>
+        /// インクルードガードが記述されていると思われるファイル
+        /// </summary>
         static Dictionary<string, string> IncludeGuards { get; } = new Dictionary<string, string>();
+
+        /// <summary>
+        /// #if/#ifdef/#else/#elifによる条件分岐状態スタック
+        /// </summary>
         static List<Condition> ConditionStack { get; } = new List<Condition>();
 
         /// <summary>
@@ -48,7 +60,10 @@ namespace CSCPP {
         public static string DateString { get; }
         public static string TimeString { get; }
 
-        static int inControlLine = 0;
+        /// <summary>
+        /// 指令行中の解析を示す状態カウンタ。
+        /// </summary>
+        static int inDirectiveLine = 0;
 
         static Cpp() {
             // 書式指定文字列での変換でもいいが、あえて全て組み立てている
@@ -149,7 +164,7 @@ namespace CSCPP {
                     return r;
                 }
                 if (tok.Kind == Token.TokenKind.NewLine) {
-                    if (inControlLine > 0) {
+                    if (inDirectiveLine > 0) {
                         CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                         end = true;
                         Lex.unget_token(tok);
@@ -439,149 +454,150 @@ namespace CSCPP {
         /// </summary>
         /// <returns></returns>
         static Token read_expand(bool limit_space = false) {
-            // トークンを一つ読み取る
-            Token tok = Lex.LexToken(limit_space: limit_space);
+            for (; ; ) {
+                // トークンを一つ読み取る
+                Token tok = Lex.LexToken(limit_space: limit_space);
 
-            // 識別子以外もしくは、verbatimなら終わり
-            if (tok.Kind != Token.TokenKind.Ident || tok.Verbatim) {
-                return tok;
-            }
-
-            // 識別子がマクロとして登録されているか調べる
-            string name = tok.StrVal;
-            Macro macro = Macros.ContainsKey(name) ? Macros[name] : null;
-
-            // マクロとして登録されていない場合や、既に一度マクロ展開をしている場合は展開不要
-            if (macro == null || (tok.Hideset.Contains(name))) {
-                return tok;
-            }
-
-            // マクロの使用フラグを立てる
-            macro.Used = true;
-
-            // 展開後のトークン列
-            List<Token> expandedTokens;
-
-            // マクロの種別に応じて処理を行う
-            if (macro is Macro.ObjectMacro) {
-                // 定数マクロの場合
-                Macro.ObjectMacro m = macro as Macro.ObjectMacro;
-
-                // マクロ再展開禁止用のhidesetに追加
-                Set hideset = tok.Hideset.Add(name);
-
-                // 実際のマクロ展開を行い、展開後のトークン列を取得する。
-                expandedTokens = Subst(m, m.Body, null, hideset);
-
-                if (CppContext.Verboses.Contains(Verbose.TraceMacroExpand)) {
-                    CppContext.CppWriter.EnterDummy();
-                    var rawPos = CppContext.CppWriter.Write(tok);
-                    CppContext.CppWriter.LeaveDummy();
-                    expandedTokens.Add(Token.make_MacroRangeFixup(new Position("dummy", -1, -1), tok, macro, rawPos.Item1, rawPos.Item2));
+                // 識別子以外もしくは、verbatimなら終わり
+                if (tok.Kind != Token.TokenKind.Ident || tok.Verbatim) {
+                    return tok;
                 }
 
-            } else if (macro is Macro.FuncMacro) {
-                // 関数形式マクロの場合
+                // 識別子がマクロとして登録されているか調べる
+                string name = tok.StrVal;
+                Macro macro = Macros.ContainsKey(name) ? Macros[name] : null;
 
-                Macro.FuncMacro m = macro as Macro.FuncMacro;
+                // マクロとして登録されていない場合や、既に一度マクロ展開をしている場合は展開不要
+                if (macro == null || (tok.Hideset.Contains(name))) {
+                    return tok;
+                }
 
-                /* 6.10.3: 関数形式マクロの呼出しを構成する前処理字句列の中では，改行は普通の空白類文字とみなす。を考慮してマクロ名と括弧の間に改行がある場合は先読みを行う。
-                 * そうしないと6.10.3.5の例3で異なった結果が得られる 
-                 */
-                List<Token> lookAHeads = new List<Token>();
-                for (; ; ) {
-                    var tok2 = Lex.LexToken(limit_space: limit_space);
-                    if (tok2.IsKeyword('(')) {
-                        // マクロ関数呼び出しである
-                        break;
-                    } else if (tok2.Kind == Token.TokenKind.NewLine) {
-                        // 改行は読み飛ばす
-                        lookAHeads.Add(tok2);
-                        continue;
-                    } else {
-                        // マクロ関数呼び出しではない
-                        Lex.unget_token(tok2);
-                        unget_all(lookAHeads);
-                        return tok;
+                // マクロの使用フラグを立てる
+                macro.Used = true;
+
+                // 展開後のトークン列
+                List<Token> expandedTokens;
+
+                // マクロの種別に応じて処理を行う
+                if (macro is Macro.ObjectMacro) {
+                    // 定数マクロの場合
+                    Macro.ObjectMacro m = macro as Macro.ObjectMacro;
+
+                    // マクロ再展開禁止用のhidesetに追加
+                    Set hideset = tok.Hideset.Add(name);
+
+                    // 実際のマクロ展開を行い、展開後のトークン列を取得する。
+                    expandedTokens = Subst(m, m.Body, null, hideset);
+
+                    if (CppContext.Verboses.Contains(Verbose.TraceMacroExpand)) {
+                        CppContext.CppWriter.EnterDummy();
+                        var rawPos = CppContext.CppWriter.Write(tok);
+                        CppContext.CppWriter.LeaveDummy();
+                        expandedTokens.Add(Token.make_MacroRangeFixup(new Position("dummy", -1, -1), tok, macro, rawPos.Item1, rawPos.Item2));
                     }
-                }
 
-                // マクロ関数呼び出しの実引数を読み取る
-                var args = read_args(tok, m, limit_space: limit_space);
-                if (args == null) {
-                    // マクロ引数読み取りにエラーがあった場合は')'もしくは末尾まで読み飛ばし展開も行わない。
+                } else if (macro is Macro.FuncMacro) {
+                    // 関数形式マクロの場合
+
+                    Macro.FuncMacro m = macro as Macro.FuncMacro;
+
+                    /* 6.10.3: 関数形式マクロの呼出しを構成する前処理字句列の中では，改行は普通の空白類文字とみなす。を考慮してマクロ名と括弧の間に改行がある場合は先読みを行う。
+                     * そうしないと6.10.3.5の例3で異なった結果が得られる 
+                     */
+                    List<Token> lookAHeads = new List<Token>();
                     for (; ; ) {
                         var tok2 = Lex.LexToken(limit_space: limit_space);
-                        if (tok2.IsKeyword(')')) {
+                        if (tok2.IsKeyword('(')) {
+                            // マクロ関数呼び出しである
                             break;
-                        }
-                        if (tok2.Kind == Token.TokenKind.NewLine || tok2.Kind == Token.TokenKind.EoF) {
+                        } else if (tok2.Kind == Token.TokenKind.NewLine) {
+                            // 改行は読み飛ばす
+                            lookAHeads.Add(tok2);
+                            continue;
+                        } else {
+                            // マクロ関数呼び出しではない
                             Lex.unget_token(tok2);
-                            break;
+                            unget_all(lookAHeads);
+                            return tok;
                         }
                     }
-                    return Token.make_invalid(tok.Pos, "マクロ呼び出しの実引数中に誤り");
-                } else {
 
-                    if (args.Count > 127) {
-                        CppContext.Warning($"関数形式マクロ `{name}` のマクロ呼出しにおける実引数の個数が127個を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                    // マクロ関数呼び出しの実引数を読み取る
+                    var args = read_args(tok, m, limit_space: limit_space);
+                    if (args == null) {
+                        // マクロ引数読み取りにエラーがあった場合は')'もしくは末尾まで読み飛ばし展開も行わない。
+                        for (; ; ) {
+                            var tok2 = Lex.LexToken(limit_space: limit_space);
+                            if (tok2.IsKeyword(')')) {
+                                break;
+                            }
+                            if (tok2.Kind == Token.TokenKind.NewLine || tok2.Kind == Token.TokenKind.EoF) {
+                                Lex.unget_token(tok2);
+                                break;
+                            }
+                        }
+                        return Token.make_invalid(tok.Pos, "マクロ呼び出しの実引数中に誤り");
+                    } else {
+
+                        if (args.Count > 127) {
+                            CppContext.Warning($"関数形式マクロ `{name}` のマクロ呼出しにおける実引数の個数が127個を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                        }
+
+                        var rparen = Lex.ExceptKeyword(')');
+
+                        // マクロ再展開禁止用のhidesetをマクロ関数名と引数の展開結果の両方に出現するものから作って追加
+                        Set hideset = tok.Hideset.Intersect(rparen.Hideset).Add(name);
+
+                        // 実際のマクロ展開を行う
+                        expandedTokens = Subst(m, m.Body, args, hideset);
                     }
 
-                    var rparen = Lex.ExceptKeyword(')');
-
-                    // マクロ再展開禁止用のhidesetをマクロ関数名と引数の展開結果の両方に出現するものから作って追加
-                    Set hideset = tok.Hideset.Intersect(rparen.Hideset).Add(name);
-
-                    // 実際のマクロ展開を行う
-                    expandedTokens = Subst(m, m.Body, args, hideset);
+                } else if (macro is Macro.BuildinMacro) {
+                    // 組み込みマクロの場合、マクロオブジェクトの処理関数に投げる
+                    Macro.BuildinMacro m = macro as Macro.BuildinMacro;
+                    expandedTokens = m.Hander(m, tok);
+                } else {
+                    CppContext.InternalError(tok, $"マクロの型が不正です。(macro.Type={macro.GetType().FullName})");
+                    expandedTokens = null;
                 }
 
-            } else if (macro is Macro.BuildinMacro) {
-                // 組み込みマクロの場合、マクロオブジェクトの処理関数に投げる
-                Macro.BuildinMacro m = macro as Macro.BuildinMacro;
-                expandedTokens = m.Hander(m, tok);
-            } else {
-                CppContext.InternalError(tok, $"マクロの型が不正です。(macro.Type={macro.GetType().FullName})");
-                expandedTokens = null;
+                // マクロオブジェクトを処置できなかったのでマクロオブジェクトをそのまま返す。
+                if (expandedTokens == null) {
+                    return tok;
+                }
+
+                // tokの空白情報を展開後のトークン列 tokensの先頭要素に伝搬させる
+                PropagateSpace(expandedTokens, tok);
+
+                // 展開して得られたトークン列の位置を調整
+                expandedTokens.ForEach(x => {
+                    x.File = tok.File;
+                    x.Pos = tok.Pos;
+                });
+
+                // 最初のトークン以外の空白位置も補正
+                expandedTokens.Skip(1).ToList().ForEach(x => {
+                    var prevSpace = x.Space;
+                    x.Space = new SpaceInfo();
+                    x.Space.chunks.AddRange(prevSpace.chunks.Select(y => new SpaceInfo.Chunk() { Pos = tok.Pos, Space = y.Space }));
+                });
+
+                if (expandedTokens.Any()) {
+                    // マクロ列の前後に行頭情報や仮想的な空白を挿入
+                    expandedTokens.First().BeginOfLine = tok.BeginOfLine;
+                    expandedTokens.First().HeadSpace = true;
+                    expandedTokens.Last().TailSpace = true;
+                } else {
+                    // マクロ列がない場合は次のトークンの頭に仮想的な空白を挿入
+                    PeekToken().HeadSpace = true;
+                }
+
+                // 構築した展開後のトークンをバッファに戻す。
+                unget_all(expandedTokens);
+
+                // 再度展開処理を行う
+                continue;
             }
-
-            // マクロオブジェクトを処置できなかったのでマクロオブジェクトをそのまま返す。
-            if (expandedTokens == null) {
-                return tok;
-            }
-
-            // tokの空白情報を展開後のトークン列 tokensの先頭要素に伝搬させる
-            PropagateSpace(expandedTokens, tok);
-
-            // 展開して得られたトークン列の位置を調整
-            expandedTokens.ForEach(x => {
-                x.File = tok.File;
-                x.Pos = tok.Pos;
-            });
-
-            // 最初のトークン以外の空白位置も補正
-            expandedTokens.Skip(1).ToList().ForEach(x => {
-                var prevSpace = x.Space;
-                x.Space = new SpaceInfo();
-                x.Space.chunks.AddRange(prevSpace.chunks.Select(y => new SpaceInfo.Chunk() { Pos = tok.Pos, Space = y.Space }));
-            });
-
-            if (expandedTokens.Any()) {
-                // マクロ列の前後に行頭情報や仮想的な空白を挿入
-                expandedTokens.First().BeginOfLine = tok.BeginOfLine;
-                expandedTokens.First().HeadSpace = true;
-                expandedTokens.Last().TailSpace = true;
-            } else {
-                // マクロ列がない場合は次のトークンの頭に仮想的な空白を挿入
-                PeekToken().HeadSpace = true;
-            }
-
-            // 構築した展開後のトークンをバッファに戻す。
-            unget_all(expandedTokens);
-
-            // 再帰的に処理する
-            return read_expand();
-
         }
 
         static bool read_funclike_macro_params(Macro m, List<Tuple<string, Token>> param, out Token lastTok) {
@@ -693,7 +709,7 @@ namespace CSCPP {
             if (CppContext.Warnings.Contains(Warning.UnspecifiedBehavior)) {
                 // ISO/IEC 9899-1999 6.10.3.2 意味規則: #演算子及び##演算子の評価順序は，未規定とする。 のチェック
                 if (r.Count(x => x.IsKeyword('#') || x.IsKeyword(Token.Keyword.HashHash)) > 1) {
-                    CppContext.Warning(param.First().Item2, "マクロ定義で `#`演算子 または `##`演算子 が複数回用いていますが、これらの評価順序は未規定でsす。(参考文献:[ISO/IEC 9899:2011] 6.10.3.2、および、MISRA-C:2004 ルール19.12)。");
+                    CppContext.Warning(param.First().Item2, "マクロ定義で `#`演算子 または `##`演算子 が複数回用いていますが、これらの評価順序は未規定です。(参考文献:[ISO/IEC 9899:2011] 6.10.3.2、および、MISRA-C:2004 ルール19.12)。");
                 }
             }
             return r;
@@ -1101,9 +1117,8 @@ namespace CSCPP {
                 case 'x': {
                         int c2 = str.ElementAtOrDefault(i + 1);
                         if (!CType.IsXdigit(c2)) {
-                            CppContext.Error(tok, $"\\x に続く文字 {(char)c2} は16進数表記で使える文字ではありません。\\xが無いものとして読みます。");
-                            i += 1;
-                            return System.Text.Encoding.UTF8.GetBytes(new[] { (char)c2 });
+                            CppContext.Error(tok, $"\\x に続く文字 {(char)c2} は16進数表記で使える文字ではありません。\\xを x として読みます。");
+                            return System.Text.Encoding.UTF8.GetBytes(new[] { (char)'x' });
                         } else {
                             UInt32 r = 0;
                             bool over = false;
@@ -1323,6 +1338,7 @@ namespace CSCPP {
                                 IntMaxT rhs = Expr(pri, skip);
                                 lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
+                                IntMaxT rhs = Expr(pri, skip+1);
                                 lhs = IntMaxT.CreateSigned(0);
                             }
                         } else {
@@ -1337,6 +1353,7 @@ namespace CSCPP {
                                 IntMaxT rhs = Expr(pri, skip);
                                 lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
+                                IntMaxT rhs = Expr(pri, skip+1);
                                 lhs = IntMaxT.CreateSigned(1);
                             }
                         } else {
@@ -1346,7 +1363,7 @@ namespace CSCPP {
                         break;
                     case (Token.Keyword)'?': {
                             // ３項演算子
-                            var cond = IntMaxT.Equal(lhs, IntMaxT.CreateSigned(0));
+                            var cond = IntMaxT.NotEqual(lhs, IntMaxT.CreateSigned(0));
                             IntMaxT rhs1 = Expr(0, skip + (cond ? 0 : 1));
                             Token tok2 = Lex.LexToken();
                             if (tok2.IsKeyword(':') == false) {
@@ -1381,7 +1398,7 @@ namespace CSCPP {
                     exprtokens.Add(pretok);
                     pretok = Lex.LexToken(limit_space: true);
                     if (pretok.Kind == Token.TokenKind.Invalid) {
-                        CppContext.Error(pretok, $@"プリプロセス指令の条件式中に不正な文字 `\x{(int)pretok.StrVal[0]:X2}` がありました。");
+                        CppContext.Error(pretok, $@"プリプロセス指令の条件式中に不正な文字 `\u{(int)pretok.StrVal[0]:X4}` がありました。");
                     }
                 }
                 exprtokens.Add(Token.make_eof(pretok.Pos));
@@ -2334,9 +2351,9 @@ namespace CSCPP {
         /// <param name="hash">'#'に対応するトークン</param>
         /// <returns>解析結果のトークン</returns>
         static Token ParseDirective(Token hash) {
-            inControlLine++;
+            inDirectiveLine++;
             var ret = ParseDirectiveBody(hash);
-            inControlLine--;
+            inDirectiveLine--;
             return ret;
         }
         static Token ParseDirectiveBody(Token hash) {

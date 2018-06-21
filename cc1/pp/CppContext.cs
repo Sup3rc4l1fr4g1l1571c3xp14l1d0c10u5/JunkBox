@@ -80,7 +80,7 @@ namespace CSCPP
         /// <param name="pos">エラー発生位置</param>
         /// <param name="message">エラーメッセージ</param>
         private static void OutputError(Position pos, string caption, string message) {
-            Console.Error.Write(pos?.ToString() ?? "(cscpp)");
+            Console.Error.Write(pos.ToString());
             Console.Error.WriteLine($" : ** {caption} ** : {message}");
         }
 
@@ -102,7 +102,7 @@ namespace CSCPP
         /// <param name="message"></param>
         public static void Error(string message)
         {
-            OutputError(null, "ERROR", message);
+            OutputError(Position.Empty, "ERROR", message);
             ErrorCount++;
         }
 
@@ -166,7 +166,7 @@ namespace CSCPP
             if (Warnings.Contains(CSCPP.Warning.Error)) {
                 Error(message);
             } else {
-                OutputError(null, "WARNING", message);
+                OutputError(Position.Empty, "WARNING", message);
                 WarningCount++;
             }
        }

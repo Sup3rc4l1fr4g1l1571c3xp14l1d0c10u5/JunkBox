@@ -303,8 +303,9 @@ namespace CSCPP {
         static string read_hex_char2(Position pos) {
             var c = File.ReadCh();
             if (!CType.IsXdigit(c.Value)) {
-                CppContext.Error(pos, $@"\x に続く文字 {(char)c.Value} は16進数表記で使える文字ではありません。");
-                return $@"\x{(char)c.Value}";
+                //CppContext.Error(pos, $"\\x に続く文字 {(char)c.Value} は16進数表記で使える文字ではありません。\\xを x として読みます。");
+                File.UnreadCh(c);
+                return $@"\x";
             }
             string r = @"\x";
             for (; ; c = File.ReadCh()) {
