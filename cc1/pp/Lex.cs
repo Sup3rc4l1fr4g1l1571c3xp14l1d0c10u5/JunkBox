@@ -113,38 +113,38 @@ namespace CSCPP {
                     // 前処理指令の中（先頭の#前処理字句の直後から，最後の改行文字の直前まで）の前処理字句の間 に現れてよい空白類文字は，空白と水平タブだけとする
                     if (CppContext.Warnings.Contains(Warning.Pedantic))
                     {
-                        CppContext.Warning(c.position, $"前処理指令の中で使えない空白文字 \\u{c.Value:x4} が使われています。");
+                        CppContext.Warning(c.Position, $"前処理指令の中で使えない空白文字 \\u{c.Value:x4} が使われています。");
                     }
                 }
-                sb.Append(c.position, (char) c.Value);
+                sb.Append(c.Position, (char) c.Value);
                 return true;
             }
             if (c.Value == '/') {
                 if (disable_comment == false && IsNextChar('*')) {
-                    var commentStr = ReadBlockComment(c.position);
+                    var commentStr = ReadBlockComment(c.Position);
                     if (!CppContext.Switchs.Contains("-C")) {
                         // コメントを保持しないオプションが有効の場合は、行を空白で置き換えてしまう
                         //commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
                         //if (commentStr.Any() == false) { commentStr = " "; }
                         commentStr = " ";
                     }
-                    sb.Append(c.position, commentStr);
+                    sb.Append(c.Position, commentStr);
                     return true;
                 } else if (disable_comment == false && PeekChar().Value == '/') {
                     if (CppContext.Warnings.Contains(Warning.LineComment)) {
-                        CppContext.Warning(c.position, "ISO/IEC 9899-1999 で導入された行コメントが利用されています。ISO/IEC 9899-1990 ではコメントとして扱われないため注意してください。");
+                        CppContext.Warning(c.Position, "ISO/IEC 9899-1999 で導入された行コメントが利用されています。ISO/IEC 9899-1990 ではコメントとして扱われないため注意してください。");
                     }
                     if (CppContext.Features.Contains(Feature.LineComment)) {
                         // 行コメントオプション有効時
                         System.Diagnostics.Debug.Assert(File.ReadCh().Value == '/');
-                        var commentStr = ReadLineComment(c.position);
+                        var commentStr = ReadLineComment(c.Position);
                         if (!CppContext.Switchs.Contains("-C")) {
                             // コメントを保持しないオプションが有効の場合は、行を空白で置き換えてしまう
                             //commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
                             //if (commentStr.Any() == false) { commentStr = " "; }
                             commentStr = " ";
                         }
-                        sb.Append(c.position, commentStr);
+                        sb.Append(c.Position, commentStr);
                         return true;
                     } else {
                         // 行コメントオプション無効時。
@@ -232,7 +232,7 @@ namespace CSCPP {
                 // 以降は条件コンパイル指令の処理
                 //
 
-                Token hash = Token.make_keyword(c.position, (Token.Keyword)'#');
+                Token hash = Token.make_keyword(c.Position, (Token.Keyword)'#');
                 hash.BeginOfLine = true;
 
                 Token tok = LexToken(); // 前処理指令部分なのでskip_badcharは使わない
@@ -376,7 +376,7 @@ namespace CSCPP {
                     b.Append((char)c.Value);
                     continue;
                 }
-                var str = read_escaped_char_string(c.position);
+                var str = read_escaped_char_string(c.Position);
                 b.Append(str);
             }
             return Token.make_char(pos, b.ToString());
@@ -412,7 +412,7 @@ namespace CSCPP {
                     b.Append((char)c.Value);
                     continue;
                 }
-                var str = read_escaped_char_string(c.position);
+                var str = read_escaped_char_string(c.Position);
                 b.Append(str);
             }
             return Token.make_strtok(pos, b.ToString());
@@ -527,7 +527,7 @@ namespace CSCPP {
 
             // トークンの開始位置を取得
             var c = File.ReadCh(handle_eof: handle_eof);
-            var tokenPosition = c.position;
+            var tokenPosition = c.Position;
             switch (c.Value) {
                 case '\n':
                     return Token.make_newline(tokenPosition);
@@ -741,7 +741,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"{Token.KeywordToStr((Token.Keyword)id)} があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 unget_token(tok);
-                return Token.make_invalid(tok.Pos, "");
+                return Token.make_invalid(tok.Position, "");
             }
             return tok;
         }
@@ -750,7 +750,7 @@ namespace CSCPP {
             if (!tok.IsKeyword(id)) {
                 failHandler(tok);
                 unget_token(tok);
-                return Token.make_invalid(tok.Pos, "");
+                return Token.make_invalid(tok.Position, "");
             }
             return tok;
         }

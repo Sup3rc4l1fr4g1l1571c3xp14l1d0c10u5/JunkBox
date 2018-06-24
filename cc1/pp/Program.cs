@@ -392,9 +392,9 @@ namespace CSCPP {
                             writer.WriteAttributeString("DefStartColumn", log.Item2.GetFirstPosition().Column.ToString());
                             writer.WriteAttributeString("DefStartLine", log.Item2.GetFirstPosition().Line.ToString());
                             writer.WriteAttributeString("DefFile", log.Item2.GetFirstPosition().FileName);
-                            writer.WriteAttributeString("UseColumn", log.Item1.Pos.Column.ToString());
-                            writer.WriteAttributeString("UseLine", log.Item1.Pos.Line.ToString());
-                            writer.WriteAttributeString("UseFile", log.Item1.Pos.FileName);
+                            writer.WriteAttributeString("UseColumn", log.Item1.Position.Column.ToString());
+                            writer.WriteAttributeString("UseLine", log.Item1.Position.Line.ToString());
+                            writer.WriteAttributeString("UseFile", log.Item1.Position.FileName);
                             writer.WriteAttributeString("Name", log.Item2.GetName());
                             writer.WriteAttributeString("Id", log.Item2.UniqueId.ToString());
                             writer.WriteEndElement(/*ExpandInfo*/);
@@ -523,22 +523,22 @@ namespace CSCPP {
                     // トークン出力の準備
                     if (tok.File.Name != CurrentFile) {
                         // ファイル自体が違う場合は #line 指令を挿入
-                        WriteLineDirective(tok.Pos.Line, tok.Pos.FileName, isDummy);
-                        CurrentFile = tok.Pos.FileName;
-                        CurrentLine = tok.Pos.Line;
+                        WriteLineDirective(tok.Position.Line, tok.Position.FileName, isDummy);
+                        CurrentFile = tok.Position.FileName;
+                        CurrentLine = tok.Position.Line;
                     } else {
                         // ファイルは同じだけど行番号が違う場合、改行で埋めて調整
-                        if (tok.Pos.Line < CurrentLine + 5) {
-                            for (long j = CurrentLine; j < tok.Pos.Line; j++) {
+                        if (tok.Position.Line < CurrentLine + 5) {
+                            for (long j = CurrentLine; j < tok.Position.Line; j++) {
                                 if (CppContext.Verboses.Contains(Verbose.TraceOutputLine)) {
                                     Write($"{CurrentLine}:", isDummy);
                                 }
                                 WriteLine("", isDummy);
                             }
                         } else {
-                            WriteLineDirective(tok.Pos.Line, tok.File.Name, isDummy);
+                            WriteLineDirective(tok.Position.Line, tok.File.Name, isDummy);
                         }
-                        CurrentLine = tok.Pos.Line;
+                        CurrentLine = tok.Position.Line;
                     }
 
                     // 行情報を付与

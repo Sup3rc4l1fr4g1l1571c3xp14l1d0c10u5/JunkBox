@@ -99,9 +99,9 @@ namespace CSCPP {
                     return x.StrVal == y.StrVal;
                 case Token.TokenKind.MacroParam:
                     if (x.IsVarArg == y.IsVarArg) {
-                        return (x.Position == y.Position);
+                        return (x.ArgIndex == y.ArgIndex);
                     } else {
-                        return (x.Position == y.Position) && (x.ArgName == y.ArgName);
+                        return (x.ArgIndex == y.ArgIndex) && (x.ArgName == y.ArgName);
                     }
                 case Token.TokenKind.MacroParamRef:
                     return CompareToken(x.MacroParamRef, y.MacroParamRef);
@@ -130,15 +130,15 @@ namespace CSCPP {
             }
 
             public override Position GetFirstPosition() {
-                return Name.Pos;
+                return Name.Position;
             }
             public override Position GetLastPosition() {
                 var last = Body.LastOrDefault();
                 if (last != null) {
-                    var p = last.Pos;
+                    var p = last.Position;
                     return new CSCPP.Position(p.FileName, p.Line, p.Column + last.ToRawString().Length);
                 } else {
-                    var p = Name.Pos;
+                    var p = Name.Position;
                     return new CSCPP.Position(p.FileName, p.Line, p.Column + Name.StrVal.Length);
                 }
             }
@@ -202,10 +202,10 @@ namespace CSCPP {
             }
 
             public override Position GetFirstPosition() {
-                return Name.Pos;
+                return Name.Position;
             }
             public override Position GetLastPosition() {
-                var p = LastToken.Pos;
+                var p = LastToken.Position;
                 return new CSCPP.Position(p.FileName, p.Line, p.Column + LastToken.ToRawString().Length);
             }
 

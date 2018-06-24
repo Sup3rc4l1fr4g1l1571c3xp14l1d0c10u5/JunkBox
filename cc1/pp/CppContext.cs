@@ -92,7 +92,7 @@ namespace CSCPP
         public static void InternalError(Token tok, string message)
         {
             Debug.Assert(tok != null);
-            OutputError(tok.Pos, "INTERNAL-ERROR", message);
+            OutputError(tok.Position, "INTERNAL-ERROR", message);
             ErrorCount++;
         }
 
@@ -114,7 +114,7 @@ namespace CSCPP
         public static void Error(Token tok, string message)
         {
             Debug.Assert(tok != null);
-            Error(tok.Pos, message);
+            Error(tok.Position, message);
         }
 
         /// <summary>
@@ -139,7 +139,7 @@ namespace CSCPP
             if (Warnings.Contains(CSCPP.Warning.Error)) {
                 Error(tok, message);
             } else {
-                OutputError(tok.Pos, "WARNING", message);
+                OutputError(tok.Position, "WARNING", message);
                 WarningCount++;
             }
         }

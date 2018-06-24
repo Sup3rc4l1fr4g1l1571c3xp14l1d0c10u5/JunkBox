@@ -57,9 +57,9 @@ namespace CSCPP {
             // common information
             sb.Append(
                 $"Id='{Id}' " +
-                $"File='{Pos.FileName}' " +
-                $"Line='{Pos.Line}' " +
-                $"Column='{Pos.Column}' " +
+                $"File='{Position.FileName}' " +
+                $"Line='{Position.Line}' " +
+                $"Column='{Position.Column}' " +
                 $"Space='{Space}' " +
                 $"Verbatim='{Verbatim}' " +
                 $"BeginOfLine='{BeginOfLine}' " +
@@ -68,7 +68,6 @@ namespace CSCPP {
         }
 
         public string ToRawString() {
-            var sb = new StringBuilder();
             switch (Kind) {
                 case TokenKind.Ident: return StrVal;
                 case TokenKind.Keyword: return KeywordToStr(KeywordVal);
@@ -108,6 +107,9 @@ namespace CSCPP {
             SystemIncludePath,
         };
 
+        /// <summary>
+        /// 記号種別
+        /// </summary>
         public enum Keyword {
             Arrow,
             AssignAdd,
@@ -144,12 +146,24 @@ namespace CSCPP {
         /// </summary>
         public ulong Id { get; }
 
+        /// <summary>
+        /// トークン種別
+        /// </summary>
         public TokenKind Kind { get; }
 
+        /// <summary>
+        /// トークンを読み取ったファイルスコープ
+        /// </summary>
         public File File { get; set; }
 
-        public Position Pos { get; set; }
+        /// <summary>
+        /// トークンの位置情報
+        /// </summary>
+        public Position Position { get; set; }
 
+        /// <summary>
+        /// トークンの前の空白情報
+        /// </summary>
         public SpaceInfo Space { get; set; }
 
         /// <summary>
@@ -176,27 +190,52 @@ namespace CSCPP {
         /// <summary>
         /// ファイルから読み取ったトークンに割り当てられる番号
         /// </summary>
-        public int IndexOfFile { get; private set; } // token number in a file, counting from 0.
+        public int IndexOfFile { get; private set; }
 
-        public Set Hideset { get; set; }  // used by the preprocessor for macro expansion
+        /// <summary>
+        /// マクロ展開時のHideSet
+        /// </summary>
+        public Set Hideset { get; set; }
 
-        //Keyword
+        /// <summary>
+        /// [Kind == Keyword] 記号種別
+        /// </summary>
         public Keyword KeywordVal { get; set; }
 
-        //StringOrCharOrNumberOrIdent
+        /// <summary>
+        /// [Kind == String | Char | Number | Ident | Invalid] 値（文字列表現）
+        /// </summary>
         public string StrVal { get; set; }
 
-        // MacroParam 
+        /// <summary>
+        /// [Kind == MacroParam] 可変長引数かどうか
+        /// </summary>
         public bool IsVarArg { get; private set; }
-        public int Position { get; private set; }
+        /// <summary>
+        /// [Kind == MacroParam] 引数番号
+        /// </summary>
+        public int ArgIndex { get; private set; }
+        /// <summary>
+        /// [Kind == MacroParam] 引数名
+        /// </summary>
         public string ArgName { get; private set; }
 
-        // MacroParamRef
+        /// <summary>
+        /// [Kind == MacroParamRef] マクロ引数が対応する宣言要素
+        /// </summary>
         public Token MacroParamRef { get; set; }
 
-        // MacroRangeFixup
+        /// <summary>
+        /// [Kind == MacroRangeFixup] マクロ置換に対応するマクロ
+        /// </summary>
         public Macro MacroRangeFixupMacro;
+        /// <summary>
+        /// [Kind == MacroRangeFixup] マクロ置換されるトークン
+        /// </summary>
         public Token MacroRangeFixupTok;
+        /// <summary>
+        /// [Kind == MacroRangeFixup] マクロ置換後の範囲
+        /// </summary>
         public int MacroRangeFixupStartLine, MacroRangeFixupStartColumn;
 
         private Token(Token.TokenKind kind) {
@@ -209,7 +248,7 @@ namespace CSCPP {
             Id = ++_uniqueIdCount;
             Kind = kind;
             File = tmpl.File;
-            Pos = tmpl.Pos;
+            Position = tmpl.Position;
             Space = tmpl.Space;
             HeadSpace = tmpl.HeadSpace;
             TailSpace = tmpl.TailSpace;
@@ -225,7 +264,7 @@ namespace CSCPP {
 
             // MacroParam 
             IsVarArg = tmpl.IsVarArg;
-            Position = tmpl.Position;
+            ArgIndex = tmpl.ArgIndex;
             ArgName = tmpl.ArgName;
 
             // MacroParamRef
@@ -239,16 +278,16 @@ namespace CSCPP {
 
         }
 
-        public static Token make_macro_token(int position, bool isVarArg, string argName, File file) {
+        public static Token make_macro_token(int index, bool isVarArg, string argName, File file) {
             return new Token(TokenKind.MacroParam) {
                 Hideset = null,
                 File = file,
                 IndexOfFile = -1,
-                Pos = new Position(file.Name, file.Line, file.Column),
+                Position = new Position(file.Name, file.Line, file.Column),
 
                 // MacroParam
                 IsVarArg = isVarArg,
-                Position = position,
+                ArgIndex = index,
                 ArgName = argName,
             };
         }
@@ -264,7 +303,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // Ident
                 StrVal = s,
@@ -282,7 +321,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // String
                 StrVal = s,
@@ -300,7 +339,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // Char
                 KeywordVal = id,
@@ -313,7 +352,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // Number
                 StrVal = s,
@@ -326,7 +365,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // Invalid
                 StrVal = s,
@@ -339,7 +378,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = File.current_file().NumOfToken++,
-                Pos = pos,
+                Position = pos,
 
                 // Invalid
                 StrVal = s,
@@ -352,7 +391,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = null,
                 IndexOfFile = -1,
-                Pos = pos,
+                Position = pos,
 
                 // Space
                 Space = sb
@@ -365,7 +404,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = -1,
-                Pos = pos,
+                Position = pos,
 
                 // NewLine
             };
@@ -377,7 +416,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = -1,
-                Pos = pos,
+                Position = pos,
 
                 // EoF
             };
@@ -388,7 +427,7 @@ namespace CSCPP {
                 Hideset = null,
                 File = File.current_file(),
                 IndexOfFile = -1,
-                Pos = pos,
+                Position = pos,
 
                 // MacroRangeFixup
                 MacroRangeFixupTok = tok,

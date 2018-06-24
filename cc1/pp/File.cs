@@ -18,19 +18,19 @@ namespace CSCPP
         /// <summary>
         /// __FILE__で得られるファイル名
         /// </summary>
-        public string Name { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().position.FileName : name; } }
+        public string Name { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.FileName : name; } }
         private string name {get; set;}
 
         /// <summary>
         /// 現在の読み取り行番号
         /// </summary>
-        public long Line { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().position.Line : line; } }
+        public long Line { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.Line : line; } }
         private long line { get; set; }
 
         /// <summary>
         /// 現在の読み取り列番号
         /// </summary>
-        public int Column { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().position.Column : column; } }
+        public int Column { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.Column : column; } }
         private int column { get; set; }
 
         /// <summary>
@@ -114,7 +114,7 @@ namespace CSCPP
                             // 空でないソースファイルが改行文字で終わっていない場合，その動作は，未定義とする。空でないソースファイルが逆斜線に続く改行文字で終わっている場合，その動作は，未定義とする。
                             // となっている
                             // Posix的にもテキストファイルは改行で終端すべしとなっている。
-                            CppContext.Warning(LastCharacter.position, "ファイルが改行文字で終了していません。");
+                            CppContext.Warning(LastCharacter.Position, "ファイルが改行文字で終了していません。");
                         }
                     }
                 }
@@ -207,7 +207,7 @@ namespace CSCPP
             {
                 // カレントから一文字読み取る
                 var c = Get();
-                var p1 = c.position;
+                var p1 = c.Position;
                 if (c.IsEof() && handle_eof == false)
                 {
                     // 現在のファイルがスタック中に残った最後のファイルの場合はEOFを返す
@@ -221,7 +221,7 @@ namespace CSCPP
                 }
                 if (CppContext.Features.Contains(Feature.Trigraphs))
                 {
-                    var p2 = c.position;
+                    var p2 = c.Position;
                     // トライグラフの読み取りを行う
                     if (c.Value == '?')
                     {
@@ -235,7 +235,7 @@ namespace CSCPP
                                 if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
                                     CppContext.Error(p2, $"トライグラフ ??{(char)c3.Value} が {tri} に置換されました。");
                                 }
-                                return new Char(c.position, tri);
+                                return new Char(c.Position, tri);
                             } else {
                                 if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
                                     CppContext.Error(p2, $"未定義のトライグラフ ??{(char)c3.Value} が使用されています。");

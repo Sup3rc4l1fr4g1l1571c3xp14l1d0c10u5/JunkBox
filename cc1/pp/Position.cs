@@ -1,10 +1,8 @@
-namespace CSCPP
-{
+namespace CSCPP {
     /// <summary>
     /// ファイル上の位置情報
     /// </summary>
-    public struct Position
-    {
+    public struct Position {
 
         /// <summary>
         /// ファイル名
@@ -24,15 +22,13 @@ namespace CSCPP
         /// <summary>
         /// 内部を示す位置情報
         /// </summary>
-        public static Position Empty { get;} = new Position("<cscpp>", 1, 1);
+        public static Position Empty { get; } = new Position("<cscpp>", 1, 1);
 
-        public override string ToString()
-        {
+        public override string ToString() {
             return $"{FileName} ({Line}, {Column})";
         }
 
-        public Position(string name, long line, int column)
-        {
+        public Position(string name, long line, int column) {
             System.Diagnostics.Debug.Assert(name != null);
             FileName = name;
             Line = line;
@@ -40,12 +36,11 @@ namespace CSCPP
         }
 
         public bool Equals(Position other) {
-            return (this.FileName == other.FileName) && (this.Line == other.Line) && (this.Column == other.Column);
+            return (FileName == other.FileName) && (Line == other.Line) && (Column == other.Column);
         }
 
         public override bool Equals(object obj) {
             if (obj == null) { return false; }
-            if (ReferenceEquals(obj, this)) { return true; }
             if (!(obj is Position)) { return false; }
             return Equals((Position)obj);
         }
