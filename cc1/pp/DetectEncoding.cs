@@ -33,12 +33,14 @@ namespace CSCPP {
                 enc = Encoding.DetectEncodingFromFile(filename);
                 if (enc == null) {
                     if (defaultEncoding != null) {
-                        CppContext.Warning($"ファイル `{filename}` の文字エンコードを自動認識できないためデフォルトの文字コード({defaultEncoding.WebName})で読み取りを行います。この警告はファイルがバイナリファイルの場合や、ファイル内に文字化けや非標準の機種依存文字が含まれている場合に出力されます。ファイルの内容を確認してください。");
+                        CppContext.Warning(new Position(filename, 1, 1), $"ファイル `{filename}` の文字エンコードを自動認識できないためデフォルトの文字コード({defaultEncoding.WebName})で読み取りを行います。この警告はファイルがバイナリファイルの場合や、ファイル内に文字化けや非標準の機種依存文字が含まれている場合に出力されます。ファイルの内容を確認してください。");
                         enc = defaultEncoding;
                     } else {
-                        CppContext.Error($"ファイル `{filename}` の文字エンコードを自動認識できません。このエラーはファイルがバイナリファイルの場合や、ファイル内に文字化けや非標準の機種依存文字が含まれている場合に出力されます。ファイルの内容を確認してください。");
+                        CppContext.Error(new Position(filename, 1, 1), $"ファイル `{filename}` の文字エンコードを自動認識できません。このエラーはファイルがバイナリファイルの場合や、ファイル内に文字化けや非標準の機種依存文字が含まれている場合に出力されます。ファイルの内容を確認してください。");
                         return null;
                     }
+                } else {
+                    //CppContext.Notify(new Position(filename, 1, 1), $"自動認識によりファイル `{filename}` の文字エンコードを {enc.WebName} とします。");
                 }
             } else {
                 enc = defaultEncoding;
@@ -75,7 +77,7 @@ namespace CSCPP {
                 // エンコードできない文字が見つかった場合に呼び出されるメソッド
                 public override bool Fallback(byte [] charUnknown, int index) {
                     // エンコードできない文字を0xFFFFで括った文字列を代替文字列とする。
-                    // 0xFFFFは一応UNICODE上は使わない（未使用）文字となっている
+                    // 0xFFFFは一応UTF16上は使わない（未使用）文字となっている
                     var str = charUnknown.Aggregate(new StringBuilder(), (s,x) => s.Append($"{ x:X2}")).ToString();
                     alternative = ($@"{(char)0xFFFF}{str}{(char)0xFFFF}").ToCharArray();
                     offset = 0;

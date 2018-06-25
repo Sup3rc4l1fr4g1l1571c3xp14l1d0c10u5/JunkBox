@@ -63,7 +63,7 @@ namespace CSCPP {
         /// <summary>
         /// 指令行中の解析を示す状態カウンタ。
         /// </summary>
-        static int inDirectiveLine = 0;
+        private static int InDirectiveLine { get; set; }
 
         static Cpp() {
             // 書式指定文字列での変換でもいいが、あえて全て組み立てている
@@ -115,30 +115,15 @@ namespace CSCPP {
          * Macro expander
          */
 
-        static Token read_ident(bool limit_space = false) {
-            Token tok = Lex.LexToken(limit_space: limit_space);
-            if (tok.Kind != Token.TokenKind.Ident) {
-                if (tok.Kind == Token.TokenKind.EoF || tok.Kind == Token.TokenKind.NewLine) {
-                    CppContext.Error(tok, $"識別子があるべき場所に行末/ファイル末尾がありました。");
-                } else {
-                    CppContext.Error(tok, $"識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
-                }
-                // 読み戻して、不正トークンを読み取ったことにする
-                Lex.unget_token(tok);
-                return new Token(tok, Token.TokenKind.Invalid);
-            }
-            return tok;
-        }
-
-        public static void expect_newline(bool limit_space = false) {
-            Token tok = Lex.LexToken(limit_space: limit_space);
+        public static void expect_newline(bool limitSpace = false) {
+            Token tok = Lex.LexToken(limitSpace: limitSpace);
             if (tok.Kind != Token.TokenKind.NewLine) {
                 if (tok.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(tok, $"改行があるべき場所にファイル終端がありました。");
                 } else {
                     CppContext.Error(tok, $"改行があるべき場所に {Token.TokenToStr(tok)} がありました。");
                     while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                        tok = Lex.LexToken(limit_space: limit_space);
+                        tok = Lex.LexToken(limitSpace: limitSpace);
                     }
                     if (tok.Kind == Token.TokenKind.EoF) {
                         Lex.unget_token(tok);
@@ -147,11 +132,11 @@ namespace CSCPP {
             }
         }
 
-        static List<Token> read_one_arg(Macro.FuncMacro macro, ref bool end, bool readall, bool limit_space = false) {
+        static List<Token> read_one_arg(Macro.FuncMacro macro, ref bool end, bool readall, bool limitSpace = false) {
             List<Token> r = new List<Token>();
             int level = 0;
             for (; ; ) {
-                Token tok = Lex.LexToken(handle_eof: true, limit_space: limit_space);
+                Token tok = Lex.LexToken(handleEof: true, limitSpace: limitSpace);
                 if (tok.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                     end = true;
@@ -164,7 +149,7 @@ namespace CSCPP {
                     return r;
                 }
                 if (tok.Kind == Token.TokenKind.NewLine) {
-                    if (inDirectiveLine > 0) {
+                    if (InDirectiveLine > 0) {
                         CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                         end = true;
                         Lex.unget_token(tok);
@@ -204,12 +189,12 @@ namespace CSCPP {
             }
         }
 
-        static List<List<Token>> do_read_args(Macro.FuncMacro macro, bool limit_space = false) {
+        static List<List<Token>> do_read_args(Macro.FuncMacro macro, bool limitSpace = false) {
             List<List<Token>> r = new List<List<Token>>();
             bool end = false;
             while (!end) {
                 bool inEllipsis = (macro.IsVarg && r.Count + 1 == macro.Args.Count);
-                var ret = read_one_arg(macro, ref end, inEllipsis, limit_space: limit_space);
+                var ret = read_one_arg(macro, ref end, inEllipsis, limitSpace: limitSpace);
                 if (ret == null) {
                     return null;
                 }
@@ -221,14 +206,14 @@ namespace CSCPP {
             return r;
         }
 
-        static List<List<Token>> read_args(Token tok, Macro.FuncMacro macro, bool limit_space = false) {
+        static List<List<Token>> read_args(Token tok, Macro.FuncMacro macro, bool limitSpace = false) {
             if (macro.Args.Count == 0 && PeekToken().IsKeyword(')')) {
                 // If a macro M has no parameter, argument list of M()
                 // is an empty list. If it has one parameter,
                 // argument list of M() is a list containing an empty list.
                 return new List<List<Token>>();
             }
-            List<List<Token>> args = do_read_args(macro, limit_space: limit_space);
+            List<List<Token>> args = do_read_args(macro, limitSpace: limitSpace);
             if (args == null) {
                 return null;
             }
@@ -348,12 +333,13 @@ namespace CSCPP {
                 // 今のトークンと次のトークンの二つを読み出しておく
                 Token t0Value = body.ElementAtOrDefault(i + 0);
                 Token t1Value = body.ElementAtOrDefault(i + 1);
+
                 Token t0 = (t0Value != null && t0Value.Kind == Token.TokenKind.MacroParamRef) ? t0Value.MacroParamRef : t0Value;
                 Token t1 = (t1Value != null && t1Value.Kind == Token.TokenKind.MacroParamRef) ? t1Value.MacroParamRef : t1Value;
                 bool t0Param = (t0 != null && t0.Kind == Token.TokenKind.MacroParam);
                 bool t1Param = (t1 != null && t1.Kind == Token.TokenKind.MacroParam);
 
-                if (args != null && t0.IsKeyword('#')) {
+                if (args != null && t0 != null && t0.IsKeyword('#')) {
 
                     // 6.10.3.2 #演算子 に
                     // 制約  関数形式マクロの置換要素並びの中にある各#前処理字句の次の前処理字句は，仮引数でなければならない
@@ -368,10 +354,10 @@ namespace CSCPP {
                         r.Add(newTok);
                         i++;
                     } else {
-                        CppContext.Error(t0, $"`#` 演算子の次はマクロ仮引数名でなければなりません。");
+                        CppContext.Error(t0, "`#` 演算子の次はマクロ仮引数名でなければなりません。");
                         r.Add(t0);
                     }
-                } else if (t0.IsKeyword(Token.Keyword.HashHash) && t1Param) {
+                } else if (t0 != null && t0.IsKeyword(Token.Keyword.HashHash) && t1Param) {
                     // (t0,t1) = ('##', <マクロ引数1>) の場合
 
                     List<Token> arg = args[t1.ArgIndex];
@@ -400,7 +386,7 @@ namespace CSCPP {
                         }
                     }
                     i++;
-                } else if (t0.IsKeyword(Token.Keyword.HashHash) && t1 != null) {
+                } else if (t0 != null && t0.IsKeyword(Token.Keyword.HashHash) && t1 != null) {
                     // 最初のトークンが## でその後ろに別のトークンがある（つまり連結演算子式の先頭以外の)場合 
                     hideset = t1.Hideset;
                     // トークンの連結処理を行う
@@ -456,7 +442,7 @@ namespace CSCPP {
         static Token read_expand(bool limit_space = false) {
             for (; ; ) {
                 // トークンを一つ読み取る
-                Token tok = Lex.LexToken(limit_space: limit_space);
+                Token tok = Lex.LexToken(limitSpace: limit_space);
 
                 // 識別子以外もしくは、verbatimなら終わり
                 if (tok.Kind != Token.TokenKind.Ident || tok.Verbatim) {
@@ -507,7 +493,7 @@ namespace CSCPP {
                      */
                     List<Token> lookAHeads = new List<Token>();
                     for (; ; ) {
-                        var tok2 = Lex.LexToken(limit_space: limit_space);
+                        var tok2 = Lex.LexToken(limitSpace: limit_space);
                         if (tok2.IsKeyword('(')) {
                             // マクロ関数呼び出しである
                             break;
@@ -524,11 +510,11 @@ namespace CSCPP {
                     }
 
                     // マクロ関数呼び出しの実引数を読み取る
-                    var args = read_args(tok, m, limit_space: limit_space);
+                    var args = read_args(tok, m, limitSpace: limit_space);
                     if (args == null) {
                         // マクロ引数読み取りにエラーがあった場合は')'もしくは末尾まで読み飛ばし展開も行わない。
                         for (; ; ) {
-                            var tok2 = Lex.LexToken(limit_space: limit_space);
+                            var tok2 = Lex.LexToken(limitSpace: limit_space);
                             if (tok2.IsKeyword(')')) {
                                 break;
                             }
@@ -926,7 +912,7 @@ namespace CSCPP {
 
         static Token read_define(Token hash, Token tdefine) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            Token name = Lex.LexToken(limit_space: true);
+            Token name = Lex.LexToken(limitSpace: true);
             if (name.Kind != Token.TokenKind.Ident) {
                 if (name.Kind == Token.TokenKind.NewLine || name.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(name, $"#define 指令の引数となる識別子がありません。");
@@ -934,7 +920,7 @@ namespace CSCPP {
                     CppContext.Error(name, $"#define 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
                 }
                 while (name.Kind != Token.TokenKind.NewLine && name.Kind != Token.TokenKind.EoF) {
-                    name = Lex.LexToken(limit_space: true);
+                    name = Lex.LexToken(limitSpace: true);
                 }
             } else {
                 Token tok = Lex.LexToken();
@@ -954,7 +940,7 @@ namespace CSCPP {
 
         static Token read_undef(Token hash, Token tundef) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            Token name = Lex.LexToken(limit_space: true);
+            Token name = Lex.LexToken(limitSpace: true);
             if (name.Kind != Token.TokenKind.Ident) {
                 if (name.Kind == Token.TokenKind.NewLine || name.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(name, $"#undef 指令の引数となる識別子がありません。");
@@ -962,7 +948,7 @@ namespace CSCPP {
                     CppContext.Error(name, $"#undef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
                 }
                 while (name.Kind != Token.TokenKind.NewLine && name.Kind != Token.TokenKind.EoF) {
-                    name = Lex.LexToken(limit_space: true);
+                    name = Lex.LexToken(limitSpace: true);
                 }
             } else {
                 expect_newline();
@@ -978,9 +964,9 @@ namespace CSCPP {
          */
 
         static Token read_defined_op() {
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             if (tok.IsKeyword('(')) {
-                tok = Lex.LexToken(limit_space: true);
+                tok = Lex.LexToken(limitSpace: true);
                 Lex.ExceptKeyword(')', (t) => {
                     if (t.Kind == Token.TokenKind.EoF || t.Kind == Token.TokenKind.NewLine) {
                         CppContext.Error(t, $"defined 演算子の始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
@@ -1189,12 +1175,12 @@ namespace CSCPP {
         }
 
         private static IntMaxT Expr(int priority, int skip) {
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             Action<bool, string> handler = (e, s) => {if (e) { CppContext.Error(tok, s); } else {CppContext.Warning(tok, s); } };
             IntMaxT lhs;
             if (tok.IsKeyword('(')) {
                 lhs = Expr(0, skip);
-                tok = Lex.LexToken(limit_space: true);
+                tok = Lex.LexToken(limitSpace: true);
                 if (tok.IsKeyword(')') == false) {
                     if (tok.Kind == Token.TokenKind.EoF) {
                         CppContext.Error(tok, $"プリプロセス指令の定数式中で始め丸括弧 `(` に対応する終わり丸括弧 `)` がありませんでした。");
@@ -1240,7 +1226,7 @@ namespace CSCPP {
             }
 
             for (; ; ) {
-                Token op = Lex.LexToken(limit_space: true);
+                Token op = Lex.LexToken(limitSpace: true);
                 Action<bool, string> handler2 = (e, s) => {if (e) { CppContext.Error(op, s); } else {CppContext.Warning(op, s); } };
                 int pri = expr_priority(op); // 0 if not a binop.
                 if (pri == 0 || priority >= pri) {
@@ -1411,10 +1397,10 @@ namespace CSCPP {
             /* コンパイルスイッチの記録のために前処理トークン列を展開無しで先読みして記録する */
             {
                 exprtokens = new List<Token>();
-                Token pretok = Lex.LexToken(limit_space: true);
+                Token pretok = Lex.LexToken(limitSpace: true);
                 while (pretok.Kind != Token.TokenKind.EoF && pretok.Kind != Token.TokenKind.NewLine) {
                     exprtokens.Add(pretok);
-                    pretok = Lex.LexToken(limit_space: true);
+                    pretok = Lex.LexToken(limitSpace: true);
                     if (pretok.Kind == Token.TokenKind.Invalid) {
                         CppContext.Error(pretok, $@"プリプロセス指令の条件式中に不正な文字 `\u{(int)pretok.StrVal[0]:X4}` がありました。");
                     }
@@ -1429,11 +1415,11 @@ namespace CSCPP {
             var intexprtoks = read_intexpr_line().Reverse<Token>().ToList();
             Lex.token_buffer_stash(intexprtoks);
             var expr = Expr(0, 0);
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             if (tok.Kind != Token.TokenKind.EoF) {
                 CppContext.Error(tok, $"プリプロセス指令の条件式中に余分なトークン {Token.TokenToStr(tok)} がありました。");
                 while (tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
             }
             Lex.token_buffer_unstash();
@@ -1459,7 +1445,7 @@ namespace CSCPP {
 
         static Token read_ifdef(Token hash, Token tifdef) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             bool cond = false;
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
@@ -1468,7 +1454,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"#ifdef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
             } else {
                 expect_newline();
@@ -1495,7 +1481,7 @@ namespace CSCPP {
         static Token read_ifndef(Token hash, Token tifndef) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
 
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             bool cond = false;
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
@@ -1504,7 +1490,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"#ifndef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
             } else {
                 expect_newline();
@@ -1606,7 +1592,7 @@ namespace CSCPP {
                 // エラー回復方法がコンパイラによってまちまちなので #elif を読み飛ばす方向で
                 var tok = hash;
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
                 Lex.unget_token(tok);
             } else {
@@ -1618,7 +1604,7 @@ namespace CSCPP {
                     // エラー回復方法がコンパイラによってまちまちなので #elif を読み飛ばす方向で
                     var tok = hash;
                     while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                        tok = Lex.LexToken(limit_space: true);
+                        tok = Lex.LexToken(limitSpace: true);
                     }
                     Lex.unget_token(tok);
                 } else {
@@ -1650,7 +1636,7 @@ namespace CSCPP {
                 // エラー回復方法がコンパイラによってまちまちなので #endif を読み飛ばす方向で
                 var tok = hash;
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
                 Lex.unget_token(tok);
             } else {
@@ -1658,13 +1644,13 @@ namespace CSCPP {
                 Condition ci = ConditionStack.Pop();
 
                 {
-                    Token tok = Lex.LexToken(limit_space: true);
+                    Token tok = Lex.LexToken(limitSpace: true);
                     if (tok.Kind != Token.TokenKind.NewLine) {
                         if (CppContext.Warnings.Contains(Warning.Pedantic)) {
                             CppContext.Warning(tok, "#endif 指令の末尾に余分なトークンがあります。");
                         }
                         while (tok.Kind != Token.TokenKind.NewLine) {
-                            tok = Lex.LexToken(limit_space: true);
+                            tok = Lex.LexToken(limitSpace: true);
                         }
                     }
                 }
@@ -1679,11 +1665,11 @@ namespace CSCPP {
                     // 現在の処理している条件コンパイルブロックはインクルードガードパターンに合致しない
                 } else {
                     // 空白と改行を読み飛ばして先読みを行う
-                    Token last = Lex.LexToken(limit_space: true);
+                    Token last = Lex.LexToken(limitSpace: true);
                     SpaceInfo sp = last.Space;
                     while (last.Kind == Token.TokenKind.NewLine && ci.File == last.File) {
                         sp.Append(new Position(last.File.Name, last.File.Line, last.File.Column), "\n");
-                        last = Lex.LexToken(limit_space: true);
+                        last = Lex.LexToken(limitSpace: true);
                     }
                     last.Space = sp;
                     Lex.unget_token(last);
@@ -1706,7 +1692,7 @@ namespace CSCPP {
         static string read_error_message() {
             StringBuilder sb = new StringBuilder();
             for (; ; ) {
-                Token tok = Lex.LexToken(limit_space: true);
+                Token tok = Lex.LexToken(limitSpace: true);
                 if (tok.Kind == Token.TokenKind.NewLine) { return sb.ToString(); }
                 if (tok.Kind == Token.TokenKind.EoF) { return sb.ToString(); }
                 if (sb.Length != 0 && tok.Space.Length > 0) { sb.Append(' '); }
@@ -1808,7 +1794,7 @@ namespace CSCPP {
             } else if (tok.Kind == Token.TokenKind.Invalid) {
                 // 不正文字の場合は既にエラーが出ているはずなのでメッセージを出さない
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
                 Lex.unget_token(tok);
                 return null;
@@ -1816,7 +1802,7 @@ namespace CSCPP {
                 // どっちでもない場合はダメ
                 CppContext.Error(tok, $"ヘッダファイル名のあるべき場所に {Token.TokenToStr(tok)} がありました。");
                 while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                    tok = Lex.LexToken(limit_space: true);
+                    tok = Lex.LexToken(limitSpace: true);
                 }
                 Lex.unget_token(tok);
                 return null;
@@ -2120,7 +2106,7 @@ namespace CSCPP {
         /// <returns></returns>
         static Token ParsePragmaDirective(Token hash, Token tpragma) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(tok, $"#pragma 指令の引数となる識別子がありません。");
@@ -2130,7 +2116,7 @@ namespace CSCPP {
                 List<Token> tokens = new List<Token> { hash, tpragma };
                 tokens.Add(tok);
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     tokens.Add(t);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2147,10 +2133,10 @@ namespace CSCPP {
                 case "once": {
                         string path = System.IO.Path.GetFullPath(tok.File.Name);
                         Once[path] = "1";
-                        var t = Lex.LexToken(limit_space: true);
+                        var t = Lex.LexToken(limitSpace: true);
                         if (t.Kind != Token.TokenKind.NewLine && t.Kind != Token.TokenKind.EoF) {
                             for (; ; ) {
-                                t = Lex.LexToken(limit_space: true);
+                                t = Lex.LexToken(limitSpace: true);
                                 //t.Verbatim = true;
                                 if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
                             }
@@ -2165,7 +2151,7 @@ namespace CSCPP {
                         List<Token> tokens = new List<Token> { hash, tpragma };
                         tokens.Add(tok);
                         for (; ; ) {
-                            Token t = Lex.LexToken(limit_space: true);
+                            Token t = Lex.LexToken(limitSpace: true);
                             tokens.Add(t);
                             if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
                         }
@@ -2183,7 +2169,7 @@ namespace CSCPP {
                         List<Token> tokens = new List<Token> { hash, tpragma };
                         tokens.Add(tok);
                         for (; ; ) {
-                            Token t = Lex.LexToken(limit_space: true);
+                            Token t = Lex.LexToken(limitSpace: true);
                             tokens.Add(t);
                             if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) { break; }
                         }
@@ -2220,7 +2206,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
                 }
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
@@ -2231,7 +2217,7 @@ namespace CSCPP {
             if (line <= 0 || 2147483647 < line) {
                 CppContext.Error(tok, $"#line 指令の行番号に {tok.StrVal} が指定されていますが、 1 以上 2147483647 以下でなければなりません。");
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
@@ -2242,7 +2228,7 @@ namespace CSCPP {
             string filename = null;
             if (tok.Kind == Token.TokenKind.String) {
                 filename = tok.StrVal;
-                expect_newline(limit_space: true);
+                expect_newline(limitSpace: true);
             } else if (tok.Kind != Token.TokenKind.NewLine) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
                     CppContext.Error(tok, "#line 指令のファイル名があるべき場所で行が終わっています。。");
@@ -2250,7 +2236,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
                 }
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
@@ -2280,7 +2266,7 @@ namespace CSCPP {
                     CppContext.Error(tok, $"#line 指令で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
                 }
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
@@ -2291,7 +2277,7 @@ namespace CSCPP {
                 if (line <= 0 || 2147483647 < line) {
                     CppContext.Error(tok, $"#line 指令の行番号に {tok.StrVal} が指定されていますが、 1 以上 2147483647 以下でなければなりません。");
                     for (; ; ) {
-                        Token t = Lex.LexToken(limit_space: true);
+                        Token t = Lex.LexToken(limitSpace: true);
                         if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                             break;
                         }
@@ -2308,7 +2294,7 @@ namespace CSCPP {
                         CppContext.Error(tok, $"gcc 形式の line 指令で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
                     }
                     for (; ; ) {
-                        Token t = Lex.LexToken(limit_space: true);
+                        Token t = Lex.LexToken(limitSpace: true);
                         if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                             break;
                         }
@@ -2319,7 +2305,7 @@ namespace CSCPP {
 
                     // 残りのフラグなどは纏めて行末まで読み飛ばす
                     do {
-                        tok = Lex.LexToken(limit_space: true);
+                        tok = Lex.LexToken(limitSpace: true);
                     } while (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF);
 
                     /* 現在のファイルの位置情報を変更 */
@@ -2342,7 +2328,7 @@ namespace CSCPP {
                 // 行末まで読み取って、マクロ展開禁止フラグを付けて押し戻す。
                 List<Token> buf = new List<Token> { tok };
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     buf.Add(t);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
@@ -2354,7 +2340,7 @@ namespace CSCPP {
             } else {
                 CppContext.Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
                 for (; ; ) {
-                    Token t = Lex.LexToken(limit_space: true);
+                    Token t = Lex.LexToken(limitSpace: true);
                     if (t.Kind == Token.TokenKind.NewLine || t.Kind == Token.TokenKind.EoF) {
                         break;
                     }
@@ -2369,13 +2355,13 @@ namespace CSCPP {
         /// <param name="hash">'#'に対応するトークン</param>
         /// <returns>解析結果のトークン</returns>
         static Token ParseDirective(Token hash) {
-            inDirectiveLine++;
+            InDirectiveLine++;
             var ret = ParseDirectiveBody(hash);
-            inDirectiveLine--;
+            InDirectiveLine--;
             return ret;
         }
         static Token ParseDirectiveBody(Token hash) {
-            Token tok = Lex.LexToken(limit_space: true);
+            Token tok = Lex.LexToken(limitSpace: true);
             switch (tok.Kind) {
                 case Token.TokenKind.NewLine: {
                         // 行末の場合、6.10.7で定義されている空指令

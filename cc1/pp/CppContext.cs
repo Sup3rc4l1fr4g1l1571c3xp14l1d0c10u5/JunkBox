@@ -171,5 +171,14 @@ namespace CSCPP
             }
        }
 
+        /// <summary>
+        /// メッセージ出力
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="message"></param>
+        public static void Notify(Position pos, string message) {
+            OutputError(pos, "NOTIFY", message);
+        }
+
     }
 }

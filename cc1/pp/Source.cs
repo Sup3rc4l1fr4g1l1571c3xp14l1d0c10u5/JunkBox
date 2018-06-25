@@ -8,16 +8,16 @@ namespace CSCPP
     public class Source : System.IDisposable
     {
         private bool _handleEoF { get; set;  }
-        private System.IO.TextReader _textReader { get; set;  }
-        private Stack<int> UnreadStack { get; } = new Stack<int>();
+        private Utf32Reader _textReader { get; set;  }
+        private Stack<UInt32> UnreadStack { get; } = new Stack<UInt32>();
 
-        public Source(System.IO.TextReader textReader)
+        public Source(Utf32Reader textReader)
         {
             _textReader = textReader;
             _handleEoF = false;
         }
 
-        public int Read(Action<string> badcharHandler)
+        public UInt32 Read(Action<string> badcharHandler)
         {
             if (disposedValue) {
                 throw new System.ObjectDisposedException(nameof(Source), "Sourceは既にDisposeされています。");
@@ -26,19 +26,18 @@ namespace CSCPP
                 return UnreadStack.Pop();
             }
             if (_handleEoF) {
-                return -1;
+                return UInt32.MaxValue;
             }
             var ch = _textReader.Read();
-            if (ch == -1) {
+            if (ch == Utf32Reader.EoF) {
                 _handleEoF = true;
-            } else if (ch == 0xFFFF) {
-                // DetectEncoding内で文字コード上で表現できない文字があった場合は 前後に \uFFFFを付与しているので
-                // それを表現不能文字として読み取る
-                StringBuilder sb = new StringBuilder();
-                while ((ch = _textReader.Read()) != 0xFFFF) {
-                    sb.Append((char)ch);
+            } else if (ch == Utf32Reader.BadCharStart) {
+                // DetectEncoding内で元の文字コード上で表現できない文字があった場合は 前後に マーカー を付与しているのでその範囲を表現不能文字として読み取る。
+                List<UInt32> sb = new List<UInt32>();
+                while ((ch = _textReader.Read()) != Utf32Reader.BadCharEnd) {
+                    sb.Add(ch);
                 }
-                badcharHandler(sb.ToString());
+                badcharHandler(System.Text.Encoding.UTF32.GetString(sb.Select(x => BitConverter.GetBytes(x)).SelectMany((x) => x).ToArray()));
 
                 ch = '?';
             }
@@ -46,7 +45,7 @@ namespace CSCPP
                 return ch;
         }
 
-        public void Unread(int v)
+        public void Unread(uint v)
         {
             UnreadStack.Push(v);
         }

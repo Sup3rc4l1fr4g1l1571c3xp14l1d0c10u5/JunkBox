@@ -83,6 +83,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
+                    System.Diagnostics.Debug.Assert(ret == Int32.MinValue);
                 }
                 {
                     // 変換前後で値が変化する例：(Uint32)-1LL
@@ -93,6 +94,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
+                    System.Diagnostics.Debug.Assert(ret == UInt32.MinValue);
                 }
             }
             {
@@ -106,6 +108,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
+                    System.Diagnostics.Debug.Assert(ret.AsInt64() == long.MaxValue);
                 }
                 {
                     var i64Max = new IntMaxT(long.MaxValue);
@@ -116,15 +119,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
-                }
-                {
-                    var i64Max = new IntMaxT(long.MaxValue);
-                    bool overflow = false;
-                    var ret = IntMaxT.Add(i64Max, i64Max, (e, s) => {
-                        Console.Error.WriteLine(s);
-                        overflow = true;
-                    });
-                    System.Diagnostics.Debug.Assert(overflow);
+                    System.Diagnostics.Debug.Assert(ret.AsInt64() == long.MinValue);
                 }
             }
             {

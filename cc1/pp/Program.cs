@@ -11,7 +11,10 @@ namespace CSCPP {
                 return Body(args);
             } else {
                 try {
-                    return Body(args);
+                    using (var sw = new System.IO.StreamWriter(Console.OpenStandardOutput()) { AutoFlush = false }) {
+                        Console.SetOut(sw);
+                        return Body(args);
+                    }
                 } catch (Exception e) {
                     Console.Error.WriteLine($@"
 --------------------------------------------------------------------
@@ -58,6 +61,7 @@ namespace CSCPP {
         }
 
         static int Body(string[] args) {
+
             // 起動時引数を保存
             CppContext.OriginalArguments = args.ToArray();
 
@@ -316,7 +320,7 @@ namespace CSCPP {
 
                 }
                 if (CppContext.TargetFilePath == null) {
-                    CppContext.Error($"有効なプリプロセス対象ファイルが指定されませんでした。");
+                    CppContext.Error("有効なプリプロセス対象ファイルが指定されませんでした。");
                     return -1;
                 }
             }
@@ -460,6 +464,7 @@ namespace CSCPP {
             /// </summary>
             /// <param name="line"></param>
             /// <param name="path"></param>
+            /// <param name="isDummy"></param>
             private void WriteLineDirective(long line, string path, bool isDummy) {
                 if (!CppContext.Switchs.Contains("-P")) {
                     if (CppContext.Features.Contains(Feature.OutputGccStyleLineDirective)) {
@@ -470,8 +475,10 @@ namespace CSCPP {
                 }
             }
 
+            private static readonly System.Text.RegularExpressions.Regex RegexpReplace = new System.Text.RegularExpressions.Regex(@"(\r\n|\r|\n)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
             private string ReplaceNewLine(string input) {
-                return System.Text.RegularExpressions.Regex.Replace(input, @"(\r\n|\r|\n)", Environment.NewLine);
+                return RegexpReplace.Replace(input, Environment.NewLine);
             }
 
 
@@ -784,7 +791,7 @@ options:
     <encoding> には以下のコードページ番号、もしくは文字コード名を指定することができます。
     何も指定しない場合はシステムデフォルト(*付き)のエンコードが使用されます。
 
-" + String.Join(System.Environment.NewLine, System.Text.Encoding.GetEncodings().Select(x => $"   {(x.CodePage == System.Text.Encoding.Default.CodePage ? "*" : " ")}{x.CodePage,-5:D0} {x.Name}")) + @"
+" + String.Join(Environment.NewLine, System.Text.Encoding.GetEncodings().Select(x => $"   {(x.CodePage == System.Text.Encoding.Default.CodePage ? "*" : " ")}{x.CodePage,-5:D0} {x.Name}")) + @"
 
 -P
     #line行の出力を無効にします。

@@ -1,4 +1,4 @@
-using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -18,20 +18,23 @@ namespace CSCPP
         /// <summary>
         /// __FILE__で得られるファイル名
         /// </summary>
-        public string Name { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.FileName : name; } }
-        private string name {get; set;}
+        public string Name { get { return PushBackBuffer.Any() ? PushBackBuffer.Peek().Position.FileName : _name; } }
+
+        private string _name;
 
         /// <summary>
         /// 現在の読み取り行番号
         /// </summary>
-        public long Line { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.Line : line; } }
-        private long line { get; set; }
+        public long Line { get { return PushBackBuffer.Any() ? PushBackBuffer.Peek().Position.Line : _line; } }
+
+        private long _line;
 
         /// <summary>
         /// 現在の読み取り列番号
         /// </summary>
-        public int Column { get { return _pushBackBuffer.Any() ? _pushBackBuffer.Peek().Position.Column : column; } }
-        private int column { get; set; }
+        public int Column { get { return PushBackBuffer.Any() ? PushBackBuffer.Peek().Position.Column : _column; } }
+
+        private int _column;
 
         /// <summary>
         /// Source から読み取られたトークンの数
@@ -41,7 +44,7 @@ namespace CSCPP
         /// <summary>
         /// Source から最後に読み取った文字
         /// </summary>
-        private Char LastCharacter { get; set; } = new Char(new Position("", 0, 0), '\n');
+        private Utf32Char LastCharacter { get; set; } = new Utf32Char(Position.Empty, '\n');
 
         /// <summary>
         /// ファイルから読み取りか？
@@ -51,25 +54,23 @@ namespace CSCPP
         /// <summary>
         /// トークンの読み戻しスタック
         /// </summary>
-        private Stack<Char> _pushBackBuffer { get; } = new Stack<Char>();
+        private Stack<Utf32Char> PushBackBuffer { get; } = new Stack<Utf32Char>();
 
-        public const int Eof = -1;
-
-        public File(System.IO.TextReader file, string name)
+        public File(TextReader tr, string name)
         {
-            Source = new Source(file);
-            this.name = name;
-            this.line = 1;
-            this.column = 1;
+            Source = new Source(Utf32Reader.FromTextReader(tr));
+            _name = name;
+            _line = 1;
+            _column = 1;
             FromFile = true;
         }
 
         public File(string str, string name)
         {
-            Source = new Source(new System.IO.StringReader(str));
-            this.name = name;
-            this.line = 1;
-            this.column = 1;
+            Source = new Source(Utf32Reader.FromTextReader(new StreamReader(new MemoryStream(System.Text.Encoding.Unicode.GetBytes(str)), System.Text.Encoding.Unicode)));
+            _name = name;
+            _line = 1;
+            _column = 1;
             FromFile = false;
         }
 
@@ -86,24 +87,24 @@ namespace CSCPP
         /// fileから１文字読み取る。
         /// </summary>
         /// <returns></returns>
-        private Char readc_file(bool skip_badchar = false)
+        private Utf32Char readc_file(bool skipBadchar = false)
         {
             // ファイルから１文字読み取る
-            var pos =  new Position(this.Name, this.Line, this.Column);
+            var pos =  new Position(Name, Line, Column);
             var c = Source.Read((s) => {
-                if (skip_badchar == false) { 
+                if (skipBadchar == false) { 
                     CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \u{s} があります。");
                 } else {
                     CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \u{s} があります。確認をしてください。");
                 }
             });
             
-            if (c == -1)
+            if (c == Utf32Reader.EoF)
             {
                 if (FromFile)
                 {
                     // 読み取り結果がEOFの場合、直前の文字が改行文字でもEOFでもなければ改行を読みとった扱いにする
-                    if (LastCharacter.Value != '\n' && !LastCharacter.IsEof())
+                    if (LastCharacter != '\n' && !LastCharacter.IsEof())
                     {
                         if (CppContext.Warnings.Contains(Warning.Pedantic))
                         {
@@ -121,7 +122,7 @@ namespace CSCPP
             } else if (c == '\r') {
                 // CRLFの場合を考慮
                 var c2 = Source.Read((s) => {
-                    if (skip_badchar == false) { 
+                    if (skipBadchar == false) { 
                         CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
                     } else {
                         CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
@@ -134,7 +135,7 @@ namespace CSCPP
                 c = '\n';
             }
 
-            var ch = new Char(pos, c);
+            var ch = new Utf32Char(pos, c);
             LastCharacter = ch;
             return ch;
         }
@@ -154,10 +155,10 @@ namespace CSCPP
         /// カレントファイルから一文字読み取る。ついでに読み取った文字に応じてファイル上の現在位置を更新する。
         /// </summary>
         /// <returns>ファイル終端以外なら読み取った文字、終端に到達していたらEOF</returns>
-        public static Char Get(bool skip_badchar = false)
+        public static Utf32Char Get(bool skipBadchar = false)
         {
             bool dummy;
-            return Get(out dummy, skip_badchar: skip_badchar);
+            return Get(out dummy, skipBadchar: skipBadchar);
         }
 
 
@@ -166,31 +167,31 @@ namespace CSCPP
         /// 読み戻された文字の場合は ungetted が trueにセットされる（この値を用いてトライグラフの警告が多重に出力されないようにする）
         /// </summary>
         /// <returns>ファイル終端以外なら読み取った文字、終端に到達していたらEOF</returns>
-        private static Char Get(out bool ungetted, bool skip_badchar = false)
+        private static Utf32Char Get(out bool ungetted, bool skipBadchar = false)
         {
             File f = _files.Peek();
-            Char c;
-            if (f._pushBackBuffer.Any() )
+            Utf32Char c;
+            if (f.PushBackBuffer.Any() )
             {
                 // 読み戻しスタックに内容がある場合はそれを読み出す
-                c = f._pushBackBuffer.Pop();
+                c = f.PushBackBuffer.Pop();
                 ungetted = true;
                 return c;
             } else
             {
                 // そうでなければ入力ソースから読み取る
                 System.Diagnostics.Debug.Assert(f != null);
-                c = f.readc_file(skip_badchar: skip_badchar);
+                c = f.readc_file(skipBadchar: skipBadchar);
                 ungetted = false;
                 // 読み取った文字に応じてファイル上の現在の読み取り位置を更新
-                if (c.Value == '\n')
+                if (c == '\n')
                 {
-                    f.line++;
-                    f.column = 1;
+                    f._line++;
+                    f._column = 1;
                 }
                 else if (!c.IsEof())
                 {
-                    f.column++;
+                    f._column++;
                 }
             }
 
@@ -201,14 +202,14 @@ namespace CSCPP
         /// 一文字読み取る。
         /// </summary>
         /// <returns>読み取った文字</returns>
-        public static Char ReadCh(bool handle_eof=false, bool skip_badchar=false)
+        public static Utf32Char ReadCh(bool handleEof=false, bool skipBadchar=false)
         {
             for (;;)
             {
                 // カレントから一文字読み取る
                 var c = Get();
                 var p1 = c.Position;
-                if (c.IsEof() && handle_eof == false)
+                if (c.IsEof() && handleEof == false)
                 {
                     // 現在のファイルがスタック中に残った最後のファイルの場合はEOFを返す
                     if (_files.Count == 1)
@@ -223,22 +224,22 @@ namespace CSCPP
                 {
                     var p2 = c.Position;
                     // トライグラフの読み取りを行う
-                    if (c.Value == '?')
+                    if (c == '?')
                     {
                         var c2 = Get();
-                        if (c2.Value == '?')
+                        if (c2 == '?')
                         {
                             bool ungetted;
-                            var c3 = Get(out ungetted, skip_badchar: skip_badchar);
-                            var tri = Trigraph(c3.Value);
+                            var c3 = Get(out ungetted, skipBadchar: skipBadchar);
+                            var tri = Trigraph(c3);
                             if (tri != '\0') {
                                 if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
-                                    CppContext.Error(p2, $"トライグラフ ??{(char)c3.Value} が {tri} に置換されました。");
+                                    CppContext.Error(p2, $"トライグラフ ??{(char)c3} が {tri} に置換されました。");
                                 }
-                                return new Char(c.Position, tri);
+                                return new Utf32Char(c.Position, tri);
                             } else {
                                 if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
-                                    CppContext.Error(p2, $"未定義のトライグラフ ??{(char)c3.Value} が使用されています。");
+                                    CppContext.Error(p2, $"未定義のトライグラフ ??{(char)c3} が使用されています。");
                                 }
                             }
                             UnreadCh(c3);
@@ -249,13 +250,13 @@ namespace CSCPP
                 }
 
                 // \でないならそれ返して終わり
-                if (c.Value != '\\')
+                if (c != '\\')
                 {
                     return c;
                 } else {
                     // 行末の\の場合、改行も読み飛ばしてリトライ
                     var c2 = Get();
-                    if (c2.Value == '\n')
+                    if (c2 == '\n')
                     {
                         var c3 = Get();
                         if (c3.IsEof())
@@ -277,45 +278,46 @@ namespace CSCPP
             }
         }
 
-        private static char Trigraph(int c)
+        private static char Trigraph(Utf32Char c)
         {
-            switch (c) {
-                case '=':
+            switch (c.ToString()) {
+                case "=":
                     return '#';
-                case '/':
+                case "/":
                     return '\\';
-                case '\'':
+                case "\'":
                     return '^';
-                case '(':
+                case "(":
                     return '[';
-                case ')':
+                case ")":
                     return ']';
-                case '!':
+                case "!":
                     return '|';
-                case '<':
+                case "<":
                     return '{';
-                case '>':
+                case ">":
                     return '}';
-                case '-':
+                case "-":
                     return '~';
                 default:
                     return '\0';
             }
+
         }
 
         /// <summary>
         /// 一文字読み戻す（正確には任意の一文字を現在の読み戻しスタックに挿入する）
         /// </summary>
         /// <param name="c"></param>
-        public static void UnreadCh(Char c)
+        public static void UnreadCh(Utf32Char c)
         {
             if (c.IsEof())
             {
                 return;
             }
             File f = _files.Peek();
-            f._pushBackBuffer.Push(c);
-            //if (c.Value == '\n')
+            f.PushBackBuffer.Push(c);
+            //if (c == '\n')
             //{
             //    f.Column = 1;
             //    f.Line--;
@@ -363,9 +365,9 @@ namespace CSCPP
 
         public static void OverWriteCurrentPosition(long line, string filename) {
             File f = current_file();
-            f.line = line;
+            f._line = line;
             if (filename != null) {
-                f.name = filename;
+                f._name = filename;
             }
         }
     }
