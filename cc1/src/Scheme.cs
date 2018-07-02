@@ -27,18 +27,18 @@ using System.Text;
 using System.Threading;
 
 namespace AnsiCParser {
-    public class Lisp {
+    public class Schene {
 
         public static class Util {
             public static Pair makeList(params object[] args) {
-                return args.Reverse().Aggregate((Pair)null, (s, x) => new Lisp.Pair(x, s));
+                return args.Reverse().Aggregate((Pair)null, (s, x) => new Schene.Pair(x, s));
             }
 
             public static Pair makeCons(params object[] args) {
                 if (args.Length < 2) {
                     throw new ArgumentException("args.Length must greater than 1", nameof(args));
                 }
-                return (Pair)args.Reverse().Aggregate((s, x) => (object)new Lisp.Pair(x, s));
+                return (Pair)args.Reverse().Aggregate((s, x) => (object)new Schene.Pair(x, s));
             }
 
             public static Symbol makeSym(string value) {

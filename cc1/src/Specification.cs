@@ -707,8 +707,8 @@ namespace AnsiCParser {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
 
-            var btLhs = tyLhs as BasicType;
-            var btRhs = tyRhs as BasicType;
+            var btLhs = tyLhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyLhs as BasicType;
+            var btRhs = tyRhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
@@ -756,8 +756,8 @@ namespace AnsiCParser {
             tyLhs = lhs.Type.Unwrap();
             tyRhs = rhs.Type.Unwrap();
 
-            btLhs = tyLhs as BasicType;
-            btRhs = tyRhs as BasicType;
+            btLhs = tyLhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyLhs as BasicType;
+            btRhs = tyRhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型が基本型以外になっています。（本実装の誤りが原因だと思われます。）");

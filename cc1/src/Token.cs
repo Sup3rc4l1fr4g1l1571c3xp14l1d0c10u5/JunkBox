@@ -115,18 +115,21 @@ namespace AnsiCParser {
         public string Raw {
             get;
         }
+
         /// <summary>
         /// トークンの種別
         /// </summary>
         public TokenKind Kind {
             get;
         }
+
         public Token(TokenKind kind, Location start, Location end, string raw) {
             Kind = kind;
             Start = start;
             End = end;
             Raw = raw;
         }
+
         public override string ToString() {
             return $"(\"{Raw}\", {Kind}, {Start}, {End})";
         }

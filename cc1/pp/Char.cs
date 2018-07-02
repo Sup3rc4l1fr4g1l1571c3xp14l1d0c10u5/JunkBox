@@ -20,7 +20,7 @@ namespace CSCPP {
         /// <summary>
         /// 文字コード(UTF32)
         /// </summary>
-        public uint Value { get; }
+        public uint Code { get; }
 
         /// <summary>
         /// 文字コードに対応する文字（C#の内部表現がUTF16なので文字列としている）
@@ -34,11 +34,11 @@ namespace CSCPP {
         /// <param name="value">文字コード</param>
         public Utf32Char(Position position, uint value) {
             Position = position;
-            Value = value;
+            Code = value;
             if (value == EoFValue) {
                 StringValue = "";
             } else {
-                StringValue = System.Text.Encoding.UTF32.GetString(BitConverter.GetBytes(Value));
+                StringValue = System.Text.Encoding.UTF32.GetString(BitConverter.GetBytes(Code));
             }
         }
 
@@ -46,7 +46,7 @@ namespace CSCPP {
             Position = position;
             StringValue = $"{value}";
             var bytes = System.Text.Encoding.UTF32.GetBytes(StringValue);
-            Value = BitConverter.ToUInt32(bytes,0);
+            Code = BitConverter.ToUInt32(bytes,0);
         }
 
         public static explicit operator char(Utf32Char self) {
@@ -72,7 +72,7 @@ namespace CSCPP {
         public override bool Equals(object obj) {
             if (obj is Utf32Char) {
                 var that = ((Utf32Char)obj);
-                return Object.Equals(Position, that.Position) && (Value == that.Value);
+                return Object.Equals(Position, that.Position) && (Code == that.Code);
             }
             if (obj is String) {
                 var that = ((String)obj);
@@ -88,7 +88,7 @@ namespace CSCPP {
             return ToString().GetHashCode();
         }
         public bool IsEof() {
-            return Value == EoFValue;
+            return Code == EoFValue;
         }
  
         public override string ToString() {
@@ -140,6 +140,7 @@ namespace CSCPP {
 
         private static IEnumerable<UInt32> ReadUtf32FromTextReaderIterator(TextReader tr) {
             using (tr) {
+                var dec = System.Text.Encoding.UTF32.GetDecoder();
                 for (;;) {
                     var ch1 = tr.Read();
                     if (ch1 == -1) {

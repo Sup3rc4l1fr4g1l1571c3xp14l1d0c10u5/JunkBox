@@ -189,11 +189,11 @@ namespace AnsiCParser {
                                 currentBitfieldCapacity = 0;
                                 currentBitfieldSize = 0;
                             } else if ((currentBitfieldType != null) && (bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) { // 今の領域があふれる
-                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
-                                // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
-                                currentBytePosition += currentBitfieldCapacity / 8;
-                                //current_bitfield_type = null;
-                                //current_bitfield_capacity = 0;
+                                if (currentBitfieldCapacity - currentBitfieldSize > 0) {
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
+                                    // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
+                                    currentBytePosition += currentBitfieldCapacity / 8;
+                                }
                                 currentBitfieldSize = 0;
                             }
 

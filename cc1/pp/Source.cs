@@ -39,7 +39,7 @@ namespace CSCPP
                 }
                 badcharHandler(System.Text.Encoding.UTF32.GetString(sb.Select(x => BitConverter.GetBytes(x)).SelectMany((x) => x).ToArray()));
 
-                ch = '?';
+                ch = '\uFFFD';  // REPLACEMENT CHARACTER に置き換える
             }
 
                 return ch;

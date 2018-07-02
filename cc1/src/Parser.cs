@@ -198,7 +198,7 @@ namespace AnsiCParser {
         /// <param name="storageClass"></param>
         /// <param name="scope"></param>
         /// <returns></returns>
-        private LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope) {
+        private LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, bool hasInitializer) {
             // 記憶域クラス指定からリンケージを求める
             switch (storageClass) {
                 case AnsiCParser.StorageClassSpecifier.Auto:
@@ -225,7 +225,7 @@ namespace AnsiCParser {
                             throw new CompilerException.SpecificationErrorException(ident.Range, "関数宣言が記憶域クラス指定子 static をもつことができるのは，ファイル有効範囲をもつ宣言の場合だけである");
                         }
                     }
-                    if (scope == ScopeKind.FileScope && (type.IsObjectType() || type.IsFunctionType())) {
+                    if (scope == ScopeKind.FileScope && (type.IsObjectType() || type.IsFunctionType() || (type.IsArrayType() && hasInitializer))) {
                         // 6.2.2 識別子の結合
                         // オブジェクト又は関数に対するファイル有効範囲の識別子の宣言が記憶域クラス指定子 static を含む場合，その識別子は，内部結合をもつ
                         return LinkageKind.InternalLinkage;
@@ -1059,7 +1059,7 @@ namespace AnsiCParser {
                 (IsTypeSpecifier() && type == null) ||
                 (IsStructOrUnionSpecifier() && type == null) ||
                 (IsEnumSpecifier() && type == null) ||
-                (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) ||
+                (IsTypedefName() && type == null && typeSpecifier == AnsiCParser.TypeSpecifier.None) || // typedef名 と TypeSpecifier は組み合わせられない。 typedef int I; unsigned I x; は妥当だがtypedef unsigned U; U int x; は妥当ではない。
                 IsTypeQualifier() ||
                 IsFunctionSpecifier());
         }
@@ -3334,7 +3334,7 @@ namespace AnsiCParser {
             }
 
             // 記憶域クラス指定からリンケージを求める(関数の場合は、外部結合もしくは内部結合のどれかとなり、無結合はない)
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope);
+            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, false);
             Debug.Assert(linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage);
 
             // その識別子の以前の宣言が可視であるか？
@@ -3426,7 +3426,7 @@ namespace AnsiCParser {
         private Declaration.VariableDeclaration VariableDeclaration(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, bool hasInitializer) {
 
             // 記憶域クラス指定からリンケージを求める
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope);
+            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, hasInitializer);
 
             // 初期化子を持つか？
             Initializer initializer = null;
@@ -3454,6 +3454,13 @@ namespace AnsiCParser {
                 // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
                 initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == LinkageKind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
 
+            } else {
+                CType baseType;
+                int len;
+                if (type.IsArrayType(out baseType, out len) && len == -1) {
+                    // 長さの指定がない配列型はポインタ型に読み替える
+                    type = CType.CreatePointer(baseType);
+                }
             }
 
 

@@ -3,28 +3,28 @@ using System.Linq;
 using AnsiCParser.DataType;
 
 namespace AnsiCParser.SyntaxTree {
-    public class ToSExprVisitor : IVisitor<Lisp.Pair, Lisp.Pair> {
-        private static Lisp.Pair LocationRangeToCons(LocationRange lr) {
-            return Lisp.Util.makeCons(
-                Lisp.Util.makeList(
-                    Lisp.Util.makeStr(lr.Start.FilePath),
-                    Lisp.Util.makeNum(lr.Start.Position),
-                    Lisp.Util.makeNum(lr.Start.Line),
-                    Lisp.Util.makeNum(lr.Start.Column)
+    public class ToSExprVisitor : IVisitor<Schene.Pair, Schene.Pair> {
+        private static Schene.Pair LocationRangeToCons(LocationRange lr) {
+            return Schene.Util.makeCons(
+                Schene.Util.makeList(
+                    Schene.Util.makeStr(lr.Start.FilePath),
+                    Schene.Util.makeNum(lr.Start.Position),
+                    Schene.Util.makeNum(lr.Start.Line),
+                    Schene.Util.makeNum(lr.Start.Column)
                 ),
-                Lisp.Util.makeList(
-                    Lisp.Util.makeStr(lr.End.FilePath),
-                    Lisp.Util.makeNum(lr.End.Position),
-                    Lisp.Util.makeNum(lr.End.Line),
-                    Lisp.Util.makeNum(lr.End.Column)
+                Schene.Util.makeList(
+                    Schene.Util.makeStr(lr.End.FilePath),
+                    Schene.Util.makeNum(lr.End.Position),
+                    Schene.Util.makeNum(lr.End.Line),
+                    Schene.Util.makeNum(lr.End.Column)
                 )
             );
         }
 
 
-        public Lisp.Pair OnAdditiveExpression(Expression.AdditiveExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(self.Op == Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"),
+        public Schene.Pair OnAdditiveExpression(Expression.AdditiveExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(self.Op == Expression.AdditiveExpression.OperatorKind.Add ? "add-expr" : "sub-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -32,9 +32,9 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnAndExpression(Expression.BitExpression.AndExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("and-expr"),
+        public Schene.Pair OnAndExpression(Expression.BitExpression.AndExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("and-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -42,37 +42,37 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("argument-declaration"),
+        public Schene.Pair OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("argument-declaration"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident),
-            Lisp.Util.makeSym(self.StorageClass.ToString().ToLower())
+            Schene.Util.makeStr(self.Ident),
+            Schene.Util.makeSym(self.StorageClass.ToString().ToLower())
             );
         }
 
-        public Lisp.Pair OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("arg-expr"),
+        public Schene.Pair OnArgumentExpression(Expression.PrimaryExpression.IdentifierExpression.ArgumentExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("arg-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident)
+            Schene.Util.makeStr(self.Ident)
             );
         }
 
-        public Lisp.Pair OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("array-assign-init"),
+        public Schene.Pair OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("array-assign-init"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
+            Schene.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
-        public Lisp.Pair OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("array-subscript-expr"),
+        public Schene.Pair OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("array-subscript-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Target.Accept(this, value),
@@ -80,54 +80,54 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnBreakStatement(Statement.BreakStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("break-stmt"),
+        public Schene.Pair OnBreakStatement(Statement.BreakStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("break-stmt"),
             LocationRangeToCons(self.LocationRange)
             );
         }
 
-        public Lisp.Pair OnCaseStatement(Statement.CaseStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("case-stmt"),
+        public Schene.Pair OnCaseStatement(Statement.CaseStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("case-stmt"),
             LocationRangeToCons(self.LocationRange),
             self.Expr.Accept(this, value),
             self.Stmt.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnCastExpression(Expression.CastExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("cast-expr"),
+        public Schene.Pair OnCastExpression(Expression.CastExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("cast-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("char-const"),
+        public Schene.Pair OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("char-const"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Str)
+            Schene.Util.makeStr(self.Str)
             );
         }
 
-        public Lisp.Pair OnCommaExpression(Expression.CommaExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("comma-expr"),
+        public Schene.Pair OnCommaExpression(Expression.CommaExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("comma-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Expressions.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
+            Schene.Util.makeList(self.Expressions.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
-        public Lisp.Pair OnComplexInitializer(Initializer.ComplexInitializer self, Lisp.Pair value) {
+        public Schene.Pair OnComplexInitializer(Initializer.ComplexInitializer self, Schene.Pair value) {
             throw new Exception("来ないはず");
         }
 
-        public Lisp.Pair OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Lisp.Pair value) {
+        public Schene.Pair OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, Schene.Pair value) {
             string ops = "";
             switch (self.Op) {
                 case Expression.AssignmentExpression.CompoundAssignmentExpression.OperatorKind.ADD_ASSIGN:
@@ -161,8 +161,8 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "shr-assign-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -170,11 +170,11 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnCompoundStatement(Statement.CompoundStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("compound-stmt"),
+        public Schene.Pair OnCompoundStatement(Statement.CompoundStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("compound-stmt"),
             LocationRangeToCons(self.LocationRange),
-            Lisp.Util.makeList(
+            Schene.Util.makeList(
                 self.Decls
                     .Select(x => x.Accept(this, value))
                     .Concat(self.Stmts.Select(x => x.Accept(this, value)))
@@ -184,9 +184,9 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnConditionalExpression(Expression.ConditionalExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("cond-expr"),
+        public Schene.Pair OnConditionalExpression(Expression.ConditionalExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("cond-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.CondExpr.Accept(this, value),
@@ -195,48 +195,48 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnContinueStatement(Statement.ContinueStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("continue-stmt"),
+        public Schene.Pair OnContinueStatement(Statement.ContinueStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("continue-stmt"),
             LocationRangeToCons(self.LocationRange)
             );
         }
 
-        public Lisp.Pair OnDefaultStatement(Statement.DefaultStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("default-stmt"),
+        public Schene.Pair OnDefaultStatement(Statement.DefaultStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("default-stmt"),
             LocationRangeToCons(self.LocationRange)
             );
         }
 
-        public Lisp.Pair OnDoWhileStatement(Statement.DoWhileStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("do-stmt"),
+        public Schene.Pair OnDoWhileStatement(Statement.DoWhileStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("do-stmt"),
             LocationRangeToCons(self.LocationRange),
             self.Stmt.Accept(this, value),
             self.Cond.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnEmptyStatement(Statement.EmptyStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("empty-stmt"),
+        public Schene.Pair OnEmptyStatement(Statement.EmptyStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("empty-stmt"),
             LocationRangeToCons(self.LocationRange)
             );
         }
 
-        public Lisp.Pair OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("enclosed-expr"),
+        public Schene.Pair OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("enclosed-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.ParenthesesExpression.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("address-constant"),
+        public Schene.Pair OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("address-constant"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Identifier.Accept(this, value),
@@ -244,16 +244,16 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("enum-const"),
+        public Schene.Pair OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("enum-const"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident), Lisp.Util.makeNum(self.Info.Value)
+            Schene.Util.makeStr(self.Ident), Schene.Util.makeNum(self.Info.Value)
             );
         }
 
-        public Lisp.Pair OnEqualityExpression(Expression.EqualityExpression self, Lisp.Pair value) {
+        public Schene.Pair OnEqualityExpression(Expression.EqualityExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.EqualityExpression.OperatorKind.Equal:
@@ -263,8 +263,8 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "notequal-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -272,9 +272,9 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("xor-expr"),
+        public Schene.Pair OnExclusiveOrExpression(Expression.BitExpression.ExclusiveOrExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("xor-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -282,104 +282,104 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnExpressionStatement(Statement.ExpressionStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("expr-stmt"),
+        public Schene.Pair OnExpressionStatement(Statement.ExpressionStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("expr-stmt"),
             LocationRangeToCons(self.LocationRange),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("float-const"),
+        public Schene.Pair OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("float-const"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Str),
-            Lisp.Util.makeFloat(self.Value)
+            Schene.Util.makeStr(self.Str),
+            Schene.Util.makeFloat(self.Value)
             );
         }
 
-        public Lisp.Pair OnForStatement(Statement.ForStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("for-stmt"),
+        public Schene.Pair OnForStatement(Statement.ForStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("for-stmt"),
             LocationRangeToCons(self.LocationRange),
-            self.Init?.Accept(this, value) ?? Lisp.Util.Nil,
-            self.Cond?.Accept(this, value) ?? Lisp.Util.Nil,
-            self.Update?.Accept(this, value) ?? Lisp.Util.Nil,
-            self.Stmt?.Accept(this, value) ?? Lisp.Util.Nil
+            self.Init?.Accept(this, value) ?? Schene.Util.Nil,
+            self.Cond?.Accept(this, value) ?? Schene.Util.Nil,
+            self.Update?.Accept(this, value) ?? Schene.Util.Nil,
+            self.Stmt?.Accept(this, value) ?? Schene.Util.Nil
             );
         }
 
-        public Lisp.Pair OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("call-expr"),
+        public Schene.Pair OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("call-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
-            Lisp.Util.makeList(self.Args.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
+            Schene.Util.makeList(self.Args.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
-        public Lisp.Pair OnFunctionDeclaration(Declaration.FunctionDeclaration self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("func-decl"),
+        public Schene.Pair OnFunctionDeclaration(Declaration.FunctionDeclaration self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("func-decl"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident),
-            Lisp.Util.makeSym(self.StorageClass.ToString().ToLower()),
-            Lisp.Util.makeSym(self.FunctionSpecifier.ToString().ToLower()),
-            Lisp.Util.makeStr($"{self.LinkageObject.LinkageId}#{self.LinkageObject.Id}"),
-            self.Body?.Accept(this, value) ?? Lisp.Util.Nil
+            Schene.Util.makeStr(self.Ident),
+            Schene.Util.makeSym(self.StorageClass.ToString().ToLower()),
+            Schene.Util.makeSym(self.FunctionSpecifier.ToString().ToLower()),
+            Schene.Util.makeStr($"{self.LinkageObject.LinkageId}#{self.LinkageObject.Id}"),
+            self.Body?.Accept(this, value) ?? Schene.Util.Nil
             );
         }
 
-        public Lisp.Pair OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("func-expr"),
+        public Schene.Pair OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("func-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident)
+            Schene.Util.makeStr(self.Ident)
             );
         }
 
-        public Lisp.Pair OnGccStatementExpression(Expression.GccStatementExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("gcc-stmt-expr"),
+        public Schene.Pair OnGccStatementExpression(Expression.GccStatementExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("gcc-stmt-expr"),
             LocationRangeToCons(self.LocationRange)
             );
         }
 
-        public Lisp.Pair OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("label-stmt"),
+        public Schene.Pair OnGenericLabeledStatement(Statement.GenericLabeledStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("label-stmt"),
             LocationRangeToCons(self.LocationRange),
-            Lisp.Util.makeStr(self.Ident),
+            Schene.Util.makeStr(self.Ident),
             self.Stmt.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnGotoStatement(Statement.GotoStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("goto-stmt"),
+        public Schene.Pair OnGotoStatement(Statement.GotoStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("goto-stmt"),
             LocationRangeToCons(self.LocationRange),
-            Lisp.Util.makeStr(self.Label)
+            Schene.Util.makeStr(self.Label)
             );
         }
 
-        public Lisp.Pair OnIfStatement(Statement.IfStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("if-stmt"),
+        public Schene.Pair OnIfStatement(Statement.IfStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("if-stmt"),
             LocationRangeToCons(self.LocationRange),
             self.Cond.Accept(this, value),
-            self.ThenStmt?.Accept(this, value) ?? Lisp.Util.Nil,
-            self.ElseStmt?.Accept(this, value) ?? Lisp.Util.Nil
+            self.ThenStmt?.Accept(this, value) ?? Schene.Util.Nil,
+            self.ElseStmt?.Accept(this, value) ?? Schene.Util.Nil
             );
         }
 
-        public Lisp.Pair OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("or-expr"),
+        public Schene.Pair OnInclusiveOrExpression(Expression.BitExpression.InclusiveOrExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("or-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -387,28 +387,28 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("int-const"),
+        public Schene.Pair OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("int-const"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Str),
-            Lisp.Util.makeNum(self.Value)
+            Schene.Util.makeStr(self.Str),
+            Schene.Util.makeNum(self.Value)
             );
         }
 
-        public Lisp.Pair OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("intpromot-expr"),
+        public Schene.Pair OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("intpromot-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnLogicalAndExpression(Expression.LogicalAndExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("logic-and-expr"),
+        public Schene.Pair OnLogicalAndExpression(Expression.LogicalAndExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("logic-and-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -416,9 +416,9 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnLogicalOrExpression(Expression.LogicalOrExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("logic-or-expr"),
+        public Schene.Pair OnLogicalOrExpression(Expression.LogicalOrExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("logic-or-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -426,27 +426,27 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("member-direct-expr"),
+        public Schene.Pair OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("member-direct-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
-            Lisp.Util.makeStr(self.Ident.Raw)
+            Schene.Util.makeStr(self.Ident.Raw)
             );
         }
 
-        public Lisp.Pair OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("member-indirect-expr"),
+        public Schene.Pair OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("member-indirect-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value),
-            Lisp.Util.makeStr(self.Ident.Raw)
+            Schene.Util.makeStr(self.Ident.Raw)
             );
         }
 
-        public Lisp.Pair OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Lisp.Pair value) {
+        public Schene.Pair OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.MultiplicitiveExpression.OperatorKind.Mul:
@@ -459,15 +459,15 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "mod-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value), self.Rhs.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnRelationalExpression(Expression.RelationalExpression self, Lisp.Pair value) {
+        public Schene.Pair OnRelationalExpression(Expression.RelationalExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.RelationalExpression.OperatorKind.LessThan:
@@ -483,8 +483,8 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "greateq-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -492,15 +492,15 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnReturnStatement(Statement.ReturnStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("ret-stmt"),
+        public Schene.Pair OnReturnStatement(Statement.ReturnStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("ret-stmt"),
             LocationRangeToCons(self.LocationRange),
-            self.Expr?.Accept(this, value) ?? Lisp.Util.Nil
+            self.Expr?.Accept(this, value) ?? Schene.Util.Nil
             );
         }
 
-        public Lisp.Pair OnShiftExpression(Expression.ShiftExpression self, Lisp.Pair value) {
+        public Schene.Pair OnShiftExpression(Expression.ShiftExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.ShiftExpression.OperatorKind.Left:
@@ -510,8 +510,8 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "shr-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -519,18 +519,18 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("simple-assign-init"),
+        public Schene.Pair OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("simple-assign-init"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("assign-expr"),
+        public Schene.Pair OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("assign-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Lhs.Accept(this, value),
@@ -538,131 +538,131 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Lisp.Pair OnSimpleInitializer(Initializer.SimpleInitializer self, Lisp.Pair value) {
+        public Schene.Pair OnSimpleInitializer(Initializer.SimpleInitializer self, Schene.Pair value) {
             throw new Exception("来ないはず");
         }
 
-        public Lisp.Pair OnSizeofExpression(Expression.SizeofExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("sizeof-expr-expr"),
+        public Schene.Pair OnSizeofExpression(Expression.SizeofExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("sizeof-expr-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.ExprOperand.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("sizeof-type-expr"),
+        public Schene.Pair OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("sizeof-type-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.TypeOperand.Accept(new DataType.ToSExprVisitor(), null)
             );
         }
 
-        public Lisp.Pair OnStringExpression(Expression.PrimaryExpression.StringExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("string-expr"),
+        public Schene.Pair OnStringExpression(Expression.PrimaryExpression.StringExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("string-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Strings.Select(Lisp.Util.makeStr).ToArray())
+            Schene.Util.makeList(self.Strings.Select(Schene.Util.makeStr).ToArray())
             );
         }
 
-        public Lisp.Pair OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("struct-union-assign-init"),
+        public Schene.Pair OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("struct-union-assign-init"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray()));
+            Schene.Util.makeList(self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray()));
         }
 
-        public Lisp.Pair OnSwitchStatement(Statement.SwitchStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("switch-expr"),
+        public Schene.Pair OnSwitchStatement(Statement.SwitchStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("switch-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Cond.Accept(this, value),
             self.Stmt.Accept(this, value));
         }
 
-        public Lisp.Pair OnTranslationUnit(TranslationUnit self, Lisp.Pair value) {
-            return Lisp.Util.makeCons(
-                Lisp.Util.makeSym("translation-unit"),
+        public Schene.Pair OnTranslationUnit(TranslationUnit self, Schene.Pair value) {
+            return Schene.Util.makeCons(
+                Schene.Util.makeSym("translation-unit"),
                 LocationRangeToCons(self.LocationRange),
-                Lisp.Util.makeList(
-                    Lisp.Util.makeSym("linkage-table"),
-                    Lisp.Util.makeList(
+                Schene.Util.makeList(
+                    Schene.Util.makeSym("linkage-table"),
+                    Schene.Util.makeList(
                         self.LinkageTable.Select(x =>
-                            Lisp.Util.makeList(
-                                Lisp.Util.makeStr($"{x.LinkageId}#{x.Id}"),
+                            Schene.Util.makeList(
+                                Schene.Util.makeStr($"{x.LinkageId}#{x.Id}"),
                                 LocationRangeToCons((x.Definition ?? x.TentativeDefinitions[0]).LocationRange),
-                                Lisp.Util.makeSym(x.Linkage.ToString()),
+                                Schene.Util.makeSym(x.Linkage.ToString()),
                                 x.Type.Accept(new DataType.ToSExprVisitor(), value)
                             )
                         ).Cast<object>().ToArray()
                     )
                 ),
-                Lisp.Util.makeList(self.Declarations.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
+                Schene.Util.makeList(self.Declarations.Select(x => x.Accept(this, value)).Cast<object>().ToArray())
             );
         }
 
-        public Lisp.Pair OnTypeConversionExpression(Expression.TypeConversionExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("type-conv"),
+        public Schene.Pair OnTypeConversionExpression(Expression.TypeConversionExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("type-conv"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnTypeDeclaration(Declaration.TypeDeclaration self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("type-decl"),
+        public Schene.Pair OnTypeDeclaration(Declaration.TypeDeclaration self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("type-decl"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident));
+            Schene.Util.makeStr(self.Ident));
         }
 
-        public Lisp.Pair OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("addr-expr"),
-            LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            self.Expr.Accept(this, value));
-        }
-
-        public Lisp.Pair OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("unary-minus-expr"),
+        public Schene.Pair OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("addr-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("unary-neg-expr"),
+        public Schene.Pair OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("unary-minus-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnUnaryNotExpression(Expression.UnaryNotExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("unary-not-expr"),
+        public Schene.Pair OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("unary-neg-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("unary-plus-expr"),
+        public Schene.Pair OnUnaryNotExpression(Expression.UnaryNotExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("unary-not-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Lisp.Pair value) {
+        public Schene.Pair OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("unary-plus-expr"),
+            LocationRangeToCons(self.LocationRange),
+            self.Type.Accept(new DataType.ToSExprVisitor(), null),
+            self.Expr.Accept(this, value));
+        }
+
+        public Schene.Pair OnUnaryPostfixExpression(Expression.PostfixExpression.UnaryPostfixExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.PostfixExpression.UnaryPostfixExpression.OperatorKind.Inc:
@@ -672,14 +672,14 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "post-inc-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value));
         }
 
-        public Lisp.Pair OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Lisp.Pair value) {
+        public Schene.Pair OnUnaryPrefixExpression(Expression.UnaryPrefixExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
                 case Expression.UnaryPrefixExpression.OperatorKind.Inc:
@@ -689,55 +689,55 @@ namespace AnsiCParser.SyntaxTree {
                     ops = "pre-inc-expr";
                     break;
             }
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym(ops),
+            return Schene.Util.makeList(
+            Schene.Util.makeSym(ops),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("ref-expr"),
+        public Schene.Pair OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("ref-expr"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
             self.Expr.Accept(this, value)
             );
         }
 
-        public Lisp.Pair OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("undef-ident-expr"),
+        public Schene.Pair OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("undef-ident-expr"),
             LocationRangeToCons(self.LocationRange),
-            Lisp.Util.makeStr(self.Ident)
+            Schene.Util.makeStr(self.Ident)
             );
         }
 
-        public Lisp.Pair OnVariableDeclaration(Declaration.VariableDeclaration self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("var-decl"),
-            LocationRangeToCons(self.LocationRange),
-            self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident),
-            Lisp.Util.makeSym(self.StorageClass.ToString().ToLower()),
-            Lisp.Util.makeStr(self.LinkageObject == null ? "" : $"{self.LinkageObject.LinkageId}#{self.LinkageObject.Id}"),
-            self.Init?.Accept(this, value) ?? Lisp.Util.Nil
-            );
-        }
-
-        public Lisp.Pair OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("var-expr"),
+        public Schene.Pair OnVariableDeclaration(Declaration.VariableDeclaration self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("var-decl"),
             LocationRangeToCons(self.LocationRange),
             self.Type.Accept(new DataType.ToSExprVisitor(), null),
-            Lisp.Util.makeStr(self.Ident)
+            Schene.Util.makeStr(self.Ident),
+            Schene.Util.makeSym(self.StorageClass.ToString().ToLower()),
+            Schene.Util.makeStr(self.LinkageObject == null ? "" : $"{self.LinkageObject.LinkageId}#{self.LinkageObject.Id}"),
+            self.Init?.Accept(this, value) ?? Schene.Util.Nil
             );
         }
 
-        public Lisp.Pair OnWhileStatement(Statement.WhileStatement self, Lisp.Pair value) {
-            return Lisp.Util.makeList(
-            Lisp.Util.makeSym("while-stmt"),
+        public Schene.Pair OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("var-expr"),
+            LocationRangeToCons(self.LocationRange),
+            self.Type.Accept(new DataType.ToSExprVisitor(), null),
+            Schene.Util.makeStr(self.Ident)
+            );
+        }
+
+        public Schene.Pair OnWhileStatement(Statement.WhileStatement self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("while-stmt"),
             LocationRangeToCons(self.LocationRange),
             self.Cond.Accept(this, value),
             self.Stmt.Accept(this, value));

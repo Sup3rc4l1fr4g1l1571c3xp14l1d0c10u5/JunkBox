@@ -45,6 +45,20 @@ namespace CSCPP {
             File.UnreadCh(c);
             return false;
         }
+        static bool IsNextStr(string str) {
+            Stack<Utf32Char> chars = new Stack<Utf32Char>();
+            foreach (var ch in str) {
+                var c = File.ReadCh();
+                chars.Push(c);
+                if (c != ch) {
+                    while (chars.Any()) {
+                        File.UnreadCh(chars.Pop());
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
 
         /// <summary>
         /// 現在の行を行末以外読み飛ばす
@@ -98,7 +112,7 @@ namespace CSCPP {
                     // 前処理指令の中（先頭の#前処理字句の直後から，最後の改行文字の直前まで）の前処理字句の間 に現れてよい空白類文字は，空白と水平タブだけとする
                     if (CppContext.Warnings.Contains(Warning.Pedantic))
                     {
-                        CppContext.Warning(c.Position, $"前処理指令の中で使えない空白文字 \\u{c.Value:x8} が使われています。");
+                        CppContext.Warning(c.Position, $"前処理指令の中で使えない空白文字 U+{c.Code:x8} が使われています。");
                     }
                 }
                 sb.Append(c.Position, (char) c);
@@ -124,9 +138,7 @@ namespace CSCPP {
                         System.Diagnostics.Debug.Assert(File.ReadCh() == '/');
                         var commentStr = ReadLineComment();
                         if (!CppContext.Switchs.Contains("-C")) {
-                            // コメントを保持しないオプションが有効の場合は、行を空白で置き換えてしまう
-                            //commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
-                            //if (commentStr.Any() == false) { commentStr = " "; }
+                            // コメントを保持しないオプションが有効の場合は、空白で置き換えてしまう
                             commentStr = " ";
                         }
                         sb.Append(c.Position, commentStr);
@@ -305,7 +317,7 @@ namespace CSCPP {
             }
         }
 
-        static string read_escaped_char_string(Position pos) {
+        static string read_escaped_char_string() {
             var c = File.ReadCh();
             // This switch-cases is an interesting example of magical aspects
             // of self-hosting compilers. Here, we teach the compiler about
@@ -339,7 +351,7 @@ namespace CSCPP {
                 case '7':
                     return read_octal_char2(c);
             }
-            CppContext.Warning(pos, $@"\{c} は未知のエスケープ文字です。");
+            CppContext.Warning(c.Position, $@"\{c} は未知のエスケープ文字です。");
             return $@"\{c}";
         }
 
@@ -348,7 +360,7 @@ namespace CSCPP {
         /// </summary>
         /// <param name="pos"></param>
         /// <returns></returns>
-        static Token read_char(Position pos) {
+        static Token read_char(Position pos, Token.EncType encType) {
             StringBuilder b = new StringBuilder();
             for (;;) {
                 var c = File.ReadCh();
@@ -363,28 +375,17 @@ namespace CSCPP {
                     b.Append(c);
                     continue;
                 }
-                var str = read_escaped_char_string(c.Position);
+                var str = read_escaped_char_string();
                 b.Append(str);
             }
-            return Token.make_char(pos, b.ToString());
-
-            /////
-            //var charPos = File.CurrentPosition();
-            //var c = File.ReadCh();
-            //string r = (c == '\\') ? read_escaped_char_string(charPos) : $"{(char)c}";
-            //c = File.ReadCh();
-            //if (c != '\'') {
-            //    CppContext.Error(pos, "文字定数が ' で終端していません。");
-            //    // 終端忘れか、二文字以上入っているのどっちかだと思われるけど、どちらでエラー回復すればいいのだろうか。
-            //}
-            //return Token.make_char(pos, r);
+            return Token.make_char(pos, b.ToString(), encType);
         }
         /// <summary>
         /// 文字列定数の読み取り
         /// </summary>
         /// <param name="pos"></param>
         /// <returns></returns>
-        static Token read_string(Position pos) {
+        static Token read_string(Position pos, Token.EncType encType) {
             StringBuilder b = new StringBuilder();
             for (;;) {
                 var c = File.ReadCh();
@@ -399,10 +400,10 @@ namespace CSCPP {
                     b.Append(c);
                     continue;
                 }
-                var str = read_escaped_char_string(c.Position);
+                var str = read_escaped_char_string();
                 b.Append(str);
             }
-            return Token.make_strtok(pos, b.ToString());
+            return Token.make_strtok(pos, b.ToString(), encType);
         }
 
         /// <summary>
@@ -416,7 +417,7 @@ namespace CSCPP {
             b.Append(c);
             for (;;) {
                 c = File.ReadCh();
-                if ((!c.IsEof()) && (c.IsAlNum() || c == '_' /*|| c == '$'*/)) {
+                if ((!c.IsEof()) && (c.IsAlNum() || c == '_')) {
                     b.Append(c);
                     continue;
                 }
@@ -443,7 +444,7 @@ namespace CSCPP {
                     // エスケープシーケンスの次の文字の場合
                     escape = false;
                     sb.Append($@"\{c}");
-                    maybeEnd = (c == '*');  // /*\*/*/ は */ にならなければならないので
+                    maybeEnd = (c == '*');  // /*\*/*/ は */ にならなければならない
                     continue;
                 } else if (c == '\\') {
                     // エスケープシーケンスの場合
@@ -539,9 +540,9 @@ namespace CSCPP {
                 case '^':
                     return read_rep(tokenPosition, '=', Token.Keyword.AssignXor, (Token.Keyword)'^');
                 case '"':
-                    return read_string(tokenPosition);
+                    return read_string(tokenPosition, Token.EncType.None);
                 case '\'':
-                    return read_char(tokenPosition);
+                    return read_char(tokenPosition, Token.EncType.None);
                 case '/':
                     return Token.make_keyword(tokenPosition, IsNextChar('=') ? Token.Keyword.AssignDiv : (Token.Keyword)'/');
                 case '.':
@@ -594,6 +595,42 @@ namespace CSCPP {
                         if (tok != null)
                             return tok;
                         return read_rep(tokenPosition, '=', Token.Keyword.AssignMod, (Token.Keyword)'%');
+                    }
+                case 'L': {
+                        if (IsNextChar('"')) {
+                            CppContext.Warning(tokenPosition, "ワイド文字列リテラルが使われています。");
+                            return read_string(tokenPosition, Token.EncType.Wide);
+                        } else if (IsNextChar('\'')) {
+                            CppContext.Warning(tokenPosition, "ワイド文字定数が使われています。");
+                            return read_char(tokenPosition, Token.EncType.Wide);
+                        } else {
+                            goto default;
+                        }
+                    }
+                case 'u': {
+                        if (IsNextStr("8\"")) {
+                            CppContext.Warning(tokenPosition, "UTF8文字列リテラルが使われています。");
+                            return read_string(tokenPosition, Token.EncType.U8);
+                        } else if (IsNextChar('"')) {
+                            CppContext.Warning(tokenPosition, "UTF16文字列リテラルが使われています。");
+                            return read_string(tokenPosition, Token.EncType.U16);
+                        } else if (IsNextChar('\'')) {
+                            CppContext.Warning(tokenPosition, "UTF16文字定数が使われています。");
+                            return read_char(tokenPosition, Token.EncType.U16);
+                        } else {
+                            goto default;
+                        }
+                    }
+                case 'U': {
+                        if (IsNextChar('"')) {
+                            CppContext.Warning(tokenPosition, "UTF32文字列リテラルが使われています。");
+                            return read_string(tokenPosition, Token.EncType.U32);
+                        } else if (IsNextChar('\'')) {
+                            CppContext.Warning(tokenPosition, "UTF32文字定数が使われています。");
+                            return read_char(tokenPosition, Token.EncType.U32);
+                        } else {
+                            goto default;
+                        }
                     }
                 default:
                     if (c.IsAlpha() || (c == '_')) {

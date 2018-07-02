@@ -2,11 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.IO;
 
 namespace CSCPP {
     public class Program {
         static int Main(string[] args) {
+
+
+
             if (System.Diagnostics.Debugger.IsAttached) {
+
+                UniTextReader.Test();
                 IntMaxT.Test();
                 return Body(args);
             } else {
@@ -38,6 +45,207 @@ namespace CSCPP {
                 }
             }
         }
+
+        private static void UtfTest() {
+            UInt16[] utf16;
+            TryUtf32ToUtf16(0x10302U, out utf16);
+            System.Diagnostics.Debug.Assert(utf16[0] == 0xD800);
+            System.Diagnostics.Debug.Assert(utf16[1] == 0xDF02);
+
+            UInt32 utf32;
+            TryUtf16ToUtf32(utf16, out utf32);
+            System.Diagnostics.Debug.Assert(utf32 == 0x10302U);
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(System.Text.Encoding.UTF32.GetString(System.BitConverter.GetBytes(utf32)));
+            Byte[] utf8;
+            TryUtf32ToUtf8(0x10302U, out utf8);
+            System.Diagnostics.Debug.Assert(utf8.Length == bytes.Length);
+            for (int i = 0; i < utf8.Length; i++) {
+                System.Diagnostics.Debug.Assert(utf8[i] == bytes[i]);
+            }
+            TryUtf8ToUtf32(utf8, out utf32);
+            System.Diagnostics.Debug.Assert(utf32 == 0x10302U);
+        }
+
+        private static bool Utf16IsHighSurrogate(ushort utf16) {
+            return (utf16 >> 10) == 0x36U;
+        }
+        private static bool Utf16IsLowSurrogate(ushort utf16) {
+            return (utf16 >> 10) == 0x37U;
+        }
+        private static bool Utf16IsSurrogate(ushort utf16) {
+            return Utf16IsHighSurrogate(utf16) || Utf16IsLowSurrogate(utf16);
+        }
+        private static bool Utf16IsSurrogatePair(ushort hi, ushort lo) {
+            return Utf16IsHighSurrogate(hi) && Utf16IsLowSurrogate(lo);
+        }
+
+        private static bool TryUtf16ToUtf32(ushort[] utf16, out uint utf32) {
+            if (utf16.Length == 1) {
+                utf32 = (uint)utf16[0];
+                return true;
+            } else if (utf16.Length == 2 && (utf16[0] >> 10) == 0x36U && (utf16[1] >> 10) == 0x37U) {
+                var w = (utf16[0] >> 6) & ((1U << 4) - 1U);
+                var u = (uint)((w + 1U) << 16);
+                utf32 = u | (utf16[1] & (uint)((1 << 10) -   1)) | ((uint)(utf16[0] & (1 << 6 - 1)) << 10);
+                return true;
+            } else {
+                utf32 = 0xFFFDU;
+                return false;
+            }
+        }
+
+        private static bool TryUtf32ToUtf16(uint utf32, out ushort[] utf16) {
+            if (utf32 < 0x10000U) {
+                utf16 = new ushort[] { (ushort)utf32 };
+                return true;
+            } else if (utf32 < 0x110000U) {
+                ushort u = (ushort)((utf32 >> 16) & 0x1FU);
+                ushort w = (ushort)((u - 1U) << 6);
+                ushort lo = (ushort)((0x37U << 10) |     ((utf32      ) & ((1U << 10) - 1U)));
+                ushort hi = (ushort)((0x36U << 10) | w | ((utf32 >> 10) & ((1U <<  6) - 1U)));
+                utf16 =new ushort[] { hi, lo };
+                return true;
+            } else {
+                utf16 = new ushort[] { 0xFFFD };
+                return false;
+            }
+        }
+
+        private static bool TryUtf8ToUtf32(byte[] utf8, out UInt32 utf32) {
+            if (utf8.Length < 0 || utf8.Length > 6) {
+                utf32 = 0xFFFD;
+                return false;
+            }
+
+            int msbc = 0;
+            for (byte v = utf8[0]; (v & 0x80) != 0; v <<= 1) {
+                msbc++;
+            }
+            switch (msbc) {
+                case 0: {
+                        if (utf8.Length == 1 && ((utf8[0] & 0x80) == 0x00)) {
+                            var code = (uint)((utf8[0] & 0x7F) << (6 * 0));
+                            if (0x0000 <= code && code <= 0x007F) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                }
+                case 2: {
+                        if (utf8.Length == 2 && ((utf8[0] & 0xE0) == 0xC0) && ((utf8[1] & 0xC0) == 0x80)) {
+                            var code = (uint)(((utf8[0] & 0x1F) << (6 * 1)) | ((utf8[1] & 0x3F) << (6 * 0)));
+                            if (0x0080 <= code && code <= 0x07FF) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                    }
+                case 3: {
+                        if (utf8.Length == 3 && ((utf8[0] & 0xF0) == 0xE0) && ((utf8[1] & 0xC0) == 0x80) && ((utf8[2] & 0xC0) == 0x80)) {
+                            var code = (uint)(((utf8[0] & 0x0F) << (6 * 2)) | ((utf8[1] & 0x3F) << (6 * 1)) | ((utf8[2] & 0x3F) << (6 * 0)));
+                            if (0x0800 <= code && code <= 0xFFFF) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                    }
+                case 4: {
+                        if (utf8.Length == 4 && ((utf8[0] & 0xF8) == 0xF0) && ((utf8[1] & 0xC0) == 0x80) && ((utf8[2] & 0xC0) == 0x80) && ((utf8[3] & 0xC0) == 0x80)) {
+                            var code = (uint)(((utf8[0] & 0x07) << (6 * 3)) | ((utf8[1] & 0x3F) << (6 * 2)) | ((utf8[2] & 0x3F) << (6 * 1)) | ((utf8[3] & 0x3F) << (6 * 0)));
+                            if (0x10000 <= code && code <= 0x1FFFFF) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                    }
+                case 5: {
+                        if (utf8.Length == 5 && ((utf8[0] & 0xFC) == 0xF8) && ((utf8[1] & 0xC0) == 0x80) && ((utf8[2] & 0xC0) == 0x80) && ((utf8[3] & 0xC0) == 0x80) && ((utf8[4] & 0xC0) == 0x80)) {
+                            var code = (uint)(((utf8[0] & 0x03) << (6 * 4)) | ((utf8[1] & 0x3F) << (6 * 3)) | ((utf8[2] & 0x3F) << (6 * 2)) | ((utf8[3] & 0x3F) << (6 * 1)) | ((utf8[4] & 0x3F) << (6 * 0)));
+                            if (0x200000 <= code && code <= 0x3FFFFFF) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                    }
+                case 6: {
+                        if (utf8.Length == 6 && ((utf8[0] & 0xFE) == 0xFC) && ((utf8[1] & 0xC0) == 0x80) && ((utf8[2] & 0xC0) == 0x80) && ((utf8[3] & 0xC0) == 0x80) && ((utf8[4] & 0xC0) == 0x80) && ((utf8[5] & 0xC0) == 0x80)) {
+                            var code = (uint)(((utf8[0] & 0x01) << (6 * 5)) | ((utf8[1] & 0x3F) << (6 * 4)) | ((utf8[2] & 0x3F) << (6 * 3)) | ((utf8[3] & 0x3F) << (6 * 2)) | ((utf8[4] & 0x3F) << (6 * 1)) | ((utf8[5] & 0x3F) << (6 * 0)));
+                            if (0x4000000 <= code && code <= 0x7FFFFFFF) {
+                                utf32 = code;
+                                return true;
+                            }
+                        }
+                        goto default;
+                    }
+                default:
+                    utf32 = 0xFFFD;
+                    return false;
+
+            }
+        }
+
+        private static bool TryUtf32ToUtf8(uint utf32, out byte[] utf8) {
+            if (utf32 <= 0x007F) {
+                utf8 = new byte[] { (byte)utf32 };
+                return true;
+            } else if (utf32 <= 0x07FF) {
+                utf8 = new byte[2];
+                for (var i = 1; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x40;
+                return true;
+            } else if (utf32 <= 0xFFFF) {
+                utf8 = new byte[3];
+                for (var i = 2; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x60;
+                return true;
+            } else if (utf32 <= 0x1FFFFF) {
+                utf8 = new byte[4];
+                for (var i = 3; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x70;
+                return true;
+            } else if (utf32 <= 0x3FFFFFF) {
+                utf8 = new byte[5];
+                for (var i = 4; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x78;
+                return true;
+            } else if (utf32 <= 0x7FFFFFFF) {
+                utf8 = new byte[6];
+                for (var i = 5; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x7C;
+                return true;
+            } else {
+                utf32 = 0xFFFD;
+                utf8 = new byte[3];
+                for (var i = 2; i >= 0; i--) {
+                    utf8[i] = (byte)(0x80U | (utf32 & 0x3FU));
+                    utf32 >>= 6;
+                }
+                utf8[0] |= 0x60;
+                return false;
+            }
+        }
+
 
         /// <summary>
         /// プログラム本体のディレクトリ
@@ -796,6 +1004,138 @@ options:
 -P
     #line行の出力を無効にします。
 ");
+        }
+    }
+
+
+    class UniTextReader {
+        private readonly Stream _inputStream;
+        private System.Text.Encoding _inputEncoding;
+        private Decoder _inputDecoder;
+        private byte[] bytes;
+        private char[] chars;
+        private byte[] utf32Bytes;
+        private int bytesIndex;
+
+        public UniTextReader(System.IO.Stream inputStream, System.Text.Encoding inputEncoding ) {
+            this._inputStream = inputStream;
+            this._inputEncoding = inputEncoding;
+            this._inputDecoder = inputEncoding.GetDecoder();
+            this. bytes = new byte[16];
+            this.chars = new char[4];
+            this.bytesIndex = 0;
+            this.utf32Bytes = new byte[4];
+
+        }
+        public byte[] ReadRaw() {
+            _inputDecoder.Reset();
+            for (;;) {
+                var data = _inputStream.ReadByte();
+                if (data == -1) {
+                    return null;
+                }
+                if (bytes.Length <= bytesIndex) {
+                    Array.Resize(ref bytes, bytesIndex + 16);
+                }
+                bytes[bytesIndex++] = (byte)data;
+                var charLen = _inputDecoder.GetCharCount(bytes.ToArray(), 0, bytesIndex);
+                if (charLen == 0) {
+                    continue;
+                }
+                if (chars.Length <= charLen) {
+                    Array.Resize(ref chars, charLen);
+                }
+                int bytesUsed, charsUsed;
+                bool complete;
+                _inputDecoder.Convert(bytes, 0, bytesIndex, chars, 0, 4, true, out bytesUsed, out charsUsed, out complete);
+                byte[] ret = bytes.Take(bytesIndex).ToArray();
+                if (bytesIndex != bytesUsed) {
+                    Array.Copy(bytes, bytesUsed, bytes, 0, bytesIndex - bytesUsed);
+                }
+                bytesIndex = 0;
+                return ret;
+            }
+        }
+        public UInt32 ReadUtf32() {
+            _inputDecoder.Reset();
+            for (;;) {
+                var data = _inputStream.ReadByte();
+                if (data == -1) {
+                    return UInt32.MaxValue;
+                }
+                if (bytes.Length <= bytesIndex) {
+                    Array.Resize(ref bytes, bytesIndex + 16);
+                }
+                bytes[bytesIndex++] = (byte)data;
+                var charLen = _inputDecoder.GetCharCount(bytes.ToArray(), 0, bytesIndex);
+                if (charLen == 0) {
+                    continue;
+                }
+                if (chars.Length <= charLen) {
+                    Array.Resize(ref chars, charLen);
+                }
+                int bytesUsed, charsUsed;
+                bool completed;
+                _inputDecoder.Convert(bytes, 0, bytesIndex, chars, 0, 4, true, out bytesUsed, out charsUsed, out completed);
+                byte[] ret = bytes.Take(bytesIndex).ToArray();
+                if (bytesIndex != bytesUsed) {
+                    Array.Copy(bytes, bytesUsed, bytes, 0, bytesIndex - bytesUsed);
+                }
+                bytesIndex = 0;
+                System.Text.Encoding.UTF32.GetEncoder().Convert(chars, 0, charsUsed, utf32Bytes, 0, 4, true, out charsUsed, out bytesUsed, out completed);
+                return BitConverter.ToUInt32(utf32Bytes, 0);
+            }
+        }
+        public EString ReadEString() {
+            _inputDecoder.Reset();
+            for (;;) {
+                var data = _inputStream.ReadByte();
+                if (data == -1) {
+                    return null;
+                }
+                if (bytes.Length <= bytesIndex) {
+                    Array.Resize(ref bytes, bytesIndex + 16);
+                }
+                bytes[bytesIndex++] = (byte)data;
+                var charLen = _inputDecoder.GetCharCount(bytes.ToArray(), 0, bytesIndex);
+                if (charLen == 0) {
+                    continue;
+                }
+                if (chars.Length <= charLen) {
+                    Array.Resize(ref chars, charLen);
+                }
+                int bytesUsed, charsUsed;
+                bool completed;
+                _inputDecoder.Convert(bytes, 0, bytesIndex, chars, 0, 4, true, out bytesUsed, out charsUsed, out completed);
+                byte[] ret = bytes.Take(bytesIndex).ToArray();
+                if (bytesIndex != bytesUsed) {
+                    Array.Copy(bytes, bytesUsed, bytes, 0, bytesIndex - bytesUsed);
+                }
+                bytesIndex = 0;
+                System.Text.Encoding.UTF32.GetEncoder().Convert(chars, 0, charsUsed, utf32Bytes, 0, 4, true, out charsUsed, out bytesUsed, out completed);
+                var utf32 = BitConverter.ToUInt32(utf32Bytes, 0);
+                return new EString(bytes, _inputEncoding);
+            }
+        }
+
+        public static void Test() {
+
+            {
+                //var _inputStream = Console.OpenStandardOutput();
+                //var _inputDecoder = Console.InputEncoding.GetDecoder();
+                var text1 = @"あいうえお①"+ "\n";
+                var testdata1 = System.Text.Encoding.GetEncoding(932).GetBytes(text1);
+                var text2 = @"東京特許許可局";
+                var testdata2 = System.Text.Encoding.UTF8.GetBytes(text2);
+                var _inputStream = new System.IO.MemoryStream(testdata1.Concat(new byte[] { 0xF0, 0x80, 0x80, 0xAF }).ToArray());
+                var _inputDecoder = System.Text.Encoding.GetEncoding(932).GetDecoder();
+
+                var reader = new UniTextReader(_inputStream, System.Text.Encoding.GetEncoding(932));
+                UInt32 utf32;
+                while ((utf32 = reader.ReadUtf32()) != UInt32.MaxValue) {
+                    Console.WriteLine($"{utf32:x8}");
+                }
+            }
         }
     }
 }

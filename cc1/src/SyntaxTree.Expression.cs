@@ -117,7 +117,7 @@ namespace AnsiCParser.SyntaxTree {
                     public override bool IsLValue() {
                         // 6.5.1 一次式
                         // 識別子がオブジェクト（この場合，識別子は左辺値となる。）
-                        return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
+                        return true; // !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
                     }
 
                     public override bool HasStorageClassRegister() {
@@ -457,7 +457,7 @@ namespace AnsiCParser.SyntaxTree {
                     }
                 }
                 public override bool IsLValue() {
-                    return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
+                    return true; //!Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);
                 }
                 public override bool HasStorageClassRegister() {
                     return Target.HasStorageClassRegister();
@@ -595,7 +595,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public override bool IsLValue() {
-                    return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
+                    return true;///* !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) &&*/ Expr.IsLValue();
                 }
                 public override bool HasStorageClassRegister() {
                     // 集成体又は共用体のオブジェクトが typedef 以外の記憶域クラス指定子を用いて宣言されたとき，結合に関するものを除いて，記憶域クラス指定子による性質をオブジェクトのメンバにも適用する。
@@ -664,7 +664,7 @@ namespace AnsiCParser.SyntaxTree {
                     // ->演算子及び識別子を後ろに伴う後置式は，構造体又は共用体オブジェクトの一つのメンバを指し示す。
                     // その値は，最初の式が指すオブジェクトの指定されたメンバの値とする。
                     // その式は左辺値とする。 <---- とあるので、その式は左辺値
-                    return !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);// && Expr.IsLValue();
+                    return true;// !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const);// && Expr.IsLValue();
                 }
 
                 public override CType Type {
@@ -697,7 +697,7 @@ namespace AnsiCParser.SyntaxTree {
                     Ident = ident;
                     MemberInfo = memberInfo;
 
-                    var qual = expr.Type.GetTypeQualifier();
+                    var qual = expr.Type.GetBasePointerType().GetTypeQualifier();
                     MemberType = memberInfo.Type.UnwrapTypeQualifier().WrapTypeQualifier(qual);
                 }
             }

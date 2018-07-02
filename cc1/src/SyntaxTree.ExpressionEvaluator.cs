@@ -386,7 +386,8 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Expression value) {
-                throw new NotImplementedException();
+                var ret = self.Expr.Accept(this, value);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnLogicalAndExpression(Expression.LogicalAndExpression self, Expression value) {
@@ -558,7 +559,7 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType) self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }
@@ -567,7 +568,7 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType) self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }

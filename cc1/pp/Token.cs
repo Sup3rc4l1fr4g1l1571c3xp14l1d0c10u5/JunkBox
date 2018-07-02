@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -20,10 +19,10 @@ namespace CSCPP {
                     sb.Append($"<Number Value='{StrVal}' ");
                     break;
                 case TokenKind.Char:
-                    sb.Append($"<Char Value='{QuoteChar(StrVal)}' ");
+                    sb.Append($"<Char Value='{QuoteChar(StrVal)}' Enc='{StrEncType}' ");
                     break;
                 case TokenKind.String:
-                    sb.Append($"<String Value=\"{QuoteStr(StrVal)}\" ");
+                    sb.Append($"<String Value=\"{QuoteStr(StrVal)}\" Enc='{StrEncType}' ");
                     break;
                 case TokenKind.EoF:
                     sb.Append($"<EoF ");
@@ -72,8 +71,8 @@ namespace CSCPP {
                 case TokenKind.Ident: return StrVal;
                 case TokenKind.Keyword: return KeywordToStr(KeywordVal);
                 case TokenKind.Number: return StrVal;
-                case TokenKind.Char: return $"'{QuoteChar(StrVal)}'";
-                case TokenKind.String: return $"\"{QuoteStr(StrVal)}\"";
+                case TokenKind.Char: return $"{Enc2Str(StrEncType)}'{QuoteChar(StrVal)}'";
+                case TokenKind.String: return $"{Enc2Str(StrEncType)}\"{QuoteStr(StrVal)}\"";
                 case TokenKind.EoF: return "";
                 case TokenKind.Invalid: return StrVal;
                 case TokenKind.MinCppToken: return ""; // not use
@@ -135,6 +134,14 @@ namespace CSCPP {
             HashHash,
             Ellipsis,
         };
+
+        public enum EncType {
+            None,   // プレフィックスなし
+            Wide,   // Lプレフィックス
+            U8,     // u8プレフィックス
+            U16,    // u16プレフィックス
+            U32     // u32プレフィックス
+        }
 
         /// <summary>
         /// トークンに割り当てるユニークなID生成用カウンタ
@@ -203,9 +210,21 @@ namespace CSCPP {
         public Keyword KeywordVal { get; set; }
 
         /// <summary>
-        /// [Kind == String | Char | Number | Ident | Invalid] 値（文字列表現）
+        /// [Kind == String | Char | Number | Ident | Invalid] 値（ソース上の文字列表現）
         /// </summary>
-        public string StrVal { get; set; }
+        public String StrVal {
+            get; set;
+        }
+
+        /// <summary>
+        /// [Kind == String | Char ] 値（エンコード付き文字列表現）
+        /// </summary>
+        public EString EncodedStrVal { get; set; }
+
+        /// <summary>
+        /// [Kind == String | Char ] 文字表現のエンコード種別
+        /// </summary>
+        public EncType StrEncType {get; set; }
 
         /// <summary>
         /// [Kind == MacroParam] 可変長引数かどうか
@@ -261,6 +280,8 @@ namespace CSCPP {
 
             //StringOrChar
             StrVal = tmpl.StrVal;
+            EncodedStrVal = tmpl.EncodedStrVal;
+            StrEncType = tmpl.StrEncType;
 
             // MacroParam 
             IsVarArg = tmpl.IsVarArg;
@@ -315,7 +336,7 @@ namespace CSCPP {
         /// </summary>
         /// <param name="s">文字列値</param>
         /// <returns></returns>
-        public static Token make_strtok(Position pos, string s) {
+        public static Token make_strtok(Position pos, string s, EncType encType) {
             return new Token(Token.TokenKind.String) {
                 // common
                 Hideset = null,
@@ -325,7 +346,16 @@ namespace CSCPP {
 
                 // String
                 StrVal = s,
-            };
+                EncodedStrVal = EString.FromCStyle(s, (e,m) => {
+                    if (e) {
+                        CppContext.Error(pos, m);
+                    } else {
+                        CppContext.Warning(pos, m);
+                    }
+                }),
+                StrEncType = encType,
+
+        };
         }
 
         /// <summary>
@@ -372,7 +402,7 @@ namespace CSCPP {
             };
         }
 
-        public static Token make_char(Position pos, string s) {
+        public static Token make_char(Position pos, string s, EncType encType) {
             return new Token(Token.TokenKind.Char) {
                 // common
                 Hideset = null,
@@ -380,8 +410,17 @@ namespace CSCPP {
                 IndexOfFile = File.current_file().NumOfToken++,
                 Position = pos,
 
-                // Invalid
+                // Char
                 StrVal = s,
+                EncodedStrVal = EString.FromCStyle(s, (e, m) => {
+                    if (e) {
+                        CppContext.Error(pos, m);
+                    } else {
+                        CppContext.Warning(pos, m);
+                    }
+                },
+                encType.ToEncoding()),
+                StrEncType = encType,
             };
         }
 
@@ -457,11 +496,11 @@ namespace CSCPP {
                 case TokenKind.Keyword:
                     return KeywordToStr(tok.KeywordVal);
                 case TokenKind.Char:
-                    return $"'{tok.StrVal}'";
+                    return $"{Enc2Str(tok.StrEncType)}'{tok.StrVal}'";
                 case TokenKind.Number:
                     return tok.StrVal;
                 case TokenKind.String:
-                    return $"\"{tok.StrVal}\"";
+                    return $"{Enc2Str(tok.StrEncType)}\"{tok.StrVal}\"";
                 case TokenKind.EoF:
                     return "(eof)";
                 case TokenKind.Invalid:
@@ -531,6 +570,16 @@ namespace CSCPP {
                     return $"{(char)id}";
             }
         }
+        private static string Enc2Str(EncType enc) {
+            switch (enc) {
+                case EncType.None: return "";
+                case EncType.Wide: return "L";
+                case EncType.U8: return "u8";
+                case EncType.U16: return "u";
+                case EncType.U32: return "U";
+                default: return "";
+            }
+        }
 
         private static string QuoteChar(string charString) {
             return charString;
@@ -566,20 +615,43 @@ namespace CSCPP {
         private static readonly Regex RegexFloatingNumberPattern = new Regex("^" + String.Join("|", FloatingNumberPatterns.Select(x => $"(?:{x})")) + "$", RegexOptions.Compiled);
 
         public static IntMaxT ToInt(Token t, string s) {
-            BigInteger value;
+            Tuple<ulong, bool> value;
 
             Match m = RegexIntegerNumberPattern.Match(s);
             if (m.Groups["hex"].Success) {
                 // 十六進数
-                // BigInteger.ParseとSystem.Globalization.NumberStyles.HexNumberを組み合わせると
-                // 最上位ビットが立っている場合は負数と見なす動作になるので対策として先頭に`0`を付与して解析
-                value = BigInteger.Parse("0" + m.Groups["hex"].Value, System.Globalization.NumberStyles.HexNumber);
+                value = m.Groups["hex"].Value.Aggregate(
+                    Tuple.Create(0UL, false), 
+                    (b, c) => 
+                        Tuple.Create(
+                            b.Item1 * 16UL + (('0' <= c && c <= '9') 
+                                            ? ((ulong)(c - '0')) 
+                                            : ('A' <= c && c <= 'F') 
+                                                ? ((ulong)(c - 'A') + 10UL) 
+                                                : ((ulong)(c - 'a') + 10UL)), 
+                            b.Item2 | (b.Item1 > ulong.MaxValue / 16UL)
+                        )
+                );
             } else if (m.Groups["oct"].Success) {
                 // 八進数
-                value = m.Groups["oct"].Value.Aggregate(new BigInteger(), (b, c) => b * 8 + c - '0');
+                value = m.Groups["oct"].Value.Aggregate(
+                    Tuple.Create(0UL, false),
+                    (b, c) =>
+                        Tuple.Create(
+                            b.Item1 * 8UL + (ulong)(c - '0'),
+                            b.Item2 | (b.Item1 > ulong.MaxValue / 8UL)
+                        )
+                );
             } else if (m.Groups["dig"].Success) {
                 // 十進数
-                value = BigInteger.Parse(m.Groups["dig"].Value);
+                value = m.Groups["dig"].Value.Aggregate(
+                    Tuple.Create(0UL, false),
+                    (b, c) =>
+                        Tuple.Create(
+                            b.Item1 * 10UL + (ulong)(c - '0'),
+                            b.Item2 | (b.Item1 > ulong.MaxValue / 10UL)
+                        )
+                );
             } else {
                 // 整数値として不正なもの。浮動小数点数かどうか判定してメッセージを変化させる
                 if (RegexFloatingNumberPattern.IsMatch(s)) {
@@ -595,14 +667,16 @@ namespace CSCPP {
                 suffix = m.Groups[2].Value;
             }
 
-            bool isUnsigned = suffix.ToUpper().Contains('U');    // 今は使っていないが将来的に使う予定がある
-            int size = suffix.Count(x => x == 'L' || x == 'l');   // 0 is int, 1 is long, 2 is long long
+            bool isUnsigned = suffix.ToUpper().Contains('U');    // 符号
+            int size = suffix.Count(x => x == 'L' || x == 'l');   // Lの数でサイズを判定（0はint, 1はlong, 2はlong long, suffixパターンで制約かけているので、3以上や0未満はない)
 
             // 値は uintmax_t として読み取る
 
             if (CppContext.Features.Contains(Feature.LongLongConstant) == false) {
                 if (size == 2) {
-                    CppContext.Error(t, $"64ビット型の定数値 `{s}` が使われています。64ビット型の定数値は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。64ビット型の定数値を有効にする場合は実行時引数に -FLongLongConstant を設定してください。");
+                    CppContext.Error(t, $"64ビット型の定数値 `{s}` が使われています。"+
+                                         "64ビット型の定数値は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。"+
+                                         "64ビット型の定数値を有効にする場合は実行時引数に -FLongLongConstant を設定してください。");
                 }
             } else if (CppContext.Warnings.Contains(Warning.LongLongConstant)) {
                 if (size == 2) {
@@ -610,16 +684,33 @@ namespace CSCPP {
                 }
             }
 
-            if (isUnsigned || value > IntMaxT.SignedMaxValue) {
-                if (IntMaxT.UnsignedMaxValue < value) {
-                    CppContext.Warning(t, $"定数 `{s}` は uintmax_t の範囲を超えています。");
+            if (isUnsigned || value.Item1 > (ulong)IntMaxT.SignedMaxValue || value.Item2) {
+                if (IntMaxT.UnsignedMaxValue < value.Item1 || value.Item2) {
+                    CppContext.Warning(t, $"定数 `{s}` は intmax_t の範囲を超えます。");
                 }
-                return IntMaxT.CreateUnsigned((ulong)(value & IntMaxT.UnsignedMaxValue));
+                return IntMaxT.CreateUnsigned((ulong)(value.Item1 & IntMaxT.UnsignedMaxValue));
             } else {
-                return IntMaxT.CreateSigned((long)(value & IntMaxT.UnsignedMaxValue));
+                return IntMaxT.CreateSigned((long)(value.Item1 & IntMaxT.UnsignedMaxValue));
             }
 
         }
 
     }
+
+    public static class EncExt {
+        public static System.Text.Encoding ToEncoding(this Token.EncType self) {
+            switch (self) {
+                case Token.EncType.Wide: return System.Text.Encoding.Unicode;
+                case Token.EncType.U8: return System.Text.Encoding.UTF8;
+                case Token.EncType.U16: return System.Text.Encoding.Unicode;
+                case Token.EncType.U32: return System.Text.Encoding.UTF32;
+                case Token.EncType.None:
+                default:
+                    return System.Text.Encoding.Default;
+
+            }
+        }
+    }
+
+
 }

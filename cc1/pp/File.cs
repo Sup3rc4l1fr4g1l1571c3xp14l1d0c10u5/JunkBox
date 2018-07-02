@@ -93,9 +93,9 @@ namespace CSCPP
             var pos =  new Position(Name, Line, Column);
             var c = Source.Read((s) => {
                 if (skipBadchar == false) { 
-                    CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \u{s} があります。");
+                    CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
                 } else {
-                    CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \u{s} があります。確認をしてください。");
+                    CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
                 }
             });
             

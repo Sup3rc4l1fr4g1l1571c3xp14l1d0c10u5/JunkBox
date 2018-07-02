@@ -1273,6 +1273,8 @@ namespace AnsiCParser {
                     // キャスト不要
                 } else if (ret.Type.IsUnionType() && type.IsUnionType()) {
                     // キャスト不要
+                } else if (type.IsVoidType()) {
+                    // キャスト不要（というより、無視？）
                 } else {
                     throw new NotImplementedException();
                 }
@@ -4102,7 +4104,6 @@ namespace AnsiCParser {
                 foreach (var s in self.Inits) {
                     s.Accept(this, value);
                 }
-
 
                 var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
                 if (suType.IsStructureType()) {

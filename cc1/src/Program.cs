@@ -109,12 +109,12 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"..\..\test.c"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\workspace\静的解析検証用コード（機密）\15CY_MTM_MAIN_SOFT_Rev2293_JPN_T_ComOpt_NewSANSA3\soft\p_dsp_img_tbl_tsw_a.i"), "<Debug>").Parse();
             var sexpr = ret.Accept(new ToSExprVisitor(), null);
-
-            var interpreter = new Lisp.SchemeInterpreter();
+            /*
+            var interpreter = new Schene.SchemeInterpreter();
             interpreter.InterpreterWantsToPrint += (s, e) => Console.Write(e.WhatToPrint);
-            interpreter.Evaluate($"(define ast '{new Lisp.Writer(false).Write(sexpr)})");
+            interpreter.Evaluate($"(define ast '{new Schene.Writer(false).Write(sexpr)})");
             interpreter.Evaluate(@"(define repl (lambda () (let ((expr (begin (display ""cc1> "") (read (standard-input-port))))) (begin (write (eval expr)) (newline) (repl)))))");
             interpreter.Evaluate(@"
 (define pp (lambda (s)
@@ -146,11 +146,12 @@ namespace AnsiCParser {
   (newline)))
 ");
             //interpreter.Evaluate(@"(repl)");
-
-            using (var o = new System.IO.StreamWriter(@"..\..\test.s")) {
-                var compiler = new Compiler();
-                compiler.Compile(ret, o);
-            }
+            */
+            return;
+            //using (var o = new System.IO.StreamWriter(@"..\..\test.s")) {
+            //    var compiler = new Compiler();
+            //    compiler.Compile(ret, o);
+            //}
 
         }
     }
@@ -171,4 +172,3 @@ namespace AnsiCParser {
  * - Complex numbers : Not Supported
  * - Imaginary numbers : Not Supported
  */
-

@@ -92,11 +92,11 @@ namespace CSCPP {
                 case Token.TokenKind.Keyword:
                     return x.KeywordVal == y.KeywordVal;
                 case Token.TokenKind.String:
-                    return x.StrVal == y.StrVal;
+                    return x.EncodedStrVal == y.EncodedStrVal;
                 case Token.TokenKind.Number:
-                    return x.StrVal == y.StrVal;
+                    return x.EncodedStrVal == y.EncodedStrVal;
                 case Token.TokenKind.Char:
-                    return x.StrVal == y.StrVal;
+                    return x.EncodedStrVal == y.EncodedStrVal;
                 case Token.TokenKind.MacroParam:
                     if (x.IsVarArg == y.IsVarArg) {
                         return (x.ArgIndex == y.ArgIndex);
@@ -145,7 +145,7 @@ namespace CSCPP {
 
             public override string ToString() {
                 var sb = new StringBuilder();
-                sb.AppendLine($"<ObjectMacro id='{UniqueId}' name='{Name.StrVal}'>");
+                sb.AppendLine($"<ObjectMacro id='{UniqueId}' name='{Name.EncodedStrVal}'>");
                 sb.AppendLine("<Body>");
                 Body.ForEach(x => sb.AppendLine(x.ToString()));
                 sb.AppendLine("</Body>");
@@ -154,7 +154,7 @@ namespace CSCPP {
                 return sb.ToString();
             }
             public static bool EqualDefine(ObjectMacro o, ObjectMacro n) {
-                if (o.Name.StrVal != n.Name.StrVal) {
+                if (o.Name.EncodedStrVal != n.Name.EncodedStrVal) {
                     return false;
                 }
                 return o.Body.SequenceEqual(n.Body, LambdaComparer.Create<Token>(CompareToken));
@@ -211,7 +211,7 @@ namespace CSCPP {
 
             public override string ToString() {
                 var sb = new StringBuilder();
-                sb.AppendLine($"<FuncMacro id='{UniqueId}' name='{Name.StrVal}'>");
+                sb.AppendLine($"<FuncMacro id='{UniqueId}' name='{Name.EncodedStrVal}'>");
                 sb.AppendLine("<Args>");
                 Args.ForEach(x => sb.AppendLine(x.ToString()));
                 sb.AppendLine("</Args>");
@@ -223,7 +223,7 @@ namespace CSCPP {
             }
 
             public static bool EqualDefine(FuncMacro o, FuncMacro n) {
-                if (o.Name.StrVal != n.Name.StrVal) {
+                if (o.Name.EncodedStrVal != n.Name.EncodedStrVal) {
                     return false;
                 }
                 if (o.IsVarg != n.IsVarg) {

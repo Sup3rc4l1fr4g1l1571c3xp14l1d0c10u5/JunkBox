@@ -1077,27 +1077,23 @@ namespace CSCPP {
             }
         }
 
-        private static uint parse_char(Token tok) {
+        private static ulong parse_char(Token tok) {
             System.Diagnostics.Debug.Assert(tok.Kind == Token.TokenKind.Char);
-            if (tok.StrVal.Length == 0) {
+            byte[] code1 = tok.EncodedStrVal.CodeAt(0);
+            byte[] code2 = tok.EncodedStrVal.CodeAt(1);
+            if (code1 == null || code1.Length == 0) {
                 CppContext.Error(tok, $"空の文字定数が使われています。");
                 return 0;
             }
-            var str = tok.StrVal;
-            List<byte> r = new List<byte>();
-            for (var i = 0; i < str.Length; i++) {
-                var ch = str.ElementAtOrDefault(i);
-                if (ch == '\\') {
-                    i++;
-                    r.AddRange(read_escaped_char(tok, str, ref i));
-                } else {
-                    r.AddRange(System.Text.Encoding.UTF8.GetBytes(new[] { (char)ch }));
-                }
+
+            var code = code1.Reverse().Aggregate(0UL, (s, x) => s << 8 | x);
+
+            if (code2 != null) {
+                CppContext.Warning(tok, $"2文字以上を含む文字定数 {Token.TokenToStr(tok)} が使われていますが、その値は処理系定義の結果となります。本処理系では { code } として扱います。");
+            } else if (code1.Length > 8) {
+                CppContext.Warning(tok, $"文字定数  {Token.TokenToStr(tok)} も文字コードが uintmax_t を超えます。");
             }
-            if (r.Count > 1) {
-                CppContext.Error(tok, $"2文字以上を含む文字定数 '{str}' が使われていますが、その値は処理系定義の結果となります。本処理系では { (int)r.Last() } として扱います。");
-            }
-            return r.Last();
+            return code;
         }
 
         private static byte[] read_escaped_char(Token tok, string str, ref int i) {
@@ -2446,7 +2442,7 @@ namespace CSCPP {
         }
 
         //static void define_obj_macro(string name, Token value, bool used = false) {
-        //    Macros[name] = new Macro.ObjectMacro(new Token() { Kind = Token.TokenKind.Ident, StrVal = name }, new List<Token> { value }) { Used = used };
+        //    Macros[name] = new Macro.ObjectMacro(new Token() { Kind = Token.TokenKind.Ident, StrOrginalVal = name }, new List<Token> { value }) { Used = used };
         //    DefinedMacros.Add(Macros[name]);
         //}
 

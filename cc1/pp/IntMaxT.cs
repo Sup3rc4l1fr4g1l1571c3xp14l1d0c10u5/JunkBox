@@ -83,7 +83,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
-                    System.Diagnostics.Debug.Assert(ret == Int32.MinValue);
+                    System.Diagnostics.Debug.Assert(ret == 0);
                 }
                 {
                     // 変換前後で値が変化する例：(Uint32)-1LL
@@ -94,7 +94,7 @@ namespace CSCPP {
                         overflow = true;
                     });
                     System.Diagnostics.Debug.Assert(overflow);
-                    System.Diagnostics.Debug.Assert(ret == UInt32.MinValue);
+                    System.Diagnostics.Debug.Assert(ret == UInt32.MaxValue);
                 }
             }
             {
