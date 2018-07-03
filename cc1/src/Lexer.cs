@@ -379,7 +379,7 @@ namespace AnsiCParser {
                         next();
                         for (var i = 0; i < 8; i++) {
                             if (IsXDigit(peek()) == false) {
-                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "invalid universal character");
+                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なユニコード文字がありました。");
                             }
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
@@ -550,7 +550,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 予約記号
         /// </summary>
-        private readonly List<Tuple<string, Token.TokenKind>> _symbols = new List<Tuple<string, Token.TokenKind>>() {
+        private readonly Tuple<string, Token.TokenKind>[] _symbols = new Tuple<string, Token.TokenKind>[] {
             Tuple.Create("...", Token.TokenKind.ELLIPSIS),
             Tuple.Create(">>=", Token.TokenKind.RIGHT_ASSIGN),
             Tuple.Create("<<=", Token.TokenKind.LEFT_ASSIGN),
@@ -601,7 +601,7 @@ namespace AnsiCParser {
             Tuple.Create("^", (Token.TokenKind)'^'),
             Tuple.Create("|", (Token.TokenKind)'|'),
             Tuple.Create("?", (Token.TokenKind)'?'),
-        }.OrderByDescending((x) => x.Item1.Length).ToList();
+        }.OrderByDescending((x) => x.Item1.Length).ToArray();
 
         /// <summary>
         /// Ｃソースコード
@@ -668,7 +668,7 @@ namespace AnsiCParser {
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <returns></returns>
-        private string Substring(Location start, Location end) {
+        public string Substring(Location start, Location end) {
             return _inputText.Substring(start.Position, end.Position - start.Position);
         }
 

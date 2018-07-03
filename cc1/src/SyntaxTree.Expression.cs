@@ -221,7 +221,7 @@ namespace AnsiCParser.SyntaxTree {
                     }
 
                     public IntegerConstant(LocationRange locationRange, string str, long value, BasicType.TypeKind kind) : base(locationRange) {
-                        var ctype = new BasicType(kind);
+                        var ctype = BasicType.Create(kind);
 
                         int lowerBits = 8 * ctype.Sizeof();
                         Debug.Assert(lowerBits > 0);
@@ -304,7 +304,7 @@ namespace AnsiCParser.SyntaxTree {
                     }
 
                     public FloatingConstant(LocationRange locationRange, string str, double value, BasicType.TypeKind kind) : base(locationRange) {
-                        ConstantType = new BasicType(kind);
+                        ConstantType = BasicType.Create(kind);
                         Str = str;
                         Value = kind == BasicType.TypeKind.Float ? (float)value : value;
                     }
@@ -1706,7 +1706,7 @@ namespace AnsiCParser.SyntaxTree {
                         }
 
                         var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
+                        TypeQualifier tq = (thenExpr.Type.IsPointerType() ? thenExpr.Type.GetBasePointerType().GetTypeQualifier():TypeQualifier.None) | (elseExpr.Type.IsPointerType() ? elseExpr.Type.GetBasePointerType().GetTypeQualifier():TypeQualifier.None);
                         baseType = baseType.WrapTypeQualifier(tq);
                         ResultType = CType.CreatePointer(baseType);
                     } else if (

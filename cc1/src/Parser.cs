@@ -178,7 +178,13 @@ namespace AnsiCParser {
             _lexer = new Lexer(source, fileName);
 
             // GCCの組み込み型の設定
-            _identScope.Add("__builtin_va_list", new Declaration.TypeDeclaration(LocationRange.Builtin, "__builtin_va_list", CType.CreatePointer(new BasicType(AnsiCParser.TypeSpecifier.Void))));
+            _identScope.Add("__builtin_va_list", 
+                new Declaration.TypeDeclaration(
+                    LocationRange.Builtin, 
+                    "__builtin_va_list", 
+                    CType.CreatePointer(CType.CreateVoid())
+                )
+            );
         }
 
         /// <summary>
@@ -644,7 +650,7 @@ namespace AnsiCParser {
             // その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
             foreach (var entry in _linkageList) {
                 if (entry.Definition == null) {
-                    if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType())) {
+                    if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
                         throw new CompilerException.SpecificationErrorException(entry.TentativeDefinitions.First().LocationRange, "不完全型のままの識別子があります。");
                     }
                     if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
@@ -1687,7 +1693,7 @@ namespace AnsiCParser {
                     MoreDirectDeclarator(stack, index);
                 } else if (is_identifier_list()) {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, CType.CreateKAndRImplicitInt())).ToList();
                     _lexer.ReadToken(')');
                     stack[index] = new FunctionType(args, false, stack[index]);
                     MoreDirectDeclarator(stack, index);
@@ -1858,7 +1864,9 @@ namespace AnsiCParser {
                     stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
                 } else {
                     // 識別子並び
-                    var args = IdentifierList().Select(x => new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, new BasicType(AnsiCParser.TypeSpecifier.None))).ToList();
+                    var args = IdentifierList().Select(x => 
+                        new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, CType.CreateKAndRImplicitInt())
+                    ).ToList();
                     stack[index] = new FunctionType(args, false, stack[index]);
                 }
                 _lexer.ReadToken(')');
@@ -2221,10 +2229,11 @@ namespace AnsiCParser {
                 // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
                 var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
                 var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
-                var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static, new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" })));
+                var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
+                varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" }));
                 _identScope.Add("__func__", varDecl);
                 decls.Add(varDecl);
-                varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, varDecl.Init != null);
+                varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
 
             }
 
@@ -3011,7 +3020,8 @@ namespace AnsiCParser {
                 var thenExpr = Expression();
                 _lexer.ReadToken(':');
                 var elseExpr = ConditionalExpression();
-                return new SyntaxTree.Expression.ConditionalExpression(new LocationRange(condExpr.LocationRange.Start, elseExpr.LocationRange.End), condExpr, thenExpr, elseExpr);
+                return new SyntaxTree.Expression.ConditionalExpression(
+                    new LocationRange(condExpr.LocationRange.Start, elseExpr.LocationRange.End), condExpr, thenExpr, elseExpr);
             }
 
             return condExpr;
@@ -3198,7 +3208,7 @@ namespace AnsiCParser {
                     if (Mode == LanguageMode.C89) {
                         // C90では互換性の観点からK&R動作が使える。
                         Logger.Warning(start, end, "型が省略された宣言は、暗黙的に signed int 型と見なします。");
-                        type = new BasicType(BasicType.TypeKind.SignedInt);
+                        type = CType.CreateSignedInt();
                     } else {
                         // C99以降では
                         // 6.7.2 それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。
@@ -3206,7 +3216,7 @@ namespace AnsiCParser {
                         throw new CompilerException.SpecificationErrorException(start, end, "C99以降ではそれぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。");
                     }
                 } else {
-                    type = new BasicType(typeSpecifier);
+                    type = BasicType.FromTypeSpecifier(typeSpecifier);
                 }
             }
 
@@ -3428,40 +3438,6 @@ namespace AnsiCParser {
             // 記憶域クラス指定からリンケージを求める
             LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, hasInitializer);
 
-            // 初期化子を持つか？
-            Initializer initializer = null;
-            if (hasInitializer) {
-
-                if (type.IsFunctionType()) {
-                    // 関数型は変数のように初期化できない。なぜなら、それは関数宣言だから。
-                    throw new CompilerException.SpecificationErrorException(ident.Range, "関数型を持つ宣言子に対して初期化子を設定しています。");
-                }
-
-                // 6.7.8 初期化
-                // 識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。
-                if ((scope == ScopeKind.BlockScope) && (linkage == LinkageKind.InternalLinkage || linkage == LinkageKind.ExternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。");
-                }
-
-                // 不完全型の配列は初期化式で完全型に書き換えられるため、複製する
-                CType elementType;
-                int len;
-                if (type.Unwrap().IsArrayType(out elementType, out len) && len == -1) {
-                    type = type.Duplicate();
-                }
-
-                // 初期化子を読み取る
-                // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
-                initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == LinkageKind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
-
-            } else {
-                CType baseType;
-                int len;
-                if (type.IsArrayType(out baseType, out len) && len == -1) {
-                    // 長さの指定がない配列型はポインタ型に読み替える
-                    type = CType.CreatePointer(baseType);
-                }
-            }
 
 
             // その識別子の以前の宣言が可視であるか？
@@ -3512,11 +3488,51 @@ namespace AnsiCParser {
                     }
                 }
             }
+            if (hasInitializer) {
+                // 不完全型の配列は初期化式で完全型に書き換えられるため、複製する
+                CType elementType;
+                int len;
+                if (type.Unwrap().IsArrayType(out elementType, out len) && len == -1) {
+                    type = type.Duplicate();
+                }
 
+            }
                 // 新たに変数宣言を作成
-                var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass, initializer);
-            varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, varDecl.Init != null);
+                var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass/*, initializer*/);
+            varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, hasInitializer);
             _identScope.Add(ident.Raw, varDecl);
+
+            // 初期化子を持つか？
+            Initializer initializer = null;
+            if (hasInitializer) {
+
+                if (type.IsFunctionType()) {
+                    // 関数型は変数のように初期化できない。なぜなら、それは関数宣言だから。
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "関数型を持つ宣言子に対して初期化子を設定しています。");
+                }
+
+                // 6.7.8 初期化
+                // 識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。
+                if ((scope == ScopeKind.BlockScope) && (linkage == LinkageKind.InternalLinkage || linkage == LinkageKind.ExternalLinkage)) {
+                    throw new CompilerException.SpecificationErrorException(ident.Range, "識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。");
+                }
+
+
+                // 初期化子を読み取る
+                // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
+                initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == LinkageKind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
+                varDecl.Init = initializer;
+
+
+            } else {
+                //CType baseType;
+                //int len;
+                //if (type.IsArrayType(out baseType, out len) && len == -1) {
+                //    // 長さの指定がない配列型はポインタ型に読み替える
+                //    type = CType.CreatePointer(baseType);
+                //}
+            }
+
             return varDecl;
         }
 

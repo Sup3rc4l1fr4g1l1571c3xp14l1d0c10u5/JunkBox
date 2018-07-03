@@ -2411,7 +2411,7 @@ namespace CSCPP {
             }
 
             private static List<Token> handle_file_macro(Macro.BuildinMacro m, Token tmpl) {
-                return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = tmpl.File.Name } }.ToList();
+                return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = tmpl.File.Name.Replace(@"\",@"\\") } }.ToList();
             }
 
             private static List<Token> handle_line_macro(Macro.BuildinMacro m, Token tmpl) {

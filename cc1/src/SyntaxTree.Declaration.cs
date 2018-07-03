@@ -106,8 +106,8 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="type"></param>
             /// <param name="storageClass"></param>
             /// <param name="init"></param>
-            public VariableDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass, Initializer init) : base(locationRange, ident, type, storageClass) {
-                Init = init;
+            public VariableDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass/*, Initializer init*/) : base(locationRange, ident, type, storageClass) {
+                Init = null;//init;
                 LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
             }
         }

@@ -179,47 +179,51 @@ namespace AnsiCParser {
             }
 
             public static BasicType CreateVoid() {
-                return new BasicType(BasicType.TypeKind.Void);
+                return BasicType.Create(BasicType.TypeKind.Void);
             }
 
             public static BasicType CreateChar() {
-                return new BasicType(BasicType.TypeKind.Char);
+                return BasicType.Create(BasicType.TypeKind.Char);
             }
 
             public static BasicType CreateUnsignedChar() {
-                return new BasicType(BasicType.TypeKind.UnsignedChar);
+                return BasicType.Create(BasicType.TypeKind.UnsignedChar);
             }
 
             public static BasicType CreateUnsignedShortInt() {
-                return new BasicType(BasicType.TypeKind.UnsignedShortInt);
+                return BasicType.Create(BasicType.TypeKind.UnsignedShortInt);
+            }
+
+            public static BasicType CreateKAndRImplicitInt() {
+                return BasicType.Create(BasicType.TypeKind.KAndRImplicitInt);
             }
 
             public static BasicType CreateUnsignedInt() {
-                return new BasicType(BasicType.TypeKind.UnsignedInt);
+                return BasicType.Create(BasicType.TypeKind.UnsignedInt);
             }
 
             public static BasicType CreateSignedInt() {
-                return new BasicType(BasicType.TypeKind.SignedInt);
+                return BasicType.Create(BasicType.TypeKind.SignedInt);
             }
 
             public static BasicType CreateUnsignedLongInt() {
-                return new BasicType(BasicType.TypeKind.UnsignedLongInt);
+                return BasicType.Create(BasicType.TypeKind.UnsignedLongInt);
             }
 
             public static BasicType CreateSignedLongInt() {
-                return new BasicType(BasicType.TypeKind.SignedLongInt);
+                return BasicType.Create(BasicType.TypeKind.SignedLongInt);
             }
 
             public static BasicType CreateFloat() {
-                return new BasicType(BasicType.TypeKind.Float);
+                return BasicType.Create(BasicType.TypeKind.Float);
             }
 
             public static BasicType CreateDouble() {
-                return new BasicType(BasicType.TypeKind.Double);
+                return BasicType.Create(BasicType.TypeKind.Double);
             }
 
             public static BasicType CreateLongDouble() {
-                return new BasicType(BasicType.TypeKind.LongDouble);
+                return BasicType.Create(BasicType.TypeKind.LongDouble);
             }
 
             public static ArrayType CreateArray(int length, CType type) {
@@ -233,11 +237,11 @@ namespace AnsiCParser {
             // 処理系定義の特殊型
 
             public static BasicType CreateSizeT() {
-                return new BasicType(BasicType.TypeKind.UnsignedLongInt);
+                return BasicType.Create(BasicType.TypeKind.UnsignedLongInt);
             }
 
             public static BasicType CreatePtrDiffT() {
-                return new BasicType(BasicType.TypeKind.SignedLongInt);
+                return BasicType.Create(BasicType.TypeKind.SignedLongInt);
             }
 
             /// <summary>
@@ -720,6 +724,7 @@ namespace AnsiCParser {
             public virtual bool IsContainFlexibleArrayMemberStruct() {
                 return false;
             }
+
         }
     }
 

@@ -380,6 +380,22 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        /// 長さを持たない配列型（array type）ならば真
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="elementType">配列型の場合、要素型が入る</param>
+        /// <param name="len"></param>
+        /// <returns></returns>
+        public static bool IsNoLengthArrayType(this CType self) {
+            var unwrappedSelf = self.Unwrap();
+            if (unwrappedSelf is ArrayType) {
+                var len = (unwrappedSelf as ArrayType).Length;
+                return len == -1;
+            } else {
+                return false;
+            }
+        }
+        /// <summary>
         /// 構造体型（structure type）ならば真
         /// </summary>
         /// <returns></returns>
@@ -730,20 +746,20 @@ namespace AnsiCParser {
             foreach (var realConversionPair in realConversionPairTable) {
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
-                        var retTy = new BasicType(realConversionPair.Item2);
+                        var retTy = BasicType.Create(realConversionPair.Item2);
                         rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
                         return retTy;
                     } else {
-                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange,new BasicType(realConversionPair.Item1), rhs);
+                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange,BasicType.Create(realConversionPair.Item1), rhs);
                         return btLhs;
                     }
                 } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btLhs.IsComplexType()) {
-                        var retTy = new BasicType(realConversionPair.Item2);
+                        var retTy = BasicType.Create(realConversionPair.Item2);
                         lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
                         return retTy;
                     } else {
-                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, new BasicType(realConversionPair.Item1), lhs);
+                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, BasicType.Create(realConversionPair.Item1), lhs);
                         return btRhs;
                     }
                 }
@@ -822,7 +838,7 @@ namespace AnsiCParser {
                     throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型がsigned int/signed long int/ signed long long int 型以外になっています。（本実装の誤りが原因だと思われます。）");
             }
 
-            var tyUnsigned = new BasicType(tyUnsignedKind);
+            var tyUnsigned = BasicType.Create(tyUnsignedKind);
             lhs = new Expression.TypeConversionExpression(rhs.LocationRange, tyUnsigned, lhs);
             rhs = new Expression.TypeConversionExpression(lhs.LocationRange, tyUnsigned, rhs);
             return tyUnsigned;
