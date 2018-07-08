@@ -1231,6 +1231,15 @@ namespace AnsiCParser {
                 return expr;
             }
 
+            // 整数は任意のポインタ型に型変換できる。
+            // これまでに規定されている場合を除き，結果は処理系定義とし，正しく境界調整されていないかもしれず，被参照型の実体を指していないかもしれず，トラップ表現であるかもしれない
+            if (expr.Type.IsIntegerType()) {
+                if (!expr.IsNullPointerConstant()) {
+                    Logger.Warning(expr.LocationRange, $"キャストなしで整数型をポインタ型に変換しています。");
+                }
+                return new Expression.TypeConversionExpression(expr.LocationRange, CType.CreatePointer(CType.CreateVoid()), expr);
+            }
+
             // 変換できなかった
             return null;
         }

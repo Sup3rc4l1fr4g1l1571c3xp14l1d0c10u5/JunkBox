@@ -80,7 +80,7 @@ namespace AnsiCParser {
                 var val = it._entries.FindLast(x => x.Item1 == ident);
                 if (val != null) {
                     if (val.Item2 is T) {
-                        value = (T)val.Item2;
+                        value = (T)(val.Item2);
                         return true;
                     } else {
                         value = default(T);

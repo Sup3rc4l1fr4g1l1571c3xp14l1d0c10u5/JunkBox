@@ -3443,7 +3443,8 @@ namespace AnsiCParser {
             // その識別子の以前の宣言が可視であるか？
             Declaration iv;
             bool isCurrent;
-            if (_identScope.TryGetValue(ident.Raw, out iv, out isCurrent)) {
+            var isVisiblePrevDecl = _identScope.TryGetValue(ident.Raw, out iv, out isCurrent);
+            if (isVisiblePrevDecl) {
                 // 以前の宣言が可視である
 
                 // 6.7 宣言
@@ -3480,14 +3481,8 @@ namespace AnsiCParser {
                 }
                 // 前の変数を隠すことができるので、新しい宣言を作成
 
-            } else {
-                // オブジェクトの識別子が無結合で宣言されている場合，オブジェクトの型は，その宣言子の終わりまで に，又は初期化宣言子の終わりまで（その宣言子が初期化子をもつとき）に，完全になっていなければならない。
-                if (linkage == LinkageKind.NoLinkage) {
-                    if (type.IsIncompleteType()) {
-                        throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"不完全型の変数 {ident.Raw} が使われています。");
-                    }
-                }
             }
+
             if (hasInitializer) {
                 // 不完全型の配列は初期化式で完全型に書き換えられるため、複製する
                 CType elementType;
@@ -3531,6 +3526,13 @@ namespace AnsiCParser {
                 //    // 長さの指定がない配列型はポインタ型に読み替える
                 //    type = CType.CreatePointer(baseType);
                 //}
+            }
+
+            // オブジェクトの識別子が無結合で宣言されている場合，オブジェクトの型は，その宣言子の終わりまで に，又は初期化宣言子の終わりまで（その宣言子が初期化子をもつとき）に，完全になっていなければならない。
+            if (!isVisiblePrevDecl && linkage == LinkageKind.NoLinkage) {
+                if (type.IsIncompleteType()) {
+                    throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"不完全型の変数 {ident.Raw} が使われています。");
+                }
             }
 
             return varDecl;

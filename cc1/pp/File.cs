@@ -117,6 +117,7 @@ namespace CSCPP
                             // Posix的にもテキストファイルは改行で終端すべしとなっている。
                             CppContext.Warning(LastCharacter.Position, "ファイルが改行文字で終了していません。");
                         }
+                        c = '\n';
                     }
                 }
             } else if (c == '\r') {

@@ -79,7 +79,15 @@ namespace AnsiCParser.SyntaxTree {
             // - 定数式を評価した結果は，その型で表現可能な値の範囲内にある定数でなければならない。
             // 
 
-            // ToDo: 初期化子中の定数式の扱いを実装
+            private bool _failed = false;
+
+            private Expression AcceptTo(Expression e, Expression value) {
+                if (_failed) {
+                    return null;
+                } else {
+                    return e.Accept(this, value);
+                }
+            }
 
             public Expression OnAdditiveExpression(Expression.AdditiveExpression self, Expression value) {
                 // 意味規則

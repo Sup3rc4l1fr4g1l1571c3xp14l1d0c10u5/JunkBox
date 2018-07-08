@@ -1223,7 +1223,7 @@ namespace AnsiCParser.SyntaxTree {
                             lhs = lhsPtr;
                             // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                             ResultType = lhs.Type;
-                        } else if (rhsPtr != null && lhs.Type.IsIntegerType() && rhs.Type.IsPointerType() && rhs.Type.GetBasePointerType().IsObjectType()) {
+                        } else if (rhsPtr != null && lhs.Type.IsIntegerType() && rhsPtr.Type.IsPointerType() && rhsPtr.Type.GetBasePointerType().IsObjectType()) {
                             rhs = rhsPtr;
                             // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                             ResultType = rhs.Type;
@@ -1674,9 +1674,8 @@ namespace AnsiCParser.SyntaxTree {
                     var elseExprPtr = Specification.ToPointerTypeExpr(elseExpr);
 
                     if (thenExprPtr != null && thenExprPtr.Type.IsPointerType()
-                                            && elseExprPtr != null && elseExprPtr.Type.IsPointerType()
-                                            //&& CType.IsEqual(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
-                                            && Specification.IsCompatible(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
+                     && elseExprPtr != null && elseExprPtr.Type.IsPointerType()
+                     && Specification.IsCompatible(thenExprPtr.Type.GetBasePointerType().Unwrap(), elseExprPtr.Type.GetBasePointerType().Unwrap())
                     ) {
                         // 制約 両オペランドが適合する型の修飾版又は非修飾版へのポインタである。
                         // 意味規則 第 2 及び第 3 オペランドがともにポインタである場合，結果の型は両オペランドが指す型のすべての型修飾子で修飾された型へのポインタとする。

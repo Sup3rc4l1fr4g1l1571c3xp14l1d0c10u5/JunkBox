@@ -23,7 +23,7 @@ namespace AnsiCParser {
             public string astFile = null;
             public bool flagSyntaxOnly = false;
             public string outputEncoding = null;
-            public string[] args = null;
+            public string[] args = new string[0];
 
             public void Validation(Action<string> act) {
                 // check outputEncoding
@@ -109,7 +109,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\test.c"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\workspace\SmallerC\SmallerC\src\main.i"), "<Debug>").Parse();
             //var sexpr = ret.Accept(new ToSExprVisitor(), null);
             /*
             var interpreter = new Schene.SchemeInterpreter();
