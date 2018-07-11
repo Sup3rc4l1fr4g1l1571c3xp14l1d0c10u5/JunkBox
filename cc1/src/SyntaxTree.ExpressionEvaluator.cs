@@ -272,7 +272,10 @@ namespace AnsiCParser.SyntaxTree {
                 throw new NotImplementedException();
             }
 
-            public Expression OnCompoundStatement(Statement.CompoundStatement self, Expression value) {
+            public Expression OnCompoundStatementC89(Statement.CompoundStatementC89 self, Expression value) {
+                throw new NotImplementedException();
+            }
+            public Expression OnCompoundStatementC99(Statement.CompoundStatementC99 self, Expression value) {
                 throw new NotImplementedException();
             }
 
@@ -555,7 +558,7 @@ namespace AnsiCParser.SyntaxTree {
                         var ret = self.Expr.Accept(this, value).LongValue() == 0 ? 0 : 1;
                         return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, BasicType.TypeKind._Bool);
                     } else {
-                        throw new CompilerException.SpecificationErrorException(self.LocationRange, "スカラ値以外を_Bool 型に変換しようとした。");
+                        throw new CompilerException.SpecificationErrorException(self.LocationRange, "スカラ値以外を _Bool 型に変換しようとした。");
                     }
                 }
 

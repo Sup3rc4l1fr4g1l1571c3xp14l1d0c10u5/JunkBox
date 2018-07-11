@@ -93,20 +93,20 @@ namespace AnsiCParser {
         /// トークンの元ソース上での開始位置
         /// </summary>
         public Location Start {
-            get;
+            get { return Range.Start; }
         }
         /// <summary>
         /// トークンの元ソース上での末尾位置
         /// </summary>
         public Location End {
-            get;
+            get { return Range.End; }
         }
 
         /// <summary>
         /// トークンの元ソース上での位置範囲
         /// </summary>
         public LocationRange Range {
-            get { return new LocationRange(this.Start, this.End); }
+            get;
         }
 
         /// <summary>
@@ -125,9 +125,8 @@ namespace AnsiCParser {
 
         public Token(TokenKind kind, Location start, Location end, string raw) {
             Kind = kind;
-            Start = start;
-            End = end;
-            Raw = raw;
+            Raw = String.Intern(raw);
+            Range = new LocationRange(start, end);
         }
 
         public override string ToString() {

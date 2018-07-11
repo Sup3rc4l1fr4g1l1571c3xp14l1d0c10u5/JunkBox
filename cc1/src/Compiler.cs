@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using AnsiCParser.DataType;
 using AnsiCParser.SyntaxTree;
-using VisitorExt = AnsiCParser.SyntaxTree.VisitorExt;
 
 namespace AnsiCParser {
     public class Compiler {
@@ -130,6 +129,13 @@ namespace AnsiCParser {
                 return _stack.ElementAt(i);
             }
 
+            public int GetStackDepth() {
+                return _stack.Count();
+            }
+            public void CheckStackDepth(int i) {
+                System.Diagnostics.Debug.Assert(i == _stack.Count());
+            }
+
 
             public void Discard() {
                 Value v = Pop();
@@ -141,6 +147,7 @@ namespace AnsiCParser {
             }
 
             public void Dup(int index) {
+                var sdp = GetStackDepth();
                 var v = Peek(index);
                 if (v.Kind == Value.ValueKind.Temp || v.Kind == Value.ValueKind.Address) {
                     int skipsize = 0;
@@ -176,9 +183,11 @@ namespace AnsiCParser {
                 } else {
                     Push(v);
                 }
+                CheckStackDepth(sdp+1);
             }
 
             public void Add(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -248,9 +257,11 @@ namespace AnsiCParser {
                 } else {
                     throw new Exception("");
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Sub(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -337,9 +348,11 @@ namespace AnsiCParser {
                 } else {
                     throw new Exception("");
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Mul(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -392,9 +405,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Div(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -448,9 +463,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Mod(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -496,9 +513,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void And(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -521,9 +540,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Or(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -546,9 +567,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Xor(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -571,9 +594,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Shl(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -612,9 +637,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Shr(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -661,9 +688,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Assign(CType type) {
+                var sdp = GetStackDepth();
                 var lhs = Peek(0);
                 var rhs = Peek(1);
 
@@ -788,9 +817,11 @@ namespace AnsiCParser {
                             break;
                     }
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Eq(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -843,9 +874,11 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Ne(CType type) {
+                var sdp = GetStackDepth();
                 var rhs = Peek(0);
                 var lhs = Peek(1);
 
@@ -898,6 +931,7 @@ namespace AnsiCParser {
                 } else {
                     throw new NotImplementedException();
                 }
+                CheckStackDepth(sdp - 1);
             }
 
             public void Label(string label) {
@@ -909,26 +943,32 @@ namespace AnsiCParser {
             }
 
             public void JmpFalse(string label) {
+                var sdp = GetStackDepth();
                 if (Peek(0).Type.IsRealFloatingType()) {
                     var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
                     Push(value);
                     Ne(CType.CreateSignedInt());
                 }
+                CheckStackDepth(sdp);
                 LoadI32("%eax");
                 Emit("cmpl $0, %eax");
                 Emit($"je {label}");
+                CheckStackDepth(sdp - 1);
             }
 
             public void JmpTrue(string label) {
+                var sdp = GetStackDepth();
                 if (Peek(0).Type.IsRealFloatingType()) {
                     var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
                     Push(value);
                     Ne(CType.CreateSignedInt());
                 }
-                LoadI32("%eax");
+                 CheckStackDepth(sdp);
+               LoadI32("%eax");
                 Emit("cmpl $0, %eax");
                 Emit($"jne {label}");
-            }
+                 CheckStackDepth(sdp - 1);
+           }
 
             public void EmitLoadTrue() {
                 Emit("pushl $1");
@@ -3460,7 +3500,7 @@ namespace AnsiCParser {
             private int _localScopeTotalSize;
             private int _maxLocalScopeTotalSize;
 
-            public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
+            public Value OnCompoundStatementC89(Statement.CompoundStatementC89 self, Value value) {
                 _context.Generator.Emit($"# {self.LocationRange}");
 
                 _localScope = _localScope.Extend();
@@ -3494,6 +3534,49 @@ namespace AnsiCParser {
                 }
 
                 foreach (var x in self.Stmts) {
+                    x.Accept(this, value);
+                }
+
+                if (_maxLocalScopeTotalSize < _localScopeTotalSize) {
+                    _maxLocalScopeTotalSize = _localScopeTotalSize;
+                }
+
+                _context.Generator.Emit("# leave scope");
+
+                _localScopeTotalSize = prevLocalScopeSize;
+                _localScope = _localScope.Parent;
+                return value;
+            }
+            public Value OnCompoundStatementC99(Statement.CompoundStatementC99 self, Value value) {
+                _context.Generator.Emit($"# {self.LocationRange}");
+
+                _localScope = _localScope.Extend();
+                var prevLocalScopeSize = _localScopeTotalSize;
+
+                _context.Generator.Emit("# enter scope");
+                foreach (var x in self.DeclsOrStmts.Where(x => x is Declaration).Cast< Declaration>().Reverse<Declaration>()) {
+                    if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                        if (x.StorageClass == StorageClassSpecifier.Static) {
+                            // static
+                            _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
+                            _context.Generator.Emit($"# static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        } else {
+                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
+                            _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
+                            _context.Generator.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
+                        }
+                    } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                        _context.Generator.Emit($"# extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        // externなのでスキップ
+                    } else if (x.LinkageObject.Linkage == LinkageKind.InternalLinkage) {
+                        _context.Generator.Emit($"# internal(filescope): name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
+                        // externなのでスキップ
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                foreach (var x in self.DeclsOrStmts) {
                     x.Accept(this, value);
                 }
 
@@ -3845,12 +3928,11 @@ namespace AnsiCParser {
                         }
                     }
                 } else {
-                    Emit(".section .bss");
-                    Emit(".align 4");
                     if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                        _context.Generator.Emit($".globl {self.LinkageObject.LinkageId}");
+                        Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}, 4");
+                    } else {
+                        Emit($".lcomm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}, 4");
                     }
-                    Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}");
                 }
 
                 return value;
@@ -4204,7 +4286,10 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
-            public Value OnCompoundStatement(Statement.CompoundStatement self, Value value) {
+            public Value OnCompoundStatementC89(Statement.CompoundStatementC89 self, Value value) {
+                throw new NotImplementedException();
+            }
+            public Value OnCompoundStatementC99(Statement.CompoundStatementC99 self, Value value) {
                 throw new NotImplementedException();
             }
 

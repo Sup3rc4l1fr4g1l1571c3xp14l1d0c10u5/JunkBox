@@ -123,9 +123,11 @@ namespace CSCPP {
                     var commentStr = ReadBlockComment(c.Position);
                     if (!CppContext.Switchs.Contains("-C")) {
                         // コメントを保持しないオプションが有効の場合は、行を空白で置き換えてしまう
-                        //commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
-                        //if (commentStr.Any() == false) { commentStr = " "; }
-                        commentStr = " ";
+                        commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
+                        if (commentStr.Any() == false) {
+                            commentStr = " ";
+                        }
+                        //commentStr = " ";
                     }
                     sb.Append(c.Position, commentStr);
                     return true;

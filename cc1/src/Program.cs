@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using AnsiCParser.SyntaxTree;
 
@@ -22,17 +24,16 @@ namespace AnsiCParser {
             public string outputFile = null;
             public string astFile = null;
             public bool flagSyntaxOnly = false;
-            public string outputEncoding = null;
+            public string outputEncoding = System.Text.Encoding.Default.WebName;
             public string[] args = new string[0];
 
             public void Validation(Action<string> act) {
                 // check outputEncoding
-                try {
-                    if (outputEncoding != null) {
-                        Console.OutputEncoding = System.Text.Encoding.GetEncoding(outputEncoding);
-                    }
-                } catch {
-                    act($"指定されたエンコーディング ${outputEncoding}は不正です。");
+                var enc = System.Text.Encoding.GetEncodings().FirstOrDefault(x => String.Equals(x.Name, outputEncoding, StringComparison.OrdinalIgnoreCase));
+                if (enc == null) {
+                    act($"指定されたエンコーディング名 {outputEncoding} は利用可能なエンコーディングに一致しません。");
+                } else {
+                    Console.OutputEncoding = enc.GetEncoding();
                 }
 
                 // check input source
@@ -109,7 +110,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\workspace\SmallerC\SmallerC\src\main.i"), "<Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\rtest\for.c"), " < Debug>").Parse();
             //var sexpr = ret.Accept(new ToSExprVisitor(), null);
             /*
             var interpreter = new Schene.SchemeInterpreter();

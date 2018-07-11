@@ -55,7 +55,8 @@ namespace AnsiCParser.SyntaxTree {
         TResult OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, TArg value);
         TResult OnBreakStatement(Statement.BreakStatement self, TArg value);
         TResult OnCaseStatement(Statement.CaseStatement self, TArg value);
-        TResult OnCompoundStatement(Statement.CompoundStatement self, TArg value);
+        TResult OnCompoundStatementC89(Statement.CompoundStatementC89 self, TArg value);
+        TResult OnCompoundStatementC99(Statement.CompoundStatementC99 self, TArg value);
         TResult OnContinueStatement(Statement.ContinueStatement self, TArg value);
         TResult OnDefaultStatement(Statement.DefaultStatement self, TArg value);
         TResult OnDoWhileStatement(Statement.DoWhileStatement self, TArg value);

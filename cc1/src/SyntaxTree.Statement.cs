@@ -98,7 +98,7 @@ namespace AnsiCParser.SyntaxTree {
         }
 
         /// <summary>
-        /// For文(C89)
+        /// For文
         /// </summary>
         public class ForStatement : Statement {
             public Expression Init {
@@ -182,7 +182,7 @@ namespace AnsiCParser.SyntaxTree {
         /// <summary>
         /// 複文(C89)
         /// </summary>
-        public class CompoundStatement : Statement {
+        public class CompoundStatementC89 : Statement {
             public List<Declaration> Decls {
                 get;
             }
@@ -196,9 +196,29 @@ namespace AnsiCParser.SyntaxTree {
                 get;
             }
 
-            public CompoundStatement(LocationRange locationRange, List<Declaration> decls, List<Statement> stmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
+            public CompoundStatementC89(LocationRange locationRange, List<Declaration> decls, List<Statement> stmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
                 Decls = decls;
                 Stmts = stmts;
+                TagScope = tagScope;
+                IdentScope = identScope;
+            }
+        }
+        /// <summary>
+        /// 複文(C99)
+        /// </summary>
+        public class CompoundStatementC99 : Statement {
+            public List<Ast/*Declaration|STatement*/> DeclsOrStmts {
+                get;
+            }
+            public Scope<TaggedType> TagScope {
+                get;
+            }
+            public Scope<Declaration> IdentScope {
+                get;
+            }
+
+            public CompoundStatementC99(LocationRange locationRange, List<Ast> declsOrStmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
+                DeclsOrStmts = declsOrStmts;
                 TagScope = tagScope;
                 IdentScope = identScope;
             }

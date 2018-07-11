@@ -24,7 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode Mode = LanguageMode.C89;
+        private LanguageMode Mode = LanguageMode.C99;
 
         /// <summary>
         /// 名前空間(ステートメント ラベル)
@@ -141,7 +141,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 暗黙的宣言の挿入対象となる宣言部
         /// </summary>
-        private readonly Stack<List<Declaration>> _insertImplictDeclarationOperatorStack = new Stack<List<Declaration>>();
+        private readonly Stack<List</*Declaration*/Ast>> _insertImplictDeclarationOperatorStack = new Stack<List</*Declaration*/Ast>>();
 
         /// <summary>
         ///  暗黙的関数宣言を挿入
@@ -177,11 +177,10 @@ namespace AnsiCParser {
         public Parser(string source, string fileName = "<built-in>") {
             _lexer = new Lexer(source, fileName);
 
-            // GCCの組み込み型の設定
-            _identScope.Add("__builtin_va_list", 
+            _identScope.Add("__builtin_va_list",
                 new Declaration.TypeDeclaration(
-                    LocationRange.Builtin, 
-                    "__builtin_va_list", 
+                    LocationRange.Builtin,
+                    "__builtin_va_list",
                     CType.CreatePointer(CType.CreateVoid())
                 )
             );
@@ -2215,50 +2214,78 @@ namespace AnsiCParser {
         /// 6.8.2 複合文
         /// </summary>
         /// <returns></returns>
-        private Statement.CompoundStatement CompoundStatement(bool skipCreateNewScope = false, string funcName = null) {
+        private Statement CompoundStatement(bool skipCreateNewScope = false, string funcName = null) {
             if (skipCreateNewScope == false) {
                 _tagScope = _tagScope.Extend();
-                _identScope = _identScope.Extend();
+                _identScope = _identScope.Extend(); 
             }
             var start = _lexer.ReadToken('{').Start;
-            var decls = new List<Declaration>();
 
-            _insertImplictDeclarationOperatorStack.Push(decls);
+            if (Mode == LanguageMode.C89) {
+                var decls = new List<Ast/*Declaration*/>();
 
-            if (funcName != null) {
-                // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
-                var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
-                var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
-                var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
-                varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" }));
-                _identScope.Add("__func__", varDecl);
-                decls.Add(varDecl);
-                varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
+                _insertImplictDeclarationOperatorStack.Push(decls);
 
-            }
-
-            // ToDo: C99対応の場合はDeclarationをStatementにしないといけない
-
-            while (IsDeclaration()) {
-                var d = Declaration();
-                if (d != null) {
-                    decls.AddRange(d);
+                while (IsDeclaration()) {
+                    var d = Declaration();
+                    if (d != null) {
+                        decls.AddRange(d);
+                    }
                 }
-            }
-            var stmts = new List<Statement>();
-            while (_lexer.PeekToken('}') == false) {
-                stmts.Add(Statement());
-            }
-            var end = _lexer.ReadToken('}').End;
+                var stmts = new List<Statement>();
+                while (_lexer.PeekToken('}') == false) {
+                    stmts.Add(Statement());
+                }
+                var end = _lexer.ReadToken('}').End;
 
-            _insertImplictDeclarationOperatorStack.Pop();
+                _insertImplictDeclarationOperatorStack.Pop();
 
-            var stmt = new Statement.CompoundStatement(new LocationRange(start, end), decls, stmts, _tagScope, _identScope);
-            if (skipCreateNewScope == false) {
-                _identScope = _identScope.Parent;
-                _tagScope = _tagScope.Parent;
+                var stmt = new Statement.CompoundStatementC89(new LocationRange(start, end), decls.Cast<Declaration>().ToList(), stmts, _tagScope, _identScope);
+                if (skipCreateNewScope == false) {
+                    _identScope = _identScope.Parent;
+                    _tagScope = _tagScope.Parent;
+                }
+                return stmt;
+            } else  {
+                var declsOrStmts = new List<Ast>();
+
+                _insertImplictDeclarationOperatorStack.Push(declsOrStmts);
+
+                if (funcName != null) {
+                    // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
+                    var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
+                    var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
+                    var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
+                    varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" }));
+                    _identScope.Add("__func__", varDecl);
+                    declsOrStmts.Add(varDecl);
+                    varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
+
+                }
+
+                while (_lexer.PeekToken('}') == false) {
+                    if (IsDeclaration()) {
+                        var d = Declaration();
+                        if (d != null) {
+                            declsOrStmts.AddRange(d);
+                        }
+                    } else {
+                        declsOrStmts.Add(Statement());
+                    }
+                }
+                var end = _lexer.ReadToken('}').End;
+
+                _insertImplictDeclarationOperatorStack.Pop();
+
+                var stmt = new Statement.CompoundStatementC99(new LocationRange(start, end), declsOrStmts, _tagScope, _identScope);
+                if (skipCreateNewScope == false) {
+                    _identScope = _identScope.Parent;
+                    _tagScope = _tagScope.Parent;
+                }
+                return stmt;
+
             }
-            return stmt;
+
 
         }
 
@@ -2279,11 +2306,38 @@ namespace AnsiCParser {
             return ret;
         }
 
+        private Statement C99StatementWrapping(Func<Statement> func) {
+            _tagScope = _tagScope.Extend();
+            _identScope = _identScope.Extend();
+            var declsOrStmts = new List<Ast>();
+            var start = _lexer.CurrentToken().Start;
+            _insertImplictDeclarationOperatorStack.Push(declsOrStmts);
+
+            declsOrStmts.Add(func());
+            var end = _lexer.CurrentToken().Start;
+
+            _insertImplictDeclarationOperatorStack.Pop();
+            var stmt = new Statement.CompoundStatementC99(new LocationRange(start, end), declsOrStmts, _tagScope, _identScope);
+            _identScope = _identScope.Parent;
+            _tagScope = _tagScope.Parent;
+
+            return stmt;
+
+        }
+
         /// <summary>
         /// 6.8.4 選択文
         /// </summary>
         /// <returns></returns>
         private Statement SelectionStatement() {
+            if (Mode == LanguageMode.C99) {
+                return C99StatementWrapping(SelectionStatementBody);
+            } else {
+                return SelectionStatementBody();
+            }
+        }
+
+        private Statement SelectionStatementBody() {
             Token start;
             if (_lexer.ReadTokenIf(out start, Token.TokenKind.IF)) {
                 _lexer.ReadToken('(');
@@ -2318,6 +2372,14 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement IterationStatement() {
+            if (Mode == LanguageMode.C99) {
+                return C99StatementWrapping(IterationStatementBody);
+            } else {
+                return IterationStatementBody();
+            }
+        }
+
+        private Statement IterationStatementBody() {
             Token start;
             if (_lexer.ReadTokenIf(out start, Token.TokenKind.WHILE)) {
                 _lexer.ReadToken('(');
@@ -2349,9 +2411,13 @@ namespace AnsiCParser {
             }
             if (_lexer.ReadTokenIf(out start, Token.TokenKind.FOR)) {
                 _lexer.ReadToken('(');
-
-                var init = _lexer.PeekToken(';') ? null : Expression();
-                _lexer.ReadToken(';');
+                Expression init = null;
+                if (Mode == LanguageMode.C89 && IsDeclaration()) {
+                    _insertImplictDeclarationOperatorStack.Peek().AddRange(Declaration());
+                } else {
+                    init = _lexer.PeekToken(';') ? null : Expression();
+                    _lexer.ReadToken(';');
+                }
                 var cond = _lexer.PeekToken(';') ? null : Expression();
                 _lexer.ReadToken(';');
                 var update = _lexer.PeekToken(')') ? null : Expression();
@@ -2554,7 +2620,7 @@ namespace AnsiCParser {
                     throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"C89において各種宣言はブロックの先頭でのみ許されます。");
                 }
 
-                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ブロック中の先頭以外での各種宣言は現在未対応です。今のところC89同様ブロックの先頭で宣言してください。");
+                //throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ブロック中の先頭以外での各種宣言は現在未対応です。今のところC89同様ブロックの先頭で宣言してください。");
             }
 
             throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"一次式となる要素があるべき場所に { _lexer.CurrentToken().Raw } があります。");
@@ -3123,7 +3189,7 @@ namespace AnsiCParser {
         //
 
 
-        #region 各宣言で登場する記憶クラス指定子/型指定子/型修飾子/関数修飾子の読み取り処理を共通化
+#region 各宣言で登場する記憶クラス指定子/型指定子/型修飾子/関数修飾子の読み取り処理を共通化
 
         [Flags]
         private enum ReadDeclarationSpecifierPartFlag {
@@ -3321,10 +3387,10 @@ namespace AnsiCParser {
             }
         }
 
-        #endregion
+#endregion
 
 
-        #region 関数宣言部（関数定義時も含む）の解析と名前表への登録を共通化
+#region 関数宣言部（関数定義時も含む）の解析と名前表への登録を共通化
 
         private Declaration.FunctionDeclaration FunctionDeclaration(Token ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier, ScopeKind scope, bool isDefine) {
             if (scope == ScopeKind.BlockScope && isDefine) {
@@ -3399,7 +3465,7 @@ namespace AnsiCParser {
             return funcDelc;
 
         }
-        #endregion
+#endregion
 
         private Declaration.TypeDeclaration TypedefDeclaration(Token ident, CType type) {
             // 型宣言名

@@ -388,11 +388,8 @@ namespace AnsiCParser.SyntaxTree {
                     }
                     if (member.Ident == null) {
                         // padding
-                        if (member.Type.IsBitField()) {
-                            assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as BitFieldType).Type as BasicType).Kind)));
-                        } else {
-                            assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as BasicType).Kind)));
-                        }
+                        var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+                        assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, kind)));
                         continue;
                     }
                     assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));
@@ -421,11 +418,8 @@ namespace AnsiCParser.SyntaxTree {
                         }
                         if (member.Ident == null) {
                             // padding
-                            if (member.Type.IsBitField()) {
-                                assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, ((member.Type as BitFieldType).Type as BasicType).Kind)));
-                            } else {
-                                assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, (member.Type as BasicType).Kind)));
-                            }
+                            var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+                            assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, kind)));
                             continue;
                         }
                         assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));

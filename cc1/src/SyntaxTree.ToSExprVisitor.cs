@@ -170,14 +170,26 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Schene.Pair OnCompoundStatement(Statement.CompoundStatement self, Schene.Pair value) {
+        public Schene.Pair OnCompoundStatementC89(Statement.CompoundStatementC89 self, Schene.Pair value) {
             return Schene.Util.makeList(
-            Schene.Util.makeSym("compound-stmt"),
+            Schene.Util.makeSym("compound-stmt-c89"),
             LocationRangeToCons(self.LocationRange),
             Schene.Util.makeList(
                 self.Decls
                     .Select(x => x.Accept(this, value))
                     .Concat(self.Stmts.Select(x => x.Accept(this, value)))
+                    .Cast<object>()
+                    .ToArray()
+            )
+            );
+        }
+        public Schene.Pair OnCompoundStatementC99(Statement.CompoundStatementC99 self, Schene.Pair value) {
+            return Schene.Util.makeList(
+            Schene.Util.makeSym("compound-stmt-c99"),
+            LocationRangeToCons(self.LocationRange),
+            Schene.Util.makeList(
+                self.DeclsOrStmts
+                    .Select(x => x.Accept(this, value))
                     .Cast<object>()
                     .ToArray()
             )

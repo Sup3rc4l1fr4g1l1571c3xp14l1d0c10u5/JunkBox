@@ -365,7 +365,7 @@ namespace AnsiCParser {
                         next();
                         for (var i = 0; i < 4; i++) {
                             if (IsXDigit(peek()) == false) {
-                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "invalid universal character");
+                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なユニコード文字がありました。");
                             }
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
@@ -407,7 +407,7 @@ namespace AnsiCParser {
                         write((byte)ret);
                         return;
                     default:
-                        throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "unknown escape character");
+                        throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なエスケープシーケンスがありました。");
 
                 }
             } else {
@@ -713,12 +713,13 @@ namespace AnsiCParser {
         /// <param name="str"></param>
         /// <returns></returns>
         private bool Peek(string str) {
-            for (var i = 0; i < str.Length; i++) {
-                if (Peek(i) != str[i]) {
-                    return false;
-                }
-            }
-            return true;
+            return string.Compare(_inputText, _inputPos, str, 0, str.Length) == 0;
+            //for (var i = 0; i < str.Length; i++) {
+            //    if (Peek(i) != str[i]) {
+            //        return false;
+            //    }
+            //}
+            //return true;
         }
 
         /// <summary>
@@ -730,80 +731,68 @@ namespace AnsiCParser {
                 // 読み取りを行わずに終わる
                 return;
             }
-            rescan:
+        rescan:
+            for (;;) {
 
-            // 空白文字の連続の処理
-            while (IsSpace(Peek())) {
-                if (Peek("\n")) {
-                    _beginOfLine = true;
-                }
-                IncPos(1);
-            }
-
-            // ブロックコメントの処理
-            if (Peek("/*")) {
-                IncPos(2);
-
-                bool terminated = false;
-                while (_inputPos < _inputText.Length) {
-                    if (Peek("\\")) {
-                        IncPos(2);
-                    } else if (Peek("*/")) {
-                        IncPos(2);
-                        terminated = true;
-                        break;
-                    } else {
-                        IncPos(1);
+                // 空白文字の連続の処理
+                while (IsSpace(Peek())) {
+                    if (Peek("\n")) {
+                        _beginOfLine = true;
                     }
+                    IncPos(1);
                 }
-                if (terminated == false) {
-                    _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
-                    return;
-                }
-                goto rescan;
-            }
-            // ブロックコメントの処理(拡張)
-            if (Peek("```")) {
-                IncPos(3);
 
-                bool terminated = false;
-                while (_inputPos < _inputText.Length) {
-                    if (Peek("\\")) {
-                        IncPos(2);
-                    } else if (Peek("```")) {
-                        IncPos(3);
-                        terminated = true;
-                        break;
-                    } else {
-                        IncPos(1);
-                    }
-                }
-                if (terminated == false) {
-                    _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
-                    return;
-                }
-                goto rescan;
-            }
-            // 行コメントの処理
-            if (Peek("//")) {
-                IncPos(2);
+                // ブロックコメントの処理
+                if (Peek("/*")) {
+                    IncPos(2);
 
-                bool terminated = false;
-                while (_inputPos < _inputText.Length) {
-                    if (Peek("\\")) {
-                        IncPos(2);
-                    } else if (Peek("\n")) {
-                        terminated = true;
-                        break;
-                    } else {
-                        IncPos(1);
+                    bool terminated = false;
+                    while (_inputPos < _inputText.Length) {
+                        if (Peek("\\")) {
+                            IncPos(1);
+                            if (Peek("\n")) {
+                                _beginOfLine = true;
+                            }
+                            IncPos(1);
+                        } else if (Peek("*/")) {
+                            IncPos(2);
+                            terminated = true;
+                            break;
+                        } else {
+                            if (Peek("\n")) {
+                                _beginOfLine = true;
+                            }
+                            IncPos(1);
+                        }
                     }
+                    if (terminated == false) {
+                        _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
+                        return;
+                    }
+                    continue;
                 }
-                if (terminated == false) {
-                    _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
-                    return;
+                // 行コメントの処理
+                if (Peek("//")) {
+                    IncPos(2);
+
+                    bool terminated = false;
+                    while (_inputPos < _inputText.Length) {
+                        if (Peek("\\")) {
+                            IncPos(2);
+                        } else if (Peek("\n")) {
+                            terminated = true;
+                            break;
+                        } else {
+                            IncPos(1);
+                        }
+                    }
+                    if (terminated == false) {
+                        _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
+                        return;
+                    }
+                    continue;
                 }
-                goto rescan;
+                break;
             }
 
 
@@ -853,9 +842,10 @@ namespace AnsiCParser {
                     }
                     goto rescan;
                 } else {
-                    _tokens.Add(new Token((Token.TokenKind)'#', start, GetCurrentLocation(), "#"));
-                    IncPos(1);
-                    return;
+                    throw new CompilerException.SyntaxErrorException(GetCurrentLocation(), GetCurrentLocation(), "stray '#' in program");
+                    //_tokens.Add(new Token((Token.TokenKind)'#', start, GetCurrentLocation(), "#"));
+                    //IncPos(1);
+                    //return;
                 }
             }
 
@@ -1060,12 +1050,8 @@ namespace AnsiCParser {
         /// 現在のトークンの種別が トークン種別候補 candidates に含まれるかどうかを調べ、含まれる場合は読み取る。
         /// </summary>
         public bool ReadTokenIf(params Token.TokenKind[] candidates) {
-            if (PeekToken(candidates)) {
-                ReadToken(candidates);
-                return true;
-            } else {
-                return false;
-            }
+            Token dummy;
+            return ReadTokenIf(out dummy, candidates);
         }
 
         /// <summary>
@@ -1086,12 +1072,8 @@ namespace AnsiCParser {
         /// 現在のトークンの種別が トークン種別候補 candidates に含まれるかどうかを調べ、含まれる場合は読み取る。
         /// </summary>
         public bool ReadTokenIf(params char[] candidates) {
-            if (PeekToken(candidates)) {
-                ReadToken(candidates);
-                return true;
-            } else {
-                return false;
-            }
+            Token dummy;
+            return ReadTokenIf(out dummy, candidates);
         }
 
         /// <summary>

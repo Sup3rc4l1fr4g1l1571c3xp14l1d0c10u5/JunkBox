@@ -702,7 +702,7 @@ namespace CSCPP {
                 // トークンの前に空白がある場合、その空白を出力
                 foreach (var chunk in tok.Space.chunks) {
                     if (BeginOfLine) {
-                        if (chunk.Pos.FileName != CurrentFile) {
+                        if (chunk.Pos.FileName != CurrentFile){ 
                             // ファイル自体が違う場合は #line 指令を挿入して現在位置を更新
                             WriteLineDirective(chunk.Pos.Line, chunk.Pos.FileName, isDummy);
                             CurrentFile = chunk.Pos.FileName;
