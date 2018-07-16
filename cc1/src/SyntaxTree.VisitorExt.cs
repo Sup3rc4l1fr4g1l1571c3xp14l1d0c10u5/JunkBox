@@ -10,13 +10,13 @@ namespace AnsiCParser.SyntaxTree {
         static readonly Dictionary<System.Type, System.Reflection.MethodInfo> methodCache = new Dictionary<System.Type, System.Reflection.MethodInfo>();
 
         public static TResult Accept<TResult, TArg>(this Ast ast, IVisitor<TResult, TArg> visitor, TArg value) {
+            return AcceptInner(ast, visitor, value);
             System.Reflection.MethodInfo methodInfo;
             if (methodCache.TryGetValue(ast.GetType(), out methodInfo) == false) {
                 methodInfo = typeof(VisitorExt).GetMethods().Where(x => x.Name == "Accept" && x.GetParameters().First().ParameterType.Equals(ast.GetType())).FirstOrDefault();
                 methodCache[ast.GetType()] = methodInfo;
             }
             return (TResult)methodInfo.MakeGenericMethod(typeof(TResult), typeof(TArg)).Invoke(null, new object[] { (object)ast, (object)visitor, (object)value });
-            //return AcceptInner(ast, visitor, value);
         }
 
         public static TResult Accept<TResult, TArg>(this Declaration.ArgumentDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {

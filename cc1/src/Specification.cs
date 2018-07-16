@@ -250,13 +250,29 @@ namespace AnsiCParser {
         public static bool IsComplexType(this CType self) {
             return self.IsBasicType(BasicType.TypeKind.Float_Complex, BasicType.TypeKind.Double_Complex, BasicType.TypeKind.LongDouble_Complex);
         }
+        /// <summary>
+        /// 特定の型の複素数型（complex type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsComplexType(this CType self, BasicType.TypeKind baseType) {
+            return  ((baseType == BasicType.TypeKind.Float) && self.IsBasicType(BasicType.TypeKind.Float_Complex)) ||
+                    ((baseType == BasicType.TypeKind.Double) && self.IsBasicType(BasicType.TypeKind.Double_Complex)) ||
+                    ((baseType == BasicType.TypeKind.LongDouble) && self.IsBasicType(BasicType.TypeKind.LongDouble_Complex));
+        }
+        /// <summary>
+        /// 虚数型（imaginary type）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsImaginaryType(this CType self) {
+            return self.IsBasicType(BasicType.TypeKind.Float_Imaginary, BasicType.TypeKind.Double_Imaginary, BasicType.TypeKind.LongDouble_Imaginary);
+        }
 
         /// <summary>
         /// 浮動小数点型（floating type）ならば真
         /// </summary>
         /// <returns></returns>
         public static bool IsFloatingType(this CType self) {
-            return self.IsRealFloatingType() || self.IsComplexType();
+            return self.IsRealFloatingType() || self.IsComplexType() || self.IsImaginaryType();
         }
 
         /// <summary>
@@ -704,6 +720,12 @@ namespace AnsiCParser {
             }
         }
 
+        public enum UsualArithmeticConversionOperator {
+            Other,
+            AddSub,
+            MulDiv,
+        }
+
         /// <summary>
         /// 通常の算術型変換（usual arithmetic conversion）
         /// </summary>
@@ -719,7 +741,7 @@ namespace AnsiCParser {
         /// - 関係演算子（&lt; > &lt;= >=）、等価演算子（== !=）の算術型オペランドに、通常の算術型変換が適用される。
         /// - 条件演算子?:の第2・第3オペランドが算術型の場合、結果の型は、両オペランドに通常の算術型変換を適用後の型となる。
         /// </remarks>
-        public static CType UsualArithmeticConversion(ref Expression lhs, ref Expression rhs) {
+        public static CType UsualArithmeticConversion(ref Expression lhs, ref Expression rhs, UsualArithmeticConversionOperator opKind = UsualArithmeticConversionOperator.Other) {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
 
@@ -729,7 +751,6 @@ namespace AnsiCParser {
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
             }
-
             // まず，一方のオペランドの対応する実数型が long double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が long double となるように型変換する。
             // そうでない場合，一方のオペランドの対応する実数型が double ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が double となるように型変換する。
             // そうでない場合，一方のオペランドの対応する実数型が float ならば，他方のオペランドを，型領域を変えることなく，変換後の型に対応する実数型が float となるように型変換する。
@@ -737,6 +758,119 @@ namespace AnsiCParser {
             //  - 一方が long double で 他方が double なら double を long double にする。
             //  - 一方が long double で 他方が float _Complex なら float _Complex を long double _Complex にする。（結果の型は long double _Complex 型になる）
             //  - 一方が long double _Complex で 他方が float なら float を long double にする。（結果の型は long double _Complex 型になる）
+
+#if true
+            // 実数型       [+-] 実数型       = 実数型
+            // 実数型       [+-] _Imaginary型 = _Complex型
+            // 実数型       [+-] _Complex型   = _Complex型
+            // _Imaginary型 [+-] 実数型       = _Complex型
+            // _Imaginary型 [+-] _Imaginary型 = _Imaginary型
+            // _Imaginary型 [+-] _Complex型   = _Complex型
+            // _Complex型   [+-] 実数型       = _Complex型
+            // _Complex型   [+-] _Imaginary型 = _Complex型
+            // _Complex型   [+-] _Complex型   = _Complex型(*例外発生の可能性)
+
+            // 実数型       [*/] 実数型       = 実数型
+            // 実数型       [*/] _Imaginary型 = _Imaginary型
+            // 実数型       [*/] _Complex型   = _Complex型(*除算時例外発生の可能性)
+            // _Imaginary型 [*/] 実数型       = _Imaginary型
+            // _Imaginary型 [*/] _Imaginary型 = 実数型
+            // _Imaginary型 [*/] _Complex型   = _Complex型(*除算時例外発生の可能性)
+            // _Complex型   [*/] 実数型       = _Complex型
+            // _Complex型   [*/] _Imaginary型 = _Complex型
+            // _Complex型   [*/] _Complex型   = _Complex型(*例外発生の可能性)
+            if ((btLhs.IsFloatingType() && btRhs.IsArithmeticType()) || (btLhs.IsArithmeticType() && btRhs.IsFloatingType())) {
+                if (btLhs.IsIntegerType()) {
+                    lhs = new Expression.TypeConversionExpression(lhs.LocationRange, btRhs.GetCorrespondingRealType(), lhs);
+                    btLhs = btRhs.GetCorrespondingRealType();
+                } else if (btRhs.IsIntegerType()) {
+                    rhs = new Expression.TypeConversionExpression(rhs.LocationRange, btLhs.GetCorrespondingRealType(), rhs);
+                    btRhs = btLhs.GetCorrespondingRealType();
+                }
+
+                if (opKind == UsualArithmeticConversionOperator.AddSub) {
+                    int ci = -1; // 0: real float 1: Imaginary 2:complex
+                    int lci = btLhs.IsRealFloatingType() ? 0 : btLhs.IsImaginaryType() ? 1 : btLhs.IsComplexType() ? 2 : 16;
+                    int rci = btRhs.IsRealFloatingType() ? 0 : btLhs.IsImaginaryType() ? 1 : btRhs.IsComplexType() ? 2 : 16;
+                    switch (lci * 16 + rci) {
+                        case 0x00: ci = 0; break;
+                        case 0x01: ci = 2; break;
+                        case 0x02: ci = 2; break;
+                        case 0x10: ci = 2; break;
+                        case 0x11: ci = 1; break;
+                        case 0x12: ci = 2; break;
+                        case 0x20: ci = 2; break;
+                        case 0x21: ci = 2; break;
+                        case 0x22: ci = 2; break;
+                        default: throw new Exception();
+                    }
+                    var bt = (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.LongDouble || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.LongDouble) ? BasicType.TypeKind.LongDouble
+                           : (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Double || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Double) ? BasicType.TypeKind.Double
+                           : (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Float || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Float) ? BasicType.TypeKind.Float
+                           : 0;
+                    switch (ci) {
+                        case 0:
+                            return BasicType.Create(bt);
+                        case 1:
+                            return BasicType.Create(bt == BasicType.TypeKind.Float ? BasicType.TypeKind.Float_Imaginary : bt == BasicType.TypeKind.Double ? BasicType.TypeKind.Double_Imaginary : BasicType.TypeKind.LongDouble_Imaginary);
+                        case 2:
+                            return BasicType.Create(bt == BasicType.TypeKind.Float ? BasicType.TypeKind.Float_Complex : bt == BasicType.TypeKind.Double ? BasicType.TypeKind.Double_Complex : BasicType.TypeKind.LongDouble_Complex);
+                        default:
+                            throw new Exception();
+                    }
+                } else if (opKind == UsualArithmeticConversionOperator.MulDiv) {
+                    int ci = -1; // 0: real float 1: Imaginary 2:complex
+                    int lci = btLhs.IsRealFloatingType() ? 0 : btLhs.IsImaginaryType() ? 1 : btLhs.IsComplexType() ? 2 : 16;
+                    int rci = btRhs.IsRealFloatingType() ? 0 : btLhs.IsImaginaryType() ? 1 : btRhs.IsComplexType() ? 2 : 16;
+                    switch (lci * 16 + rci) {
+                        case 0x00: ci = 0; break;
+                        case 0x01: ci = 1; break;
+                        case 0x02: ci = 2; break;
+                        case 0x10: ci = 1; break;
+                        case 0x11: ci = 0; break;
+                        case 0x12: ci = 2; break;
+                        case 0x20: ci = 2; break;
+                        case 0x21: ci = 2; break;
+                        case 0x22: ci = 2; break;
+                        default: throw new Exception();
+                    }
+                    var bt = (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.LongDouble || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.LongDouble) ? BasicType.TypeKind.LongDouble
+                           : (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Double || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Double) ? BasicType.TypeKind.Double
+                           : (btLhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Float || btRhs.GetCorrespondingRealType().Kind == BasicType.TypeKind.Float) ? BasicType.TypeKind.Float
+                           : 0;
+                    switch (ci) {
+                        case 0:
+                            return BasicType.Create(bt);
+                        case 1:
+                            return BasicType.Create(bt == BasicType.TypeKind.Float ? BasicType.TypeKind.Float_Imaginary : bt == BasicType.TypeKind.Double ? BasicType.TypeKind.Double_Imaginary : BasicType.TypeKind.LongDouble_Imaginary);
+                        case 2:
+                            return BasicType.Create(bt == BasicType.TypeKind.Float ? BasicType.TypeKind.Float_Complex : bt == BasicType.TypeKind.Double ? BasicType.TypeKind.Double_Complex : BasicType.TypeKind.LongDouble_Complex);
+                        default:
+                            throw new Exception();
+                    }
+                } else {
+                    if (btLhs.Kind == BasicType.TypeKind.LongDouble || btRhs.Kind == BasicType.TypeKind.LongDouble) {
+                        var retTy = BasicType.Create(BasicType.TypeKind.LongDouble);
+                        if (btRhs.Kind != BasicType.TypeKind.LongDouble) { rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs); }
+                        if (btLhs.Kind != BasicType.TypeKind.LongDouble) { lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs); }
+                        return retTy;
+                    }
+                    if (btLhs.Kind == BasicType.TypeKind.Double || btRhs.Kind == BasicType.TypeKind.Double) {
+                        var retTy = BasicType.Create(BasicType.TypeKind.Double);
+                        if (btRhs.Kind != BasicType.TypeKind.Double) { rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs); }
+                        if (btLhs.Kind != BasicType.TypeKind.Double) { lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs); }
+                        return retTy;
+                    }
+                    if (btLhs.Kind == BasicType.TypeKind.Float || btRhs.Kind == BasicType.TypeKind.Float) {
+                        var retTy = BasicType.Create(BasicType.TypeKind.Float);
+                        if (btRhs.Kind != BasicType.TypeKind.Float) { rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs); }
+                        if (btLhs.Kind != BasicType.TypeKind.Float) { lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs); }
+                        return retTy;
+                    }
+                    throw new Exception();
+                }
+            }
+#else
             var realConversionPairTable = new[] {
                 Tuple.Create(BasicType.TypeKind.LongDouble,BasicType.TypeKind.LongDouble_Complex),
                 Tuple.Create(BasicType.TypeKind.Double,BasicType.TypeKind.Double_Complex),
@@ -747,23 +881,24 @@ namespace AnsiCParser {
                 if (btLhs.IsFloatingType() && btLhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btRhs.IsComplexType()) {
                         var retTy = BasicType.Create(realConversionPair.Item2);
-                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
+                        //lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
                         return retTy;
                     } else {
-                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange,BasicType.Create(realConversionPair.Item1), rhs);
+                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange,BasicType.Create(realConversionPair.Item1), lhs);
                         return btLhs;
                     }
                 } else if (btRhs.IsFloatingType() && btRhs.GetCorrespondingRealType().Kind == realConversionPair.Item1) {
                     if (btLhs.IsComplexType()) {
                         var retTy = BasicType.Create(realConversionPair.Item2);
-                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, retTy, lhs);
+                        //rhs = new Expression.TypeConversionExpression(rhs.LocationRange, retTy, rhs);
                         return retTy;
                     } else {
-                        lhs = new Expression.TypeConversionExpression(lhs.LocationRange, BasicType.Create(realConversionPair.Item1), lhs);
+                        rhs = new Expression.TypeConversionExpression(rhs.LocationRange, BasicType.Create(realConversionPair.Item1), rhs);
                         return btRhs;
                     }
                 }
             }
+#endif
 
             // そうでない場合，整数拡張を両オペランドに対して行い，拡張後のオペランドに次の規則を適用する。
             lhs = IntegerPromotion(lhs);
@@ -1364,7 +1499,7 @@ namespace AnsiCParser {
                 }
 
                 if (t1 is TaggedType.StructUnionType && t2 is TaggedType.StructUnionType) {
-                    #if false
+#if false
                     // 6.7.2.1 構造体指定子及び共用体指定子
                     // 構造体型、及び共用体型は無結合であるため、構文上の誤りが無ければ単一翻訳単位内では同名＝同一型である。
                     // しかし、異なる翻訳単位間での規則も示されているためそちらで検証する
@@ -1416,9 +1551,9 @@ namespace AnsiCParser {
                         // 一方、もしくは、両方が不完全型
                         return true;
                     }
-                    #else
+#else
                     return t1 == t2;
-                    #endif
+#endif
                 }
 
                 // 6.7.2.2 列挙型指定子

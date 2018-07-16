@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace AnsiCParser {
@@ -39,7 +40,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override string ToString() {
-                return this.Accept<string, string>(new ToStringVisitor(), "");
+                return this.Accept(new ToStringVisitor(), "");
             }
 
             /// <summary>

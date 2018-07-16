@@ -23,7 +23,7 @@ namespace AnsiCParser {
         /// 10進数文字に一致する正規表現。
         /// </summary>
         private static string D { get; } = @"\d";
-        
+
         /// <summary>
         /// 16進数文字に一致する正規表現。
         /// </summary>
@@ -121,8 +121,15 @@ namespace AnsiCParser {
                 return 0;
             }
 
+            int eBase;
+            int eSize;
+            int fSize;
             if (suffix == "f") {
-                // float 型として解析
+                eBase = 127;
+                eSize = 8;
+                fSize = 23;
+#if false
+// float 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0',8).ToArray())).Substring(0, 8);
                 var f = ToUInt32(range, fs, 16);
                 dp *= 4;
@@ -139,9 +146,14 @@ namespace AnsiCParser {
 
                 var qw = (sign ? (1U << 31) : 0) | (((UInt32)(e + 127) & ((1U << 8) - 1)) << 23) | ((f >> (32 - 23)) & ((1U << 23) - 1));
                 var d = BitConverter.ToSingle(BitConverter.GetBytes(qw), 0);
-
                 return d;
+#endif
             } else {
+                eBase = 1023;
+                eSize = 11;
+                fSize = 52;
+
+#if false
                 // double 型として解析
                 fs = (fs + new string(Enumerable.Repeat('0', 16).ToArray())).Substring(0, 16);
                 var f = ToUInt64(range, fs, 16);
@@ -160,6 +172,29 @@ namespace AnsiCParser {
                 var qw = (sign ? (1UL << 63) : 0) | (((UInt64)(e + 1023) & ((1UL << 11) - 1)) << 52) | ((f >> (64 - 52)) & ((1UL << 52) - 1));
                 var d = BitConverter.ToDouble(BitConverter.GetBytes(qw), 0);
 
+                return d;
+#endif
+            }
+            {
+                var bitSize = eSize + fSize + 1;
+                var hexSize = bitSize / 8;
+                var msb = 1UL << (bitSize - 1);
+                fs = (fs + new string(Enumerable.Repeat('0', hexSize).ToArray())).Substring(0, hexSize);
+                var f = ToUInt64(range, fs, 16);
+                dp *= 4;
+                while ((f & msb) == 0) {
+                    f <<= 1;
+                    dp--;
+                }
+                // ケチ表現化
+                {
+                    f <<= 1;
+                    dp--;
+                }
+                var e = dp + int.Parse(exp);
+
+                var qw = (sign ? msb : 0) | (((UInt64)(e + eBase) & ((1UL << eSize) - 1)) << fSize) | ((f >> (bitSize - fSize)) & ((1UL << fSize) - 1));
+                var d = BitConverter.ToSingle(BitConverter.GetBytes(qw), 0);
                 return d;
             }
             throw new NotImplementedException();
@@ -258,7 +293,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static Int32 ToInt32(LocationRange range, string s, int radix) {
             var ret = Read(range, s, radix).ToByteArray();
-            return BitConverter.ToInt32(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00),4)).ToArray(),0);
+            return BitConverter.ToInt32(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00), 4)).ToArray(), 0);
         }
 
         /// <summary>
@@ -270,7 +305,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static UInt32 ToUInt32(LocationRange range, string s, int radix) {
             var ret = Read(range, s, radix).ToByteArray();
-            return BitConverter.ToUInt32(ret.Concat(Enumerable.Repeat((byte)0,4)).ToArray(),0);
+            return BitConverter.ToUInt32(ret.Concat(Enumerable.Repeat((byte)0, 4)).ToArray(), 0);
         }
 
         /// <summary>
@@ -282,7 +317,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static Int64 ToInt64(LocationRange range, string s, int radix) {
             var ret = Read(range, s, radix).ToByteArray();
-            return BitConverter.ToInt64(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00),8)).ToArray(),0);
+            return BitConverter.ToInt64(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00), 8)).ToArray(), 0);
         }
 
         /// <summary>
@@ -294,7 +329,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         public static UInt64 ToUInt64(LocationRange range, string s, int radix) {
             var ret = Read(range, s, radix).ToByteArray();
-            return BitConverter.ToUInt64(ret.Concat(Enumerable.Repeat((byte)0,8)).ToArray(),0);
+            return BitConverter.ToUInt64(ret.Concat(Enumerable.Repeat((byte)0, 8)).ToArray(), 0);
         }
 
         /// <summary>
@@ -540,6 +575,9 @@ namespace AnsiCParser {
             // c99
             {"inline" , Token.TokenKind.INLINE},
             {"restrict" , Token.TokenKind.RESTRICT},
+            {"_Complex" , Token.TokenKind._COMPLEX},
+            {"_Imaginary" , Token.TokenKind._IMAGINARY},
+
             // special
             {"near" , Token.TokenKind.NEAR},
             {"far" , Token.TokenKind.FAR},
@@ -731,8 +769,8 @@ namespace AnsiCParser {
                 // 読み取りを行わずに終わる
                 return;
             }
-        rescan:
-            for (;;) {
+            rescan:
+            for (; ; ) {
 
                 // 空白文字の連続の処理
                 while (IsSpace(Peek())) {
@@ -898,7 +936,7 @@ namespace AnsiCParser {
                 } else if (RegexDecimal.IsMatch(str)) {
                     _tokens.Add(new Token(Token.TokenKind.DECIAML_CONSTANT, start, end, str));
                 } else {
-//                    throw new Exception();
+                    //                    throw new Exception();
                     _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
                 }
                 return;
@@ -913,7 +951,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => {});
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();
@@ -930,7 +968,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => {});
+                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();

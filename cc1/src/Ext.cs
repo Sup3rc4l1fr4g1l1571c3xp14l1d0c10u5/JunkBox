@@ -29,6 +29,9 @@ namespace AnsiCParser {
         public static TypeSpecifier SignFlag(this TypeSpecifier self) {
             return TypeSpecifier.SignMask & self;
         }
+        public static TypeSpecifier ComplexFlag(this TypeSpecifier self) {
+            return TypeSpecifier.CIMask & self;
+        }
 
         public static TypeSpecifier Marge(this TypeSpecifier self, TypeSpecifier other, LocationRange range) {
             TypeSpecifier type = TypeSpecifier.None;
@@ -63,16 +66,30 @@ namespace AnsiCParser {
             }
 
             TypeSpecifier sign = TypeSpecifier.None;
-            if (self.SignFlag() == TypeSpecifier.None) {
+            if (self.SignFlag() == TypeSpecifier.None && other.SignFlag() != TypeSpecifier.None) {
                 sign = other.SignFlag();
-            } else if (other.SignFlag() == TypeSpecifier.None) {
+            } else if (self.SignFlag() != TypeSpecifier.None && other.SignFlag() == TypeSpecifier.None) {
                 sign = self.SignFlag();
             } else if (self.SignFlag() != other.SignFlag()) {
                 throw new Exception();
             }
 
-            return type | size | sign;
+            TypeSpecifier complex = TypeSpecifier.None;
+            if (self.ComplexFlag() == TypeSpecifier.None && other.ComplexFlag() != TypeSpecifier.None) {
+                complex = other.ComplexFlag();
+            } else if (self.ComplexFlag() != TypeSpecifier.None && other.ComplexFlag() == TypeSpecifier.None) {
+                complex = self.ComplexFlag();
+            } else if (self.ComplexFlag() != other.ComplexFlag()) {
+                throw new Exception();
+            }
+
+            if (sign != TypeSpecifier.None && complex != TypeSpecifier.None) {
+                throw new Exception();
+            }
+
+            return type | size | sign | complex;
         }
+
         public static TypeQualifier Marge(this TypeQualifier self, TypeQualifier other) {
             return self | other;
         }

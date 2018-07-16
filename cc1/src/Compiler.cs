@@ -254,6 +254,32 @@ namespace AnsiCParser {
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsComplexType()) {
+                    FpuPush();
+                    FpuPush();
+
+                    Emit("faddp %st(0), %st(2)");
+                    Emit("faddp %st(0), %st(2)");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsRealFloatingType() && rhs.Type.IsComplexType()) {
+                    FpuPush();  // rhs
+                    FpuPush();  // lhs
+                    FpuPushZero();
+
+                    Emit("faddp %st(0), %st(2)");
+                    Emit("faddp %st(0), %st(2)");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsRealFloatingType()) {
+                    FpuPush();  // rhs
+                    FpuPushZero();
+                    FpuPush();  // lhs 
+
+                    Emit("faddp %st(0), %st(2)");
+                    Emit("faddp %st(0), %st(2)");
+
+                    FpuPop(type);
                 } else {
                     throw new Exception("");
                 }
@@ -277,7 +303,7 @@ namespace AnsiCParser {
                     } else {
                         LoadI32("%ecx"); // rhs
                         LoadI32("%eax"); // lhs
-                        Emit("subl %ecx, %eax");
+                         Emit("subl %ecx, %eax");
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
@@ -345,6 +371,42 @@ namespace AnsiCParser {
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsComplexType()) {
+                    FpuPush();    // rhs [c + di]
+                    FpuPush();    // lhs [a + bi]
+
+                    // %st(0) = b
+                    // %st(1) = a
+                    // %st(2) = d
+                    // %st(3) = c 
+
+                    Emit("fsubp %st(0), %st(2)");   // [a,b-d,c]
+                    Emit("fsubp %st(0), %st(2)");   // [b-d,a-c]
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsRealFloatingType() && rhs.Type.IsComplexType()) {
+                    FpuPush();    // rhs [c + di]
+                    FpuPush();    // lhs [a]
+                    FpuPushZero();// b = 0
+
+                    // %st(0) = b
+                    // %st(1) = a
+                    // %st(2) = d
+                    // %st(3) = c 
+
+                    Emit("fsubp %st(0), %st(2)");
+                    Emit("fsubp %st(0), %st(2)");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsRealFloatingType()) {
+                    FpuPush();  // rhs
+                    FpuPushZero();
+                    FpuPush();  // lhs 
+
+                    Emit("fsubp %st(0), %st(2)");
+                    Emit("fsubp %st(0), %st(2)");
+
+                    FpuPop(type);
                 } else {
                     throw new Exception("");
                 }
@@ -400,6 +462,51 @@ namespace AnsiCParser {
                     FpuPush();
 
                     Emit("fmulp");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsComplexType()) {
+                    FpuPush();    // rhs [c + di]
+                    FpuPush();    // lhs [a + bi]
+
+                    // %st(0) = b
+                    // %st(1) = a
+                    // %st(2) = d
+                    // %st(3) = c 
+
+                    // [a+bi]*[c+di] = (a×c)-(b×d)+(a×d+b×c)i
+
+                    Emit("fld %st(1)");             // [a,b,a,d,c]
+                    Emit("fmul %st(4), %st(0)");    // [a*c,b,a,d,c]
+                    Emit("fld %st(1)");             // [b,a*c,b,a,d,c]
+                    Emit("fmul %st(4), %st(0)");    // [b*d,a*c,b,a,d,c]
+                    Emit("fsubrp %st(0), %st(1)");  // [(a*c)-(b*d),b,a,d,c]
+                    Emit("fld %st(2)");             // [a,(a*c)-(b*d),b,a,d,c]
+                    Emit("fmul %st(4),  %st(0)");   // [a*d,(a*c)-(b*d),b,a,d,c]
+                    Emit("fld %st(2)");             // [b,a*d,(a*c)-(b*d),b,a,d,c]
+                    Emit("fmul %st(6),  %st(0)");   // [b*c,a*d,(a*c)-(b*d),b,a,d,c]
+                    Emit("faddp");                  // [(a*d)+(b*c),(a*c)-(b*d),b,a,d,c]
+
+                    FpuPop(type);
+                    FpuDiscard();
+                    FpuDiscard();
+                    FpuDiscard();
+                    FpuDiscard();
+                } else if (lhs.Type.IsRealFloatingType() && rhs.Type.IsComplexType()) {
+                    FpuPush();  // rhs
+                    FpuPush();  // lhs
+                    Emit("fld %st(0)");
+
+                    Emit("fmulp %st(0), %st(2)");
+                    Emit("fmulp %st(0), %st(2)");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsRealFloatingType()) {
+                    FpuPush();  // rhs
+                    Emit("fld %st(0)");
+                    FpuPush();  // lhs 
+
+                    Emit("fmulp %st(0), %st(2)");
+                    Emit("fmulp %st(0), %st(2)");
 
                     FpuPop(type);
                 } else {
@@ -458,6 +565,76 @@ namespace AnsiCParser {
                     FpuPush();
 
                     Emit("fdivp");
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsComplexType()) {
+                    FpuPush();    // rhs [c + di]
+                    FpuPush();    // lhs [a + bi]
+
+                    // %st(0) = b
+                    // %st(1) = a
+                    // %st(2) = d
+                    // %st(3) = c 
+
+                    // ((a×c+b×d)+(b×c-a×d)i) / (c*c+d*d)
+
+                    Emit("fld %st(3)");             // [c,b,a,d,c]
+                    Emit("fmul %st(2), %st(0)");    // [a*c,b,a,d,c]
+                    Emit("fld %st(3)");             // [d,a*c,b,a,d,c]
+                    Emit("fmul %st(2), %st(0)");    // [b*d,a*c,b,a,d,c]
+                    Emit("faddp");                  // [(a*c)+(b*d),b,a,d,c]
+                    Emit("fxch %st(2)");            // [a,b,(a*c)+(b*d),d,c]
+                    Emit("fmul %st(3), %st(0)");    // [a*d,b,(a*c)+(b*d),d,c]
+                    Emit("fxch %st(1)");            // [b,a*d,(a*c)+(b*d),d,c]
+                    Emit("fmul %st(4), %st(0)");    // [b*c,a*d,(a*c)+(b*d),d,c]
+                    Emit("fsubp");                  // [(b*c)-(a*d),(a*c)+(b*d),d,c]
+                    Emit("fxch %st(2)");            // [d,(a*c)+(b*d),(b*c)-(a*d),c]
+                    Emit("fmul %st(0), %st(0)");    // [d*d,(a*c)+(b*d),(b*c)-(a*d),c]
+                    Emit("fxch %st(3)");            // [c,(a*c)+(b*d),(b*c)-(a*d),d*d]
+                    Emit("fmul %st(0), %st(0)");    // [c*c,(a*c)+(b*d),(b*c)-(a*d),d*d]
+                    Emit("faddp %st(0), %st(3)");   // [(a*c)+(b*d),(b*c)-(a*d),(c*c)+(d*d)]
+                    Emit("fxch %st(2)");            // [(c*c)+(d*d),(b*c)-(a*d),(a*c)+(b*d)]
+                    Emit("fdivr %st(0), %st(2)");   // [(c*c)+(d*d),(b*c)-(a*d),((a*c)+(b*d))/((c*c)+(d*d))]
+                    Emit("fdivrp %st(0), %st(1)");  // [((b*c)-(a*d))/((c*c)+(d*d)),((a*c)+(b*d))/((c*c)+(d*d))]
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsRealFloatingType() && rhs.Type.IsComplexType()) {
+                    FpuPush();    // rhs [c + di]
+                    FpuPush();    // lhs a
+
+                    // %st(0) = a
+                    // %st(1) = d
+                    // %st(2) = c 
+
+                    // (a×c)-(a×d)i / (c*c+d*d)
+                    Emit("fld %st(2)");             // [c,a,d,c]
+                    Emit("fmul %st(0),  %st(0)");   // [c*c,a,d,c]
+                    Emit("fld %st(2)");             // [d,c*c,a,d,c]
+                    Emit("fmul %st(0),  %st(0)");   // [d*d,c*c,a,d,c]
+                    Emit("faddp");                  // [d*d+c*c,a,d,c]
+                    Emit("fxch %st(1)");            // [a,d*d+c*c,d,c]
+                    Emit("fmul %st(0),  %st(3)");   // [a,d*d+c*c,d,a*c]
+                    Emit("fchs");                   // [-a,d*d+c*c,d,a*c]
+                    Emit("fmulp %st(0),  %st(2)");  // [d*d+c*c,d*-a,a*c]
+
+                    Emit("fdivr %st(0), %st(2)");    // [d*d+c*c,d*-a,(a*c) / (d*d+c*c)]
+                    Emit("fdivrp %st(0), %st(1)");   // [(d*-a) / (d*d+c*c),(a*c) / (d*d+c*c)]
+
+                    FpuPop(type);
+                } else if (lhs.Type.IsComplexType() && rhs.Type.IsRealFloatingType()) {
+                    FpuPush();    // rhs c
+                    FpuPush();    // lhs [a + bi]
+
+                    // %st(0) = b
+                    // %st(1) = a
+                    // %st(2) = c 
+
+                    // (a/c)+(b/c)i
+
+                    Emit("fld %st(2)");            // [c,b,a,c]
+                    Emit("fdivrp %st(0), %st(2)"); // [b,a/c,c]
+                    Emit("fdivp %st(0), %st(2)");  // [a/c,b/c]
+                    Emit("fxch %st(1)");            // [b/c,a/c]
 
                     FpuPop(type);
                 } else {
@@ -1286,6 +1463,26 @@ namespace AnsiCParser {
                 FpuPush();
                 FpuPop(type);
             }
+            private void CastComplexTypeToOtherComplexType(CType type) {
+                Value ret = Peek(0);
+                Debug.Assert(ret.Type.IsComplexType() && type.IsComplexType());
+                FpuPush();
+                FpuPop(type);
+            }
+            private void CastComplexTypeToRealFloatingType(CType type) {
+                Value ret = Peek(0);
+                Debug.Assert(ret.Type.IsComplexType() && type.IsRealFloatingType());
+                FpuPush();      // real->imagの順で積まれる
+                FpuDiscard();   // imagを捨てる
+                FpuPop(type);   // realを読む
+            }
+            private void CastRealFloatingTypeToComplexType(CType type) {
+                Value ret = Peek(0);
+                Debug.Assert(ret.Type.IsRealFloatingType() && type.IsComplexType());
+                FpuPush();      // realを積む
+                FpuPushZero();  // imagを積む
+                FpuPop(type);   // 読む
+            }
 
             public void CastTo(CType type) {
                 Value ret = Peek(0);
@@ -1311,6 +1508,12 @@ namespace AnsiCParser {
                     CastIntValueToFloating(type);
                 } else if (ret.Type.IsStructureType() && type.IsStructureType()) {
                     // キャスト不要
+                } else if (ret.Type.IsComplexType() && type.IsComplexType()) {
+                    CastComplexTypeToOtherComplexType(type);
+                } else if (ret.Type.IsComplexType() && type.IsRealFloatingType()) {
+                    CastComplexTypeToRealFloatingType(type);
+                } else if (ret.Type.IsRealFloatingType() && type.IsComplexType()) {
+                    CastRealFloatingTypeToComplexType(type);
                 } else if (ret.Type.IsUnionType() && type.IsUnionType()) {
                     // キャスト不要
                 } else if (type.IsVoidType()) {
@@ -1926,7 +2129,15 @@ namespace AnsiCParser {
                         throw new NotImplementedException();
                 }
             }
-
+            /// <summary>
+            ///     FPUスタック上に+0.0をロードする
+            /// </summary>
+            private void FpuPushZero() {
+                Emit("fldz");
+            }
+            private void FpuPushOne() {
+                Emit("fld1");
+            }
             /// <summary>
             ///     FPUスタック上に値をロードする
             /// </summary>
@@ -1943,6 +2154,18 @@ namespace AnsiCParser {
                     Emit("addl $4, %esp");
                 } else if (rhs.Type.IsBasicType(BasicType.TypeKind.Double)) {
                     rhs = Pop();
+                    Emit("fldl (%esp)");
+                    Emit("addl $8, %esp");
+                } else if (rhs.Type.IsComplexType(BasicType.TypeKind.Float)) {
+                    rhs = Pop();
+                    Emit("flds (%esp)");
+                    Emit("addl $4, %esp");
+                    Emit("flds (%esp)");
+                    Emit("addl $4, %esp");
+                } else if (rhs.Type.IsComplexType(BasicType.TypeKind.Double)) {
+                    rhs = Pop();
+                    Emit("fldl (%esp)");
+                    Emit("addl $8, %esp");
                     Emit("fldl (%esp)");
                     Emit("addl $8, %esp");
                 } else if (rhs.Type.IsIntegerType()) {
@@ -1994,9 +2217,28 @@ namespace AnsiCParser {
                     Emit("sub $8, %esp");
                     Emit("fstpl (%esp)");
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = ty, StackPos = _stack.Count });
+                } else if (ty.IsComplexType(BasicType.TypeKind.Float)) {
+                    Emit("sub $4, %esp");
+                    Emit("fstps (%esp)");
+                    Emit("sub $4, %esp");
+                    Emit("fstps (%esp)");
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = ty, StackPos = _stack.Count });
+                } else if (ty.IsComplexType(BasicType.TypeKind.Double)) {
+                    Emit("sub $8, %esp");
+                    Emit("fstpl (%esp)");
+                    Emit("sub $8, %esp");
+                    Emit("fstpl (%esp)");
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = ty, StackPos = _stack.Count });
                 } else {
                     throw new NotImplementedException();
                 }
+            }
+            /// <summary>
+            ///     FPUスタックの一番上の値を捨てる
+            /// </summary>
+            /// <param name="ty"></param>
+            public void FpuDiscard() {
+                Emit("fstp %st(0)");
             }
 
             /// <summary>
@@ -2903,7 +3145,7 @@ namespace AnsiCParser {
                     _context.Generator.Emit("pushl %esi");
                     _context.Generator.Emit("pushl %edi");
                     var c = _context.Generator.Emit(".error \"Stack size is need backpatch.\""); // スタックサイズは仮置き
-                    _localScopeTotalSize = 4 * 3; // %ebx,%esi,%edi分
+                    _localScopeTotalSize = 4 * 3;   // %ebx,%esi,%edi分
                     _maxLocalScopeTotalSize = 4 * 3;
                     self.Body.Accept(this, value);  // 本体のコード生成を実行
                     c.Body = $"subl ${_maxLocalScopeTotalSize - 4 * 3}, %esp # alloc stack"; // スタックサイズをバックパッチ

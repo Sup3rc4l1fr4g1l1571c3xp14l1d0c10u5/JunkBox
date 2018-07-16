@@ -110,7 +110,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\rtest\for.c"), " < Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\complex_bool.c"), " < Debug>").Parse();
             //var sexpr = ret.Accept(new ToSExprVisitor(), null);
             /*
             var interpreter = new Schene.SchemeInterpreter();
@@ -166,9 +166,10 @@ namespace AnsiCParser {
  * C99 Features
  * - __func__ : Complete
  * - Line comment : Complete
- * - Mix Statement and Declaration : Incomplete
+ * - Mix Statement and Declaration : Complete
  * - Flexible array member : Complete
  * - Variable length array : Not Supported. It's nothing, but harmful. 
- * - Complex numbers : Not Supported
- * - Imaginary numbers : Not Supported
+ * - Complex numbers : Complete
+ * - Imaginary numbers : Incomplete.
+ * - Library : NO (now use glibc)
  */

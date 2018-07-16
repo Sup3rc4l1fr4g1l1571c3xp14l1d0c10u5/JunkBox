@@ -48,6 +48,8 @@ namespace AnsiCParser {
             // C99
             INLINE,
             RESTRICT,
+            _COMPLEX,
+            _IMAGINARY,
             // Special
             NEAR,
             FAR,

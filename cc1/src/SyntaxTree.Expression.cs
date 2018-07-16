@@ -1158,7 +1158,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
                 // 意味規則  
                 // 通常の算術型変換をオペランドに適用する。
-                ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs, Specification.UsualArithmeticConversionOperator.MulDiv);
 
                 Op = op;
                 Lhs = lhs;
@@ -1212,7 +1212,7 @@ namespace AnsiCParser.SyntaxTree {
                     if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                         // 両オペランドが算術型をもつ
                         // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                        ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                        ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs, Specification.UsualArithmeticConversionOperator.AddSub);
                     } else {
                         // ポインタ型への暗黙的型変換を試みる
                         var lhsPtr = Specification.ToPointerTypeExpr(lhs);
@@ -1236,7 +1236,7 @@ namespace AnsiCParser.SyntaxTree {
                     if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
                         // 両オペランドが算術型をもつ
                         // 意味規則 両オペランドが算術型をもつ場合，通常の算術型変換をそれらに適用する。
-                        ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs);
+                        ResultType = Specification.UsualArithmeticConversion(ref lhs, ref rhs, Specification.UsualArithmeticConversionOperator.AddSub);
                     } else {
                         // ポインタ型への暗黙的型変換を試みる
                         var lhsPtr = Specification.ToPointerTypeExpr(lhs);

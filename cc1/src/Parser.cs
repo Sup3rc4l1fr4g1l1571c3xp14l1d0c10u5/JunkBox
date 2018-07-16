@@ -1108,7 +1108,16 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private bool IsTypeSpecifier() {
-            return _lexer.PeekToken(Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED);
+            if (Mode == LanguageMode.C89) {
+                return _lexer.PeekToken(
+                    Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED
+                );
+            } else {
+                return _lexer.PeekToken(
+                    Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED,
+                    Token.TokenKind._COMPLEX, Token.TokenKind._IMAGINARY
+                );
+            }
         }
 
         /// <summary>
@@ -1149,6 +1158,18 @@ namespace AnsiCParser {
                 case Token.TokenKind.UNSIGNED:
                     _lexer.NextToken();
                     return AnsiCParser.TypeSpecifier.Unsigned;
+                case Token.TokenKind._COMPLEX:
+                    if (Mode == LanguageMode.C89) {
+                        throw new Exception();
+                    }
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier._Complex;
+                case Token.TokenKind._IMAGINARY:
+                    if (Mode == LanguageMode.C89) {
+                        throw new Exception();
+                    }
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier._Imaginary;
                 default:
                     throw new Exception();
             }
@@ -2698,13 +2719,13 @@ namespace AnsiCParser {
                 _lexer.ReadToken(')');
                 // 未定義の識別子の直後に関数呼び出し用の後置演算子 '(' がある場合、
                 if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
+                    var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
                     // K&RおよびC89/90では暗黙的関数宣言 extern int 識別子(); が現在の宣言ブロックの先頭で定義されていると仮定して翻訳する
                     if (Mode == LanguageMode.C89) {
-                        var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
                         var decl = AddImplictFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new FunctionType(null, false, CType.CreateSignedInt()));
                         expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(tok.Range, identExpr.Ident, decl as Declaration.FunctionDeclaration);
                     } else {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "未定義の識別子を関数として用いています。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"未定義の識別子 {identExpr.Ident} を関数として用いています。");
                     }
                 }
                 return MorePostfixExpression(new SyntaxTree.Expression.PostfixExpression.FunctionCallExpression(tok.Range, expr, args));

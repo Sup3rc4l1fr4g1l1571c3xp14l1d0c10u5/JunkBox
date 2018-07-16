@@ -51,7 +51,7 @@ namespace AnsiCParser {
         /// <summary>
         /// デフォルト処理
         /// </summary>
-        private OptionHandler _default = null;
+        private OptionHandler _default;
 
         /// <summary>
         /// 引数の定義を登録する
@@ -67,8 +67,6 @@ namespace AnsiCParser {
         /// <summary>
         /// どれにも一致しなかった場合の処理
         /// </summary>
-        /// <param name="name">引数文字列</param>
-        /// <param name="argc">受け取る引数の数</param>
         /// <param name="handler">処理用のハンドラ</param>
         public CommandLineOptionsParser<T> Default(OptionHandler handler) {
             _default = handler;
@@ -116,6 +114,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数の解析を行う
         /// </summary>
+        /// <param name="t"></param>
         /// <param name="args">引数列</param>
         /// <returns>余りの引数列</returns>
         public T Parse(T t, string[] args) {
