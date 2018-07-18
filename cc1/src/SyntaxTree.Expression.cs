@@ -1033,7 +1033,7 @@ namespace AnsiCParser.SyntaxTree {
                 // 意味規則 
                 // 論理否定演算子!の結果は，そのオペランドの値が 0 と比較して等しくない場合 0 とし，等しい場合 1 とする。
                 // 結果の型は，int とする。式!E は，(0 == E)と等価とする。
-                Expr = expr;
+                Expr = Specification.TypeConvert(CType.CreateBool(), expr);
             }
         }
 
@@ -1098,7 +1098,11 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 if (!type.IsScalarType()) {
-                    throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                    if (type.IsBoolType()) {
+                        // _Bool型にはキャスト可能である。
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                    }
                 }
 
                 if (!expr.Type.IsScalarType()) {
@@ -1391,7 +1395,7 @@ namespace AnsiCParser.SyntaxTree {
             }
             public override CType Type {
                 get {
-                    return CType.CreateSignedInt();
+                    return CType.CreateBool();
                 }
             }
 
@@ -1536,7 +1540,7 @@ namespace AnsiCParser.SyntaxTree {
             }
             public override CType Type {
                 get {
-                    return CType.CreateSignedInt();
+                    return CType.CreateBool();
                 }
             }
 
@@ -1556,8 +1560,8 @@ namespace AnsiCParser.SyntaxTree {
                 // 第 1 オペランドの評価の直後を副作用完了点とする。
                 // 第 1 オペランドの値が 0 と比較して等しい場合，第 2 オペランドは評価しない。
 
-                Lhs = lhs;
-                Rhs = rhs;
+                Lhs = Specification.TypeConvert(CType.CreateBool(), lhs);
+                Rhs = Specification.TypeConvert(CType.CreateBool(), rhs);
             }
         }
 
@@ -1573,7 +1577,7 @@ namespace AnsiCParser.SyntaxTree {
             }
             public override CType Type {
                 get {
-                    return CType.CreateSignedInt();
+                    return CType.CreateBool();
                 }
             }
 
@@ -1593,8 +1597,9 @@ namespace AnsiCParser.SyntaxTree {
                 // ビット単位の|演算子と異なり，||演算子は左から右への評価を保証する。
                 // 第 1 オペランドの評価の直後を副作用完了点とする。
                 // 第 1 オペランドの値が 0 と比較して等しくない場合，第 2 オペランドは評価しない
-                Lhs = lhs;
-                Rhs = rhs;
+                Lhs = Specification.TypeConvert(CType.CreateBool(), lhs);
+                Rhs = Specification.TypeConvert(CType.CreateBool(), rhs);
+
             }
 
         }
@@ -1730,8 +1735,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
 
-
-                CondExpr = cond;
+                CondExpr = Specification.TypeConvert(CType.CreateBool(), cond);
                 ThenExpr = thenExpr;
                 ElseExpr = elseExpr;
             }
@@ -1846,7 +1850,7 @@ namespace AnsiCParser.SyntaxTree {
                     rhs = ApplyAssignmentRule(LocationRange, lhs.Type, rhs);
 
                     Lhs = lhs;
-                    Rhs = rhs;
+                    Rhs = Specification.TypeConvert(lhs.Type, rhs);
                     // 代入式の型は，左オペランドの型とする。
                     // ただし，左オペランドの型が修飾型である場合は，左オペランドの型の非修飾版とする。
                     ResultType = lhs.Type.UnwrapTypeQualifier();

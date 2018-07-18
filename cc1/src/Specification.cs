@@ -195,6 +195,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.UnsignedInt:          // unsigned int
                     case BasicType.TypeKind.UnsignedLongInt:      // unsigned long int
                     case BasicType.TypeKind.UnsignedLongLongInt:  // unsigned long long int
+                    case BasicType.TypeKind._Bool:  // _Bool
                         return true;
                     default:
                         return false;

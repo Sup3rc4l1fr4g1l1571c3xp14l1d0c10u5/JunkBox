@@ -1106,7 +1106,7 @@ namespace AnsiCParser {
 
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else {
-                    throw new NotImplementedException();
+                    throw new NotImplementedException($"lhs={lhs.Type} rhs={rhs.Type}");
                 }
                 CheckStackDepth(sdp - 1);
             }
@@ -1265,6 +1265,10 @@ namespace AnsiCParser {
                                 Emit("pushl %eax");
                             }
 
+                            break;
+                        case BasicType.TypeKind._Bool:
+                            // do nothing;
+                            Emit("pushl %eax");
                             break;
                         default:
                             throw new NotImplementedException();
@@ -1486,7 +1490,34 @@ namespace AnsiCParser {
 
             public void CastTo(CType type) {
                 Value ret = Peek(0);
-                if (ret.Type.IsIntegerType() && type.IsIntegerType()) {
+                if (type.IsBoolType()) {
+                    // Boolは専用のルールに従ってキャストする
+                    if (ret.Type.IsComplexType()) {
+                        FpuPush();      // real->imagの順で積まれる
+                        Emit("fldz");   // ST(0) == 0   
+                        Emit("fcomi %st(1), %st(0)");   // ST(0) == 0   
+                        Emit("setne %al");
+                        Emit("fcomip %st(2), %st(0)");   // ST(0) == 0   
+                        Emit("setne %ah");
+                        Emit("fstp %st(0)");
+                        Emit("fstp %st(0)");
+                        Emit("orb %al, %ah");
+                        Emit("movzbl %al, %eax");
+                        Emit("pushl %eax");
+
+                        Push(new Value { Kind = Value.ValueKind.Temp, Type = CType.CreateBool(), StackPos = _stack.Count });
+                    } else if (ret.Type.IsRealFloatingType()) {
+                        var value = new Value { Kind = Value.ValueKind.FloatConst, Type = CType.CreateDouble(), FloatConst = 0.0 };
+                        Push(value);
+                        Ne(CType.CreateBool());
+                    } else if (ret.Type.IsIntegerType() || ret.Type.IsPointerType()) {
+                        var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
+                        Push(value);
+                        Ne(CType.CreateBool());
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                } else if (ret.Type.IsIntegerType() && type.IsIntegerType()) {
                     CastIntValueToInt(type);
                 } else if (ret.Type.IsPointerType() && type.IsPointerType()) {
                     CastPointerValueToPointer(type);
@@ -2427,7 +2458,60 @@ namespace AnsiCParser {
             }
 
             private void PostfixOp(CType type, string op) {
-                if (type.IsIntegerType() || type.IsPointerType()) {
+                if (type.IsBoolType()) {
+
+                    LoadVariableAddress("%eax");
+
+                    // load value
+                    switch (type.Sizeof()) {
+                        case 8:
+                            var subop = (op == "add") ? "adc" : "sbb";
+                            Emit("pushl 4(%eax)");
+                            Emit("pushl 0(%eax)");
+                            if (op == "add") {
+                                Emit($"movl $1, 0(%eax)");
+                                Emit($"movl $0, 4(%eax)");
+                            } else {
+                                Emit($"xorl $1, 0(%eax)");
+                                Emit($"movl $0, 4(%eax)");
+                            }
+                            break;
+                        case 4:
+                            Emit("pushl (%eax)");
+                            if (op == "add") {
+                                Emit($"movl $1, (%eax)");
+                            } else {
+                                Emit($"xorl $1, (%eax)");
+                            }
+                            break;
+                        case 2:
+                            Emit("movw (%eax), %cx");
+                            Emit($"movzwl %cx, %ecx");
+                            Emit($"pushl %ecx");
+
+                            if (op == "add") {
+                                Emit($"movw $1, (%eax)");
+                            } else {
+                                Emit($"xorw $1, (%eax)");
+                            }
+                            break;
+                        case 1:
+                            Emit("movb (%eax), %cl");
+                            Emit($"movzbl %cl, %ecx");
+                            Emit($"pushl %ecx");
+                            if (op == "add") {
+                                Emit($"movb $1, (%eax)");
+                            } else {
+                                Emit($"xorb $1, (%eax)");
+                            }
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+
+                } else if (type.IsIntegerType() || type.IsPointerType()) {
                     CType baseType;
                     int size;
                     if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
@@ -2810,7 +2894,59 @@ namespace AnsiCParser {
             }
 
             private void PrefixOp(CType type, string op) {
-                if (type.IsIntegerType() || type.IsPointerType()) {
+                if (type.IsBoolType()) {
+
+                    LoadVariableAddress("%eax");
+
+                    // load value
+                    switch (type.Sizeof()) {
+                        case 8:
+                            var subop = (op == "add") ? "adc" : "sbb";
+                            if (op == "add") {
+                                Emit($"movl $1, 0(%eax)");
+                                Emit($"movl $0, 4(%eax)");
+                            } else {
+                                Emit($"xorl $1, 0(%eax)");
+                                Emit($"movl $0, 4(%eax)");
+                            }
+                            Emit("pushl 4(%eax)");
+                            Emit("pushl 0(%eax)");
+                            break;
+                        case 4:
+                            if (op == "add") {
+                                Emit($"movl $1, (%eax)");
+                            } else {
+                                Emit($"xorl $1, (%eax)");
+                            }
+                            Emit("pushl (%eax)");
+                            break;
+                        case 2:
+                            if (op == "add") {
+                                Emit($"movw $1, (%eax)");
+                            } else {
+                                Emit($"xorw $1, (%eax)");
+                            }
+                            Emit("movw (%eax), %cx");
+                            Emit($"movzwl %cx, %ecx");
+                            Emit($"pushl %ecx");
+                            break;
+                        case 1:
+                            if (op == "add") {
+                                Emit($"movb $1, (%eax)");
+                            } else {
+                                Emit($"xorb $1, (%eax)");
+                            }
+                            Emit("movb (%eax), %cl");
+                            Emit($"movzbl %cl, %ecx");
+                            Emit($"pushl %ecx");
+                            break;
+                        default:
+                            throw new NotImplementedException();
+                    }
+
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+
+                } else if (type.IsIntegerType() || type.IsPointerType()) {
                     CType baseType;
                     int size;
                     if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
@@ -3242,6 +3378,10 @@ namespace AnsiCParser {
                         break;
                     default:
                         throw new Exception("来ないはず");
+                }
+                if (self.Type.IsBoolType()) {
+                    // _Bool型は特別扱い
+                    _context.Generator.CastTo(CType.CreateBool());
                 }
 
                 _context.Generator.Dup(1);

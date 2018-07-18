@@ -237,6 +237,10 @@ namespace AnsiCParser {
 
             // 処理系定義の特殊型
 
+            public static BasicType CreateBool() {
+                return BasicType.Create(BasicType.TypeKind._Bool);
+            }
+
             public static BasicType CreateSizeT() {
                 return BasicType.Create(BasicType.TypeKind.UnsignedLongInt);
             }

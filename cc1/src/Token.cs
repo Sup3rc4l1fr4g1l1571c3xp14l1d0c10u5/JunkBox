@@ -48,6 +48,7 @@ namespace AnsiCParser {
             // C99
             INLINE,
             RESTRICT,
+            _BOOL,
             _COMPLEX,
             _IMAGINARY,
             // Special

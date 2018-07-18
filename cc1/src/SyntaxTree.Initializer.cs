@@ -97,7 +97,7 @@ namespace AnsiCParser.SyntaxTree {
 
             public SimpleAssignInitializer(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
                 Type = type;
-                Expr = expr;
+                Expr = Specification.TypeConvert(type, expr);
             }
         }
 

@@ -575,6 +575,7 @@ namespace AnsiCParser {
             // c99
             {"inline" , Token.TokenKind.INLINE},
             {"restrict" , Token.TokenKind.RESTRICT},
+            {"_Bool" , Token.TokenKind._BOOL},
             {"_Complex" , Token.TokenKind._COMPLEX},
             {"_Imaginary" , Token.TokenKind._IMAGINARY},
 

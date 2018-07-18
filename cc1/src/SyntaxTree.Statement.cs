@@ -78,7 +78,8 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public WhileStatement(LocationRange locationRange, Expression cond) : base(locationRange) {
-                Cond = cond;
+                Cond = Specification.TypeConvert(CType.CreateBool(), cond);
+                ;
             }
         }
 
@@ -116,7 +117,7 @@ namespace AnsiCParser.SyntaxTree {
 
             public ForStatement(LocationRange locationRange, Expression init, Expression cond, Expression update) : base(locationRange) {
                 Init = init;
-                Cond = cond;
+                Cond = Specification.TypeConvert(CType.CreateBool(), cond);
                 Update = update;
             }
         }
@@ -136,7 +137,7 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public IfStatement(LocationRange locationRange, Expression cond, Statement thenStmt, Statement elseStmt) : base(locationRange) {
-                Cond = cond;
+                Cond = Specification.TypeConvert(CType.CreateBool(), cond);
                 ThenStmt = thenStmt;
                 ElseStmt = elseStmt;
             }

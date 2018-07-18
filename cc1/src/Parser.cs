@@ -1115,7 +1115,7 @@ namespace AnsiCParser {
             } else {
                 return _lexer.PeekToken(
                     Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED,
-                    Token.TokenKind._COMPLEX, Token.TokenKind._IMAGINARY
+                    Token.TokenKind._BOOL, Token.TokenKind._COMPLEX, Token.TokenKind._IMAGINARY
                 );
             }
         }
@@ -1158,6 +1158,12 @@ namespace AnsiCParser {
                 case Token.TokenKind.UNSIGNED:
                     _lexer.NextToken();
                     return AnsiCParser.TypeSpecifier.Unsigned;
+                case Token.TokenKind._BOOL:
+                    if (Mode == LanguageMode.C89) {
+                        throw new Exception();
+                    }
+                    _lexer.NextToken();
+                    return AnsiCParser.TypeSpecifier._Bool;
                 case Token.TokenKind._COMPLEX:
                     if (Mode == LanguageMode.C89) {
                         throw new Exception();
@@ -2424,7 +2430,7 @@ namespace AnsiCParser {
                 _continueScope.Pop();
                 _lexer.ReadToken(Token.TokenKind.WHILE);
                 _lexer.ReadToken('(');
-                ss.Cond = Expression();
+                ss.Cond = Specification.TypeConvert(CType.CreateBool(), Expression());
                 var end = _lexer.ReadToken(')');
                 _lexer.ReadToken(';');
                 ss.LocationRange = new LocationRange(start, end);
