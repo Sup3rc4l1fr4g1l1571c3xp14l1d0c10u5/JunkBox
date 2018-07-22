@@ -125,6 +125,40 @@ namespace AnsiCParser.SyntaxTree {
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else {
+                    if (lhs is Expression.PrimaryExpression.AddressConstantExpression && rhs is Expression.PrimaryExpression.Constant && rhs.Type.IsIntegerType()) {
+                        var adc = lhs as Expression.PrimaryExpression.AddressConstantExpression;
+                        Expression.PrimaryExpression.Constant.IntegerConstant off;
+                        var stride = adc.Type.GetBasePointerType().Sizeof();
+                        switch (self.Op) {
+                            case Expression.AdditiveExpression.OperatorKind.Add:
+                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() + rhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                break;
+                            case Expression.AdditiveExpression.OperatorKind.Sub:
+                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() - rhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                break;
+                            default:
+                                throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                        }
+
+                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, adc.Type, off);
+                    } else if (rhs is Expression.PrimaryExpression.AddressConstantExpression && lhs is Expression.PrimaryExpression.Constant && lhs.Type.IsIntegerType()) {
+                        var adc = rhs as Expression.PrimaryExpression.AddressConstantExpression;
+                        Expression.PrimaryExpression.Constant.IntegerConstant off;
+                        var stride = adc.Type.GetBasePointerType().Sizeof();
+                        switch (self.Op) {
+                            case Expression.AdditiveExpression.OperatorKind.Add:
+                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() + lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                break;
+                            case Expression.AdditiveExpression.OperatorKind.Sub:
+                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() - lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                break;
+                            default:
+                                throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                        }
+
+                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, adc.Type, off);
+                    }
+
                     return new Expression.AdditiveExpression(self.LocationRange, Expression.AdditiveExpression.OperatorKind.Add, lhs, rhs);
                 }
             }
@@ -705,7 +739,12 @@ namespace AnsiCParser.SyntaxTree {
 
             public Expression OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Expression value) {
                 //return self;
-                return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, CType.CreatePointer(self.Type), new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.SignedInt));
+                CType bType;
+                if (self.Type.IsArrayType(out bType)) {
+                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, CType.CreatePointer(bType), new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.SignedInt));
+                } else {
+                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, self, CType.CreatePointer(self.Type), new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.SignedInt));
+                }
             }
 
             public Expression OnWhileStatement(Statement.WhileStatement self, Expression value) {

@@ -1511,7 +1511,7 @@ namespace AnsiCParser {
                         Push(value);
                         Ne(CType.CreateBool());
                     } else if (ret.Type.IsIntegerType() || ret.Type.IsPointerType()) {
-                        var value = new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreateSignedInt(), IntConst = 0 };
+                        var value = new Value { Kind = Value.ValueKind.IntConst, Type = ret.Type, IntConst = 0 };
                         Push(value);
                         Ne(CType.CreateBool());
                     } else {
@@ -1796,6 +1796,9 @@ namespace AnsiCParser {
                                 case BasicType.TypeKind.UnsignedLongInt:
                                     Emit($"movl ${value.IntConst}, {register}");
                                     break;
+                                case BasicType.TypeKind._Bool:
+                                    Emit($"movl ${value.IntConst}, {register}");
+                                    break;
                                 case BasicType.TypeKind.SignedLongLongInt:
                                 case BasicType.TypeKind.UnsignedLongLongInt:
                                 default:
@@ -1847,6 +1850,9 @@ namespace AnsiCParser {
                                 break;
                             case BasicType.TypeKind.UnsignedInt:
                             case BasicType.TypeKind.UnsignedLongInt:
+                                Emit($"popl {register}");
+                                break;
+                            case BasicType.TypeKind._Bool:
                                 Emit($"popl {register}");
                                 break;
                             case BasicType.TypeKind.SignedLongLongInt:
@@ -2218,7 +2224,7 @@ namespace AnsiCParser {
                         Emit("faddp %st, %st(1)");
                         Label(l);
                         Emit("addl $8, %esp");
-                    } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.UnsignedInt)) {
+                    } else if (rhs.Type.IsBasicType(BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.UnsignedInt, BasicType.TypeKind._Bool)) {
                         rhs = Pop();
                         Emit("pushl $0");
                         Emit("pushl 4(%esp)");

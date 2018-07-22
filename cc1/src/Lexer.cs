@@ -86,118 +86,122 @@ namespace AnsiCParser {
             throw new Exception();
         }
 
+        private static uint msb(ulong x) {
+            uint n = 0;
+            while (x > 1) {
+                x >>= 1;
+                n++;
+            }
+            return n;
+        }
+
+        interface _FloatFmt {
+            uint bias { get; }
+            uint exponent_size { get; }
+            double binary2double(uint mantissa, uint exponent);
+        }
+        struct FloatFmt : _FloatFmt {
+            public uint bias => (1 << 8) / 2 - 1;
+            public uint exponent_size => 23;
+
+            public double binary2double(uint mantissa, uint exponent) {
+                var binary = (mantissa | ((ulong)exponent << (int)exponent_size));
+                return BitConverter.ToSingle(BitConverter.GetBytes(binary), 0);
+            }
+        }
+        struct DoubleFmt : _FloatFmt {
+            public uint bias => (1 << 11) / 2 - 1;
+            public uint exponent_size => 52;
+            public double binary2double(uint mantissa, uint exponent) {
+                var binary = (mantissa | ((ulong)exponent << (int)exponent_size));
+                return BitConverter.ToDouble(BitConverter.GetBytes(binary), 0);
+            }
+        }
+
+
         /// <summary>
         /// 16進浮動小数点形式を double 型に変換
         /// </summary>
         /// <param name="range"></param>
-        /// <param name="fact"></param>
-        /// <param name="exp"></param>
-        /// <param name="suffix"></param>
+        /// <param name="mantissaPart"></param>
+        /// <param name="exponentPart"></param>
+        /// <param name="suffixPart"></param>
         /// <returns></returns>
-        public static double ParseHeximalFloat(LocationRange range, string fact, string exp, string suffix) {
-            // 小数点の初期位置を決める
-            var dp = fact.IndexOf('.');
-            string fs;
-            if (dp == -1) {
-                // 小数点が無かったので、仮数部の末尾に小数点があるものとする
-                dp = fact.Length;
-                fs = fact;
+        public static double ParseHeximalFloat(LocationRange range, string mantissaPart, string exponentPart, string suffixPart) {
+            _FloatFmt fmt = (suffixPart == "f" || suffixPart == "F") ? (_FloatFmt)new FloatFmt() : (_FloatFmt)new DoubleFmt();
+            // 小数点の位置
+            var dotIndexPos = mantissaPart.IndexOf('.');
+            var dotIndex = (dotIndexPos != -1) ? (uint)dotIndexPos : (uint)mantissaPart.Length;
+
+            // 仮数部(小数点を除去)
+            mantissaPart = mantissaPart.Replace(".", "");
+            var mantissa = ToUInt64(range, mantissaPart, 16);
+
+            // 指数部
+            var exponent = ToInt64(range, exponentPart, 10);
+
+            // 仮数部の最左ビット位置
+            var msbIndex = msb(mantissa);
+
+            // 小数点のビット位置
+            dotIndex = ((uint)mantissaPart.Length - dotIndex) * 4;
+
+            // 仮数部が 1.xxxxxxx になるように指数部を正規化
+            exponent = exponent + msbIndex - dotIndex;
+
+            // 仮数部の最左ビット位置をfmt[:exponent_size]にするために必要な左シフト数
+            var msbShiftValue = (int)(fmt.exponent_size - msbIndex);
+
+
+            // 仮数部の最左ビット位置をfmt[:exponent_size]にしたときの指数部が-126より大きいなら正規化数なのでケチ表現化できる。
+            if (exponent + msbShiftValue > -126) {
+
+                // ケチ表現化
+                // puts "正規化数なのでケチ表現にする"
+
+                // 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフトしてマスク
+                if (msbShiftValue > 0) {
+                    // 左シフト
+                    mantissa = mantissa << msbShiftValue;
+                } else {
+                    // 右シフト
+                    mantissa = mantissa  >> -msbShiftValue;
+                }
+                mantissa = mantissa & ((1UL << (int)fmt.exponent_size) - 1);
+
+                // バイアスを指数に加算
+                exponent += fmt.bias;
             } else {
-                // 小数点があった
-                fs = fact.Remove(dp, 1);
+                // 非正規化数なのでケチ表現化は不可能
+                // puts "非正規化数なのでケチ表現化はできない"
+
+                // 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフト
+                if (msbShiftValue > 0) {
+                    // 左シフト
+                    mantissa = mantissa << msbShiftValue;
+                } else {
+                    // 右シフト
+                    mantissa = mantissa  >> -msbShiftValue;
+                }
+                var shr = -(fmt.bias - 1) - exponent;
+                if (shr > 0) {
+                    // 右シフト
+                    mantissa = mantissa >> (int)shr;
+                } else {
+                    // 左シフト
+                    mantissa = mantissa >> -(int)shr;
+                }
+                // 非正規仮数を示す0を設定
+                exponent = 0;
             }
 
-            // 符号を読んでおく
-            var sign = false;
-            if (fs.FirstOrDefault() == '-') {
-                fs = fs.Remove(0, 1);
-                sign = true;
-            } else if (fs.FirstOrDefault() == '+') {
-                fs = fs.Remove(0, 1);
-            }
+            return fmt.binary2double((uint)mantissa, (uint)exponent);
 
-            // 仮数部が0の場合は特別扱い
-            if (ToUInt64(range, fs, 16) == 0) {
-                return 0;
-            }
 
-            int eBase;
-            int eSize;
-            int fSize;
-            if (suffix == "f") {
-                eBase = 127;
-                eSize = 8;
-                fSize = 23;
-#if false
-// float 型として解析
-                fs = (fs + new string(Enumerable.Repeat('0',8).ToArray())).Substring(0, 8);
-                var f = ToUInt32(range, fs, 16);
-                dp *= 4;
-                while ((f & (1UL << 31)) == 0) {
-                    f <<= 1;
-                    dp--;
-                }
-                // ケチ表現化
-                {
-                    f <<= 1;
-                    dp--;
-                }
-                var e = dp + int.Parse(exp);
 
-                var qw = (sign ? (1U << 31) : 0) | (((UInt32)(e + 127) & ((1U << 8) - 1)) << 23) | ((f >> (32 - 23)) & ((1U << 23) - 1));
-                var d = BitConverter.ToSingle(BitConverter.GetBytes(qw), 0);
-                return d;
-#endif
-            } else {
-                eBase = 1023;
-                eSize = 11;
-                fSize = 52;
 
-#if false
-                // double 型として解析
-                fs = (fs + new string(Enumerable.Repeat('0', 16).ToArray())).Substring(0, 16);
-                var f = ToUInt64(range, fs, 16);
-                dp *= 4;
-                while ((f & (1UL << 63)) == 0) {
-                    f <<= 1;
-                    dp--;
-                }
-                // ケチ表現化
-                {
-                    f <<= 1;
-                    dp--;
-                }
-                var e = dp + int.Parse(exp);
 
-                var qw = (sign ? (1UL << 63) : 0) | (((UInt64)(e + 1023) & ((1UL << 11) - 1)) << 52) | ((f >> (64 - 52)) & ((1UL << 52) - 1));
-                var d = BitConverter.ToDouble(BitConverter.GetBytes(qw), 0);
 
-                return d;
-#endif
-            }
-            {
-                var bitSize = eSize + fSize + 1;
-                var hexSize = bitSize / 8;
-                var msb = 1UL << (bitSize - 1);
-                fs = (fs + new string(Enumerable.Repeat('0', hexSize).ToArray())).Substring(0, hexSize);
-                var f = ToUInt64(range, fs, 16);
-                dp *= 4;
-                while ((f & msb) == 0) {
-                    f <<= 1;
-                    dp--;
-                }
-                // ケチ表現化
-                {
-                    f <<= 1;
-                    dp--;
-                }
-                var e = dp + int.Parse(exp);
-
-                var qw = (sign ? msb : 0) | (((UInt64)(e + eBase) & ((1UL << eSize) - 1)) << fSize) | ((f >> (bitSize - fSize)) & ((1UL << fSize) - 1));
-                var d = BitConverter.ToSingle(BitConverter.GetBytes(qw), 0);
-                return d;
-            }
-            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -316,7 +320,26 @@ namespace AnsiCParser {
         /// <param name="radix"></param>
         /// <returns></returns>
         public static Int64 ToInt64(LocationRange range, string s, int radix) {
-            var ret = Read(range, s, radix).ToByteArray();
+            bool neg = false;
+            for (;;) {
+                switch (s[0]) {
+                    case '+':
+                        s = s.Remove(0,1);
+                        continue;
+                    case '-':
+                        neg = !neg;
+                        s = s.Remove(0,1);
+                        continue;
+                    default:
+                        break;
+                }
+                break;
+            }
+            var val = Read(range, s, radix);
+            if (neg) {
+                val *= -1;
+            }
+            var ret = val.ToByteArray();
             return BitConverter.ToInt64(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00), 8)).ToArray(), 0);
         }
 
@@ -338,7 +361,7 @@ namespace AnsiCParser {
         /// <param name="peek"></param>
         /// <param name="next"></param>
         /// <param name="write"></param>
-        public static void CharIterator(Func<int> peek, Action next, Action<byte> write) {
+        public static void CharIterator(Location loc, Func<int> peek, Action next, Action<byte> write) {
             int ret = 0;
             if (peek() == '\\') {
                 next();
@@ -357,6 +380,10 @@ namespace AnsiCParser {
                     case 'b':
                         next();
                         write((byte)'\b');
+                        return;
+                    case 'e':
+                        next();
+                        write((byte)0x1B);
                         return;
                     case 'f':
                         next();
@@ -400,7 +427,7 @@ namespace AnsiCParser {
                         next();
                         for (var i = 0; i < 4; i++) {
                             if (IsXDigit(peek()) == false) {
-                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なユニコード文字がありました。");
+                                throw new CompilerException.SyntaxErrorException(loc, loc, "不正なユニコード文字がありました。");
                             }
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
@@ -414,7 +441,7 @@ namespace AnsiCParser {
                         next();
                         for (var i = 0; i < 8; i++) {
                             if (IsXDigit(peek()) == false) {
-                                throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なユニコード文字がありました。");
+                                throw new CompilerException.SyntaxErrorException(loc, loc, "不正なユニコード文字がありました。");
                             }
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
@@ -442,7 +469,7 @@ namespace AnsiCParser {
                         write((byte)ret);
                         return;
                     default:
-                        throw new CompilerException.SyntaxErrorException(Location.Empty, Location.Empty, "不正なエスケープシーケンスがありました。");
+                        throw new CompilerException.SyntaxErrorException(loc,loc, "不正なエスケープシーケンスがありました。");
 
                 }
             } else {
@@ -952,7 +979,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
+                        CharIterator(GetCurrentLocation(),() => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();
@@ -969,7 +996,7 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start, end, str));
                         return;
                     } else {
-                        CharIterator(() => Peek(), () => IncPos(1), (b) => { });
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();
@@ -1165,3 +1192,156 @@ namespace AnsiCParser {
         }
     }
 }
+
+
+/*
+ 
+
+module ParseFloat 
+def self.msb(x)
+  n = 0
+  while (x > 1) do
+    x >>= 1
+    n += 1
+  end
+  return n
+end
+
+
+
+FLOAT = {
+	:kind => :float,
+	:bias => (1 << 8)/2-1, # float bias
+	:exponent_size => 23,
+}
+DOUBLE = {
+	:kind => :double,
+	:bias => (1 << 11)/2-1, # double bias
+	:exponent_size => 52,
+}
+QUAD = {
+	:kind => :quad,
+	:bias => (1 << 15)/2-1, # double bias
+	:exponent_size => 52,
+}
+
+FORMAT = {
+	"f" => FLOAT,
+	"F" => FLOAT,
+	"l" => QUAD,
+	"L" => QUAD,
+	""  => DOUBLE,
+	nil => DOUBLE
+}
+
+def self.parse(input)
+puts "input=#{input}"
+
+parser = /0[xX](?<mantissaPart>[0-9a-fA-F]*\.[0-9a-fA-F]+|[0-9a-fA-F]+\.?)[pP](?<exponentPart>[+-]?[0-9]+)(?<suffixPart>[flFL]?)/
+m = parser.match(input)
+exit if !m 
+
+puts "mantissaPart=#{m[:mantissaPart]}, exponentPart=#{m[:exponentPart]}, suffixPart=#{m[:suffixPart]}"
+
+fmt = FORMAT[m[:suffixPart]]
+
+# 仮数部
+mantissaPart = m[:mantissaPart]
+
+# 指数部
+exponentPart = m[:exponentPart]
+
+# 小数点の位置
+dotIndex = mantissaPart.index('.')
+p [dotIndex,mantissaPart.length]
+dotIndex = dotIndex ? (dotIndex) : mantissaPart.length
+
+# 仮数部(小数点を除去)
+mantissaPart = mantissaPart.delete(".")
+mantissa = mantissaPart.to_i(16)
+
+# 指数部
+exponent = exponentPart.to_i
+
+# 仮数部の最左ビット位置
+msbIndex = msb(mantissa)
+
+# 小数点のビット位置
+dotIndex = (mantissaPart.length - dotIndex) * 4
+
+# 仮数部が 1.xxxxxxx になるように指数部を正規化
+p "#{exponent} + #{msbIndex}-#{dotIndex}"
+exponent += msbIndex-dotIndex
+# 仮数部の最左ビット位置をfmt[:exponent_size]にするために必要な左シフト数
+msbShiftValue = (fmt[:exponent_size]-msbIndex) 
+
+# 仮数部の最左ビット位置をfmt[:exponent_size]にしたときの指数部が-126より大きいなら正規化数なのでケチ表現化できる。
+if (exponent + msbShiftValue > -126) 
+
+  # ケチ表現化
+  puts "正規化数なのでケチ表現にする"
+
+  # 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフトしてマスク
+  if msbShiftValue > 0
+    # 左シフト
+    mantissa <<= msbShiftValue
+  else
+    # 右シフト
+    mantissa >>= -msbShiftValue
+  end
+  mantissa &= ((1 << fmt[:exponent_size])-1)
+
+  # 指数部を更新
+  #exponent += msbShiftValue
+  
+  # バイアスを指数に加算
+  exponent += fmt[:bias]
+  p exponent
+
+else
+  # 非正規化数なのでケチ表現化は不可能
+  puts "非正規化数なのでケチ表現化はできない"
+
+  # 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフト
+  if msbShiftValue > 0
+    # 左シフト
+    mantissa <<= msbShiftValue
+  else
+    # 右シフト
+    mantissa >>= -msbShiftValue
+  end
+
+  shr = -(fmt[:bias]-1)-exponent
+  p "-(#{fmt[:bias]}-1)-#{exponent}"
+  if shr > 0
+    # 右シフト
+    mantissa >>= shr
+  else
+    # 左シフト
+    mantissa <<= -shr
+  end
+
+  # 非正規仮数を示す0を設定
+  exponent = 0
+end
+
+binary = (mantissa | (exponent << fmt[:exponent_size]))
+puts "mantissa=#{mantissa.to_s(16)} exponent=#{exponent}, msbIndex=#{msbIndex}, dotIndex=#{dotIndex}, binary=#{binary}, binary=>str=#{ [binary].pack("L*").unpack("f")}/#{[binary].pack("Q*").unpack("d") }"
+
+return { :mantissa => mantissa, :exponent => exponent, :kind=>fmt[:kind] }
+end
+
+end
+
+
+#input = "0x1p-149F"   # => 0x00000001
+input = "0x1p-52"   # => 0x00000001
+#input = "0x1.0p-126f" # => 1.17549e-38
+#input = "0x1.8p3f"    # => 12.0
+#input = "0xABC.0p-3f" # => 0x43ABC000
+#input = "0x0.3p10f"   # => 192
+
+ParseFloat.parse(input)
+
+     
+     */

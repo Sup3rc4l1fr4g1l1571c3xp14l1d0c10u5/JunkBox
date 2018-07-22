@@ -117,7 +117,7 @@ namespace AnsiCParser.SyntaxTree {
 
             public ForStatement(LocationRange locationRange, Expression init, Expression cond, Expression update) : base(locationRange) {
                 Init = init;
-                Cond = Specification.TypeConvert(CType.CreateBool(), cond);
+                Cond = cond == null ? null : Specification.TypeConvert(CType.CreateBool(), cond);
                 Update = update;
             }
         }

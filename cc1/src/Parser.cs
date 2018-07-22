@@ -2439,7 +2439,7 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf(out start, Token.TokenKind.FOR)) {
                 _lexer.ReadToken('(');
                 Expression init = null;
-                if (Mode == LanguageMode.C89 && IsDeclaration()) {
+                if (Mode == LanguageMode.C99 && IsDeclaration()) {
                     _insertImplictDeclarationOperatorStack.Peek().AddRange(Declaration());
                 } else {
                     init = _lexer.PeekToken(';') ? null : Expression();

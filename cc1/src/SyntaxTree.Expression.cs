@@ -274,7 +274,7 @@ namespace AnsiCParser.SyntaxTree {
 
                         int[] i = { 1 };
                         int value = 0;
-                        Lexer.CharIterator(() => str[i[0]], () => i[0]++, b => value = (value << 8) | b);
+                        Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => value = (value << 8) | b);
                         Value = value;
                     }
 
@@ -354,7 +354,7 @@ namespace AnsiCParser.SyntaxTree {
                     foreach (var str in strings) {
                         int[] i = { 1 };
                         while (str[i[0]] != '"') {
-                            Lexer.CharIterator(() => str[i[0]], () => i[0]++, b => Value.Add(b));
+                            Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => Value.Add(b));
                         }
                         strParts.Add(str.Substring(1, i[0] - 1));
                     }
