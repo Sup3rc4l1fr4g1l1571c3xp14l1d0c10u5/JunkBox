@@ -110,9 +110,9 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\9cctest\tmp\float.i"), " <Debug>").Parse();
-            //var sexpr = ret.Accept(new ToSExprVisitor(), null);
-            /*
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\mbchar.c"), " <Debug>").Parse();
+            var sexpr = ret.Accept(new ToSExprVisitor(), null);
+            //*
             var interpreter = new Schene.SchemeInterpreter();
             interpreter.InterpreterWantsToPrint += (s, e) => Console.Write(e.WhatToPrint);
             interpreter.Evaluate($"(define ast '{new Schene.Writer(false).Write(sexpr)})");
@@ -146,9 +146,9 @@ namespace AnsiCParser {
       (write s))
   (newline)))
 ");
-            //interpreter.Evaluate(@"(repl)");
-            */
-            using (var o = new System.IO.StreamWriter(@"..\..\test.s")) {
+            interpreter.Evaluate(@"(repl)");
+            //*/
+            using (var o = new System.IO.StreamWriter(@"test.s")) {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);
             }
@@ -171,5 +171,5 @@ namespace AnsiCParser {
  * - Variable length array : Not Supported. It's nothing, but harmful. 
  * - Complex numbers : Complete
  * - Imaginary numbers : Incomplete.
- * - Library : NO (now use glibc)
+ * - Bool type : Complete.
  */

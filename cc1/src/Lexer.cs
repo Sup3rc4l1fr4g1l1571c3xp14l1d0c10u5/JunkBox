@@ -469,7 +469,10 @@ namespace AnsiCParser {
                         write((byte)ret);
                         return;
                     default:
-                        throw new CompilerException.SyntaxErrorException(loc,loc, "不正なエスケープシーケンスがありました。");
+                        Logger.Warning(loc,loc, $"不正なエスケープシーケンス '\\{(char)peek()}' がありました。エスケープ文字を無視し、'{(char)peek()}' として読み取ります。");
+                        write((byte)peek());
+                        next();
+                        return;
 
                 }
             } else {
@@ -605,6 +608,12 @@ namespace AnsiCParser {
             {"_Bool" , Token.TokenKind._BOOL},
             {"_Complex" , Token.TokenKind._COMPLEX},
             {"_Imaginary" , Token.TokenKind._IMAGINARY},
+
+            // c11
+            {"_Alignas" , Token.TokenKind._Alignas},
+            {"_Alignof" , Token.TokenKind._Alignof},
+            {"_Noreturn" , Token.TokenKind._Noreturn},
+            {"_Static_assert" , Token.TokenKind._Static_assert},
 
             // special
             {"near" , Token.TokenKind.NEAR},
@@ -968,8 +977,11 @@ namespace AnsiCParser {
                     _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
                 }
                 return;
-            } else if (Peek("'")) {
+            } 
+            
                 // 文字定数の読み取り
+                // todo : wide char / unicode char
+            if (Peek("'")) {
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
                     if (Peek("'")) {
@@ -986,6 +998,7 @@ namespace AnsiCParser {
             }
 
             // 文字列リテラルの読み取り
+                // todo : wide char / unicode char
             if (Peek("\"")) {
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
@@ -1335,7 +1348,8 @@ end
 
 
 #input = "0x1p-149F"   # => 0x00000001
-input = "0x1p-52"   # => 0x00000001
+#input = "0x1p-52"   # => 0x00000001
+input = "0X1P-1074"
 #input = "0x1.0p-126f" # => 1.17549e-38
 #input = "0x1.8p3f"    # => 12.0
 #input = "0xABC.0p-3f" # => 0x43ABC000

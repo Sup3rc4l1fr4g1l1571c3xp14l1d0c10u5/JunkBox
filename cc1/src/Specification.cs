@@ -995,7 +995,6 @@ namespace AnsiCParser {
         /// 適合する型へのオペランドの値の型変換は，値又は表現の変更を引き起こさない
         /// </remarks>
         public static Expression TypeConvert(CType targetType, Expression expr) {
-
             // 6.3.1 算術オペランド
 
             // 6.3.1.1 論理型，文字型及び整数型
@@ -1172,6 +1171,7 @@ namespace AnsiCParser {
                     return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType() && expr.IsNullPointerConstant()) {
+                    // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
                     return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType() && expr.Type.IsIntegerType()) {
@@ -1245,6 +1245,7 @@ namespace AnsiCParser {
                     return new Expression.TypeConversionExpression(expr.LocationRange, targetType, expr);
                 }
 
+
             } else {
                 if (expr.Type.IsPointerType()) {
                     return expr;
@@ -1265,7 +1266,11 @@ namespace AnsiCParser {
                     return expr;
                 }
             }
-            throw new CompilerException.SpecificationErrorException(expr.LocationRange, "型変換できない組み合わせを型変換しようとした");
+            if (targetType != null) {
+                throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"{expr.Type.ToString()}から{targetType.ToString()}へは型変換できません。");
+            } else {
+                throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"{expr.Type.ToString()}は規定の型変換ができません。");
+            }
 
         }
 

@@ -349,7 +349,9 @@ namespace AnsiCParser.SyntaxTree {
                 public StringExpression(LocationRange locationRange, List<string> strings) : base(locationRange) {
                     // Todo: WideChar未対応
 
-                    Value = new List<byte>();
+                    // ascii 
+
+                     Value = new List<byte>();
                     var strParts = new List<string>();
                     foreach (var str in strings) {
                         int[] i = { 1 };
@@ -880,6 +882,7 @@ namespace AnsiCParser.SyntaxTree {
                     // これら以外の場合，結果はそのオペランドが指し示すオブジェクト又は関数へのポインタとなる
                     Expr = expr;
                     ResultType = CType.CreatePointer(expr.Type);
+                    //Console.Error.WriteLine($"&:{locationRange.ToString()}: ExprType={expr.Type.ToString()}, ResultType={ResultType.ToString()}");
                 }
             }
         }
@@ -922,7 +925,14 @@ namespace AnsiCParser.SyntaxTree {
                 // オペランドが型“～型へのポインタ”をもつ場合，その結果は型“～型”をもつ。
                 // 正しくない値がポインタに代入されている場合，単項*演算子の動作は，未定義とする
                 Expr = expr;
-                ResultType = expr.Type.GetBasePointerType();
+                CType bt;
+                if (expr.Type.IsPointerType(out bt) && bt.IsFunctionType()) {
+                    //Console.Error.WriteLine($"expr is pointer of function");
+                    ResultType = expr.Type;
+                } else {
+                    ResultType = expr.Type.GetBasePointerType();
+                }
+                //Console.Error.WriteLine($"*:{locationRange.ToString()}: ExprType={expr.Type.ToString()}, ResultType={ResultType.ToString()}");
             }
         }
 
@@ -2092,6 +2102,9 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
+            if (type.IsFunctionType()) {
+                System.Diagnostics.Debugger.Break();
+            }
                 Ty = type;
                 Expr = expr;
             }

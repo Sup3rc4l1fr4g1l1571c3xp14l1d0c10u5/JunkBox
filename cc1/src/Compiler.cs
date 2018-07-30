@@ -1550,7 +1550,7 @@ namespace AnsiCParser {
                 } else if (type.IsVoidType()) {
                     // キャスト不要（というより、無視？）
                 } else {
-                    throw new NotImplementedException();
+                    throw new NotImplementedException($"cast {ret.Type.ToString()} to {type.ToString()} is not implemented.");
                 }
             }
 
@@ -3815,8 +3815,13 @@ namespace AnsiCParser {
             }
 
             public Value OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Value value) {
+                CType bt;
                 self.Expr.Accept(this, value);
-                _context.Generator.Reference(self.Type);
+                if (self.Expr.Type.IsPointerType(out bt) && bt.IsFunctionType()) {
+                    // そのままの値を返す
+                } else {
+                    _context.Generator.Reference(self.Type);
+                }
                 return value;
             }
 

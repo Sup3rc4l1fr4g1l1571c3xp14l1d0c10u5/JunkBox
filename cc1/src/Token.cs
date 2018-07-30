@@ -51,6 +51,11 @@ namespace AnsiCParser {
             _BOOL,
             _COMPLEX,
             _IMAGINARY,
+            // C11
+            _Alignas,
+            _Alignof,
+            _Noreturn,
+            _Static_assert,
             // Special
             NEAR,
             FAR,

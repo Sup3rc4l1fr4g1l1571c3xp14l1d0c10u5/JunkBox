@@ -134,6 +134,7 @@ namespace AnsiCParser.SyntaxTree {
                     Logger.Warning(it.Current.LocationRange, "スカラー初期化子内の要素が多すぎます");
                 }
                 it.Leave();
+                it.Next();
                 return ret;
             } else {
                 var expr = it.AsSimpleInitializer().AssignmentExpression;
