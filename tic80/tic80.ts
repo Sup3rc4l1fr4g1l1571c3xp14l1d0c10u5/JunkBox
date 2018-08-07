@@ -1,5 +1,6 @@
 window.addEventListener("load", function () {
     "use strict";
+
     // utility
     function times(step: number): number[] {
         return [...Array(step).keys()];
@@ -182,8 +183,7 @@ window.addEventListener("load", function () {
     }
 
     function api_btn(id: number): boolean {
-        id = ~~id;
-        const btn = _btn_status[~~id & 0x1F];
+        const btn = _btn_status[id & 0x1F];
         return btn.PrevStatus;
     }
 
@@ -206,39 +206,39 @@ window.addEventListener("load", function () {
     // TIC-80 : 240x136 = 16320 byte
     // NDS    : 256x192 = 24576 byte
     // NES    : 256x240 = 30720 byte
+    // STM32F7 DISCO : 408x272
+    const SCREEN_WIDTH = 240;
+    const SCREEN_HEIGHT = 136;
+    const SPRITE_SIZE = 8;
 
-    const width = 240;
-    const height = 136;
-    const sprite_size = 8;
-    const map_width = (~~(width / sprite_size)) * sprite_size;
-    const map_height = (~~(height / sprite_size)) * sprite_size;
+    // 240x136 cells, 1920x1088 pixels (240*8 x 136*8)
+    const MAP_WIDTH = (~~(SCREEN_WIDTH / SPRITE_SIZE)) * SPRITE_SIZE;
+    const MAP_HEIGHT = (~~(SCREEN_HEIGHT / SPRITE_SIZE)) * SPRITE_SIZE;
 
-
-    const SCREEN                = 0x00000;
-    const SCREEN_SIZE           = 0x03FC0;
-    const PALETTE               = 0x03FC0;
-    const PALETTE_SIZE          = 0x00030;
-    const PALETTE_MAP           = 0x03FF0;
-    const PALETTE_MAP_SIZE      = 0x00008;
-    const BORDER                = 0x03FF8;
-    const BORDER_SIZE           = 0x00001;
-    const SCREEN_OFFSET         = 0x03FF9;
-    const SCREEN_OFFSET_SIZE    = 0x00002;
-    const MOUSE_CURSOR          = 0x03FFB;
-    const MOUSE_CURSOR_SIZE     = 0x00001;
-    const RESERVED1			    = 0x03FFC;
-    const RESERVED1_SIZE        = 0x00004;
-    const TILES                 = 0x04000;
-    const TILES_SIZE            = 0x02000;
-    const SPRITES               = 0x06000;
-    const SPRITES_SIZE          = 0x02000;
-    const MAP                   = 0x08000;
-    const MAP_SIZE              = 0x07F80;
-    const GAMEPADS              = 0x0FF80;
-    const GAMEPADS_SIZE         = 0x00004;
-    const MOUSE                 = 0x0FF84;
-    const MOUSE_SIZE            = 0x00004;
-
+    const SCREEN = 0x00000;
+    const SCREEN_SIZE = 0x03FC0;
+    const PALETTE = 0x03FC0;
+    const PALETTE_SIZE = 0x00030;
+    const PALETTE_MAP = 0x03FF0;
+    const PALETTE_MAP_SIZE = 0x00008;
+    const BORDER = 0x03FF8;
+    const BORDER_SIZE = 0x00001;
+    const SCREEN_OFFSET = 0x03FF9;
+    const SCREEN_OFFSET_SIZE = 0x00002;
+    const MOUSE_CURSOR = 0x03FFB;
+    const MOUSE_CURSOR_SIZE = 0x00001;
+    const RESERVED1 = 0x03FFC;
+    const RESERVED1_SIZE = 0x00004;
+    const TILES = 0x04000;
+    const TILES_SIZE = 0x02000;
+    const SPRITES = 0x06000;
+    const SPRITES_SIZE = 0x02000;
+    const MAP = 0x08000;
+    const MAP_SIZE = 0x07F80;
+    const GAMEPADS = 0x0FF80;
+    const GAMEPADS_SIZE = 0x00004;
+    const MOUSE = 0x0FF84;
+    const MOUSE_SIZE = 0x00004;
 
     const ram = new Uint8Array(1024 * 80);	// 80kb
     const screen = ram.subarray(SCREEN, SCREEN + SCREEN_SIZE);
@@ -254,7 +254,7 @@ window.addEventListener("load", function () {
     const mouse = ram.subarray(MOUSE, MOUSE + MOUSE_SIZE);
 
     function poke(address: number, value: number): void {
-        ram[~~address] = (~~value);
+        ram[~~address] = value;
     }
 
     function peek(address: number): number {
@@ -289,13 +289,13 @@ window.addEventListener("load", function () {
 
     function poke1(ram: Uint8Array, index: number, value: number): void {
         const address = (index >> 3);
-        const bit = index & 0x07;
+        const bit = (7 - index & 0x07);
         ram[address] = (ram[address] & (~(1 << bit))) | ((value & 0x01) << bit);
     }
 
     function peek1(ram: Uint8Array, index: number): number {
         const address = (index >> 3);
-        const bit = index & 0x07;
+        const bit = (7 - index & 0x07);
         return (ram[address] >> bit) & 0x01;
     }
 
@@ -335,19 +335,19 @@ window.addEventListener("load", function () {
 
     function set_pixel(x: number, y: number, color: number): void {
         if (clip.t <= y && y < clip.b && clip.l <= x && x < clip.r) {
-            poke4(screen, ~~y * width + ~~x, color & 0x0F);
+            poke4(screen, ~~y * SCREEN_WIDTH + ~~x, color & 0x0F);
         }
     }
 
     function get_pixel(x: number, y: number): number {
-        if (0 <= y && y < height && 0 <= x && x < width) {
-            return peek4(screen, ~~y * width + ~~x);
+        if (0 <= y && y < SCREEN_HEIGHT && 0 <= x && x < SCREEN_WIDTH) {
+            return peek4(screen, ~~y * SCREEN_WIDTH + ~~x);
         } else {
             return 0;
         }
     }
 
-    function api_pix(x:number, y:number, color?:number): number {
+    function api_pix(x: number, y: number, color?: number): number {
         if (color == undefined) {
             return get_pixel(x, y);
         } else {
@@ -357,7 +357,7 @@ window.addEventListener("load", function () {
     }
 
     function api_cls(color: number = 0): void {
-        if (clip.l == 0 && clip.t == 0 && clip.r == width && clip.b == height) {
+        if (clip.l == 0 && clip.t == 0 && clip.r == SCREEN_WIDTH && clip.b == SCREEN_HEIGHT) {
             color = (color & 0x0F);
             const byte = (color << 4) | color;
             screen.fill(byte);
@@ -375,14 +375,14 @@ window.addEventListener("load", function () {
 
     function api_rect_border(x: number, y: number, w: number, h: number, color: number): void {
         x = ~~x; y = ~~y; w = ~~w; h = ~~h; color = ~~color;
-        _lineH(x, y    , w, color);
-        _lineH(x, y + h-1, w, color);
-        _lineV(x    , y, h, color);
+        _lineH(x, y, w, color);
+        _lineH(x, y + h - 1, w, color);
+        _lineV(x, y, h, color);
         _lineV(x + w - 1, y, h, color);
     }
 
     function api_line(x0: number, y0: number, x1: number, y1: number, color: number): void {
-        _line(x0, y0, x1, y1, (x,y) => set_pixel(x, y, color));
+        _line(x0, y0, x1, y1, (x, y) => set_pixel(x, y, color));
     }
 
     function _lineH(x: number, y: number, w: number, color: number): void {
@@ -391,7 +391,7 @@ window.addEventListener("load", function () {
         const xl = Math.max(x, clip.l);
         const xr = Math.min(x + w, clip.r);
         for (let i = xl; i < xr; i++) {
-            poke4(screen, y * width + i, color);
+            poke4(screen, y * SCREEN_WIDTH + i, color);
         }
     }
 
@@ -401,7 +401,7 @@ window.addEventListener("load", function () {
         const yr = y + h >= clip.b ? clip.b : y + h;
 
         for (let i = yl; i < yr; ++i) {
-            poke4(screen, i * width + x, color);
+            poke4(screen, i * SCREEN_WIDTH + x, color);
         }
     }
 
@@ -433,7 +433,7 @@ window.addEventListener("load", function () {
         _drawTile(sprites, id, x, y, colorkey, scale, flip, rotate);
     }
 
-    function _line(x0: number, y0: number, x1: number, y1: number, putPixelHandler:(x:number, y:number)=>void): void {
+    function _line(x0: number, y0: number, x1: number, y1: number, putPixelHandler: (x: number, y: number) => void): void {
         x0 = ~~x0; x1 = ~~x1; y0 = ~~y0; y1 = ~~y1;
 
         const dx = Math.abs(x1 - x0);
@@ -457,23 +457,23 @@ window.addEventListener("load", function () {
         t: number,
         b: number,
     } = {
-        l: 0,
-        r: width,
-        t: 0,
-        b: height,
-    };
+            l: 0,
+            r: SCREEN_WIDTH,
+            t: 0,
+            b: SCREEN_HEIGHT,
+        };
 
-    function api_clip(x: number = 0, y: number = 0, w: number = width, h: number=height) : void {
+    function api_clip(x: number = 0, y: number = 0, w: number = SCREEN_WIDTH, h: number = SCREEN_HEIGHT): void {
 
-        clip.l = x;
-        clip.t = y;
-        clip.r = x + w;
-        clip.b = y + h;
+        clip.l = ~~x;
+        clip.t = ~~y;
+        clip.r = ~~x + ~~w;
+        clip.b = ~~y + ~~h;
 
         if (clip.l < 0) { clip.l = 0; }
         if (clip.t < 0) { clip.t = 0; }
-        if (clip.r > width) { clip.r = width; }
-        if (clip.b > height) { clip.b = height; }
+        if (clip.r > SCREEN_WIDTH) { clip.r = SCREEN_WIDTH; }
+        if (clip.b > SCREEN_HEIGHT) { clip.b = SCREEN_HEIGHT; }
     }
 
     function api_tri(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, color: number): void {
@@ -499,17 +499,17 @@ window.addEventListener("load", function () {
         Right: number;
     }
 
-    const _sideBuffer: ISideBuffer[] = times(height).map(() => { return { Left: 0, Right: 0 }; });
+    const _sideBuffer: ISideBuffer[] = times(SCREEN_HEIGHT).map(() => { return { Left: 0, Right: 0 }; });
 
     function _initSidesBuffer(): void {
-        for (let i = 0; i < height; i++) {
-            _sideBuffer[i].Left = width;
+        for (let i = 0; i < SCREEN_HEIGHT; i++) {
+            _sideBuffer[i].Left = SCREEN_WIDTH;
             _sideBuffer[i].Right = -1;
         }
     }
 
     function _setSidePixel(x: number, y: number): void {
-        if (y >= 0 && y < height) {
+        if (y >= 0 && y < SCREEN_HEIGHT) {
             if (x < _sideBuffer[y].Left) { _sideBuffer[y].Left = x; }
             if (x > _sideBuffer[y].Right) { _sideBuffer[y].Right = x; }
         }
@@ -584,7 +584,7 @@ window.addEventListener("load", function () {
                         scanline <<= 1;
                     }
                 }
-                x += 8*scale;
+                x += 8 * scale;
             }
         }
         return Math.max(max_x, x) - sx;
@@ -633,47 +633,45 @@ window.addEventListener("load", function () {
 
     function api_map(x: number = 0, y: number = 0, w: number = 30, h: number = 17, sx: number = 0, sy: number = 0, colorkey: number = -1, scale: number = 1, remap: (id: number, x: number, y: number) => [/*id*/number, /*flip*/number, /*rotate*/number] = null) {
         scale = ~~scale;
+        x = ~~x;
+        y = ~~y;
         h = ~~h;
         w = ~~w;
         const size = 8 * scale;
 
-        for (let j: number = y, jj: number = sy; j < y + h; j++ , jj += size) {
-            for (let i: number = x, ii: number = sx; i < x + w; i++ , ii += size) {
+        for (let j = y, jj = sy; j < y + h; j++ , jj += size) {
+            for (let i = x, ii = sx; i < x + w; i++ , ii += size) {
                 let mi = i;
                 let mj = j;
 
-                while (mi < 0) mi += map_width;
-                while (mj < 0) mj += map_height;
-                while (mi >= map_width) mi -= map_width;
-                while (mj >= map_height) mj -= map_height;
+                while (mi < 0) { mi += MAP_WIDTH; }
+                while (mj < 0) { mj += MAP_HEIGHT; }
+                while (mi >= MAP_WIDTH) { mi -= MAP_WIDTH; }
+                while (mj >= MAP_HEIGHT) { mj -= MAP_HEIGHT; }
 
-                const index = ~~mi + ~~mj * 8;
+                const index = mi + mj * MAP_WIDTH;
                 const data = map[index];
-                let tile: [/*id*/number, /*flip*/number, /*rotate*/number] = [/*id*/data, /*flip*/0, /*rotate*/0];
+                let tile: [/*id*/number, /*flip*/number, /*rotate*/number] = remap ? remap(data, mi, mj) : [/*id*/data, /*flip*/0, /*rotate*/0];
 
-                if (remap) {
-                    tile = remap(data, mi, mj);
-                }
-
-                _drawTile(tiles, ~~tile[0], ii, jj, colorkey, scale, tile[1], tile[2]);
+                _drawTile(tiles, tile[0], ii, jj, colorkey, scale, tile[1], tile[2]);
             }
         }
     }
 
-    function api_map_set(x: number, y: number, value: number) : void {
-        if (x < 0 || x >= map_width || y < 0 || y >= map_height) {
+    function api_map_set(x: number, y: number, value: number): void {
+        if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) {
             return;
         }
 
-        map[~~y * map_width + ~~x] = value;
+        map[~~y * MAP_WIDTH + ~~x] = value;
     }
 
     function api_map_get(x: number, y: number): number {
-        if (x < 0 || x >= map_width || y < 0 || y >= map_height) {
+        if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) {
             return;
         }
 
-        return map[~~y * map_width + ~~x];
+        return map[~~y * MAP_WIDTH + ~~x];
     }
 
     interface IEvalContext {
@@ -686,20 +684,20 @@ window.addEventListener("load", function () {
         print: (text: string, x?: number, y?: number, color?: number, fixed?: boolean, scale?: number) => number; // Print string with system font
         font: (text: string, x: number, y: number, colorkey: number, char_width: number, char_height: number, fixed?: boolean, scale?: number) => number; // Print string with font defined in foreground sprites
         clip: (x?: number, y?: number, w?: number, h?: number) => void; // Set screen clipping region
-        cls: (color?:number) => void; // Clear the screen
+        cls: (color?: number) => void; // Clear the screen
         pix: (...args: number[]) => number; // Set/Get pixel color on the screen
         line: (x0: number, y0: number, x1: number, y1: number, color: number) => void; // Draw line
         rect: (x: number, y: number, w: number, h: number, color: number) => void; // Draw filled rectangle
         rectb: (x: number, y: number, w: number, h: number, color: number) => void; // Draw rectangle border
-        circ: (xm: number, ym: number, radius: number, color: number) => void ; // Draw filled circle
-        circb: (xm: number, ym: number, radius: number, color: number) => void ; // Draw circle border
+        circ: (xm: number, ym: number, radius: number, color: number) => void; // Draw filled circle
+        circb: (xm: number, ym: number, radius: number, color: number) => void; // Draw circle border
         spr: (id: number, x: number, y: number, colorkey?: number, scale?: number, flip?: number, rotate?: number) => void; // Draw sprite by ID, can rotate or flip
         btn: (id: number) => boolean; // Get gamepad button state in current frame
         btnp: (id: number, hold?: number, period?: number) => boolean; // Get gamepad button state according to previous frame
         sfx: any; // Play SFX by ID on specific channel
         key: any; // Get keybaord button state in current frame
         keyp: any; // Get keyboard button state according to previous frame
-        map: (x?: number, y?: number, w?: number, h?: number, sx?: number, sy?: number, colorkey?: number, scale?: number, remap?: (id: number, x: number, y: number) => [/*id*/number, /*flip*/number, /*rotate*/number] ) => void; // Draw map region on the screen
+        map: (x?: number, y?: number, w?: number, h?: number, sx?: number, sy?: number, colorkey?: number, scale?: number, remap?: (id: number, x: number, y: number) => [/*id*/number, /*flip*/number, /*rotate*/number]) => void; // Draw map region on the screen
         mget: (x: number, y: number) => number; // Get map tile index
         mset: (x: number, y: number, value: number) => void; // Set map tile index
         music: any; // Play music track by ID
@@ -708,14 +706,14 @@ window.addEventListener("load", function () {
         peek4: (address: number) => number; // Read a half byte value from RAM
         poke4: (address: number, value: number) => void; // Write a half byte value to RAM
         reset: () => void; // Reset game to initial state (0.60)
-        memcpy: (toaddr: number, fromaddr: number, len:number) => void; // Copy bytes in RAM ( name is memcpy but behavior is memmove )
-        memset: (addr: number, val : number, len: number) => void; // Set byte values in RAM
+        memcpy: (toaddr: number, fromaddr: number, len: number) => void; // Copy bytes in RAM ( name is memcpy but behavior is memmove )
+        memset: (addr: number, val: number, len: number) => void; // Set byte values in RAM
         pmem: any; // Save integer value to persistent memory
         trace: any; // Trace string to the Console
         time: () => number; // Returns how many ticks passed from game started
         mouse: any; // Get XY and press state of mouse/touch
         sync: any; // Copy modified sprites/map to the cartridge
-        tri: (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, color: number)=>void; // Draw filled triangle
+        tri: (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, color: number) => void; // Draw filled triangle
         textri: any; // Draw triangle filled with texture
         exit: () => void; // Interrupt program and return to console
 
@@ -786,7 +784,7 @@ window.addEventListener("load", function () {
 
     function reset(): void {
         ram.fill(0);
-        api_clip(0, 0, width, height);
+        api_clip(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         set_palette(0, 0x140C1C);	// Black
         set_palette(1, 0x442434);	// Dark Red
         set_palette(2, 0x30346D);	// Dark Blue
@@ -809,9 +807,13 @@ window.addEventListener("load", function () {
         }
         tic = 0;
 
+        // copy font to sprite 
         for (let i = 0; i < Font.rom.length; i++) {
             for (let j = 0; j < 8; j++) {
-                tiles[i * 8 + j] = Font.rom[i][j];
+                const line = Font.rom[i][j];
+                for (let k = 0; k < 8; k++) {
+                    poke4(tiles, i * 64 + j * 8 + k, (line & (0x80 >> k)) ? 0x0F : 0x00);
+                }
             }
         }
 
@@ -820,13 +822,13 @@ window.addEventListener("load", function () {
 
     const _canvas: HTMLCanvasElement = <HTMLCanvasElement>document.getElementById("glcanvas");
     const _context: CanvasRenderingContext2D = _canvas.getContext("2d");
-    const _backbuffer: ImageData = _context.createImageData(width, height);
+    const _backbuffer: ImageData = _context.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     function _flip(): void {
         let i = 0;
-        for (let y = 0; y < height; y++) {
+        for (let y = 0; y < SCREEN_HEIGHT; y++) {
             evalContext.scanline(y);
-            for (let x = 0; x < width; x++) {
+            for (let x = 0; x < SCREEN_WIDTH; x++) {
                 const pixel = peek4(screen, i);
                 const palette_no = peek4(palette_map, pixel);
                 const palette_address = palette_no * 3;
@@ -865,15 +867,15 @@ window.addEventListener("load", function () {
     animationFrameFunc();
 
 
-    const KeyMap: { [key:string]: number} = {
-        "ArrowUp" : 0,
-        "ArrowDown": 1, 
-        "ArrowLeft" : 2,
-        "ArrowRight" : 3,
-        "z" : 4,
-        "x" : 5,
-        "a" : 6,
-        "s" : 7,
+    const KeyMap: { [key: string]: number } = {
+        "ArrowUp": 0,
+        "ArrowDown": 1,
+        "ArrowLeft": 2,
+        "ArrowRight": 3,
+        "z": 4,
+        "x": 5,
+        "a": 6,
+        "s": 7,
     };
 
 
@@ -910,3 +912,484 @@ window.addEventListener("load", function () {
         evalInContext(domCodeArea.value, evalContext);
     });
 });
+module Uare {
+    const _mouse: boolean[] = [];
+    export function mouse_is_down(id: number) {
+        return _mouse[id];
+    }
+    export function mouse_down(id: number, state:boolean) {
+        return _mouse[id] = state;
+    }
+
+    let context: CanvasRenderingContext2D;
+
+    export class Uare {
+        drawContent: (self: Uare, alpha: number) => void;
+        text: any;
+        border: any;
+        icon: any;
+        static elements: Uare[] = [];
+        static z: number = 1;
+        static hz: number = null;
+        static holdt: any = { obj: null };
+        static c: boolean = undefined;
+
+        static withinBounds(x: number, y: number, x1: number, y1: number, x2: number, y2: number): boolean {
+            return x > x1 && x < x2 && y > y1 && y < y2;
+        }
+        static lerp(a: number, b: number, k: number): number {
+            if (a == b) {
+                return a;
+            } else {
+                if (Math.abs(a - b) < 0.005) {
+                    return b;
+                } else {
+                    return a * (1 - k) + b * k;
+                }
+            }
+        }
+
+
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        hold: boolean;
+        holdColor: any;
+        hover: boolean;
+        hoverColor: any;
+        color: any;
+        click: boolean;
+        active: boolean;
+        drag: { enabled: boolean, fixed: { x: number, y: number }, bounds: { x: number, y: number }[] };
+        visible: boolean;
+        vAlpha: number;
+        center: boolean;
+        track: any;
+        content: { scroll: { x: number, y: number }, width: number, height: number, wrap: boolean };
+        type: string;
+        z: number;
+        l: number;
+        elements:Uare[];
+
+        onClick: () => void;
+        onCleanRelease: () => void;
+        onRelease: () => void;
+        onHold: () => void;
+        onStartHover: () => void;
+        onHover: () => void;
+        onReleaseHover: () => void;
+
+        constructor(t: string | any = {}, f?: any) {
+
+            if (f == undefined) { f = t; t = "button"; }
+
+            this.x = 0;
+            this.y = 0;
+            this.width = 0;
+            this.height = 0;
+            this.hover = false;
+            this.hold = null;
+            this.click = false;
+            this.active = true;
+            this.drag = { enabled: false, fixed: null, bounds: null };
+            this.visible = true;
+            this.vAlpha = 1;
+            this.center = false;
+            this.content = { scroll: { x: 0, y: 0 }, width: undefined, height: undefined, wrap: undefined };
+            this.l = 0.2;
+            Object.assign(this, f);
+            if (this.content.width == undefined) {
+                this.content.width = this.width;
+            }
+            if (this.content.height == undefined) {
+                this.content.height = this.height;
+            }
+
+            this.type = t;
+            this.z = Uare.z;
+
+            Uare.z = Uare.z + 1;
+            Uare.hz = Uare.z;
+
+            Uare.elements.push(this);
+
+            return this;
+        }
+        static newButton(f?: any) {
+            return new Uare("button", f);
+        }
+        static newStyle(f?: any) {
+            return f;
+        }
+        static newIcon(f?: any) {
+            return f;
+        }
+        static newGroup() {
+            return new Uare("group", { elements: {} });
+        }
+
+        updateSelf(dt: number, mx: number, my: number, e: string) {
+
+            let alphaTarget = this.visible ? 1 : 0;
+            if (this.vAlpha != alphaTarget) {
+                this.vAlpha = Uare.lerp(this.vAlpha, alphaTarget, this.l);
+            }
+
+            let mlc = (e != "s") && mouse_is_down(1);
+
+            let rwb = Uare.withinBounds(mx, my, this.x, this.y, this.x + this.width, this.y + this.height);
+
+            if (this.center) {
+                rwb = Uare.withinBounds(mx, my, this.x - this.width * 0.5, this.y - this.height * 0.5, this.x + this.width * 0.5, this.y + this.height * 0.5);
+            }
+
+            let wb = e != "s" && rwb;
+
+            let thover = this.hover;
+            let thold = this.hold;
+
+            this.hover = wb || (this.drag.enabled && Uare.holdt && Uare.holdt.obj == this);
+
+            this.hold = (e == "c" && wb) || (mlc && this.hold) || ((wb && e != "r" && this.hold));
+
+            if (e == "c" && wb && this.onClick) {
+                this.onClick();
+            } else if ((e == "r" && wb && thold) && this.onCleanRelease) {
+                this.onCleanRelease();
+            } else if (((e == "r" && wb && thold) || (this.hold && !wb)) && this.onRelease) {
+                this.onRelease();
+            } else if (this.hold && this.onHold) {
+                this.onHold();
+            } else if (!thover && this.hover && this.onStartHover) {
+                this.onStartHover();
+            } else if (this.hover && this.onHover) {
+                this.onHover();
+            } else if (thover && !this.hover && this.onReleaseHover) {
+                this.onReleaseHover();
+            }
+
+            if (this.hold && (!wb || this.drag.enabled) && !Uare.holdt) {
+                this.hold = this.drag.enabled;
+                Uare.holdt = { obj: this, d: { x: this.x - mx, y: this.y - my } };
+            } else if (!this.hold && wb && (Uare.holdt && Uare.holdt.obj == this)) {
+                this.hold = true;
+                Uare.holdt = null;
+            }
+
+            if (Uare.holdt && Uare.holdt.obj == this && this.drag.enabled) {
+                this.x = (!this.drag.fixed || !this.drag.fixed.x) ? mx + Uare.holdt.d.x : this.x;
+                this.y = (!this.drag.fixed || !this.drag.fixed.y) ? my + Uare.holdt.d.y : this.y;
+                if (this.drag.bounds) {
+                    if (this.drag.bounds[0]) {
+                        this.x = (this.drag.bounds[0].x && this.x < this.drag.bounds[0].x) ? this.drag.bounds[0].x : this.x;
+                        this.y = (this.drag.bounds[0].y && this.y < this.drag.bounds[0].y) ? this.drag.bounds[0].y : this.y;
+                    }
+                    if (this.drag.bounds[1]) {
+                        this.x = (this.drag.bounds[1].x && this.x > this.drag.bounds[1].x) ? this.drag.bounds[1].x : this.x;
+                        this.y = (this.drag.bounds[1].y && this.y > this.drag.bounds[1].y) ? this.drag.bounds[1].y : this.y;
+                    }
+                }
+                if (this.track) {
+                    this.anchor(this.track.ref);
+                }
+            }
+
+            return wb;
+
+        }
+
+        updateTrack(dt: number) {
+            if (this.track) {
+                this.x = this.track.ref.x + this.track.d.x;
+                this.y = this.track.ref.y + this.track.d.y;
+            }
+        }
+
+
+        drawSelf() {
+
+            let tempX = this.x;
+            let tempY = this.y;
+            if (this.center) {
+                tempX = this.x - this.width * .5;
+                tempY = this.y - this.height * .5;
+            }
+
+            context.fillStyle = this.alphaColor((this.hold && this.holdColor) ? this.holdColor : (this.hover && this.hoverColor) ? this.hoverColor : this.color);
+            context.fillRect(tempX, tempY, this.width, this.height);
+
+            if (this.border && this.border.color && this.border.size) {
+                context.strokeStyle = this.alphaColor((this.hold && this.holdColor) ? this.holdColor : (this.hover && this.hoverColor) ? this.hoverColor : this.border.color);
+                context.lineWidth = this.border.size;
+                context.strokeRect(tempX, tempY, this.width, this.height);
+            }
+
+            if (this.icon && this.icon.source.type && this.icon.source.content) {
+                context.strokeStyle = this.alphaColor((this.hold && this.holdColor) ? this.holdColor : (this.hover && this.hoverColor) ? this.hoverColor : this.icon.hoverColor ? this.icon.hoverColor : this.icon.color);
+                context.save();
+                let offset = this.icon.offset || { x: 0, y: 0 };
+                context.translate((tempX + (this.center ? 0 : this.width * .5) + offset.x), (tempY + (this.center ? 0 : this.height * 0.5) + offset.y));
+
+                if (this.icon.source.type == "polygon") {
+                    for (let i = 0; i < this.icon.source.content.length; i++) {
+                        context.beginPath();
+                        for (let j = 0; j < this.icon.source.content[i].length; j++) {
+                            const c: any = this.icon.source.content[j];
+                            if (j == 0) {
+                                context.moveTo(c.x, c.y);
+                            } else {
+                                context.lineTo(c.x, c.y);
+                            }
+                        }
+                        context.closePath();
+                    }
+                } else if (this.icon.source.type == "image") {
+                    context.drawImage(this.icon.source.content, 0, 0);
+                }
+                context.restore();
+            }
+
+            if (this.text && this.text.display && this.text.color) {
+                context.fillStyle = this.alphaColor((this.hold && this.text.holdColor) ? this.text.holdColor : (this.hover && this.text.hoverColor) ? this.text.hoverColor : this.text.color);
+                context.font = this.text.font;
+                let offset = this.text.offset || { x: 0, y: 0 };
+                context.fillText(
+                    this.text.display,
+                    this.x - (this.center ? this.width * 0.5 : 0) + offset.x,
+                    this.y + (this.center ? 0 : this.height * 0.5) + offset.y, this.width);//, this.text.align);
+            }
+
+            if (this.content && this.drawContent) {
+                this.renderContent();
+            }
+
+        }
+
+        renderContent() {
+            context.save();
+            let tx = this.x;
+            let ty = this.y;
+            if (this.center) { tx = this.x - this.width * .5; ty = this.y - this.height * .5; }
+            context.translate(tx - this.content.scroll.x * (this.content.width - this.width), ty - this.content.scroll.y * (this.content.height - this.height));
+            if (this.content && this.content.wrap) {
+                context.rect(tx, ty, this.width, this.height);
+                context.clip();
+            }
+            this.drawContent(this, this.vAlpha * 255);
+            if (this.content && this.content.wrap) {
+                //context.clip();
+            }
+            context.restore();
+        }
+
+        setContent(f: (self: Uare, alpha: number) => void) {
+            this.drawContent = f;
+        }
+
+        setContentDimensions(w: number, h: number) {
+            if (this.content) {
+                this.content.width = w;
+                this.content.height = h;
+            }
+        }
+
+        setScroll(f: { x: number, y: number }) {
+            f.x = f.x || 0
+            f.y = f.y || 0
+            if (this.content) {
+                f.x = (f.x < 0) ? 0 : (f.x > 1) ? 1 : f.x;
+                f.y = (f.y < 0) ? 0 : (f.y > 1) ? 1 : f.y;
+                this.content.scroll.x = f.x || this.content.scroll.x;
+                this.content.scroll.y = f.y || this.content.scroll.y;
+            }
+        }
+
+        getScroll() {
+            if (this.content) {
+                return { x: this.content.scroll.x, y: this.content.scroll.y };
+            }
+        }
+
+
+        update(dt:number, x?:number, y?:number) {
+
+            if (x && y) {
+                let e = "n";
+                let c = mouse_is_down(1);
+                if (Uare.c && !c) {
+                    Uare.c = false;
+                    e = "r";
+                    Uare.holdt = null;
+                } else if (!Uare.c && c) {
+                    Uare.c = true;
+                    e = "c";
+                    Uare.holdt = null;
+                }
+
+                let focused = false;
+
+                let updateQueue = [];
+
+                for (let i = 0; i < Uare.elements.length; i++) {
+                    updateQueue.push(Uare.elements[i]);
+                }
+
+                updateQueue.sort((a, b) => a.z - b.z);
+
+                for (let i = 0; i < updateQueue.length; i++) {
+                    let elemt = updateQueue[i];
+                    if (elemt) {
+                        if (elemt.updateSelf(dt, x, y, ((focused || (Uare.holdt && Uare.holdt.obj != elemt)) || !elemt.active) ? "s" : e)) {
+                            focused = true
+                        }
+                    }
+                }
+                for (let i = Uare.elements.length = 1; i >= 0; i--) {
+                    if (Uare.elements[i]) {
+                        Uare.elements[i].updateTrack(dt)
+                    }
+                }
+            }
+        }
+
+        draw() {
+            let drawQueue = [];
+
+            for (let i = 0; i < Uare.elements.length; i++) {
+                if (Uare.elements[i].draw) {
+                    drawQueue.push(Uare.elements[i]);
+                }
+            }
+
+            drawQueue.sort((a, b) => a.z - b.z);
+
+            for (let i = 0; i < drawQueue.length; i++) {
+                drawQueue[i].drawSelf();
+            }
+        }
+
+        style(s: any) {
+            Object.assign(this, s);
+            return this
+        }
+
+        anchor(other: Uare) {
+            this.track = { ref: other, d: { x: this.x - other.x, y: this.y - other.y } };
+
+            return this;
+        }
+
+        group(group: any) {
+            group.elements.push(this);
+            return this
+        }
+
+        setActive(bool: boolean) {
+            if (this.type == "group") {
+                for (let i = 0; i < this.elements.length; i++) {
+                    this.elements[i].setActive(bool);
+                }
+            } else {
+                this.active = bool
+            }
+        }
+
+        enable() { return this.setActive(true) }
+
+        disable() { return this.setActive(false) }
+
+        getActive() { if (this.active != null) { return this.active } }
+
+        setVisible(bool:boolean, l:number=0) {
+
+            if (this.type == "group") {
+                for (let i = 0; i < this.elements.length; i++) {
+                    this.elements[i].setVisible(bool, l)
+                }
+            } else {
+                this.visible = bool
+                this.l = l
+                if (l == 0) { this.vAlpha = bool ? 1 : 0 }
+            }
+
+        }
+
+        show(l: number=0) { return this.setVisible(true, l); }
+
+        hide(l: number=0) { return this.setVisible(false, l); }
+
+        getVisible() { return this.visible; }
+
+        setDragBounds(bounds: {x:number, y:number}[]) {
+            this.drag.bounds = bounds
+        }
+
+        setHorizontalRange(n: number) {
+            this.x = this.drag.bounds[0].x + (this.drag.bounds[1].x - this.drag.bounds[0].x) * n
+        }
+
+        setVerticalRange(n: number) {
+            this.y = this.drag.bounds[0].y + (this.drag.bounds[1].y - this.drag.bounds[0].y) * n
+        }
+
+        getHorizontalRange() {
+            if (!(this.drag.bounds && this.drag.bounds[0] && this.drag.bounds[1] && this.drag.bounds[0].x && this.drag.bounds[1].x)) {
+                throw new Error("Element must have 2 horizontal boundaries");
+            }
+            return (this.x - this.drag.bounds[0].x) / (this.drag.bounds[1].x - this.drag.bounds[0].x);
+        }
+
+        getVerticalRange() {
+            if (!(this.drag.bounds && this.drag.bounds[0] && this.drag.bounds[1] && this.drag.bounds[0].y && this.drag.bounds[1].y)) {
+                throw new Error("Element must have 2 vertical boundaries");
+            }
+            return (this.y - this.drag.bounds[0].y) / (this.drag.bounds[1].y - this.drag.bounds[0].y);
+        }
+
+        setIndex(index: number) {
+
+            if (this.type == "group") {
+                let lowest: number;
+                for (let i = 0; i < this.elements.length; i++) {
+                    if (!lowest || this.elements[i].z < lowest) { lowest = this.elements[i].z; }
+                }
+                for (let i = 0; i < this.elements.length; i++) {
+                    let ti = this.elements[i].z - lowest + index;
+                    this.elements[i].setIndex(ti);
+                }
+            } else {
+                this.z = index;
+                if (index > Uare.hz) { Uare.hz = index; }
+            }
+
+        }
+
+        toFront() {
+            if ((this.z < Uare.hz) || (this.type == "group")) { return this.setIndex(Uare.hz + 1); }
+        }
+
+        getIndex() { return this.z }
+
+        alphaColor(col: [number, number, number, number] | [number, number, number]) {
+            var ret = [col[0], col[1], col[2], col[3] && col[3] * this.vAlpha || this.vAlpha * 255];
+            return "rgba("+ret[0]+","+ret[1]+","+ret[2]+","+(ret[3]/255.0)+")";
+        }
+
+        remove() {
+            let self = this;
+            for (let i = Uare.elements.length - 1; i > 0; i--) {
+                if (Uare.elements[i] == self) { Uare.elements.splice(i, 1); self = null; }
+            }
+        }
+
+        clear() {
+            for (let i = 0; i < Uare.elements.length; i++) {
+                Uare.elements[i] = null;
+            }
+
+        }
+
+
+    }
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
@@ -8,321 +8,384 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="tic80.js"></script>
     <script id="print-demo1" data-name="print centered" type="text/tic80">
-cls();
-let string = "my perfectly centered text";
-let width = print(string,0,-6);
-print(string,(240-width)/2,(136-6)/2);
+        cls();
+        let string = "my perfectly centered text";
+        let width = print(string, 0, -6);
+        print(string, (240 - width) / 2, (136 - 6) / 2);
     </script>
     <script id="print-demo2" data-name="print demo2" type="text/tic80">
-const msg="FNORD                      ";
-let t=0;
-TIC = () => {
-    cls();
-    let c=0;
-    for (let x=0; x < 30; x++) {
-        for (let y=0; y<16;y++) {
-            c = (c+1) % msg.length;
-            const l = (c - floor(t)) % msg.length;
-            print(msg.substr(l,1), x*8, y*8, y%12);
+        const msg = "FNORD                      ";
+        let t = 0;
+        TIC = () => {
+            cls();
+            let c = 0;
+            for (let x = 0; x < 30; x++) {
+                for (let y = 0; y
+                    < 16; y++) {
+                    c = (c + 1) % msg.length;
+                    const l = (c - floor(t)) % msg.length;
+                    print(msg.substr(l, 1), x * 8, y * 8, y % 12);
+                }
+            }
+            t = t + 0.15;
         }
-    }
-    t = t + 0.15;
-}
     </script>
     <script id="line-demo" data-name="line demo" type="text/tic80">
-let pi8 = pi / 8;
-let pi2 = pi * 2;
+        let pi8 = pi / 8;
+        let pi2 = pi * 2;
 
-let t = 0;
-        
-TIC = () => {
-    cls();
+        let t = 0;
 
-    for (let i=t%8; i<=135; i+=8) {
-        line(i,0,0,135-i,8);
-        line(i,135,135,135-i,6);
-        t = t+0.01
-    }
+        TIC = () => {
+            cls();
 
-    for (let i=t/16%pi8; i <= pi2; i += pi8) {
-        const x = 68 + 32 * cos(i);
-        const y = 68 + 32 * cos(i);
-        line(135,0,x,y,15);
-        line(0,135,x,y,15);
-    }
+            for (let i = t % 8; i <= 135; i += 8) {
+                line(i, 0, 0, 135 - i, 8);
+                line(i, 135, 135, 135 - i, 6);
+                t = t + 0.01
+            }
 
-    line(0,0,135,0,8);
-    line(0,0,0,135,8);
-    line(135,0,135,135,6);
-    line(0,135,135,135,6);
-}
+            for (let i = t / 16 % pi8; i <= pi2; i += pi8) {
+                const x = 68 + 32 * cos(i);
+                const y = 68 + 32 * cos(i);
+                line(135, 0, x, y, 15);
+                line(0, 135, x, y, 15);
+            }
+
+            line(0, 0, 135, 0, 8);
+            line(0, 0, 0, 135, 8);
+            line(135, 0, 135, 135, 6);
+            line(0, 135, 135, 135, 6);
+        }
     </script>
     <script id="ball-demo" data-name="ball demo" type="text/tic80">
-let balls=[];
-let d=1;
-for (let i=0; i<=500; i++) {
-    const ball = {
-        x: rand(10, 230),
-        y : rand(10, 126),
-        dx: rand(1, 3) * d,
-        dy: rand(1, 3) * d,
-        r : rand(6, 19),
-        c : rand(1, 8),
-    };
-    balls[i] = ball;
-    d = d * -1;
-}
-
-TIC = function () {
-    cls() ;
-    for (let k=0; k<balls.length; k++) {
-        const b = balls [k]
-        b.x = b.x+b.dx;
-        b.y = b.y+b.dy;
-        if (b.x >= 240-b.r) {
-            b.x = 240-b.r-1;
-            b.dx = -b.dx;
-        } else if (b.x < b.r) {
-            b.x=b.r ;
-            b.dx=-b.dx;
+        let balls = [];
+        let d = 1;
+        for (let i = 0; i <= 500; i++) {
+            const ball = {
+                x: rand(10, 230),
+                y: rand(10, 126),
+                dx: rand(1, 3) * d,
+                dy: rand(1, 3) * d,
+                r: rand(6, 19),
+                c: rand(1, 8),
+            };
+            balls[i] = ball;
+            d = d * -1;
         }
 
-        if (b.y >= 136-b.r) {
-            b.y=136-b.r-1 ;
-            b.dy=-b.dy;
-        } else if (b.y < b.r) {
-            b.y=b.r;
-            b.dy=-b.dy;
-        }
+        TIC = function () {
+            cls();
+            for (let k = 0; k
+                < balls.length; k++) {
+                const b = balls[k]
+                b.x = b.x + b.dx;
+                b.y = b.y + b.dy;
+                if (b.x >= 240 - b.r) {
+                    b.x = 240 - b.r - 1;
+                    b.dx = -b.dx;
+                } else if (b.x < b.r) {
+                    b.x = b.r;
+                    b.dx = -b.dx;
+                }
 
-        circ(b.x,b.y,b.r,b.c);
-        circ(b.x+(b.r>>2),b.y-(b.r>>2),b.r>>2,b.c+7);
-    }
-}
+                if (b.y >= 136 - b.r) {
+                    b.y = 136 - b.r - 1;
+                    b.dy = -b.dy;
+                } else if (b.y < b.r) {
+                    b.y = b.r;
+                    b.dy = -b.dy;
+                }
+
+                circ(b.x, b.y, b.r, b.c);
+                circ(b.x + (b.r >> 2), b.y - (b.r >> 2), b.r >> 2, b.c + 7);
+            }
+        }
     </script>
     <script id="rect-demo" data-name="rect demo" type="text/tic80">
-let x = 120;
-let y = 68;
-let dx = 7;
-let dy = 4;
-let col= 1;
+        let x = 120;
+        let y = 68;
+        let dx = 7;
+        let dy = 4;
+        let col = 1;
 
-cls();
-TIC = () => { 
-    x = x + dx;
-    y = y + dy;
+        cls();
+        TIC = () => {
+            x = x + dx;
+            y = y + dy;
 
-    if ((x > 240-6) || (x<0)) {
-        dx  = -dx;
-        col = col % 15 + 1;
-    }
-    if ((y>136-6) || (y<0)) {
-        dy  = -dy;
-        col = col % 15 + 1;
-    }
-
-    rect(x,y,6,6,col);
-}
+            if ((x > 240 - 6) || (x
+                < 0)) {
+                dx = -dx;
+                col = col % 15 + 1;
+            }
+            if ((y >
+                136 - 6) || (y < 0)) {
+                dy = -dy;
+                col = col % 15 + 1;
+            }
+            rect(x, y, 6, 6, col);
+        }
     </script>
     <script id="rectb-demo" data-name="rectb demo" type="text/tic80">
-let x=104;
-let y=60;
+        let x = 104;
+        let y = 60;
 
-TIC = function () {
-    cls();
-    for (let s=280; s > 0; s -=4) {
-        const s2=s/2;
-        const sd=500/s;
-        x = sd * sin(time()/1000);
-        y = sd * cos(time()/1000);
-        rectb(120+x-s2, 68+y-(s2/2), s, s2, 8);
-    }
-}
+        TIC = function () {
+            cls();
+            for (let s = 280; s > 0; s -= 4) {
+                const s2 = s / 2;
+                const sd = 500 / s;
+                x = sd * sin(time() / 1000);
+                y = sd * cos(time() / 1000);
+                rectb(120 + x - s2, 68 + y - (s2 / 2), s, s2, 8);
+            }
+        }
     </script>
     <script id="spr-demo" data-name="spr demo" type="text/tic80">
-const data = [
-    0x0a, 0x00, 0x00, 0xa0, 
-    0x0a, 0x0f, 0xf0, 0xa0, 
-    0xaa, 0xaa, 0xaa, 0xaa, 
-    0xaa, 0xaf, 0xaa, 0xa6, 
-    0xfa, 0xff, 0xaa, 0xaa, 
-    0xaa, 0xaf, 0x6a, 0xaa, 
-    0xaa, 0xaa, 0xaa, 0xaa, 
-    0x33, 0x33, 0x33, 0x33
-];
+        const data = [
+            0x0a, 0x00, 0x00, 0xa0,
+            0x0a, 0x0f, 0xf0, 0xa0,
+            0xaa, 0xaa, 0xaa, 0xaa,
+            0xaa, 0xaf, 0xaa, 0xa6,
+            0xfa, 0xff, 0xaa, 0xaa,
+            0xaa, 0xaf, 0x6a, 0xaa,
+            0xaa, 0xaa, 0xaa, 0xaa,
+            0x33, 0x33, 0x33, 0x33
+        ];
 
-for (let i=0; i<32; i++) {
-    poke(0x6000+32+i, data[i]);
-}
-
-const p = {
-    x: {val: 100, min: 0, max: 240}, 
-    y: {val: 68, min: 0, max: 136}, 
-    colorkey: {val: 0, min: -1, max: 15}, 
-    scale: {val: 1, min: 0, max: 256}, 
-    flip: {val: 0, min: 0, max: 3}, 
-    rotate: {val: 0, min: 0, max: 3}, 
-};
-const keys = Object.keys(p);
-let sel = 0;
-  
-
-TIC = () => {
-
-    if (btnp(0,30,6)) {
-        sel = sel-1;
-        if (sel < 0) {
-            sel = keys.length-1;
+        for (let i = 0; i
+            < 32; i++) {
+            poke(0x6000 + 32 + i, data[i]);
         }
-    }
-    if (btnp(1,30,6)) {
-        sel = sel+1;
-        if (sel >= keys.length) {
-            sel = 0;
+        const p = {
+            x: { val: 100, min: 0, max: 240 },
+            y: { val: 68, min: 0, max: 136 },
+            colorkey: { val: 0, min: -1, max: 15 },
+            scale: { val: 1, min: 0, max: 256 },
+            flip: { val: 0, min: 0, max: 3 },
+            rotate: { val: 0, min: 0, max: 3 },
+        };
+        const keys = Object.keys(p);
+        let sel = 0;
+        TIC = () => {
+
+            if (btnp(0, 30, 6)) {
+                sel = sel - 1;
+                if (sel < 0) {
+                    sel = keys.length - 1;
+                }
+            }
+            if (btnp(1, 30, 6)) {
+                sel = sel + 1;
+                if (sel >= keys.length) {
+                    sel = 0;
+                }
+            }
+
+            if (btnp(2, 30, 6)) {
+                p[keys[sel]].val -= 1;
+            }
+            if (btnp(3, 30, 6)) {
+                p[keys[sel]].val += 1;
+            }
+
+            if (p[keys[sel]].val > p[keys[sel]].max) {
+                p[keys[sel]].val = p[keys[sel]].max
+            }
+            if (p[keys[sel]].val < p[keys[sel]].min) {
+                p[keys[sel]].val = p[keys[sel]].min
+            }
+
+            cls(0);
+            print("Use up/down  to select parameter", 0, 0);
+            print("left/right to change its value:", 0, 10);
+
+            let r = 0
+            for (const k of Object.keys(p)) {
+                const v = p[k];
+                const cur = (k == keys[sel]) ? '>' : ' ';
+                print(cur + k + ':' + v.val, 0, 30 + 10 * r);
+                r = r + 1;
+            }
+
+            spr(1,
+                p.x.val,
+                p.y.val,
+                p.colorkey.val,
+                p.scale.val,
+                p.flip.val,
+                p.rotate.val);
+
         }
-    }
-     
-    if (btnp(2,30,6)) {
-        p[keys[sel]].val -= 1;
-    }
-    if (btnp(3,30,6)) {
-        p[keys[sel]].val += 1;
-    }
-     
-    if (p[keys[sel]].val > p[keys[sel]].max) {
-        p[keys[sel]].val = p[keys[sel]].max
-    }
-    if (p[keys[sel]].val < p[keys[sel]].min) {
-        p[keys[sel]].val = p[keys[sel]].min
-    }
-
-    cls(0);
-    print("Use up/down  to select parameter",0,0);
-    print("left/right to change its value:",0,10);
-      
-    let r = 0
-    for (const k of Object.keys(p)){
-        const v = p[k]; 
-        const cur = (k==keys[sel]) ? '>' : ' ';
-        print(cur+k+':'+v.val,0,30+10*r);
-        r=r+1;
-    }
-     
-    spr(1,
-        p.x.val,
-        p.y.val,
-        p.colorkey.val,
-        p.scale.val,
-        p.flip.val,
-        p.rotate.val);
-
-}
     </script>
     <script id="scanline-demo" data-name="256 shades of gray" type="text/tic80">
-const ADDR = 0x3FC0;
-let palette = 0;
+        const ADDR = 0x3FC0;
+        let palette = 0;
 
-function addLight() {
-  for (let i=0; i<16; i++) {
-    for (let j=0; j<3; j++) {
-      poke(ADDR+(i*3)+j, palette);
-    }
-    palette = palette + 1;
-  }
-}
+        function addLight() {
+            for (let i = 0; i < 16; i++) {
+                for (let j = 0; j < 3; j++) {
+                    poke(ADDR + (i * 3) + j, palette);
+                }
+                palette = palette + 1;
+            }
+        }
 
-scanline = function (scnline) {
-  if (scnline % 8 == 0) {
-    addLight();
-  }
-}
+        scanline = function (scnline) {
+            if (scnline % 8 == 0) {
+                addLight();
+            }
+        }
 
-for (let i=0; i<16; i++) {
-  rect(i*15, 0, 15, 240, i);
-}
+        for (let i = 0; i < 16; i++) {
+            rect(i * 15, 0, 15, 240, i);
+        }
 
-TIC = function () {
-  palette = 0
-}
+        TIC = function () {
+            palette = 0
+        }
     </script>
     <script id="keytest-demo" data-name="key test" type="text/tic80">
-let x = 70;
-let y = 25;
-let btnLabel = ["Up","Down","Left","Right","Btn A","Btn B","Btn X","Btn Y"];
+        let x = 70;
+        let y = 25;
+        let btnLabel = ["Up", "Down", "Left", "Right", "Btn A", "Btn B", "Btn X", "Btn Y"];
 
-TIC = function () {
-    cls(0);
-    print("Key Test Project",x,y);
-    print("Btn",x,y+15,2);
-    print("1P",x+50,y+15,2);
-    print("2P",x+80,y+15,2);
-    for (let i=0; i<btnLabel.length; i++) {
-        print(btnLabel[i],x,y+(i+1)*10+5);
-        if (btn(i)) {
-            print("On",x+50,y+(i+1)*10+5,11);
-        }else{
-            print("Off",x+47,y+(i+1)*10+5,6);
+        TIC = function () {
+            cls(0);
+            print("Key Test Project", x, y);
+            print("Btn", x, y + 15, 2);
+            print("1P", x + 50, y + 15, 2);
+            print("2P", x + 80, y + 15, 2);
+            for (let i = 0; i
+                < btnLabel.length; i++) {
+                print(btnLabel[i], x, y + (i + 1) * 10 + 5);
+                if (btn(i)) {
+                    print("On", x + 50, y + (i + 1) * 10 + 5, 11);
+                } else {
+                    print("Off", x + 47, y + (i + 1) * 10 + 5, 6);
+                }
+                if (btn(i + 8)) {
+                    print("On", x + 80, y + (i + 1) * 10 + 5, 11);
+                } else {
+                    print("Off", x + 77, y + (i + 1) * 10 + 5, 6);
+                }
+            }
         }
-        if (btn(i+8)) {
-            print("On",x+80,y+(i+1)*10+5,11);
-        }else {
-            print("Off",x+77,y+(i+1)*10+5,6);
-        }
-    }
-}
     </script>
     <script id="memcpy-demo" data-name="memcpy demo" type="text/tic80">
-TIC = function () {
-	cls()
+        TIC = function () {
+            cls()
 
-	// draw something to the screen
-	for (let y=1; y <=16; y++) {
-	    line(0,y,240,y,y-1);
-	}
+            // draw something to the screen
+            for (let y = 1; y <= 16; y++) {
+                line(0, y, 240, y, y - 1);
+            }
 
-	// copy the drawing to an another place a couple of times
-	for (let i=1; i <= 4; i++) {
-	    memcpy((i*28)*120, 0x0000, 2400);
-	}
-}
+            // copy the drawing to an another place a couple of times
+            for (let i = 1; i <= 4; i++) {
+                memcpy((i * 28) * 120, 0x0000, 2400);
+            }
+        }
     </script>
     <script id="memset-demo" data-name="memset demo" type="text/tic80">
-TIC = function () {
-    // alternative way to clear the screen
-    memset(0x00, 0, 16320);
-}
+        TIC = function () {
+            // alternative way to clear the screen
+            memset(0x00, 0, 16320);
+        }
     </script>
     <script id="tri-demo" data-name="triangle demo" type="text/tic80">
-function Pir(x,y,w,h,cx,cy) {
- tri(x,y,w/2+cx,h/2+cy,x+w,y,1);
- tri(x+w,y,w/2+cx,h/2+cy,x+w,y+h,2);
- tri(x,y,w/2+cx,h/2+cy,x,y+h,8);
- tri(x,y+h,w/2+cx,h/2+cy,x+w,y+h,15);
-}
-
-cls();
-TIC = function () {
- for (let x=0; x<=240; x+=28) {
-  for (let y=0;y<=136; y+=28) {
-            const cx=12*sin(time()/30000*(x+y+1));
-            const cy=12*cos(time()/30000*(x+y+1));
-            Pir(x,y,25,25,x+cx,y+cy);
+        function Pir(x, y, w, h, cx, cy) {
+            tri(x, y, w / 2 + cx, h / 2 + cy, x + w, y, 1);
+            tri(x + w, y, w / 2 + cx, h / 2 + cy, x + w, y + h, 2);
+            tri(x, y, w / 2 + cx, h / 2 + cy, x, y + h, 8);
+            tri(x, y + h, w / 2 + cx, h / 2 + cy, x + w, y + h, 15);
         }
-    }
-}
+
+        cls();
+        TIC = function () {
+            for (let x = 0; x <= 240; x += 28) {
+                for (let y = 0; y <= 136; y += 28) {
+                    const cx = 12 * sin(time() / 30000 * (x + y + 1));
+                    const cy = 12 * cos(time() / 30000 * (x + y + 1));
+                    Pir(x, y, 25, 25, x + cx, y + cy);
+                }
+            }
+        }
     </script>
     <script id="map-demo" data-name="map demo" type="text/tic80">
-const rooms = [];
-for (let x = 0; x <= 240-30; x+= 30 ){
-    for (let y = 0; y <= 136-17; y+= 17 ){
-        rooms.push([x,y]);
-    }
-}
+        for (let x = 0; x < 240; x++) {
+            for (let y = 0; y < 136; y++) {
+                mset(x, y, (y * 240 + x) % 127);
+            }
+        }
 
-TIC = function () {
-    cls();
-    map(rooms[63][0],rooms[63][1],30,17);
-}
+        let xx = 0;
+        let yy = 0;
+        function s1() {
+            cls();
+            map(xx / 10, yy / 10, 30, 17);
+            if (xx == 240 * 10) {
+                TIC = s2;
+            } else {
+                xx++;
+            }
+        }
+        function s2() {
+            cls();
+            map(xx / 10, yy / 10, 30, 17);
+            if (yy == 136 * 10) {
+                TIC = s3;
+            } else {
+                yy++;
+            }
+        }
+        function s3() {
+            cls();
+            map(xx / 10, yy / 10, 30, 17);
+            if (xx == 0) {
+                TIC = s4;
+            } else {
+                xx--;
+            }
+        }
+        function s4() {
+            cls();
+            map(xx / 10, yy / 10, 30, 17);
+            if (yy == 0) {
+                TIC = s1;
+            } else {
+                yy--;
+            }
+        }
+        TIC = s1;
+    </script>
+    <script id="clip-demo" data-name="clip demo" type="text/tic80">
+        for (let x = 0; x < 240; x++) {
+            for (let y = 0; y < 136; y++) {
+                mset(x, y, (y * 240 + x) % 127);
+            }
+        }
+        let x = 120;
+        let y = 68;
+        let dx = 7;
+        let dy = 4;
+
+        cls();
+        TIC = () => {
+            x = x + dx;
+            y = y + dy;
+
+            if ((x / 10 > 240 - 6 * 3) || (x / 10 < 0)) {
+                dx = -dx;
+            }
+            if ((y / 10 > 136 - 6 * 3) || (y / 10 < 0)) {
+                dy = -dy;
+            }
+            cls();
+            clip(x / 10, y / 10, 6 * 3, 6 * 3);
+            map(0, 0, 30, 17);
+        }
     </script>
 </head>
 <body>
