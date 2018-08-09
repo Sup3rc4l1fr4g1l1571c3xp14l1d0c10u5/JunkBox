@@ -153,10 +153,9 @@
             0xaa, 0xaa, 0xaa, 0xaa,
             0x33, 0x33, 0x33, 0x33
         ];
-
-        for (let i = 0; i
-            < 32; i++) {
-            poke(0x6000 + 32 + i, data[i]);
+        const ADDR_SPRITE = minfo("sprites")[0];
+        for (let i = 0; i < 32; i++) {
+            poke(ADDR_SPRITE + 32 + i, data[i]);
         }
         const p = {
             x: { val: 100, min: 0, max: 240 },
@@ -220,7 +219,7 @@
         }
     </script>
     <script id="scanline-demo" data-name="256 shades of gray" type="text/tic80">
-        const ADDR = 0x3FC0;
+        const ADDR =  minfo("palette")[0];
         let palette = 0;
 
         function addLight() {
@@ -257,8 +256,7 @@
             print("Btn", x, y + 15, 2);
             print("1P", x + 50, y + 15, 2);
             print("2P", x + 80, y + 15, 2);
-            for (let i = 0; i
-                < btnLabel.length; i++) {
+            for (let i = 0; i < btnLabel.length; i++) {
                 print(btnLabel[i], x, y + (i + 1) * 10 + 5);
                 if (btn(i)) {
                     print("On", x + 50, y + (i + 1) * 10 + 5, 11);
@@ -289,9 +287,10 @@
         }
     </script>
     <script id="memset-demo" data-name="memset demo" type="text/tic80">
+        const (ADDR,SIZE) =  minfo("screen");
         TIC = function () {
             // alternative way to clear the screen
-            memset(0x00, 0, 16320);
+            memset(ADDR, 0, SIZE);
         }
     </script>
     <script id="tri-demo" data-name="triangle demo" type="text/tic80">
@@ -389,13 +388,17 @@
     </script>
 </head>
 <body>
-    <div><canvas id="glcanvas" width="240" height="136"></canvas></div>
-    <div>
-        <textarea id="code" style="border: 1px solid black;"></textarea>
-    </div>
-    <div>
-        <select id="demos" style="border: 1px solid black;"></select>
-        <input id="run" type="button" value="run" style="border: 1px solid black;" />
-    </div>
+    <section style="display: none">
+        <div><canvas id="glcanvas" width="240" height="136"></canvas></div>
+        <div>
+            <textarea id="code" style="border: 1px solid black"></textarea>
+        </div>
+        <div>
+            <select id="demos" style="border: 1px solid black;"></select>
+            <input id="run" type="button" value="run" style="border: 1px solid black;" />
+        </div>
+    </section>
+    <div><canvas id="glcanvas2" width="640" height="480"></canvas></div>
 </body>
 </html>
+
