@@ -10,8 +10,8 @@
     <script id="print-demo1" data-name="print centered" type="text/tic80">
         cls();
         let string = "my perfectly centered text";
-        let width = print(string, 0, -6);
-        print(string, (240 - width) / 2, (136 - 6) / 2);
+        let width = print(string, 0, -SPR_H);
+        print(string, (SCREEN_W - width) / 2, (SCREEN_H - SPR_H) / 2);
     </script>
     <script id="print-demo2" data-name="print demo2" type="text/tic80">
         const msg = "FNORD                      ";
@@ -19,12 +19,11 @@
         TIC = () => {
             cls();
             let c = 0;
-            for (let x = 0; x < 30; x++) {
-                for (let y = 0; y
-                    < 16; y++) {
+            for (let x = 0; x < SCREEN_W/SPR_W; x++) {
+                for (let y = 0; y < SCREEN_H/SPR_H; y++) {
                     c = (c + 1) % msg.length;
                     const l = (c - floor(t)) % msg.length;
-                    print(msg.substr(l, 1), x * 8, y * 8, y % 12);
+                    print(msg.substr(l, 1), x * SPR_W, y * SPR_H, y % (SCREEN_H/SPR_H));
                 }
             }
             t = t + 0.15;
@@ -39,23 +38,23 @@
         TIC = () => {
             cls();
 
-            for (let i = t % 8; i <= 135; i += 8) {
-                line(i, 0, 0, 135 - i, 8);
-                line(i, 135, 135, 135 - i, 6);
+            for (let i = t % 8; i <= SCREEN_H; i += 8) {
+                line(i, 0, 0, SCREEN_H - i, 8);
+                line(i, SCREEN_H, SCREEN_H, SCREEN_H - i, 6);
                 t = t + 0.01
             }
 
             for (let i = t / 16 % pi8; i <= pi2; i += pi8) {
-                const x = 68 + 32 * cos(i);
-                const y = 68 + 32 * cos(i);
-                line(135, 0, x, y, 15);
-                line(0, 135, x, y, 15);
+                const x = SCREEN_H/2 + 32 * cos(i);
+                const y = SCREEN_H/2 + 32 * cos(i);
+                line(SCREEN_H, 0, x, y, 15);
+                line(0, SCREEN_H, x, y, 15);
             }
 
-            line(0, 0, 135, 0, 8);
-            line(0, 0, 0, 135, 8);
-            line(135, 0, 135, 135, 6);
-            line(0, 135, 135, 135, 6);
+            line(0, 0, SCREEN_H, 0, 8);
+            line(0, 0, 0, SCREEN_H, 8);
+            line(SCREEN_H, 0, SCREEN_H, SCREEN_H, 6);
+            line(0, SCREEN_H, SCREEN_H, SCREEN_H, 6);
         }
     </script>
     <script id="ball-demo" data-name="ball demo" type="text/tic80">
@@ -63,8 +62,8 @@
         let d = 1;
         for (let i = 0; i <= 500; i++) {
             const ball = {
-                x: rand(10, 230),
-                y: rand(10, 126),
+                x: rand(10, SCREEN_W-10),
+                y: rand(10, SCREEN_H-10),
                 dx: rand(1, 3) * d,
                 dy: rand(1, 3) * d,
                 r: rand(6, 19),
@@ -81,16 +80,16 @@
                 const b = balls[k]
                 b.x = b.x + b.dx;
                 b.y = b.y + b.dy;
-                if (b.x >= 240 - b.r) {
-                    b.x = 240 - b.r - 1;
+                if (b.x >= SCREEN_W - b.r) {
+                    b.x = SCREEN_W - b.r - 1;
                     b.dx = -b.dx;
                 } else if (b.x < b.r) {
                     b.x = b.r;
                     b.dx = -b.dx;
                 }
 
-                if (b.y >= 136 - b.r) {
-                    b.y = 136 - b.r - 1;
+                if (b.y >= SCREEN_H - b.r) {
+                    b.y = SCREEN_H - b.r - 1;
                     b.dy = -b.dy;
                 } else if (b.y < b.r) {
                     b.y = b.r;
@@ -103,8 +102,8 @@
         }
     </script>
     <script id="rect-demo" data-name="rect demo" type="text/tic80">
-        let x = 120;
-        let y = 68;
+        let x = SCREEN_W/2;
+        let y = SCREEN_H/2;
         let dx = 7;
         let dy = 4;
         let col = 1;
@@ -114,13 +113,11 @@
             x = x + dx;
             y = y + dy;
 
-            if ((x > 240 - 6) || (x
-                < 0)) {
+            if ((x > SCREEN_W - 6) || (x < 0)) {
                 dx = -dx;
                 col = col % 15 + 1;
             }
-            if ((y >
-                136 - 6) || (y < 0)) {
+            if ((y > SCREEN_H - 6) || (y < 0)) {
                 dy = -dy;
                 col = col % 15 + 1;
             }
@@ -128,17 +125,17 @@
         }
     </script>
     <script id="rectb-demo" data-name="rectb demo" type="text/tic80">
-        let x = 104;
-        let y = 60;
+        let x = SCREEN_W/2;
+        let y = SCREEN_H/2;
 
         TIC = function () {
             cls();
-            for (let s = 280; s > 0; s -= 4) {
+            for (let s = SCREEN_W; s > 0; s -= 4) {
                 const s2 = s / 2;
                 const sd = 500 / s;
                 x = sd * sin(time() / 1000);
                 y = sd * cos(time() / 1000);
-                rectb(120 + x - s2, 68 + y - (s2 / 2), s, s2, 8);
+                rectb(SCREEN_W/2 + x - s2, SCREEN_H/2 + y - (s2 / 2), s, s2, 8);
             }
         }
     </script>
@@ -158,8 +155,8 @@
             poke(ADDR_SPRITE + 32 + i, data[i]);
         }
         const p = {
-            x: { val: 100, min: 0, max: 240 },
-            y: { val: 68, min: 0, max: 136 },
+            x: { val: SCREEN_W/2, min: 0, max: SCREEN_W },
+            y: { val: SCREEN_H/2, min: 0, max: SCREEN_H },
             colorkey: { val: 0, min: -1, max: 15 },
             scale: { val: 1, min: 0, max: 256 },
             flip: { val: 0, min: 0, max: 3 },
@@ -238,7 +235,7 @@
         }
 
         for (let i = 0; i < 16; i++) {
-            rect(i * 15, 0, 15, 240, i);
+            rect(i * 15, 0, 15, SCREEN_W, i);
         }
 
         TIC = function () {
@@ -276,21 +273,23 @@
             cls()
 
             // draw something to the screen
-            for (let y = 1; y <= 16; y++) {
-                line(0, y, 240, y, y - 1);
+            for (let y = 0; y < 16; y++) {
+                line(0, y, SCREEN_W, y, y );
             }
 
             // copy the drawing to an another place a couple of times
-            for (let i = 1; i <= 4; i++) {
-                memcpy((i * 28) * 120, 0x0000, 2400);
+            for (let i = 1; i < ~~(SCREEN_H/32); i++) {
+                memcpy(SCREEN_W*16*i, 0x0000, SCREEN_W*16);
             }
         }
     </script>
     <script id="memset-demo" data-name="memset demo" type="text/tic80">
-        const (ADDR,SIZE) =  minfo("screen");
+        const [ADDR, SIZE] = minfo("screen");
+        console.log(ADDR,SIZE);
         TIC = function () {
             // alternative way to clear the screen
-            memset(ADDR, 0, SIZE);
+            memset(ADDR, 0x12, SIZE/2);
+            memset(ADDR + SIZE/2, 0x34, SIZE/2);
         }
     </script>
     <script id="tri-demo" data-name="triangle demo" type="text/tic80">
@@ -303,8 +302,8 @@
 
         cls();
         TIC = function () {
-            for (let x = 0; x <= 240; x += 28) {
-                for (let y = 0; y <= 136; y += 28) {
+            for (let x = 0; x <= SCREEN_W; x += 28) {
+                for (let y = 0; y <= SCREEN_H; y += 28) {
                     const cx = 12 * sin(time() / 30000 * (x + y + 1));
                     const cy = 12 * cos(time() / 30000 * (x + y + 1));
                     Pir(x, y, 25, 25, x + cx, y + cy);
@@ -313,9 +312,9 @@
         }
     </script>
     <script id="map-demo" data-name="map demo" type="text/tic80">
-        for (let x = 0; x < 240; x++) {
-            for (let y = 0; y < 136; y++) {
-                mset(x, y, (y * 240 + x) % 127);
+        for (let x = 0; x < SCREEN_W; x++) {
+            for (let y = 0; y < SCREEN_H; y++) {
+                mset(x, y, (y * SCREEN_W + x) % 127);
             }
         }
 
@@ -323,8 +322,8 @@
         let yy = 0;
         function s1() {
             cls();
-            map(xx / 10, yy / 10, 30, 17);
-            if (xx == 240 * 10) {
+            map(xx / 10, yy / 10, SCREEN_W/SPR_W, SCREEN_W/SPR_H);
+            if (xx == SCREEN_W * 10) {
                 TIC = s2;
             } else {
                 xx++;
@@ -332,8 +331,8 @@
         }
         function s2() {
             cls();
-            map(xx / 10, yy / 10, 30, 17);
-            if (yy == 136 * 10) {
+            map(xx / 10, yy / 10, SCREEN_W/SPR_W, SCREEN_W/SPR_H);
+            if (yy == SCREEN_W * 10) {
                 TIC = s3;
             } else {
                 yy++;
@@ -341,7 +340,7 @@
         }
         function s3() {
             cls();
-            map(xx / 10, yy / 10, 30, 17);
+            map(xx / 10, yy / 10, SCREEN_W/SPR_W, SCREEN_W/SPR_H);
             if (xx == 0) {
                 TIC = s4;
             } else {
@@ -350,7 +349,7 @@
         }
         function s4() {
             cls();
-            map(xx / 10, yy / 10, 30, 17);
+            map(xx / 10, yy / 10, SCREEN_W/SPR_W, SCREEN_W/SPR_H);
             if (yy == 0) {
                 TIC = s1;
             } else {
@@ -360,13 +359,13 @@
         TIC = s1;
     </script>
     <script id="clip-demo" data-name="clip demo" type="text/tic80">
-        for (let x = 0; x < 240; x++) {
-            for (let y = 0; y < 136; y++) {
-                mset(x, y, (y * 240 + x) % 127);
+        for (let x = 0; x < SCREEN_W; x++) {
+            for (let y = 0; y < SPR_W; y++) {
+                mset(x, y, (y * SCREEN_W + x) % 127);
             }
         }
-        let x = 120;
-        let y = 68;
+        let x = SCREEN_W/2;
+        let y = SCREEN_H/2;
         let dx = 7;
         let dy = 4;
 
@@ -375,21 +374,294 @@
             x = x + dx;
             y = y + dy;
 
-            if ((x / 10 > 240 - 6 * 3) || (x / 10 < 0)) {
+            if ((x / 10 > SCREEN_W - 6 * 3) || (x / 10 < 0)) {
                 dx = -dx;
             }
-            if ((y / 10 > 136 - 6 * 3) || (y / 10 < 0)) {
+            if ((y / 10 > SCREEN_H - 6 * 3) || (y / 10 < 0)) {
                 dy = -dy;
             }
             cls();
             clip(x / 10, y / 10, 6 * 3, 6 * 3);
-            map(0, 0, 30, 17);
+            map(0, 0, SCREEN_W/SPR_W, SCREEN_W/SPR_H);
         }
+    </script>
+    <script id="stg-demo" data-name="stg demo" type="text/tic80">
+const img = new Image();
+img.onload = () => {
+    const canv = document.createElement("canvas");
+    const cont = canv.getContext("2d");
+    cont.drawImage(img,0,0);
+    const w = img.width;
+    const h = img.height;
+    const data = cont.getImageData(0, 0, img.width, img.height);
+    // create palette
+    const pal = {};
+    const colors = []
+    const ADDR_PALETTE = minfo("palette")[0];
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const r = (data.data[(y * w + x) * 4 + 0]); 
+            const g = (data.data[(y * w + x) * 4 + 1]); 
+            const b = (data.data[(y * w + x) * 4 + 2]); 
+            const color = (r << 16) | (g << 8) | (b << 0);
+            const len = colors.length;
+            if (len >= 16) {
+                throw Error("pal over");
+            }
+            if (pal[color] == undefined) {
+                pal[color] = len;
+                colors.push(color);
+                poke(ADDR_PALETTE + len*3+0, r);
+                poke(ADDR_PALETTE + len*3+1, g);
+                poke(ADDR_PALETTE + len*3+2, b);
+            }
+        }
+    }
+
+    // create sprite
+    const ADDR_SPRITE = minfo("sprites")[0];
+    for (let y = 0; y < h; y += 8) {
+        for (let x = 0; x < w; x += 8) {
+            const sprite = [
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ];
+            for (let j = 0; j < 8; j ++) {
+                for (let i = 0; i < 4 ; i++) {
+                    const pixel1 = ((y + j) * w + (x + i * 2 + 0)) * 4;
+                    const color1 = (data.data[pixel1 + 0] << 16) | (data.data[pixel1 + 1] << 8) | (data.data[pixel1 + 2] << 0);
+                    const pixel2 = ((y + j) * w + (x + i * 2 + 1)) * 4;
+                    const color2 = (data.data[pixel2 + 0] << 16) | (data.data[pixel2 + 1] << 8) | (data.data[pixel2 + 2] << 0);
+                    sprite[(j * 4 + i)] = (pal[color2] << 4) | pal[color1];
+                }
+            }
+            for (let i = 0; i < 32; i++) {
+                poke(ADDR_SPRITE + ((~~(y/8)*16) + (~~(x/8)))*32+i, sprite[i]);
+            }
+        }
+    }
+    function spr16(id, x, y, colorkey = -1, scale = 1, flip = 0, rotate = 0) {
+        let orientation = flip & 0x03;
+        switch (rotate & 0x03) {
+            case 0: break;
+            case 1: orientation ^= 0x01; orientation |= 0x04; break;
+            case 2: orientation ^= 0x03; break;
+            case 3: orientation ^= 0x02; orientation |= 0x04; break;
+        }
+        for (let j = 0; j < 2; j++) {
+            for (let i = 0; i < 2; i++) {
+                const ix = (orientation & 0x01) ? (2 - i - 1) : i;
+                const iy = (orientation & 0x02) ? (2 - j - 1) : j;
+                const iz = (orientation & 0x04) ? (ix * 16 + iy) : (iy * 16 + ix);
+                spr(id + iz, x + (8 * i) * scale, y + (8 * j) * scale, colorkey, scale, flip, rotate);
+            }
+        }
+    }
+
+    // game body 
+
+    let px = 0;
+    let py = 0;
+    let prevBtn4 = false;
+
+    const enemies = [];
+    const shots = [];
+    const eshots = [];
+    const particles = []
+
+    class Enemy {
+        constructor(x,y,life) {
+            this.x = x;
+            this.y = y;
+            this.alive = true;
+            this.life = life;
+            this.tick = 0;
+        }
+        draw() {
+        }
+        move() {
+            this.tick++;
+        }
+    }
+    class EnemySmall extends Enemy {
+        constructor(x, y, life, spr) {
+            super(x,y,life);
+            this.spr = spr;
+        }
+        draw(){
+            spr16(this.spr + ((this.tick % 30) > 15 ? 2 : 0), this.x, this.y, 0);
+        }
+        move(){
+        }
+    }
+    class EnemySmallGreen extends EnemySmall {
+        constructor(x, y) {
+            super(x, y, 2, 0x20);
+        }
+        move() {
+            this.tick++;
+            this.x += -2;
+            if ((this.tick % 60)==0) { 
+                const rad = Math.atan2(py-this.y, px-this.x);
+                eshots.push({ x: this.x, y: this.y, dx: cos(rad)*2, dy: sin(rad)*2, alive: true}); 
+            }
+        }
+    }
+    class EnemySmallBlue extends EnemySmall {
+        constructor(x, y) {
+            super(x, y, 5, 0x24);
+            this.cy = y;
+        }
+        move() {
+            this.tick++;
+            this.x += -1;
+            this.y = this.cy + sin(this.tick / 60 * pi) * 20;
+            if ((this.tick % 60)==0) { 
+                const rad = Math.atan2(py-this.y, px-this.x);
+                eshots.push({ x: this.x, y: this.y, dx: cos(rad)*2, dy: sin(rad)*2, alive: true}); 
+            }
+        }
+    }
+    class EnemySmallRed extends EnemySmall {
+        constructor(x, y) {
+            super(x, y, 10, 0x28);
+        }
+        move() {
+            this.tick++;
+            if (this.tick <= 30) {
+                this.x += -1;
+            } else if (this.tick >= 480) {
+                this.x += -1;
+            }  else {
+                if ((this.tick % 120)==0) { 
+                    for (let i=-2; i<=+2; i++) {
+                        eshots.push({ x: this.x, y: this.y, dx: cos((180+i*15)*pi/180), dy: sin((180+i*15)*pi/180), alive: true}); 
+                    }
+                }
+            }
+        }
+    }
+
+    TIC = function () {
+        cls();
+        // move hiden chang
+        if (btn(0)) { py -= 1; }
+        if (btn(1)) { py += 1; }
+        if (btn(2)) { px -= 1; }
+        if (btn(3)) { px += 1; }
+        if (btn(4)) { 
+           if (!prevBtn4) {
+                shots.push({ x: px + 8, y: py + 4, dx: 8, dy: -5, alive: true}); 
+                shots.push({ x: px + 8, y: py + 4, dx: 8, dy: 0, alive: true}); 
+                shots.push({ x: px + 8, y: py + 4, dx: 8, dy: +5, alive: true}); 
+                prevBtn4 = true;
+            }
+        } else {
+            prevBtn4 = false;
+        }
+        // move enemies
+        enemies.forEach(e => {
+            e.move();
+            if (e.x < -8 || e.x >= SCREEN_W + 8 || e.y < -8 || e.y >= SCREEN_H + 8) { e.alive = false; }
+        });
+        // generate enemy
+        if ((time() % 60) == 0) {
+            switch (rand(3)) {
+                case 0:
+                    enemies.push(new EnemySmallGreen(SCREEN_W, rand(SCREEN_H - 16)));
+                    break;
+                case 1:
+                    enemies.push(new EnemySmallBlue(SCREEN_W, rand(32, SCREEN_H - 32 - 16)));
+                    break;
+                case 2:
+                    enemies.push(new EnemySmallRed(SCREEN_W, rand(32, SCREEN_H - 32 - 16)));
+                    break;
+            }
+        }
+        // move shots
+        shots.forEach(e => {
+            e.x += e.dx;
+            e.y += e.dy;
+            if (e.x < -8 || e.x >= SCREEN_W + 8 || e.y < -8 || e.y >= SCREEN_H + 8) { e.alive = false; }
+        });
+        // move enemy shots
+        eshots.forEach(e => {
+            e.x += e.dx;
+            e.y += e.dy;
+            if (e.x < -8 || e.x >= SCREEN_W + 8 || e.y < -8 || e.y >= SCREEN_H + 8) { e.alive = false; }
+        });
+        // move particles
+        particles.forEach(e => {
+            e.x += e.dx;
+            e.y += e.dy;
+            e.tick += 1;
+            if (e.x < -8 || e.x >= SCREEN_W + 8 || e.y < -8 || e.y >= SCREEN_H + 8) { e.alive = false; }
+            if (e.tick >= 15) { e.alive = false;}
+        });
+        // hit check
+        enemies.forEach(enemy => {
+            shots.forEach(shot => {
+                if ((shot.x <= enemy.x + 16) && (enemy.x <= shot.x + 8) && (shot.y <= enemy.y + 16) && (enemy.y <= shot.y + 8)) {
+                    shot.alive = false;
+                    particles.push({ tick: 0, x: shot.x, y: shot.y, dx: shot.dx*0.1, dy: shot.dy*0.1, alive: true});
+                    if (enemy.life > 0) {
+                        enemy.life -= 1;
+                        enemy.alive = enemy.life > 0;
+                    }
+                }
+            });
+        });
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            if (e.alive == false) { enemies.splice(i, 1); }
+        }
+        for (let i = shots.length - 1; i >= 0; i--) {
+            const e = shots[i];
+            if (e.alive == false) { shots.splice(i, 1); }
+        }
+        for (let i = eshots.length - 1; i >= 0; i--) {
+            const e = eshots[i];
+            if (e.alive == false) { eshots.splice(i, 1); }
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const e = particles[i];
+            if (e.alive == false) { particles.splice(i, 1); }
+        }
+
+        // draw hiden chang
+        spr16(0 + ((time()%60)>30?2:0), px,py,0);
+        // draw enemies
+        enemies.forEach((e) => {
+            spr16(e.spr + ((time() % 30) > 15 ? 2 : 0), e.x, e.y,0);
+        });
+        // draw shots
+        shots.forEach((e) => {
+            spr((time() % 20) > 10 ? 0x80 : 0x70, e.x, e.y,0);
+        });
+        // draw enemy shots
+        eshots.forEach((e) => {
+            spr(0x72, e.x, e.y,0);
+        });
+        // draw particles
+        particles.forEach((e) => {
+            spr(~~(e.tick / 5)+0x74, e.x, e.y, 0);
+        });
+    }
+
+};
+img.src = "SpriteSheet.png";
+
     </script>
 </head>
 <body>
-    <section style="display: none">
-        <div><canvas id="glcanvas" width="240" height="136"></canvas></div>
+    <section>
+        <div id="wrapper"></div>
         <div>
             <textarea id="code" style="border: 1px solid black"></textarea>
         </div>
@@ -398,7 +670,8 @@
             <input id="run" type="button" value="run" style="border: 1px solid black;" />
         </div>
     </section>
-    <div><canvas id="glcanvas2" width="640" height="480"></canvas></div>
+    <section  style="display: none">
+        <div><canvas id="glcanvas2" width="640" height="480"></canvas></div>
+    </section>
 </body>
 </html>
-
