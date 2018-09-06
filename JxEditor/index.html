@@ -16,7 +16,6 @@ function isLoSurrogate(x) {
 function isSurrogatePair(high, low) {
   return isHighSurrogate(high) && isLoSurrogate(low);
 }
-
 function utf16ToUtf32Char(high, low) {
   if (0x0000 <= high && high <= 0xD7FF) {
     return [1, high];
@@ -44,7 +43,6 @@ function utf32ToUtf16Char(code) {
     return undefined;
   }
 }
-
 function stringToUtf16(str) {
   const utf16 = [];
   for (let i=0; i<str.length; i++) {
@@ -81,14 +79,12 @@ function utf32ToUtf16(utf32) {
 function utf16ToString(utf16) {
   return String.fromCharCode.apply(null, utf16);
 }
-
 function strToUtf32(str) {
   return utf16ToUtf32(stringToUtf16(str));
 }
 function utf32ToStr(utf32) {
   return utf16ToString(utf32ToUtf16(utf32));
 }
-
 class GapBuffer {
   constructor (gapSize) {
     this.gapSize = parseInt(gapSize || 64);
@@ -100,12 +96,6 @@ class GapBuffer {
     this.gapStart   = 0;
     this.gapEnd     = this.gapSize;
     
-    Object.defineProperty(GapBuffer.prototype, 'length', {
-      enumerable: true,
-      get: function() {
-        return this.buffer.length - (this.gapEnd - this.gapStart);
-      },
-    });
     const self = this;
     this[Symbol.iterator] = function*() {
       for (let i=0; i<self.gapStart; i++) {
@@ -125,7 +115,6 @@ class GapBuffer {
     }
     return this.buffer[ix];
   }
-
   grow(newsize) {
     const gapSize = newsize - this.buffer.length + (this.gapEnd - this.gapStart);
     const newBuffer = new Uint32Array(newsize);
@@ -138,7 +127,6 @@ class GapBuffer {
     this.buffer = newBuffer;
     this.gapEnd = this.gapStart + gapSize;
   }
-
   insert(ix, value) {
     if (ix < 0) {
       throw new RangeError("insert index must be >= 0");
@@ -154,14 +142,12 @@ class GapBuffer {
     
     this.buffer[this.gapStart++] = value;
   }
-
   insertAll(ix, values) {
     // TODO: this should be optimised
     for (let i = 0; i < values.length; ++i) {
       this.insert(ix + i, values[i]);
     }
   }
-
   deleteBefore(ix, len) {
     if (ix === 0 || ix > this.length) {
       return;
@@ -171,12 +157,10 @@ class GapBuffer {
     if (this.gapStart < 0)
       this.gapStart = 0;
   }
-
   clear() {
     this.gapStart = 0;
     this.gapEnd = this.buffer.size;
   }
-
   asArray() {
     const newBuffer = new Uint32Array(this.length);
     let n = 0;
@@ -188,7 +172,6 @@ class GapBuffer {
     }
     return newBuffer;
   }
-
   moveGap(ix) {
     if (ix < this.gapStart) {
       
@@ -245,11 +228,16 @@ class GapBuffer {
     return undefined;
   }
 }
+Object.defineProperty(GapBuffer.prototype, 'length', {
+  enumerable: true,
+  get: function() {
+    return this.buffer.length - (this.gapEnd - this.gapStart);
+  },
+});
 
 Array.equal = function (x, y) {
   return x.length === y.length && x.find((n,i)=> y[i] !=n) === undefined
 }
-
 class DataViewIterator{
   constructor (arraybuffer, little) {
     this.little = little;
@@ -272,11 +260,9 @@ class DataViewIterator{
     return ret;
   }
 }
-
 class BMPFont {
   constructor(arraybuffer) {
     const it = new DataViewIterator(arraybuffer, true);
-
     this.FourCC         = it.getUint32(),
     this.FontWidth      = it.getUint32(),
     this.FontHeight     = it.getUint32(),
@@ -285,7 +271,6 @@ class BMPFont {
     this.PixelTableSize = it.getUint32(),
     this.WidthTable = [];
     this.PixelTable = [];
-
     for (let i=0; i<this.WidthTableSize; i++) {
       this.WidthTable.push({
         RangeStart: it.getUint32(),
@@ -293,7 +278,6 @@ class BMPFont {
         Width     : it.getUint8(),
       });
     }
-
     for (let i=0; i<this.PixelTableSize; i++) {
       const RangeStart = it.getUint32();
       const RangeEnd   = it.getUint32();
@@ -383,7 +367,7 @@ BMPFont.loadFont = function (url) {
     let xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.onload = () => {
-      if (xhr.readyState === 4 && ((xhr.responseURL.startsWith("file://") === false && xhr.status === 200) || (xhr.responseURL.startsWith("file://") === true && xhr.status === 0))) {
+      if (xhr.readyState === 4 && ((xhr.status === 200) || (xhr.responseURL.startsWith("file://") === true && xhr.status === 0))) {
         resolve(xhr.response);
       } else {
         reject(new Error(xhr.statusText));
@@ -404,10 +388,11 @@ class EditorView {
     this.height = height;
     this.grid = new Uint32Array(width * height);
   }
-  layout(takeUtf32) {
-    let ch = takeUtf32();
+  layout(dataCursor) {
+    dataCursor = dataCursor.dup();
     for (let y = 0; y<this.height; y++) {
       for (let x = 0; x<this.width; ) {
+        let ch = dataCursor.getch();
         let width = this.font.getWidth(ch);
         if (ch === undefined || width === undefined) {
           width = 1;
@@ -422,7 +407,7 @@ class EditorView {
           for (let i = x; i< this.width; i++) {
             this.grid[y * this.width + i] = 0x00;
           }
-          ch = takeUtf32();
+          dataCursor.nextch();
           break;
         } else {
           this.grid[y * this.width + x] = ch;
@@ -430,16 +415,143 @@ class EditorView {
             this.grid[y * this.width + x + i] = 0x00;
           }
           x += width;
-          ch = takeUtf32();
+          dataCursor.nextch();
         }
+      }
+    }
+  }
+  calcCursorPos(dataCursor) {
+    const dCursor = dataCursor.dup();
+    dCursor.row = 0;
+    const viewCursor = { column: 0, row: 0 };
+
+    let x = 0;
+    while (dCursor.row < dataursor.row) {
+      let ch = dCursor.getch();
+      let width = this.font.getWidth(ch);
+      if (ch === undefined || width === undefined) {
+        width = 1;
+        ch = 0x00;
+      };
+      if (this.width < x + width) {
+        viewCursor.row = 0;
+        viewCursor.column++;
+        break;
+      } else if (ch == 0x0A) {
+        viewCursor.row = 0;
+        viewCursor.column++;
+        dataCursor.nextch();
+        break;
+      } else {
+        this.grid[y * this.width + x] = ch;
+        for (let i = 1; i< width; i++) {
+          this.grid[y * this.width + x + i] = 0x00;
+        }
+        x += width;
+        dataCursor.nextch();
+      }
+    }
+    {
+      let ch = dCursor.getch();
+      let width = this.font.getWidth(ch);
+      if (ch === undefined || width === undefined) {
+        width = 1;
+        ch = 0x00;
+      };
+      if (this.width < x + width) {
+        viewCursor.row = 0;
+        viewCursor.column++;
+      }
+    }
+    return viewCursor;
+  }
+  moveNextLine(dataCursor) {
+    dataCursor = dataCursor.dup();
+    for (let x = 0; x<this.width; ) {
+      let ch = dataCursor.getch();
+      let width = this.font.getWidth(ch);
+      if (ch === undefined || width === undefined) {
+        width = 1;
+        ch = 0x00;
+      };
+      if (this.width < x + width) {
+        break;
+      } else if (ch == 0x0A) {
+        dataCursor.nextch();
+        break;
+      } else {
+        x += width;
+        dataCursor.nextch();
+      }
+    }
+    return dataCursor;
+  }
+  movePrevLine(dataCursor) {
+    dataCursor = dataCursor.dup();
+    lineViewSize = this.calcCursorPos(dataCursor);
+    if (lineViewSize.column == 0) {
+      // 前の行へ
+      prevLineDataCursor = new DataCursor(dataCursor.column-1, dataCursor.lines[dataCursor.column-1].length, dataCursor.lines);
+      prevLineViewSize = this.calcCursorPos(prevLineDataCursor);
+      if (prevLineViewSize.row < lineViewSize.row) {
+        return prevLineViewSize.row;
       }
     }
   }
 }
 
+class DataCursor {
+  constructor (column, row, lines) {
+    this.column = column;
+    this.row = row;
+    this.lines = lines;
+  }
+  getch() {
+    if (this.lines.length <= this.column) {
+      return undefined;
+    }
+    if (this.lines[this.column].length == this.row) {
+      return 0x0A;
+    }
+    return this.lines[this.column].get(this.row);
+  }
+  nextch() {
+    if (this.lines.length <= this.column) {
+      return false;
+    }
+    if (this.lines[this.column].length == this.row) {
+      this.column++;
+      this.row = 0;
+      return true;
+    }
+    this.row++;
+    return true;
+  } 
+  prevch() {
+    if (this.lines.length <= this.column) {
+      return false;
+    }
+    if (0 == this.row) {
+      if (this.column > 0) {
+        this.column--;
+        this.row = this.lines.length;
+        return true;
+      } else {
+        return false;
+      }
+    }
+    this.row--;
+    return true;
+  } 
+  dup() {
+    return new DataCursor(this.column, this.row, this.lines);
+  }
+}
+
+
 window.onload = BMPFont.loadFont("font.bmpf").then((bmpFont) => {
   const docStr = document.getElementsByTagName('script')[0].innerHTML;
-  const lines = docStr.split("\r\n").map(x => {
+  const lines = docStr.split("\n").map(x => {
     const gb = new GapBuffer(16);
     gb.insertAll(0, strToUtf32(x));
     return gb;
@@ -448,36 +560,31 @@ window.onload = BMPFont.loadFont("font.bmpf").then((bmpFont) => {
   const canvas = document.getElementById("canvas");
   const context = canvas.getContext("2d");
   const imageData = context.createImageData(canvas.width, canvas.height);
-  const view = new EditorView(bmpFont, (~~(canvas.width / bmpFont.FontWidth)), ~~(canvas.height / bmpFont.FontHeight));
-  
-  let line = 0;
-  let n = 0;
-  view.layout(() => {
-    for (;;) {
-      if (lines.length <= line) {
-        return undefined;
-      }
-      if (lines[line].length == n) {
-        line++;
-        n = 0;
-        continue;
-      }
-      return lines[line].get(n++);
+  const view = new EditorView(bmpFont, ~~(canvas.width / bmpFont.FontWidth), ~~(canvas.height / bmpFont.FontHeight));
+  let lefttop = new DataCursor(0, 0, lines);
+
+  function updateAndDraw() {
+    view.layout(lefttop);
+    imageData.data.fill(0);
+    for (let i=0; i<view.height; i++) {
+      bmpFont.drawUtf32(0,i*bmpFont.FontHeight,view.grid.subarray(i*view.width,(i+1)*view.width), (x,y) => { 
+        if (0 <= y && y < canvas.height && 0 <= x && x < canvas.width) {
+          imageData.data[(y*canvas.width+x)*4+3] = 0xFF; 
+        }
+      }, );
     }
-  });
-
-  for (let i=0; i<view.height; i++) {
-    bmpFont.drawUtf32(0,i*bmpFont.FontHeight,view.grid.subarray(i*view.width,(i+1)*view.width), (x,y) => { 
-      if (0 <= y && y < canvas.height && 0 <= x && x < canvas.width) {
-        imageData.data[(y*canvas.width+x)*4+3] = 0xFF; 
-      }
-    }, );
+    context.putImageData(imageData,0,0);
   }
-  context.putImageData(imageData,0,0);
+  updateAndDraw();
+  document.addEventListener("wheel", (e) => {
+    if (e.deltaY > 0) {
+      lefttop = view.moveNextLine(lefttop);
+    }  else {
+      lefttop = view.movePrevLine(lefttop);
+    }
+    updateAndDraw();
+  });
 });
-
-
-
     </script>
 </head>
 <body style="margin: 0; padding: 0;">
