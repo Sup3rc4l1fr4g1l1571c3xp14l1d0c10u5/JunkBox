@@ -1,395 +1,78 @@
-﻿// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
-
-//interface XMLHttpRequest {
-//    responseURL: string;
-//}
-
-interface Window {
-    whenEvent<T>(event: string): Promise<T>;
-}
-
-Window.prototype.whenEvent = function (event: string): Promise<any> {
-    return new Promise<any>((resolve, reject) => {
-        const fire = (e: Event) => {
+// <reference path="C:/Program Files/Microsoft Visual Studio 14.0/Common7/IDE/CommonExtensions/Microsoft/TypeScript/lib.es6.d.ts" />
+Window.prototype.whenEvent = function (event) {
+    return new Promise((resolve, reject) => {
+        const fire = (e) => {
             resolve(e);
             this.addEventListener(event, fire, false);
-        }
+        };
         this.addEventListener(event, fire, false);
     });
-}
-
-module Editor {
+};
+var Editor;
+(function (Editor) {
     "use strict";
-
-    function assert(x: boolean): void {
+    function assert(x) {
         if (!x) {
             throw new Error("assert failed");
         }
     }
-
-    const enum CTRLKEY_FLAG {
-        CHK_NONE = 0x0000,
-        CHK_SHIFT_L = 0x0001,
-        CHK_SHIFT_R = 0x0002,
-        CHK_CTRL_L = 0x0004,
-        CHK_CTRL_R = 0x0008,
-        CHK_ALT_L = 0x0010,
-        CHK_ALT_R = 0x0020,
-        CHK_WIN_L = 0x0040,
-        CHK_WIN_R = 0x0080,
-
-        CHK_SCRLK = 0x0100,
-        CHK_NUMLK = 0x0200,
-        CHK_CAPSLK = 0x0400,
-
-        CHK_SHIFT = CHK_SHIFT_L | CHK_SHIFT_R,
-        CHK_CTRL = CHK_CTRL_L | CHK_CTRL_R,
-        CHK_ALT = CHK_ALT_L | CHK_ALT_R,
-        CHK_WIN = CHK_WIN_L | CHK_WIN_R,
-
-        CHK_MASK_SCAL = CHK_SHIFT | CHK_CTRL | CHK_ALT | CHK_WIN
-
-    };
-    const enum VIRTUAL_KEY {
-        VKEY_NONE = 0x00,
-        VKEY_LBUTTON = 0x01,
-        VKEY_RBUTTON = 0x02,
-        VKEY_CANCEL = 0x03,
-        VKEY_MBUTTON = 0x04,
-        VKEY_XBUTTON1 = 0x05,
-        VKEY_XBUTTON2 = 0x06,
-        VKEY_UNDEFINED_0x07 = 0x07,
-        VKEY_BACK = 0x08,
-        VKEY_TAB = 0x09,
-        VKEY_RESERVED_0x0A = 0x0A,
-        VKEY_RESERVED_0x0B = 0x0B,
-        VKEY_CLEAR = 0x0C,
-        VKEY_RETURN = 0x0D,
-        VKEY_UNDEFINED_0x0E = 0x0E,
-        VKEY_UNDEFINED_0x0F = 0x0F,
-        VKEY_SHIFT = 0x10,
-        VKEY_CONTROL = 0x11,
-        VKEY_MENU = 0x12,
-        VKEY_PAUSE = 0x13,
-        VKEY_CAPITAL = 0x14,
-        VKEY_KANA = 0x15,
-        VKEY_HANGUEL = 0x15,
-        VKEY_HANGUL = 0x15,
-        VKEY_UNDEFINED_0x16 = 0x16,
-        VKEY_JUNJA = 0x17,
-        VKEY_FINAL = 0x18,
-        VKEY_HANJA = 0x19,
-        VKEY_KANJI = 0x19,
-        VKEY_UNDEFINED_0x1A = 0x1A,
-        VKEY_ESCAPE = 0x1B,
-        VKEY_CONVERT = 0x1C,
-        VKEY_NONCONVERT = 0x1D,
-        VKEY_ACCEPT = 0x1E,
-        VKEY_MODECHANGE = 0x1F,
-        VKEY_SPACE = 0x20,
-        VKEY_PRIOR = 0x21,
-        VKEY_NEXT = 0x22,
-        VKEY_END = 0x23,
-        VKEY_HOME = 0x24,
-        VKEY_LEFT = 0x25,
-        VKEY_UP = 0x26,
-        VKEY_RIGHT = 0x27,
-        VKEY_DOWN = 0x28,
-        VKEY_SELECT = 0x29,
-        VKEY_PRINT = 0x2A,
-        VKEY_EXECUTE = 0x2B,
-        VKEY_SNAPSHOT = 0x2C,
-        VKEY_INSERT = 0x2D,
-        VKEY_DELETE = 0x2E,
-        VKEY_HELP = 0x2F,
-        VKEY_NUM0 = 0x30,
-        VKEY_NUM1 = 0x31,
-        VKEY_NUM2 = 0x32,
-        VKEY_NUM3 = 0x33,
-        VKEY_NUM4 = 0x34,
-        VKEY_NUM5 = 0x35,
-        VKEY_NUM6 = 0x36,
-        VKEY_NUM7 = 0x37,
-        VKEY_NUM8 = 0x38,
-        VKEY_NUM9 = 0x39,
-        VKEY_UNDEFINED_0x3A = 0x3A,
-        VKEY_UNDEFINED_0x3B = 0x3B,
-        VKEY_UNDEFINED_0x3C = 0x3C,
-        VKEY_UNDEFINED_0x3D = 0x3D,
-        VKEY_UNDEFINED_0x3E = 0x3E,
-        VKEY_UNDEFINED_0x3F = 0x3F,
-        VKEY_UNDEFINED_0x40 = 0x40,
-        VKEY_KEY_A = 0x41,
-        VKEY_KEY_B = 0x42,
-        VKEY_KEY_C = 0x43,
-        VKEY_KEY_D = 0x44,
-        VKEY_KEY_E = 0x45,
-        VKEY_KEY_F = 0x46,
-        VKEY_KEY_G = 0x47,
-        VKEY_KEY_H = 0x48,
-        VKEY_KEY_I = 0x49,
-        VKEY_KEY_J = 0x4A,
-        VKEY_KEY_K = 0x4B,
-        VKEY_KEY_L = 0x4C,
-        VKEY_KEY_M = 0x4D,
-        VKEY_KEY_N = 0x4E,
-        VKEY_KEY_O = 0x4F,
-        VKEY_KEY_P = 0x50,
-        VKEY_KEY_Q = 0x51,
-        VKEY_KEY_R = 0x52,
-        VKEY_KEY_S = 0x53,
-        VKEY_KEY_T = 0x54,
-        VKEY_KEY_U = 0x55,
-        VKEY_KEY_V = 0x56,
-        VKEY_KEY_W = 0x57,
-        VKEY_KEY_X = 0x58,
-        VKEY_KEY_Y = 0x59,
-        VKEY_KEY_Z = 0x5A,
-        VKEY_LWIN = 0x5B,
-        VKEY_RWIN = 0x5C,
-        VKEY_APPS = 0x5D,
-        VKEY_RESERVED_0x5E = 0x5E,
-        VKEY_SLEEP = 0x5F,
-        VKEY_NUMPAD0 = 0x60,
-        VKEY_NUMPAD1 = 0x61,
-        VKEY_NUMPAD2 = 0x62,
-        VKEY_NUMPAD3 = 0x63,
-        VKEY_NUMPAD4 = 0x64,
-        VKEY_NUMPAD5 = 0x65,
-        VKEY_NUMPAD6 = 0x66,
-        VKEY_NUMPAD7 = 0x67,
-        VKEY_NUMPAD8 = 0x68,
-        VKEY_NUMPAD9 = 0x69,
-        VKEY_MULTIPLY = 0x6A,
-        VKEY_ADD = 0x6B,
-        VKEY_SEPARATOR = 0x6C,
-        VKEY_SUBTRACT = 0x6D,
-        VKEY_DECIMAL = 0x6E,
-        VKEY_DIVIDE = 0x6F,
-        VKEY_F1 = 0x70,
-        VKEY_F2 = 0x71,
-        VKEY_F3 = 0x72,
-        VKEY_F4 = 0x73,
-        VKEY_F5 = 0x74,
-        VKEY_F6 = 0x75,
-        VKEY_F7 = 0x76,
-        VKEY_F8 = 0x77,
-        VKEY_F9 = 0x78,
-        VKEY_F10 = 0x79,
-        VKEY_F11 = 0x7A,
-        VKEY_F12 = 0x7B,
-        VKEY_F13 = 0x7C,
-        VKEY_F14 = 0x7D,
-        VKEY_F15 = 0x7E,
-        VKEY_F16 = 0x7F,
-        VKEY_F17 = 0x80,
-        VKEY_F18 = 0x81,
-        VKEY_F19 = 0x82,
-        VKEY_F20 = 0x83,
-        VKEY_F21 = 0x84,
-        VKEY_F22 = 0x85,
-        VKEY_F23 = 0x86,
-        VKEY_F24 = 0x87,
-        VKEY_UNASSIGNED_0x88 = 0x88,
-        VKEY_UNASSIGNED_0x89 = 0x89,
-        VKEY_UNASSIGNED_0x8A = 0x8A,
-        VKEY_UNASSIGNED_0x8B = 0x8B,
-        VKEY_UNASSIGNED_0x8C = 0x8C,
-        VKEY_UNASSIGNED_0x8D = 0x8D,
-        VKEY_UNASSIGNED_0x8E = 0x8E,
-        VKEY_UNASSIGNED_0x8F = 0x8F,
-        VKEY_NUMLOCK = 0x90,
-        VKEY_SCROLL = 0x91,
-        VKEY_LSHIFT = 0xA0,
-        VKEY_RSHIFT = 0xA1,
-        VKEY_LCONTROL = 0xA2,
-        VKEY_RCONTROL = 0xA3,
-        VKEY_LMENU = 0xA4,
-        VKEY_RMENU = 0xA5,
-        VKEY_BROWSER_BACK = 0xA6,
-        VKEY_BROWSER_FORWARD = 0xA7,
-        VKEY_BROWSER_REFRESH = 0xA8,
-        VKEY_BROWSER_STOP = 0xA9,
-        VKEY_BROWSER_SEARCH = 0xAA,
-        VKEY_BROWSER_FAVORITES = 0xAB,
-        VKEY_BROWSER_HOME = 0xAC,
-        VKEY_VOLUME_MUTE = 0xAD,
-        VKEY_VOLUME_DOWN = 0xAE,
-        VKEY_VOLUME_UP = 0xAF,
-        VKEY_MEDIA_NEXT_TRACK = 0xB0,
-        VKEY_MEDIA_PREV_TRACK = 0xB1,
-        VKEY_MEDIA_STOP = 0xB2,
-        VKEY_MEDIA_PLAY_PAUSE = 0xB3,
-        VKEY_LAUNCH_MAIL = 0xB4,
-        VKEY_LAUNCH_MEDIA_SELECT = 0xB5,
-        VKEY_LAUNCH_APP1 = 0xB6,
-        VKEY_LAUNCH_APP2 = 0xB7,
-        VKEY_RESERVED_0xB8 = 0xB8,
-        VKEY_RESERVED_0xB9 = 0xB9,
-        VKEY_OEM_1 = 0xBA,
-        VKEY_OEM_PLUS = 0xBB,
-        VKEY_OEM_COMMA = 0xBC,
-        VKEY_OEM_MINUS = 0xBD,
-        VKEY_OEM_PERIOD = 0xBE,
-        VKEY_OEM_2 = 0xBF,
-        VKEY_OEM_3 = 0xC0,
-        VKEY_RESERVED_0xC1 = 0xC1,
-        VKEY_RESERVED_0xC2 = 0xC2,
-        VKEY_RESERVED_0xC3 = 0xC3,
-        VKEY_RESERVED_0xC4 = 0xC4,
-        VKEY_RESERVED_0xC5 = 0xC5,
-        VKEY_RESERVED_0xC6 = 0xC6,
-        VKEY_RESERVED_0xC7 = 0xC7,
-        VKEY_RESERVED_0xC8 = 0xC8,
-        VKEY_RESERVED_0xC9 = 0xC9,
-        VKEY_RESERVED_0xCA = 0xCA,
-        VKEY_RESERVED_0xCB = 0xCB,
-        VKEY_RESERVED_0xCC = 0xCC,
-        VKEY_RESERVED_0xCD = 0xCD,
-        VKEY_RESERVED_0xCE = 0xCE,
-        VKEY_RESERVED_0xCF = 0xCF,
-        VKEY_RESERVED_0xD0 = 0xD0,
-        VKEY_RESERVED_0xD1 = 0xD1,
-        VKEY_RESERVED_0xD2 = 0xD2,
-        VKEY_RESERVED_0xD3 = 0xD3,
-        VKEY_RESERVED_0xD4 = 0xD4,
-        VKEY_RESERVED_0xD5 = 0xD5,
-        VKEY_RESERVED_0xD6 = 0xD6,
-        VKEY_RESERVED_0xD7 = 0xD7,
-        VKEY_UNASSIGNED_0xD8 = 0xD8,
-        VKEY_UNASSIGNED_0xD9 = 0xD9,
-        VKEY_UNASSIGNED_0xDA = 0xDA,
-        VKEY_OEM_4 = 0xDB,
-        VKEY_OEM_5 = 0xDC,
-        VKEY_OEM_6 = 0xDD,
-        VKEY_OEM_7 = 0xDE,
-        VKEY_OEM_8 = 0xDF,
-        VKEY_RESERVED_0xE0 = 0xE0,
-        VKEY_OEM_SPECIFIC_0xE1 = 0xE1,
-        VKEY_OEM_102 = 0xE2,
-        VKEY_OEM_SPECIFIC_0xE3 = 0xE3,
-        VKEY_OEM_SPECIFIC_0xE4 = 0xE4,
-        VKEY_PROCESSKEY = 0xE5,
-        VKEY_OEM_SPECIFIC_0xE6 = 0xE6,
-        VKEY_PACKE = 0xE7,
-        VKEY_UNASSIGNED_0xE8 = 0xE8,
-        VKEY_OEM_SPECIFIC_0xE9 = 0xE9,
-        VKEY_OEM_SPECIFIC_0xEA = 0xEA,
-        VKEY_OEM_SPECIFIC_0xEB = 0xEB,
-        VKEY_OEM_SPECIFIC_0xEC = 0xEC,
-        VKEY_OEM_SPECIFIC_0xED = 0xED,
-        VKEY_OEM_SPECIFIC_0xEE = 0xEE,
-        VKEY_OEM_SPECIFIC_0xEF = 0xEF,
-        VKEY_OEM_SPECIFIC_0xF0 = 0xF0,
-        VKEY_OEM_SPECIFIC_0xF1 = 0xF1,
-        VKEY_OEM_SPECIFIC_0xF2 = 0xF2,
-        VKEY_OEM_SPECIFIC_0xF3 = 0xF3,
-        VKEY_OEM_SPECIFIC_0xF4 = 0xF4,
-        VKEY_OEM_SPECIFIC_0xF5 = 0xF5,
-        VKEY_ATTN = 0xF6,
-        VKEY_CRSEL = 0xF7,
-        VKEY_EXSEL = 0xF8,
-        VKEY_EREOF = 0xF9,
-        VKEY_PLAY = 0xFA,
-        VKEY_ZOOM = 0xFB,
-        VKEY_NONAME = 0xFC,
-        VKEY_PA1 = 0xFD,
-        VKEY_OEM_CLEAR = 0xFE,
-    };
-
+    ;
+    ;
     class Keyboard {
-        private static KeycodeBufferSize: number = 16;
-
-        // 入力バッファ（リングバッファ）
-        private inputBuffer: {
-            ctrlkey: CTRLKEY_FLAG;
-            keycode: VIRTUAL_KEY;
-        }[];
-
-        //入力バッファの書き込み先頭ポインタ
-        private inputBufferWriteIndex: number = 0;
-        //入力バッファの読み出し先頭ポインタ
-        private inputBufferReadIndex: number = 0;
-        // /シフト、コントロールキー等の状態
-        private ctrlKeyStatus: CTRLKEY_FLAG = CTRLKEY_FLAG.CHK_NONE;
-        // 仮想キーコードに対応するキーの状態（Onの時1）
-        private virtualKeyStatus: Uint8Array = new Uint8Array(256 / 8);
-
-        // readで読み取ったキーの情報
-        private currentCtrlKeys: CTRLKEY_FLAG = CTRLKEY_FLAG.CHK_NONE;
-        private currentVKeyCode: VIRTUAL_KEY = 0;
-        private currentAsciiCode: number = 0;
-
-        static vk2asc1: Uint8Array = new Uint8Array([
-            // 仮想キーコードからASCIIコードへの変換テーブル（SHIFTなし）
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0, 0, 0, 0, 0, 0,
-            0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-            'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '*', '+', 0, '-', 0, '/',
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ':', ';', ',', '-', '.', '/',
-            '@', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[', '\\', ']', '^', 0,
-            0, 0, '\\', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        ].map(x => (typeof (x) == "string") ? (x as string).codePointAt(0) : (x as number)));
-
-        static vk2asc2: Uint8Array = new Uint8Array([
-            // 仮想キーコードからASCIIコードへの変換テーブル（SHIFTあり）
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, '!', '"', '#', '$', '%', '&', 0x27, '(', ')', 0, 0, 0, 0, 0, 0,
-            0, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-            'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 0, 0, 0, 0, 0,
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '+', 0, '-', '.', '/',
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '*', '+', '<', '=', '>', '?',
-            '`', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '{', '|', '}', '~', 0,
-            0, 0, '_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        ].map(x => (typeof (x) == "string") ? (x as string).codePointAt(0) : (x as number)));
-
-        private UpdateCtrlKeyState(vk: VIRTUAL_KEY, breakflag: boolean): void {
+        constructor() {
+            //入力バッファの書き込み先頭ポインタ
+            this.inputBufferWriteIndex = 0;
+            //入力バッファの読み出し先頭ポインタ
+            this.inputBufferReadIndex = 0;
+            // /シフト、コントロールキー等の状態
+            this.ctrlKeyStatus = 0 /* CHK_NONE */;
+            // 仮想キーコードに対応するキーの状態（Onの時1）
+            this.virtualKeyStatus = new Uint8Array(256 / 8);
+            // readで読み取ったキーの情報
+            this.currentCtrlKeys = 0 /* CHK_NONE */;
+            this.currentVKeyCode = 0;
+            this.currentAsciiCode = 0;
+            // キーボードシステム初期化
+            this.inputBufferWriteIndex = 0;
+            this.inputBufferReadIndex = 0;
+            this.ctrlKeyStatus = 512 /* CHK_NUMLK */; // NumLock 初期状態はONとする
+            this.inputBuffer = [];
+            for (let i = 0; i < Keyboard.KeycodeBufferSize; i++) {
+                this.inputBuffer[i] = { ctrlkey: 0 /* CHK_NONE */, keycode: 0 };
+            }
+            //全キー離した状態
+            this.virtualKeyStatus.fill(0);
+        }
+        UpdateCtrlKeyState(vk, breakflag) {
             // SHIFT,ALT,CTRL,Winキーの押下状態を更新
-            let k: CTRLKEY_FLAG = 0;
+            let k = 0;
             switch (vk) {
-                case VIRTUAL_KEY.VKEY_SHIFT:
-                case VIRTUAL_KEY.VKEY_LSHIFT:
-                    k = CTRLKEY_FLAG.CHK_SHIFT_L;
+                case 16 /* VKEY_SHIFT */:
+                case 160 /* VKEY_LSHIFT */:
+                    k = 1 /* CHK_SHIFT_L */;
                     break;
-                case VIRTUAL_KEY.VKEY_RSHIFT:
-                    k = CTRLKEY_FLAG.CHK_SHIFT_R;
+                case 161 /* VKEY_RSHIFT */:
+                    k = 2 /* CHK_SHIFT_R */;
                     break;
-                case VIRTUAL_KEY.VKEY_CONTROL:
-                case VIRTUAL_KEY.VKEY_LCONTROL:
-                    k = CTRLKEY_FLAG.CHK_CTRL_L;
+                case 17 /* VKEY_CONTROL */:
+                case 162 /* VKEY_LCONTROL */:
+                    k = 4 /* CHK_CTRL_L */;
                     break;
-                case VIRTUAL_KEY.VKEY_RCONTROL:
-                    k = CTRLKEY_FLAG.CHK_CTRL_R;
+                case 163 /* VKEY_RCONTROL */:
+                    k = 8 /* CHK_CTRL_R */;
                     break;
-                case VIRTUAL_KEY.VKEY_MENU:
-                case VIRTUAL_KEY.VKEY_LMENU:
-                    k = CTRLKEY_FLAG.CHK_ALT_L;
+                case 18 /* VKEY_MENU */:
+                case 164 /* VKEY_LMENU */:
+                    k = 16 /* CHK_ALT_L */;
                     break;
-                case VIRTUAL_KEY.VKEY_RMENU:
-                    k = CTRLKEY_FLAG.CHK_ALT_R;
+                case 165 /* VKEY_RMENU */:
+                    k = 32 /* CHK_ALT_R */;
                     break;
-                case VIRTUAL_KEY.VKEY_LWIN:
-                    k = CTRLKEY_FLAG.CHK_WIN_L;
+                case 91 /* VKEY_LWIN */:
+                    k = 64 /* CHK_WIN_L */;
                     break;
-                case VIRTUAL_KEY.VKEY_RWIN:
-                    k = CTRLKEY_FLAG.CHK_WIN_R;
+                case 92 /* VKEY_RWIN */:
+                    k = 128 /* CHK_WIN_R */;
                     break;
             }
             if (breakflag) {
@@ -399,57 +82,55 @@ module Editor {
                 this.ctrlKeyStatus = this.ctrlKeyStatus | k;
             }
         }
-
         // NumLock,CapsLock,ScrollLockの状態更新
-        private UpdateLockKeyState(vk: VIRTUAL_KEY): void {
+        UpdateLockKeyState(vk) {
             switch (vk) {
-                case VIRTUAL_KEY.VKEY_SCROLL:
-                    this.ctrlKeyStatus ^= CTRLKEY_FLAG.CHK_SCRLK;
+                case 145 /* VKEY_SCROLL */:
+                    this.ctrlKeyStatus ^= 256 /* CHK_SCRLK */;
                     break;
-                case VIRTUAL_KEY.VKEY_NUMLOCK:
-                    this.ctrlKeyStatus ^= CTRLKEY_FLAG.CHK_NUMLK;
+                case 144 /* VKEY_NUMLOCK */:
+                    this.ctrlKeyStatus ^= 512 /* CHK_NUMLK */;
                     break;
-                case VIRTUAL_KEY.VKEY_CAPITAL:
-                    if ((this.ctrlKeyStatus & CTRLKEY_FLAG.CHK_SHIFT) == 0) return;
-                    this.ctrlKeyStatus ^= CTRLKEY_FLAG.CHK_CAPSLK;
+                case 20 /* VKEY_CAPITAL */:
+                    if ((this.ctrlKeyStatus & 3 /* CHK_SHIFT */) == 0)
+                        return;
+                    this.ctrlKeyStatus ^= 1024 /* CHK_CAPSLK */;
                     break;
                 default:
                     return;
             }
         }
         // vkが SHIFT,ALT,WIN,CTRLか判定
-        private isShiftkey(vk: VIRTUAL_KEY): boolean {
+        isShiftkey(vk) {
             switch (vk) {
-                case VIRTUAL_KEY.VKEY_SHIFT:
-                case VIRTUAL_KEY.VKEY_LSHIFT:
-                case VIRTUAL_KEY.VKEY_RSHIFT:
-                case VIRTUAL_KEY.VKEY_CONTROL:
-                case VIRTUAL_KEY.VKEY_LCONTROL:
-                case VIRTUAL_KEY.VKEY_RCONTROL:
-                case VIRTUAL_KEY.VKEY_MENU:
-                case VIRTUAL_KEY.VKEY_LMENU:
-                case VIRTUAL_KEY.VKEY_RMENU:
-                case VIRTUAL_KEY.VKEY_LWIN:
-                case VIRTUAL_KEY.VKEY_RWIN:
+                case 16 /* VKEY_SHIFT */:
+                case 160 /* VKEY_LSHIFT */:
+                case 161 /* VKEY_RSHIFT */:
+                case 17 /* VKEY_CONTROL */:
+                case 162 /* VKEY_LCONTROL */:
+                case 163 /* VKEY_RCONTROL */:
+                case 18 /* VKEY_MENU */:
+                case 164 /* VKEY_LMENU */:
+                case 165 /* VKEY_RMENU */:
+                case 91 /* VKEY_LWIN */:
+                case 92 /* VKEY_RWIN */:
                     return true;
                 default:
                     return false;
             }
         }
-
         // vkがNumLock,SCRLock,CapsLockか判定
-        private isLockKey(vk: VIRTUAL_KEY): boolean {
+        isLockKey(vk) {
             switch (vk) {
-                case VIRTUAL_KEY.VKEY_SCROLL:
-                case VIRTUAL_KEY.VKEY_NUMLOCK:
-                case VIRTUAL_KEY.VKEY_CAPITAL:
+                case 145 /* VKEY_SCROLL */:
+                case 144 /* VKEY_NUMLOCK */:
+                case 20 /* VKEY_CAPITAL */:
                     return true;
                 default:
                     return false;
             }
         }
-
-        pushKeyStatus(vk: VIRTUAL_KEY, breakflag: boolean) {
+        pushKeyStatus(vk, breakflag) {
             if (this.isShiftkey(vk)) {
                 if (breakflag == false && this.virtualKeyStatus.getBit(vk)) {
                     return; // キーリピートの場合、無視
@@ -468,7 +149,6 @@ module Editor {
                 return;
             }
             this.virtualKeyStatus.setBit(vk, 1);
-
             if ((this.inputBufferWriteIndex + 1 == this.inputBufferReadIndex) ||
                 (this.inputBufferWriteIndex == Keyboard.KeycodeBufferSize - 1) && (this.inputBufferReadIndex == 0)) {
                 return; //バッファがいっぱいの場合無視
@@ -480,48 +160,27 @@ module Editor {
                 this.inputBufferWriteIndex = 0;
             }
         }
-
-        constructor() {
-            // キーボードシステム初期化
-            this.inputBufferWriteIndex = 0;
-            this.inputBufferReadIndex = 0;
-            this.ctrlKeyStatus = CTRLKEY_FLAG.CHK_NUMLK; // NumLock 初期状態はONとする
-            this.inputBuffer = [];
-            for (let i = 0; i < Keyboard.KeycodeBufferSize; i++) {
-                this.inputBuffer[i] = { ctrlkey: CTRLKEY_FLAG.CHK_NONE, keycode: 0 };
-            }
-
-            //全キー離した状態
-            this.virtualKeyStatus.fill(0);
-
-        }
-
         // キーバッファからキーを一つ読み取る
         // 押されていなければfalseを返す
-        readKey(): boolean {
-
+        readKey() {
             this.currentAsciiCode = 0x00;
             this.currentVKeyCode = 0x0000;
-            this.currentCtrlKeys = CTRLKEY_FLAG.CHK_NONE;
-
+            this.currentCtrlKeys = 0 /* CHK_NONE */;
             if (this.inputBufferWriteIndex == this.inputBufferReadIndex) {
                 return false;
             }
             const k = this.inputBuffer[this.inputBufferReadIndex++];
             this.currentVKeyCode = k.keycode;
             this.currentCtrlKeys = k.ctrlkey;
-
             if (this.inputBufferReadIndex == Keyboard.KeycodeBufferSize) {
                 this.inputBufferReadIndex = 0;
             }
-
-            if (k.ctrlkey & (CTRLKEY_FLAG.CHK_CTRL | CTRLKEY_FLAG.CHK_ALT | CTRLKEY_FLAG.CHK_WIN)) {
+            if (k.ctrlkey & (12 /* CHK_CTRL */ | 48 /* CHK_ALT */ | 192 /* CHK_WIN */)) {
                 return true;
             }
-
-            let k2: number = 0;
-            if (k.keycode >= VIRTUAL_KEY.VKEY_KEY_A && k.keycode <= VIRTUAL_KEY.VKEY_KEY_Z) {
-                if (((k.ctrlkey & CTRLKEY_FLAG.CHK_SHIFT) != 0) != ((k.ctrlkey & CTRLKEY_FLAG.CHK_CAPSLK) != 0)) {
+            let k2 = 0;
+            if (k.keycode >= 65 /* VKEY_KEY_A */ && k.keycode <= 90 /* VKEY_KEY_Z */) {
+                if (((k.ctrlkey & 3 /* CHK_SHIFT */) != 0) != ((k.ctrlkey & 1024 /* CHK_CAPSLK */) != 0)) {
                     //SHIFTまたはCapsLock（両方ではない）
                     k2 = Keyboard.vk2asc2[k.keycode];
                 }
@@ -529,9 +188,9 @@ module Editor {
                     k2 = Keyboard.vk2asc1[k.keycode];
                 }
             }
-            else if (k.keycode >= VIRTUAL_KEY.VKEY_NUMPAD0 && k.keycode <= VIRTUAL_KEY.VKEY_DIVIDE) {
+            else if (k.keycode >= 96 /* VKEY_NUMPAD0 */ && k.keycode <= 111 /* VKEY_DIVIDE */) {
                 //テンキー関連
-                if ((k.ctrlkey & (CTRLKEY_FLAG.CHK_SHIFT | CTRLKEY_FLAG.CHK_NUMLK)) == CTRLKEY_FLAG.CHK_NUMLK) {
+                if ((k.ctrlkey & (3 /* CHK_SHIFT */ | 512 /* CHK_NUMLK */)) == 512 /* CHK_NUMLK */) {
                     //NumLock（SHIFT＋NumLockは無効）
                     k2 = Keyboard.vk2asc2[k.keycode];
                 }
@@ -540,7 +199,7 @@ module Editor {
                 }
             }
             else {
-                if (k.ctrlkey & CTRLKEY_FLAG.CHK_SHIFT) {
+                if (k.ctrlkey & 3 /* CHK_SHIFT */) {
                     k2 = Keyboard.vk2asc2[k.keycode];
                 }
                 else {
@@ -550,78 +209,109 @@ module Editor {
             this.currentAsciiCode = k2;
             return true;
         }
-
-        GetCurrentCtrlKeys(): CTRLKEY_FLAG {
+        GetCurrentCtrlKeys() {
             return this.currentCtrlKeys;
         }
-
-        GetCurrentVKeyCode(): VIRTUAL_KEY {
+        GetCurrentVKeyCode() {
             return this.currentVKeyCode;
         }
-
-        GetCurrentAsciiCode(): number {
+        GetCurrentAsciiCode() {
             return this.currentAsciiCode;
         }
     }
-
-    module Unicode {
-
-        export type Char32 = number;
-        export type Char16 = number;
-        export type Utf16Str = Uint16Array;
-        export type Utf32Str = Uint32Array;
-
-        function isHighSurrogate(x: Char16): boolean {
+    Keyboard.KeycodeBufferSize = 16;
+    Keyboard.vk2asc1 = new Uint8Array([
+        // 仮想キーコードからASCIIコードへの変換テーブル（SHIFTなし）
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0, 0, 0, 0, 0, 0,
+        0, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+        'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '*', '+', 0, '-', 0, '/',
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ':', ';', ',', '-', '.', '/',
+        '@', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '[', '\\', ']', '^', 0,
+        0, 0, '\\', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ].map(x => (typeof (x) == "string") ? x.codePointAt(0) : x));
+    Keyboard.vk2asc2 = new Uint8Array([
+        // 仮想キーコードからASCIIコードへの変換テーブル（SHIFTあり）
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, '!', '"', '#', '$', '%', '&', 0x27, '(', ')', 0, 0, 0, 0, 0, 0,
+        0, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+        'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 0, 0, 0, 0, 0,
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '+', 0, '-', '.', '/',
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '*', '+', '<', '=', '>', '?',
+        '`', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '{', '|', '}', '~', 0,
+        0, 0, '_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ].map(x => (typeof (x) == "string") ? x.codePointAt(0) : x));
+    let Unicode;
+    (function (Unicode) {
+        function isHighSurrogate(x) {
             return 0xD800 <= x && x <= 0xDBFF;
         }
-
-        function isLoSurrogate(x: Char16): boolean {
+        function isLoSurrogate(x) {
             return 0xDC00 <= x && x <= 0xDFFF;
         }
-
-        function isSurrogatePair(high: Char16, low: Char16): boolean {
+        function isSurrogatePair(high, low) {
             return isHighSurrogate(high) && isLoSurrogate(low);
         }
-
-        function utf16ToUtf32Char(high: Char16, low: Char16): [number, Char32] {
+        function utf16ToUtf32Char(high, low) {
             if (0x0000 <= high && high <= 0xD7FF) {
                 return [1, high];
-            } else if (0xE000 <= high && high <= 0xFFFF) {
+            }
+            else if (0xE000 <= high && high <= 0xFFFF) {
                 return [1, high];
-            } else if (0xD800 <= high && high <= 0xDBFF && 0xDC00 <= low && low <= 0xDFFF) {
+            }
+            else if (0xD800 <= high && high <= 0xDBFF && 0xDC00 <= low && low <= 0xDFFF) {
                 return [2, ((((high >> 6) & 0x0F) + 1) << 16) | ((high & 0x3F) << 10) | (low & 0x3FF)];
-            } else {
+            }
+            else {
                 return undefined;
             }
         }
-
-        function utf32ToUtf16Char(code: Char32): [Char16, Char16] {
+        function utf32ToUtf16Char(code) {
             if (0x0000 <= code && code <= 0xD7FF) {
                 return [code, undefined];
-            } else if (0xD800 <= code && code <= 0xDFFF) {
+            }
+            else if (0xD800 <= code && code <= 0xDFFF) {
                 return undefined;
-            } else if (0xE000 <= code && code <= 0xFFFF) {
+            }
+            else if (0xE000 <= code && code <= 0xFFFF) {
                 return [code, undefined];
-            } else if (0x10000 <= code && code <= 0x10FFFF) {
+            }
+            else if (0x10000 <= code && code <= 0x10FFFF) {
                 const cp = code - 0x10000;
                 const high = 0xD800 | (cp >> 10);
                 const low = 0xDC00 | (cp & 0x3FF);
                 return [high, low];
-            } else {
+            }
+            else {
                 return undefined;
             }
         }
-
-        function stringToUtf16(str: string): Utf16Str {
-            const utf16: number[] = [];
+        function stringToUtf16(str) {
+            const utf16 = [];
             for (let i = 0; i < str.length; i++) {
                 utf16.push(str.charCodeAt(i));
             }
             return new Uint16Array(utf16);
         }
-
-        export function utf16ToUtf32(utf16: Utf16Str): Utf32Str {
-            const utf32: number[] = [];
+        function utf16ToUtf32(utf16) {
+            const utf32 = [];
             for (let i = 0; i < utf16.length;) {
                 const [size, code] = utf16ToUtf32Char(utf16[i], utf16[i + 1]);
                 if (size === undefined) {
@@ -632,9 +322,9 @@ module Editor {
             }
             return new Uint32Array(utf32);
         }
-
-        export function utf32ToUtf16(utf32: Utf32Str): Utf16Str {
-            const utf16: number[] = [];
+        Unicode.utf16ToUtf32 = utf16ToUtf32;
+        function utf32ToUtf16(utf32) {
+            const utf16 = [];
             for (let i = 0; i < utf32.length; i++) {
                 const [high, low] = utf32ToUtf16Char(utf32[i]);
                 if (high === undefined) {
@@ -647,37 +337,31 @@ module Editor {
             }
             return new Uint16Array(utf16);
         }
-
-        export function utf16ToString(utf16: Utf16Str): string {
+        Unicode.utf32ToUtf16 = utf32ToUtf16;
+        function utf16ToString(utf16) {
             return String.fromCharCode.apply(null, utf16);
         }
-
-        export function strToUtf32(str: string): Utf32Str {
+        Unicode.utf16ToString = utf16ToString;
+        function strToUtf32(str) {
             return utf16ToUtf32(stringToUtf16(str));
         }
-
-        export function utf32ToStr(utf32: Utf32Str): string {
+        Unicode.strToUtf32 = strToUtf32;
+        function utf32ToStr(utf32) {
             return utf16ToString(utf32ToUtf16(utf32));
         }
-    }
-
+        Unicode.utf32ToStr = utf32ToStr;
+    })(Unicode || (Unicode = {}));
     class GapBuffer {
-        private gapStart: number;
-        private gapEnd: number;
-        private gapSize: number;
-        private buffer: Uint32Array;
-
-        constructor(gapSize?: number) {
+        constructor(gapSize) {
             this.gapSize = gapSize || 64;
             if (this.gapSize <= 0) {
                 throw new RangeError("gapSize must be > 0");
             }
-
             this.buffer = new Uint32Array(this.gapSize);
             this.gapStart = 0;
             this.gapEnd = this.gapSize;
         }
-        Dispose(): void {
+        Dispose() {
             this.buffer = null;
             this.gapStart = this.gapEnd = 0;
         }
@@ -689,12 +373,10 @@ module Editor {
                 yield this.buffer[i];
             }
         }
-
         get length() {
             return this.buffer.length - (this.gapEnd - this.gapStart);
         }
-
-        get(ix: number): number {
+        get(ix) {
             if (ix >= this.length) {
                 return undefined;
             }
@@ -703,7 +385,7 @@ module Editor {
             }
             return this.buffer[ix];
         }
-        set(ix: number, value: number): void {
+        set(ix, value) {
             if (ix >= this.length) {
                 return;
             }
@@ -712,7 +394,7 @@ module Editor {
             }
             this.buffer[ix] = value;
         }
-        private grow(newsize: number): void {
+        grow(newsize) {
             const gapSize = newsize - this.buffer.length + (this.gapEnd - this.gapStart);
             const newBuffer = new Uint32Array(newsize);
             for (let i = 0; i < this.gapStart; i++) {
@@ -724,28 +406,26 @@ module Editor {
             this.buffer = newBuffer;
             this.gapEnd = this.gapStart + gapSize;
         }
-        insert(ix: number, value: number): void {
+        insert(ix, value) {
             if (ix < 0) {
                 throw new RangeError("insert index must be >= 0");
             }
             if (ix > this.length) {
                 throw new RangeError("insert index must be <= length (for now)");
             }
-
             if (this.gapStart === this.gapEnd) {
                 this.grow(this.buffer.length + this.gapSize);
             }
             this.moveGap(ix);
-
             this.buffer[this.gapStart++] = value;
         }
-        insertAll(ix: number, values: number[] | Uint32Array): void {
+        insertAll(ix, values) {
             // TODO: this should be optimised
             for (let i = 0; i < values.length; ++i) {
                 this.insert(ix + i, values[i]);
             }
         }
-        deleteAfter(ix: number, len: number): boolean {
+        deleteAfter(ix, len) {
             if (ix >= this.length) {
                 return false;
             }
@@ -757,7 +437,7 @@ module Editor {
             }
             return true;
         }
-        deleteBefore(ix: number, len: number): boolean {
+        deleteBefore(ix, len) {
             if (ix === 0 || ix > this.length) {
                 return false;
             }
@@ -768,123 +448,97 @@ module Editor {
             }
             return true;
         }
-        clear(): void {
+        clear() {
             this.gapStart = 0;
             this.gapEnd = this.buffer.length;
         }
-        asArray(): Uint32Array {
+        asArray() {
             const newBuffer = new Uint32Array(this.length);
             let n = 0;
-            for (let i = 0; i < this.gapStart; i++ , n++) {
+            for (let i = 0; i < this.gapStart; i++, n++) {
                 newBuffer[n] = this.buffer[i];
             }
-            for (let i = this.gapEnd; i < this.buffer.length; i++ , n++) {
+            for (let i = this.gapEnd; i < this.buffer.length; i++, n++) {
                 newBuffer[n] = this.buffer[i];
             }
             return newBuffer;
         }
-        private moveGap(ix: number): void {
+        moveGap(ix) {
             if (ix < this.gapStart) {
-
                 const gapSize = (this.gapEnd - this.gapStart);
                 const delta = this.gapStart - ix;
-
                 this.buffer.copyWithin(this.gapEnd - delta, ix, this.gapStart);
                 //for (let i = delta - 1; i >= 0; --i) {
                 //    this.buffer[this.gapEnd - delta + i] = this.buffer[ix + i];
                 //}
-
                 this.gapStart -= delta;
                 this.gapEnd -= delta;
-
-            } else if (ix > this.gapStart) {
-
+            }
+            else if (ix > this.gapStart) {
                 const gapSize = (this.gapEnd - this.gapStart);
                 const delta = ix - this.gapStart;
-
                 this.buffer.copyWithin(this.gapStart, this.gapEnd, this.gapEnd + delta);
                 //for (let i = 0; i < delta; ++i) {
                 //    this.buffer[this.gapStart + i] = this.buffer[this.gapEnd + i];
                 //}
-
                 this.gapStart += delta;
                 this.gapEnd += delta;
-
             }
         }
-
-        append(that: GapBuffer): void {
+        append(that) {
             this.moveGap(this.length);
             this.grow(this.length + that.length);
             for (let i = 0; i < that.length; ++i) {
                 this.buffer[this.gapStart++] = that.get(i);
             }
         }
-
-        reduce<U>(callbackfn: (previousValue: U, currentValue: number, currentIndex: number, obj: GapBuffer) => U, initialValue: U): U {
-            let currentIndex: number = 0;
+        reduce(callbackfn, initialValue) {
+            let currentIndex = 0;
             let previousValue = initialValue;
             for (const currentValue of this) {
                 previousValue = callbackfn(previousValue, currentValue, currentIndex++, this);
             }
             return previousValue;
         }
-
-        find(predicate: (value: number, index: number, obj: GapBuffer) => boolean): number {
+        find(predicate) {
             let index = 0;
             for (const value of this) {
-                if (predicate(value, index, this) === true) { return value; }
+                if (predicate(value, index, this) === true) {
+                    return value;
+                }
             }
             return undefined;
         }
-
-
     }
-
     class DataViewIterator {
-        private littleEndian: boolean;
-        private dataView: DataView;
-        private byteOffset: number;
-        constructor(buffer: ArrayBuffer, littleEndian: boolean = false) {
+        constructor(buffer, littleEndian = false) {
             this.littleEndian = littleEndian;
             this.dataView = new DataView(buffer);
             this.byteOffset = 0;
         }
-        Dispose(): void {
+        Dispose() {
             this.littleEndian = false;
             this.dataView = null;
             this.byteOffset = 0;
         }
-        getUint32(): number {
+        getUint32() {
             const ret = this.dataView.getUint32(this.byteOffset, this.littleEndian);
             this.byteOffset += 4;
             return ret;
         }
-        getUint8(): number {
+        getUint8() {
             const ret = this.dataView.getUint8(this.byteOffset);
             this.byteOffset += 1;
             return ret;
         }
-        getBytes(len: number): Uint8Array {
+        getBytes(len) {
             const ret = new Uint8Array(this.dataView.buffer, this.byteOffset, len);
             this.byteOffset += len;
             return ret;
         }
     }
-
-    interface IRange {
-        RangeStart: number;
-        RangeEnd: number;
-    }
-
     class BMPFont {
-        FontWidth: number;
-        FontHeight: number;
-        PixelSize: number;
-        WidthTable: (IRange & { Width: number; })[];
-        PixelTable: (IRange & { Pixels: Uint8Array[]; })[];
-
-        constructor(buffer: ArrayBuffer) {
+        constructor(buffer) {
             const it = new DataViewIterator(buffer, true);
             const fourCC = it.getUint32();
             if (fourCC != 0x46504D42) {
@@ -908,7 +562,7 @@ module Editor {
             for (let i = 0; i < pixelTableSize; i++) {
                 const RangeStart = it.getUint32();
                 const RangeEnd = it.getUint32();
-                const Pixels: Uint8Array[] = [];
+                const Pixels = [];
                 for (let j = RangeStart; j <= RangeEnd; j++) {
                     Pixels.push(it.getBytes(this.PixelSize));
                 }
@@ -920,42 +574,43 @@ module Editor {
             }
             it.Dispose();
         }
-
-        static loadFont(url: string): Promise<BMPFont> {
-            return new Promise<ArrayBuffer>((resolve, reject) => {
+        static loadFont(url) {
+            return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
                 xhr.onload = () => {
                     if (xhr.readyState === 4 && ((xhr.status === 200) || (xhr.responseURL.startsWith("file://") === true && xhr.status === 0))) {
                         resolve(xhr.response);
-                    } else {
+                    }
+                    else {
                         reject(new Error(xhr.statusText));
                     }
                 };
                 xhr.onerror = () => { reject(new Error(xhr.statusText)); };
-                xhr.responseType = 'arraybuffer'
+                xhr.responseType = 'arraybuffer';
                 xhr.send(null);
             }).then((arraybuffer) => {
                 return new BMPFont(arraybuffer);
             });
         }
-
-        private static search<T>(table: Array<T & IRange>, codePoint: number): T & IRange {
+        static search(table, codePoint) {
             let start = 0;
             let end = table.length - 1;
             while (start <= end) {
                 const mid = ((end - start) >> 1) + start;
                 if (table[mid].RangeStart > codePoint) {
                     end = mid - 1;
-                } else if (table[mid].RangeEnd < codePoint) {
+                }
+                else if (table[mid].RangeEnd < codePoint) {
                     start = mid + 1;
-                } else {
+                }
+                else {
                     return table[mid];
                 }
             }
             return undefined;
         }
-        getWidth(codePoint: number): number {
+        getWidth(codePoint) {
             if (0x00 == codePoint) {
                 return 0;
             }
@@ -963,25 +618,31 @@ module Editor {
                 return 1; // control code
             }
             const ret = BMPFont.search(this.WidthTable, codePoint);
-            if (ret === undefined) { return undefined; }
+            if (ret === undefined) {
+                return undefined;
+            }
             return ret.Width;
         }
-        getPixelWidth(codePoint: number, defaultWidth?: number): number {
+        getPixelWidth(codePoint, defaultWidth) {
             const ret = this.getWidth(codePoint);
-            if (ret === undefined) { return defaultWidth; }
+            if (ret === undefined) {
+                return defaultWidth;
+            }
             return ret * this.FontWidth;
         }
-        getPixel(codePoint: number): Uint8Array {
+        getPixel(codePoint) {
             const ret = BMPFont.search(this.PixelTable, codePoint);
-            if (ret === undefined) { return undefined; }
+            if (ret === undefined) {
+                return undefined;
+            }
             return ret.Pixels[codePoint - ret.RangeStart];
         }
-        measureStr(str: string) :[number, number] {
+        measureStr(str) {
             return this.measureUtf32(Unicode.strToUtf32(str));
         }
-        measureUtf32(utf32Str: Unicode.Utf32Str) :[number, number] {
-            let w=0;
-            let h=0;
+        measureUtf32(utf32Str) {
+            let w = 0;
+            let h = 0;
             let xx = 0;
             let yy = 0;
             const size = this.FontHeight;
@@ -990,22 +651,24 @@ module Editor {
                 if (width === undefined) {
                     xx += this.FontWidth;
                     w = Math.max(w, xx);
-                    h = Math.max(h, yy+this.FontHeight);
-                } else if (utf32Ch == 0x0A) {
+                    h = Math.max(h, yy + this.FontHeight);
+                }
+                else if (utf32Ch == 0x0A) {
                     yy += size;
                     xx = 0;
-                } else {
+                }
+                else {
                     xx += width;
                     w = Math.max(w, xx);
-                    h = Math.max(h, yy+this.FontHeight);
+                    h = Math.max(h, yy + this.FontHeight);
                 }
             }
-            return [w,h];
+            return [w, h];
         }
-        drawStr(x: number, y: number, str: string, pset: (x: number, y: number) => void): void {
+        drawStr(x, y, str, pset) {
             this.drawUtf32(x, y, Unicode.strToUtf32(str), pset);
         }
-        drawUtf32(x: number, y: number, utf32Str: Unicode.Utf32Str, pset: (x: number, y: number) => void): void {
+        drawUtf32(x, y, utf32Str, pset) {
             let xx = x;
             let yy = y;
             const size = this.FontHeight;
@@ -1020,13 +683,14 @@ module Editor {
                     yy += size;
                     xx = x;
                     continue;
-                } else {
+                }
+                else {
                     const pixel = this.getPixel(utf32Ch);
                     if (pixel) {
                         let pSrc = 0;
                         for (let j = 0; j < size; j++) {
                             let p = pSrc;
-                            for (let i = 0; i < size; i++ , p++) {
+                            for (let i = 0; i < size; i++, p++) {
                                 if (pixel[p >> 3] & (0x80 >> (p & 0x07))) {
                                     pset(xx + i, yy + j);
                                 }
@@ -1039,36 +703,31 @@ module Editor {
             }
         }
     }
-
     class text_buffer_cursor_t {
-        use: boolean;
-        line: text_buffer_line_t;	/* 行 */
-        row: number;		        /* 列 */
-
-        constructor(line: text_buffer_line_t, row: number = 0) {
+        constructor(line, row = 0) {
             this.use = true;
             this.line = line;
             this.row = row;
         }
-        Duplicate(): text_buffer_cursor_t {
+        Duplicate() {
             return this.line.parent.DuplicateCursor(this);
         }
-        Dispose(): void {
+        Dispose() {
             this.line.parent.DisposeCursor(this);
         }
-        CheckValid(): void {
+        CheckValid() {
             assert(this.use);
             assert(this.line != null);
             assert(0 <= this.row);
             assert(this.row <= this.line.buffer.length);
         }
-        static Equal(x: text_buffer_cursor_t, y: text_buffer_cursor_t): boolean {
+        static Equal(x, y) {
             if ((x.use == false) || (y.use == false)) {
                 return false;
             }
             return (x.line == y.line) && (x.row == y.row);
         }
-        CopyTo(other: text_buffer_cursor_t): void {
+        CopyTo(other) {
             if (this.use == false || other.use == false) {
                 throw new Error();
             }
@@ -1076,13 +735,8 @@ module Editor {
             other.row = this.row;
         }
     }
-
     class text_buffer_line_t {
-        parent: TextBuffer;
-        buffer: GapBuffer;
-        prev: text_buffer_line_t;
-        next: text_buffer_line_t;
-        constructor(parent: TextBuffer) {
+        constructor(parent) {
             this.parent = parent;
             this.buffer = new GapBuffer();
             this.prev = null;
@@ -1096,34 +750,31 @@ module Editor {
             this.next = null;
         }
     }
-
     class TextBuffer {
-        private Buffers: text_buffer_line_t;
-        private Cur: Set<text_buffer_cursor_t>;
-        private TotalLength: number;
-
-        getTotalLength(): number {
+        getTotalLength() {
             return this.TotalLength;
         }
-
         clear() {
             this.Buffers.next = null;
             this.Buffers.prev = null;
             this.Buffers.buffer.clear();
             this.TotalLength = 0;
             for (const cur of this.Cur) {
-                if (cur.use == false) { this.Cur.delete(cur); continue; }
+                if (cur.use == false) {
+                    this.Cur.delete(cur);
+                    continue;
+                }
                 cur.line = this.Buffers;
                 cur.row = 0;
-            };
+            }
+            ;
         }
-
-        AllocateCursor(): text_buffer_cursor_t {
+        AllocateCursor() {
             var newCursor = new text_buffer_cursor_t(this.Buffers);
             this.Cur.add(newCursor);
             return newCursor;
         }
-        DuplicateCursor(cursor: text_buffer_cursor_t): text_buffer_cursor_t {
+        DuplicateCursor(cursor) {
             if ((!this.Cur.has(cursor)) || (cursor.use == false)) {
                 throw new Error();
             }
@@ -1131,8 +782,7 @@ module Editor {
             this.Cur.add(newCursor);
             return newCursor;
         }
-
-        DisposeCursor(cursor: text_buffer_cursor_t) {
+        DisposeCursor(cursor) {
             if ((!this.Cur.has(cursor)) || (cursor.use == false)) {
                 throw new Error();
             }
@@ -1141,21 +791,18 @@ module Editor {
             cursor.line = null;
             cursor.row = -1;
         }
-
         constructor() {
             this.Buffers = new text_buffer_line_t(this);
             this.TotalLength = 0;
-            this.Cur = new Set<text_buffer_cursor_t>();
+            this.Cur = new Set();
         }
-
-        private checkValidCursor(cursor: text_buffer_cursor_t): void {
+        checkValidCursor(cursor) {
             if ((!this.Cur.has(cursor)) || (cursor.use == false)) {
                 throw new Error();
             }
             cursor.CheckValid();
         }
-
-        DeleteCharacatorOnCursor(cursor: text_buffer_cursor_t) {
+        DeleteCharacatorOnCursor(cursor) {
             if ((!this.Cur.has(cursor)) || (cursor.use == false)) {
                 throw new Error();
             }
@@ -1175,31 +822,31 @@ module Editor {
                 }
                 this.TotalLength--;
             }
-
         }
-
-        private RemoveLine(buf: text_buffer_line_t) {
+        RemoveLine(buf) {
             if (buf.prev == null && buf.next == null) {
                 // １行だけ存在する場合
-
                 // １行目をクリア
                 buf.buffer.clear();
-
                 // 行内にあるカーソルを先頭に移動させる
                 for (const cur of this.Cur) {
-                    if (cur.use == false) { this.Cur.delete(cur); continue; }
-                    if (cur.line != buf) { continue; }
+                    if (cur.use == false) {
+                        this.Cur.delete(cur);
+                        continue;
+                    }
+                    if (cur.line != buf) {
+                        continue;
+                    }
                     // 最初の行に対する行削除なので最初の行に設定
                     cur.row = 0;
                 }
-            } else {
+            }
+            else {
                 // ２行以上存在する場合
-
                 // １行目が削除対象の場合、先頭行を２行目にずらす。
                 if (this.Buffers == buf && buf.next != null) {
                     this.Buffers = buf.next;
                 }
-
                 // リンクリストから削除行を削除する
                 if (buf.next != null) {
                     buf.next.prev = buf.prev;
@@ -1207,36 +854,37 @@ module Editor {
                 if (buf.prev != null) {
                     buf.prev.next = buf.next;
                 }
-
                 // 削除した行内にあるカーソルは移動させる
                 for (const cur of this.Cur) {
-                    if (cur.use == false) { this.Cur.delete(cur); continue; }
-                    if (cur.line != buf) { continue; }
-
+                    if (cur.use == false) {
+                        this.Cur.delete(cur);
+                        continue;
+                    }
+                    if (cur.line != buf) {
+                        continue;
+                    }
                     if (buf.next != null) {
                         //   次の行がある場合：次の行の行頭に移動する
                         cur.line = buf.next;
                         cur.row = 0;
-                    } else if (buf.prev != null) {
+                    }
+                    else if (buf.prev != null) {
                         //   次の行がなく前の行がある場合：前の行の行末に移動する。
                         cur.line = buf.prev;
                         cur.row = buf.prev.buffer.length;
-                    } else {
+                    }
+                    else {
                         //   どちらもない場合：最初の行に対する行削除なので最初の行に設定
                         cur.line = this.Buffers;
                         cur.row = 0;
                     }
                 }
-
                 // 行情報を破棄
                 buf.Dispose();
             }
         }
-
-
-        DeleteArea(s: text_buffer_cursor_t, len: number): void {
+        DeleteArea(s, len) {
             const start = this.DuplicateCursor(s);
-
             // １文字づつ消す
             while (len > 0) {
                 this.DeleteCharacatorOnCursor(start);
@@ -1244,35 +892,27 @@ module Editor {
             }
             this.DisposeCursor(start);
         }
-
-        TakeCharacatorOnCursor(cursor: text_buffer_cursor_t): number {
+        TakeCharacatorOnCursor(cursor) {
             if ((!this.Cur.has(cursor)) || (cursor.use == false)) {
                 throw new Error();
             }
-
             if (cursor.line.buffer.length == cursor.row) {
                 if (cursor.line.next == null) {
                     return 0x00; // 終端なのでヌル文字を返す
                 }
                 else {
-                    return 0x0A;	// 改行文字を返す
+                    return 0x0A; // 改行文字を返す
                 }
-
             }
             return cursor.line.buffer.get(cursor.row);
-
         }
-
-        InsertCharacatorOnCursor(cursor: text_buffer_cursor_t, ch: number): boolean {
-
+        InsertCharacatorOnCursor(cursor, ch) {
             this.checkValidCursor(cursor);
-            if (ch == 0x0A)// 0x0A = \n
-            {
+            if (ch == 0x0A) // 0x0A = \n
+             {
                 // 改行は特別扱い
-
                 // 新しい行バッファを確保
                 const nb = new text_buffer_line_t(this);
-
                 // 現在カーソルがあるバッファの後ろに連結
                 const buf = cursor.line;
                 nb.prev = buf;
@@ -1281,7 +921,6 @@ module Editor {
                     buf.next.prev = nb;
                 }
                 buf.next = nb;
-
                 // カーソル位置から行末までを新しい行バッファに移動させる
                 const len = cursor.row;
                 const size = buf.buffer.length - len;
@@ -1289,48 +928,48 @@ module Editor {
                     nb.buffer.insert(i, buf.buffer.get(len + i));
                 }
                 buf.buffer.deleteAfter(len, size);
-
                 // 移動させた範囲にあるカーソルを新しい位置に変更する
                 for (const cur of this.Cur) {
-                    if (cur.use == false) { this.Cur.delete(cur); continue; }
-                    if (cur === cursor) { continue; }
-
+                    if (cur.use == false) {
+                        this.Cur.delete(cur);
+                        continue;
+                    }
+                    if (cur === cursor) {
+                        continue;
+                    }
                     if (cur.line == buf && cur.row > len) {
                         cur.line = nb;
                         cur.row -= len;
                     }
                 }
-
                 // 行を増やす＝改行挿入なので文字は増えていないが仮想的に1文字使っていることにする
                 this.TotalLength++;
-            } else {
+            }
+            else {
                 cursor.line.buffer.insert(cursor.row, ch);
                 this.TotalLength++;
             }
             return true;
         }
-
         // カーソル位置の文字を上書きする
-        OverwriteCharacatorOnCursor(cursor: text_buffer_cursor_t, ch: number): boolean {
+        OverwriteCharacatorOnCursor(cursor, ch) {
             this.checkValidCursor(cursor);
             if (cursor.line.buffer.length == cursor.row || ch == 0x0A) {
                 this.InsertCharacatorOnCursor(cursor, ch);
-            } else {
+            }
+            else {
                 this.TotalLength++;
                 cursor.line.buffer.set(cursor.row, ch);
             }
             return true;
         }
-
         // テキストバッファカーソルを１文字前に移動させる
         // falseはcursorが元々先頭であったことを示す。
-        CursorBackward(cursor: text_buffer_cursor_t): boolean {
+        CursorBackward(cursor) {
             this.checkValidCursor(cursor);
-
             if (cursor.row > 0) {
                 // カーソル位置がバッファ先頭以外の場合
                 cursor.row--;
-
                 this.checkValidCursor(cursor);
                 return true;
             }
@@ -1346,18 +985,14 @@ module Editor {
                     return false;
                 }
             }
-
         }
-
         // テキストバッファカーソルを１文字後ろに移動させる
         // falseはcursorが元々終端であったことを示す。
-        CursorForward(cursor: text_buffer_cursor_t): boolean {
+        CursorForward(cursor) {
             this.checkValidCursor(cursor);
-
             if (cursor.row < cursor.line.buffer.length) {
                 // カーソル位置がバッファ先頭以外の場合
                 cursor.row++;
-
                 this.checkValidCursor(cursor);
                 return true;
             }
@@ -1371,73 +1006,76 @@ module Editor {
                 }
                 else {
                     return false;
-
                 }
             }
         }
-
         // カーソルを文字列中の位置関係で比較する
         // c1がc2より前にある場合は -1 、c2がc1より前にある場合は1、同じ位置にある場合は0を返す
-        CompareCursor(c1: text_buffer_cursor_t, c2: text_buffer_cursor_t): number {
+        CompareCursor(c1, c2) {
             this.checkValidCursor(c1);
             this.checkValidCursor(c2);
-
             if (c1.line == c2.line) {
-                if (c1.row < c2.row) { return -1; }
-                if (c1.row == c2.row) { return 0; }
-                if (c1.row > c2.row) { return 1; }
+                if (c1.row < c2.row) {
+                    return -1;
+                }
+                if (c1.row == c2.row) {
+                    return 0;
+                }
+                if (c1.row > c2.row) {
+                    return 1;
+                }
             }
-
             for (let p = this.Buffers; p != null; p = p.next) {
-                if (p == c1.line) { return -1; }
-                if (p == c2.line) { return 1; }
+                if (p == c1.line) {
+                    return -1;
+                }
+                if (p == c2.line) {
+                    return 1;
+                }
             }
-
             throw new Error(); // 不正なカーソルが渡された
         }
-
         // カーソルが同一位置を示しているか判定
         // CompareCursorより高速
-        EqualCursor(c1: text_buffer_cursor_t, c2: text_buffer_cursor_t): boolean {
+        EqualCursor(c1, c2) {
             this.checkValidCursor(c1);
             this.checkValidCursor(c2);
             if (c1.line == c2.line) {
-                if (c1.row == c2.row) { return true; }
+                if (c1.row == c2.row) {
+                    return true;
+                }
             }
             return false;
         }
-
         // テキスト全体の先頭かどうか判定
-        StartOfString(c: text_buffer_cursor_t): boolean {
+        StartOfString(c) {
             this.checkValidCursor(c);
             return (c.line.prev == null && c.row == 0);
         }
-
-        EndOfString(c: text_buffer_cursor_t): boolean {
+        EndOfString(c) {
             this.checkValidCursor(c);
-            if (c.line.buffer.length == c.row && c.line.next == null) { return true; }
+            if (c.line.buffer.length == c.row && c.line.next == null) {
+                return true;
+            }
             return false;
         }
-
         // カーソルを行頭に移動
-        MoveToBeginningOfLine(cur: text_buffer_cursor_t): void {
+        MoveToBeginningOfLine(cur) {
             this.checkValidCursor(cur);
             cur.row = 0;
         }
-
-        MoveToBeginningOfDocument(cur: text_buffer_cursor_t): void {
+        MoveToBeginningOfDocument(cur) {
             this.checkValidCursor(cur);
             cur.line = this.Buffers;
             cur.row = 0;
         }
-
         // 区間[start, end)の文字数をカウントする。endは含まれないので注意
-        strlen(start: text_buffer_cursor_t, end: text_buffer_cursor_t) {
+        strlen(start, end) {
             this.checkValidCursor(start);
             this.checkValidCursor(end);
             let n = 0;
-            const c: text_buffer_cursor_t = this.DuplicateCursor(start);
-            for (; ;) {
+            const c = this.DuplicateCursor(start);
+            for (;;) {
                 if (this.EqualCursor(c, end)) {
                     break;
                 }
@@ -1447,43 +1085,21 @@ module Editor {
             this.DisposeCursor(c);
             return n;
         }
-
     }
-
-    interface screen_pos_t { X: number; Y: number }
-
     class TextVRAM {
-        private ColorPalette: Uint32Array;
-        private Pixels: Uint32Array;
-        private BackgroundColor: number;
-        private TextColor: number;
-        private CursorPtr: number;
-        private width: number;
-        private height: number;
-        private font: BMPFont;
-        get Width(): number { return this.width; }
-        get Height(): number { return this.height; }
-        constructor(font: BMPFont, width: number, height: number) {
+        get Width() { return this.width; }
+        get Height() { return this.height; }
+        constructor(font, width, height) {
             this.font = font;
             this.width = width;
             this.height = height;
             this.ColorPalette = new Uint32Array(16);
             for (let i = 0; i < 8; i++) {
-                this.SetPaletteColor(
-                    i,
-                    (255 * (i >> 2)),
-                    (255 * (i & 1)),
-                    (255 * ((i >> 1) & 1))
-                );
+                this.SetPaletteColor(i, (255 * (i >> 2)), (255 * (i & 1)), (255 * ((i >> 1) & 1)));
             }
             for (let i = 8; i < 16; i++) {
                 //8以上は全て白に初期化
-                this.SetPaletteColor(
-                    i,
-                    255,
-                    255,
-                    255
-                );
+                this.SetPaletteColor(i, 255, 255, 255);
             }
             this.Pixels = new Uint32Array(this.width * this.height * 2);
             this.BackgroundColor = 0;
@@ -1491,35 +1107,33 @@ module Editor {
             this.CursorPtr = 0;
             this.ClearScreen();
         }
-        ClearScreen(): void {
+        ClearScreen() {
             this.Pixels.fill(0);
         }
-        SetPaletteColor(index: number, r: number, g: number, b: number): void {
+        SetPaletteColor(index, r, g, b) {
             const color = (0xFF << 24) | (r << 16) | (g << 8) | (b << 0);
             this.ColorPalette[index & 0x0F] = color;
-
         }
-        GetCursorPtr(): number {
+        GetCursorPtr() {
             return this.CursorPtr;
         }
-        GetCursorPosition(): screen_pos_t {
+        GetCursorPosition() {
             return {
                 X: ~~(this.CursorPtr % this.width),
                 Y: ~~(this.CursorPtr / this.width)
             };
-
         }
-        SetCursorPosition(x: number, y: number): void {
+        SetCursorPosition(x, y) {
             if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
                 return;
             }
             this.CursorPtr = y * this.width + x;
         }
-        GetVramPtr(): Uint32Array { return this.Pixels; }
-        GetPalettePtr(): Uint32Array { return this.ColorPalette; }
-        GetBackgroundColor(): number { return this.BackgroundColor; }
-        SetBackgroundColor(color: number): void { this.BackgroundColor = color; }
-        FillBackgroundColor(x: number, y: number, length: number, palette: number): void {
+        GetVramPtr() { return this.Pixels; }
+        GetPalettePtr() { return this.ColorPalette; }
+        GetBackgroundColor() { return this.BackgroundColor; }
+        SetBackgroundColor(color) { this.BackgroundColor = color; }
+        FillBackgroundColor(x, y, length, palette) {
             if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
                 return;
             }
@@ -1530,9 +1144,9 @@ module Editor {
                 n++;
             }
         }
-        GetTextColor(): number { return this.TextColor; }
-        SetTextColor(color: number): void { this.TextColor = color; }
-        FillTextColor(pos: screen_pos_t, length: number, palette: number): void {
+        GetTextColor() { return this.TextColor; }
+        SetTextColor(color) { this.TextColor = color; }
+        FillTextColor(pos, length, palette) {
             if (pos.X < 0 || pos.X >= this.width || pos.Y < 0 || pos.Y >= this.height) {
                 return;
             }
@@ -1543,16 +1157,14 @@ module Editor {
                 n++;
             }
         }
-        Scroll(): void {
+        Scroll() {
             this.Pixels.copyWithin(0, this.width * 2, this.Pixels.length - this.width * 2);
             this.Pixels.fill(0, this.Pixels.length - this.width * 2, this.Pixels.length);
         }
-        putch(n: number): void {
+        putch(n) {
             //カーソル位置にテキストコードnを1文字表示し、カーソルを1文字進める
             //画面最終文字表示してもスクロールせず、次の文字表示時にスクロールする
-
             let sz = this.font.getWidth(n);
-
             if (this.CursorPtr < 0 || this.CursorPtr > this.width * this.height) {
                 // VRAM外への描画
                 return;
@@ -1594,33 +1206,36 @@ module Editor {
                 }
             }
         }
-        puts(str: number[] | Uint32Array): void {
+        puts(str) {
             for (let i = 0; i < str.length; i++) {
                 this.putch(str[i]);
             }
-
         }
         //カーソル位置に符号なし整数nを10進数表示
-        putdigit(n: number): void {
+        putdigit(n) {
             const n1 = ~~(n / 10);
             let d = 1;
-            while (n1 >= d) { d *= 10; }
+            while (n1 >= d) {
+                d *= 10;
+            }
             while (d != 0) {
                 this.putch(0x30 + ~~(n / d));
                 n %= d;
                 d = ~~(d / 10);
             }
-
         }
         //カーソル位置に符号なし整数nをe桁の10進数表示（前の空き桁部分はスペースで埋める）
-        putdigit2(n: number, e: number): void {
+        putdigit2(n, e) {
             if (e == 0) {
                 return;
             }
             const n1 = ~~(n / 10);
             let d = 1;
             e--;
-            while (e > 0 && n1 >= d) { d *= 10; e--; }
+            while (e > 0 && n1 >= d) {
+                d *= 10;
+                e--;
+            }
             if (e == 0 && n1 > d) {
                 n %= d * 10;
             }
@@ -1634,8 +1249,8 @@ module Editor {
             }
         }
         // カーソル位置p, 画面幅widthにおいて、 Utf32文字列strの範囲[head,cur) を入力した場合の入力後のカーソル位置を求める
-        CalcCursorPosition(str: Uint32Array, head: number, cur: number, p: screen_pos_t, width: number): void {
-            for (; ;) {
+        CalcCursorPosition(str, head, cur, p, width) {
+            for (;;) {
                 if (head == cur) {
                     return;
                 }
@@ -1646,10 +1261,8 @@ module Editor {
                 }
                 const c1 = str[head];
                 const w1 = this.font.getWidth(head++);
-
                 // ２文字先を読む（折り返し判定のため）
                 const w2 = this.font.getWidth(head++);
-
                 // 全角文字の回り込みを考慮して改行が必要か判定
                 if (c1 == 0x0A) {
                     p.X = 0;
@@ -1665,145 +1278,119 @@ module Editor {
             }
         }
     }
-
     const COLOR_NORMALTEXT = 7; //通常テキスト色
-    const COLOR_NORMALTEXT_BG = 0;	 //通常テキスト背景
+    const COLOR_NORMALTEXT_BG = 0; //通常テキスト背景
     const COLOR_ERRORTEXT = 4; //エラーメッセージテキスト色
     const COLOR_AREASELECTTEXT = 4; //範囲選択テキスト色
     const COLOR_BOTTOMLINE = 5; //画面最下行のテキスト色
     const COLOR_CURSOR = 6; //カーソル色
     const COLOR_BOTTOMLINE_BG = 8; //画面最下行背景
-
     class TextEditor {
-        private textBuffer: TextBuffer = null;
-        private font: BMPFont = null;
-        private vram: TextVRAM = null;
-        private insertMode: boolean = true;
-
-        /**
-        * 現在のカーソル位置に対応するテキスト位置
-        * [0] は現在位置を示す値
-        * [1] はsave_cursorで退避された値
-        */
-        private Cursor: [text_buffer_cursor_t, text_buffer_cursor_t] = [null, null];
-
-        /**
-        * 現在表示中の画面の左上に対応するテキスト位置
-        * [0] は現在位置を示す値
-        * [1] はsave_cursorで退避された値
-        */
-        private DisplayLeftTop: [text_buffer_cursor_t, text_buffer_cursor_t] = [null, null];
-
-        /**
-        * 画面上でのカーソルの位置
-        * [0] は現在位置を示す値
-        * [1] はsave_cursorで退避された値
-        */
-        private CursorScreenPos: [screen_pos_t, screen_pos_t] = [null, null];
-
-        GetCursorScreenPosX(): number { return this.CursorScreenPos[0].X; }
-        GetCursorScreenPosY(): number { return this.CursorScreenPos[0].Y; }
-
-        //上下移動時の仮カーソルX座標
-        private cx2: number = 0;
-
-        // 範囲選択時のカーソルのスタート位置
-        private SelectStart: text_buffer_cursor_t = null;
-
-        // 範囲選択時のカーソルのスタート座標（画面上）
-        private SelectStartCursorScreenPos: screen_pos_t = null;
-
-        //保存後に変更されたかを表すフラグ
-        private edited: boolean = false;
-
-        //ファイルアクセス用バッファ
-        private filebuf: string = "";
-
-        //編集中のファイル名
-        private CurrentFileName: string = "";
-
-        // 列挙したファイル表示用
-        private filenames: string[] = [];
-
-        // クリップボードデータ
-        private clipboard: Uint32Array = null;
-
-        private get EDITOR_SCREEN_HEIGHT(): number {
-            return this.vram.Height - 1;
-        }
-
-
-        constructor(font: BMPFont, vram: TextVRAM) {
+        constructor(font, vram) {
+            this.textBuffer = null;
+            this.font = null;
+            this.vram = null;
+            this.insertMode = true;
+            /**
+            * 現在のカーソル位置に対応するテキスト位置
+            * [0] は現在位置を示す値
+            * [1] はsave_cursorで退避された値
+            */
+            this.Cursor = [null, null];
+            /**
+            * 現在表示中の画面の左上に対応するテキスト位置
+            * [0] は現在位置を示す値
+            * [1] はsave_cursorで退避された値
+            */
+            this.DisplayLeftTop = [null, null];
+            /**
+            * 画面上でのカーソルの位置
+            * [0] は現在位置を示す値
+            * [1] はsave_cursorで退避された値
+            */
+            this.CursorScreenPos = [null, null];
+            //上下移動時の仮カーソルX座標
+            this.cx2 = 0;
+            // 範囲選択時のカーソルのスタート位置
+            this.SelectStart = null;
+            // 範囲選択時のカーソルのスタート座標（画面上）
+            this.SelectStartCursorScreenPos = null;
+            //保存後に変更されたかを表すフラグ
+            this.edited = false;
+            //ファイルアクセス用バッファ
+            this.filebuf = "";
+            //編集中のファイル名
+            this.CurrentFileName = "";
+            // 列挙したファイル表示用
+            this.filenames = [];
+            // クリップボードデータ
+            this.clipboard = null;
+            ///////////////////
+            this.menuStr = Unicode.strToUtf32("F1:LOAD F2:SAVE   F4:NEW ");
             this.font = font;
             this.vram = vram;
-
             // テキストバッファの初期化
             this.textBuffer = new TextBuffer();
-
             // カーソルをリセット
             this.Cursor = [this.textBuffer.AllocateCursor(), null];
             this.DisplayLeftTop = [this.textBuffer.AllocateCursor(), null];
             this.CursorScreenPos = [{ X: 0, Y: 0 }, { X: 0, Y: 0 }];
             this.SelectStart = null;
             this.SelectStartCursorScreenPos = { X: 0, Y: 0 };
-
             // カーソル位置を先頭に
             this.cursor_top();
-
             //編集済みフラグクリア
             this.edited = false;
             // 挿入モードに設定
-            this.insertMode = true
+            this.insertMode = true;
         }
-
+        GetCursorScreenPosX() { return this.CursorScreenPos[0].X; }
+        GetCursorScreenPosY() { return this.CursorScreenPos[0].Y; }
+        get EDITOR_SCREEN_HEIGHT() {
+            return this.vram.Height - 1;
+        }
         clear() {
             if (this.SelectStart != null) {
                 this.SelectStart.Dispose();
                 this.SelectStart = null;
             }
             this.CursorScreenPos = [{ X: 0, Y: 0 }, { X: 0, Y: 0 }];
-
             // カーソル位置を先頭に
             this.cursor_top();
             //編集済みフラグクリア
             this.edited = false;
             // 挿入モードに設定
-            this.insertMode = true
-
+            this.insertMode = true;
             // バッファクリア（カーソルも全部補正される）
             this.textBuffer.clear();
         }
-
         /**
          * 画面上のカーソル位置と再算出した位置情報が一致しているか検査（デバッグ用）
          */
-        private ValidateDisplayCursorPos() {
-            const p: screen_pos_t = this.calc_screen_pos_from_line_head(this.DisplayLeftTop[0], this.Cursor[0]);
+        ValidateDisplayCursorPos() {
+            const p = this.calc_screen_pos_from_line_head(this.DisplayLeftTop[0], this.Cursor[0]);
             assert((p.X == this.CursorScreenPos[0].X) && (p.Y == this.CursorScreenPos[0].Y));
         }
-
         // 画面上の位置と折り返しを考慮に入れながらカーソルと画面上の位置を連動させてひとつ進める
-        private iterate_cursor_with_screen_pos(p: screen_pos_t, cur: text_buffer_cursor_t): boolean {
+        iterate_cursor_with_screen_pos(p, cur) {
             // １文字先（移動先）を読む
-            const c1: number = this.textBuffer.TakeCharacatorOnCursor(cur);
+            const c1 = this.textBuffer.TakeCharacatorOnCursor(cur);
             if (c1 == 0x0000) {
                 // 1文字先が文末なので打ち切り
                 return false;
             }
             const w1 = this.font.getWidth(c1);
-
             // ２文字先を読む（後述の折り返し判定のため）
             this.textBuffer.CursorForward(cur);
             const c2 = this.textBuffer.TakeCharacatorOnCursor(cur);
             const w2 = this.font.getWidth(c2);
-
             // タブ・折り返しを考慮して文字の位置を決定
-
             if (c1 == 0x0A) {
                 // １文字目が改行文字の場合は次行に移動
                 p.X = 0;
                 p.Y++;
-            } else if (c1 == 0x09) {
+            }
+            else if (c1 == 0x09) {
                 // タブ文字の場合
                 const tabSize = 4 - (p.X % 4);
                 // タブの位置に応じて処理変更
@@ -1821,23 +1408,23 @@ module Editor {
                         p.Y++;
                     }
                 }
-            } else if (p.X + w1 + w2 > this.vram.Width) {
+            }
+            else if (p.X + w1 + w2 > this.vram.Width) {
                 // 一文字目、二文字目両方を受け入れると行末を超える場合
                 p.X = 0;
                 p.Y++;
-            } else {
+            }
+            else {
                 p.X += w1;
             }
             return true;
         }
-
         // headのスクリーン座標を(0,0)とした場合のcurのスクリーン座標位置を算出
-        private calc_screen_pos_from_line_head(head: text_buffer_cursor_t, cur: text_buffer_cursor_t): screen_pos_t {
+        calc_screen_pos_from_line_head(head, cur) {
             head.CheckValid();
             cur.CheckValid();
-
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const h: text_buffer_cursor_t = head.Duplicate();
+            const p = { X: 0, Y: 0 };
+            const h = head.Duplicate();
             while (text_buffer_cursor_t.Equal(h, cur) == false) {
                 if (this.iterate_cursor_with_screen_pos(p, h) == false) {
                     break;
@@ -1846,34 +1433,36 @@ module Editor {
             h.Dispose();
             return p;
         }
-
         // 画面原点を基準に現在の行の画面上での最左位置に対応する位置にカーソルを移動
-        private move_cursor_to_display_line_head(pos: screen_pos_t, cur: text_buffer_cursor_t): boolean {
+        move_cursor_to_display_line_head(pos, cur) {
             cur.CheckValid();
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const c: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
-            const cprev: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
+            const p = { X: 0, Y: 0 };
+            const c = this.DisplayLeftTop[0].Duplicate();
+            const cprev = this.DisplayLeftTop[0].Duplicate();
             // タブや折り返しなどがあるため、単純に逆順に辿ることができない場合もあって場合分けすると面倒くさい
             //画面原点に対応するバッファカーソルは常に計算済みなのでそこからの距離を求める
             let result = false;
-            for (; ;) {
-                const pprev: screen_pos_t = { X: p.X, Y: p.Y };
+            for (;;) {
+                const pprev = { X: p.X, Y: p.Y };
                 c.CopyTo(cprev);
                 if (p.Y == pos.Y && p.X == 0) {
-                    pos.X = p.X; pos.Y = p.Y;
+                    pos.X = p.X;
+                    pos.Y = p.Y;
                     c.CopyTo(cur);
                     result = true;
                     break;
                 }
                 else if (this.iterate_cursor_with_screen_pos(p, c) == false) {
-                    pos.X = pprev.X; pos.Y = pprev.Y;
+                    pos.X = pprev.X;
+                    pos.Y = pprev.Y;
                     cprev.CopyTo(cur);
                     result = false;
                     break;
                 }
                 else if (p.Y == pos.Y) {
                     assert(p.X == 0);
-                    pos.X = p.X; pos.Y = p.Y;
+                    pos.X = p.X;
+                    pos.Y = p.Y;
                     c.CopyTo(cur);
                     result = true;
                     break;
@@ -1883,26 +1472,26 @@ module Editor {
             cprev.Dispose();
             return result;
         }
-
         // 画面上で現在行の末尾まで移動
-        move_cursor_to_display_line_tail(pos: screen_pos_t, cur: text_buffer_cursor_t): boolean {
+        move_cursor_to_display_line_tail(pos, cur) {
             cur.CheckValid();
-
-            const p: screen_pos_t = { X: pos.X, Y: pos.Y };
-            const c: text_buffer_cursor_t = cur.Duplicate();
-            const cprev: text_buffer_cursor_t = cur.Duplicate();
-            let result: boolean = false;
-            for (; ;) {
-                const pprev: screen_pos_t = { X: p.X, Y: p.Y };
+            const p = { X: pos.X, Y: pos.Y };
+            const c = cur.Duplicate();
+            const cprev = cur.Duplicate();
+            let result = false;
+            for (;;) {
+                const pprev = { X: p.X, Y: p.Y };
                 c.CopyTo(cprev);
                 if (this.iterate_cursor_with_screen_pos(p, c) == false) {
-                    pos.X = p.X; pos.Y = p.Y;
+                    pos.X = p.X;
+                    pos.Y = p.Y;
                     c.CopyTo(cur);
                     result = false;
                     break;
                 }
                 else if (p.Y == pos.Y + 1) {
-                    pos.X = pprev.X; pos.Y = pprev.Y;
+                    pos.X = pprev.X;
+                    pos.Y = pprev.Y;
                     cprev.CopyTo(cur);
                     result = true;
                     break;
@@ -1912,49 +1501,53 @@ module Editor {
             cprev.Dispose();
             return result;
         }
-
         // 画面上で現在の文字の手前まで移動
-        private move_cursor_to_prev(pos: screen_pos_t, cur: text_buffer_cursor_t): boolean {
+        move_cursor_to_prev(pos, cur) {
             cur.CheckValid();
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const pprev: screen_pos_t = { X: 0, Y: 0 };
-            const c: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
-            const cprev: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
+            const p = { X: 0, Y: 0 };
+            const pprev = { X: 0, Y: 0 };
+            const c = this.DisplayLeftTop[0].Duplicate();
+            const cprev = this.DisplayLeftTop[0].Duplicate();
             while (!(p.Y == pos.Y && p.X == pos.X)) {
-                pprev.X = p.X; pprev.Y = p.Y;
+                pprev.X = p.X;
+                pprev.Y = p.Y;
                 c.CopyTo(cprev);
                 assert(this.iterate_cursor_with_screen_pos(p, c));
             }
-            pos.X = pprev.X; pos.Y = pprev.Y;
+            pos.X = pprev.X;
+            pos.Y = pprev.Y;
             cprev.CopyTo(cur);
             c.Dispose();
             cprev.Dispose();
             return true;
         }
-
-        private move_cursor_to_display_pos(target: screen_pos_t, rp: screen_pos_t, c: text_buffer_cursor_t) {
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const pp: screen_pos_t = { X: 0, Y: 0 };
+        move_cursor_to_display_pos(target, rp, c) {
+            const p = { X: 0, Y: 0 };
+            const pp = { X: 0, Y: 0 };
             this.DisplayLeftTop[0].CopyTo(c);
-            const pc: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
-            let ret: boolean = false;
-            for (; ;) {
+            const pc = this.DisplayLeftTop[0].Duplicate();
+            let ret = false;
+            for (;;) {
                 if (p.Y == target.Y && p.X >= target.X) {
-                    rp.X = p.X; rp.Y = p.Y;
+                    rp.X = p.X;
+                    rp.Y = p.Y;
                     ret = true;
                     break;
                 }
                 if (p.Y > target.Y) {
-                    rp.X = pp.X; rp.Y = pp.Y;
+                    rp.X = pp.X;
+                    rp.Y = pp.Y;
                     pc.CopyTo(c);
                     ret = true;
                     break;
                 }
-                pp.X = p.X; pp.Y = p.Y;
+                pp.X = p.X;
+                pp.Y = p.Y;
                 c.CopyTo(pc);
                 if (this.iterate_cursor_with_screen_pos(p, c) == false) {
                     // 文書末に到達
-                    rp.X = pp.X; rp.Y = pp.Y;
+                    rp.X = pp.X;
+                    rp.Y = pp.Y;
                     pc.CopyTo(c);
                     ret = false;
                     break;
@@ -1963,9 +1556,8 @@ module Editor {
             pc.Dispose();
             return ret;
         }
-
         // カーソル位置で１文字上書きする
-        private OverwriteCharactor(ch: number): boolean {
+        OverwriteCharactor(ch) {
             if (this.textBuffer.OverwriteCharacatorOnCursor(this.Cursor[0], ch) == false) {
                 return false;
             }
@@ -1973,9 +1565,8 @@ module Editor {
             this.ValidateDisplayCursorPos();
             return true;
         }
-
         // カーソル位置に１文字挿入する
-        private InsertCharactor(ch: number): boolean {
+        InsertCharactor(ch) {
             if (this.textBuffer.InsertCharacatorOnCursor(this.Cursor[0], ch) == false) {
                 return false;
             }
@@ -1983,12 +1574,11 @@ module Editor {
             this.ValidateDisplayCursorPos();
             return true;
         }
-
         // 画面を１行下にスクロールする
-        private screen_scrolldown(): boolean {
-            const c: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            for (; ;) {
+        screen_scrolldown() {
+            const c = this.DisplayLeftTop[0].Duplicate();
+            const p = { X: 0, Y: 0 };
+            for (;;) {
                 if (p.Y == 1) {
                     c.CopyTo(this.DisplayLeftTop[0]);
                     this.CursorScreenPos[0].Y -= 1;
@@ -2000,29 +1590,23 @@ module Editor {
                     c.Dispose();
                     return false;
                 }
-
             }
         }
-
-        private screen_scrollup(): boolean {
+        screen_scrollup() {
             // カーソルの画面Ｙ座標が最上列なので左上座標の更新が必要
-            const lt: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
+            const lt = this.DisplayLeftTop[0].Duplicate();
             if (this.textBuffer.CursorBackward(lt)) {
                 // 左上から１文字戻る＝画面上における前の行の末尾にバッファ上のカーソルを移動
-
                 // 行頭位置を算出
-                const c: text_buffer_cursor_t = lt.Duplicate();
+                const c = lt.Duplicate();
                 this.textBuffer.MoveToBeginningOfLine(c);
-
                 // 行頭位置を(0,0)点としてカーソルltの画面上位置を計算
-                const lp: screen_pos_t = this.calc_screen_pos_from_line_head(c, lt);
-
+                const lp = this.calc_screen_pos_from_line_head(c, lt);
                 // ltの画面位置を超えない位置の行頭をサーチ
-                const p: screen_pos_t = { X: 0, Y: 0 };
+                const p = { X: 0, Y: 0 };
                 while (p.Y != lp.Y) {
                     this.iterate_cursor_with_screen_pos(p, c);
                 }
-
                 // 見つかったところが新しい左上位置
                 c.CopyTo(this.DisplayLeftTop[0]);
                 this.CursorScreenPos[0].Y += 1;
@@ -2037,31 +1621,26 @@ module Editor {
                 return false;
             }
         }
-
         ////////////////////
-
         // カーソルを1つ左に移動
-        private cursor_left_(): void {
+        cursor_left_() {
             if (this.CursorScreenPos[0].X == 0 && this.CursorScreenPos[0].Y == 0) {
                 if (this.screen_scrollup() == false) {
                     // 上にスクロールできない＝先頭なので戻れない
                     return;
                 }
             }
-
             this.move_cursor_to_prev(this.CursorScreenPos[0], this.Cursor[0]);
             this.cx2 = this.CursorScreenPos[0].X;
         }
-
         // カーソルを1つ左に移動
-        cursor_left(): void {
+        cursor_left() {
             this.ValidateDisplayCursorPos();
             this.cursor_left_();
             this.ValidateDisplayCursorPos();
         }
-
         // カーソルを右に移動
-        private cursor_right_(): void {
+        cursor_right_() {
             if (this.iterate_cursor_with_screen_pos(this.CursorScreenPos[0], this.Cursor[0])) {
                 if (this.CursorScreenPos[0].Y == this.EDITOR_SCREEN_HEIGHT) {
                     // カーソルを進めることに成功したらカーソル位置が画面最下段からはみ出たので
@@ -2071,15 +1650,13 @@ module Editor {
             }
             this.cx2 = this.CursorScreenPos[0].X;
         }
-
         // カーソルを右に移動
-        cursor_right(): void {
+        cursor_right() {
             this.ValidateDisplayCursorPos();
             this.cursor_right_();
             this.ValidateDisplayCursorPos();
         }
-
-        private cursor_up_(): void {
+        cursor_up_() {
             if (this.CursorScreenPos[0].Y == 0) {
                 if (this.screen_scrollup() == false) {
                     // 画面を上にスクロールできない＝戻れないので終了
@@ -2087,32 +1664,27 @@ module Editor {
                 }
             }
             this.ValidateDisplayCursorPos();
-
             // 左上の補正が終った
             // 左上位置から画面上で１行上の位置をサーチする
-            const target: screen_pos_t = { X: this.cx2, Y: this.CursorScreenPos[0].Y - 1 };
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const c: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
-
+            const target = { X: this.cx2, Y: this.CursorScreenPos[0].Y - 1 };
+            const p = { X: 0, Y: 0 };
+            const c = this.textBuffer.AllocateCursor();
             this.move_cursor_to_display_pos(target, p, c);
-
             c.CopyTo(this.Cursor[0]);
             this.CursorScreenPos[0] = p;
             c.Dispose();
-
             this.ValidateDisplayCursorPos();
         }
-        cursor_up(): void {
+        cursor_up() {
             this.ValidateDisplayCursorPos();
             this.cursor_up_();
             this.ValidateDisplayCursorPos();
         }
-        private cursor_down_(): void {
+        cursor_down_() {
             // 左上位置からサーチする
-            const target: screen_pos_t = { X: this.cx2, Y: this.CursorScreenPos[0].Y + 1 };
-            const p: screen_pos_t = { X: 0, Y: 0 };
-            const c: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
-
+            const target = { X: this.cx2, Y: this.CursorScreenPos[0].Y + 1 };
+            const p = { X: 0, Y: 0 };
+            const c = this.textBuffer.AllocateCursor();
             if (this.move_cursor_to_display_pos(target, p, c) == false) {
                 if (p.Y != target.Y) {
                     // 次の行に移動できていない＝最下段の行で下を押した
@@ -2120,11 +1692,9 @@ module Editor {
                     return;
                 }
             }
-
             c.CopyTo(this.Cursor[0]);
             this.CursorScreenPos[0] = p;
             c.Dispose();
-
             // 画面を一行下にスクロールが必要か？
             if (this.CursorScreenPos[0].Y == this.EDITOR_SCREEN_HEIGHT) {
                 // 必要
@@ -2133,41 +1703,34 @@ module Editor {
                     return;
                 }
             }
-
             this.ValidateDisplayCursorPos();
-
         }
-        cursor_down(): void {
+        cursor_down() {
             this.ValidateDisplayCursorPos();
             this.cursor_down_();
             this.ValidateDisplayCursorPos();
         }
-
         // カーソルを行頭に移動する
-        private cursor_home_(): void {
+        cursor_home_() {
             this.move_cursor_to_display_line_head(this.CursorScreenPos[0], this.Cursor[0]);
             this.cx2 = 0;
         }
-
-        cursor_home(): void {
+        cursor_home() {
             this.ValidateDisplayCursorPos();
             this.cursor_home_();
             this.ValidateDisplayCursorPos();
         }
-
         // カーソルを行末に移動する
-        private cursor_end_(): void {
+        cursor_end_() {
             this.move_cursor_to_display_line_tail(this.CursorScreenPos[0], this.Cursor[0]);
             this.cx2 = this.CursorScreenPos[0].X;
         }
-
-        cursor_end(): void {
+        cursor_end() {
             this.ValidateDisplayCursorPos();
             this.cursor_end_();
             this.ValidateDisplayCursorPos();
         }
-
-        private cursor_pageup_(): void {
+        cursor_pageup_() {
             //PageUpキー
             //最上行が最下行になるまでスクロール
             //出力：下記変数を移動先の値に変更
@@ -2175,14 +1738,12 @@ module Editor {
             //cx,cx2
             //cy
             //disptopbp,disptopix 画面左上のバッファ上の位置
-
             const cy_old = this.CursorScreenPos[0].Y;
             while (this.CursorScreenPos[0].Y > 0) {
                 this.cursor_up(); // cy==0になるまでカーソルを上に移動
             }
-
-            let i: number = 0;
-            const prev: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
+            let i = 0;
+            const prev = this.textBuffer.AllocateCursor();
             for (i = 0; i < this.EDITOR_SCREEN_HEIGHT - 1; i++) {
                 //画面行数-1行分カーソルを上に移動
                 this.DisplayLeftTop[0].CopyTo(prev);
@@ -2199,14 +1760,12 @@ module Editor {
                 }
             }
         }
-
-        cursor_pageup(): void {
+        cursor_pageup() {
             this.ValidateDisplayCursorPos();
             this.cursor_pageup_();
             this.ValidateDisplayCursorPos();
         }
-
-        private cursor_pagedown_(): void {
+        cursor_pagedown_() {
             //PageDownキー
             //最下行が最上行になるまでスクロール
             //出力：下記変数を移動先の値に変更
@@ -2214,20 +1773,17 @@ module Editor {
             //cx,cx2
             //cy
             //disptopbp,disptopix 画面左上のバッファ上の位置
-
-
             const cy_old = this.CursorScreenPos[0].Y;
             while (this.CursorScreenPos[0].Y < this.EDITOR_SCREEN_HEIGHT - 1) {
                 // cy==EDITWIDTH-1になるまでカーソルを下に移動
                 const y = this.CursorScreenPos[0].Y;
                 this.cursor_down();
                 if (y == this.CursorScreenPos[0].Y) {
-                    break;// バッファ最下行で移動できなかった場合抜ける
+                    break; // バッファ最下行で移動できなかった場合抜ける
                 }
             }
-
-            let i: number = 0;
-            const prev: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
+            let i = 0;
+            const prev = this.textBuffer.AllocateCursor();
             for (i = 0; i < this.EDITOR_SCREEN_HEIGHT - 1; i++) {
                 //画面行数-1行分カーソルを下に移動
                 this.DisplayLeftTop[0].CopyTo(prev);
@@ -2237,7 +1793,6 @@ module Editor {
                 }
             }
             prev.Dispose();
-
             //下端からさらに移動した行数分、カーソルを上に移動、1行も動かなかった場合は最下行に留まる
             if (i > 0) {
                 while (this.CursorScreenPos[0].Y > cy_old) {
@@ -2245,41 +1800,32 @@ module Editor {
                 }
             }
         }
-
-        cursor_pagedown(): void {
+        cursor_pagedown() {
             this.ValidateDisplayCursorPos();
             this.cursor_pagedown_();
             this.ValidateDisplayCursorPos();
         }
-
-        cursor_top(): void {
+        cursor_top() {
             //カーソルをテキストバッファの先頭に移動
             this.textBuffer.MoveToBeginningOfDocument(this.Cursor[0]);
-
             //範囲選択モード解除
             if (this.SelectStart != null) {
                 this.SelectStart.Dispose();
                 this.SelectStart = null;
             }
-
             // 画面の左上位置をリセット
             this.Cursor[0].CopyTo(this.DisplayLeftTop[0]);
-
             // 画面上カーソル位置をリセット
             this.CursorScreenPos[0].X = 0;
             this.CursorScreenPos[0].Y = 0;
-
             // 最後の横移動位置をリセット
             this.cx2 = 0;
         }
-
         ///////////////////
-
         // 選択範囲をクリップボードにコピー
-        Clipboard_CopyTo(): void {
-            const bp1: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
-            const bp2: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
-
+        Clipboard_CopyTo() {
+            const bp1 = this.textBuffer.AllocateCursor();
+            const bp2 = this.textBuffer.AllocateCursor();
             //範囲選択モードの場合、開始位置と終了の前後判断して
             //bp1,ix1を開始位置、bp2,ix2を終了位置に設定
             if (this.CursorScreenPos[0].Y < this.SelectStartCursorScreenPos.Y ||
@@ -2291,8 +1837,7 @@ module Editor {
                 this.SelectStart.CopyTo(bp1);
                 this.Cursor[0].CopyTo(bp2);
             }
-
-            const pd: number[] = [];
+            const pd = [];
             while (this.textBuffer.EqualCursor(bp1, bp2) == false) {
                 pd.push(this.textBuffer.TakeCharacatorOnCursor(bp1));
                 this.textBuffer.CursorForward(bp1);
@@ -2301,21 +1846,18 @@ module Editor {
             bp1.Dispose();
             bp2.Dispose();
         }
-
-        Clipboard_PasteFrom(): void {
+        Clipboard_PasteFrom() {
             // クリップボードから貼り付け
             for (let i = 0; i < this.clipboard.length; i++) {
                 if (this.InsertCharactor(this.clipboard[i]) == false) {
                     break;
                 }
-                this.cursor_right();//画面上、バッファ上のカーソル位置を1つ後ろに移動
+                this.cursor_right(); //画面上、バッファ上のカーソル位置を1つ後ろに移動
             }
         }
-
         ///////////////////
-
         //範囲選択モード開始時のカーソル開始位置グローバル変数設定
-        set_areamode(): void {
+        set_areamode() {
             if (this.SelectStart != null) {
                 this.SelectStart.Dispose();
                 this.SelectStart = null;
@@ -2324,16 +1866,13 @@ module Editor {
             this.SelectStartCursorScreenPos.X = this.CursorScreenPos[0].X;
             this.SelectStartCursorScreenPos.Y = this.CursorScreenPos[0].Y;
         }
-
-
-        private countarea(): number {
+        countarea() {
             if (this.SelectStart == null) {
                 return 0;
             }
             //テキストバッファの指定範囲の文字数をカウント
             //範囲は(cursorbp,cursorix)と(SelectStart.Buffer,SelectStart.Index)で指定
             //後ろ側の一つ前の文字までをカウント
-
             //選択範囲の開始位置と終了の前後を判断して開始位置と終了位置を設定
             if (this.CursorScreenPos[0].Y < this.SelectStartCursorScreenPos.Y ||
                 (this.CursorScreenPos[0].Y == this.SelectStartCursorScreenPos.Y && this.CursorScreenPos[0].X < this.SelectStartCursorScreenPos.X)) {
@@ -2343,18 +1882,15 @@ module Editor {
                 return this.textBuffer.strlen(this.SelectStart, this.Cursor[0]);
             }
         }
-
         // テキストバッファの指定範囲を削除
-        private deletearea(): void {
+        deletearea() {
             if (this.SelectStart == null) {
                 return;
             }
             //範囲は(cursorbp,cursorix)と(SelectStart.Buffer,SelectStart.Index)で指定
             //後ろ側の一つ前の文字までを削除
             //削除後のカーソル位置は選択範囲の先頭にし、範囲選択モード解除する
-
             const n = this.countarea(); //選択範囲の文字数カウント
-
             //範囲選択の開始位置と終了位置の前後を判断してカーソルを開始位置に設定
             if (this.CursorScreenPos[0].Y > this.SelectStartCursorScreenPos.Y || (this.CursorScreenPos[0].Y == this.SelectStartCursorScreenPos.Y && this.CursorScreenPos[0].X > this.SelectStartCursorScreenPos.X)) {
                 this.SelectStart.CopyTo(this.Cursor[0]);
@@ -2362,19 +1898,16 @@ module Editor {
                 this.CursorScreenPos[0].Y = this.SelectStartCursorScreenPos.Y;
             }
             this.cx2 = this.CursorScreenPos[0].X;
-
             //範囲選択モード解除
             if (this.SelectStart != null) {
                 this.SelectStart.Dispose();
                 this.SelectStart = null;
             }
-
             // 始点からn文字削除
             this.textBuffer.DeleteArea(this.Cursor[0], n);
             this.CursorScreenPos[0] = this.calc_screen_pos_from_line_head(this.DisplayLeftTop[0], this.Cursor[0]);
         }
-
-        checkResetSelectArea(): void {
+        checkResetSelectArea() {
             if (this.SelectStart != null &&
                 this.CursorScreenPos[0].X == this.SelectStartCursorScreenPos.X &&
                 this.CursorScreenPos[0].Y == this.SelectStartCursorScreenPos.Y) {
@@ -2383,11 +1916,9 @@ module Editor {
                 this.SelectStart = null;
             }
         }
-
         ///////////////////
-
         //カーソル関連グローバル変数を一時避難
-        save_cursor(): void {
+        save_cursor() {
             assert(this.Cursor[1] == null);
             assert(this.DisplayLeftTop[1] == null);
             this.Cursor[1] = this.Cursor[0].Duplicate();
@@ -2395,38 +1926,40 @@ module Editor {
             this.CursorScreenPos[1].X = this.CursorScreenPos[0].X;
             this.CursorScreenPos[1].Y = this.CursorScreenPos[0].Y;
         }
-
         //カーソル関連グローバル変数を一時避難場所から戻す
-        restore_cursor(): void {
+        restore_cursor() {
             assert(this.Cursor[0] != null);
             assert(this.DisplayLeftTop[0] != null);
             assert(this.Cursor[1] != null);
             assert(this.DisplayLeftTop[1] != null);
-            this.Cursor[0].Dispose(); this.Cursor[0] = this.Cursor[1]; this.Cursor[1] = null;
-            this.DisplayLeftTop[0].Dispose(); this.DisplayLeftTop[0] = this.DisplayLeftTop[1]; this.DisplayLeftTop[1] = null;
-            this.CursorScreenPos[0].X = this.CursorScreenPos[1].X; this.CursorScreenPos[1].X = 0;
-            this.CursorScreenPos[0].Y = this.CursorScreenPos[1].Y; this.CursorScreenPos[1].Y = 0;
+            this.Cursor[0].Dispose();
+            this.Cursor[0] = this.Cursor[1];
+            this.Cursor[1] = null;
+            this.DisplayLeftTop[0].Dispose();
+            this.DisplayLeftTop[0] = this.DisplayLeftTop[1];
+            this.DisplayLeftTop[1] = null;
+            this.CursorScreenPos[0].X = this.CursorScreenPos[1].X;
+            this.CursorScreenPos[1].X = 0;
+            this.CursorScreenPos[0].Y = this.CursorScreenPos[1].Y;
+            this.CursorScreenPos[1].Y = 0;
         }
-
-        discard_saved_cursor(): void {
+        discard_saved_cursor() {
             if (this.Cursor[1] != null) {
-                this.Cursor[1].Dispose(); this.Cursor[1] = null;
+                this.Cursor[1].Dispose();
+                this.Cursor[1] = null;
             }
             if (this.DisplayLeftTop[1] != null) {
-                this.DisplayLeftTop[1].Dispose(); this.DisplayLeftTop[1] = null;
+                this.DisplayLeftTop[1].Dispose();
+                this.DisplayLeftTop[1] = null;
             }
             this.CursorScreenPos[1].X = 0;
             this.CursorScreenPos[1].Y = 0;
         }
-
         ///////////////////
-
-        redraw(): void {
-            let cl: number = COLOR_NORMALTEXT;
-
-            let select_start: text_buffer_cursor_t;
-            let select_end: text_buffer_cursor_t;
-
+        redraw() {
+            let cl = COLOR_NORMALTEXT;
+            let select_start;
+            let select_end;
             if (this.SelectStart == null) {
                 //範囲選択モードでない場合
                 select_start = null;
@@ -2447,18 +1980,21 @@ module Editor {
             }
             this.vram.SetTextColor(COLOR_NORMALTEXT);
             this.vram.SetBackgroundColor(COLOR_NORMALTEXT_BG);
-
             // テキストVRAMへの書き込み
             // 必要なら割り込み禁止とか使うこと
             this.vram.ClearScreen();
             const vp = this.vram.GetVramPtr();
-            const bp: text_buffer_cursor_t = this.DisplayLeftTop[0].Duplicate();
-            const sp: screen_pos_t = { X: 0, Y: 0 };
+            const bp = this.DisplayLeftTop[0].Duplicate();
+            const sp = { X: 0, Y: 0 };
             while (sp.Y < this.EDITOR_SCREEN_HEIGHT) {
                 // 選択範囲の始点/終点に到達してたら色設定変更
                 if (this.SelectStart != null) {
-                    if (this.textBuffer.EqualCursor(bp, select_start)) { cl = COLOR_AREASELECTTEXT; }
-                    if (this.textBuffer.EqualCursor(bp, select_end)) { cl = COLOR_NORMALTEXT; }
+                    if (this.textBuffer.EqualCursor(bp, select_start)) {
+                        cl = COLOR_AREASELECTTEXT;
+                    }
+                    if (this.textBuffer.EqualCursor(bp, select_end)) {
+                        cl = COLOR_NORMALTEXT;
+                    }
                 }
                 const ch = this.textBuffer.TakeCharacatorOnCursor(bp);
                 const index = (sp.Y * this.vram.Width + sp.X) * 2;
@@ -2476,21 +2012,19 @@ module Editor {
             if (select_end != null) {
                 select_end.Dispose();
             }
-
             //EnableInterrupt();
-
         }
-
         ///////////////////
-
-        save<T>(start: (context: T) => boolean, write: (context: T, ch: number) => boolean, end: (context: T) => void, context: T): boolean {
-            let ret: boolean = false;
+        save(start, write, end, context) {
+            let ret = false;
             if (start(context)) {
                 ret = true;
-                const bp: text_buffer_cursor_t = this.textBuffer.AllocateCursor();
+                const bp = this.textBuffer.AllocateCursor();
                 while (this.textBuffer.EndOfString(bp) == false) {
                     const ch = this.textBuffer.TakeCharacatorOnCursor(bp);
-                    if (ch == 0x0000) { break; }
+                    if (ch == 0x0000) {
+                        break;
+                    }
                     if (write(context, ch) == false) {
                         ret = false;
                         break;
@@ -2499,75 +2033,62 @@ module Editor {
                 }
                 bp.Dispose();
             }
-
             end(context);
             return ret;
         }
-
-        load<T>(start: (context: T) => boolean, read: (context: T) => number, end: (context: T) => void, context: T): boolean {
-            let ret: boolean = false;
+        load(start, read, end, context) {
+            let ret = false;
             if (start(context)) {
                 ret = true;
                 this.clear();
-                let ch: number = 0;
+                let ch = 0;
                 while ((ch = read(context)) != 0) {
                     this.InsertCharactor(ch);
-                    this.cursor_right();//画面上、バッファ上のカーソル位置を1つ後ろに移動
+                    this.cursor_right(); //画面上、バッファ上のカーソル位置を1つ後ろに移動
                 }
             }
-
             end(context);
             return ret;
         }
-
-        ///////////////////
-        private menuStr = Unicode.strToUtf32("F1:LOAD F2:SAVE   F4:NEW ");
-        displaybottomline(): void {
+        displaybottomline() {
             //エディター画面最下行の表示
             this.vram.SetCursorPosition(0, this.vram.Height - 1);
             this.vram.SetTextColor(COLOR_BOTTOMLINE);
             this.vram.SetBackgroundColor(COLOR_BOTTOMLINE_BG);
-
             this.vram.puts(this.menuStr);
             this.vram.putdigit2(this.textBuffer.getTotalLength(), 5);
             this.vram.FillBackgroundColor(0, this.vram.Height - 1, this.vram.Width, COLOR_BOTTOMLINE_BG);
         }
-
         ///////////////////
-        normal_code_process(k: number): void {
+        normal_code_process(k) {
             // 通常文字入力処理
             // k:入力された文字コード
-
             this.edited = true; //編集済みフラグを設定
-
             if (this.insertMode || k == 0x0A || this.SelectStart != null) { // 挿入モードの場合
                 // 選択範囲を削除
                 if (this.SelectStart != null) {
                     this.deletearea();
                 }
                 if (this.InsertCharactor(k)) {
-                    this.cursor_right();//画面上、バッファ上のカーソル位置を1つ後ろに移動
+                    this.cursor_right(); //画面上、バッファ上のカーソル位置を1つ後ろに移動
                 }
             }
             else { //上書きモード
                 if (this.OverwriteCharactor(k)) {
-                    this.cursor_right();//画面上、バッファ上のカーソル位置を1つ後ろに移動
+                    this.cursor_right(); //画面上、バッファ上のカーソル位置を1つ後ろに移動
                 }
             }
         }
-
-        control_code_process(k: VIRTUAL_KEY, sh: CTRLKEY_FLAG): void {
+        control_code_process(k, sh) {
             // 制御文字入力処理
             // k:制御文字の仮想キーコード
             // sh:シフト関連キー状態
-
             this.save_cursor(); //カーソル関連変数退避（カーソル移動できなかった場合戻すため）
-
             switch (k) {
-                case VIRTUAL_KEY.VKEY_LEFT:
-                case VIRTUAL_KEY.VKEY_NUMPAD4:
+                case 37 /* VKEY_LEFT */:
+                case 100 /* VKEY_NUMPAD4 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD4) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 100 /* VKEY_NUMPAD4 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
@@ -2576,7 +2097,7 @@ module Editor {
                     else if (this.SelectStart == null) {
                         this.set_areamode(); //範囲選択モードでなければ範囲選択モード開始
                     }
-                    if (sh & CTRLKEY_FLAG.CHK_CTRL) {
+                    if (sh & 12 /* CHK_CTRL */) {
                         //CTRL＋左矢印でHome
                         this.cursor_home();
                         break;
@@ -2593,10 +2114,10 @@ module Editor {
                         }
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_RIGHT:
-                case VIRTUAL_KEY.VKEY_NUMPAD6:
+                case 39 /* VKEY_RIGHT */:
+                case 102 /* VKEY_NUMPAD6 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD6) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 102 /* VKEY_NUMPAD6 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
@@ -2605,7 +2126,7 @@ module Editor {
                     else if (this.SelectStart == null) {
                         this.set_areamode(); //範囲選択モードでなければ範囲選択モード開始
                     }
-                    if (sh & CTRLKEY_FLAG.CHK_CTRL) {
+                    if (sh & 12 /* CHK_CTRL */) {
                         //CTRL＋右矢印でEnd
                         this.cursor_end();
                         break;
@@ -2613,14 +2134,16 @@ module Editor {
                     this.cursor_right();
                     if (this.SelectStart != null && (this.textBuffer.EqualCursor(this.DisplayLeftTop[0], this.DisplayLeftTop[1]) == false)) {
                         //範囲選択モードで画面スクロールがあった場合
-                        if (this.SelectStartCursorScreenPos.Y > 0) this.SelectStartCursorScreenPos.Y--; //範囲スタート位置もスクロール
-                        else this.restore_cursor(); //カーソル位置を戻す（画面範囲外の範囲選択禁止）
+                        if (this.SelectStartCursorScreenPos.Y > 0)
+                            this.SelectStartCursorScreenPos.Y--; //範囲スタート位置もスクロール
+                        else
+                            this.restore_cursor(); //カーソル位置を戻す（画面範囲外の範囲選択禁止）
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_UP:
-                case VIRTUAL_KEY.VKEY_NUMPAD8:
+                case 38 /* VKEY_UP */:
+                case 104 /* VKEY_NUMPAD8 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD8) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 104 /* VKEY_NUMPAD8 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
@@ -2634,20 +2157,20 @@ module Editor {
                         //範囲選択モードで画面スクロールがあった場合
                         if (this.SelectStartCursorScreenPos.Y < this.EDITOR_SCREEN_HEIGHT - 1) {
                             this.SelectStartCursorScreenPos.Y++; //範囲スタート位置もスクロール
-                        } else {
+                        }
+                        else {
                             this.restore_cursor(); //カーソル位置を戻す（画面範囲外の範囲選択禁止）
                         }
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_DOWN:
-                case VIRTUAL_KEY.VKEY_NUMPAD2:
+                case 40 /* VKEY_DOWN */:
+                case 98 /* VKEY_NUMPAD2 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD2) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 98 /* VKEY_NUMPAD2 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
                         }
-
                     }
                     else if (this.SelectStart == null) {
                         this.set_areamode(); //範囲選択モードでなければ範囲選択モード開始
@@ -2655,44 +2178,44 @@ module Editor {
                     this.cursor_down();
                     if (this.SelectStart != null && (this.textBuffer.EqualCursor(this.DisplayLeftTop[0], this.DisplayLeftTop[1]) == false)) {
                         //範囲選択モードで画面スクロールがあった場合
-                        if (this.SelectStartCursorScreenPos.Y > 0) this.SelectStartCursorScreenPos.Y--; //範囲スタート位置もスクロール
-                        else this.restore_cursor(); //カーソル位置を戻す（画面範囲外の範囲選択禁止）
+                        if (this.SelectStartCursorScreenPos.Y > 0)
+                            this.SelectStartCursorScreenPos.Y--; //範囲スタート位置もスクロール
+                        else
+                            this.restore_cursor(); //カーソル位置を戻す（画面範囲外の範囲選択禁止）
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_HOME:
-                case VIRTUAL_KEY.VKEY_NUMPAD7:
+                case 36 /* VKEY_HOME */:
+                case 103 /* VKEY_NUMPAD7 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD7) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 103 /* VKEY_NUMPAD7 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
                         }
-
                     }
                     else if (this.SelectStart == null) {
                         this.set_areamode(); //範囲選択モードでなければ範囲選択モード開始
                     }
                     this.cursor_home();
                     break;
-                case VIRTUAL_KEY.VKEY_END:
-                case VIRTUAL_KEY.VKEY_NUMPAD1:
+                case 35 /* VKEY_END */:
+                case 97 /* VKEY_NUMPAD1 */:
                     //シフトキー押下していなければ範囲選択モード解除（NumLock＋シフト＋テンキーでも解除）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) == 0 || (k == VIRTUAL_KEY.VKEY_NUMPAD1) && (sh & CTRLKEY_FLAG.CHK_NUMLK)) {
+                    if ((sh & 3 /* CHK_SHIFT */) == 0 || (k == 97 /* VKEY_NUMPAD1 */) && (sh & 512 /* CHK_NUMLK */)) {
                         if (this.SelectStart != null) {
                             this.SelectStart.Dispose();
                             this.SelectStart = null;
                         }
-
                     }
                     else if (this.SelectStart == null) {
                         this.set_areamode(); //範囲選択モードでなければ範囲選択モード開始
                     }
                     this.cursor_end();
                     break;
-                case VIRTUAL_KEY.VKEY_PRIOR: // PageUpキー
-                case VIRTUAL_KEY.VKEY_NUMPAD9:
+                case 33 /* VKEY_PRIOR */: // PageUpキー
+                case 105 /* VKEY_NUMPAD9 */:
                     //シフト＋PageUpは無効（NumLock＋シフト＋「9」除く）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) && ((k != VIRTUAL_KEY.VKEY_NUMPAD9) || ((sh & CTRLKEY_FLAG.CHK_NUMLK) == 0))) {
+                    if ((sh & 3 /* CHK_SHIFT */) && ((k != 105 /* VKEY_NUMPAD9 */) || ((sh & 512 /* CHK_NUMLK */) == 0))) {
                         break;
                     }
                     //範囲選択モード解除
@@ -2700,13 +2223,12 @@ module Editor {
                         this.SelectStart.Dispose();
                         this.SelectStart = null;
                     }
-
                     this.cursor_pageup();
                     break;
-                case VIRTUAL_KEY.VKEY_NEXT: // PageDownキー
-                case VIRTUAL_KEY.VKEY_NUMPAD3:
+                case 34 /* VKEY_NEXT */: // PageDownキー
+                case 99 /* VKEY_NUMPAD3 */:
                     //シフト＋PageDownは無効（NumLock＋シフト＋「3」除く）
-                    if ((sh & CTRLKEY_FLAG.CHK_SHIFT) && ((k != VIRTUAL_KEY.VKEY_NUMPAD3) || ((sh & CTRLKEY_FLAG.CHK_NUMLK) == 0))) {
+                    if ((sh & 3 /* CHK_SHIFT */) && ((k != 99 /* VKEY_NUMPAD3 */) || ((sh & 512 /* CHK_NUMLK */) == 0))) {
                         break;
                     }
                     //範囲選択モード解除
@@ -2714,24 +2236,23 @@ module Editor {
                         this.SelectStart.Dispose();
                         this.SelectStart = null;
                     }
-
                     this.cursor_pagedown();
                     break;
-                case VIRTUAL_KEY.VKEY_DELETE: //Deleteキー
-                case VIRTUAL_KEY.VKEY_DECIMAL: //テンキーの「.」
+                case 46 /* VKEY_DELETE */: //Deleteキー
+                case 110 /* VKEY_DECIMAL */: //テンキーの「.」
                     this.edited = true; //編集済みフラグ
                     if (this.SelectStart != null) {
-                        this.deletearea();//選択範囲を削除
+                        this.deletearea(); //選択範囲を削除
                     }
                     else {
                         this.textBuffer.DeleteCharacatorOnCursor(this.Cursor[0]);
                         this.CursorScreenPos[0] = this.calc_screen_pos_from_line_head(this.DisplayLeftTop[0], this.Cursor[0]);
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_BACK: //BackSpaceキー
+                case 8 /* VKEY_BACK */: //BackSpaceキー
                     this.edited = true; //編集済みフラグ
                     if (this.SelectStart != null) {
-                        this.deletearea();//選択範囲を削除
+                        this.deletearea(); //選択範囲を削除
                         break;
                     }
                     if (this.textBuffer.StartOfString(this.Cursor[0])) {
@@ -2741,242 +2262,200 @@ module Editor {
                     this.textBuffer.DeleteCharacatorOnCursor(this.Cursor[0]);
                     this.CursorScreenPos[0] = this.calc_screen_pos_from_line_head(this.DisplayLeftTop[0], this.Cursor[0]);
                     break;
-                case VIRTUAL_KEY.VKEY_INSERT:
-                case VIRTUAL_KEY.VKEY_NUMPAD0:
+                case 45 /* VKEY_INSERT */:
+                case 96 /* VKEY_NUMPAD0 */:
                     this.insertMode = !this.insertMode; //挿入モード、上書きモードを切り替え
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_C:
+                case 67 /* VKEY_KEY_C */:
                     //CTRL+C、クリップボードにコピー
-                    if (this.SelectStart != null && (sh & CTRLKEY_FLAG.CHK_CTRL)) {
+                    if (this.SelectStart != null && (sh & 12 /* CHK_CTRL */)) {
                         this.Clipboard_CopyTo();
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_X:
+                case 88 /* VKEY_KEY_X */:
                     //CTRL+X、クリップボードに切り取り
-                    if (this.SelectStart != null && (sh & CTRLKEY_FLAG.CHK_CTRL)) {
+                    if (this.SelectStart != null && (sh & 12 /* CHK_CTRL */)) {
                         this.Clipboard_CopyTo();
                         this.deletearea(); //選択範囲の削除
                         this.edited = true; //編集済みフラグ
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_V:
+                case 86 /* VKEY_KEY_V */:
                     //CTRL+V、クリップボードから貼り付け
-                    if ((sh & CTRLKEY_FLAG.CHK_CTRL) == 0) break;
-                    if (this.clipboard == null || this.clipboard.length == 0) break;
+                    if ((sh & 12 /* CHK_CTRL */) == 0)
+                        break;
+                    if (this.clipboard == null || this.clipboard.length == 0)
+                        break;
                     this.edited = true; //編集済みフラグ
                     if (this.SelectStart != null) {
                         //範囲選択している時は削除してから貼り付け
-                        this.deletearea();//選択範囲を削除
-                        this.Clipboard_PasteFrom();//クリップボード貼り付け
+                        this.deletearea(); //選択範囲を削除
+                        this.Clipboard_PasteFrom(); //クリップボード貼り付け
                     }
                     else {
-                        this.Clipboard_PasteFrom();//クリップボード貼り付け
+                        this.Clipboard_PasteFrom(); //クリップボード貼り付け
                     }
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_S:
+                case 83 /* VKEY_KEY_S */:
                     //CTRL+S、SDカードに保存
-                    if ((sh & CTRLKEY_FLAG.CHK_CTRL) == 0) break;
-                case VIRTUAL_KEY.VKEY_F2: //F2キー
+                    if ((sh & 12 /* CHK_CTRL */) == 0)
+                        break;
+                case 113 /* VKEY_F2 */: //F2キー
                     //this.save_as(); //ファイル名を付けて保存
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_O:
+                case 79 /* VKEY_KEY_O */:
                     //CTRL+O、ファイル読み込み
-                    if ((sh & CTRLKEY_FLAG.CHK_CTRL) == 0) break;
-                case VIRTUAL_KEY.VKEY_F1: //F1キー
+                    if ((sh & 12 /* CHK_CTRL */) == 0)
+                        break;
+                case 112 /* VKEY_F1 */: //F1キー
                     //F1キー、ファイル読み込み
                     //this.selectfile();	//ファイルを選択して読み込み
                     break;
-                case VIRTUAL_KEY.VKEY_KEY_N:
+                case 78 /* VKEY_KEY_N */:
                     //CTRL+N、新規作成
-                    if ((sh & CTRLKEY_FLAG.CHK_CTRL) == 0) break;
-                case VIRTUAL_KEY.VKEY_F4: //F4キー
+                    if ((sh & 12 /* CHK_CTRL */) == 0)
+                        break;
+                case 115 /* VKEY_F4 */: //F4キー
                     //this.newtext(); //新規作成
                     break;
             }
             this.discard_saved_cursor();
         }
-
     }
-
-
-
-
     window
-        .whenEvent<Event>('load')
-        .then<BMPFont>(() => BMPFont.loadFont("font.bmpf"))
+        .whenEvent('load')
+        .then(() => BMPFont.loadFont("font.bmpf"))
         .then((bmpFont) => {
-            const root = document.getElementById("editor");
-            const boundingRect = root.getBoundingClientRect();
-
-            var vkeyboard = new VirtualKeyboard(root, keypad_layout);
-            const canvas = document.createElement("canvas");
-            root.appendChild(canvas);
-            canvas.width = ~~boundingRect.width;
-            canvas.height = ~~boundingRect.height - vkeyboard.height;
-            canvas.style.position = "absolute";
-            canvas.style.left = "0px";
-            canvas.style.top = "0px";
-            canvas.style.width = canvas.width + "px";
-            canvas.style.height = canvas.height + "px";
-            const context = canvas.getContext("2d");
-            const imageData = context.createImageData(~~canvas.width, ~~canvas.height);
-            imageData.data32 = new Uint32Array(imageData.data.buffer);
-            const textVram = new TextVRAM(bmpFont, ~~(canvas.width / bmpFont.FontWidth), ~~(canvas.height / bmpFont.FontHeight));
-            textVram.SetPaletteColor(COLOR_BOTTOMLINE_BG, 0x00, 0x20, 0x80);
-
-            const textEditor = new TextEditor(bmpFont, textVram);
-            const keyboard = new Keyboard();
-            //*
-            textEditor.load(
-                (s) => { s.str = Unicode.strToUtf32(document.getElementById('demo').innerHTML); return true; },
-                (s) => s.str.length > s.index ? s.str[s.index++] : 0,
-                (s) => true,
-                { str: null, index: 0 }
-            );
-            //*/
-
-            window.addEventListener('keydown', (e) => {
-                if (e.repeat == false) {
-                    keyboard.pushKeyStatus(e.keyCode, false);
+        const root = document.getElementById("editor");
+        const boundingRect = root.getBoundingClientRect();
+        var vkeyboard = new VirtualKeyboard(root, keypad_layout);
+        const canvas = document.createElement("canvas");
+        root.appendChild(canvas);
+        canvas.width = ~~boundingRect.width;
+        canvas.height = ~~boundingRect.height - vkeyboard.height;
+        canvas.style.position = "absolute";
+        canvas.style.left = "0px";
+        canvas.style.top = "0px";
+        canvas.style.width = canvas.width + "px";
+        canvas.style.height = canvas.height + "px";
+        const context = canvas.getContext("2d");
+        const imageData = context.createImageData(~~canvas.width, ~~canvas.height);
+        imageData.data32 = new Uint32Array(imageData.data.buffer);
+        const textVram = new TextVRAM(bmpFont, ~~(canvas.width / bmpFont.FontWidth), ~~(canvas.height / bmpFont.FontHeight));
+        textVram.SetPaletteColor(COLOR_BOTTOMLINE_BG, 0x00, 0x20, 0x80);
+        const textEditor = new TextEditor(bmpFont, textVram);
+        const keyboard = new Keyboard();
+        //*
+        textEditor.load((s) => { s.str = Unicode.strToUtf32(document.getElementById('demo').innerHTML); return true; }, (s) => s.str.length > s.index ? s.str[s.index++] : 0, (s) => true, { str: null, index: 0 });
+        //*/
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat == false) {
+                keyboard.pushKeyStatus(e.keyCode, false);
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        });
+        vkeyboard.addEventListener('keydown', (caption, keycode, repeat) => {
+            if (repeat == false) {
+                keyboard.pushKeyStatus(keycode, false);
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keyboard.pushKeyStatus(e.keyCode, true);
+            e.stopPropagation();
+            e.preventDefault();
+        });
+        vkeyboard.addEventListener('keyup', (caption, keycode, repeat) => {
+            if (repeat == false) {
+                keyboard.pushKeyStatus(keycode, true);
+            }
+        });
+        function loop() {
+            textEditor.redraw();
+            textEditor.displaybottomline();
+            textVram.SetCursorPosition(textEditor.GetCursorScreenPosX(), textEditor.GetCursorScreenPosY());
+            textVram.SetTextColor(COLOR_NORMALTEXT);
+            textVram.SetBackgroundColor(COLOR_NORMALTEXT_BG);
+            while (keyboard.readKey() && keyboard.GetCurrentVKeyCode()) {
+                let k1 = keyboard.GetCurrentAsciiCode();
+                const k2 = keyboard.GetCurrentVKeyCode();
+                const sh = keyboard.GetCurrentCtrlKeys(); //sh:シフト関連キー状態
+                //Enter押下は単純に改行文字を入力とする
+                if (k2 == 13 /* VKEY_RETURN */ || k2 == 108 /* VKEY_SEPARATOR */) {
+                    k1 = 0x0A;
                 }
-                e.stopPropagation();
-                e.preventDefault();
-            });
-            vkeyboard.addEventListener('keydown', (caption, keycode, repeat) => {
-                if (repeat == false) {
-                    keyboard.pushKeyStatus(keycode, false);
+                if (k1 != 0) {
+                    //通常文字が入力された場合
+                    textEditor.normal_code_process(k1);
                 }
-            });
-            window.addEventListener('keyup', (e) => {
-                keyboard.pushKeyStatus(e.keyCode, true);
-                e.stopPropagation();
-                e.preventDefault();
-            });
-            vkeyboard.addEventListener('keyup', (caption, keycode, repeat) => {
-                if (repeat == false) {
-                    keyboard.pushKeyStatus(keycode, true);
+                else {
+                    //制御文字が入力された場合
+                    textEditor.control_code_process(k2, sh);
                 }
-            });
-
-            function loop() {
-                textEditor.redraw();
-                textEditor.displaybottomline();
-                textVram.SetCursorPosition(textEditor.GetCursorScreenPosX(), textEditor.GetCursorScreenPosY());
-                textVram.SetTextColor(COLOR_NORMALTEXT);
-                textVram.SetBackgroundColor(COLOR_NORMALTEXT_BG);
-
-                while (keyboard.readKey() && keyboard.GetCurrentVKeyCode()) {
-                    let k1 = keyboard.GetCurrentAsciiCode();
-                    const k2 = keyboard.GetCurrentVKeyCode();
-                    const sh = keyboard.GetCurrentCtrlKeys();             //sh:シフト関連キー状態
-                    //Enter押下は単純に改行文字を入力とする
-                    if (k2 == VIRTUAL_KEY.VKEY_RETURN || k2 == VIRTUAL_KEY.VKEY_SEPARATOR) {
-                        k1 = 0x0A;
-                    }
-                    if (k1 != 0) {
-                        //通常文字が入力された場合
-                        textEditor.normal_code_process(k1);
-                    }
-                    else {
-                        //制御文字が入力された場合
-                        textEditor.control_code_process(k2, sh);
-                    }
-                    textEditor.checkResetSelectArea();
-                }
-
-                {
-                    const palPtr = textVram.GetPalettePtr();
-                    const vramPtr = textVram.GetVramPtr();
-                    const cursorPos = textVram.GetCursorPosition();
-                    imageData.data32.fill(0xFF000000);
-                    let idx = 0;
-                    for (let y = 0; y < textVram.Height; y++) {
-                        for (let x = 0; x < textVram.Width; x++) {
-                            const ch = vramPtr[idx + 0];
-                            const color = palPtr[(vramPtr[idx + 1] >> 0) & 0x0F];
-                            const bgColor = palPtr[(vramPtr[idx + 1] >> 4) & 0x0F];
-                            const fontWidth = bmpFont.getPixelWidth(ch);
-                            const fontHeight = bmpFont.FontHeight;
-                            const fontPixel = bmpFont.getPixel(ch);
-                            const left = x * bmpFont.FontWidth;
-                            const top = y * bmpFont.FontHeight;
-                            const size = bmpFont.FontHeight;
-                            if (x == cursorPos.X && y == cursorPos.Y) {
-                                imageData.fillRect(left, top, fontWidth != 0 ? fontWidth : bmpFont.FontWidth, fontHeight, palPtr[COLOR_CURSOR]);
-                            } else {
-                                imageData.fillRect(left, top, fontWidth, fontHeight, bgColor);
-                            }
-                            if (fontPixel !== undefined) {
-                                for (let j = 0; j < size; j++) {
-                                    for (let i = 0; i < size; i++) {
-                                        if (fontPixel.getBit(j * size + i)) {
-                                            imageData.setPixel(left + i, top + j, color);
-                                        }
+                textEditor.checkResetSelectArea();
+            }
+            {
+                const palPtr = textVram.GetPalettePtr();
+                const vramPtr = textVram.GetVramPtr();
+                const cursorPos = textVram.GetCursorPosition();
+                imageData.data32.fill(0xFF000000);
+                let idx = 0;
+                for (let y = 0; y < textVram.Height; y++) {
+                    for (let x = 0; x < textVram.Width; x++) {
+                        const ch = vramPtr[idx + 0];
+                        const color = palPtr[(vramPtr[idx + 1] >> 0) & 0x0F];
+                        const bgColor = palPtr[(vramPtr[idx + 1] >> 4) & 0x0F];
+                        const fontWidth = bmpFont.getPixelWidth(ch);
+                        const fontHeight = bmpFont.FontHeight;
+                        const fontPixel = bmpFont.getPixel(ch);
+                        const left = x * bmpFont.FontWidth;
+                        const top = y * bmpFont.FontHeight;
+                        const size = bmpFont.FontHeight;
+                        if (x == cursorPos.X && y == cursorPos.Y) {
+                            imageData.fillRect(left, top, fontWidth != 0 ? fontWidth : bmpFont.FontWidth, fontHeight, palPtr[COLOR_CURSOR]);
+                        }
+                        else {
+                            imageData.fillRect(left, top, fontWidth, fontHeight, bgColor);
+                        }
+                        if (fontPixel !== undefined) {
+                            for (let j = 0; j < size; j++) {
+                                for (let i = 0; i < size; i++) {
+                                    if (fontPixel.getBit(j * size + i)) {
+                                        imageData.setPixel(left + i, top + j, color);
                                     }
                                 }
                             }
-                            idx += 2;
                         }
+                        idx += 2;
                     }
-                    context.putImageData(imageData, 0, 0);
                 }
-
-                //
-                vkeyboard.render(bmpFont);
-
-                window.requestAnimationFrame(loop);
+                context.putImageData(imageData, 0, 0);
             }
+            //
+            vkeyboard.render(bmpFont);
             window.requestAnimationFrame(loop);
-
-            //////////
-
-
-        });
-
-    interface IKayboardLineLayout { height: number, buttons: IKayboardButtonLayout[]; }
-    interface IKayboardButtonLayout { id: string, keycode: VIRTUAL_KEY, captions: [string, string], fontsize: number, width: number, repeat?: boolean, rect?: { left: number, top: number, width: number, height: number }, index?: number, }
-
-    type KeyMap = { [key: string]: { dom: HTMLElement, id: string, setKeyText: (str: string) => void } };
-    type KeyHandler = (str: string, keycode: VIRTUAL_KEY, repeat: boolean) => void;
+        }
+        window.requestAnimationFrame(loop);
+        //////////
+    });
     class VirtualKeyboard {
-
-        private buttons: IKayboardButtonLayout[];
-        private hitAreaMap: Uint8Array;
-        private canvas: HTMLCanvasElement;
-        private toggleShift: boolean;
-        private changed: boolean;
-        private boundRect: ClientRect | DOMRect;
-        root: HTMLElement;
-        total_width: number;
-        total_height: number;
-        width: number;
-        height: number;
-        left: number;
-        top: number;
-        context: CanvasRenderingContext2D;
-        events: Map<string, KeyHandler[]>
-        imageData: ImageData;
-
-        addEventListener(event: string, handler: KeyHandler): void {
-
+        addEventListener(event, handler) {
             if (!this.events.has(event)) {
                 this.events.set(event, []);
             }
             this.events.get(event).push(handler);
         }
-        fire(event: string, str: string, keycode: VIRTUAL_KEY, repeat: boolean): void {
+        fire(event, str, keycode, repeat) {
             if (!this.events.has(event)) {
                 return;
             }
             this.events.get(event).forEach((ev) => ev(str, keycode, repeat));
         }
-
         resize() {
             const boundingRect = this.root.getBoundingClientRect();
             const cell_w = boundingRect.width / this.total_width - 2;
             const cell_h = boundingRect.height / this.total_height - 2;
             const cell_size = Math.min(cell_w, cell_h);
-
             this.width = boundingRect.width;
             this.height = this.total_height * cell_size;
             this.left = boundingRect.left;
@@ -2986,30 +2465,24 @@ module Editor {
             this.canvas.style.position = "absolute";
             this.canvas.style.left = "0px";
             this.canvas.style.top = (boundingRect.height - this.height) + "px";
-
         }
-        constructor(root: HTMLElement, layout: IKayboardLineLayout[][]) {
-            const widths = layout.map((block) =>
-                Math.max(...block.map(line => line.buttons.reduce((s, x) => s + x.width, 0)))
-            );
-            this.events = new Map<string, KeyHandler[]>();
+        constructor(root, layout) {
+            const widths = layout.map((block) => Math.max(...block.map(line => line.buttons.reduce((s, x) => s + x.width, 0))));
+            this.events = new Map();
             this.total_width = widths.reduce((s, x) => s + x, 0);
             this.total_height = Math.max(...layout.map((block) => block.reduce((s, line) => s + line.height, 0)));
             this.buttons = [];
             this.root = root;
             this.canvas = document.createElement("canvas");
             this.context = this.canvas.getContext("2d");
-
             this.root.appendChild(this.canvas);
             this.toggleShift = false;
             this.changed = true;
-            this.pointers = new Map<number, number>();
-
+            this.pointers = new Map();
             this.resize();
             this.imageData = this.context.createImageData(this.width, this.height);
             this.imageData.data32 = new Uint32Array(this.imageData.data.buffer);
-
-            let left_base = 0
+            let left_base = 0;
             for (let i = 0; i < layout.length; i++) {
                 const block = layout[i];
                 const block_width_pixel = this.width * (widths[i]) / this.total_width;
@@ -3029,15 +2502,14 @@ module Editor {
                         left_step += button.width;
                     });
                     top_step += line.height;
-                })
+                });
                 left_base += widths[i];
             }
-
             this.hitAreaMap = new Uint8Array(this.width * this.height);
             this.hitAreaMap.fill(0xFF);
             for (let button of this.buttons) {
                 const buttonWidth = button.rect.width;
-                if (button.keycode != VIRTUAL_KEY.VKEY_NONE) {
+                if (button.keycode != 0 /* VKEY_NONE */) {
                     let pos = button.rect.left + button.rect.top * this.width;
                     for (let y = 0; y < button.rect.height; y++) {
                         this.hitAreaMap.fill(button.index, pos, pos + buttonWidth);
@@ -3045,8 +2517,6 @@ module Editor {
                     }
                 }
             }
-
-
             this.canvas.addEventListener("mousedown", (e) => {
                 const br = this.canvas.getBoundingClientRect();
                 this.onTouchDown(e.button, e.pageX - ~~br.left, e.pageY - ~~br.top);
@@ -3090,22 +2560,25 @@ module Editor {
                 e.stopPropagation();
             });
         }
-
-        pointers: Map<number, number>;
-
-        onTouchDown(finger: number, x: number, y: number) {
+        onTouchDown(finger, x, y) {
             const keyid = this.hitAreaMap[y * this.width + x];
-            if (keyid == 0xFF) { return; }
-            if (this.pointers.has(finger)) { return; }
+            if (keyid == 0xFF) {
+                return;
+            }
+            if (this.pointers.has(finger)) {
+                return;
+            }
             this.pointers.set(finger, keyid);
             const pushedKey = this.buttons[keyid];
             this.changed = true;
             this.toggleShift = false;
             for (let [k, v] of this.pointers) {
-                if (v == 0xFF) { continue; }
-                if (this.buttons[v].keycode == VIRTUAL_KEY.VKEY_SHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_RSHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_LSHIFT) {
+                if (v == 0xFF) {
+                    continue;
+                }
+                if (this.buttons[v].keycode == 16 /* VKEY_SHIFT */ ||
+                    this.buttons[v].keycode == 161 /* VKEY_RSHIFT */ ||
+                    this.buttons[v].keycode == 160 /* VKEY_LSHIFT */) {
                     this.toggleShift = true;
                     this.changed = true;
                     break;
@@ -3113,19 +2586,25 @@ module Editor {
             }
             this.fire("keydown", pushedKey.captions[this.toggleShift ? 1 : 0], pushedKey.keycode, false);
         }
-        onTouchUp(finger: number, x: number, y: number) {
+        onTouchUp(finger, x, y) {
             const keyid = this.hitAreaMap[y * this.width + x];
-            if (keyid == 0xFF) { return; }
-            if (!this.pointers.has(finger)) { return; }
+            if (keyid == 0xFF) {
+                return;
+            }
+            if (!this.pointers.has(finger)) {
+                return;
+            }
             this.pointers.delete(finger);
             const pushedKey = this.buttons[keyid];
             this.changed = true;
             this.toggleShift = false;
             for (let [k, v] of this.pointers) {
-                if (v == 0xFF) { continue; }
-                if (this.buttons[v].keycode == VIRTUAL_KEY.VKEY_SHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_RSHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_LSHIFT) {
+                if (v == 0xFF) {
+                    continue;
+                }
+                if (this.buttons[v].keycode == 16 /* VKEY_SHIFT */ ||
+                    this.buttons[v].keycode == 161 /* VKEY_RSHIFT */ ||
+                    this.buttons[v].keycode == 160 /* VKEY_LSHIFT */) {
                     this.toggleShift = true;
                     this.changed = true;
                     break;
@@ -3133,11 +2612,15 @@ module Editor {
             }
             this.fire("keyup", pushedKey.captions[this.toggleShift ? 1 : 0], pushedKey.keycode, false);
         }
-        onTouchMove(finger: number, x: number, y: number) {
-            if (!this.pointers.has(finger)) { return; }
+        onTouchMove(finger, x, y) {
+            if (!this.pointers.has(finger)) {
+                return;
+            }
             const prevKey = this.pointers.get(finger);
             const keyid = this.hitAreaMap[y * this.width + x];
-            if (keyid == prevKey) { return; }
+            if (keyid == prevKey) {
+                return;
+            }
             this.pointers.set(finger, keyid);
             let upKey = null;
             let downKey = null;
@@ -3151,10 +2634,12 @@ module Editor {
             }
             this.toggleShift = false;
             for (let [k, v] of this.pointers) {
-                if (v == 0xFF) { continue; }
-                if (this.buttons[v].keycode == VIRTUAL_KEY.VKEY_SHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_RSHIFT ||
-                    this.buttons[v].keycode == VIRTUAL_KEY.VKEY_LSHIFT) {
+                if (v == 0xFF) {
+                    continue;
+                }
+                if (this.buttons[v].keycode == 16 /* VKEY_SHIFT */ ||
+                    this.buttons[v].keycode == 161 /* VKEY_RSHIFT */ ||
+                    this.buttons[v].keycode == 160 /* VKEY_LSHIFT */) {
                     this.toggleShift = true;
                     this.changed = true;
                     break;
@@ -3167,249 +2652,252 @@ module Editor {
                 this.fire("keydown", downKey.captions[this.toggleShift ? 1 : 0], downKey.keycode, false);
             }
         }
-
-
-        render(bmpFont: BMPFont) {
-            if (this.changed == false) { return; }
+        render(bmpFont) {
+            if (this.changed == false) {
+                return;
+            }
             const captionIndex = this.toggleShift ? 1 : 0;
             this.imageData.data32.fill(0xFFFFFFFF);
             keypad_layout.forEach((block) => {
                 block.forEach((line) => {
                     line.buttons.forEach((btn) => {
-                        if (btn.keycode != VIRTUAL_KEY.VKEY_NONE) {
+                        if (btn.keycode != 0 /* VKEY_NONE */) {
                             this.imageData.drawRect(btn.rect.left, btn.rect.top, btn.rect.width, btn.rect.height, 0xFF000000);
                             const text = btn.captions[captionIndex];
                             if (text != null && text != "") {
-                                const [w,h] = bmpFont.measureStr(text);
-                                const offx = (btn.rect.width-w)>>1;
-                                const offy = (btn.rect.height-h)>>1;
-                                bmpFont.drawStr(btn.rect.left+offx, btn.rect.top+offy, text, (x, y) => this.imageData.setPixel(x, y, 0xFF000000));
+                                const [w, h] = bmpFont.measureStr(text);
+                                const offx = (btn.rect.width - w) >> 1;
+                                const offy = (btn.rect.height - h) >> 1;
+                                bmpFont.drawStr(btn.rect.left + offx, btn.rect.top + offy, text, (x, y) => this.imageData.setPixel(x, y, 0xFF000000));
                             }
                         }
-                    })
+                    });
                 });
             });
             this.context.putImageData(this.imageData, 0, 0);
             this.changed = false;
-
         }
     }
-
-    const keypad_layout: IKayboardLineLayout[][] = [
+    const keypad_layout = [
         [
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "ESC", "fontsize": 0.8, "width": 2, "captions": ["ESC", "ESC"], "keycode": VIRTUAL_KEY.VKEY_ESCAPE },
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE },
-                    { "id": "F1", "fontsize": 0.8, "width": 2, "captions": ["F1", "F1"], "keycode": VIRTUAL_KEY.VKEY_F1 },
-                    { "id": "F2", "fontsize": 0.8, "width": 2, "captions": ["F2", "F2"], "keycode": VIRTUAL_KEY.VKEY_F2 },
-                    { "id": "F3", "fontsize": 0.8, "width": 2, "captions": ["F3", "F3"], "keycode": VIRTUAL_KEY.VKEY_F3 },
-                    { "id": "F4", "fontsize": 0.8, "width": 2, "captions": ["F4", "F4"], "keycode": VIRTUAL_KEY.VKEY_F4 },
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE },
-                    { "id": "F5", "fontsize": 0.8, "width": 2, "captions": ["F5", "F5"], "keycode": VIRTUAL_KEY.VKEY_F5 },
-                    { "id": "F6", "fontsize": 0.8, "width": 2, "captions": ["F6", "F6"], "keycode": VIRTUAL_KEY.VKEY_F6 },
-                    { "id": "F7", "fontsize": 0.8, "width": 2, "captions": ["F7", "F7"], "keycode": VIRTUAL_KEY.VKEY_F7 },
-                    { "id": "F8", "fontsize": 0.8, "width": 2, "captions": ["F8", "F8"], "keycode": VIRTUAL_KEY.VKEY_F8 },
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE },
-                    { "id": "F9", "fontsize": 0.8, "width": 2, "captions": ["F9", "F9"], "keycode": VIRTUAL_KEY.VKEY_F9 },
-                    { "id": "F10", "fontsize": 0.8, "width": 2, "captions": ["F10", "F10"], "keycode": VIRTUAL_KEY.VKEY_F10 },
-                    { "id": "F11", "fontsize": 0.8, "width": 2, "captions": ["F11", "F11"], "keycode": VIRTUAL_KEY.VKEY_F11 },
-                    { "id": "F12", "fontsize": 0.8, "width": 2, "captions": ["F12", "F12"], "keycode": VIRTUAL_KEY.VKEY_F12 }
+                    { "id": "ESC", "fontsize": 0.8, "width": 2, "captions": ["ESC", "ESC"], "keycode": 27 /* VKEY_ESCAPE */ },
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ },
+                    { "id": "F1", "fontsize": 0.8, "width": 2, "captions": ["F1", "F1"], "keycode": 112 /* VKEY_F1 */ },
+                    { "id": "F2", "fontsize": 0.8, "width": 2, "captions": ["F2", "F2"], "keycode": 113 /* VKEY_F2 */ },
+                    { "id": "F3", "fontsize": 0.8, "width": 2, "captions": ["F3", "F3"], "keycode": 114 /* VKEY_F3 */ },
+                    { "id": "F4", "fontsize": 0.8, "width": 2, "captions": ["F4", "F4"], "keycode": 115 /* VKEY_F4 */ },
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ },
+                    { "id": "F5", "fontsize": 0.8, "width": 2, "captions": ["F5", "F5"], "keycode": 116 /* VKEY_F5 */ },
+                    { "id": "F6", "fontsize": 0.8, "width": 2, "captions": ["F6", "F6"], "keycode": 117 /* VKEY_F6 */ },
+                    { "id": "F7", "fontsize": 0.8, "width": 2, "captions": ["F7", "F7"], "keycode": 118 /* VKEY_F7 */ },
+                    { "id": "F8", "fontsize": 0.8, "width": 2, "captions": ["F8", "F8"], "keycode": 119 /* VKEY_F8 */ },
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ },
+                    { "id": "F9", "fontsize": 0.8, "width": 2, "captions": ["F9", "F9"], "keycode": 120 /* VKEY_F9 */ },
+                    { "id": "F10", "fontsize": 0.8, "width": 2, "captions": ["F10", "F10"], "keycode": 121 /* VKEY_F10 */ },
+                    { "id": "F11", "fontsize": 0.8, "width": 2, "captions": ["F11", "F11"], "keycode": 122 /* VKEY_F11 */ },
+                    { "id": "F12", "fontsize": 0.8, "width": 2, "captions": ["F12", "F12"], "keycode": 123 /* VKEY_F12 */ }
                 ]
             },
             {
                 "height": 1,
                 "buttons": [
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE }
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "`", "fontsize": 1, "width": 2, "captions": ["`", "~"], "keycode": VIRTUAL_KEY.VKEY_OEM_3 },
-                    { "id": "1", "fontsize": 1, "width": 2, "captions": ["1", "!"], "keycode": VIRTUAL_KEY.VKEY_NUM1 },
-                    { "id": "2", "fontsize": 1, "width": 2, "captions": ["2", "@"], "keycode": VIRTUAL_KEY.VKEY_NUM2 },
-                    { "id": "3", "fontsize": 1, "width": 2, "captions": ["3", "#"], "keycode": VIRTUAL_KEY.VKEY_NUM3 },
-                    { "id": "4", "fontsize": 1, "width": 2, "captions": ["4", "$"], "keycode": VIRTUAL_KEY.VKEY_NUM4 },
-                    { "id": "5", "fontsize": 1, "width": 2, "captions": ["5", "%"], "keycode": VIRTUAL_KEY.VKEY_NUM5 },
-                    { "id": "6", "fontsize": 1, "width": 2, "captions": ["6", "^"], "keycode": VIRTUAL_KEY.VKEY_NUM6 },
-                    { "id": "7", "fontsize": 1, "width": 2, "captions": ["7", "&"], "keycode": VIRTUAL_KEY.VKEY_NUM7 },
-                    { "id": "8", "fontsize": 1, "width": 2, "captions": ["8", "*"], "keycode": VIRTUAL_KEY.VKEY_NUM8 },
-                    { "id": "9", "fontsize": 1, "width": 2, "captions": ["9", "("], "keycode": VIRTUAL_KEY.VKEY_NUM9 },
-                    { "id": "0", "fontsize": 1, "width": 2, "captions": ["0", ")"], "keycode": VIRTUAL_KEY.VKEY_NUM0 },
-                    { "id": "-", "fontsize": 1, "width": 2, "captions": ["-", "_"], "keycode": VIRTUAL_KEY.VKEY_OEM_MINUS },
-                    { "id": "=", "fontsize": 1, "width": 2, "captions": ["=", "+"], "keycode": VIRTUAL_KEY.VKEY_OEM_PLUS },
-                    { "id": "BackSpace", "fontsize": 0.8, "width": 4, "captions": ["back", "back"], "keycode": VIRTUAL_KEY.VKEY_BACK }
+                    { "id": "`", "fontsize": 1, "width": 2, "captions": ["`", "~"], "keycode": 192 /* VKEY_OEM_3 */ },
+                    { "id": "1", "fontsize": 1, "width": 2, "captions": ["1", "!"], "keycode": 49 /* VKEY_NUM1 */ },
+                    { "id": "2", "fontsize": 1, "width": 2, "captions": ["2", "@"], "keycode": 50 /* VKEY_NUM2 */ },
+                    { "id": "3", "fontsize": 1, "width": 2, "captions": ["3", "#"], "keycode": 51 /* VKEY_NUM3 */ },
+                    { "id": "4", "fontsize": 1, "width": 2, "captions": ["4", "$"], "keycode": 52 /* VKEY_NUM4 */ },
+                    { "id": "5", "fontsize": 1, "width": 2, "captions": ["5", "%"], "keycode": 53 /* VKEY_NUM5 */ },
+                    { "id": "6", "fontsize": 1, "width": 2, "captions": ["6", "^"], "keycode": 54 /* VKEY_NUM6 */ },
+                    { "id": "7", "fontsize": 1, "width": 2, "captions": ["7", "&"], "keycode": 55 /* VKEY_NUM7 */ },
+                    { "id": "8", "fontsize": 1, "width": 2, "captions": ["8", "*"], "keycode": 56 /* VKEY_NUM8 */ },
+                    { "id": "9", "fontsize": 1, "width": 2, "captions": ["9", "("], "keycode": 57 /* VKEY_NUM9 */ },
+                    { "id": "0", "fontsize": 1, "width": 2, "captions": ["0", ")"], "keycode": 48 /* VKEY_NUM0 */ },
+                    { "id": "-", "fontsize": 1, "width": 2, "captions": ["-", "_"], "keycode": 189 /* VKEY_OEM_MINUS */ },
+                    { "id": "=", "fontsize": 1, "width": 2, "captions": ["=", "+"], "keycode": 187 /* VKEY_OEM_PLUS */ },
+                    { "id": "BackSpace", "fontsize": 0.8, "width": 4, "captions": ["back", "back"], "keycode": 8 /* VKEY_BACK */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "Tab", "fontsize": 0.8, "width": 3, "captions": ["tab", "tab"], "keycode": VIRTUAL_KEY.VKEY_TAB },
-                    { "id": "q", "fontsize": 1, "width": 2, "captions": ["q", "Q"], "keycode": VIRTUAL_KEY.VKEY_KEY_Q },
-                    { "id": "w", "fontsize": 1, "width": 2, "captions": ["w", "W"], "keycode": VIRTUAL_KEY.VKEY_KEY_W },
-                    { "id": "e", "fontsize": 1, "width": 2, "captions": ["e", "E"], "keycode": VIRTUAL_KEY.VKEY_KEY_E },
-                    { "id": "r", "fontsize": 1, "width": 2, "captions": ["r", "R"], "keycode": VIRTUAL_KEY.VKEY_KEY_R },
-                    { "id": "t", "fontsize": 1, "width": 2, "captions": ["t", "T"], "keycode": VIRTUAL_KEY.VKEY_KEY_T },
-                    { "id": "y", "fontsize": 1, "width": 2, "captions": ["y", "Y"], "keycode": VIRTUAL_KEY.VKEY_KEY_Y },
-                    { "id": "u", "fontsize": 1, "width": 2, "captions": ["u", "U"], "keycode": VIRTUAL_KEY.VKEY_KEY_U },
-                    { "id": "i", "fontsize": 1, "width": 2, "captions": ["i", "I"], "keycode": VIRTUAL_KEY.VKEY_KEY_I },
-                    { "id": "o", "fontsize": 1, "width": 2, "captions": ["o", "O"], "keycode": VIRTUAL_KEY.VKEY_KEY_O },
-                    { "id": "p", "fontsize": 1, "width": 2, "captions": ["p", "P"], "keycode": VIRTUAL_KEY.VKEY_KEY_P },
-                    { "id": "[", "fontsize": 1, "width": 2, "captions": ["[", "{"], "keycode": VIRTUAL_KEY.VKEY_OEM_4 },
-                    { "id": "]", "fontsize": 1, "width": 2, "captions": ["]", "}"], "keycode": VIRTUAL_KEY.VKEY_OEM_6 },
-                    { "id": "\\", "fontsize": 1, "width": 3, "captions": ["\\", "|"], "keycode": VIRTUAL_KEY.VKEY_OEM_5 }
+                    { "id": "Tab", "fontsize": 0.8, "width": 3, "captions": ["tab", "tab"], "keycode": 9 /* VKEY_TAB */ },
+                    { "id": "q", "fontsize": 1, "width": 2, "captions": ["q", "Q"], "keycode": 81 /* VKEY_KEY_Q */ },
+                    { "id": "w", "fontsize": 1, "width": 2, "captions": ["w", "W"], "keycode": 87 /* VKEY_KEY_W */ },
+                    { "id": "e", "fontsize": 1, "width": 2, "captions": ["e", "E"], "keycode": 69 /* VKEY_KEY_E */ },
+                    { "id": "r", "fontsize": 1, "width": 2, "captions": ["r", "R"], "keycode": 82 /* VKEY_KEY_R */ },
+                    { "id": "t", "fontsize": 1, "width": 2, "captions": ["t", "T"], "keycode": 84 /* VKEY_KEY_T */ },
+                    { "id": "y", "fontsize": 1, "width": 2, "captions": ["y", "Y"], "keycode": 89 /* VKEY_KEY_Y */ },
+                    { "id": "u", "fontsize": 1, "width": 2, "captions": ["u", "U"], "keycode": 85 /* VKEY_KEY_U */ },
+                    { "id": "i", "fontsize": 1, "width": 2, "captions": ["i", "I"], "keycode": 73 /* VKEY_KEY_I */ },
+                    { "id": "o", "fontsize": 1, "width": 2, "captions": ["o", "O"], "keycode": 79 /* VKEY_KEY_O */ },
+                    { "id": "p", "fontsize": 1, "width": 2, "captions": ["p", "P"], "keycode": 80 /* VKEY_KEY_P */ },
+                    { "id": "[", "fontsize": 1, "width": 2, "captions": ["[", "{"], "keycode": 219 /* VKEY_OEM_4 */ },
+                    { "id": "]", "fontsize": 1, "width": 2, "captions": ["]", "}"], "keycode": 221 /* VKEY_OEM_6 */ },
+                    { "id": "\\", "fontsize": 1, "width": 3, "captions": ["\\", "|"], "keycode": 220 /* VKEY_OEM_5 */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "CapsLock", "fontsize": 0.8, "width": 4, "repeat": false, "captions": ["caps", "caps"], "keycode": VIRTUAL_KEY.VKEY_CAPITAL },
-                    { "id": "a", "fontsize": 1, "width": 2, "captions": ["a", "A"], "keycode": VIRTUAL_KEY.VKEY_KEY_A },
-                    { "id": "s", "fontsize": 1, "width": 2, "captions": ["s", "S"], "keycode": VIRTUAL_KEY.VKEY_KEY_S },
-                    { "id": "d", "fontsize": 1, "width": 2, "captions": ["d", "D"], "keycode": VIRTUAL_KEY.VKEY_KEY_D },
-                    { "id": "f", "fontsize": 1, "width": 2, "captions": ["f", "F"], "keycode": VIRTUAL_KEY.VKEY_KEY_F },
-                    { "id": "g", "fontsize": 1, "width": 2, "captions": ["g", "G"], "keycode": VIRTUAL_KEY.VKEY_KEY_G },
-                    { "id": "h", "fontsize": 1, "width": 2, "captions": ["h", "H"], "keycode": VIRTUAL_KEY.VKEY_KEY_H },
-                    { "id": "j", "fontsize": 1, "width": 2, "captions": ["j", "J"], "keycode": VIRTUAL_KEY.VKEY_KEY_J },
-                    { "id": "k", "fontsize": 1, "width": 2, "captions": ["k", "K"], "keycode": VIRTUAL_KEY.VKEY_KEY_K },
-                    { "id": "l", "fontsize": 1, "width": 2, "captions": ["l", "L"], "keycode": VIRTUAL_KEY.VKEY_KEY_L },
-                    { "id": ";", "fontsize": 1, "width": 2, "captions": [";", ":"], "keycode": VIRTUAL_KEY.VKEY_OEM_1 },
-                    { "id": "'", "fontsize": 1, "width": 2, "captions": ["'", "\""], "keycode": VIRTUAL_KEY.VKEY_OEM_7 },
-                    { "id": "Enter", "fontsize": 0.8, "width": 4, "captions": ["enter", "enter"], "keycode": VIRTUAL_KEY.VKEY_RETURN }
+                    { "id": "CapsLock", "fontsize": 0.8, "width": 4, "repeat": false, "captions": ["caps", "caps"], "keycode": 20 /* VKEY_CAPITAL */ },
+                    { "id": "a", "fontsize": 1, "width": 2, "captions": ["a", "A"], "keycode": 65 /* VKEY_KEY_A */ },
+                    { "id": "s", "fontsize": 1, "width": 2, "captions": ["s", "S"], "keycode": 83 /* VKEY_KEY_S */ },
+                    { "id": "d", "fontsize": 1, "width": 2, "captions": ["d", "D"], "keycode": 68 /* VKEY_KEY_D */ },
+                    { "id": "f", "fontsize": 1, "width": 2, "captions": ["f", "F"], "keycode": 70 /* VKEY_KEY_F */ },
+                    { "id": "g", "fontsize": 1, "width": 2, "captions": ["g", "G"], "keycode": 71 /* VKEY_KEY_G */ },
+                    { "id": "h", "fontsize": 1, "width": 2, "captions": ["h", "H"], "keycode": 72 /* VKEY_KEY_H */ },
+                    { "id": "j", "fontsize": 1, "width": 2, "captions": ["j", "J"], "keycode": 74 /* VKEY_KEY_J */ },
+                    { "id": "k", "fontsize": 1, "width": 2, "captions": ["k", "K"], "keycode": 75 /* VKEY_KEY_K */ },
+                    { "id": "l", "fontsize": 1, "width": 2, "captions": ["l", "L"], "keycode": 76 /* VKEY_KEY_L */ },
+                    { "id": ";", "fontsize": 1, "width": 2, "captions": [";", ":"], "keycode": 186 /* VKEY_OEM_1 */ },
+                    { "id": "'", "fontsize": 1, "width": 2, "captions": ["'", "\""], "keycode": 222 /* VKEY_OEM_7 */ },
+                    { "id": "Enter", "fontsize": 0.8, "width": 4, "captions": ["enter", "enter"], "keycode": 13 /* VKEY_RETURN */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "LShift", "fontsize": 0.8, "width": 5, "repeat": false, "captions": ["shift", "shift"], "keycode": VIRTUAL_KEY.VKEY_LSHIFT },
-                    { "id": "z", "fontsize": 1, "width": 2, "captions": ["z", "Z"], "keycode": VIRTUAL_KEY.VKEY_KEY_Z },
-                    { "id": "x", "fontsize": 1, "width": 2, "captions": ["x", "X"], "keycode": VIRTUAL_KEY.VKEY_KEY_X },
-                    { "id": "c", "fontsize": 1, "width": 2, "captions": ["c", "C"], "keycode": VIRTUAL_KEY.VKEY_KEY_C },
-                    { "id": "v", "fontsize": 1, "width": 2, "captions": ["v", "V"], "keycode": VIRTUAL_KEY.VKEY_KEY_V },
-                    { "id": "b", "fontsize": 1, "width": 2, "captions": ["b", "B"], "keycode": VIRTUAL_KEY.VKEY_KEY_B },
-                    { "id": "n", "fontsize": 1, "width": 2, "captions": ["n", "N"], "keycode": VIRTUAL_KEY.VKEY_KEY_N },
-                    { "id": "m", "fontsize": 1, "width": 2, "captions": ["m", "M"], "keycode": VIRTUAL_KEY.VKEY_KEY_M },
-                    { "id": ",", "fontsize": 1, "width": 2, "captions": [",", "<"], "keycode": VIRTUAL_KEY.VKEY_OEM_COMMA },
-                    { "id": ".", "fontsize": 1, "width": 2, "captions": [".", ">"], "keycode": VIRTUAL_KEY.VKEY_OEM_PERIOD },
-                    { "id": "/", "fontsize": 1, "width": 2, "captions": ["/", "?"], "keycode": VIRTUAL_KEY.VKEY_OEM_2 },
-                    { "id": "RShift", "fontsize": 0.8, "width": 5, "repeat": false, "captions": ["shift", "shift"], "keycode": VIRTUAL_KEY.VKEY_RSHIFT }
+                    { "id": "LShift", "fontsize": 0.8, "width": 5, "repeat": false, "captions": ["shift", "shift"], "keycode": 160 /* VKEY_LSHIFT */ },
+                    { "id": "z", "fontsize": 1, "width": 2, "captions": ["z", "Z"], "keycode": 90 /* VKEY_KEY_Z */ },
+                    { "id": "x", "fontsize": 1, "width": 2, "captions": ["x", "X"], "keycode": 88 /* VKEY_KEY_X */ },
+                    { "id": "c", "fontsize": 1, "width": 2, "captions": ["c", "C"], "keycode": 67 /* VKEY_KEY_C */ },
+                    { "id": "v", "fontsize": 1, "width": 2, "captions": ["v", "V"], "keycode": 86 /* VKEY_KEY_V */ },
+                    { "id": "b", "fontsize": 1, "width": 2, "captions": ["b", "B"], "keycode": 66 /* VKEY_KEY_B */ },
+                    { "id": "n", "fontsize": 1, "width": 2, "captions": ["n", "N"], "keycode": 78 /* VKEY_KEY_N */ },
+                    { "id": "m", "fontsize": 1, "width": 2, "captions": ["m", "M"], "keycode": 77 /* VKEY_KEY_M */ },
+                    { "id": ",", "fontsize": 1, "width": 2, "captions": [",", "<"], "keycode": 188 /* VKEY_OEM_COMMA */ },
+                    { "id": ".", "fontsize": 1, "width": 2, "captions": [".", ">"], "keycode": 190 /* VKEY_OEM_PERIOD */ },
+                    { "id": "/", "fontsize": 1, "width": 2, "captions": ["/", "?"], "keycode": 191 /* VKEY_OEM_2 */ },
+                    { "id": "RShift", "fontsize": 0.8, "width": 5, "repeat": false, "captions": ["shift", "shift"], "keycode": 161 /* VKEY_RSHIFT */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "LCtrl", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["ctrl", "ctrl"], "keycode": VIRTUAL_KEY.VKEY_LCONTROL },
-                    { "id": "Fn", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["fn", "fn"], "keycode": VIRTUAL_KEY.VKEY_NONE },
-                    { "id": "LOs", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["os", "os"], "keycode": VIRTUAL_KEY.VKEY_LWIN },
-                    { "id": "LAlt", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["alt", "alt"], "keycode": VIRTUAL_KEY.VKEY_MENU },
-                    { "id": "Space", "fontsize": 0.8, "width": 12, "captions": ["space", "space"], "keycode": VIRTUAL_KEY.VKEY_SPACE },
-                    { "id": "RAlt", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["alt", "alt"], "keycode": VIRTUAL_KEY.VKEY_MENU },
-                    { "id": "ROs", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["os", "os"], "keycode": VIRTUAL_KEY.VKEY_RWIN },
-                    { "id": "Menu", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["menu", "menu"], "keycode": VIRTUAL_KEY.VKEY_RMENU },
-                    { "id": "RCtrl", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["ctrl", "ctrl"], "keycode": VIRTUAL_KEY.VKEY_RCONTROL }
+                    { "id": "LCtrl", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["ctrl", "ctrl"], "keycode": 162 /* VKEY_LCONTROL */ },
+                    { "id": "Fn", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["fn", "fn"], "keycode": 0 /* VKEY_NONE */ },
+                    { "id": "LOs", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["os", "os"], "keycode": 91 /* VKEY_LWIN */ },
+                    { "id": "LAlt", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["alt", "alt"], "keycode": 18 /* VKEY_MENU */ },
+                    { "id": "Space", "fontsize": 0.8, "width": 12, "captions": ["space", "space"], "keycode": 32 /* VKEY_SPACE */ },
+                    { "id": "RAlt", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["alt", "alt"], "keycode": 18 /* VKEY_MENU */ },
+                    { "id": "ROs", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["os", "os"], "keycode": 92 /* VKEY_RWIN */ },
+                    { "id": "Menu", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["menu", "menu"], "keycode": 165 /* VKEY_RMENU */ },
+                    { "id": "RCtrl", "fontsize": 0.8, "width": 3, "repeat": false, "captions": ["ctrl", "ctrl"], "keycode": 163 /* VKEY_RCONTROL */ }
                 ]
             }
         ], [
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "PrintScreen", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["PrtSc", "PrtSc"], "keycode": VIRTUAL_KEY.VKEY_PRINT },
-                    { "id": "ScrollLock", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["ScrLk", "ScrLk"], "keycode": VIRTUAL_KEY.VKEY_SCROLL },
-                    { "id": "Pause", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["Pause", "Pause"], "keycode": VIRTUAL_KEY.VKEY_PAUSE }
+                    { "id": "PrintScreen", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["PrtSc", "PrtSc"], "keycode": 42 /* VKEY_PRINT */ },
+                    { "id": "ScrollLock", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["ScrLk", "ScrLk"], "keycode": 145 /* VKEY_SCROLL */ },
+                    { "id": "Pause", "fontsize": 0.8, "width": 2, "repeat": false, "captions": ["Pause", "Pause"], "keycode": 19 /* VKEY_PAUSE */ }
                 ]
             },
             {
                 "height": 1,
                 "buttons": [
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE }
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "Insert", "fontsize": 0.8, "width": 2, "captions": ["Ins", "Ins"], "keycode": VIRTUAL_KEY.VKEY_INSERT },
-                    { "id": "Home", "fontsize": 0.8, "width": 2, "captions": ["Home", "Home"], "keycode": VIRTUAL_KEY.VKEY_HOME },
-                    { "id": "PageUp", "fontsize": 0.8, "width": 2, "captions": ["PgUp", "PgUp"], "keycode": VIRTUAL_KEY.VKEY_PRIOR }
+                    { "id": "Insert", "fontsize": 0.8, "width": 2, "captions": ["Ins", "Ins"], "keycode": 45 /* VKEY_INSERT */ },
+                    { "id": "Home", "fontsize": 0.8, "width": 2, "captions": ["Home", "Home"], "keycode": 36 /* VKEY_HOME */ },
+                    { "id": "PageUp", "fontsize": 0.8, "width": 2, "captions": ["PgUp", "PgUp"], "keycode": 33 /* VKEY_PRIOR */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "Delete", "fontsize": 0.8, "width": 2, "captions": ["Del", "Del"], "keycode": VIRTUAL_KEY.VKEY_DELETE },
-                    { "id": "End", "fontsize": 0.8, "width": 2, "captions": ["End", "End"], "keycode": VIRTUAL_KEY.VKEY_END },
-                    { "id": "PageDown", "fontsize": 0.8, "width": 2, "captions": ["PgDn", "PgDn"], "keycode": VIRTUAL_KEY.VKEY_NEXT }
+                    { "id": "Delete", "fontsize": 0.8, "width": 2, "captions": ["Del", "Del"], "keycode": 46 /* VKEY_DELETE */ },
+                    { "id": "End", "fontsize": 0.8, "width": 2, "captions": ["End", "End"], "keycode": 35 /* VKEY_END */ },
+                    { "id": "PageDown", "fontsize": 0.8, "width": 2, "captions": ["PgDn", "PgDn"], "keycode": 34 /* VKEY_NEXT */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE }
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE },
-                    { "id": "ArrowUp", "fontsize": 0.8, "width": 2, "captions": ["↑", "↑"], "keycode": VIRTUAL_KEY.VKEY_UP },
-                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": VIRTUAL_KEY.VKEY_NONE }
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ },
+                    { "id": "ArrowUp", "fontsize": 0.8, "width": 2, "captions": ["↑", "↑"], "keycode": 38 /* VKEY_UP */ },
+                    { "id": "", "fontsize": 0.8, "width": 2, "captions": [null, null], "keycode": 0 /* VKEY_NONE */ }
                 ]
             },
             {
                 "height": 2,
                 "buttons": [
-                    { "id": "ArrowLeft", "fontsize": 0.8, "width": 2, "captions": ["←", "←"], "keycode": VIRTUAL_KEY.VKEY_LEFT },
-                    { "id": "ArrowDown", "fontsize": 0.8, "width": 2, "captions": ["↓", "↓"], "keycode": VIRTUAL_KEY.VKEY_DOWN },
-                    { "id": "ArrowRight", "fontsize": 0.8, "width": 2, "captions": ["→", "→"], "keycode": VIRTUAL_KEY.VKEY_RIGHT }
+                    { "id": "ArrowLeft", "fontsize": 0.8, "width": 2, "captions": ["←", "←"], "keycode": 37 /* VKEY_LEFT */ },
+                    { "id": "ArrowDown", "fontsize": 0.8, "width": 2, "captions": ["↓", "↓"], "keycode": 40 /* VKEY_DOWN */ },
+                    { "id": "ArrowRight", "fontsize": 0.8, "width": 2, "captions": ["→", "→"], "keycode": 39 /* VKEY_RIGHT */ }
                 ]
             }
         ]
     ];
-
-}
-
-interface Uint8Array {
-    getBit(n: number): number;
-    setBit(n: number, value: number): void;
-}
-
-Uint8Array.prototype.getBit = function (n: number): number {
+})(Editor || (Editor = {}));
+Uint8Array.prototype.getBit = function (n) {
     return this[n >> 3] & (0x80 >> (n & 0x07));
-}
-
-Uint8Array.prototype.setBit = function (n: number, value: number): void {
+};
+Uint8Array.prototype.setBit = function (n, value) {
     const bit = 0x80 >> (n & 0x07);
     if (value) {
         this[n >> 3] |= bit;
-    } else {
+    }
+    else {
         this[n >> 3] &= ~bit;
     }
-}
-
-interface ImageData {
-    data32: Uint32Array;
-    setPixel(x: number, y: number, color: number): void;
-    fillRect(x: number, y: number, w: number, h: number, color: number): void;
-    drawRect(x: number, y: number, w: number, h: number, color: number): void;
-}
-
-ImageData.prototype.setPixel = function (x: number, y: number, color: number): void {
-    if (x < 0) { return; }
-    if (x >= this.width) { return; }
-    if (y < 0) { return; }
-    if (y >= this.height) { return; }
+};
+ImageData.prototype.setPixel = function (x, y, color) {
+    if (x < 0) {
+        return;
+    }
+    if (x >= this.width) {
+        return;
+    }
+    if (y < 0) {
+        return;
+    }
+    if (y >= this.height) {
+        return;
+    }
     this.data32[y * this.width + x] = color;
-}
-
-ImageData.prototype.fillRect = function (x: number, y: number, w: number, h: number, color: number): void {
-    if (x < 0) { w += x; x = 0; }
-    if (x + w > this.width) { w = this.width - x; }
-    if (w <= 0) { return; }
-    if (y < 0) { h += y; y = 0; }
-    if (y + h > this.height) { h = this.height - y; }
-    if (h <= 0) { return; }
-
+};
+ImageData.prototype.fillRect = function (x, y, w, h, color) {
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (x + w > this.width) {
+        w = this.width - x;
+    }
+    if (w <= 0) {
+        return;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (y + h > this.height) {
+        h = this.height - y;
+    }
+    if (h <= 0) {
+        return;
+    }
     const width = this.width;
     let start = y * width + x;
     let end = start + w;
@@ -3418,15 +2906,28 @@ ImageData.prototype.fillRect = function (x: number, y: number, w: number, h: num
         start += width;
         end += width;
     }
-}
-ImageData.prototype.drawRect = function (x: number, y: number, w: number, h: number, color: number): void {
-    if (x < 0) { w += x; x = 0; }
-    if (x + w > this.width) { w = this.width - x; }
-    if (w <= 0) { return; }
-    if (y < 0) { h += y; y = 0; }
-    if (y + h > this.height) { h = this.height - y; }
-    if (h <= 0) { return; }
-
+};
+ImageData.prototype.drawRect = function (x, y, w, h, color) {
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (x + w > this.width) {
+        w = this.width - x;
+    }
+    if (w <= 0) {
+        return;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (y + h > this.height) {
+        h = this.height - y;
+    }
+    if (h <= 0) {
+        return;
+    }
     const width = this.width;
     let start = y * width + x;
     let end = start + w;
@@ -3438,5 +2939,5 @@ ImageData.prototype.drawRect = function (x: number, y: number, w: number, h: num
         this.data32[end - 1] = color;
     }
     this.data32.fill(color, start, end);
-}
-
+};
+//# sourceMappingURL=editor.js.map
