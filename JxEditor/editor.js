@@ -569,7 +569,7 @@ var Editor;
             }
             it.dispose();
         }
-        static loadFont(url) {
+        static loadFont(url, progress = undefined) {
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
@@ -581,6 +581,9 @@ var Editor;
                         reject(new Error(xhr.statusText));
                     }
                 };
+                if (progress !== null && progress !== undefined) {
+                    xhr.onprogress = (e) => progress(e.loaded, e.total);
+                }
                 xhr.onerror = () => { reject(new Error(xhr.statusText)); };
                 xhr.responseType = 'arraybuffer';
                 xhr.send(null);
@@ -1287,6 +1290,7 @@ var Editor;
             this.font = null;
             this.textVram = null;
             this.insertMode = true;
+            this.needUpdate = false;
             /**
             * 現在のカーソル位置に対応するテキスト位置
             * [0] は現在位置を示す値
@@ -1333,6 +1337,8 @@ var Editor;
             this.edited = false;
             // 挿入モードに設定
             this.insertMode = true;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         getCursorScreenPosX() { return this.currentCursorPosition[0].x; }
         getCursorScreenPosY() { return this.currentCursorPosition[0].y; }
@@ -1367,6 +1373,8 @@ var Editor;
             currentCursor.copyTo(this.currentCursor[0]);
             currentCursor.dispose();
             leftTopCursor.dispose();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         clear() {
             if (this.selectRangeStartCursor !== null) {
@@ -1382,6 +1390,8 @@ var Editor;
             this.insertMode = true;
             // バッファクリア（カーソルも全部補正される）
             this.textBuffer.clear();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         /**
          * 画面上のカーソル位置と再算出した位置情報が一致しているか検査（デバッグ用）
@@ -1522,6 +1532,7 @@ var Editor;
             }
             cur.dispose();
             prevCur.dispose();
+            this.needUpdate = true;
             return result;
         }
         // 画面上で現在の文字の手前まで移動
@@ -1544,6 +1555,7 @@ var Editor;
             prevCur.dispose();
             return true;
         }
+        // 指定したディスプレイ位置になるまでカーソル位置を進める
         moveCursorToDisplayPos(targetTextPosition, resultTextPosition, resultTextBufferCursor) {
             const pos = { x: 0, y: 0 };
             const prevPos = { x: 0, y: 0 };
@@ -1588,6 +1600,8 @@ var Editor;
             }
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
             this.validateDisplayCursorPos();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             return true;
         }
         // カーソル位置に１文字挿入する
@@ -1597,6 +1611,8 @@ var Editor;
             }
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
             this.validateDisplayCursorPos();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             return true;
         }
         // 画面を１行下にスクロールする
@@ -1617,6 +1633,7 @@ var Editor;
                 }
             }
         }
+        // 画面を１行上にスクロールする
         screenScrollUp() {
             // カーソルの画面Ｙ座標が最上列なので左上座標の更新が必要
             const lt = this.displayLeftTopCursor[0].duplicate();
@@ -1657,6 +1674,8 @@ var Editor;
             }
             this.moveCursorToPrev(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         // カーソルを1つ左に移動
         cursorMoveLeft() {
@@ -1671,6 +1690,8 @@ var Editor;
                     // カーソルを進めることに成功したらカーソル位置が画面最下段からはみ出たので
                     // 画面を一行下にスクロールする
                     this.screenScrollDown();
+                    // 画面更新が必要な状態に設定
+                    this.needUpdate = true;
                 }
             }
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
@@ -1698,6 +1719,8 @@ var Editor;
             c.copyTo(this.currentCursor[0]);
             this.currentCursorPosition[0] = p;
             c.dispose();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             this.validateDisplayCursorPos();
         }
         cursorMoveUp() {
@@ -1720,6 +1743,8 @@ var Editor;
             c.copyTo(this.currentCursor[0]);
             this.currentCursorPosition[0] = p;
             c.dispose();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             // 画面を一行下にスクロールが必要か？
             if (this.currentCursorPosition[0].y === this.editorScreenHeight) {
                 // 必要
@@ -1739,6 +1764,8 @@ var Editor;
         cursorMoveToLineHeadBody() {
             this.moveCursorToDisplayLineHead(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = 0;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         cursorMoveToLineHead() {
             this.validateDisplayCursorPos();
@@ -1749,6 +1776,8 @@ var Editor;
         cursorMoveToLineTailBody() {
             this.moveCursorToDisplayLineTail(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         cursorMoveToLineTail() {
             this.validateDisplayCursorPos();
@@ -1784,6 +1813,8 @@ var Editor;
                     this.cursorMoveDown();
                 }
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         cursorMovePageUp() {
             this.validateDisplayCursorPos();
@@ -1824,6 +1855,8 @@ var Editor;
                     this.cursorMoveUp();
                 }
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         cursorMovePageDown() {
             this.validateDisplayCursorPos();
@@ -1845,6 +1878,8 @@ var Editor;
             this.currentCursorPosition[0].y = 0;
             // 最後の横移動位置をリセット
             this.cachedCursorScreenPosX = 0;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         ///////////////////
         // 選択範囲をクリップボードにコピー
@@ -1871,6 +1906,7 @@ var Editor;
             bp1.dispose();
             bp2.dispose();
         }
+        // クリップボードから貼り付け
         pasteFromClipboard() {
             // クリップボードから貼り付け
             for (let i = 0; i < this.clipboard.length; i++) {
@@ -1879,9 +1915,11 @@ var Editor;
                 }
                 this.cursorMoveRight(); //画面上、バッファ上のカーソル位置を1つ後ろに移動
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         ///////////////////
-        //範囲選択モード開始時のカーソル開始位置グローバル変数設定
+        //範囲選択モード開始時のカーソル開始位置設定
         setSelectedRangeStart() {
             if (this.selectRangeStartCursor !== null) {
                 this.selectRangeStartCursor.dispose();
@@ -1890,6 +1928,8 @@ var Editor;
             this.selectRangeStartCursor = this.currentCursor[0].duplicate();
             this.selectStartCursorScreenPos.x = this.currentCursorPosition[0].x;
             this.selectStartCursorScreenPos.y = this.currentCursorPosition[0].y;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         getSelectedRangeLength() {
             if (this.selectRangeStartCursor === null) {
@@ -1931,6 +1971,8 @@ var Editor;
             // 始点からn文字削除
             this.textBuffer.deleteMany(this.currentCursor[0], n);
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         checkSelectedRange() {
             if (this.selectRangeStartCursor !== null &&
@@ -1939,6 +1981,8 @@ var Editor;
                 //選択範囲の開始と終了が重なったら範囲選択モード解除
                 this.selectRangeStartCursor.dispose();
                 this.selectRangeStartCursor = null;
+                // 画面更新が必要な状態に設定
+                this.needUpdate = true;
             }
         }
         ///////////////////
@@ -1967,6 +2011,8 @@ var Editor;
             this.currentCursorPosition[1].x = 0;
             this.currentCursorPosition[0].y = this.currentCursorPosition[1].y;
             this.currentCursorPosition[1].y = 0;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
         discardSavedCursor() {
             if (this.currentCursor[1] !== null) {
@@ -1980,8 +2026,14 @@ var Editor;
             this.currentCursorPosition[1].x = 0;
             this.currentCursorPosition[1].y = 0;
         }
-        ///////////////////
         draw() {
+            if (this.needUpdate === false) {
+                return false;
+            }
+            this.textVram.setTextColor(COLOR_NORMALTEXT);
+            this.textVram.setBackgroundColor(COLOR_NORMALTEXT_BG);
+            // 画面更新するので更新フラグ解除
+            this.needUpdate = false;
             let textColor = COLOR_NORMALTEXT;
             let selectStart;
             let selectEnd;
@@ -2037,6 +2089,14 @@ var Editor;
                 selectEnd.dispose();
             }
             //EnableInterrupt();
+            //エディター画面最下行の表示
+            this.textVram.setCursorPosition(0, this.textVram.height - 1);
+            this.textVram.setTextColor(COLOR_BOTTOMLINE);
+            this.textVram.setBackgroundColor(COLOR_BOTTOMLINE_BG);
+            this.textVram.putStr(this.menuStr);
+            this.textVram.putDigit2(this.textBuffer.getTotalLength(), 5);
+            this.textVram.fillBackgroundColor(0, this.textVram.height - 1, this.textVram.width, COLOR_BOTTOMLINE_BG);
+            return true;
         }
         ///////////////////
         save(start, write, end, context) {
@@ -2062,6 +2122,10 @@ var Editor;
         }
         load(start, read, end, context) {
             let ret = false;
+            // カーソル位置を行頭に移動
+            this.cursorMoveToBeginningOfDocument();
+            // クリア
+            this.clear();
             if (start(context)) {
                 ret = true;
                 this.clear();
@@ -2072,16 +2136,11 @@ var Editor;
                 }
             }
             end(context);
+            // カーソル位置を行頭に移動
+            this.cursorMoveToBeginningOfDocument();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             return ret;
-        }
-        drawStatusLine() {
-            //エディター画面最下行の表示
-            this.textVram.setCursorPosition(0, this.textVram.height - 1);
-            this.textVram.setTextColor(COLOR_BOTTOMLINE);
-            this.textVram.setBackgroundColor(COLOR_BOTTOMLINE_BG);
-            this.textVram.putStr(this.menuStr);
-            this.textVram.putDigit2(this.textBuffer.getTotalLength(), 5);
-            this.textVram.fillBackgroundColor(0, this.textVram.height - 1, this.textVram.width, COLOR_BOTTOMLINE_BG);
         }
         ///////////////////
         inputNormalCharacter(utf32) {
@@ -2519,7 +2578,55 @@ var Editor;
     ];
     window
         .whenEvent('load')
-        .then(() => BitmapFont.loadFont('font.bmpf'))
+        .then(() => {
+        const canvas = document.createElement("canvas");
+        canvas.style.position = "absolute";
+        canvas.style.left = "0px";
+        canvas.style.top = "0px";
+        canvas.style.height = "100vh";
+        canvas.style.width = "100vw";
+        document.body.appendChild(canvas);
+        const boundRect = canvas.getBoundingClientRect();
+        canvas.width = boundRect.width;
+        canvas.height = boundRect.height;
+        const context = canvas.getContext("2d");
+        const loadingInfo = {
+            _stop: false,
+            _loaded: 0,
+            _total: 0,
+            stopAnimation() {
+                this._stop = true;
+                document.body.removeChild(canvas);
+            },
+            updateAnimation(loaded, total) {
+                this._loaded = loaded;
+                this._total = total;
+            },
+            draw() {
+                context.save();
+                context.font = "24px 'Times New Roman'";
+                context.fillStyle = 'rgb(0,0,0)';
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                context.textAlign = "center";
+                context.textBaseline = "middle";
+                context.fillText(`Now loading ${this._loaded}/${this._total}`, canvas.width / 2, canvas.height / 2);
+                context.restore();
+            },
+        };
+        const loading = () => {
+            if (loadingInfo._stop === false) {
+                loadingInfo.draw();
+                requestAnimationFrame(loading);
+            }
+        };
+        loading();
+        return loadingInfo;
+    })
+        .then((loadingInfo) => BitmapFont.loadFont('font.bmpf', (l, t) => loadingInfo.updateAnimation(l, t))
+        .then((bmpFont) => {
+        loadingInfo.stopAnimation();
+        return bmpFont;
+    }))
         .then((bmpFont) => {
         const root = document.getElementById("editor");
         const virtualKeyboard = new VirtualKeyboard(root, keyboardLayout, bmpFont);
@@ -2558,30 +2665,8 @@ var Editor;
             }
         });
         function loop() {
-            textEditor.draw();
-            textEditor.drawStatusLine();
-            textVram.setCursorPosition(textEditor.getCursorScreenPosX(), textEditor.getCursorScreenPosY());
-            textVram.setTextColor(COLOR_NORMALTEXT);
-            textVram.setBackgroundColor(COLOR_NORMALTEXT_BG);
-            while (keyboard.readKey() && keyboard.getCurrentVKeyCode()) {
-                let k1 = keyboard.getCurrentAsciiCode();
-                const k2 = keyboard.getCurrentVKeyCode();
-                const sh = keyboard.getCurrentCtrlKeys(); //sh:シフト関連キー状態
-                //Enter押下は単純に改行文字を入力とする
-                if (k2 === 13 /* VKEY_RETURN */ || k2 === 108 /* VKEY_SEPARATOR */) {
-                    k1 = 0x0A;
-                }
-                if (k1 !== 0) {
-                    //通常文字が入力された場合
-                    textEditor.inputNormalCharacter(k1);
-                }
-                else {
-                    //制御文字が入力された場合
-                    textEditor.inputControlCharacter(k2, sh);
-                }
-                textEditor.checkSelectedRange();
-            }
-            {
+            if (textEditor.draw()) {
+                textVram.setCursorPosition(textEditor.getCursorScreenPosX(), textEditor.getCursorScreenPosY());
                 const palette = textVram.getPalette();
                 const pixels = textVram.getPixels();
                 const cursorPos = textVram.getCursorPosition();
@@ -2614,6 +2699,24 @@ var Editor;
             }
             //
             virtualKeyboard.render();
+            while (keyboard.readKey() && keyboard.getCurrentVKeyCode()) {
+                let k1 = keyboard.getCurrentAsciiCode();
+                const k2 = keyboard.getCurrentVKeyCode();
+                const sh = keyboard.getCurrentCtrlKeys(); //sh:シフト関連キー状態
+                //Enter押下は単純に改行文字を入力とする
+                if (k2 === 13 /* VKEY_RETURN */ || k2 === 108 /* VKEY_SEPARATOR */) {
+                    k1 = 0x0A;
+                }
+                if (k1 !== 0) {
+                    //通常文字が入力された場合
+                    textEditor.inputNormalCharacter(k1);
+                }
+                else {
+                    //制御文字が入力された場合
+                    textEditor.inputControlCharacter(k2, sh);
+                }
+                textEditor.checkSelectedRange();
+            }
             window.requestAnimationFrame(loop);
         }
         window.requestAnimationFrame(loop);

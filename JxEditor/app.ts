@@ -914,7 +914,7 @@ module Editor {
             it.dispose();
         }
 
-        static loadFont(url: string): Promise<BitmapFont> {
+        static loadFont(url: string, progress: (loaded:number, total:number) => void = undefined): Promise<BitmapFont> {
             return new Promise<ArrayBuffer>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
@@ -925,6 +925,9 @@ module Editor {
                         reject(new Error(xhr.statusText));
                     }
                 };
+                if (progress !== null && progress !== undefined) {
+                    xhr.onprogress = (e) => progress(e.loaded, e.total);
+                }
                 xhr.onerror = () => { reject(new Error(xhr.statusText)); };
                 xhr.responseType = 'arraybuffer';
                 xhr.send(null);
@@ -995,10 +998,10 @@ module Editor {
             }
             return [w, h];
         }
-        drawStr(x: number, y: number, str: string, drawChar: (x: number, y: number, size:number, pixels:Uint8Array) => void): void {
+        drawStr(x: number, y: number, str: string, drawChar: (x: number, y: number, size: number, pixels: Uint8Array) => void): void {
             this.drawUtf32(x, y, Unicode.strToUtf32(str), drawChar);
         }
-        drawUtf32(x: number, y: number, utf32Str: Unicode.Utf32Str, drawChar: (x: number, y: number, size:number, pixels:Uint8Array) => void): void {
+        drawUtf32(x: number, y: number, utf32Str: Unicode.Utf32Str, drawChar: (x: number, y: number, size: number, pixels: Uint8Array) => void): void {
             let xx = ~~x;
             let yy = ~~y;
             const size = this._fontHeight;
@@ -1673,7 +1676,7 @@ module Editor {
         private font: BitmapFont = null;
         private textVram: TextVram = null;
         private insertMode: boolean = true;
-
+        private needUpdate: boolean = false;
         /**
         * 現在のカーソル位置に対応するテキスト位置
         * [0] は現在位置を示す値
@@ -1738,6 +1741,8 @@ module Editor {
             this.edited = false;
             // 挿入モードに設定
             this.insertMode = true;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         resize(w: number, h: number) {
@@ -1774,6 +1779,9 @@ module Editor {
 
             currentCursor.dispose();
             leftTopCursor.dispose();
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         clear() {
@@ -1792,6 +1800,9 @@ module Editor {
 
             // バッファクリア（カーソルも全部補正される）
             this.textBuffer.clear();
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         /**
@@ -1876,7 +1887,7 @@ module Editor {
             const prevCur: TextBufferCursor = this.displayLeftTopCursor[0].duplicate();
             // タブや折り返しなどがあるため、単純に逆順に辿ることができない場合もあって場合分けすると面倒くさい
             //画面原点に対応するバッファカーソルは常に計算済みなのでそこからの距離を求める
-            let result:boolean;
+            let result: boolean;
             for (; ;) {
                 prevPos.x = pos.x; prevPos.y = pos.y;
                 cur.copyTo(prevCur);
@@ -1906,7 +1917,7 @@ module Editor {
         }
 
         // 画面上で現在行の末尾まで移動
-        moveCursorToDisplayLineTail(textPosition: ITextPosition, textBufferCursor: TextBufferCursor): boolean {
+        private moveCursorToDisplayLineTail(textPosition: ITextPosition, textBufferCursor: TextBufferCursor): boolean {
             textBufferCursor.checkValid();
 
             const pos: ITextPosition = { x: textPosition.x, y: textPosition.y };
@@ -1932,6 +1943,8 @@ module Editor {
             }
             cur.dispose();
             prevCur.dispose();
+            this.needUpdate = true;
+
             return result;
         }
 
@@ -1954,7 +1967,8 @@ module Editor {
             return true;
         }
 
-        private moveCursorToDisplayPos(targetTextPosition: ITextPosition, resultTextPosition: ITextPosition, resultTextBufferCursor : TextBufferCursor) {
+        // 指定したディスプレイ位置になるまでカーソル位置を進める
+        private moveCursorToDisplayPos(targetTextPosition: ITextPosition, resultTextPosition: ITextPosition, resultTextBufferCursor: TextBufferCursor) {
             const pos: ITextPosition = { x: 0, y: 0 };
             const prevPos: ITextPosition = { x: 0, y: 0 };
             const cur: TextBufferCursor = this.displayLeftTopCursor[0].duplicate();
@@ -1995,6 +2009,8 @@ module Editor {
             }
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
             this.validateDisplayCursorPos();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             return true;
         }
 
@@ -2005,6 +2021,8 @@ module Editor {
             }
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
             this.validateDisplayCursorPos();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
             return true;
         }
 
@@ -2028,6 +2046,7 @@ module Editor {
             }
         }
 
+        // 画面を１行上にスクロールする
         private screenScrollUp(): boolean {
             // カーソルの画面Ｙ座標が最上列なので左上座標の更新が必要
             const lt: TextBufferCursor = this.displayLeftTopCursor[0].duplicate();
@@ -2075,6 +2094,8 @@ module Editor {
 
             this.moveCursorToPrev(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         // カーソルを1つ左に移動
@@ -2091,6 +2112,8 @@ module Editor {
                     // カーソルを進めることに成功したらカーソル位置が画面最下段からはみ出たので
                     // 画面を一行下にスクロールする
                     this.screenScrollDown();
+                    // 画面更新が必要な状態に設定
+                    this.needUpdate = true;
                 }
             }
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
@@ -2124,6 +2147,9 @@ module Editor {
             this.currentCursorPosition[0] = p;
             c.dispose();
 
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
+
             this.validateDisplayCursorPos();
         }
 
@@ -2151,6 +2177,9 @@ module Editor {
             this.currentCursorPosition[0] = p;
             c.dispose();
 
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
+
             // 画面を一行下にスクロールが必要か？
             if (this.currentCursorPosition[0].y === this.editorScreenHeight) {
                 // 必要
@@ -2174,6 +2203,8 @@ module Editor {
         private cursorMoveToLineHeadBody(): void {
             this.moveCursorToDisplayLineHead(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = 0;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         cursorMoveToLineHead(): void {
@@ -2186,6 +2217,8 @@ module Editor {
         private cursorMoveToLineTailBody(): void {
             this.moveCursorToDisplayLineTail(this.currentCursorPosition[0], this.currentCursor[0]);
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         cursorMoveToLineTail(): void {
@@ -2225,6 +2258,8 @@ module Editor {
                     this.cursorMoveDown();
                 }
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         cursorMovePageUp(): void {
@@ -2271,6 +2306,8 @@ module Editor {
                     this.cursorMoveUp();
                 }
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         cursorMovePageDown(): void {
@@ -2298,6 +2335,9 @@ module Editor {
 
             // 最後の横移動位置をリセット
             this.cachedCursorScreenPosX = 0;
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         ///////////////////
@@ -2329,6 +2369,7 @@ module Editor {
             bp2.dispose();
         }
 
+        // クリップボードから貼り付け
         pasteFromClipboard(): void {
             // クリップボードから貼り付け
             for (let i = 0; i < this.clipboard.length; i++) {
@@ -2337,11 +2378,13 @@ module Editor {
                 }
                 this.cursorMoveRight();//画面上、バッファ上のカーソル位置を1つ後ろに移動
             }
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         ///////////////////
 
-        //範囲選択モード開始時のカーソル開始位置グローバル変数設定
+        //範囲選択モード開始時のカーソル開始位置設定
         setSelectedRangeStart(): void {
             if (this.selectRangeStartCursor !== null) {
                 this.selectRangeStartCursor.dispose();
@@ -2350,6 +2393,8 @@ module Editor {
             this.selectRangeStartCursor = this.currentCursor[0].duplicate();
             this.selectStartCursorScreenPos.x = this.currentCursorPosition[0].x;
             this.selectStartCursorScreenPos.y = this.currentCursorPosition[0].y;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         private getSelectedRangeLength(): number {
@@ -2398,6 +2443,9 @@ module Editor {
             // 始点からn文字削除
             this.textBuffer.deleteMany(this.currentCursor[0], n);
             this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         checkSelectedRange(): void {
@@ -2407,6 +2455,8 @@ module Editor {
                 //選択範囲の開始と終了が重なったら範囲選択モード解除
                 this.selectRangeStartCursor.dispose();
                 this.selectRangeStartCursor = null;
+                // 画面更新が必要な状態に設定
+                this.needUpdate = true;
             }
         }
 
@@ -2432,6 +2482,8 @@ module Editor {
             this.displayLeftTopCursor[0].dispose(); this.displayLeftTopCursor[0] = this.displayLeftTopCursor[1]; this.displayLeftTopCursor[1] = null;
             this.currentCursorPosition[0].x = this.currentCursorPosition[1].x; this.currentCursorPosition[1].x = 0;
             this.currentCursorPosition[0].y = this.currentCursorPosition[1].y; this.currentCursorPosition[1].y = 0;
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         discardSavedCursor(): void {
@@ -2446,8 +2498,18 @@ module Editor {
         }
 
         ///////////////////
+        private menuStr = Unicode.strToUtf32("F1:LOAD F2:SAVE   F4:NEW ");
 
-        draw(): void {
+        draw(): boolean {
+            if (this.needUpdate === false) {
+                return false;
+            }
+            this.textVram.setTextColor(COLOR_NORMALTEXT);
+            this.textVram.setBackgroundColor(COLOR_NORMALTEXT_BG);
+
+            // 画面更新するので更新フラグ解除
+            this.needUpdate = false;
+
             let textColor: number = COLOR_NORMALTEXT;
 
             let selectStart: TextBufferCursor;
@@ -2504,6 +2566,15 @@ module Editor {
 
             //EnableInterrupt();
 
+            //エディター画面最下行の表示
+            this.textVram.setCursorPosition(0, this.textVram.height - 1);
+            this.textVram.setTextColor(COLOR_BOTTOMLINE);
+            this.textVram.setBackgroundColor(COLOR_BOTTOMLINE_BG);
+
+            this.textVram.putStr(this.menuStr);
+            this.textVram.putDigit2(this.textBuffer.getTotalLength(), 5);
+            this.textVram.fillBackgroundColor(0, this.textVram.height - 1, this.textVram.width, COLOR_BOTTOMLINE_BG);
+            return true;
         }
 
         ///////////////////
@@ -2531,6 +2602,13 @@ module Editor {
 
         load<T>(start: (context: T) => boolean, read: (context: T) => number, end: (context: T) => void, context: T): boolean {
             let ret: boolean = false;
+
+            // カーソル位置を行頭に移動
+            this.cursorMoveToBeginningOfDocument();
+
+            // クリア
+            this.clear();
+
             if (start(context)) {
                 ret = true;
                 this.clear();
@@ -2542,20 +2620,14 @@ module Editor {
             }
 
             end(context);
+
+            // カーソル位置を行頭に移動
+            this.cursorMoveToBeginningOfDocument();
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
+
             return ret;
-        }
-
-        ///////////////////
-        private menuStr = Unicode.strToUtf32("F1:LOAD F2:SAVE   F4:NEW ");
-        drawStatusLine(): void {
-            //エディター画面最下行の表示
-            this.textVram.setCursorPosition(0, this.textVram.height - 1);
-            this.textVram.setTextColor(COLOR_BOTTOMLINE);
-            this.textVram.setBackgroundColor(COLOR_BOTTOMLINE_BG);
-
-            this.textVram.putStr(this.menuStr);
-            this.textVram.putDigit2(this.textBuffer.getTotalLength(), 5);
-            this.textVram.fillBackgroundColor(0, this.textVram.height - 1, this.textVram.width, COLOR_BOTTOMLINE_BG);
         }
 
         ///////////////////
@@ -2823,7 +2895,7 @@ module Editor {
 
     }
 
-        const keyboardLayout: IKeyboardLineLayout[][] = [
+    const keyboardLayout: IKeyboardLineLayout[][] = [
         [
             {
                 "height": 2,
@@ -2996,10 +3068,60 @@ module Editor {
     ];
 
 
-
     window
         .whenEvent<Event>('load')
-        .then<BitmapFont>(() => BitmapFont.loadFont('font.bmpf'))
+        .then<{ stopAnimation: () => void, updateAnimation: (loaded:number, total:number) => void}>(() => {
+            const canvas = document.createElement("canvas");
+            canvas.style.position = "absolute";
+            canvas.style.left = "0px";
+            canvas.style.top = "0px";
+            canvas.style.height = "100vh";
+            canvas.style.width = "100vw";
+            document.body.appendChild(canvas);
+            const boundRect = canvas.getBoundingClientRect();
+            canvas.width = boundRect.width;
+            canvas.height = boundRect.height;
+            const context = canvas.getContext("2d");
+            const loadingInfo = {
+                _stop: false,
+                _loaded: 0,
+                _total: 0,
+                stopAnimation() {
+                    this._stop = true;
+                    document.body.removeChild(canvas);
+                },
+                updateAnimation(loaded:number, total:number) {
+                    this._loaded = loaded;
+                    this._total = total;
+                },
+                draw() {
+                    context.save();
+                    context.font = "24px 'Times New Roman'";
+                    context.fillStyle = 'rgb(0,0,0)';
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.textAlign = "center";
+                    context.textBaseline = "middle";
+                    context.fillText(`Now loading ${this._loaded}/${this._total}`, canvas.width / 2, canvas.height / 2);
+                    context.restore();
+                },
+            };
+            const loading = () => {
+                if (loadingInfo._stop === false) {
+                    loadingInfo.draw();
+                    requestAnimationFrame(loading);
+                }
+            }
+            loading();
+            return loadingInfo;
+        })
+        .then<BitmapFont>(
+            (loadingInfo) => 
+                BitmapFont.loadFont('font.bmpf', (l,t) => loadingInfo.updateAnimation(l,t))
+                          .then<BitmapFont>((bmpFont) => {
+                    loadingInfo.stopAnimation();
+                                return bmpFont;
+                          })
+        )
         .then((bmpFont) => {
             const root = document.getElementById("editor");
 
@@ -3046,32 +3168,9 @@ module Editor {
             });
 
             function loop() {
-                textEditor.draw();
-                textEditor.drawStatusLine();
-                textVram.setCursorPosition(textEditor.getCursorScreenPosX(), textEditor.getCursorScreenPosY());
-                textVram.setTextColor(COLOR_NORMALTEXT);
-                textVram.setBackgroundColor(COLOR_NORMALTEXT_BG);
+                if (textEditor.draw()) {
+                    textVram.setCursorPosition(textEditor.getCursorScreenPosX(), textEditor.getCursorScreenPosY());
 
-                while (keyboard.readKey() && keyboard.getCurrentVKeyCode()) {
-                    let k1 = keyboard.getCurrentAsciiCode();
-                    const k2 = keyboard.getCurrentVKeyCode();
-                    const sh = keyboard.getCurrentCtrlKeys();             //sh:シフト関連キー状態
-                    //Enter押下は単純に改行文字を入力とする
-                    if (k2 === VirtualKey.VKEY_RETURN || k2 === VirtualKey.VKEY_SEPARATOR) {
-                        k1 = 0x0A;
-                    }
-                    if (k1 !== 0) {
-                        //通常文字が入力された場合
-                        textEditor.inputNormalCharacter(k1);
-                    }
-                    else {
-                        //制御文字が入力された場合
-                        textEditor.inputControlCharacter(k2, sh);
-                    }
-                    textEditor.checkSelectedRange();
-                }
-
-                {
                     const palette = textVram.getPalette();
                     const pixels = textVram.getPixels();
                     const cursorPos = textVram.getCursorPosition();
@@ -3104,6 +3203,25 @@ module Editor {
 
                 //
                 virtualKeyboard.render();
+
+                while (keyboard.readKey() && keyboard.getCurrentVKeyCode()) {
+                    let k1 = keyboard.getCurrentAsciiCode();
+                    const k2 = keyboard.getCurrentVKeyCode();
+                    const sh = keyboard.getCurrentCtrlKeys();             //sh:シフト関連キー状態
+                    //Enter押下は単純に改行文字を入力とする
+                    if (k2 === VirtualKey.VKEY_RETURN || k2 === VirtualKey.VKEY_SEPARATOR) {
+                        k1 = 0x0A;
+                    }
+                    if (k1 !== 0) {
+                        //通常文字が入力された場合
+                        textEditor.inputNormalCharacter(k1);
+                    }
+                    else {
+                        //制御文字が入力された場合
+                        textEditor.inputControlCharacter(k2, sh);
+                    }
+                    textEditor.checkSelectedRange();
+                }
 
                 window.requestAnimationFrame(loop);
             }
@@ -3329,7 +3447,7 @@ module Editor {
                 return 0xFF;
             }
         }
-        private isShiftKeyDown() : boolean {
+        private isShiftKeyDown(): boolean {
             for (let [k, v] of this._touchPoints) {
                 if (v === 0xFF) { continue; }
                 if (this._buttons[v].keycode === VirtualKey.VKEY_SHIFT ||
@@ -3403,7 +3521,7 @@ module Editor {
 
         private buttonIsDown(index: number): number {
             let n = 0;
-            for (const [k,v] of this._touchPoints.entries()) {
+            for (const [k, v] of this._touchPoints.entries()) {
                 if (v === index) { n++; }
             }
             return n;
@@ -3424,7 +3542,7 @@ module Editor {
                                     const [w, h] = this._font.measureStr(text);
                                     const offX = (btn.rect.width - w) >> 1;
                                     const offY = (btn.rect.height - h) >> 1;
-                                    this._font.drawStr(btn.rect.left + offX, btn.rect.top + offY, text, (x, y, size,pixels) => this._canvasOffscreenImageData.drawChar(x, y, size,pixels,0xFFFFFFFF));
+                                    this._font.drawStr(btn.rect.left + offX, btn.rect.top + offY, text, (x, y, size, pixels) => this._canvasOffscreenImageData.drawChar(x, y, size, pixels, 0xFFFFFFFF));
                                 }
                             } else {
                                 this._canvasOffscreenImageData.drawRect(btn.rect.left, btn.rect.top, btn.rect.width, btn.rect.height, 0xFF000000);
@@ -3433,7 +3551,7 @@ module Editor {
                                     const [w, h] = this._font.measureStr(text);
                                     const offX = (btn.rect.width - w) >> 1;
                                     const offY = (btn.rect.height - h) >> 1;
-                                    this._font.drawStr(btn.rect.left + offX, btn.rect.top + offY, text, (x, y, size,pixels) => this._canvasOffscreenImageData.drawChar(x, y, size,pixels,0xFF000000));
+                                    this._font.drawStr(btn.rect.left + offX, btn.rect.top + offY, text, (x, y, size, pixels) => this._canvasOffscreenImageData.drawChar(x, y, size, pixels, 0xFF000000));
                                 }
                             }
                         }
@@ -3470,11 +3588,11 @@ interface ImageData {
     setPixel(x: number, y: number, color: number): void;
     fillRect(x: number, y: number, w: number, h: number, color: number): void;
     drawRect(x: number, y: number, w: number, h: number, color: number): void;
-    drawChar(x: number, y: number, size: number, pixel: Uint8Array, color: number) :void;
+    drawChar(x: number, y: number, size: number, pixel: Uint8Array, color: number): void;
 
 }
 
-ImageData.prototype.drawChar = function(x: number, y: number, size: number, pixel: Uint8Array, color: number) : void {
+ImageData.prototype.drawChar = function (x: number, y: number, size: number, pixel: Uint8Array, color: number): void {
     const data32 = this.data32;
     const stride = this.width;
     let pSrc = 0;
@@ -3482,7 +3600,7 @@ ImageData.prototype.drawChar = function(x: number, y: number, size: number, pixe
     for (let j = 0; j < size; j++) {
         let p = pSrc;
         let q = pDst;
-        for (let i = 0; i < size; i++ , p++, q++) {
+        for (let i = 0; i < size; i++ , p++ , q++) {
             if (pixel[p >> 3] & (0x80 >> (p & 0x07))) {
                 data32[q] = color;
             }
