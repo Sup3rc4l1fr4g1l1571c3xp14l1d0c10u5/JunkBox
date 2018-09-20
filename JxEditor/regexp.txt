@@ -1,0 +1,636 @@
+// see <http://swtch.com/~rsc/regexp/regexp2.html>
+//   Russ Cox, ``Regular Expression Matching: the Virtual Machine Approach ''
+
+function regexp_pikevm(code:any, input:any):any {
+    return new Pikevm(code).execute(input);
+}
+
+class Pikevm {
+    private gen:number;
+    private mark:Uint32Array;
+    private code : any;
+    constructor(code: any) {
+        this.gen = 1;
+        this.mark = new Uint32Array(code.size);
+        this.code = code;
+    }
+
+  public execute(input:any ) :any{
+    this.gen = 1;
+    this.mark.fill(0);
+    let matched :any = null;
+    let run :any[] = [];
+    let rdy :any[] = [];
+    let sp = 0;
+    this.addthread(run, 3, sp, [0, 0]);
+    while (run.length != 0) {
+      this.gen += 1;
+        for (const [pc, saved] of run) {
+            switch (this.code[pc]) {
+          case "char":
+            if ((sp < input.size) && (input[sp] == this.code[pc + 1])) {
+              this.addthread(rdy, pc + 2, sp + 1, saved);
+            }
+            continue;
+          case "any":
+            if (sp < input.length) {
+                this.addthread(rdy, pc + 1, sp + 1, saved);
+            }
+              continue;
+          case "match":
+            matched = [saved[0],sp];
+            break;
+                default:
+                    continue;
+            }
+            break;
+        }
+        let tmp = run;
+        run = rdy;
+        rdy = tmp;
+      rdy.length = 0;
+      if (sp >= input.size) {
+        break;
+      }
+      sp += 1;
+    }
+    return matched
+  }
+
+  private addthread(q:any, pc:number, sp:number, saved:any) : void {
+    if (this.mark[pc] == this.gen) {
+      return;
+    }
+    this.mark[pc] = this.gen;
+    switch (this.code[pc]) {
+      case "jmp":
+        this.addthread(q, this.code[pc + 1], sp, saved);
+        break;
+      case "split":
+          this.addthread(q, this.code[pc + 1], sp, saved);
+          this.addthread(q, this.code[pc + 2], sp, saved);
+        break;
+      case "save":
+        saved = saved.dup;
+        saved[this.code[pc + 1]] = sp;
+          this.addthread(q, pc + 2, sp, saved);
+        break;
+      default:
+        q.push([pc, saved]);
+        break;
+    }
+  }
+}
+
+function regexp_compile(src:string) : any {
+  const exp = regexp_parse(src);
+  let code : (string|number)[] = ["regex", null, null]; // magic, length, number of instructions
+  const kont = [exp];
+  let n = 0;
+  while (kont.length != 0) {
+      let node : any[] = kont[0]; kont.shift();
+    switch (node[0]) {
+    case  "char":
+    {
+        code.push("char", node[1]);
+        n += 1;
+        break;
+    }
+    case "any":
+    {
+        code.push("any");
+        n += 1;
+        break;
+    }
+    case "seq":
+    {
+        let [_, ...a] = node;
+        kont.unshift(...a);
+        break;
+    }
+    case "group":
+    {
+        code.push("save", node[1] * 2);
+        n += 1;
+        kont.unshift(node[2], ["group_end", node[1]]);
+        break;
+    }
+    case "group_end":
+      code.push("save", (node[1] * 2 + 1));
+      n += 1;
+      break;
+    case "split":
+    {
+        let i = code.length;
+        code.push("split", i + 3, null);
+        n += 1;
+        kont.unshift(node[1], ["split_fixup1", i, node[2]]);
+        break;
+    }
+    case "split_fixup1":
+    {
+        const i = node[1];
+        const j = code.length;
+        code.push("jmp", null);
+        n += 1;
+        code[i + 2] = j + 2;
+        kont.unshift(node[2], ["split_fixup2", j]);
+        break;
+    }
+        case "split_fixup2": {
+            const i = node[1];
+      const j = code.length;
+      code[i + 1] = j;
+      break;
+        }
+    case "opt_greedy":
+    {
+        const i = code.length;
+        code.push("split", i + 3, null);
+        n += 1;
+        kont.unshift(node[1], ["opt_greedy_fixup", i]);
+        break;
+    }
+    case "opt_greedy_fixup":
+    {
+        const  i = node[1];
+        const j = code.length;
+        code[i + 2] = j;
+        break;
+    }
+    case "opt_nongreedy":
+    {
+        const i = code.length;
+        code.push("split", null, i + 3);
+        n += 1;
+        kont.unshift(node[1], ["opt_nongreedy_fixup", i]);
+        break;
+    }
+    case "opt_nongreedy_fixup":
+    {
+        const i = node[1];
+        const j = code.length;
+        code[i + 1] = j;
+        break;
+    }
+
+    case "many0_greedy":
+    {
+        const i = code.length;
+        code.push("split", i + 3, null);
+        n += 1;
+        kont.unshift(node[1], ["many0_greedy_fixup", i]);
+        break;
+    }
+    case "many0_greedy_fixup":
+    {
+        const i = node[1];
+        code.push("jmp", i);
+        const j = code.length;
+        code[i + 2] = j;
+        break;
+    }
+    case "many0_nongreedy":
+    {
+        const i = code.length;
+        code.push("split", null, i + 3);
+        kont.unshift(node[1], ["many0_nongreedy_fixup", i]);
+        break;
+    }
+    case "many0_nongreedy_fixup":
+    {
+        const i = node[1];
+        code.push("jmp", i);
+        n += 1;
+        const j = code.length;
+        code[i + 1] = j;
+        break;
+    }
+
+    case "many1_greedy":
+    {
+        const i = code.length;
+        kont.unshift(node[1], ["many1_greedy_fixup", i]);
+        break;
+    }
+    case "many1_greedy_fixup":
+    {
+        const i = node[1];
+        const j = code.length;
+        code.push("split", i, j + 3);
+        n += 1;
+        break;
+    }
+
+    case "many1_nongreedy":
+    {
+        const i = code.length;
+        kont.unshift(node[1], ["many1_nongreedy_fixup", i]);
+        break;
+    }
+    case "many1_nongreedy_fixup":
+    {
+        const i = node[1];
+        const j = code.length;
+        code.push("split", j + 3, i);
+        n += 1;
+        break;
+    }
+        }
+        }
+  code.push( "match");
+  n += 1;
+  code[1] = code.length;
+  code[2] = n;
+  return code;
+}
+
+function regexp_parse(src:string) : any {
+    const repeats: {[key:string]:string}= {
+    '?' : "opt_greedy",   '??' : "opt_nongreedy",
+    '*' : "many0_greedy", '*?' : "many0_nongreedy",
+    '+' : "many1_greedy", '+?' : "many1_nongreedy",
+  };
+  let got : any[]= [];
+  let srcp = 0;
+  let group_number = 0;
+    let token : any= null;
+    let value : any= null;
+  let kont :string[] = ["get_token", "exp", "eos"];
+    while (kont.length) {
+        const state: string = kont[0];
+        kont.shift();
+        switch (state) {
+            case '|':
+            case '?':
+            case '*':
+            case '+':
+            case '??':
+            case '*?':
+            case '+?':
+            case '(?:':
+            case '(':
+            case ')':
+            case '.':
+            case "char":
+            case "eos":
+            {
+                if (token == state) {
+                    if (token != "eos") {
+                        got.push(token, value);
+                    }
+                    kont.unshift("get_token");
+                    continue;
+                }
+                break;
+            }
+            case "exp":
+            {
+                switch (token) {
+                    case "char":
+                    case '(?:':
+                    case '(':
+                    case '.':
+                    case '|':
+                        kont.unshift("seq", "exp1");
+                        continue;
+                    case ')':
+                    case "eos":
+                        continue;
+                }
+                break;
+            }
+            case "exp1":
+            {
+                switch (token) {
+                    case '|':
+                        kont.unshift('|', "seq", "gotsplit", "exp1");
+                        continue;
+                    case ')':
+                    case "eos":
+                        continue;
+                }
+                break;
+            }
+            case "gotsplit":
+            {
+                const e1: any = got.pop();
+                const _: any = got.pop();
+                const e2: any = got.pop();
+                got.push(["split", e1, e2]);
+                continue;
+            }
+
+            case "seq":
+            {
+                switch (token) {
+                    case "char":
+                    case '(?:':
+                    case '(':
+                    case '.':
+                    case '|':
+                    case ')':
+                    case "eos":
+                        kont.unshift("gotseq", "seq1");
+                        continue;
+                }
+                break;
+            }
+            case "seq1":
+            {
+                switch (token) {
+                    case "char":
+                    case '(?:':
+                    case '(':
+                    case '.':
+                        kont.unshift("atom", "addseq", "seq1");
+                        continue;
+                    case '|':
+                    case ')':
+                    case "eos":
+                        continue;
+                }
+                break;
+            }
+            case "gotseq":
+            {
+                got.push(["seq"]);
+                continue;
+            }
+            case "addseq":
+            {
+                const e = got.pop()
+                if (e[0] == "seq") {
+                    e.shift
+                    got[got.length - 1] += e;
+                } else {
+                    got[got.length - 1].push(e);
+                }
+                continue;
+            }
+
+            case "atom":
+            {
+                switch (token) {
+                    case "char":
+                    case '(?:':
+                    case '(':
+                    case '.':
+                        kont.unshift("primary", "postfix");
+                        continue;
+                }
+                break;
+            }
+            case "primary":
+            {
+                switch (token) {
+                    case "char":
+                        kont.unshift("char");
+                        continue;
+                    case '(?:':
+                        kont.unshift('(?:', "exp", ')', "gotsubexp");
+                        continue;
+                    case '(':
+                        kont.unshift('(', "exp", ')', "gotgroup");
+                        continue;
+                    case '.':
+                        kont.unshift('.', "gotany");
+                        continue;
+                }
+                break;
+            }
+            case "gotsubexp":
+            {
+                const _: any = got.pop();
+                const e: any = got.pop();
+                const __: any = got.pop();
+                got.push(e);
+                continue;
+            }
+            case "gotgroup":
+            {
+                const e1: any = got.pop();
+                const e2: any = got.pop();
+                const _: any = got.pop();
+                got.push(["group", e1[1], e2]);
+                continue;
+            }
+            case "gotany":
+            {
+                got[got.length - 1] = ["any"];
+                continue;
+            }
+            case "postfix":
+                switch (token) {
+                    case '?':
+                        kont.unshift('?', "gotrepeats");
+                        continue;
+                    case '*':
+                        kont.unshift('*', "gotrepeats");
+                        continue;
+                    case '+':
+                        kont.unshift('+', "gotrepeats");
+                        continue;
+                    case '??':
+                        kont.unshift('??', "gotrepeats");
+                        continue;
+                    case '*?':
+                        kont.unshift('*?', "gotrepeats");
+                        continue;
+                    case '+?':
+                        kont.unshift('+?', "gotrepeats");
+                        continue;
+                    case "char":
+                    case '(?:':
+                    case '(':
+                    case '.':
+                    case '|':
+                    case ')':
+                    case "eos":
+                        continue;
+                }
+                break;
+            case "gotrepeats":
+            {
+                const e: any = got.pop();
+                const postfix: any = got.pop();
+                got.push([repeats[postfix[0]], e]);
+                continue;
+            }
+            case "get_token":
+                if (srcp >= src.length) {
+                    token = "eos";
+                    value = '';
+                } else if (src[srcp] == '\\' && srcp + 1 < src.length) {
+                    token = "char";
+                    value = src[srcp + 1]
+                    srcp += 2;
+                } else if (src.substr(srcp, 3) == '(?:') {
+                    srcp += 3;
+                    token = '(?:';
+                    value = '';
+                } else if (src[srcp] == '(') {
+                    group_number += 1;
+                    token = '(';
+                    value = group_number;
+                    srcp += 1;
+                } else if ('?*+'.includes(src[srcp]) && src[srcp + 1] == '?') {
+                    const x = src[srcp] + '?';
+                    token = x;
+                    value = '';
+                    srcp += 2;
+                } else if ('|?*+).'.includes(src[srcp])) {
+                    token = src[srcp];
+                    value = src[srcp];
+                    srcp += 1;
+                } else {
+                    token = "char";
+                    value = src[srcp];
+                    srcp += 1;
+                }
+                continue;
+            default:
+                throw new Error(`grammar error. unexpected nonterminal ${state}`);
+        }
+        const s :string[] = [state];
+        throw new Error(`syntax error. unexpected token ${token.inspect} ${s.concat(kont)}`);
+    }
+    return got[0];
+}
+
+//def regexp_list(code)
+//  output = ''
+//  k = 0
+//  labels = {}
+//  n = code[1]
+//  i = 3
+//  while i < n
+//    case code[i]
+//    case "char":
+//      i += 2
+//    case "any":
+//      i += 1
+//    case "save":
+//      i += 2
+//    case "match":
+//      i += 1
+//    case "split":
+//      if not labels.key?(code[i + 1])
+//        labels[code[i + 1]] = code[i + 1]
+//      end
+//      if not labels.key?(code[i + 2])
+//        labels[code[i + 2]] = code[i + 2]
+//      end
+//      i += 3
+//    case "jmp":
+//      if not labels.key?(code[i + 1])
+//        labels[code[i + 1]] = code[i + 1]
+//      end
+//      i += 2
+//    end
+//  end
+//  labels.keys.sort.each_with_index do |k, i|
+//    labels[k] = 'L%d' % [i + 1]
+//  end
+//  output << "%03d %-6s%-8s%d, %d\n" % [0, '', '.regex', code[1], code[2]]
+//  i = 3
+//  while i < n
+//    r = labels.key?(i) ? labels[i] + ':' : ''
+//    case code[i]
+//    case "char":
+//      output << "%03d %-6s%-8s'%s'\n" % [i, r, 'char', code[i + 1]]
+//      i += 2
+//    case "any":
+//      output << "%03d %-6s%s\n" % [i, r, 'any']
+//      i += 1
+//    case "save":
+//      output << "%03d %-6s%-8s%d\n" % [i, r, 'save', code[i + 1]]
+//      i += 2
+//    case "match":
+//      output << "%03d %-6s%s\n" % [i, r, 'match']
+//      i += 1
+//    case "split":
+//      output << "%03d %-6s%-8s%s, %s\n" % [i, r, 'split', labels[code[i + 1]], labels[code[i + 2]]]
+//      i += 3
+//    case "jmp":
+//      output << "%03d %-6s%-8s%s\n" % [i, r, 'jmp', labels[code[i + 1]]]
+//      i += 2
+//    end
+//  end
+//  output
+//end
+
+function regexp_list(code:any):string[] {
+    let output :string[] = [];
+    let k = 0;
+    let labels: {[key:string]:string}= {};
+    let n = code[1];
+    let i = 3;
+  while (i < n) {
+    switch (code[i]) {
+    case "char":
+      i += 2;
+      break;
+    case "any":
+      i += 1;
+      break;
+    case "save":
+      i += 2;
+      break;
+    case "match":
+      i += 1;
+      break;
+    case "split":
+      if (labels[code[i + 1]] == undefined) {
+        labels[code[i + 1]] = code[i + 1];
+      }
+      if (labels[code[i + 2]] == undefined) {
+        labels[code[i + 2]] = code[i + 2];
+      }
+      i += 3;
+      break;
+    case "jmp":
+      if (labels[code[i + 1]] == undefined) {
+        labels[code[i + 1]] = code[i + 1];
+      }
+      i += 2;
+      break;
+    }
+  }
+  const labelKeys = Object.keys(labels);
+  labelKeys.sort().forEach((k, i) => {
+    labels[k] = `L{i + 1}`;
+  });
+  output.push([0, '', '.regex', code[1], code[2]].join("\t"));
+  i = 3;
+  while (i < n) {
+    const r = labelKeys[i] ? labels[i] + ':' : '';
+    switch (code[i]) {
+    case "char":
+      output.push([i, r, 'char', code[i + 1]].join("\t"));
+      i += 2;
+      break;
+    case "any":
+      output.push([i, r, 'any'].join("\t"));
+      i += 1;
+      break;
+    case "save":
+      output.push([i, r, 'save', code[i + 1]].join("\t"));
+      i += 2;
+      break;
+    case "match":
+      output.push([i, r, 'match'].join("\t"));
+      i += 1;
+      break;
+    case "split":
+      output.push([i, r, 'split', labels[code[i + 1]], labels[code[i + 2]]].join("\t"));
+      i += 3;
+      break;
+    case "jmp":
+      output.push([i, r, 'jmp', labels[code[i + 1]]].join("\t"));
+      i += 2;
+      break;
+    }
+  }
+    return output;
+}
