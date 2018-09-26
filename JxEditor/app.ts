@@ -2026,6 +2026,24 @@ module Editor {
             return true;
         }
 
+        // カーソル位置に複数文字挿入する
+        private insertCharacters(utf32s: Uint32Array): boolean {
+            for (let i = utf32s.length-1; i >=0 ; i--) {
+                if (this.textBuffer.insertCharacterOnCursor(this.currentCursor[0], utf32s[i]) === false) {
+                    return false;
+                }
+            }
+            this.currentCursorPosition[0] = this.calcScreenPosFromLineHead(this.displayLeftTopCursor[0], this.currentCursor[0]);
+            while (this.currentCursorPosition[0].y  > this.editorScreenHeight) {
+                this.screenScrollDown();
+                this.currentCursorPosition[0].y--;
+            }
+            this.validateDisplayCursorPos();
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
+            return true;
+        }
+
         // 画面を１行下にスクロールする
         private screenScrollDown(): boolean {
             const c: TextBufferCursor = this.displayLeftTopCursor[0].duplicate();
@@ -2112,11 +2130,12 @@ module Editor {
                     // カーソルを進めることに成功したらカーソル位置が画面最下段からはみ出たので
                     // 画面を一行下にスクロールする
                     this.screenScrollDown();
-                    // 画面更新が必要な状態に設定
-                    this.needUpdate = true;
                 }
             }
             this.cachedCursorScreenPosX = this.currentCursorPosition[0].x;
+
+            // 画面更新が必要な状態に設定
+            this.needUpdate = true;
         }
 
         // カーソルを右に移動
@@ -2372,12 +2391,7 @@ module Editor {
         // クリップボードから貼り付け
         pasteFromClipboard(): void {
             // クリップボードから貼り付け
-            for (let i = 0; i < this.clipboard.length; i++) {
-                if (this.insertCharacter(this.clipboard[i]) === false) {
-                    break;
-                }
-                this.cursorMoveRight();//画面上、バッファ上のカーソル位置を1つ後ろに移動
-            }
+            this.insertCharacters(this.clipboard);
             // 画面更新が必要な状態に設定
             this.needUpdate = true;
         }
@@ -2599,27 +2613,14 @@ module Editor {
             end(context);
             return ret;
         }
-
-        load<T>(start: (context: T) => boolean, read: (context: T) => number, end: (context: T) => void, context: T): boolean {
-            let ret: boolean = false;
-
+        load(data: Uint32Array) : boolean {
             // カーソル位置を行頭に移動
             this.cursorMoveToBeginningOfDocument();
 
             // クリア
             this.clear();
-
-            if (start(context)) {
-                ret = true;
-                this.clear();
-                let ch: number;
-                while ((ch = read(context)) !== 0) {
-                    this.insertCharacter(ch);
-                    this.cursorMoveRight();//画面上、バッファ上のカーソル位置を1つ後ろに移動
-                }
-            }
-
-            end(context);
+            
+            const ret = this.insertCharacters(data);
 
             // カーソル位置を行頭に移動
             this.cursorMoveToBeginningOfDocument();
@@ -2631,6 +2632,7 @@ module Editor {
         }
 
         ///////////////////
+        
         inputNormalCharacter(utf32: number): void {
             // 通常文字入力処理
             // k:入力された文字コード
@@ -3135,14 +3137,7 @@ module Editor {
             const textEditor = new TextEditor(bmpFont, textVram);
             const keyboard = new Keyboard();
             resize();
-            //*
-            textEditor.load(
-                (s) => { s.str = Unicode.strToUtf32(document.getElementById('demo').innerHTML); return true; },
-                (s) => s.str.length > s.index ? s.str[s.index++] : 0,
-                (s) => true,
-                { str: null, index: 0 }
-            );
-            //*/
+            textEditor.load(Unicode.strToUtf32(document.getElementById('demo').innerHTML));
 
             window.addEventListener('keydown', (e) => {
                 if (e.repeat === false) {
