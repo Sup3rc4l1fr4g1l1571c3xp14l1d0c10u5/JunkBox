@@ -2854,15 +2854,16 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf(out tok, Token.TokenKind.SIZEOF)) {
                 if (_lexer.PeekToken('(')) {
                     // どちらにも'('の出現が許されるためさらに先読みを行う。
-                    var saveCurrent = _lexer.Save();
+                    _lexer.Save();
                     _lexer.ReadToken('(');
                     if (IsTypeName()) {
+                        _lexer.Discard();
                         var type = TypeName();
                         var end = _lexer.ReadToken(')');
                         return new SyntaxTree.Expression.SizeofTypeExpression(new LocationRange(tok.Start, end.End), type);
                     }
 
-                    _lexer.Restore(saveCurrent);
+                    _lexer.Restore();
                     var expr = UnaryExpression();
                     return new SyntaxTree.Expression.SizeofExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
                 }
@@ -2884,9 +2885,10 @@ namespace AnsiCParser {
             Token tok;
             if (_lexer.PeekToken(out tok, '(')) {
                 // どちらにも'('の出現が許されるためさらに先読みを行う。
-                var saveCurrent = _lexer.Save();
+                _lexer.Save();
                 _lexer.ReadToken('(');
                 if (IsTypeName()) {
+                    _lexer.Discard();
                     var type = TypeName();
                     _lexer.ReadToken(')');
                     var expr = CastExpression();
@@ -2896,7 +2898,7 @@ namespace AnsiCParser {
                     return new SyntaxTree.Expression.CastExpression(new LocationRange(tok.Start, expr.LocationRange.End), type, expr);
                 }
 
-                _lexer.Restore(saveCurrent);
+                _lexer.Restore();
                 return UnaryExpression();
             }
 

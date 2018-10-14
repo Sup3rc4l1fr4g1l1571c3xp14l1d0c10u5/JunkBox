@@ -1,12 +1,13 @@
 using System.Collections.Generic;
-using System.Linq;
-
 
 namespace AnsiCParser {
     /// <summary>
     /// ソースコード中の位置情報
     /// </summary>
-    public struct Location {
+    public class Location {
+        /// <summary>
+        /// 論理ソースファイルパス
+        /// </summary>
         private static List<string> FilePathTable { get; } = new List<string>();
 
         /// <summary>
@@ -14,11 +15,14 @@ namespace AnsiCParser {
         /// </summary>
         public string FilePath {
             get {
-                return FilePathTable[FilePathIndex];
+                return FilePathTable[_filePathIndex];
             }
         }
 
-        private int FilePathIndex;
+        /// <summary>
+        /// 論理ソースファイルパス表のID
+        /// </summary>
+        private readonly int _filePathIndex;
 
         /// <summary>
         /// 論理ソースファイル上の行番号
@@ -41,12 +45,15 @@ namespace AnsiCParser {
             get;
         }
 
+        /// <summary>
+        /// 空の位置情報
+        /// </summary>
         public static Location Empty { get; } = new Location("", 1, 1, 0);
 
         public Location(string filepath, int line, int column, int position) {
-            FilePathIndex = FilePathTable.IndexOf(filepath);
-            if (FilePathIndex == -1) {
-                FilePathIndex = FilePathTable.Count;
+            _filePathIndex = FilePathTable.IndexOf(filepath);
+            if (_filePathIndex == -1) {
+                _filePathIndex = FilePathTable.Count;
                 FilePathTable.Add(filepath);
             }
             Line = line;

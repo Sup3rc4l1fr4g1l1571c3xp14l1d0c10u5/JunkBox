@@ -110,7 +110,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\mbchar.c"), " <Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\tests2\tmp\70_floating_point_literals.i"), " <Debug>").Parse();
             var sexpr = ret.Accept(new ToSExprVisitor(), null);
             //*
             var interpreter = new Schene.SchemeInterpreter();

@@ -6,14 +6,10 @@ namespace AnsiCParser {
     public class LocationRange {
 
         /// <summary>
-        /// 組込み型等の位置を示す
+        /// 組込み型等の位置情報
         /// </summary>
-        public static LocationRange Builtin {
-            get {
-                var location = new Location("<built-in>", 1, 1, 0);
-                return new LocationRange(location, location);
-            }
-        }
+        private static Location BuiltinLocation { get; } = new Location("<built-in>", 1, 1, 0);
+        public static LocationRange Builtin { get; } = new LocationRange(BuiltinLocation, BuiltinLocation);
 
         /// <summary>
         /// 範囲の開始地点
