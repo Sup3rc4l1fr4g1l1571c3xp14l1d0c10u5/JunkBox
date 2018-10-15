@@ -54,23 +54,22 @@ namespace AnsiCParser.SyntaxTree {
                 Current = null;
                 return false;
             }
-            public bool Enter() {
+            public void Enter() {
                 if (Current is Initializer.ComplexInitializer) {
                     _inits.Push(Tuple.Create(_initializer, _index));
                     _initializer = Current;
                     _index = -1;
                     Current = null;
-                    return true;
+                    return;
                 }
 
                 throw new Exception();
             }
-            public bool Leave() {
+            public void Leave() {
                 Current = _initializer;
                 var top = _inits.Pop();
                 _initializer = top.Item1;
                 _index = top.Item2;
-                return true;
             }
 
             public bool IsSimpleInitializer() {

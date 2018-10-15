@@ -20,8 +20,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override CType Duplicate() {
-                var ret = new ArrayType(Length, BaseType);
-                return ret;
+                return new ArrayType(Length, BaseType);
             }
 
             /// <summary>

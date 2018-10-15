@@ -8,13 +8,13 @@ namespace AnsiCParser.SyntaxTree {
             return Schene.Util.makeCons(
                 Schene.Util.makeList(
                     Schene.Util.makeStr(lr.Start.FilePath),
-                    Schene.Util.makeNum(lr.Start.Position),
+                    //Schene.Util.makeNum(lr.Start.Position),
                     Schene.Util.makeNum(lr.Start.Line),
                     Schene.Util.makeNum(lr.Start.Column)
                 ),
                 Schene.Util.makeList(
                     Schene.Util.makeStr(lr.End.FilePath),
-                    Schene.Util.makeNum(lr.End.Position),
+                    //Schene.Util.makeNum(lr.End.Position),
                     Schene.Util.makeNum(lr.End.Line),
                     Schene.Util.makeNum(lr.End.Column)
                 )

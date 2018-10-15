@@ -241,7 +241,7 @@ namespace AnsiCParser {
                 return BasicType.Create(BasicType.TypeKind._Bool);
             }
 
-            public static BasicType CreateSizeT() {
+            public static BasicType CreateSizeT() { 
                 return BasicType.Create(BasicType.TypeKind.UnsignedLongInt);
             }
 
@@ -631,7 +631,7 @@ namespace AnsiCParser {
                             }
 
                             var storageClass = ta1.Arguments[i].StorageClass;
-                            newArguments.Add(new FunctionType.ArgumentInfo(ta1.Arguments[i].Range ?? ta2.Arguments[i].Range, null, storageClass, newArgument));
+                            newArguments.Add(new FunctionType.ArgumentInfo(/*ta1.Arguments[i].Range ?? */ta2.Arguments[i].Range, null, storageClass, newArgument));
                         }
 
                         // 戻り値の型が適合する？

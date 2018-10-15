@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace AnsiCParser {
@@ -48,27 +47,27 @@ namespace AnsiCParser {
         /// <summary>
         /// 10進浮動小数点形式に一致する正規表現
         /// </summary>
-        private static Regex RegexDecimalFloat { get; } = new Regex($@"^(?<Body>{D}+{E}|{D}*\.{D}+(?:{E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$",RegexOptions.Compiled);
+        private static Regex RegexDecimalFloat { get; } = new Regex($@"^(?<Body>{D}+{E}|{D}*\.{D}+(?:{E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 16進浮動小数点形式に一致する正規表現
         /// </summary>
-        private static Regex RegexHeximalFloat { get; } = new Regex($@"^0[xX](?<Fact>(?:{H}*?\.{H}+|{H}+\.?))[pP](?<Exp>[\+\-]?{D}+)(?<Suffix>{FS})$",RegexOptions.Compiled);
+        private static Regex RegexHeximalFloat { get; } = new Regex($@"^0[xX](?<Fact>(?:{H}*?\.{H}+|{H}+\.?))[pP](?<Exp>[\+\-]?{D}+)(?<Suffix>{FS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 10進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$",RegexOptions.Compiled);
+        private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 16進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$",RegexOptions.Compiled);
+        private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 8進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexOctal { get; } = new Regex($@"^0(?<Body>{D}+)(?<Suffix>{IS})$",RegexOptions.Compiled);
+        private static Regex RegexOctal { get; } = new Regex($@"^(?<Body>0{D}*)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 浮動小数点文字列の解析
@@ -87,7 +86,276 @@ namespace AnsiCParser {
             throw new Exception();
         }
 
-        private static uint msb(ulong x) {
+        public class NumberScanner {
+
+            public enum FormatType {
+                Invalid,
+                IntegerLiteral,
+                HexLiteral,
+                OctalLiteral,
+                HexFloatLiteral,
+                RealLiteral,
+            }
+
+            private static bool IsHexDigit(char ch) {
+                return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F');
+            }
+            private static bool IsDigit(char ch) {
+                return ('0' <= ch && ch <= '9');
+            }
+            private static bool IsOctalDigit(char ch) {
+                return ('0' <= ch && ch <= '7');
+            }
+            private static bool IsIntSuffix(char ch) {
+                return ch == 'u' || ch == 'U' || ch == 'l' || ch == 'L';
+            }
+            private static bool IsFloatSuffix(char ch) {
+                return ch == 'f' || ch == 'F' || ch == 'l' || ch == 'L';
+            }
+
+            // 10進浮動小数点形式に一致する正規表現
+            //   ^(?<Body>{D}+{E}|{D}*\.{D}+(?:{E})?|{D}+\.{D}*({E})?)(?<Suffix>{FS})$
+            // 16進浮動小数点形式に一致する正規表現
+            //   ^0[xX](?<Fact>(?:{H}*?\.{H}+|{H}+\.?))[pP](?<Exp>[\+\-]?{D}+)(?<Suffix>{FS})$
+            // 10進数形式に一致する正規表現
+            //   ^(?<Body>{D}+)(?<Suffix>{IS})$
+            // 16進数形式に一致する正規表現
+            //   ^0[xX](?<Body>{H}+)(?<Suffix>{IS})$",RegexOptions.Compiled);
+            // 8進数形式に一致する正規表現
+            //   ^0(?<Body>{D}+)(?<Suffix>{IS})$
+
+            //   ^{D}+      {E} {FS}$ = DFloat
+            //   ^{D}+\.{D}*{E}?{FS}$ = DFloat
+            //   ^    \.{D}+{E}?{FS}$ = DFloat
+            //   ^{D}+{IS}$ = DInt
+            //   ^0[xX]    \.{H}+[pP][\+\-]?{D}+{FS}$ = HFloat
+            //   ^0[xX]{H}+\.{H}+[pP][\+\-]?{D}+{FS}$ = HFloat
+            //   ^0[xX]{H}+      [pP][\+\-]?{D}+{FS}$ = HFloat
+            //   ^0[xX]{H}+\.    [pP][\+\-]?{D}+{FS}$ = HFloat
+            //   ^0[xX]{H}+{IS}$ = HInt
+            //   ^0{D}+{IS}$ = OInt
+
+            private string _str;
+            private int _index;
+
+            private char CurrentCh { get; set; }
+            private void NextCh() {
+                _index++;
+                CurrentCh = _str.Length > _index ? _str[_index] : '\0';
+            }
+
+            private bool Many1Digits() {
+                if (IsDigit(CurrentCh) == false) {
+                    return false;
+                }
+                while (IsDigit(CurrentCh)) {
+                    NextCh();
+                }
+                return true;
+            }
+            private void ManyDigits() {
+                while (IsDigit(CurrentCh)) {
+                    NextCh();
+                }
+            }
+            private bool Many1Hex() {
+                if (_str.Length <= _index || IsHexDigit(CurrentCh) == false) {
+                    return false;
+                }
+                while (IsHexDigit(CurrentCh)) {
+                    NextCh();
+                }
+                return true;
+            }
+            private void ManyHex() {
+                while (IsHexDigit(CurrentCh)) {
+                    NextCh();
+                }
+            }
+            private void IntSuffix() {
+                while (IsIntSuffix(CurrentCh)) {
+                    NextCh();
+                }
+            }
+
+            //[eE][\+\-]?{D}+
+            private bool E() {
+                if (CurrentCh != 'e' && CurrentCh != 'E') {
+                    return false;
+                }
+                NextCh();
+
+                if (CurrentCh == '+' || CurrentCh == '-') {
+                    NextCh();
+                }
+                //{D}+
+                if (Many1Digits() == false) {
+                    return false;
+                }
+                return true;
+            }
+            private bool OptE() {
+                // ([eE][\+\-]?{D}+)?
+                if (CurrentCh == 'e' || CurrentCh == 'E') {
+                    NextCh();
+                    if (CurrentCh == '+' || CurrentCh == '-') {
+                        NextCh();
+                    }
+                    //{D}+
+                    if (Many1Digits() == false) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            public FormatType GetFormat(string s) {
+                this._str = s;
+                this._index = -1;
+                NextCh();
+
+                if (CurrentCh == '0') {
+                    NextCh();
+                    if (CurrentCh == 'x' || CurrentCh == 'X') {
+                        // hex digit or hex float
+                        NextCh();
+                        if (CurrentCh == '.') {
+                            // skip
+                            NextCh();
+                            // {h}+
+                            if (Many1Hex() == false) {
+                                return FormatType.Invalid;
+                            }
+                        } else {
+                            // {h}+
+                            if (Many1Hex() == false) {
+                                return FormatType.Invalid;
+                            }
+
+                            if (CurrentCh == '.') {
+                                // skip
+                                NextCh();
+                                // {h}*
+                                ManyHex();
+                            } else if (CurrentCh != 'p' && CurrentCh != 'P') {
+                                // {IS}
+                                IntSuffix();
+                                return CurrentCh == '\0' ? FormatType.HexLiteral : FormatType.Invalid;
+                            }
+                        }
+
+                        // [Pp]
+                        if (CurrentCh != 'p' && CurrentCh != 'P') {
+                            return FormatType.Invalid;
+                        }
+                        NextCh();
+
+                        // [\+\-]?
+                        if (CurrentCh == '+' || CurrentCh == '-') {
+                            NextCh();
+                        }
+
+                        // {D}+
+                        if (Many1Digits() == false) {
+                            return FormatType.Invalid;
+                        }
+
+                        // {FS}?
+                        if (IsFloatSuffix(CurrentCh)) {
+                            NextCh();
+                        }
+
+                        return CurrentCh == '\0' ? FormatType.HexFloatLiteral : FormatType.Invalid;
+                    } else {
+                        int notOct = -1;
+                        while (IsDigit(CurrentCh)) {
+                            if (!IsOctalDigit(CurrentCh) && notOct == -1) {
+                                notOct = _index;
+                            }
+                            NextCh();
+                        }
+                        if (CurrentCh != '.' && CurrentCh != 'e' && CurrentCh != 'E') {
+                            // octal
+                            if (notOct != -1) {
+                                return FormatType.Invalid;
+                            }
+                            // {IS}
+                            IntSuffix();
+                            return CurrentCh == '\0' ? FormatType.OctalLiteral : FormatType.Invalid;
+                        } else {
+                            // float
+                        }
+                    }
+                } else if (CurrentCh == '.') {
+                    // float
+                    // \.
+                    NextCh();
+
+                    // {D}+
+                    if (Many1Digits() == false) {
+                        return FormatType.Invalid;
+                    }
+
+                    // {E}?
+                    if (OptE() == false) {
+                        return FormatType.Invalid;
+                    }
+
+                    // {FS}
+                    if (IsFloatSuffix(CurrentCh)) {
+                        NextCh();
+                    }
+                    return CurrentCh == '\0' ? FormatType.RealLiteral : FormatType.Invalid;
+
+                } else {
+
+                    // int/float
+                    // {D}*
+                    ManyDigits();
+                    if (CurrentCh != '.' && CurrentCh != 'e' && CurrentCh != 'E') {
+                        // {IS}*
+                        while (IsIntSuffix(CurrentCh)) {
+                            NextCh();
+                        }
+                        return CurrentCh == '\0' ? FormatType.IntegerLiteral : FormatType.Invalid;
+                    }
+                }
+                // float
+                if (CurrentCh == '.') {
+                    NextCh();
+                    // {D}*
+                    ManyDigits();
+
+                    // {E}?
+                    if (OptE() == false) {
+                        return FormatType.Invalid;
+                    }
+
+                    // {FS}
+                    if (IsFloatSuffix(CurrentCh)) {
+                        NextCh();
+                    }
+                    return CurrentCh == '\0' ? FormatType.RealLiteral : FormatType.Invalid;
+                } else if (E()) {
+                    // E()
+
+                    // {FS}
+                    if (IsFloatSuffix(CurrentCh)) {
+                        NextCh();
+                    }
+                    return CurrentCh == '\0' ? FormatType.RealLiteral : FormatType.Invalid;
+
+                } else {
+                    return FormatType.Invalid;
+                }
+
+            }
+
+        }
+
+        private readonly NumberScanner _numberScanner = new NumberScanner();
+
+        private static uint MostSignificantBit(ulong x) {
             uint n = 0;
             while (x > 1) {
                 x >>= 1;
@@ -96,25 +364,38 @@ namespace AnsiCParser {
             return n;
         }
 
-        interface _FloatFmt {
-            uint bias { get; }
-            uint exponent_size { get; }
-            double binary2double(ulong mantissa, ulong exponent);
+        interface IFloatFmt {
+            uint Bias { get; }
+            uint ExponentSize { get; }
+            double Binary2Double(ulong mantissa, ulong exponent);
         }
-        struct FloatFmt : _FloatFmt {
-            public uint bias => (1 << 8) / 2 - 1;
-            public uint exponent_size => 23;
 
-            public double binary2double(ulong mantissa, ulong exponent) {
-                var binary = (uint)(mantissa | ((ulong)exponent << (int)exponent_size));
+        struct FloatFmt : IFloatFmt {
+            public uint Bias {
+                get { return (1 << 8) / 2 - 1; }
+            }
+
+            public uint ExponentSize {
+                get { return 23; }
+            }
+
+            public double Binary2Double(ulong mantissa, ulong exponent) {
+                var binary = (uint)(mantissa | (exponent << (int)ExponentSize));
                 return BitConverter.ToSingle(BitConverter.GetBytes(binary), 0);
             }
         }
-        struct DoubleFmt : _FloatFmt {
-            public uint bias => (1 << 11) / 2 - 1;
-            public uint exponent_size => 52;
-            public double binary2double(ulong mantissa, ulong exponent) {
-                var binary = (mantissa | ((ulong)exponent << (int)exponent_size));
+
+        struct DoubleFmt : IFloatFmt {
+            public uint Bias {
+                get { return (1 << 11) / 2 - 1; }
+            }
+
+            public uint ExponentSize {
+                get { return 52; }
+            }
+
+            public double Binary2Double(ulong mantissa, ulong exponent) {
+                var binary = (mantissa | (exponent << (int)ExponentSize));
                 return BitConverter.ToDouble(BitConverter.GetBytes(binary), 0);
             }
         }
@@ -129,7 +410,7 @@ namespace AnsiCParser {
         /// <param name="suffixPart"></param>
         /// <returns></returns>
         public static double ParseHeximalFloat(LocationRange range, string mantissaPart, string exponentPart, string suffixPart) {
-            _FloatFmt fmt = (suffixPart == "f" || suffixPart == "F") ? (_FloatFmt)new FloatFmt() : (_FloatFmt)new DoubleFmt();
+            IFloatFmt fmt = (suffixPart == "f" || suffixPart == "F") ? (IFloatFmt)new FloatFmt() : (IFloatFmt)new DoubleFmt();
             // 小数点の位置
             var dotIndexPos = mantissaPart.IndexOf('.');
             var dotIndex = (dotIndexPos != -1) ? (uint)dotIndexPos : (uint)mantissaPart.Length;
@@ -142,7 +423,7 @@ namespace AnsiCParser {
             var exponent = ToInt64(range, exponentPart, 10);
 
             // 仮数部の最左ビット位置
-            var msbIndex = msb(mantissa);
+            var msbIndex = MostSignificantBit(mantissa);
 
             // 小数点のビット位置
             dotIndex = ((uint)mantissaPart.Length - dotIndex) * 4;
@@ -151,7 +432,7 @@ namespace AnsiCParser {
             exponent = exponent + msbIndex - dotIndex;
 
             // 仮数部の最左ビット位置をfmt[:exponent_size]にするために必要な左シフト数
-            var msbShiftValue = (int)(fmt.exponent_size - msbIndex);
+            var msbShiftValue = (int)(fmt.ExponentSize - msbIndex);
 
 
             // 仮数部の最左ビット位置をfmt[:exponent_size]にしたときの指数部が-126より大きいなら正規化数なのでケチ表現化できる。
@@ -166,12 +447,12 @@ namespace AnsiCParser {
                     mantissa = mantissa << msbShiftValue;
                 } else {
                     // 右シフト
-                    mantissa = mantissa  >> -msbShiftValue;
+                    mantissa = mantissa >> -msbShiftValue;
                 }
-                mantissa = mantissa & ((1UL << (int)fmt.exponent_size) - 1);
+                mantissa = mantissa & ((1UL << (int)fmt.ExponentSize) - 1);
 
                 // バイアスを指数に加算
-                exponent += fmt.bias;
+                exponent += fmt.Bias;
             } else {
                 // 非正規化数なのでケチ表現化は不可能
                 // puts "非正規化数なのでケチ表現化はできない"
@@ -182,9 +463,9 @@ namespace AnsiCParser {
                     mantissa = mantissa << msbShiftValue;
                 } else {
                     // 右シフト
-                    mantissa = mantissa  >> -msbShiftValue;
+                    mantissa = mantissa >> -msbShiftValue;
                 }
-                var shr = -(fmt.bias - 1) - exponent;
+                var shr = -(fmt.Bias - 1) - exponent;
                 if (shr > 0) {
                     // 右シフト
                     mantissa = mantissa >> (int)shr;
@@ -196,13 +477,7 @@ namespace AnsiCParser {
                 exponent = 0;
             }
 
-            return fmt.binary2double((ulong)mantissa, (ulong)exponent);
-
-
-
-
-
-
+            return fmt.Binary2Double(mantissa, (ulong)exponent);
         }
 
         /// <summary>
@@ -211,11 +486,40 @@ namespace AnsiCParser {
         /// <param name="str"></param>
         /// <returns></returns>
         public static Tuple<string, string> ParseHeximal(string str) {
-            var m = RegexHeximal.Match(str);
-            if (m.Success == false) {
-                throw new Exception();
+            // 正規表現を用いるより手書きの方が高速かつ省メモリだった
+
+            if (str.Length < 3 || str[0] != '0' || (str[1] != 'x' && str[1] != 'X')) {
+                throw new Exception(str);
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+
+            var i = 2;
+            for (;i < str.Length; i++) {
+                if (!IsXDigit(str[i])) {
+                    break;
+                }
+            }
+            var body = str.Substring(2, i-2);
+
+            var suffix = "";
+            for (;i < str.Length; i++) {
+                var ch = str[i];
+                if (ch == 'u' || ch == 'U') {
+                    suffix = suffix + 'U';
+                } else if (ch == 'l' || ch == 'L') {
+                    suffix = 'L' + suffix;
+                } else {
+                    break;
+                }
+            }
+            if (body.Length == 0 || i != str.Length) {
+                throw new Exception(str);
+            }
+            return Tuple.Create(body, suffix);
+            //var m = RegexHeximal.Match(str);
+            //if (m.Success == false) {
+            //    throw new Exception();
+            //}
+            //return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
         /// <summary>
@@ -224,11 +528,35 @@ namespace AnsiCParser {
         /// <param name="str"></param>
         /// <returns></returns>
         public static Tuple<string, string> ParseDecimal(string str) {
-            var m = RegexDecimal.Match(str);
-            if (m.Success == false) {
-                throw new Exception();
+            var i = 0;
+
+            for (;i < str.Length; i++) {
+                if (!IsDigit(str[i])) {
+                    break;
+                }
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+            var body = str.Substring(0, i);
+
+            var suffix = "";
+            for (;i < str.Length; i++) {
+                var ch = str[i];
+                if (ch == 'u' || ch == 'U') {
+                    suffix = suffix + 'U';
+                } else if (ch == 'l' || ch == 'L') {
+                    suffix = 'L' + suffix;
+                } else {
+                    break;
+                }
+            }
+            if (body.Length == 0 || i != str.Length) {
+                throw new Exception(str);
+            }
+            return Tuple.Create(body, suffix);
+            //var m = RegexDecimal.Match(str);
+            //if (m.Success == false) {
+            //    throw new Exception();
+            //}
+            //return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
         /// <summary>
@@ -237,11 +565,35 @@ namespace AnsiCParser {
         /// <param name="str"></param>
         /// <returns></returns>
         public static Tuple<string, string> ParseOctal(string str) {
-            var m = RegexOctal.Match(str);
-            if (m.Success == false) {
-                throw new Exception();
+            var i = 0;
+
+            for (;i < str.Length; i++) {
+                if (!IsOct(str[i])) {
+                    break;
+                }
             }
-            return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+            var body = str.Substring(0, i);
+
+            var suffix = "";
+            for (;i < str.Length; i++) {
+                var ch = str[i];
+                if (ch == 'u' || ch == 'U') {
+                    suffix = suffix + 'U';
+                } else if (ch == 'l' || ch == 'L') {
+                    suffix = 'L' + suffix;
+                } else {
+                    break;
+                }
+            }
+            if (body.Length == 0 || i != str.Length) {
+                throw new Exception(str);
+            }
+            return Tuple.Create(body, suffix);
+            //var m = RegexOctal.Match(str);
+            //if (!m.Success) {
+            //    throw new Exception(str);
+            //}
+            //return Tuple.Create(m.Groups["Body"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
         }
 
         /// <summary>
@@ -266,7 +618,7 @@ namespace AnsiCParser {
                 case 10:
                     foreach (var ch in s) {
                         if ('0' <= ch && ch <= '9') {
-                            ret = ret * 10 + (ulong) (ch - '0');
+                            ret = ret * 10 + (ulong)(ch - '0');
                         } else {
                             throw new CompilerException.SpecificationErrorException(range, $"十進数に使えない文字{ch}が含まれています。");
                         }
@@ -275,7 +627,7 @@ namespace AnsiCParser {
                 case 16:
                     foreach (var ch in s) {
                         if ('0' <= ch && ch <= '9') {
-                            ret = ret * 16 + (ulong) (ch - '0');
+                            ret = ret * 16 + (ulong)(ch - '0');
                         } else if ('A' <= ch && ch <= 'F') {
                             ret = ret * 16 + (ulong)(ch - 'A' + 10);
                         } else if ('a' <= ch && ch <= 'f') {
@@ -315,9 +667,7 @@ namespace AnsiCParser {
                 break;
             }
 
-            return unchecked((neg ? -1: 1)*(Int32) Read(range, s, radix));
-            //var ret = Read(range, s, radix).ToByteArray();
-            //return BitConverter.ToInt32(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00), 4)).ToArray(), 0);
+            return unchecked((neg ? -1 : 1) * (Int32)Read(range, s, radix));
         }
 
         /// <summary>
@@ -328,9 +678,7 @@ namespace AnsiCParser {
         /// <param name="radix"></param>
         /// <returns></returns>
         public static UInt32 ToUInt32(LocationRange range, string s, int radix) {
-            return unchecked((UInt32) Read(range, s, radix));
-            //var ret = Read(range, s, radix).ToByteArray();
-            //return BitConverter.ToUInt32(ret.Concat(Enumerable.Repeat((byte)0, 4)).ToArray(), 0);
+            return unchecked((UInt32)Read(range, s, radix));
         }
 
         /// <summary>
@@ -356,13 +704,7 @@ namespace AnsiCParser {
                 }
                 break;
             }
-            //var val = Read(range, s, radix);
-            //if (neg) {
-            //    val *= -1;
-            //}
-            //var ret = val.ToByteArray();
-            //return BitConverter.ToInt64(ret.Concat(Enumerable.Repeat((byte)((ret.Last() & 0x80) != 0x00 ? 0xFF : 0x00), 8)).ToArray(), 0);
-            return unchecked((neg ? -1: 1)*(Int64) Read(range, s, radix));
+            return unchecked((neg ? -1 : 1) * (Int64)Read(range, s, radix));
         }
 
         /// <summary>
@@ -373,9 +715,7 @@ namespace AnsiCParser {
         /// <param name="radix"></param>
         /// <returns></returns>
         public static UInt64 ToUInt64(LocationRange range, string s, int radix) {
-            //var ret = Read(range, s, radix).ToByteArray();
-            //return BitConverter.ToUInt64(ret.Concat(Enumerable.Repeat((byte)0, 8)).ToArray(), 0);
-            return unchecked((UInt64) Read(range, s, radix));
+            return Read(range, s, radix);
         }
 
         /// <summary>
@@ -492,7 +832,7 @@ namespace AnsiCParser {
                         write((byte)ret);
                         return;
                     default:
-                        Logger.Warning(loc,loc, $"不正なエスケープシーケンス '\\{(char)peek()}' がありました。エスケープ文字を無視し、'{(char)peek()}' として読み取ります。");
+                        Logger.Warning(loc, loc, $"不正なエスケープシーケンス '\\{(char)peek()}' がありました。エスケープ文字を無視し、'{(char)peek()}' として読み取ります。");
                         write((byte)peek());
                         next();
                         return;
@@ -595,7 +935,7 @@ namespace AnsiCParser {
         /// ファイル終端なら真
         /// </summary>
         /// <returns></returns>
-        public bool is_eof() {
+        public bool IsEof() {
             return _tokens[_currentTokenPos].Kind == Token.TokenKind.EOF;
         }
 
@@ -750,6 +1090,12 @@ namespace AnsiCParser {
         /// 現在のトークンの読み取り位置
         /// </summary>
         private int _currentTokenPos;
+        /// <summary>
+
+        /// 読み取り位置情報の保存スタック
+        /// </summary>
+        private readonly Stack<int> _contextSaveStack = new Stack<int>();
+
 
         public Lexer(string source, string filepath = "") {
             _inputText = source;
@@ -763,11 +1109,19 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 字句解析器が示す現在の読み取り位置情報を取得する
+        /// 字句解析器が示す現在のファイル位置情報を取得する
         /// </summary>
         /// <returns></returns>
         private Location GetCurrentLocation() {
-            return new Location(_filepath, _line, _column, _inputPos);
+            return new Location(_filepath, _line, _column);
+        }
+
+        /// <summary>
+        /// 字句解析器が示す現在のファイル位置情報と読み取り位置情報を取得する
+        /// </summary>
+        /// <returns></returns>
+        private Tuple<Location, int> GetCurrentLocationWithInputPos() {
+            return Tuple.Create(new Location(_filepath, _line, _column), _inputPos);
         }
 
         /// <summary>
@@ -776,8 +1130,8 @@ namespace AnsiCParser {
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <returns></returns>
-        public string Substring(Location start, Location end) {
-            return _inputText.Substring(start.Position, end.Position - start.Position);
+        private string Substring(int start, int end) {
+            return _inputText.Substring(start, end - start);
         }
 
         /// <summary>
@@ -854,7 +1208,7 @@ namespace AnsiCParser {
         /// </summary>
         private void ScanToken() {
             // トークン列の末尾にＥＯＦトークンがある＝すでにファイル終端に到達
-            if (_tokens.Count > 0 && _tokens[_tokens.Count-1].Kind == Token.TokenKind.EOF) {
+            if (_tokens.Count > 0 && _tokens[_tokens.Count - 1].Kind == Token.TokenKind.EOF) {
                 // 読み取りを行わずに終わる
                 return;
             }
@@ -862,7 +1216,7 @@ namespace AnsiCParser {
             for (; ; ) {
 
                 // 空白文字の連続の処理
-                for (int ch = 0; IsSpace(ch = Peek());) {
+                for (int ch; IsSpace(ch = Peek());) {
                     if (ch == '\n') {
                         _beginOfLine = true;
                     }
@@ -904,7 +1258,7 @@ namespace AnsiCParser {
 
                     bool terminated = false;
                     while (_inputPos < _inputText.Length) {
-                        int ch = Peek(); 
+                        int ch = Peek();
                         if (ch == '\\') {
                             IncPos(2);
                         } else if (ch == '\n') {
@@ -932,7 +1286,7 @@ namespace AnsiCParser {
             }
 
             // 読み取り開始位置を記録
-            var start = GetCurrentLocation();
+            var start = GetCurrentLocationWithInputPos();
 
             // 前処理指令の扱い
             if (Peek('#')) {
@@ -941,8 +1295,8 @@ namespace AnsiCParser {
                     while (Peek('\n') == false) {
                         IncPos(1);
                     }
-                    var end = GetCurrentLocation();
-                    var str = Substring(start, end);
+                    var end = GetCurrentLocationWithInputPos();
+                    var str = Substring(start.Item2, end.Item2);
                     IncPos(1);
 
                     {
@@ -965,7 +1319,6 @@ namespace AnsiCParser {
                             } else {
                                 Settings.PackSize = Settings.DefaultPackSize;
                             }
-                            goto rescan;
                         }
                     }
                     goto rescan;
@@ -985,13 +1338,13 @@ namespace AnsiCParser {
                 while (IsIdentifierBody(Peek())) {
                     IncPos(1);
                 }
-                var end = GetCurrentLocation();
-                var str = Substring(start, end);
+                var end = GetCurrentLocationWithInputPos();
+                var str = Substring(start.Item2, end.Item2);
                 Token.TokenKind kind;
                 if (_reserveWords.TryGetValue(str, out kind)) {
-                    _tokens.Add(new Token(kind, start, end, str));
+                    _tokens.Add(new Token(kind, start.Item1, end.Item1, str));
                 } else {
-                    _tokens.Add(new Token(Token.TokenKind.IDENTIFIER, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.IDENTIFIER, start.Item1, end.Item1, str));
                 }
                 return;
             }
@@ -1006,7 +1359,7 @@ namespace AnsiCParser {
                     IncPos(1);
                 }
                 IncPos(1);
-                for (int ch = 0; (ch = Peek()) != -1;) {
+                for (int ch; (ch = Peek()) != -1;) {
                     if ("eEpP".IndexOf((char)ch) != -1 && "+-".IndexOf((char)Peek(1)) != -1) {
                         IncPos(2);
                     } else if (ch == '.' || IsIdentifierBody(ch)) {
@@ -1015,52 +1368,72 @@ namespace AnsiCParser {
                         break;
                     }
                 }
-                var end = GetCurrentLocation();
-                var str = Substring(start, end);
-
+                var end = GetCurrentLocationWithInputPos();
+                var str = Substring(start.Item2, end.Item2);
+#if true
+                switch (_numberScanner.GetFormat(str)) {
+                    case NumberScanner.FormatType.Invalid:
+                        _tokens.Add(new Token(Token.TokenKind.INVALID, start.Item1, end.Item1, str));
+                        break;
+                    case NumberScanner.FormatType.IntegerLiteral:
+                        _tokens.Add(new Token(Token.TokenKind.DECIAML_CONSTANT, start.Item1, end.Item1, str));
+                        break;
+                    case NumberScanner.FormatType.HexLiteral:
+                        _tokens.Add(new Token(Token.TokenKind.HEXIMAL_CONSTANT, start.Item1, end.Item1, str));
+                        break;
+                    case NumberScanner.FormatType.OctalLiteral:
+                        _tokens.Add(new Token(Token.TokenKind.OCTAL_CONSTANT, start.Item1, end.Item1, str));
+                        break;
+                    case NumberScanner.FormatType.HexFloatLiteral:
+                    case NumberScanner.FormatType.RealLiteral:
+                        _tokens.Add(new Token(Token.TokenKind.FLOAT_CONSTANT, start.Item1, end.Item1, str));
+                        break;
+                }
+#else
                 if (RegexDecimalFloat.IsMatch(str) || RegexHeximalFloat.IsMatch(str)) {
-                    _tokens.Add(new Token(Token.TokenKind.FLOAT_CONSTANT, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.FLOAT_CONSTANT, start.Item1, end.Item1, str));
                 } else if (RegexHeximal.IsMatch(str)) {
-                    _tokens.Add(new Token(Token.TokenKind.HEXIMAL_CONSTANT, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.HEXIMAL_CONSTANT, start.Item1, end.Item1, str));
                 } else if (RegexOctal.IsMatch(str)) {
-                    _tokens.Add(new Token(Token.TokenKind.OCTAL_CONSTANT, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.OCTAL_CONSTANT, start.Item1, end.Item1, str));
                 } else if (RegexDecimal.IsMatch(str)) {
-                    _tokens.Add(new Token(Token.TokenKind.DECIAML_CONSTANT, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.DECIAML_CONSTANT, start.Item1, end.Item1, str));
                 } else {
                     //throw new Exception();
-                    _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
+                    _tokens.Add(new Token(Token.TokenKind.INVALID, start.Item1, end.Item1, str));
                 }
+#endif
                 return;
-            } 
-            
-                // 文字定数の読み取り
-                // todo : wide char / unicode char
+            }
+
+            // 文字定数の読み取り
+            // todo : wide char / unicode char
             if (Peek('\'')) {
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
                     if (Peek('\'')) {
                         IncPos(1);
-                        var end = GetCurrentLocation();
-                        var str = Substring(start, end);
-                        _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start, end, str));
+                        var end = GetCurrentLocationWithInputPos();
+                        var str = Substring(start.Item2, end.Item2);
+                        _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start.Item1, end.Item1, str));
                         return;
                     } else {
-                        CharIterator(GetCurrentLocation(),() => Peek(), () => IncPos(1), (b) => { });
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { });
                     }
                 }
                 throw new Exception();
             }
 
             // 文字列リテラルの読み取り
-                // todo : wide char / unicode char
+            // todo : wide char / unicode char
             if (Peek('"')) {
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
                     if (Peek('"')) {
                         IncPos(1);
-                        var end = GetCurrentLocation();
-                        var str = Substring(start, end);
-                        _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start, end, str));
+                        var end = GetCurrentLocationWithInputPos();
+                        var str = Substring(start.Item2, end.Item2);
+                        _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start.Item1, end.Item1, str));
                         return;
                     } else {
                         CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { });
@@ -1074,9 +1447,9 @@ namespace AnsiCParser {
                 foreach (var sym in _symbols) {
                     if (Peek(sym.Item1)) {
                         IncPos(sym.Item1.Length);
-                        var end = GetCurrentLocation();
-                        var str = Substring(start, end);
-                        _tokens.Add(new Token(sym.Item2, start, end, str));
+                        var end = GetCurrentLocationWithInputPos();
+                        var str = Substring(start.Item2, end.Item2);
+                        _tokens.Add(new Token(sym.Item2, start.Item1, end.Item1, str));
                         return;
                     }
                 }
@@ -1085,9 +1458,9 @@ namespace AnsiCParser {
             // 不正な文字
             {
                 IncPos(1);
-                var end = GetCurrentLocation();
-                var str = Substring(start, end);
-                _tokens.Add(new Token(Token.TokenKind.INVALID, start, end, str));
+                var end = GetCurrentLocationWithInputPos();
+                var str = Substring(start.Item2, end.Item2);
+                _tokens.Add(new Token(Token.TokenKind.INVALID, start.Item1, end.Item1, str));
                 return;
 
             }
@@ -1109,11 +1482,10 @@ namespace AnsiCParser {
         /// トークンを一つ読み進める
         /// </summary>
         public void NextToken() {
-            if (SaveStack.Count > 0) {
+            if (_contextSaveStack.Count > 0) {
                 _currentTokenPos++;
-            }
-            else {
-                _tokens.RemoveRange(0, _currentTokenPos+1);
+            } else {
+                _tokens.RemoveRange(0, _currentTokenPos + 1);
                 _currentTokenPos = 0;
             }
 
@@ -1126,20 +1498,15 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="candidates"></param>
         public Token ReadToken(params Token.TokenKind[] candidates) {
-            if (candidates.Contains(CurrentToken().Kind)) {
-                var token = CurrentToken();
-                NextToken();
-                return token;
+            var token = CurrentToken();
+            var kind = token.Kind;
+            foreach (var candidate in candidates) {
+                if (candidate == kind) {
+                    NextToken();
+                    return token;
+                }
             }
-            throw new CompilerException.SyntaxErrorException(CurrentToken().Start, CurrentToken().End, $" {String.Join(", ", candidates.Select(x => (((int)x < 256) ? ((char)x).ToString() : x.ToString())))} があるべき {(CurrentToken().Kind == Token.TokenKind.EOF ? "ですがファイル終端に到達しました。" : $"場所に{CurrentToken().Raw} があります。")} ");
-        }
-        private Token ReadToken(IEnumerable<Token.TokenKind> candidates) {
-            if (candidates.Contains(CurrentToken().Kind)) {
-                var token = CurrentToken();
-                NextToken();
-                return token;
-            }
-            throw new CompilerException.SyntaxErrorException(CurrentToken().Start, CurrentToken().End, $" {String.Join(", ", candidates.Select(x => (((int)x < 256) ? ((char)x).ToString() : x.ToString())))} があるべき {(CurrentToken().Kind == Token.TokenKind.EOF ? "ですがファイル終端に到達しました。" : $"場所に{CurrentToken().Raw} があります。")} ");
+            throw new CompilerException.SyntaxErrorException(token.Start, token.End, $" {String.Join(", ", candidates.Select(x => (((int)x < 256) ? ((char)x).ToString() : x.ToString())))} があるべき {(CurrentToken().Kind == Token.TokenKind.EOF ? "ですがファイル終端に到達しました。" : $"場所に{CurrentToken().Raw} があります。")} ");
         }
 
         /// <summary>
@@ -1149,7 +1516,15 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="candidates"></param>
         public Token ReadToken(params char[] candidates) {
-            return ReadToken(candidates.Select(x => (Token.TokenKind)x));
+            var token = CurrentToken();
+            var kind = token.Kind;
+            foreach (var candidate in candidates) {
+                if ((Token.TokenKind)candidate == kind) {
+                    NextToken();
+                    return token;
+                }
+            }
+            throw new CompilerException.SyntaxErrorException(token.Start, token.End, $" {String.Join(", ", candidates.Select(x => (((int)x < 256) ? ((char)x).ToString() : x.ToString())))} があるべき {(CurrentToken().Kind == Token.TokenKind.EOF ? "ですがファイル終端に到達しました。" : $"場所に{CurrentToken().Raw} があります。")} ");
         }
 
 
@@ -1166,7 +1541,7 @@ namespace AnsiCParser {
             }
             return false;
         }
-        
+
 
         /// <summary>
         /// 現在のトークンの種別が トークン種別候補 candidates に含まれるかどうかを調べ、含まれる場合は t にそのトークンの情報を格納する
@@ -1190,7 +1565,7 @@ namespace AnsiCParser {
         public bool PeekToken(params char[] candidates) {
             var kind = CurrentToken().Kind;
             foreach (var candidate in candidates) {
-                if ((Token.TokenKind) candidate == kind) {
+                if ((Token.TokenKind)candidate == kind) {
                     return true;
                 }
             }
@@ -1204,7 +1579,7 @@ namespace AnsiCParser {
             var ct = CurrentToken();
             var kind = ct.Kind;
             foreach (var candidate in candidates) {
-                if ((Token.TokenKind) candidate == kind) {
+                if ((Token.TokenKind)candidate == kind) {
                     t = ct;
                     return true;
                 }
@@ -1270,7 +1645,7 @@ namespace AnsiCParser {
         public bool PeekNextToken(params Token.TokenKind[] candidates) {
             if (_tokens.Count <= _currentTokenPos + 1) {
                 ScanToken();
-                if (is_eof()) {
+                if (IsEof()) {
                     return false;
                 }
             }
@@ -1279,7 +1654,7 @@ namespace AnsiCParser {
         private bool PeekNextToken(IEnumerable<Token.TokenKind> candidates) {
             if (_tokens.Count <= _currentTokenPos + 1) {
                 ScanToken();
-                if (is_eof()) {
+                if (IsEof()) {
                     return false;
                 }
             }
@@ -1293,30 +1668,28 @@ namespace AnsiCParser {
             return PeekNextToken(candidates.Select(x => (Token.TokenKind)x));
         }
 
-        private Stack<int> SaveStack = new Stack<int>();
-
         /// <summary>
         /// 現在の読み取り位置についての情報を保存する
         /// </summary>
         /// <returns></returns>
-        public void Save() {
-            SaveStack.Push(_currentTokenPos);
+        public void SaveContext() {
+            _contextSaveStack.Push(_currentTokenPos);
         }
 
         /// <summary>
         /// 現在の読み取り位置について保存した情報を破棄する
         /// </summary>
         /// <returns></returns>
-        public void Discard() {
-            SaveStack.Pop();
+        public void DiscardSavedContext() {
+            _contextSaveStack.Pop();
         }
 
         /// <summary>
         /// 現在の読み取り位置についての情報を復帰する
         /// </summary>
         /// <returns></returns>
-        public void Restore() {
-            _currentTokenPos = SaveStack.Pop();
+        public void RestoreSavedContext() {
+            _currentTokenPos = _contextSaveStack.Pop();
         }
     }
 }

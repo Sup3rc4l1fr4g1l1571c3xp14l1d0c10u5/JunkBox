@@ -102,7 +102,7 @@ namespace AnsiCParser {
                         return false;
                     }
 
-                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, int bitpos, int bitsize) {
+                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, sbyte bitpos, sbyte bitsize) {
                         if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bitpos + bitsize) {
                             throw new Exception("");
                         } else {
@@ -136,7 +136,7 @@ namespace AnsiCParser {
                         }
                         return result;
                     }
-                    private List<MemberInfo> CreateMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, int bitpos, int bitsize) {
+                    private List<MemberInfo> CreateMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, sbyte bitpos, sbyte bitsize) {
                         if (bitsize == -1) {
                             result.Add(new MemberInfo(ident, ty, bytepos));
                             return result;
@@ -165,7 +165,9 @@ namespace AnsiCParser {
                             if ((currentBitfieldType != null) && (bit == 0)) {
                                 if ((currentBitfieldSize % 8) > 0) {
                                     var pad = PaddingOf(currentBitfieldSize, 8);
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, pad);
+                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                    System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)pad);
                                     currentBitfieldSize += pad;
                                     if (currentBitfieldCapacity != currentBitfieldSize) {
                                         currentBytePosition += currentBitfieldCapacity / 8;
@@ -182,7 +184,9 @@ namespace AnsiCParser {
                                 ((currentBitfieldType != null) && (bit == -1))) { // ビットフィールドではない
                                                                                   // ビットフィールドの終了
                                 if (currentBitfieldCapacity - currentBitfieldSize > 0) {
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
+                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                    System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
                                 }
                                 currentBytePosition += currentBitfieldCapacity / 8;
                                 currentBitfieldType = null;
@@ -190,7 +194,9 @@ namespace AnsiCParser {
                                 currentBitfieldSize = 0;
                             } else if ((currentBitfieldType != null) && (bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) { // 今の領域があふれる
                                 if (currentBitfieldCapacity - currentBitfieldSize > 0) {
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
+                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                    System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
+                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
                                     // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
                                     currentBytePosition += currentBitfieldCapacity / 8;
                                 }
@@ -217,7 +223,9 @@ namespace AnsiCParser {
                                     currentBitfieldCapacity = size * 8;
                                     currentBitfieldSize = 0; // 念のため
                                 }
-                                result = CreateMemberInfo(result, type, name, currentBytePosition, currentBitfieldSize, bit);
+                                System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                System.Diagnostics.Debug.Assert(bit <= sbyte.MaxValue);
+                                result = CreateMemberInfo(result, type, name, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)bit);
                                 currentBitfieldSize += bit;
                             } else {
                                 // 境界の処理には到達しないはず
@@ -227,7 +235,9 @@ namespace AnsiCParser {
                         if (currentBitfieldType != null) {
                             var pad = currentBitfieldCapacity - currentBitfieldSize;
                             if (pad > 0) {
-                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, currentBitfieldSize, (currentBitfieldCapacity - currentBitfieldSize));
+                                System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                System.Diagnostics.Debug.Assert((currentBitfieldCapacity - currentBitfieldSize) <= sbyte.MaxValue);
+                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
                             }
                             currentBytePosition += currentBitfieldCapacity / 8;
                             currentBitfieldType = null;

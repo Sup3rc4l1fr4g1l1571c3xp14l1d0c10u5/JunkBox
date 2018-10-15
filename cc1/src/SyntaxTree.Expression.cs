@@ -79,7 +79,7 @@ namespace AnsiCParser.SyntaxTree {
                     get;
                 }
 
-                protected IdentifierExpression(LocationRange locationRange, string ident) : base(locationRange){
+                protected IdentifierExpression(LocationRange locationRange, string ident) : base(locationRange) {
                     Ident = ident;
                 }
 
@@ -93,7 +93,7 @@ namespace AnsiCParser.SyntaxTree {
                             throw new InvalidOperationException();
                         }
                     }
-                        
+
                     public UndefinedIdentifierExpression(LocationRange locationRange, string ident) : base(locationRange, ident) {
                     }
 
@@ -111,7 +111,7 @@ namespace AnsiCParser.SyntaxTree {
                     }
                     public override CType Type {
                         get {
-                            return Decl.Type;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+                            return Decl.Type;
                         }
                     }
                     public override bool IsLValue() {
@@ -351,7 +351,7 @@ namespace AnsiCParser.SyntaxTree {
 
                     // ascii 
 
-                     Value = new List<byte>();
+                    Value = new List<byte>();
                     var strParts = new List<string>();
                     foreach (var str in strings) {
                         int[] i = { 1 };
@@ -361,7 +361,7 @@ namespace AnsiCParser.SyntaxTree {
                         strParts.Add(str.Substring(1, i[0] - 1));
                     }
                     Value.Add(0x00);
-                    
+
                     Strings = strParts;
                     ConstantType = CType.CreateArray(Value.Count, CType.CreateChar());
                 }
@@ -840,7 +840,7 @@ namespace AnsiCParser.SyntaxTree {
                 } else if (
                     expr.IsLValue() &&  // オペランドは，左辺値
                     (!(  // ビットフィールドでない
-                            (expr is PostfixExpression.MemberDirectAccess && ((PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) || 
+                            (expr is PostfixExpression.MemberDirectAccess && ((PostfixExpression.MemberDirectAccess)expr).Type.IsBitField()) ||
                             (expr is PostfixExpression.MemberIndirectAccess && ((PostfixExpression.MemberIndirectAccess)expr).Type.IsBitField())
                         )) &&
                     !expr.HasStorageClassRegister()// register 記憶域クラス指定子付きで宣言されてもいないオブジェクト
@@ -1518,14 +1518,14 @@ namespace AnsiCParser.SyntaxTree {
             /// </summary>
             public class AndExpression : BitExpression {
 
-                public AndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の AND 演算子", locationRange, lhs, rhs) {}
+                public AndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の AND 演算子", locationRange, lhs, rhs) { }
             }
 
             /// <summary>
             /// 6.5.11 ビット単位の排他 OR 演算子(排他OR式)
             /// </summary>
             public class ExclusiveOrExpression : BitExpression {
-                public ExclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の 排他 OR 演算子", locationRange, lhs, rhs) {}
+                public ExclusiveOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base("ビット単位の 排他 OR 演算子", locationRange, lhs, rhs) { }
 
             }
 
@@ -1720,7 +1720,7 @@ namespace AnsiCParser.SyntaxTree {
                         }
 
                         var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
-                        TypeQualifier tq = (thenExpr.Type.IsPointerType() ? thenExpr.Type.GetBasePointerType().GetTypeQualifier():TypeQualifier.None) | (elseExpr.Type.IsPointerType() ? elseExpr.Type.GetBasePointerType().GetTypeQualifier():TypeQualifier.None);
+                        TypeQualifier tq = (thenExpr.Type.IsPointerType() ? thenExpr.Type.GetBasePointerType().GetTypeQualifier() : TypeQualifier.None) | (elseExpr.Type.IsPointerType() ? elseExpr.Type.GetBasePointerType().GetTypeQualifier() : TypeQualifier.None);
                         baseType = baseType.WrapTypeQualifier(tq);
                         ResultType = CType.CreatePointer(baseType);
                     } else if (
@@ -1784,8 +1784,8 @@ namespace AnsiCParser.SyntaxTree {
                     //if (lType.IsStructureType() && CType.IsEqual(lType.Unwrap(), rhs.Type.Unwrap())) {
                     //    // 構造体・共用体については暗黙的型変換を用いない
                     //} else {
-                        // 代入元式に対して代入先型への(暗黙的)型変換を適用
-                        rhs = Specification.ImplicitConversion(lType, rhs);
+                    // 代入元式に対して代入先型への(暗黙的)型変換を適用
+                    rhs = Specification.ImplicitConversion(lType, rhs);
                     //}
 
                     // 制約 (単純代入)
@@ -1894,65 +1894,65 @@ namespace AnsiCParser.SyntaxTree {
                     switch (op) {
                         case OperatorKind.ADD_ASSIGN:
                         case OperatorKind.SUB_ASSIGN: {
-                            if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
-                                // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
-                            } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
-                                // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
-                            } else {
-                                throw new CompilerException.SpecificationErrorException(LocationRange, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
+                                if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
+                                    // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
+                                } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                                    // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
+                                } else {
+                                    throw new CompilerException.SpecificationErrorException(LocationRange, "複合代入演算子+=及び-=の場合に満たさなければならない制約を満たしていない。");
+                                }
+                                break;
                             }
-                            break;
-                        }
                         case OperatorKind.MUL_ASSIGN:
                         case OperatorKind.DIV_ASSIGN:
                         case OperatorKind.MOD_ASSIGN: {
-                            // 制約(複合代入)
-                            // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
+                                // 制約(複合代入)
+                                // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
-                            // 制約(6.5.5 乗除演算子)
-                            // 各オペランドは，算術型をもたなければならない。
-                            // %演算子のオペランドは，整数型をもたなければならない
-                            if (op == OperatorKind.MOD_ASSIGN) {
-                                if (!lhs.Type.IsIntegerType()) {
-                                    throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                // 制約(6.5.5 乗除演算子)
+                                // 各オペランドは，算術型をもたなければならない。
+                                // %演算子のオペランドは，整数型をもたなければならない
+                                if (op == OperatorKind.MOD_ASSIGN) {
+                                    if (!lhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsIntegerType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
+                                    }
+                                } else {
+                                    if (!lhs.Type.IsArithmeticType()) {
+                                        throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
+                                    }
+                                    if (!rhs.Type.IsArithmeticType()) {
+                                        throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
+                                    }
                                 }
-                                if (!rhs.Type.IsIntegerType()) {
-                                    throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "%=演算子のオペランドは，整数型をもたなければならない。");
-                                }
-                            } else {
-                                if (!lhs.Type.IsArithmeticType()) {
-                                    throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
-                                }
-                                if (!rhs.Type.IsArithmeticType()) {
-                                    throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，算術型をもたなければならない。");
-                                }
+                                break;
                             }
-                            break;
-                        }
                         case OperatorKind.LEFT_ASSIGN:
                         case OperatorKind.RIGHT_ASSIGN:
-                        case OperatorKind.AND_ASSIGN: 
+                        case OperatorKind.AND_ASSIGN:
                         case OperatorKind.XOR_ASSIGN:
                         case OperatorKind.OR_ASSIGN: {
-                            // 制約(複合代入)
-                            // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
+                                // 制約(複合代入)
+                                // その他の演算子の場合，各オペランドの型は，対応する 2 項演算子に対して許される算術型でなければならない。
 
-                            // 制約(6.5.7 ビット単位のシフト演算子)  
-                            // 制約(6.5.10 ビット単位の AND 演算子)
-                            // 制約(6.5.11 ビット単位の排他 OR 演算子)
-                            // 制約(6.5.12 ビット単位の OR 演算子)
-                            // 各オペランドの型は，整数型でなければならない。
-                            if (!lhs.Type.IsIntegerType()) {
-                                throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
+                                // 制約(6.5.7 ビット単位のシフト演算子)  
+                                // 制約(6.5.10 ビット単位の AND 演算子)
+                                // 制約(6.5.11 ビット単位の排他 OR 演算子)
+                                // 制約(6.5.12 ビット単位の OR 演算子)
+                                // 各オペランドの型は，整数型でなければならない。
+                                if (!lhs.Type.IsIntegerType()) {
+                                    throw new CompilerException.SpecificationErrorException(lhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
+                                }
+                                if (!rhs.Type.IsIntegerType()) {
+                                    throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
+                                }
+                                break;
                             }
-                            if (!rhs.Type.IsIntegerType()) {
-                                throw new CompilerException.SpecificationErrorException(rhs.LocationRange, "各オペランドは，整数型をもたなければならない。");
-                            }
-                            break;
-                        }
                         default: {
-                            throw new Exception();
-                        }
+                                throw new Exception();
+                            }
                     }
 
                     // 意味規則(代入演算子(代入式))
@@ -2102,9 +2102,9 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
-            if (type.IsFunctionType()) {
-                System.Diagnostics.Debugger.Break();
-            }
+                if (type.IsFunctionType()) {
+                    System.Diagnostics.Debugger.Break();
+                }
                 Ty = type;
                 Expr = expr;
             }

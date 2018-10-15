@@ -40,7 +40,7 @@ namespace AnsiCParser {
         /// </remarks>
         public class BasicType : CType {
 
-            public enum TypeKind {
+            public enum TypeKind : byte {
                 KAndRImplicitInt,
                 Void,
                 Char,
@@ -86,10 +86,10 @@ namespace AnsiCParser {
                 Kind = kind;
             }
 
-            private static Dictionary<TypeKind, BasicType> instanceType = Enum.GetValues(typeof(TypeKind)).Cast<TypeKind>().ToDictionary(x => x, x => new BasicType(x));
+            private static Dictionary<TypeKind, BasicType> InstanceType { get; } = Enum.GetValues(typeof(TypeKind)).Cast<TypeKind>().ToDictionary(x => x, x => new BasicType(x));
 
             public static BasicType Create(TypeKind kind) {
-                return instanceType[kind];
+                return InstanceType[kind];
             }
 
 

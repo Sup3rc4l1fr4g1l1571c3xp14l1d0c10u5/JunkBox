@@ -20,24 +20,43 @@ namespace AnsiCParser {
         /// </summary>
         private class OptionDefinition {
 
+            /// <summary>
+            /// コンストラクタ
+            /// </summary>
+            /// <param name="name">引数の名前</param>
+            /// <param name="argc">引数の数</param>
+            /// <param name="handler">引数処理ハンドラ</param>
             public OptionDefinition(string name, int argc, OptionHandler handler) {
                 Name = name;
                 Argc = argc;
                 Handler = handler;
             }
 
+            /// <summary>
+            /// 引数の名前
+            /// </summary>
             public string Name {
                 get;
             }
 
+            /// <summary>
+            /// 引数の数
+            /// </summary>
             public int Argc {
                 get;
             }
 
+            /// <summary>
+            /// 引数処理ハンドラ
+            /// </summary>
             public OptionHandler Handler {
                 get;
             }
 
+            /// <summary>
+            /// ハッシュ値
+            /// </summary>
+            /// <returns></returns>
             public override int GetHashCode() {
                 return Name.GetHashCode();
             }

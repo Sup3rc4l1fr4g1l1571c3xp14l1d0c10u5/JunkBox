@@ -4216,11 +4216,11 @@ namespace AnsiCParser {
             /// </summary>
             private struct ValueEntry {
                 public int ByteOffset { get; }
-                public int BitOffset { get; }
-                public int BitSize { get; }
+                public sbyte BitOffset { get; }
+                public sbyte BitSize { get; }
                 public Expression Expr { get; }
 
-                public ValueEntry(int byteOffset, int bitOffset, int bitSize, Expression expr) {
+                public ValueEntry(int byteOffset, sbyte bitOffset, sbyte bitSize, Expression expr) {
                     this.ByteOffset = byteOffset;
                     this.BitOffset = bitOffset;
                     this.BitSize = bitSize;

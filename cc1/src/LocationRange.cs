@@ -3,12 +3,12 @@ namespace AnsiCParser {
     /// <summary>
     /// ソースコード中の範囲を示す位置情報
     /// </summary>
-    public class LocationRange {
+    public struct LocationRange {
 
         /// <summary>
         /// 組込み型等の位置情報
         /// </summary>
-        private static Location BuiltinLocation { get; } = new Location("<built-in>", 1, 1, 0);
+        private static Location BuiltinLocation { get; } = new Location("<built-in>", 1, 1/*, 0*/);
         public static LocationRange Builtin { get; } = new LocationRange(BuiltinLocation, BuiltinLocation);
 
         /// <summary>

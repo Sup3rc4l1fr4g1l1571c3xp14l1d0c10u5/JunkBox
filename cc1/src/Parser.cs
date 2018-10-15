@@ -24,7 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode Mode = LanguageMode.C99;
+        private LanguageMode _mode = LanguageMode.C99;
 
         /// <summary>
         /// 名前空間(ステートメント ラベル)
@@ -42,80 +42,9 @@ namespace AnsiCParser {
         private Scope<Declaration> _identScope = Scope<Declaration>.Empty.Extend();
 
         /// <summary>
-        /// リンケージオブジェクト表(外部結合・内部結合解決用)
+        /// リンケージオブジェクト表
         /// </summary>
-        private readonly Dictionary<string, LinkageObject> _linkageTable = new Dictionary<string, LinkageObject>();
-
-        /// <summary>
-        /// リンケージオブジェクトリスト
-        /// </summary>
-        private readonly List<LinkageObject> _linkageList = new List<LinkageObject>();
-
-        /// <summary>
-        /// リンケージオブジェクトの生成とリンケージ表への登録
-        /// </summary>
-        /// <param name="ident"></param>
-        /// <param name="linkage"></param>
-        /// <param name="decl"></param>
-        /// <param name="isDefine"></param>
-        /// <returns></returns>
-        private LinkageObject AddLinkageObject(Token ident, LinkageKind linkage, Declaration decl, bool isDefine) {
-            switch (linkage) {
-                case LinkageKind.ExternalLinkage:
-                case LinkageKind.InternalLinkage: {
-                        // 外部もしくは内部結合なので再定義チェック
-                        LinkageObject value;
-                        if (_linkageTable.TryGetValue(decl.Ident, out value)) {
-                            if (value.Linkage != linkage) {
-                                throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
-                            }
-                            if (Specification.IsCompatible(value.Type, decl.Type) == false) {
-                                throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, "オブジェクトの型が以前のオブジェクトと一致しない");
-                            }
-                            if (value.Definition != null && isDefine) {
-                                throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクトは既に実体をもっています");
-                            }
-                        } else {
-                            value = new LinkageObject(decl.Ident, decl.Type, linkage);
-                            _linkageTable[decl.Ident] = value;
-                            _linkageList.Add(value);
-                        }
-
-                        if (!isDefine) {
-                            // 仮定義
-                            value.TentativeDefinitions.Add(decl);
-                        } else {
-                            // 本定義
-                            if (value.Definition != null) {
-                                // 上記判定の結果、ここにはこないはず
-                                throw new CompilerException.InternalErrorException(ident.Start, ident.End, "リンケージオブジェクトの本定義が再度行われた（本処理系の不具合です。）");
-                            }
-
-                            value.Definition = decl;
-                        }
-
-                        return value;
-                    }
-
-                case LinkageKind.NoLinkage: {
-                        // 無結合なので再定義チェックはしない。(名前表上で再定義のチェックは終わっているはず。)
-                        var value = new LinkageObject(decl.Ident, decl.Type, linkage);
-                        // static の場合は、staticなリンケージ名を生成して使う
-                        if (decl.StorageClass == AnsiCParser.StorageClassSpecifier.Static) {
-                            value.Definition = decl;
-                            value.LinkageId = $"{decl.Ident}.{_linkageList.Count}";
-                            _linkageList.Add(value);
-                        }
-                        return value;
-                    }
-
-                default:
-                    throw new CompilerException.SpecificationErrorException(ident.Range, "リンケージが指定されていません。");
-            }
-        }
-
-
-        // 構造体または共用体のメンバーについてはそれぞれのオブジェクトが管理する
+        private readonly LinkageObjectTable _linkageObjectTable = new LinkageObjectTable();
 
         /// <summary>
         /// break命令についてのスコープ
@@ -141,7 +70,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 暗黙的宣言の挿入対象となる宣言部
         /// </summary>
-        private readonly Stack<List</*Declaration*/Ast>> _insertImplictDeclarationOperatorStack = new Stack<List</*Declaration*/Ast>>();
+        private readonly Stack<List</*Declaration*/Ast>> _insertImplicitDeclarationOperatorStack = new Stack<List</*Declaration*/Ast>>();
 
         /// <summary>
         ///  暗黙的関数宣言を挿入
@@ -149,11 +78,11 @@ namespace AnsiCParser {
         /// <param name="ident"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        private Declaration AddImplictFunctionDeclaration(Token ident, CType type) {
+        private Declaration AddImplicitFunctionDeclaration(Token ident, CType type) {
             var storageClass = AnsiCParser.StorageClassSpecifier.Extern;
             var functionSpecifier = AnsiCParser.FunctionSpecifier.None;
             var funcDecl = FunctionDeclaration(ident, type, storageClass, functionSpecifier, ScopeKind.FileScope, false);
-            _insertImplictDeclarationOperatorStack.Peek().Add(funcDecl);
+            _insertImplicitDeclarationOperatorStack.Peek().Add(funcDecl);
             return funcDecl;
         }
 
@@ -163,9 +92,9 @@ namespace AnsiCParser {
         /// <param name="ident"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        private Declaration AddImplictTypeDeclaration(Token ident, CType type) {
+        private Declaration AddImplicitTypeDeclaration(Token ident, CType type) {
             var typeDecl = new Declaration.TypeDeclaration(ident.Range, ident.Raw, type);
-            _insertImplictDeclarationOperatorStack.Peek().Add(typeDecl);
+            _insertImplicitDeclarationOperatorStack.Peek().Add(typeDecl);
             return typeDecl;
         }
 
@@ -422,55 +351,60 @@ namespace AnsiCParser {
             foreach (var candidate in candidates) {
                 switch (candidate) {
                     case BasicType.TypeKind.SignedInt: {
-                            try {
-                                var v = Lexer.ToInt32(token.Range, body, radix);
+                            //try {
+                                //var v = Lexer.ToInt32(token.Range, body, radix);
+                                var v = unchecked((Int32) originalSigned);
                                 if (v == originalSigned) {
                                     value = v;
                                     break;
                                 }
-                            } catch (OverflowException) {
-                                // 大きすぎる。
-                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
                             continue;
                         }
                     case BasicType.TypeKind.UnsignedInt: {
-                            try {
-                                var v = Lexer.ToUInt32(token.Range, body, radix);
+                            //try {
+                                //var v = Lexer.ToUInt32(token.Range, body, radix);
+                                var v = unchecked((UInt32) originalUnsigned);
                                 if (v == originalUnsigned) {
                                     value = v;
                                     break;
                                 }
-                            } catch (OverflowException) {
-                                // 大きすぎる。
-                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
                             continue;
                         }
                     case BasicType.TypeKind.SignedLongInt: {
-                            try {
-                                var v = Lexer.ToInt32(token.Range, body, radix);
+                            //try {
+                                //var v = Lexer.ToInt32(token.Range, body, radix);
+                                var v = unchecked((Int32) originalSigned);
                                 if (v == originalSigned) {
                                     value = v;
                                     break;
                                 }
-                            } catch (OverflowException) {
-                                // 大きすぎる。
-                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
                             continue;
                         }
                     case BasicType.TypeKind.UnsignedLongInt: {
-                            try {
-                                var v = Lexer.ToUInt32(token.Range, body, radix);
+                            //try {
+                                //var v = Lexer.ToUInt32(token.Range, body, radix);
+                                var v = unchecked((UInt32) originalUnsigned);
                                 if (v == originalUnsigned) {
                                     value = v;
                                     break;
                                 }
-                            } catch (OverflowException) {
-                                // 大きすぎる。
-                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
                             continue;
                         }
                     case BasicType.TypeKind.SignedLongLongInt: {
-                            var v = Lexer.ToInt64(token.Range, body, radix);
+                            //var v = Lexer.ToInt64(token.Range, body, radix);
+                            var v = unchecked((Int64) originalSigned);
                             if (v == originalSigned) {
                                 value = v;
                                 break;
@@ -478,7 +412,8 @@ namespace AnsiCParser {
                             continue;
                         }
                     case BasicType.TypeKind.UnsignedLongLongInt: {
-                            var v = Lexer.ToUInt64(token.Range, body, radix);
+                            //var v = Lexer.ToUInt64(token.Range, body, radix);
+                            var v = unchecked((UInt64) originalUnsigned);
                             if (v == originalUnsigned) {
                                 value = unchecked((Int64)v);
                                 break;
@@ -613,7 +548,7 @@ namespace AnsiCParser {
         /// ファイル終端
         /// </summary>
         private void EoF() {
-            if (!_lexer.is_eof()) {
+            if (!_lexer.IsEof()) {
                 throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "ファイルが正しく終端していません。");
             }
         }
@@ -627,7 +562,7 @@ namespace AnsiCParser {
             var ret = new TranslationUnit(LocationRange.Empty);
 
             // 暗黙的宣言の処理スタックに追加対象の宣言リストを積む
-            _insertImplictDeclarationOperatorStack.Push(ret.Declarations);
+            _insertImplicitDeclarationOperatorStack.Push(ret.Declarations);
 
             // 定義を全て解析
             while (IsExternalDeclaration(null, AnsiCParser.TypeSpecifier.None)) {
@@ -635,7 +570,7 @@ namespace AnsiCParser {
             }
 
             // 暗黙的宣言の処理スタックから宣言リストを外す
-            _insertImplictDeclarationOperatorStack.Pop();
+            _insertImplicitDeclarationOperatorStack.Pop();
 
             // ファイル終端の確認
             EoF();
@@ -647,7 +582,7 @@ namespace AnsiCParser {
             // 6.9.2 外部オブジェクト定義
             // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，
             // その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
-            foreach (var entry in _linkageList) {
+            foreach (var entry in _linkageObjectTable.LinkageObjects) {
                 if (entry.Definition == null) {
                     if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
                         throw new CompilerException.SpecificationErrorException(entry.TentativeDefinitions.First().LocationRange, "不完全型のままの識別子があります。");
@@ -660,7 +595,7 @@ namespace AnsiCParser {
             }
 
             // 翻訳単位内でのリンケージ情報を保存
-            ret.LinkageTable = _linkageList;
+            ret.LinkageTable = _linkageObjectTable.LinkageObjects;
             return ret;
         }
 
@@ -1108,7 +1043,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private bool IsTypeSpecifier() {
-            if (Mode == LanguageMode.C89) {
+            if (_mode == LanguageMode.C89) {
                 return _lexer.PeekToken(
                     Token.TokenKind.VOID, Token.TokenKind.CHAR, Token.TokenKind.INT, Token.TokenKind.FLOAT, Token.TokenKind.DOUBLE, Token.TokenKind.SHORT, Token.TokenKind.LONG, Token.TokenKind.SIGNED, Token.TokenKind.UNSIGNED
                 );
@@ -1159,19 +1094,19 @@ namespace AnsiCParser {
                     _lexer.NextToken();
                     return AnsiCParser.TypeSpecifier.Unsigned;
                 case Token.TokenKind._BOOL:
-                    if (Mode == LanguageMode.C89) {
+                    if (_mode == LanguageMode.C89) {
                         throw new Exception();
                     }
                     _lexer.NextToken();
                     return AnsiCParser.TypeSpecifier._Bool;
                 case Token.TokenKind._COMPLEX:
-                    if (Mode == LanguageMode.C89) {
+                    if (_mode == LanguageMode.C89) {
                         throw new Exception();
                     }
                     _lexer.NextToken();
                     return AnsiCParser.TypeSpecifier._Complex;
                 case Token.TokenKind._IMAGINARY:
-                    if (Mode == LanguageMode.C89) {
+                    if (_mode == LanguageMode.C89) {
                         throw new Exception();
                     }
                     _lexer.NextToken();
@@ -1217,7 +1152,7 @@ namespace AnsiCParser {
                         }
                         structUnionType = new TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, structUnionType);
-                        AddImplictTypeDeclaration(token, structUnionType);
+                        AddImplicitTypeDeclaration(token, structUnionType);
                     } else if (!(tagType is TaggedType.StructUnionType)) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as TaggedType.StructUnionType).Kind != kind) {
@@ -1242,7 +1177,7 @@ namespace AnsiCParser {
                         // タグ名前表に無い場合は新しく追加する。
                         tagType = new TaggedType.StructUnionType(kind, ident, false);
                         _tagScope.Add(ident, tagType);
-                        AddImplictTypeDeclaration(token, tagType);
+                        AddImplicitTypeDeclaration(token, tagType);
                     } else if (!(tagType is TaggedType.StructUnionType)) {
                         throw new CompilerException.SpecificationErrorException(token.Range, $"構造体/共用体 {ident} は既に列挙型として定義されています。");
                     } else if ((tagType as TaggedType.StructUnionType).Kind != kind) {
@@ -1262,7 +1197,7 @@ namespace AnsiCParser {
 
                 // タグ名前表に追加する
                 _tagScope.Add(ident, structUnionType);
-                AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().End, ident), structUnionType);
+                AddImplicitTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().End, ident), structUnionType);
 
                 // メンバ宣言並びを解析する
                 _lexer.ReadToken('{');
@@ -1419,14 +1354,18 @@ namespace AnsiCParser {
         /// 6.7.2.1 型指定子型修飾子並び（ビットフィールド長を読み取る）
         /// </summary>
         /// <returns></returns>
-        private int BitFieldSize() {
+        private sbyte BitFieldSize() {
             var expr = ConstantExpression();
             var ret = ExpressionEvaluator.Eval(expr);
-            int? size = (int?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
-            if (size.HasValue == false || size < 0) {
+            long? size = (long?)(ret as SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+            if (size.HasValue == false || size.Value  < 0) {
                 throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールド長には0以上の定数式を指定してください。");
             }
-            return size.Value;
+            if (size.Value > sbyte.MaxValue) {
+                throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"ビットフィールド長には{sbyte.MaxValue}以下の定数式を指定してください。");
+            }
+            
+            return (sbyte)size.Value;
         }
 
         /// <summary>
@@ -1446,7 +1385,7 @@ namespace AnsiCParser {
                 }
 
                 // ビットフィールド部分(opt)
-                int? size = _lexer.ReadTokenIf(':') ? BitFieldSize() : (int?)null;
+                sbyte? size = _lexer.ReadTokenIf(':') ? BitFieldSize() : (sbyte?)null;
 
                 if (size.HasValue) {
                     return new TaggedType.StructUnionType.MemberInfo(ident, new BitFieldType(ident, type, 0, size.Value), 0);
@@ -1457,7 +1396,7 @@ namespace AnsiCParser {
 
             if (_lexer.ReadTokenIf(':')) {
                 // ビットフィールド部分(must)
-                int size = BitFieldSize();
+                sbyte size = BitFieldSize();
                 return new TaggedType.StructUnionType.MemberInfo(null, new BitFieldType(null, type, 0, size), 0);
             }
 
@@ -1486,7 +1425,7 @@ namespace AnsiCParser {
                     // タグ名前表に無い場合は新しく追加する。
                     taggedType = new TaggedType.EnumType(ident.Raw, false);
                     _tagScope.Add(ident.Raw, taggedType);
-                    AddImplictTypeDeclaration(ident, taggedType);
+                    AddImplicitTypeDeclaration(ident, taggedType);
 
                 } else if (!(taggedType is TaggedType.EnumType)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に構造体/共用体として定義されています。");
@@ -1510,7 +1449,7 @@ namespace AnsiCParser {
                 var ident = $"$enum_{_anonymousNameCounter++}";
                 var etype = new TaggedType.EnumType(ident, true);
                 _tagScope.Add(ident, etype);
-                AddImplictTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), etype);
+                AddImplicitTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), etype);
                 _lexer.ReadToken('{');
                 EnumeratorList(etype);
                 _lexer.ReadToken('}');
@@ -1539,7 +1478,7 @@ namespace AnsiCParser {
             while (_lexer.ReadTokenIf(out t, ',')) {
                 var i = e.Value + 1;
                 if (IsEnumerator() == false) {
-                    if (Mode == LanguageMode.C89) {
+                    if (_mode == LanguageMode.C89) {
                         Logger.Warning(t.Range, "列挙子並びの末尾にコンマを付けることができるのは C99 以降です。C89では使えません。");
                     }
                     break;
@@ -1717,7 +1656,7 @@ namespace AnsiCParser {
                     // 識別子並びの省略
                     stack[index] = new FunctionType(null, false, stack[index]);
                     MoreDirectDeclarator(stack, index);
-                } else if (is_identifier_list()) {
+                } else if (IsIdentifierList()) {
                     // 識別子並び
                     var args = IdentifierList().Select(x => new FunctionType.ArgumentInfo(x.Range, x, AnsiCParser.StorageClassSpecifier.None, CType.CreateKAndRImplicitInt())).ToList();
                     _lexer.ReadToken(')');
@@ -1918,7 +1857,7 @@ namespace AnsiCParser {
         /// 6.7.5 宣言子(識別子並びとなりうるか)
         /// </summary>
         /// <returns></returns>
-        private bool is_identifier_list() {
+        private bool IsIdentifierList() {
             return IsIdentifier(false);
         }
 
@@ -2248,10 +2187,10 @@ namespace AnsiCParser {
             }
             var start = _lexer.ReadToken('{').Start;
 
-            if (Mode == LanguageMode.C89) {
+            if (_mode == LanguageMode.C89) {
                 var decls = new List<Ast/*Declaration*/>();
 
-                _insertImplictDeclarationOperatorStack.Push(decls);
+                _insertImplicitDeclarationOperatorStack.Push(decls);
 
                 while (IsDeclaration()) {
                     var d = Declaration();
@@ -2265,7 +2204,7 @@ namespace AnsiCParser {
                 }
                 var end = _lexer.ReadToken('}').End;
 
-                _insertImplictDeclarationOperatorStack.Pop();
+                _insertImplicitDeclarationOperatorStack.Pop();
 
                 var stmt = new Statement.CompoundStatementC89(new LocationRange(start, end), decls.Cast<Declaration>().ToList(), stmts, _tagScope, _identScope);
                 if (skipCreateNewScope == false) {
@@ -2276,7 +2215,7 @@ namespace AnsiCParser {
             } else  {
                 var declsOrStmts = new List<Ast>();
 
-                _insertImplictDeclarationOperatorStack.Push(declsOrStmts);
+                _insertImplicitDeclarationOperatorStack.Push(declsOrStmts);
 
                 if (funcName != null) {
                     // C99 __func__ の対応（後付なので無理やりここに入れているがエレガントさの欠片もない！）
@@ -2286,7 +2225,7 @@ namespace AnsiCParser {
                     varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" }));
                     _identScope.Add("__func__", varDecl);
                     declsOrStmts.Add(varDecl);
-                    varDecl.LinkageObject = AddLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
+                    varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
 
                 }
 
@@ -2302,7 +2241,7 @@ namespace AnsiCParser {
                 }
                 var end = _lexer.ReadToken('}').End;
 
-                _insertImplictDeclarationOperatorStack.Pop();
+                _insertImplicitDeclarationOperatorStack.Pop();
 
                 var stmt = new Statement.CompoundStatementC99(new LocationRange(start, end), declsOrStmts, _tagScope, _identScope);
                 if (skipCreateNewScope == false) {
@@ -2338,12 +2277,12 @@ namespace AnsiCParser {
             _identScope = _identScope.Extend();
             var declsOrStmts = new List<Ast>();
             var start = _lexer.CurrentToken().Start;
-            _insertImplictDeclarationOperatorStack.Push(declsOrStmts);
+            _insertImplicitDeclarationOperatorStack.Push(declsOrStmts);
 
             declsOrStmts.Add(func());
             var end = _lexer.CurrentToken().Start;
 
-            _insertImplictDeclarationOperatorStack.Pop();
+            _insertImplicitDeclarationOperatorStack.Pop();
             var stmt = new Statement.CompoundStatementC99(new LocationRange(start, end), declsOrStmts, _tagScope, _identScope);
             _identScope = _identScope.Parent;
             _tagScope = _tagScope.Parent;
@@ -2357,7 +2296,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement SelectionStatement() {
-            if (Mode == LanguageMode.C99) {
+            if (_mode == LanguageMode.C99) {
                 return C99StatementWrapping(SelectionStatementBody);
             } else {
                 return SelectionStatementBody();
@@ -2399,7 +2338,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Statement IterationStatement() {
-            if (Mode == LanguageMode.C99) {
+            if (_mode == LanguageMode.C99) {
                 return C99StatementWrapping(IterationStatementBody);
             } else {
                 return IterationStatementBody();
@@ -2439,8 +2378,8 @@ namespace AnsiCParser {
             if (_lexer.ReadTokenIf(out start, Token.TokenKind.FOR)) {
                 _lexer.ReadToken('(');
                 Expression init = null;
-                if (Mode == LanguageMode.C99 && IsDeclaration()) {
-                    _insertImplictDeclarationOperatorStack.Peek().AddRange(Declaration());
+                if (_mode == LanguageMode.C99 && IsDeclaration()) {
+                    _insertImplicitDeclarationOperatorStack.Peek().AddRange(Declaration());
                 } else {
                     init = _lexer.PeekToken(';') ? null : Expression();
                     _lexer.ReadToken(';');
@@ -2643,7 +2582,7 @@ namespace AnsiCParser {
 
             if (IsDeclaration()) {
                 // heuristic C89/C99 detect
-                if (Mode == LanguageMode.C89) {
+                if (_mode == LanguageMode.C89) {
                     throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"C89において各種宣言はブロックの先頭でのみ許されます。");
                 }
 
@@ -2727,8 +2666,8 @@ namespace AnsiCParser {
                 if (expr is SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression) {
                     var identExpr = expr as SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression;
                     // K&RおよびC89/90では暗黙的関数宣言 extern int 識別子(); が現在の宣言ブロックの先頭で定義されていると仮定して翻訳する
-                    if (Mode == LanguageMode.C89) {
-                        var decl = AddImplictFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new FunctionType(null, false, CType.CreateSignedInt()));
+                    if (_mode == LanguageMode.C89) {
+                        var decl = AddImplicitFunctionDeclaration(new Token(Token.TokenKind.IDENTIFIER, identExpr.LocationRange.Start, identExpr.LocationRange.End, identExpr.Ident), new FunctionType(null, false, CType.CreateSignedInt()));
                         expr = new SyntaxTree.Expression.PrimaryExpression.IdentifierExpression.FunctionExpression(tok.Range, identExpr.Ident, decl as Declaration.FunctionDeclaration);
                     } else {
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"未定義の識別子 {identExpr.Ident} を関数として用いています。");
@@ -2809,72 +2748,76 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private Expression UnaryExpression() {
-            Token tok;
-            if (_lexer.ReadTokenIf(out tok, Token.TokenKind.INC_OP, Token.TokenKind.DEC_OP)) {
-                SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind op;
-                switch (tok.Kind) {
-                    case Token.TokenKind.INC_OP:
-                        op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc;
-                        break;
-                    case Token.TokenKind.DEC_OP:
-                        op = SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec;
-                        break;
-                    default:
-                        throw new CompilerException.InternalErrorException(tok.Range, "たぶん実装ミスです。");
+            Token tok = _lexer.CurrentToken();
+            switch (tok.Kind) {
+                case Token.TokenKind.INC_OP: {
+                    _lexer.NextToken();
+                    var expr = UnaryExpression();
+                    return new SyntaxTree.Expression.UnaryPrefixExpression(new LocationRange(tok.Start, expr.LocationRange.End), SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Inc, expr);
+                }
+                case Token.TokenKind.DEC_OP: {
+                    _lexer.NextToken();
+                    var expr = UnaryExpression();
+                    return new SyntaxTree.Expression.UnaryPrefixExpression(new LocationRange(tok.Start, expr.LocationRange.End), SyntaxTree.Expression.UnaryPrefixExpression.OperatorKind.Dec, expr);
                 }
 
-                //_lexer.NextToken();
-                var expr = UnaryExpression();
-                return new SyntaxTree.Expression.UnaryPrefixExpression(new LocationRange(tok.Start, expr.LocationRange.End), op, expr);
-            }
-            if (_lexer.ReadTokenIf(out tok, '&')) {
+            case (Token.TokenKind)'&': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryAddressExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, '*')) {
+            case (Token.TokenKind)'*': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryReferenceExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, '+')) {
+            case (Token.TokenKind)'+': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryPlusExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, '-')) {
+            case (Token.TokenKind)'-': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryMinusExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, '~')) {
+            case (Token.TokenKind)'~': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryNegateExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, '!')) {
+            case (Token.TokenKind)'!': {
+                _lexer.NextToken();
                 var expr = CastExpression();
                 return new SyntaxTree.Expression.UnaryNotExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
             }
-            if (_lexer.ReadTokenIf(out tok, Token.TokenKind.SIZEOF)) {
+            case Token.TokenKind.SIZEOF: {
+                _lexer.NextToken();
                 if (_lexer.PeekToken('(')) {
                     // どちらにも'('の出現が許されるためさらに先読みを行う。
-                    _lexer.Save();
+                    _lexer.SaveContext();
                     _lexer.ReadToken('(');
                     if (IsTypeName()) {
-                        _lexer.Discard();
+                        _lexer.DiscardSavedContext();
                         var type = TypeName();
                         var end = _lexer.ReadToken(')');
                         return new SyntaxTree.Expression.SizeofTypeExpression(new LocationRange(tok.Start, end.End), type);
+                    } else {
+                        // 式
+                        _lexer.RestoreSavedContext();
+                        var expr = UnaryExpression();
+                        return new SyntaxTree.Expression.SizeofExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
                     }
-
-                    _lexer.Restore();
-                    var expr = UnaryExpression();
-                    return new SyntaxTree.Expression.SizeofExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
-                }
-
-                {
+                } else {
                     // 括弧がないので式
                     var expr = UnaryExpression();
                     return new SyntaxTree.Expression.SizeofExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
                 }
             }
-            return PostfixExpression();
+            default:
+                return PostfixExpression();
+
+            }
         }
 
         /// <summary>
@@ -2885,10 +2828,10 @@ namespace AnsiCParser {
             Token tok;
             if (_lexer.PeekToken(out tok, '(')) {
                 // どちらにも'('の出現が許されるためさらに先読みを行う。
-                _lexer.Save();
+                _lexer.SaveContext();
                 _lexer.ReadToken('(');
                 if (IsTypeName()) {
-                    _lexer.Discard();
+                    _lexer.DiscardSavedContext();
                     var type = TypeName();
                     _lexer.ReadToken(')');
                     var expr = CastExpression();
@@ -2898,7 +2841,7 @@ namespace AnsiCParser {
                     return new SyntaxTree.Expression.CastExpression(new LocationRange(tok.Start, expr.LocationRange.End), type, expr);
                 }
 
-                _lexer.Restore();
+                _lexer.RestoreSavedContext();
                 return UnaryExpression();
             }
 
@@ -3300,7 +3243,7 @@ namespace AnsiCParser {
                 // 型指定子部に構造体共用体指定子、列挙型指定子、型定義名が出現しない場合
                 if (typeSpecifier == AnsiCParser.TypeSpecifier.None) {
                     // 歴史的な話：K&R では 宣言指定子を省略すると int 扱い
-                    if (Mode == LanguageMode.C89) {
+                    if (_mode == LanguageMode.C89) {
                         // C90では互換性の観点からK&R動作が使える。
                         Logger.Warning(start, end, "型が省略された宣言は、暗黙的に signed int 型と見なします。");
                         type = CType.CreateSignedInt();
@@ -3488,7 +3431,7 @@ namespace AnsiCParser {
             var funcDelc = new Declaration.FunctionDeclaration(ident.Range, ident.Raw, type, storageClass, functionSpecifier);
 
             // 結合スコープにオブジェクトを追加
-            funcDelc.LinkageObject = AddLinkageObject(ident, linkage, funcDelc, (scope == ScopeKind.FileScope && isDefine));
+            funcDelc.LinkageObject = _linkageObjectTable.RegistLinkageObject(ident, linkage, funcDelc, (scope == ScopeKind.FileScope && isDefine));
             _identScope.Add(ident.Raw, funcDelc);
 
             return funcDelc;
@@ -3589,7 +3532,7 @@ namespace AnsiCParser {
             }
                 // 新たに変数宣言を作成
                 var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass/*, initializer*/);
-            varDecl.LinkageObject = AddLinkageObject(ident, linkage, varDecl, hasInitializer);
+            varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(ident, linkage, varDecl, hasInitializer);
             _identScope.Add(ident.Raw, varDecl);
 
             // 初期化子を持つか？

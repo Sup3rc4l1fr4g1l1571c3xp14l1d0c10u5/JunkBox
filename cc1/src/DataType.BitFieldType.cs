@@ -7,18 +7,18 @@ namespace AnsiCParser {
             /// <summary>
             /// ビットフィールドグループ内でのビット単位でのオフセット位置
             /// </summary>
-            public int BitOffset {
+            public sbyte BitOffset {
                 get;
             }
 
             /// <summary>
             /// ビットフィールドのビット単位でのサイズ
             /// </summary>
-            public int BitWidth {
+            public sbyte BitWidth {
                 get;
             }
 
-            public BitFieldType(Token ident, CType type, int bitOffset, int bitWidth) {
+            public BitFieldType(Token ident, CType type, sbyte bitOffset, sbyte bitWidth) {
                 if (bitWidth >= 0) {
                     // 制約
                     // - ビットフィールドの幅を指定する式は，整数定数式でなければならない。

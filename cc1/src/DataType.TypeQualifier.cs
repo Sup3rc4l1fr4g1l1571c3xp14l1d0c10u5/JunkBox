@@ -6,7 +6,7 @@ namespace AnsiCParser {
         /// 型修飾子
         /// </summary>
         [Flags]
-        public enum TypeQualifier {
+        public enum TypeQualifier : UInt16 {
             None = 0x0000,
             Const = 0x0001,
             Volatile = 0x002,

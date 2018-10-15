@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using AnsiCParser.SyntaxTree;
@@ -21,33 +20,33 @@ namespace AnsiCParser {
         }
 
         private class CommandLineOptions {
-            public string outputFile = null;
-            public string astFile = null;
-            public bool flagSyntaxOnly = false;
-            public string outputEncoding = System.Text.Encoding.Default.WebName;
-            public string[] args = new string[0];
+            public string OutputFile;
+            public string AstFile;
+            public bool FlagSyntaxOnly;
+            public string OutputEncoding = System.Text.Encoding.Default.WebName;
+            public string[] Args = new string[0];
 
             public void Validation(Action<string> act) {
                 // check outputEncoding
-                var enc = System.Text.Encoding.GetEncodings().FirstOrDefault(x => String.Equals(x.Name, outputEncoding, StringComparison.OrdinalIgnoreCase));
+                var enc = System.Text.Encoding.GetEncodings().FirstOrDefault(x => String.Equals(x.Name, OutputEncoding, StringComparison.OrdinalIgnoreCase));
                 if (enc == null) {
-                    act($"指定されたエンコーディング名 {outputEncoding} は利用可能なエンコーディングに一致しません。");
+                    act($"指定されたエンコーディング名 {OutputEncoding} は利用可能なエンコーディングに一致しません。");
                 } else {
                     Console.OutputEncoding = enc.GetEncoding();
                 }
 
                 // check input source
-                if (args.Length == 0) {
+                if (Args.Length == 0) {
                     act("コンパイル対象のCソースファイルを１つ指定してください。");
-                } else if (args.Length > 1) {
+                } else if (Args.Length > 1) {
                     act("コンパイル対象のCソースファイルが２つ以上指定されています。");
-                } else if (System.IO.File.Exists(args[0]) == false) {
-                    act($"ファイル {args[0]} が見つかりません。処理を中止します。");
+                } else if (System.IO.File.Exists(Args[0]) == false) {
+                    act($"ファイル {Args[0]} が見つかりません。処理を中止します。");
                 }
 
                 // check output
-                if (outputFile == null) {
-                    outputFile = System.IO.Path.ChangeExtension(args[0], "s");
+                if (OutputFile == null) {
+                    OutputFile = System.IO.Path.ChangeExtension(Args[0], "s");
                 }
 
             }
@@ -56,24 +55,24 @@ namespace AnsiCParser {
         static void CommonMain(string[] args) {
 
             var opts = new CommandLineOptionsParser<CommandLineOptions>()
-                .Entry("-o", 1, (t, s) => {
-                    t.outputFile = s[0];
+                .Entry(@"-o", 1, (t, s) => {
+                    t.OutputFile = s[0];
                     return true;
                 })
-                .Entry("-ast", 1, (t, s) => {
-                    t.astFile = s[0];
+                .Entry(@"-ast", 1, (t, s) => {
+                    t.AstFile = s[0];
                     return true;
                 })
-                .Entry("-console-output-encoding", 1, (t, s) => {
-                    t.outputEncoding = s[0];
+                .Entry(@"-console-output-encoding", 1, (t, s) => {
+                    t.OutputEncoding = s[0];
                     return true;
                 })
-                .Entry("-fsyntax-only", 0, (t, s) => {
-                    t.flagSyntaxOnly = true;
+                .Entry(@"-fsyntax-only", 0, (t, s) => {
+                    t.FlagSyntaxOnly = true;
                     return true;
                 })
                 .Default((t, s) => {
-                    t.args = s;
+                    t.Args = s;
                     return true;
                 })
                 .Parse(new CommandLineOptions(), args);
@@ -84,15 +83,15 @@ namespace AnsiCParser {
             });
 
             try {
-                var ret = new Parser(System.IO.File.ReadAllText(opts.args[0]), opts.args[0]).Parse();
-                if (opts.astFile != null) {
-                    using (var o = new System.IO.StreamWriter(opts.astFile)) {
+                var ret = new Parser(System.IO.File.ReadAllText(opts.Args[0]), opts.Args[0]).Parse();
+                if (opts.AstFile != null) {
+                    using (var o = new System.IO.StreamWriter(opts.AstFile)) {
                         o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
                     }
                 }
 
-                if (opts.flagSyntaxOnly == false) {
-                    using (var o = new System.IO.StreamWriter(opts.outputFile)) {
+                if (opts.FlagSyntaxOnly == false) {
+                    using (var o = new System.IO.StreamWriter(opts.OutputFile)) {
                         var compiler = new Compiler();
                         compiler.Compile(ret, o);
                     }
@@ -110,7 +109,8 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\tests2\tmp\70_floating_point_literals.i"), " <Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\huge-table.c"), " <Debug>").Parse();
+            return;
             var sexpr = ret.Accept(new ToSExprVisitor(), null);
             //*
             var interpreter = new Schene.SchemeInterpreter();
