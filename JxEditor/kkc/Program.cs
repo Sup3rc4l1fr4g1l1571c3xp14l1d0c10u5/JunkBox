@@ -14,67 +14,65 @@ namespace KKC1
         static void Main(string[] args)
         {
             {
-            {
-                string data = @"
-<s>/<s> 一/いち	1	3
-<s>/<s> 幹事/かんじ	1	3
-<s>/<s> 良/よ	1	3
-い/い 感じ/かんじ	1	1
-う/う <s>/<s>	1	1
-かな/かな 漢字/かんじ	1	1
-の/の かな/かな	1	1
-を/を 行/おこな	1	1
-一/いち 行/ぎょう	1	1
-幹事/かんじ 席/せき	1	1
-感じ/かんじ <s>/<s>	1	1
-漢字/かんじ 変換/へんかん	1	1
-行/おこな う/う	1	2
-行/ぎょう の/の	1	2
-席/せき <s>/<s>	1	1
-変換/へんかん を/を	1	1
-良/よ い/い	1	1
-";
-            var counts = new Dictionary<string, int>();
-            var context_counts = new Dictionary<string, int>();
-
-                var emit = new Dictionary<string, int>();
-                var context = new Dictionary<string, int>();
-  
-                var SEPARATOR = ' ';
-                foreach (var line in Regex.Split(data,@"\r\n")) {
-                    if (string.IsNullOrWhiteSpace(line)) {
-                        continue;
-                    }
-                    var tmp1 = line.Split('\t');
-                    var bi = tmp1[0];
-                    var words = tmp1[0].Split(' ');
-                    var p = int.Parse(tmp1[1]);
-                    // # 2-gram の分子と分母を加算
-                    // counts["words[i-1] words[i]"] += 1   
-                    counts[words[0] + SEPARATOR + words[1]] = counts.Get(words[0] + SEPARATOR + words[1]) + p;
-                    // context_counts["words[i-1]"] += 1   
-                    context_counts[words[0]] = context_counts.Get(words[0]) + p;
-                    // counts["words[i]"] += 1   
-                    counts[words[1]] = counts.Get(words[1]) + p;
-                    // context_counts[""] += 1   
-                    context_counts[""] = context_counts.Get("") + p;
-
-                    ////
-                    {
-                        var word = words.Last();
-                        var kakiyomi = word.Split('/');
-                        if (kakiyomi[0] != "<s>") {
-                        emit[string.Join(" ",kakiyomi)] = emit.Get(string.Join(" ",kakiyomi)) + 1;
-                        }
-                        context[kakiyomi[0]] = context.Get(kakiyomi[0]) + 1;
-                    }
-                }
-
                 {
+                    string data = @"
+<s>/<s> 一/いち	1
+<s>/<s> 幹事/かんじ	1
+<s>/<s> 良/よ	1
+い/い 感じ/かんじ	1
+う/う <s>/<s>	1
+かな/かな 漢字/かんじ	1
+の/の かな/かな	1
+を/を 行/おこな	1
+一/いち 行/ぎょう	1
+幹事/かんじ 席/せき	1
+感じ/かんじ <s>/<s>	1
+漢字/かんじ 変換/へんかん	1
+行/おこな う/う	1
+行/ぎょう の/の	1
+席/せき <s>/<s>	1
+変換/へんかん を/を	1
+良/よ い/い	1
+";
+                   
+                    {
+                        var model = KKC2Loader.ReadModelFromString(data, new KKC2Loader.Config() {
+                            ParseLine = (line) => {
+                                if (String.IsNullOrWhiteSpace(line)) { return null; }
+                                    var fields = Regex.Split(line, @"\t+");
+                                var freq = int.Parse(fields[1]);
+                                var words = fields[0].Split(' ').Select(y => y.Split('/')).Select(y => new KKC2Loader.YomiKaki(y[1], y[0])).ToArray();
+                                return new KKC2Loader.NGramCorpus(freq, words);
+                            }
+                        });
+                        KKC2 kkc2 = new KKC2(model.Item1, model.Item2);
+                        foreach (var line in System.IO.File.ReadLines("./test/06-pron.txt"))
+                        {
+                            var tags = kkc2.Convert(line);
+                            Console.WriteLine(String.Join(" ", tags));
+                        }
+                    }
+                    {
+                        var model = KKC2Loader.ReadModelFromFile(@"corpus/2-gram.fwk", Encoding.UTF8, new KKC2Loader.Config()
+                        {
+                            BreakToken = "BT",
+                            ParseLine = (line) => {
+                                if (String.IsNullOrWhiteSpace(line)) { return null; }
+                                var fields = Regex.Split(line.Trim(), @" ");
+                                var freq = int.Parse(fields[0]);
+                                var words = fields.Skip(1).Take(2).Select(y => y.Split('/')).Select(y => new KKC2Loader.YomiKaki(y.Length >= 2 ? y[1] : y[0], y[0])).ToArray();
+                                return new KKC2Loader.NGramCorpus(freq, words);
+                            }
+                        });
+                        KKC2 kkc2 = new KKC2(model.Item1, model.Item2);
+                        foreach (var line in System.IO.File.ReadLines("./test/06-pron.txt"))
+                        {
+                            var tags = kkc2.Convert(line);
+                            Console.WriteLine(String.Join(" ", tags));
+                        }
+                    }
                 }
-                
-            }
-                
+
             }
             {
                 Bigram lm = Bigram.CreateFromFile("test/06-word.txt", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"));
@@ -83,31 +81,45 @@ namespace KKC1
                 Hmm tm = Hmm.CreateFromFile("test/06-pronword.txt", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"), (word) => { var tmp = word.Split('_'); return Tuple.Create(tmp[0], tmp[1]); });
                 tm.SaveToFile("test/06-tm.output.txt", Encoding.UTF8);
 
+                {
+                    Console.WriteLine($"em:");
+                    foreach (var kv in tm.emit)
+                    {
+                        Console.WriteLine($"{kv.Key}: {kv.Value}");
+                    }
+                    Console.WriteLine($"lm:");
+                    foreach (var kv in lm.lm)
+                    {
+                        Console.WriteLine($"{kv.Key}: {kv.Value}");
+                    }
+                }
+
                 KKC2 kkc2 = new KKC2(tm, lm);
 
-                foreach (var line in System.IO.File.ReadLines("./test/06-pron.txt")) {
+                foreach (var line in System.IO.File.ReadLines("./test/06-pron.txt"))
+                {
                     var tags = kkc2.Convert(line);
                     Console.WriteLine(String.Join(" ", tags));
                 }
 
             }
-                //{
-                //    Bigram lm = Bigram.CreateFromFile("data/wiki-ja-train.word", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"));
-                //    lm.SaveToFile("data/wiki-ja-train-lm.output.txt", Encoding.UTF8);
+            //{
+            //    Bigram lm = Bigram.CreateFromFile("data/wiki-ja-train.word", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"));
+            //    lm.SaveToFile("data/wiki-ja-train-lm.output.txt", Encoding.UTF8);
 
-                //    Hmm tm = Hmm.CreateFromFile("data/wiki-ja-train.pron_word", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"), (word) => { var tmp = word.Split('_'); return Tuple.Create(tmp[0], tmp[1]); });
-                //    tm.SaveToFile("data/wiki-ja-train-tm.output.txt", Encoding.UTF8);
+            //    Hmm tm = Hmm.CreateFromFile("data/wiki-ja-train.pron_word", Encoding.UTF8, (line) => Regex.Split(line, @"\s+"), (word) => { var tmp = word.Split('_'); return Tuple.Create(tmp[0], tmp[1]); });
+            //    tm.SaveToFile("data/wiki-ja-train-tm.output.txt", Encoding.UTF8);
 
-                //    KKC2 kkc2 = new KKC2(tm, lm);
+            //    KKC2 kkc2 = new KKC2(tm, lm);
 
-                //    foreach (var line in System.IO.File.ReadLines("./data/wiki-ja-test.pron"))
-                //    {
-                //        var tags = kkc2.Convert(line);
-                //        Console.WriteLine(String.Join(" ", tags));
-                //    }
+            //    foreach (var line in System.IO.File.ReadLines("./data/wiki-ja-test.pron"))
+            //    {
+            //        var tags = kkc2.Convert(line);
+            //        Console.WriteLine(String.Join(" ", tags));
+            //    }
 
-                //}
-                {
+            //}
+            {
                 // 単語 bi-gram を構築
                 Bigram lm = Bigram.CreateFromFile("corpus/L.wordkkci", Encoding.UTF8, (line) => Regex.Split(line, @"\s+").Select(x => x.Split('/')[0]).ToArray());
                 lm.SaveToFile("corpus/lm.output.txt", Encoding.UTF8);
@@ -633,10 +645,10 @@ namespace KKC1
     public class Bigram
     {
         public const string SOF = "<s>";
-        public const string EOF = "</s>";
+        public const string EOF = "<s>";
         public const char SEPARATOR = ' ';
 
-        public SortedDictionary<string, Tuple<int,int>> lm { get; }
+        public SortedDictionary<string, Tuple<int, int>> lm { get; }
 
         public static Bigram CreateFromFile(string file, Encoding enc, Func<string, string[]> splitter)
         {
@@ -686,7 +698,7 @@ namespace KKC1
                 }
             }
 
-            var lm = new Dictionary<string, Tuple<int,int>>();
+            var lm = new Dictionary<string, Tuple<int, int>>();
 
             // for each ngram, count in counts
             foreach (var kv in counts)
@@ -698,7 +710,7 @@ namespace KKC1
                 // remove the last element of words
                 words.RemoveAt(words.Count - 1);
                 // join words into context
-                var context = string.Join(""+SEPARATOR, words);
+                var context = string.Join("" + SEPARATOR, words);
                 // probability = counts [ngram] / context_counts[context]
                 var probability = (double)counts[ngram] / context_counts[context];
                 // save
@@ -709,9 +721,9 @@ namespace KKC1
         }
 
 
-        private Bigram(IDictionary<string, Tuple<int,int>> lm)
+        private Bigram(IDictionary<string, Tuple<int, int>> lm)
         {
-            this.lm = new SortedDictionary<string, Tuple<int,int>>(lm);
+            this.lm = new SortedDictionary<string, Tuple<int, int>>(lm);
         }
 
         public void SaveToFile(string file, Encoding enc)
@@ -733,11 +745,11 @@ namespace KKC1
     public class Hmm
     {
         public const string SOF = "<s>";
-        public const string EOF = "</s>";
+        public const string EOF = "<s>";
         public const char SEPARATOR = ' ';
 
-        public SortedDictionary<string, double> transition { get; }
-        public SortedDictionary<string, double> emit { get; }
+        public SortedDictionary<string, Tuple<int,int>> transition { get; }
+        public SortedDictionary<string, Tuple<int, int>> emit { get; }
 
         public static Hmm CreateFromFile(string file, Encoding enc, Func<string, string[]> lineSplitter, Func<string, Tuple<string, string>> wordSplitter)
         {
@@ -780,18 +792,18 @@ namespace KKC1
                 transition[previous + SEPARATOR + EOF] = transition.Get(previous + SEPARATOR + EOF) + 1;
             }
 
-            var T = transition.ToDictionary((kv) => kv.Key, (kv) => (double)kv.Value / context[kv.Key.Split(SEPARATOR)[0]]);
+            var T = transition.ToDictionary((kv) => kv.Key, (kv) => Tuple.Create(kv.Value,context[kv.Key.Split(SEPARATOR)[0]]));
 
-            var E = emit.ToDictionary((kv) => kv.Key, (kv) => (double)kv.Value / context[kv.Key.Split(SEPARATOR)[0]]);
+            var E = emit.ToDictionary((kv) => kv.Key, (kv) => Tuple.Create(kv.Value,context[kv.Key.Split(SEPARATOR)[0]]));
 
             return new Hmm(T, E);
         }
 
 
-        private Hmm(IDictionary<string, double> transition, IDictionary<string, double> emit)
+        private Hmm(IDictionary<string, Tuple<int, int>> transition, IDictionary<string, Tuple<int, int>> emit)
         {
-            this.transition = new SortedDictionary<string, double>(transition);
-            this.emit = new SortedDictionary<string, double>(emit);
+            this.transition = new SortedDictionary<string, Tuple<int, int>>(transition);
+            this.emit = new SortedDictionary<string, Tuple<int, int>>(emit);
         }
 
         public void SaveToFile(string file, Encoding enc)
@@ -902,21 +914,189 @@ namespace KKC1
         public double BoundAccuracy { get { return (double)corb / totb; } }
     }
 
+    public class StringComare : IComparer<string>
+    {
+        public int Compare(string x, string y)
+        {
+            return String.Compare(x, y, StringComparison.Ordinal);
+        }
+    }
+
+    static class KKC2Loader
+    {
+        public struct YomiKaki
+        {
+            public string Yomi { get; }
+            public string Kaki { get; }
+            public YomiKaki(string yomi, string kaki)
+            {
+                this.Yomi = yomi;
+                this.Kaki = kaki;
+            }
+            public override bool Equals(object obj)
+            {
+                if (obj == null) { return false; }
+                if (!(obj is YomiKaki)) { return false; }
+                var other = (YomiKaki)obj;
+                return (other.Yomi == this.Yomi && other.Kaki == this.Kaki);
+            }
+            public override int GetHashCode()
+            {
+                return this.Yomi.GetHashCode() ^ this.Kaki.GetHashCode();
+            }
+        }
+        public interface INGramCorpus
+        {
+            /// <summary>
+            /// 頻度
+            /// </summary>
+            int Frequency { get; }
+
+            /// <summary>
+            /// 単語列
+            /// </summary>
+            YomiKaki[] Words { get; }
+        }
+        public class NGramCorpus : INGramCorpus
+        {
+            /// <summary>
+            /// 頻度
+            /// </summary>
+            public int Frequency { get; }
+
+            /// <summary>
+            /// 単語列
+            /// </summary>
+            public YomiKaki[] Words { get; }
+
+            public NGramCorpus(int frequency, YomiKaki[] words)
+            {
+                this.Frequency = frequency;
+                this.Words = words;
+            }
+        }
+
+        public class Config
+        {
+            /// <summary>
+            /// N-gram の文頭、文末を表す特殊な記号
+            /// </summary>
+            public string BreakToken = "<s>";
+            public string FieldSeparatorPattern = @"\t+";
+            public char SEPARATOR = ' ';
+            public Func<string, INGramCorpus> ParseLine = null;
+        }
+
+        public static Tuple<SortedDictionary<string, Tuple<int, int>>, SortedDictionary<string, Tuple<int, int>>> ReadModelFromString(string value, Config config, string lineSplitPattern = @"\r?\n")
+        {
+            return ReadModel(Regex.Split(value, lineSplitPattern).ToArray(), config);
+        }
+        public static Tuple<SortedDictionary<string, Tuple<int, int>>, SortedDictionary<string, Tuple<int, int>>> ReadModelFromFile(string path, Encoding enc, Config config)
+        {
+            return ReadModel(System.IO.File.ReadLines(path, enc), config);
+        }
+
+        public static Tuple<SortedDictionary<string, Tuple<int, int>>, SortedDictionary<string, Tuple<int, int>>> ReadModel(IEnumerable<string> path, Config config)
+        {
+            SortedDictionary<string, Tuple<int, int>> em;
+            SortedDictionary<string, Tuple<int, int>> lm;
+            {
+
+                var counts = new Dictionary<string, int>();
+                var context_counts = new Dictionary<string, int>();
+
+                var emit = new Dictionary<string, int>();
+                var context = new Dictionary<string, int>();
+
+                foreach (var line in path)
+                {
+                    var entry = config.ParseLine(line);
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+                    var words = entry.Words.Select(x => x.Kaki).ToArray();
+                    {
+                        // 2gram 
+                        var freq = entry.Frequency;
+                        // 2-gram の分子と分母を加算
+                        counts[words[0] + config.SEPARATOR + words[1]] = counts.Get(words[0] + config.SEPARATOR + words[1][0]) + freq;
+                        context_counts[words[0]] = context_counts.Get(words[0]) + freq;
+                        counts[words[1]] = counts.Get(words[1]) + freq;
+                        context_counts[""] = context_counts.Get("") + freq;
+                    }
+                    {
+                        // hmm
+                        var word = entry.Words.Last();
+                        if (word.Kaki != config.BreakToken)
+                        {
+                            var key = word.Kaki + config.SEPARATOR + word.Yomi;
+                            emit[key] = emit.Get(key) + 1;
+                        }
+                        context[word.Kaki] = context.Get(word.Kaki) + 1;
+                    }
+                }
+
+                {
+                    // n-gram
+                    lm = new SortedDictionary<string, Tuple<int, int>>( new StringComare());
+
+                    // for each ngram, count in counts
+                    foreach (var kv in counts)
+                    {
+                        var ngram = kv.Key;
+                        var count = kv.Value;
+                        // split ngram into an array of words # "wi1 wi" => ["wi1", "wi"]
+                        var words = ngram.Split(config.SEPARATOR).ToList();
+                        // remove the last element of words
+                        words.RemoveAt(words.Count - 1);
+                        // join words into context
+                        var _context = string.Join("" + config.SEPARATOR, words);
+                        // probability = counts [ngram] / context_counts[context]
+                        var probability = (double)counts[ngram] / context_counts[_context];
+                        // save
+                        lm[ngram] = Tuple.Create(counts[ngram], context_counts[_context]);
+                    }
+                }
+                {
+                    // hmm
+                    em = new SortedDictionary<string, Tuple<int, int>>(emit.ToDictionary((kv) => kv.Key, (kv) => Tuple.Create(kv.Value, context[kv.Key.Split(config.SEPARATOR)[0]])), new StringComare());
+                }
+                if (false) {
+                    Console.WriteLine($"em:");
+                    foreach (var kv in em)
+                    {
+                        Console.WriteLine($"{kv.Key}: {kv.Value}");
+                    }
+                    Console.WriteLine($"lm:");
+                    foreach (var kv in lm)
+                    {
+                        Console.WriteLine($"{kv.Key}: {kv.Value}");
+                    }
+                }
+            }
+            return Tuple.Create(em, lm);
+        }
+    }
+
     class KKC2
     {
         public const string SOF = "<s>";
-        public const string EOS = "</s>";
+        public const string EOS = "<s>";
         public const char SEPARATOR = ' ';
         private const double UT = 0.000001;
         private readonly SortedDictionary<string, double> emission;
         private readonly Dictionary<string, List<Tuple<string, double>>> transition;
 
-        public KKC2(Hmm tm, Bigram lm)
+        public KKC2(Hmm tm, Bigram lm) : this(tm.emit, lm.lm)
         {
+            
+        }
+        public KKC2(SortedDictionary<string, Tuple<int, int>> em, SortedDictionary<string, Tuple<int, int>> lm, char skey = ' ') {
             this.transition = new Dictionary<string, List<Tuple<string, double>>>();
-            foreach (var kv in tm.emit)
+            foreach (var kv in em)
             {
-                var wc = kv.Key.Split(' ');
+                var wc = kv.Key.Split(skey);
                 var context = wc[0];
                 var word = wc[1];
                 var prob = kv.Value;
@@ -924,10 +1104,10 @@ namespace KKC1
                 {
                     transition[word] = new List<Tuple<string, double>>();
                 }
-                transition[word].Add(Tuple.Create(context, prob));
+                transition[word].Add(Tuple.Create(context, (double)prob.Item1/ prob.Item2));
             }
 
-            this.emission = new SortedDictionary<string, double>(lm.lm.ToDictionary(x=> x.Key, x => (double)x.Value.Item1/x.Value.Item2));
+            this.emission = new SortedDictionary<string, double>(lm.ToDictionary(x => x.Key, x => (double)x.Value.Item1 / x.Value.Item2), new StringComare ());
 
         }
 
