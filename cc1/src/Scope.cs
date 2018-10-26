@@ -22,7 +22,7 @@ namespace AnsiCParser {
         /// <summary>
         /// スコープに登録されている要素
         /// </summary>
-        private readonly List<Tuple<string, TValue>> _entries = new List<Tuple<string, TValue>>();
+        private readonly Dictionary<string, TValue> _entries = new Dictionary<string, TValue>();
 
         /// <summary>
         /// コンストラクタ
@@ -51,7 +51,8 @@ namespace AnsiCParser {
         /// <param name="ident"></param>
         /// <param name="value"></param>
         public void Add(string ident, TValue value) {
-            _entries.Add(Tuple.Create(ident, value));
+            //_entries.Add(Tuple.Create(ident, value));
+            _entries[ident] = value;
         }
 
         /// <summary>
@@ -77,12 +78,16 @@ namespace AnsiCParser {
             var it = this;
             isCurrent = true;
             while (it != Empty) {
-                var val = it._entries.FindLast(x => x.Item1 == ident);
-                if (val != null) {
-                    if (val.Item2 is T) {
-                        value = (T)(val.Item2);
+                TValue val;
+                if (it._entries.TryGetValue(ident,out val))
+                {
+                    if (val is T)
+                    {
+                        value = (T)(val);
                         return true;
-                    } else {
+                    }
+                    else
+                    {
                         value = default(T);
                         return false;
                     }
@@ -94,11 +99,11 @@ namespace AnsiCParser {
             return false;
         }
 
-        #region IEnumerable<Tuple<string, TValue>>の実装
+#region IEnumerable<Tuple<string, TValue>>の実装
 
         public IEnumerator<Tuple<string, TValue>> GetEnumerator() {
             foreach (var entry in _entries) {
-                yield return entry;
+                yield return Tuple.Create(entry.Key, entry.Value);
             }
         }
 
@@ -107,7 +112,7 @@ namespace AnsiCParser {
                 yield return entry;
             }
         }
-        #endregion
+#endregion
 
     }
 }

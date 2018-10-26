@@ -9,6 +9,7 @@ namespace AnsiCParser {
         /// 論理ソースファイルパス
         /// </summary>
         private static List<string> FilePathTable { get; } = new List<string>();
+        private static Dictionary<string,int> FilePathMap { get; } = new Dictionary<string, int>();
 
         /// <summary>
         /// ファイル位置表現の値
@@ -59,9 +60,10 @@ namespace AnsiCParser {
         public static Location Empty { get; } = new Location("", 1, 1/*, 0*/);
 
         public Location(string filepath, int line, int column/*, int position*/) {
-            var filePathIndex = FilePathTable.IndexOf(filepath);
-            if (filePathIndex == -1) {
+            int filePathIndex;
+            if (!FilePathMap.TryGetValue(filepath, out filePathIndex)) {
                 filePathIndex = FilePathTable.Count;
+                FilePathMap[filepath] = filePathIndex;
                 FilePathTable.Add(filepath);
             }
 

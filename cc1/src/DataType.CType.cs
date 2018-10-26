@@ -69,23 +69,23 @@ namespace AnsiCParser {
 
                     if (t1 is TypedefedType || t2 is TypedefedType) {
                         if (t1 is TypedefedType) {
-                            t1 = (t1 as TypedefedType).Type;
+                            t1 = ((TypedefedType)t1).Type;
                         }
 
                         if (t2 is TypedefedType) {
-                            t2 = (t2 as TypedefedType).Type;
+                            t2 = ((TypedefedType)t2).Type;
                         }
 
                         continue;
                     }
 
                     if ((t1 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
-                        t1 = (t1 as TypeQualifierType).Type;
+                        t1 = ((TypeQualifierType)t1).Type;
                         continue;
                     }
 
                     if ((t2 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
-                        t2 = (t2 as TypeQualifierType).Type;
+                        t2 = ((TypeQualifierType)t2).Type;
                         continue;
                     }
 
@@ -94,48 +94,54 @@ namespace AnsiCParser {
                     }
 
                     if (t1 is TypeQualifierType && t2 is TypeQualifierType) {
-                        if ((t1 as TypeQualifierType).Qualifier != (t2 as TypeQualifierType).Qualifier) {
+                        var _t1 = (TypeQualifierType)t1;
+                        var _t2 = (TypeQualifierType)t2;
+                        if (_t1.Qualifier != _t2.Qualifier) {
                             return false;
                         }
 
-                        t1 = (t1 as TypeQualifierType).Type;
-                        t2 = (t2 as TypeQualifierType).Type;
+                        t1 = _t1.Type;
+                        t2 = _t2.Type;
                         continue;
                     }
 
                     if (t1 is PointerType && t2 is PointerType) {
-                        t1 = (t1 as PointerType).BaseType;
-                        t2 = (t2 as PointerType).BaseType;
+                        t1 = ((PointerType)t1).BaseType;
+                        t2 = ((PointerType)t2).BaseType;
                         continue;
                     }
 
                     if (t1 is ArrayType && t2 is ArrayType) {
-                        if ((t1 as ArrayType).Length != (t2 as ArrayType).Length) {
+                        var _t1 = (ArrayType)t1;
+                        var _t2 = (ArrayType)t2;
+                        if (_t1.Length != _t2.Length) {
                             return false;
                         }
 
-                        t1 = (t1 as ArrayType).BaseType;
-                        t2 = (t2 as ArrayType).BaseType;
+                        t1 = _t1.BaseType;
+                        t2 = _t2.BaseType;
                         continue;
                     }
 
                     if (t1 is FunctionType && t2 is FunctionType) {
-                        if ((t1 as FunctionType).Arguments?.Length != (t2 as FunctionType).Arguments?.Length) {
+                        var _t1 = (FunctionType)t1;
+                        var _t2 = (FunctionType)t2;
+                        if (_t1.Arguments?.Length != _t2.Arguments?.Length) {
                             return false;
                         }
 
-                        if ((t1 as FunctionType).HasVariadic != (t2 as FunctionType).HasVariadic) {
+                        if (_t1.HasVariadic != _t2.HasVariadic) {
                             return false;
                         }
 
-                        if ((t1 as FunctionType).Arguments != null && (t2 as FunctionType).Arguments != null) {
-                            if ((t1 as FunctionType).Arguments.Zip((t2 as FunctionType).Arguments, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
+                        if (_t1.Arguments != null && _t2.Arguments != null) {
+                            if (_t1.Arguments.Zip(_t2.Arguments, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                                 return false;
                             }
                         }
 
-                        t1 = (t1 as FunctionType).ResultType;
-                        t2 = (t2 as FunctionType).ResultType;
+                        t1 = _t1.ResultType;
+                        t2 = _t2.ResultType;
                         continue;
                     }
 
@@ -144,23 +150,25 @@ namespace AnsiCParser {
                     }
 
                     if (t1 is TaggedType.StructUnionType && t2 is TaggedType.StructUnionType) {
-                        if ((t1 as TaggedType.StructUnionType).Kind != (t2 as TaggedType.StructUnionType).Kind) {
+                        var _t1 = (TaggedType.StructUnionType)t1;
+                        var _t2 = (TaggedType.StructUnionType)t2;
+                        if (_t1.Kind != _t2.Kind) {
                             return false;
                         }
 
-                        if ((t1 as TaggedType.StructUnionType).IsAnonymous != (t2 as TaggedType.StructUnionType).IsAnonymous) {
+                        if (_t1.IsAnonymous != _t2.IsAnonymous) {
                             return false;
                         }
 
-                        if ((t1 as TaggedType.StructUnionType).TagName != (t2 as TaggedType.StructUnionType).TagName) {
+                        if (_t1.TagName != _t2.TagName) {
                             return false;
                         }
 
-                        if ((t1 as TaggedType.StructUnionType).Members.Count != (t2 as TaggedType.StructUnionType).Members.Count) {
+                        if (_t1.Members.Count != _t2.Members.Count) {
                             return false;
                         }
 
-                        if ((t1 as TaggedType.StructUnionType).Members.Zip((t2 as TaggedType.StructUnionType).Members, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
+                        if (_t1.Members.Zip(_t2.Members, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                             return false;
                         }
 
@@ -168,7 +176,7 @@ namespace AnsiCParser {
                     }
 
                     if (t1 is BasicType && t2 is BasicType) {
-                        if ((t1 as BasicType).Kind != (t2 as BasicType).Kind) {
+                        if (((BasicType)t1).Kind != ((BasicType)t2).Kind) {
                             return false;
                         }
 
@@ -326,7 +334,16 @@ namespace AnsiCParser {
             public bool IsBasicType(params BasicType.TypeKind[] kind) {
                 var unwrappedSelf = Unwrap();
                 if (kind.Length > 0) {
-                    return unwrappedSelf is BasicType && kind.Contains((unwrappedSelf as BasicType).Kind);
+                    if (unwrappedSelf is BasicType) {
+                        var targetKind = ((BasicType)unwrappedSelf).Kind;
+                        foreach (var k in kind) {
+                            if (k == targetKind)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
                 }
                 else {
                     return unwrappedSelf is BasicType;

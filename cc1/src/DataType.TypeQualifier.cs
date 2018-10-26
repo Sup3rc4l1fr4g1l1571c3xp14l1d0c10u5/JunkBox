@@ -16,4 +16,10 @@ namespace AnsiCParser {
             Invalid = 0x1000,
         }
     }
+    public static class TypeQualifierExt {
+        public static DataType.TypeQualifier Marge(this DataType.TypeQualifier self, DataType.TypeQualifier other) {
+            return self | other;
+        }
+    }
 }
+

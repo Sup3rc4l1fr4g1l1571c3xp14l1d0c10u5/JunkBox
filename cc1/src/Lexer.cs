@@ -42,7 +42,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 整数数形式のサフィックスに一致する正規表現。
         /// </summary>
-        private static string IS { get; } = @"(?:u|U|l|L)*";
+        //private static string IS { get; } = @"(?:u|U|l|L)*";
 
         /// <summary>
         /// 10進浮動小数点形式に一致する正規表現
@@ -57,17 +57,17 @@ namespace AnsiCParser {
         /// <summary>
         /// 10進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
+        //private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 16進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
+        //private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 8進数形式に一致する正規表現
         /// </summary>
-        private static Regex RegexOctal { get; } = new Regex($@"^(?<Body>0{D}*)(?<Suffix>{IS})$", RegexOptions.Compiled);
+        //private static Regex RegexOctal { get; } = new Regex($@"^(?<Body>0{D}*)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
         /// 浮動小数点文字列の解析
@@ -1324,13 +1324,10 @@ namespace AnsiCParser {
                     goto rescan;
                 } else {
                     throw new CompilerException.SyntaxErrorException(GetCurrentLocation(), GetCurrentLocation(), "stray '#' in program");
-                    //_tokens.Add(new Token((Token.TokenKind)'#', start, GetCurrentLocation(), "#"));
-                    //IncPos(1);
-                    //return;
                 }
             }
 
-            // トークンを読み取った結果、行頭以外になるので先に行頭フラグを立てておく
+            // トークンを読み取った結果、行頭以外になるので先に行頭フラグを倒しておく
             _beginOfLine = false;
 
             // 識別子の読み取り
@@ -1693,157 +1690,3 @@ namespace AnsiCParser {
         }
     }
 }
-
-
-/*
- 
-
-module ParseFloat 
-def self.msb(x)
-  n = 0
-  while (x > 1) do
-    x >>= 1
-    n += 1
-  end
-  return n
-end
-
-
-
-FLOAT = {
-	:kind => :float,
-	:bias => (1 << 8)/2-1, # float bias
-	:exponent_size => 23,
-}
-DOUBLE = {
-	:kind => :double,
-	:bias => (1 << 11)/2-1, # double bias
-	:exponent_size => 52,
-}
-QUAD = {
-	:kind => :quad,
-	:bias => (1 << 15)/2-1, # double bias
-	:exponent_size => 52,
-}
-
-FORMAT = {
-	"f" => FLOAT,
-	"F" => FLOAT,
-	"l" => QUAD,
-	"L" => QUAD,
-	""  => DOUBLE,
-	nil => DOUBLE
-}
-
-def self.parse(input)
-puts "input=#{input}"
-
-parser = /0[xX](?<mantissaPart>[0-9a-fA-F]*\.[0-9a-fA-F]+|[0-9a-fA-F]+\.?)[pP](?<exponentPart>[+-]?[0-9]+)(?<suffixPart>[flFL]?)/
-m = parser.match(input)
-exit if !m 
-
-puts "mantissaPart=#{m[:mantissaPart]}, exponentPart=#{m[:exponentPart]}, suffixPart=#{m[:suffixPart]}"
-
-fmt = FORMAT[m[:suffixPart]]
-
-# 仮数部
-mantissaPart = m[:mantissaPart]
-
-# 指数部
-exponentPart = m[:exponentPart]
-
-# 小数点の位置
-dotIndex = mantissaPart.index('.')
-p [dotIndex,mantissaPart.length]
-dotIndex = dotIndex ? (dotIndex) : mantissaPart.length
-
-# 仮数部(小数点を除去)
-mantissaPart = mantissaPart.delete(".")
-mantissa = mantissaPart.to_i(16)
-
-# 指数部
-exponent = exponentPart.to_i
-
-# 仮数部の最左ビット位置
-msbIndex = msb(mantissa)
-
-# 小数点のビット位置
-dotIndex = (mantissaPart.length - dotIndex) * 4
-
-# 仮数部が 1.xxxxxxx になるように指数部を正規化
-p "#{exponent} + #{msbIndex}-#{dotIndex}"
-exponent += msbIndex-dotIndex
-# 仮数部の最左ビット位置をfmt[:exponent_size]にするために必要な左シフト数
-msbShiftValue = (fmt[:exponent_size]-msbIndex) 
-
-# 仮数部の最左ビット位置をfmt[:exponent_size]にしたときの指数部が-126より大きいなら正規化数なのでケチ表現化できる。
-if (exponent + msbShiftValue > -126) 
-
-  # ケチ表現化
-  puts "正規化数なのでケチ表現にする"
-
-  # 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフトしてマスク
-  if msbShiftValue > 0
-    # 左シフト
-    mantissa <<= msbShiftValue
-  else
-    # 右シフト
-    mantissa >>= -msbShiftValue
-  end
-  mantissa &= ((1 << fmt[:exponent_size])-1)
-
-  # 指数部を更新
-  #exponent += msbShiftValue
-  
-  # バイアスを指数に加算
-  exponent += fmt[:bias]
-  p exponent
-
-else
-  # 非正規化数なのでケチ表現化は不可能
-  puts "非正規化数なのでケチ表現化はできない"
-
-  # 仮数部の最左ビット位置がfmt[:exponent_size]になるようにシフト
-  if msbShiftValue > 0
-    # 左シフト
-    mantissa <<= msbShiftValue
-  else
-    # 右シフト
-    mantissa >>= -msbShiftValue
-  end
-
-  shr = -(fmt[:bias]-1)-exponent
-  p "-(#{fmt[:bias]}-1)-#{exponent}"
-  if shr > 0
-    # 右シフト
-    mantissa >>= shr
-  else
-    # 左シフト
-    mantissa <<= -shr
-  end
-
-  # 非正規仮数を示す0を設定
-  exponent = 0
-end
-
-binary = (mantissa | (exponent << fmt[:exponent_size]))
-puts "mantissa=#{mantissa.to_s(16)} exponent=#{exponent}, msbIndex=#{msbIndex}, dotIndex=#{dotIndex}, binary=#{binary}, binary=>str=#{ [binary].pack("L*").unpack("f")}/#{[binary].pack("Q*").unpack("d") }"
-
-return { :mantissa => mantissa, :exponent => exponent, :kind=>fmt[:kind] }
-end
-
-end
-
-
-#input = "0x1p-149F"   # => 0x00000001
-#input = "0x1p-52"   # => 0x00000001
-input = "0X1P-1074"
-#input = "0x1.0p-126f" # => 1.17549e-38
-#input = "0x1.8p3f"    # => 12.0
-#input = "0xABC.0p-3f" # => 0x43ABC000
-#input = "0x0.3p10f"   # => 192
-
-ParseFloat.parse(input)
-
-     
-     */

@@ -11,8 +11,7 @@ namespace AnsiCParser {
             //
             // I Do Not Know C. 
             //
-
-            if (Debugger.IsAttached == false) {
+            if (Debugger.IsAttached) {
                 CommonMain(args);
             } else {
                 DebugMain(args);
@@ -38,10 +37,14 @@ namespace AnsiCParser {
                 // check input source
                 if (Args.Length == 0) {
                     act("コンパイル対象のCソースファイルを１つ指定してください。");
-                } else if (Args.Length > 1) {
-                    act("コンパイル対象のCソースファイルが２つ以上指定されています。");
-                } else if (System.IO.File.Exists(Args[0]) == false) {
-                    act($"ファイル {Args[0]} が見つかりません。処理を中止します。");
+                //} else if (Args.Length > 1) {
+                //    act("コンパイル対象のCソースファイルが２つ以上指定されています。");
+                } else {
+                    foreach (var arg in Args) {
+                        if (System.IO.File.Exists(arg) == false) {
+                            act($"ファイル {arg} が見つかりません。処理を中止します。");
+                        }
+                    }
                 }
 
                 // check output
@@ -53,7 +56,6 @@ namespace AnsiCParser {
         }
 
         static void CommonMain(string[] args) {
-
             var opts = new CommandLineOptionsParser<CommandLineOptions>()
                 .Entry(@"-o", 1, (t, s) => {
                     t.OutputFile = s[0];
@@ -83,17 +85,35 @@ namespace AnsiCParser {
             });
 
             try {
-                var ret = new Parser(System.IO.File.ReadAllText(opts.Args[0]), opts.Args[0]).Parse();
-                if (opts.AstFile != null) {
-                    using (var o = new System.IO.StreamWriter(opts.AstFile)) {
-                        o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
+                if (opts.Args.Length == 1) {
+                    var ret = new Parser(System.IO.File.ReadAllText(opts.Args[0]), opts.Args[0]).Parse();
+                    if (opts.AstFile != null) {
+                        using (var o = new System.IO.StreamWriter(opts.AstFile)) {
+                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
+                        }
                     }
-                }
 
-                if (opts.FlagSyntaxOnly == false) {
-                    using (var o = new System.IO.StreamWriter(opts.OutputFile)) {
-                        var compiler = new Compiler();
-                        compiler.Compile(ret, o);
+                    if (opts.FlagSyntaxOnly == false) {
+                        using (var o = new System.IO.StreamWriter(opts.OutputFile)) {
+                            var compiler = new Compiler();
+                            compiler.Compile(ret, o);
+                        }
+                    }
+                } else {
+                    foreach (var arg in opts.Args) {
+                        var astFile = System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(arg), "scm");
+                        var asmFile = System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(arg), "s");
+                        var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
+                        using (var o = new System.IO.StreamWriter(astFile)) {
+                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
+                        }
+
+                        if (opts.FlagSyntaxOnly == false) {
+                            using (var o = new System.IO.StreamWriter(asmFile)) {
+                                var compiler = new Compiler();
+                                compiler.Compile(ret, o);
+                            }
+                        }
                     }
                 }
             } catch (CompilerException e) {
@@ -170,6 +190,6 @@ namespace AnsiCParser {
  * - Flexible array member : Complete
  * - Variable length array : Not Supported. It's nothing, but harmful. 
  * - Complex numbers : Complete
- * - Imaginary numbers : Incomplete.
+ * - Imaginary numbers : Complete.
  * - Bool type : Complete.
  */

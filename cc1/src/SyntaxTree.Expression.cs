@@ -564,13 +564,13 @@ namespace AnsiCParser.SyntaxTree {
 
                         if (functionType.HasVariadic) {
                             for (var i = functionType.Arguments.Length; i < args.Count; i++) {
-                                args[i] = new TypeConversionExpression(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
+                                args[i] = TypeConversionExpression.Apply(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
                             }
                         }
 
                     } else {
                         // 呼び出される関数を表す式が，関数原型を含まない型をもつ場合，各実引数に対して既定の実引数拡張を行う。
-                        args = args.Select(x => (Expression)new TypeConversionExpression(x.LocationRange, Specification.DefaultArgumentPromotion(x.Type), x)).ToList();
+                        args = args.Select(x => (Expression)TypeConversionExpression.Apply(x.LocationRange, Specification.DefaultArgumentPromotion(x.Type), x)).ToList();
                     }
                     // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない
                     ResultType = functionType.ResultType;
@@ -752,7 +752,7 @@ namespace AnsiCParser.SyntaxTree {
                     // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                     Op = op;
                     Expr = expr;
-                    // new TypeConversionExpression(expr.Type, Specification.TypeConvert(expr.Type, expr));
+                    // TypeConversionExpression.Apply(expr.Type, Specification.TypeConvert(expr.Type, expr));
 
                 }
 
@@ -802,7 +802,7 @@ namespace AnsiCParser.SyntaxTree {
                 // 制約，型，副作用，並びにポインタに対する型変換及び演算の効果については，加減演算子及び複合代入の規定のとおりとする。
                 // ToDo: とあるので、加減演算子及び複合代入の規定をコピーしてくること
                 Op = op;
-                Expr = expr;    // new TypeConversionExpression(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
+                Expr = expr;    // TypeConversionExpression.Apply(expr.Type, Specification.ImplicitConversion(expr.Type, expr));
             }
         }
 
@@ -873,7 +873,7 @@ namespace AnsiCParser.SyntaxTree {
                         new AdditiveExpression(
                             locationRange,
                             AdditiveExpression.OperatorKind.Add,
-                            new TypeConversionExpression(aexpr.Target.LocationRange, aexpr.Target.Type, aexpr.Target),
+                            TypeConversionExpression.Apply(aexpr.Target.LocationRange, aexpr.Target.Type, aexpr.Target),
                             Specification.ImplicitConversion(CType.CreateSignedInt(), aexpr.Index)
                         );
                     Expr = expr;
@@ -1444,10 +1444,10 @@ namespace AnsiCParser.SyntaxTree {
                     } else if (lhsPtr != null && lhsPtr.Type.IsPointerType() && rhs.IsNullPointerConstant()) {
                         // 左辺のオペランドがポインタで右辺が空ポインタ定数である。
                         lhs = lhsPtr;
-                        rhs = new TypeConversionExpression(rhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), rhs);
+                        rhs = TypeConversionExpression.Apply(rhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), rhs);
                     } else if (rhsPtr != null && rhsPtr.Type.IsPointerType() && lhs.IsNullPointerConstant()) {
                         // 右辺のオペランドがポインタで左辺が空ポインタ定数である。
-                        lhs = new TypeConversionExpression(lhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), lhs);
+                        lhs = TypeConversionExpression.Apply(lhs.LocationRange, CType.CreatePointer(CType.CreateVoid()), lhs);
                         rhs = rhsPtr;
                     } else {
                         throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "等価演算子は両オペランドは算術型をもつ、両オペランドとも適合する型の修飾版又は非修飾版へのポインタである、一方のオペランドがオブジェクト型又は不完全型へのポインタで他方が void の修飾版又は非修飾版へのポインタである、一方のオペランドがポインタで他方が空ポインタ定数であるの何れかを満たさなければならない。");
@@ -1842,7 +1842,7 @@ namespace AnsiCParser.SyntaxTree {
 
                     if (!CType.IsEqual(lType, rhs.Type)) {
                         //（=）は，右オペランドの値を代入式の型に型変換し，左オペランドで指し示されるオブジェクトに格納されている値をこの値で置き換える。
-                        rhs = new TypeConversionExpression(rhs.LocationRange, lType, rhs);
+                        rhs = TypeConversionExpression.Apply(rhs.LocationRange, lType, rhs);
                     }
 
                     return rhs;
@@ -2101,13 +2101,21 @@ namespace AnsiCParser.SyntaxTree {
                 return !Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) && Expr.IsLValue();
             }
 
-            public TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
-                if (type.IsFunctionType()) {
-                    System.Diagnostics.Debugger.Break();
-                }
+            protected TypeConversionExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
+                //System.Diagnostics.Debug.Assert(!CType.IsEqual(type, expr.Type));
                 Ty = type;
                 Expr = expr;
             }
+            public static Expression Apply(LocationRange locationRange, CType type, Expression expr)
+            {
+                if (CType.IsEqual(type, expr.Type))
+                {
+                    return expr;
+                } else {
+                    return new TypeConversionExpression(locationRange, type, expr);
+                }
+            }
+
         }
 
         /// <summary>
