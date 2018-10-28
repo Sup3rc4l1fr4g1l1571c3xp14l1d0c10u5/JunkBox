@@ -458,16 +458,16 @@ namespace AnsiCParser.SyntaxTree {
             );
         }
 
-        public Schene.Pair OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Schene.Pair value) {
+        public Schene.Pair OnMultiplicativeExpression(Expression.MultiplicativeExpression self, Schene.Pair value) {
             var ops = "";
             switch (self.Op) {
-                case Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                case Expression.MultiplicativeExpression.OperatorKind.Mul:
                     ops = "mul-expr";
                     break;
-                case Expression.MultiplicitiveExpression.OperatorKind.Div:
+                case Expression.MultiplicativeExpression.OperatorKind.Div:
                     ops = "div-expr";
                     break;
-                case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                case Expression.MultiplicativeExpression.OperatorKind.Mod:
                     ops = "mod-expr";
                     break;
             }

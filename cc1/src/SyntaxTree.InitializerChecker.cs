@@ -201,7 +201,7 @@ namespace AnsiCParser.SyntaxTree {
             // 文字配列が対象の場合
             var expr = it.AsSimpleInitializer().AssignmentExpression;
             while (expr is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
-                expr = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression) expr).ParenthesesExpression;
+                expr = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression)expr).ParenthesesExpression;
             }
 
             if (!(expr is Expression.PrimaryExpression.StringExpression)) {
@@ -345,7 +345,7 @@ namespace AnsiCParser.SyntaxTree {
             if (it.IsSimpleInitializer()) {
                 Expression ae = it.AsSimpleInitializer().AssignmentExpression;
                 while (ae is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
-                    ae = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression) ae).ParenthesesExpression;
+                    ae = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression)ae).ParenthesesExpression;
                 }
                 if (ae is Expression.PrimaryExpression.StringExpression) {
                     return CheckInitializerArrayByStringExpressionInitializer(depth, type, it, isLocalVariableInit);

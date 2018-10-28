@@ -2448,44 +2448,41 @@ namespace AnsiCParser {
                             }
 
                             if (value.Type.IsBitField()) {
-                                var bft = (BitFieldType) value.Type;
+                                var bft = (BitFieldType)value.Type;
                                 // ビットフィールドなので
                                 switch (bft.Sizeof()) {
                                     case 1:
                                         Emit($"movb (%esi), %al");
-                                        Emit($"shlb ${7-(bft.BitOffset+bft.BitWidth)}, %al");
+                                        Emit($"shlb ${7 - (bft.BitOffset + bft.BitWidth)}, %al");
                                         if (bft.IsSignedIntegerType()) {
-                                            Emit($"sarb ${8-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %al");
-                                        }
-                                        else {
-                                            Emit($"shrb ${8-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %al");
+                                            Emit($"sarb ${8 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %al");
+                                        } else {
+                                            Emit($"shrb ${8 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %al");
                                         }
                                         Emit($"movb %al, (%esi)");
                                         break;
                                     case 2:
                                         Emit($"movw (%esi), %ax");
-                                        Emit($"shlw ${16-(bft.BitOffset+bft.BitWidth)}, %ax");
+                                        Emit($"shlw ${16 - (bft.BitOffset + bft.BitWidth)}, %ax");
                                         if (bft.IsSignedIntegerType()) {
-                                            Emit($"sarw ${16-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %ax");
-                                        }
-                                        else {
-                                            Emit($"shrw ${16-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %ax");
+                                            Emit($"sarw ${16 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %ax");
+                                        } else {
+                                            Emit($"shrw ${16 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %ax");
                                         }
                                         Emit($"movw %ax, (%esi)");
                                         break;
                                     case 4:
                                         Emit($"movl (%esi), %eax");
-                                        Emit($"shll ${32-(bft.BitOffset+bft.BitWidth)}, %eax");
+                                        Emit($"shll ${32 - (bft.BitOffset + bft.BitWidth)}, %eax");
                                         if (bft.IsSignedIntegerType()) {
-                                            Emit($"sarl ${32-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %eax");
-                                        }
-                                        else {
-                                            Emit($"shrl ${32-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %eax");
+                                            Emit($"sarl ${32 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %eax");
+                                        } else {
+                                            Emit($"shrl ${32 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %eax");
                                         }
                                         Emit($"movl %eax, (%esi)");
                                         break;
                                     case 8:
-                                        default:
+                                    default:
                                         throw new NotSupportedException();
                                 }
 
@@ -2890,7 +2887,7 @@ namespace AnsiCParser {
                         break;
                     case Value.ValueKind.IntConst:
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.IntConst, Type = type , IntConst = operand.IntConst});
+                        Push(new Value { Kind = Value.ValueKind.IntConst, Type = type, IntConst = operand.IntConst });
                         break;
                     default:
                         throw new NotImplementedException();
@@ -3613,19 +3610,19 @@ namespace AnsiCParser {
                 return value;
             }
 
-            public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
+            public Value OnMultiplicativeExpression(Expression.MultiplicativeExpression self, Value value) {
                 switch (self.Op) {
-                    case Expression.MultiplicitiveExpression.OperatorKind.Mul:
+                    case Expression.MultiplicativeExpression.OperatorKind.Mul:
                         self.Lhs.Accept(this, value);
                         self.Rhs.Accept(this, value);
                         _context.Generator.Mul(self.Type);
                         break;
-                    case Expression.MultiplicitiveExpression.OperatorKind.Div:
+                    case Expression.MultiplicativeExpression.OperatorKind.Div:
                         self.Lhs.Accept(this, value);
                         self.Rhs.Accept(this, value);
                         _context.Generator.Div(self.Type);
                         break;
-                    case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                    case Expression.MultiplicativeExpression.OperatorKind.Mod:
                         self.Lhs.Accept(this, value);
                         self.Rhs.Accept(this, value);
                         _context.Generator.Mod(self.Type);
@@ -4417,15 +4414,15 @@ namespace AnsiCParser {
                 if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.IntConst) {
                     lv.IntConst += rv.IntConst;
                     return lv;
-                } 
+                }
                 if (lv.Kind == Value.ValueKind.Ref && rv.Kind == Value.ValueKind.IntConst) {
                     lv.Offset += (int)rv.IntConst;
                     return lv;
-                } 
+                }
                 if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.Ref) {
                     lv.Offset += (int)rv.IntConst;
                     return lv;
-                } 
+                }
                 throw new NotImplementedException();
             }
 
@@ -4481,7 +4478,7 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
-            public Value OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Value value) {
+            public Value OnMultiplicativeExpression(Expression.MultiplicativeExpression self, Value value) {
                 throw new NotImplementedException();
             }
 

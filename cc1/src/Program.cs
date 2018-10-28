@@ -130,7 +130,7 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\documents\visual studio 2017\Projects\AnsiCParser\AnsiCParser\lacc-test\tmp\initialize-string.i"), " <Debug>").Parse();
+            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\documents\visual studio 2017\Projects\AnsiCParser\AnsiCParser\lacc-test\tmp\prototype-scope-enum.i"), " <Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);

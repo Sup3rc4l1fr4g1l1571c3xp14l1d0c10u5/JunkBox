@@ -588,7 +588,7 @@ namespace AnsiCParser {
                     {
                         var definition = entry.TentativeDefinitions.FirstOrDefault(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType());
                         if (definition != null) {
-                        //if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
+                            //if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
                             throw new CompilerException.SpecificationErrorException(definition.LocationRange, "不完全型のままの識別子があります。");
                         }
                     }
@@ -596,7 +596,7 @@ namespace AnsiCParser {
                     {
                         var definition = entry.TentativeDefinitions.FirstOrDefault(x => x.StorageClass != AnsiCParser.StorageClassSpecifier.Extern);
                         if (definition != null) {
-                        //if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                            //if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
                             entry.Definition = entry.TentativeDefinitions[0];
                             entry.TentativeDefinitions.RemoveAt(0);
                         }
@@ -2739,7 +2739,7 @@ namespace AnsiCParser {
                 // 6.5.2.5 複合リテラル
                 // Todo: 実装
                 default: {
-                    return expr;
+                        return expr;
                     }
             }
         }
@@ -2886,22 +2886,22 @@ namespace AnsiCParser {
             var lhs = CastExpression();
             Token tok;
             while (_lexer.ReadTokenIf(out tok, '*', '/', '%')) {
-                SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind op;
+                SyntaxTree.Expression.MultiplicativeExpression.OperatorKind op;
                 switch (tok.Kind) {
                     case (Token.TokenKind)'*':
-                        op = SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mul;
+                        op = SyntaxTree.Expression.MultiplicativeExpression.OperatorKind.Mul;
                         break;
                     case (Token.TokenKind)'/':
-                        op = SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Div;
+                        op = SyntaxTree.Expression.MultiplicativeExpression.OperatorKind.Div;
                         break;
                     case (Token.TokenKind)'%':
-                        op = SyntaxTree.Expression.MultiplicitiveExpression.OperatorKind.Mod;
+                        op = SyntaxTree.Expression.MultiplicativeExpression.OperatorKind.Mod;
                         break;
                     default:
                         throw new CompilerException.InternalErrorException(tok.Range, "");
                 }
                 var rhs = CastExpression();
-                lhs = new SyntaxTree.Expression.MultiplicitiveExpression(op, lhs, rhs);
+                lhs = new SyntaxTree.Expression.MultiplicativeExpression(op, lhs, rhs);
             }
             return lhs;
         }
@@ -3434,7 +3434,7 @@ namespace AnsiCParser {
                 // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
                 if ((iv.LinkageObject.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
                     || (iv.LinkageObject.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Range, $"{iv.LocationRange.ToString()} で {(iv.LinkageObject.Linkage == LinkageKind.InternalLinkage? "内部結合" : "外部結合")} として宣言された識別子 {ident.Raw} が {(linkage == LinkageKind.InternalLinkage ? "内部結合" : "外部結合")} として再宣言されています。"+
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"{iv.LocationRange.ToString()} で {(iv.LinkageObject.Linkage == LinkageKind.InternalLinkage ? "内部結合" : "外部結合")} として宣言された識別子 {ident.Raw} が {(linkage == LinkageKind.InternalLinkage ? "内部結合" : "外部結合")} として再宣言されています。" +
                                                                                          $"翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合の動作は未定義です。");
                 }
 
@@ -3707,7 +3707,7 @@ namespace AnsiCParser {
                     //  - 記憶域クラス指定子がなし、もしくは static のもの
                     // 仮定義された識別子に対する外部定義を含まない場合、翻訳単位の末尾に合成型で0の初期化子付き宣言があるとして扱う
 
-                    for (;;) {
+                    for (; ; ) {
                         var decl = FunctionOrVariableOrTypedefDeclaration(ident, type, storageClass, AnsiCParser.FunctionSpecifier.None, scope);
                         decls.Add(decl);
 

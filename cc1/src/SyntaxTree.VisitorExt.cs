@@ -6,11 +6,9 @@ namespace AnsiCParser.SyntaxTree {
         private static TResult AcceptInner<TResult, TArg>(dynamic ast, IVisitor<TResult, TArg> visitor, TArg value) {
             return Accept<TResult, TArg>(ast, visitor, value);
         }
-
         public static TResult Accept<TResult, TArg>(this Ast ast, IVisitor<TResult, TArg> visitor, TArg value) {
             return AcceptInner(ast, visitor, value);
         }
-
         public static TResult Accept<TResult, TArg>(this Declaration.ArgumentDeclaration self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnArgumentDeclaration(self, value);
         }
@@ -65,8 +63,8 @@ namespace AnsiCParser.SyntaxTree {
         public static TResult Accept<TResult, TArg>(this Expression.LogicalOrExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnLogicalOrExpression(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this Expression.MultiplicitiveExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnMultiplicitiveExpression(self, value);
+        public static TResult Accept<TResult, TArg>(this Expression.MultiplicativeExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnMultiplicativeExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this Expression.PostfixExpression.ArraySubscriptingExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnArraySubscriptingExpression(self, value);

@@ -19,7 +19,7 @@ namespace AnsiCParser.SyntaxTree {
         TResult OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, TArg value);
         TResult OnLogicalAndExpression(Expression.LogicalAndExpression self, TArg value);
         TResult OnLogicalOrExpression(Expression.LogicalOrExpression self, TArg value);
-        TResult OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, TArg value);
+        TResult OnMultiplicativeExpression(Expression.MultiplicativeExpression self, TArg value);
         TResult OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, TArg value);
         TResult OnFunctionCallExpression(Expression.PostfixExpression.FunctionCallExpression self, TArg value);
         TResult OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, TArg value);

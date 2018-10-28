@@ -38,8 +38,7 @@ namespace AnsiCParser.SyntaxTree {
             // 初期化子の要素が定数ではありません等
             if (ret.HasValue) {
                 return ret.Value;
-            }
-            else {
+            } else {
                 throw new NotSupportedException(self.GetType().Name);
             }
         }
@@ -109,18 +108,18 @@ namespace AnsiCParser.SyntaxTree {
                 if (self.Type.IsRealFloatingType()) {
                     switch (self.Op) {
                         case Expression.AdditiveExpression.OperatorKind.Add:
-                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() + rhs.DoubleValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() + rhs.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
                         case Expression.AdditiveExpression.OperatorKind.Sub:
-                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() - rhs.DoubleValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() - rhs.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else if (self.Type.IsIntegerType()) {
                     switch (self.Op) {
                         case Expression.AdditiveExpression.OperatorKind.Add:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() + rhs.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() + rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
                         case Expression.AdditiveExpression.OperatorKind.Sub:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() - rhs.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() - rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -173,7 +172,7 @@ namespace AnsiCParser.SyntaxTree {
                 if (lhs != 0) {
                     ret = self.Rhs.Accept(this, value).LongValue() == 0 ? 0 : 1;
                 }
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Expression value) {
@@ -207,7 +206,7 @@ namespace AnsiCParser.SyntaxTree {
                     long reti = (ret as Expression.PrimaryExpression.Constant.IntegerConstant).Value;
 
                     if (self.Type.Unwrap() is BasicType) {
-                        var bt = ((BasicType) self.Type.Unwrap()).Kind;
+                        var bt = ((BasicType)self.Type.Unwrap()).Kind;
                         switch (bt) {
                             case BasicType.TypeKind.Char:
                             case BasicType.TypeKind.SignedChar:
@@ -247,7 +246,7 @@ namespace AnsiCParser.SyntaxTree {
                     double reti = (ret as Expression.PrimaryExpression.Constant.FloatingConstant).Value;
 
                     if (self.Type.Unwrap() is BasicType) {
-                        var bt = ((BasicType) self.Type.Unwrap()).Kind;
+                        var bt = ((BasicType)self.Type.Unwrap()).Kind;
                         switch (bt) {
                             case BasicType.TypeKind.Char:
                             case BasicType.TypeKind.SignedChar:
@@ -314,7 +313,7 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnConditionalExpression(Expression.ConditionalExpression self, Expression value) {
-                var cond = self.CondExpr.Accept(this,value);
+                var cond = self.CondExpr.Accept(this, value);
                 if (cond.LongValue() != 0) {
                     return self.ThenExpr.Accept(this, value);
                 } else {
@@ -343,7 +342,7 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Info.Value, ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Info.Value, ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnEqualityExpression(Expression.EqualityExpression self, Expression value) {
@@ -358,9 +357,9 @@ namespace AnsiCParser.SyntaxTree {
                 }
                 switch (self.Op) {
                     case Expression.EqualityExpression.OperatorKind.Equal:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     case Expression.EqualityExpression.OperatorKind.NotEqual:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     default:
                         throw new Exception();
                 }
@@ -371,7 +370,7 @@ namespace AnsiCParser.SyntaxTree {
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
                     var ret = lhs.LongValue() ^ rhs.LongValue();
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -421,7 +420,7 @@ namespace AnsiCParser.SyntaxTree {
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
                     var ret = lhs.LongValue() | rhs.LongValue();
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -442,7 +441,7 @@ namespace AnsiCParser.SyntaxTree {
                     var rhs = self.Rhs.Accept(this, value);
                     ret = rhs.LongValue() != 0;
                 }
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnLogicalOrExpression(Expression.LogicalOrExpression self, Expression value) {
@@ -452,7 +451,7 @@ namespace AnsiCParser.SyntaxTree {
                     var rhs = self.Rhs.Accept(this, value);
                     ret = rhs.LongValue() != 0;
                 }
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Expression value) {
@@ -467,41 +466,41 @@ namespace AnsiCParser.SyntaxTree {
 
                 var addrConstExpr = expr as Expression.PrimaryExpression.AddressConstantExpression;
                 return new Expression.PrimaryExpression.AddressConstantExpression(
-                    self.LocationRange, 
-                    addrConstExpr.Identifier, 
-                    self.MemberInfo.Type, 
+                    self.LocationRange,
+                    addrConstExpr.Identifier,
+                    self.MemberInfo.Type,
                     new Expression.PrimaryExpression.Constant.IntegerConstant(
-                        self.LocationRange, 
-                        "", 
-                        self.MemberInfo.Offset + addrConstExpr.Offset.Value, 
+                        self.LocationRange,
+                        "",
+                        self.MemberInfo.Offset + addrConstExpr.Offset.Value,
                         BasicType.TypeKind.SignedInt
                     )
                 );
             }
 
-            public Expression OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Expression value) {
+            public Expression OnMultiplicativeExpression(Expression.MultiplicativeExpression self, Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
 
                 if (self.Type.IsRealFloatingType()) {
                     switch (self.Op) {
-                        case Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() * rhs.DoubleValue(), ((BasicType) self.Type.Unwrap()).Kind);
-                        case Expression.MultiplicitiveExpression.OperatorKind.Div:
-                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() / rhs.DoubleValue(), ((BasicType) self.Type.Unwrap()).Kind);
-                        case Expression.MultiplicitiveExpression.OperatorKind.Mod:
+                        case Expression.MultiplicativeExpression.OperatorKind.Mul:
+                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() * rhs.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                        case Expression.MultiplicativeExpression.OperatorKind.Div:
+                            return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", lhs.DoubleValue() / rhs.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                        case Expression.MultiplicativeExpression.OperatorKind.Mod:
                             throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中で浮動小数点数の剰余算が行われています。");
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else if (self.Type.IsIntegerType()) {
                     switch (self.Op) {
-                        case Expression.MultiplicitiveExpression.OperatorKind.Mul:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() * rhs.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
-                        case Expression.MultiplicitiveExpression.OperatorKind.Div:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() / rhs.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
-                        case Expression.MultiplicitiveExpression.OperatorKind.Mod:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() % rhs.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                        case Expression.MultiplicativeExpression.OperatorKind.Mul:
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() * rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                        case Expression.MultiplicativeExpression.OperatorKind.Div:
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() / rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                        case Expression.MultiplicativeExpression.OperatorKind.Mod:
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() % rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -528,13 +527,13 @@ namespace AnsiCParser.SyntaxTree {
                 }
                 switch (self.Op) {
                     case Expression.RelationalExpression.OperatorKind.LessThan:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le && !ge) ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le && !ge) ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     case Expression.RelationalExpression.OperatorKind.GreaterThan:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le && ge) ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le && ge) ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     case Expression.RelationalExpression.OperatorKind.LessOrEqual:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le) ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (le) ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     case Expression.RelationalExpression.OperatorKind.GreaterOrEqual:
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le) ? 1 : 0, ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (!le) ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
                     default:
                         throw new Exception();
                 }
@@ -559,7 +558,7 @@ namespace AnsiCParser.SyntaxTree {
                         default:
                             throw new Exception();
                     }
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v, ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v, ((BasicType)self.Type.Unwrap()).Kind);
                 }
                 throw new Exception();
             }
@@ -577,11 +576,11 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnSizeofExpression(Expression.SizeofExpression self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.Sizeof(), ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.Sizeof(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.Sizeof(), ((BasicType) self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.Sizeof(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnStringExpression(Expression.PrimaryExpression.StringExpression self, Expression value) {
@@ -620,7 +619,7 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }
@@ -629,7 +628,7 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType) self.Type.Unwrap()).Kind);
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
                     } else {
                         return e;
                     }
@@ -650,11 +649,11 @@ namespace AnsiCParser.SyntaxTree {
                 // 変換する値が表現しうる値の範囲外にある場合，その動作は未定義とする。
                 if (self.Type.IsFloatingType() && self.Expr.Type.IsIntegerType()) {
                     var v = self.Expr.Accept(this, value).DoubleValue();
-                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((BasicType)self.Type.Unwrap()).Kind);
                 }
                 if (self.Type.IsFloatingType() && self.Expr.Type.IsFloatingType()) {
                     var v = self.Expr.Accept(this, value).DoubleValue();
-                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", v, ((BasicType)self.Type.Unwrap()).Kind);
                 }
 
                 // 6.3.1.6 複素数型  
@@ -706,9 +705,9 @@ namespace AnsiCParser.SyntaxTree {
             public Expression OnUnaryMinusExpression(Expression.UnaryMinusExpression self, Expression value) {
                 var ret = self.Expr.Accept(this, value);
                 if (ret.Type.IsRealFloatingType()) {
-                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", -ret.DoubleValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", -ret.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
                 } else if (ret.Type.IsIntegerType()) {
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", -ret.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", -ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
                 } else {
                     throw new Exception();
                 }
@@ -717,7 +716,7 @@ namespace AnsiCParser.SyntaxTree {
             public Expression OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Expression value) {
                 var ret = self.Expr.Accept(this, value);
                 if (ret.Type.IsIntegerType()) {
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ~ret.LongValue(), ((BasicType) self.Type.Unwrap()).Kind);
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ~ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
                 } else {
                     throw new Exception();
                 }
@@ -744,8 +743,7 @@ namespace AnsiCParser.SyntaxTree {
             public Expression OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Expression value) {
                 if (!(self.Expr is Expression.UnaryAddressExpression)) {
                     throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中でアドレス演算子と対にならない間接演算子が使用されています。");
-                }
-                else {
+                } else {
                     return this.AcceptTo(self.Expr, value);
                 }
             }

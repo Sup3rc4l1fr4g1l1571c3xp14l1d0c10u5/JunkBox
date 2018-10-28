@@ -544,16 +544,14 @@ namespace AnsiCParser.SyntaxTree {
                             if (0 != args.Count) {
                                 throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数(0個)と一致しない。");
                             }
-                        }
-                        else {
+                        } else {
                             // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
                             if (functionType.HasVariadic) {
                                 // 可変長引数を持つ
                                 if (functionType.Arguments.Length > args.Count) {
                                     throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)よりも少ない。");
                                 }
-                            }
-                            else {
+                            } else {
                                 if (functionType.Arguments.Length != args.Count) {
                                     throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)と一致しない。");
                                 }
@@ -607,7 +605,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public override bool IsLValue() {
-                    return true;///* !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) &&*/ Expr.IsLValue();
+                    return true;// /* !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) &&*/ Expr.IsLValue();
                 }
                 public override bool HasStorageClassRegister() {
                     // 集成体又は共用体のオブジェクトが typedef 以外の記憶域クラス指定子を用いて宣言されたとき，結合に関するものを除いて，記憶域クラス指定子による性質をオブジェクトのメンバにも適用する。
@@ -1139,7 +1137,7 @@ namespace AnsiCParser.SyntaxTree {
         /// <summary>
         /// 6.5.5 乗除演算子(乗除式)
         /// </summary>
-        public class MultiplicitiveExpression : Expression {
+        public class MultiplicativeExpression : Expression {
             public enum OperatorKind {
                 Mul, Div, Mod
             }
@@ -1161,7 +1159,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
             }
 
-            public MultiplicitiveExpression(OperatorKind op, Expression lhs, Expression rhs) : base(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End)) {
+            public MultiplicativeExpression(OperatorKind op, Expression lhs, Expression rhs) : base(new LocationRange(lhs.LocationRange.Start, rhs.LocationRange.End)) {
                 // 制約 
                 // 各オペランドは，算術型をもたなければならない。
                 // %演算子のオペランドは，整数型をもたなければならない
@@ -2116,10 +2114,8 @@ namespace AnsiCParser.SyntaxTree {
                 Ty = type;
                 Expr = expr;
             }
-            public static Expression Apply(LocationRange locationRange, CType type, Expression expr)
-            {
-                if (CType.IsEqual(type, expr.Type))
-                {
+            public static Expression Apply(LocationRange locationRange, CType type, Expression expr) {
+                if (CType.IsEqual(type, expr.Type)) {
                     return expr;
                 } else {
                     return new TypeConversionExpression(locationRange, type, expr);
