@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace AnsiCParser {
@@ -67,13 +66,13 @@ namespace AnsiCParser {
                         return true;
                     }
 
-                    if (t1 is TypedefedType || t2 is TypedefedType) {
-                        if (t1 is TypedefedType) {
-                            t1 = ((TypedefedType)t1).Type;
+                    if (t1 is TypedefType || t2 is TypedefType) {
+                        if (t1 is TypedefType) {
+                            t1 = ((TypedefType)t1).Type;
                         }
 
-                        if (t2 is TypedefedType) {
-                            t2 = ((TypedefedType)t2).Type;
+                        if (t2 is TypedefType) {
+                            t2 = ((TypedefType)t2).Type;
                         }
 
                         continue;
@@ -106,8 +105,21 @@ namespace AnsiCParser {
                     }
 
                     if (t1 is PointerType && t2 is PointerType) {
-                        t1 = ((PointerType)t1).BaseType;
-                        t2 = ((PointerType)t2).BaseType;
+                        t1 = ((PointerType)t1).ReferencedType;
+                        t2 = ((PointerType)t2).ReferencedType;
+                        continue;
+                    }
+                    if (t1 is BitFieldType && t2 is BitFieldType) {
+                        var _t1 = (BitFieldType)t1;
+                        var _t2 = (BitFieldType)t2;
+                        if (_t1.BitOffset != _t2.BitOffset) {
+                            return false;
+                        }
+                        if (_t1.BitWidth != _t2.BitWidth) {
+                            return false;
+                        }
+                        t1 = _t1.Type;
+                        t2 = _t2.Type;
                         continue;
                     }
 
@@ -118,8 +130,8 @@ namespace AnsiCParser {
                             return false;
                         }
 
-                        t1 = _t1.BaseType;
-                        t2 = _t2.BaseType;
+                        t1 = _t1.ElementType;
+                        t2 = _t2.ElementType;
                         continue;
                     }
 
@@ -381,8 +393,8 @@ namespace AnsiCParser {
             public CType Unwrap() {
                 var self = this;
                 for (;;) {
-                    if (self is TypedefedType) {
-                        self = (self as TypedefedType).Type;
+                    if (self is TypedefType) {
+                        self = (self as TypedefType).Type;
                         continue;
                     }
 
@@ -491,29 +503,29 @@ namespace AnsiCParser {
                         // 配列型の指定が型修飾子を含む場合，それは要素の型を修飾するだけで，その配列型を修飾するのではない
                         var arrayType = ret as ArrayType;
 
-                        return new ArrayType(arrayType.Length, arrayType.BaseType.WrapTypeQualifier(ta1.Qualifier));
+                        return new ArrayType(arrayType.Length, arrayType.ElementType.WrapTypeQualifier(ta1.Qualifier));
                     }
                     else {
                         return new TypeQualifierType(ret, ta1.Qualifier);
                     }
                 }
 
-                if (t1 is TypedefedType) {
+                if (t1 is TypedefType) {
 
-                    var ta1 = t1 as TypedefedType;
+                    var ta1 = t1 as TypedefType;
                     return CompositeType(ta1.Type, t2);
                 }
 
-                if (t2 is TypedefedType) {
+                if (t2 is TypedefType) {
 
-                    var ta2 = t2 as TypedefedType;
+                    var ta2 = t2 as TypedefType;
                     return CompositeType(t1, ta2.Type);
                 }
 
                 if (t1.IsPointerType() && t2.IsPointerType()) {
                     var ta1 = t1 as PointerType;
                     var ta2 = t2 as PointerType;
-                    var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                    var ret = CompositeType(ta1.ReferencedType, ta2.ReferencedType);
                     if (ret == null) {
                         return null;
                     }
@@ -587,7 +599,7 @@ namespace AnsiCParser {
                     if ((ta1.Length != -1 && ta2.Length == -1)
                         || (ta1.Length == -1 && ta2.Length != -1)) {
                         int len = ta1.Length != -1 ? ta1.Length : ta2.Length;
-                        var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                        var ret = CompositeType(ta1.ElementType, ta2.ElementType);
                         if (ret == null) {
                             return null;
                         }
@@ -595,7 +607,7 @@ namespace AnsiCParser {
                         return CreateArray(len, ret);
                     }
                     else if (ta1.Length == ta2.Length) {
-                        var ret = CompositeType(ta1.BaseType, ta2.BaseType);
+                        var ret = CompositeType(ta1.ElementType, ta2.ElementType);
                         if (ret == null) {
                             return null;
                         }
@@ -699,18 +711,18 @@ namespace AnsiCParser {
                         continue;
                     }
 
-                    if (t1 is TypedefedType) {
+                    if (t1 is TypedefType) {
                         // typedef型については宣言時に警告を出し、使用時には警告を出さない。
                         return false;
                     }
 
                     if (t1 is PointerType) {
-                        t1 = (t1 as PointerType).BaseType;
+                        t1 = (t1 as PointerType).ReferencedType;
                         continue;
                     }
 
                     if (t1 is ArrayType) {
-                        t1 = (t1 as ArrayType).BaseType;
+                        t1 = (t1 as ArrayType).ElementType;
                         continue;
                     }
 

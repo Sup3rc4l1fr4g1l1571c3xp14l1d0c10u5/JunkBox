@@ -7,10 +7,10 @@ namespace AnsiCParser {
     [Flags]
     public enum FunctionSpecifier {
         None = 0x0000,
-        Inline = 0x0001,
+        Inline = 0x0001
     }
 
-    public static partial class FunctionSpecifierExt {
+    public static class FunctionSpecifierExt {
         public static FunctionSpecifier Marge(this FunctionSpecifier self, FunctionSpecifier other) {
             return self | other;
         }

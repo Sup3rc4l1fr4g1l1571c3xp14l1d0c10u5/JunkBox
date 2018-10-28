@@ -30,8 +30,8 @@ namespace DataType {
         public static TResult Accept<TResult, TArg>(this TaggedType.StructUnionType self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnStructUnionType(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this TypedefedType self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnTypedefedType(self, value);
+        public static TResult Accept<TResult, TArg>(this TypedefType self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnTypedefType(self, value);
         }
         public static TResult Accept<TResult, TArg>(this TypeQualifierType self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnTypeQualifierType(self, value);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using AnsiCParser.DataType;
 using AnsiCParser.SyntaxTree;
 
@@ -183,7 +184,7 @@ namespace AnsiCParser {
                 } else {
                     Push(v);
                 }
-                CheckStackDepth(sdp+1);
+                CheckStackDepth(sdp + 1);
             }
 
             public void Add(CType type) {
@@ -303,7 +304,7 @@ namespace AnsiCParser {
                     } else {
                         LoadI32("%ecx"); // rhs
                         LoadI32("%eax"); // lhs
-                         Emit("subl %ecx, %eax");
+                        Emit("subl %ecx, %eax");
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
@@ -977,7 +978,7 @@ namespace AnsiCParser {
                             break;
                         case 3:
                         case 4:
-                            LoadI32("%ecx"); // ToDo: float のコピーにLoadI32を転用しているのを修正
+                            LoadI32("%ecx");
                             Emit("movl %ecx, (%eax)");
                             Emit("pushl %ecx");
                             Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -1140,12 +1141,12 @@ namespace AnsiCParser {
                     Push(value);
                     Ne(CType.CreateSignedInt());
                 }
-                 CheckStackDepth(sdp);
-               LoadI32("%eax");
+                CheckStackDepth(sdp);
+                LoadI32("%eax");
                 Emit("cmpl $0, %eax");
                 Emit($"jne {label}");
-                 CheckStackDepth(sdp - 1);
-           }
+                CheckStackDepth(sdp - 1);
+            }
 
             public void EmitLoadTrue() {
                 Emit("pushl $1");
@@ -1689,6 +1690,7 @@ namespace AnsiCParser {
                 LoadVariableAddress("%eax");
                 Emit($"addl ${offset}, %eax");
                 Emit("pushl %eax");
+
                 Push(new Value { Kind = Value.ValueKind.Address, Type = type, StackPos = _stack.Count });
             }
 
@@ -1809,66 +1811,76 @@ namespace AnsiCParser {
                             return;
                         }
                     case Value.ValueKind.Temp: {
-                        //if (valueType.Sizeof() <= 4) {
-                        //    // スタックトップの値をレジスタにロード
-                        //    Emit($"popl {register}");
-                        //    return;
-                        //} else {
-                        //    throw new NotImplementedException();
-                        //}
-                        BasicType.TypeKind kind;
-                        if (valueType.Unwrap() is BasicType) {
-                            kind = (valueType.Unwrap() as BasicType).Kind;
-                        } else if (valueType.IsEnumeratedType()) {
-                            kind = BasicType.TypeKind.SignedInt;
-                        } else if (valueType.IsPointerType()) {
-                            kind = BasicType.TypeKind.UnsignedInt;
-                        } else {
-                            throw new Exception("整数定数値の型が不正です");
-                        }
-                        switch (kind) {
-                            case BasicType.TypeKind.Char:
-                            case BasicType.TypeKind.SignedChar:
-                                Emit($"popl {register}");
-                                Emit($"movsbl {ToByteReg(register)}, {register}");
-                                break;
-                            case BasicType.TypeKind.UnsignedChar:
-                                Emit($"popl {register}");
-                                Emit($"movzbl {ToByteReg(register)}, {register}");
-                                break;
-                            case BasicType.TypeKind.SignedShortInt:
-                                Emit($"popl {register}");
-                                Emit($"movswl {ToWordReg(register)}, {register}");
-                                break;
-                            case BasicType.TypeKind.UnsignedShortInt:
-                                Emit($"popl {register}");
-                                Emit($"movzwl {ToWordReg(register)}, {register}");
-                                break;
-                            case BasicType.TypeKind.SignedInt:
-                            case BasicType.TypeKind.SignedLongInt:
-                                Emit($"popl {register}");
-                                break;
-                            case BasicType.TypeKind.UnsignedInt:
-                            case BasicType.TypeKind.UnsignedLongInt:
-                                Emit($"popl {register}");
-                                break;
-                            case BasicType.TypeKind._Bool:
-                                Emit($"popl {register}");
-                                break;
-                            case BasicType.TypeKind.SignedLongLongInt:
-                            case BasicType.TypeKind.UnsignedLongLongInt:
-                            default:
-                                if (valueType.Sizeof() <= 4) {
+                            //if (valueType.Sizeof() <= 4) {
+                            //    // スタックトップの値をレジスタにロード
+                            //    Emit($"popl {register}");
+                            //    return;
+                            //} else {
+                            //    throw new NotImplementedException();
+                            //}
+                            BasicType.TypeKind kind;
+                            if (valueType.Unwrap() is BasicType) {
+                                kind = (valueType.Unwrap() as BasicType).Kind;
+                            } else if (valueType.IsEnumeratedType()) {
+                                kind = BasicType.TypeKind.SignedInt;
+                            } else if (valueType.IsPointerType()) {
+                                kind = BasicType.TypeKind.UnsignedInt;
+                            } else {
+                                throw new Exception("整数定数値の型が不正です");
+                            }
+                            switch (kind) {
+                                case BasicType.TypeKind.Char:
+                                case BasicType.TypeKind.SignedChar:
+                                    Emit($"popl {register}");
+                                    Emit($"movsbl {ToByteReg(register)}, {register}");
+                                    break;
+                                case BasicType.TypeKind.UnsignedChar:
+                                    Emit($"popl {register}");
+                                    Emit($"movzbl {ToByteReg(register)}, {register}");
+                                    break;
+                                case BasicType.TypeKind.SignedShortInt:
+                                    Emit($"popl {register}");
+                                    Emit($"movswl {ToWordReg(register)}, {register}");
+                                    break;
+                                case BasicType.TypeKind.UnsignedShortInt:
+                                    Emit($"popl {register}");
+                                    Emit($"movzwl {ToWordReg(register)}, {register}");
+                                    break;
+                                case BasicType.TypeKind.SignedInt:
+                                case BasicType.TypeKind.SignedLongInt:
                                     Emit($"popl {register}");
                                     break;
-                                }
-                                throw new Exception("32bitレジスタにロードできないテンポラリ値です。");
-                        }
+                                case BasicType.TypeKind.UnsignedInt:
+                                case BasicType.TypeKind.UnsignedLongInt:
+                                    Emit($"popl {register}");
+                                    break;
+                                case BasicType.TypeKind._Bool:
+                                    Emit($"popl {register}");
+                                    break;
+                                case BasicType.TypeKind.SignedLongLongInt:
+                                case BasicType.TypeKind.UnsignedLongLongInt:
+                                default:
+                                    if (valueType.Sizeof() <= 4) {
+                                        Emit($"popl {register}");
+                                        break;
+                                    }
+                                    throw new Exception("32bitレジスタにロードできないテンポラリ値です。");
+                            }
 
-                        return;
+                            return;
                         }
-                    case Value.ValueKind.FloatConst:
-                        throw new NotImplementedException();
+                    case Value.ValueKind.FloatConst: {
+                            BasicType.TypeKind kind = (valueType.Unwrap() as BasicType).Kind;
+                            // 一時的
+                            if (kind == BasicType.TypeKind.Float) {
+                                var bytes = BitConverter.GetBytes((float)value.FloatConst);
+                                var dword = BitConverter.ToUInt32(bytes, 0);
+                                Emit($"movl ${dword}, {register}");
+                            } else {
+                                throw new Exception("32bitレジスタにfloat型以外の浮動小数定数値はロードできません。");
+                            }
+                            return;
+                        }
                     case Value.ValueKind.Var:
                     case Value.ValueKind.Address: {
                             // 変数値もしくは参照値をレジスタにロード
@@ -1884,7 +1896,7 @@ namespace AnsiCParser {
                                     src = $"({register})";
                                     break;
                                 default:
-                                    throw new NotImplementedException();
+                                    throw new NotImplementedException("こないはず");
                             }
 
                             string op;
@@ -2435,17 +2447,72 @@ namespace AnsiCParser {
                                     throw new NotImplementedException();
                             }
 
-                            // コピー先を確保
-                            Emit($"subl ${StackAlign(valueType.Sizeof())}, %esp");
-                            Emit("movl %esp, %edi");
+                            if (value.Type.IsBitField()) {
+                                var bft = (BitFieldType) value.Type;
+                                // ビットフィールドなので
+                                switch (bft.Sizeof()) {
+                                    case 1:
+                                        Emit($"movb (%esi), %al");
+                                        Emit($"shlb ${7-(bft.BitOffset+bft.BitWidth)}, %al");
+                                        if (bft.IsSignedIntegerType()) {
+                                            Emit($"sarb ${8-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %al");
+                                        }
+                                        else {
+                                            Emit($"shrb ${8-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %al");
+                                        }
+                                        Emit($"movb %al, (%esi)");
+                                        break;
+                                    case 2:
+                                        Emit($"movw (%esi), %ax");
+                                        Emit($"shlw ${16-(bft.BitOffset+bft.BitWidth)}, %ax");
+                                        if (bft.IsSignedIntegerType()) {
+                                            Emit($"sarw ${16-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %ax");
+                                        }
+                                        else {
+                                            Emit($"shrw ${16-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %ax");
+                                        }
+                                        Emit($"movw %ax, (%esi)");
+                                        break;
+                                    case 4:
+                                        Emit($"movl (%esi), %eax");
+                                        Emit($"shll ${32-(bft.BitOffset+bft.BitWidth)}, %eax");
+                                        if (bft.IsSignedIntegerType()) {
+                                            Emit($"sarl ${32-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %eax");
+                                        }
+                                        else {
+                                            Emit($"shrl ${32-(bft.BitOffset+bft.BitWidth) + bft.BitOffset}, %eax");
+                                        }
+                                        Emit($"movl %eax, (%esi)");
+                                        break;
+                                    case 8:
+                                        default:
+                                        throw new NotSupportedException();
+                                }
 
-                            // 転送
-                            Emit("pushl %ecx");
-                            Emit($"movl ${valueType.Sizeof()}, %ecx");
-                            Emit("cld");
-                            Emit("rep movsb");
-                            Emit("popl %ecx");
+                                // コピー先を確保
+                                Emit($"subl ${StackAlign(valueType.Sizeof())}, %esp");
+                                Emit("movl %esp, %edi");
 
+                                // 転送
+                                Emit("pushl %ecx");
+                                Emit($"movl ${valueType.Sizeof()}, %ecx");
+                                Emit("cld");
+                                Emit("rep movsb");
+                                Emit("popl %ecx");
+
+                            } else {
+
+                                // コピー先を確保
+                                Emit($"subl ${StackAlign(valueType.Sizeof())}, %esp");
+                                Emit("movl %esp, %edi");
+
+                                // 転送
+                                Emit("pushl %ecx");
+                                Emit($"movl ${valueType.Sizeof()}, %ecx");
+                                Emit("cld");
+                                Emit("rep movsb");
+                                Emit("popl %ecx");
+                            }
                             Pop();
                             Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                         }
@@ -2820,6 +2887,10 @@ namespace AnsiCParser {
                         break;
                     case Value.ValueKind.Temp:
                         // nothing
+                        break;
+                    case Value.ValueKind.IntConst:
+                        Pop();
+                        Push(new Value { Kind = Value.ValueKind.IntConst, Type = type , IntConst = operand.IntConst});
                         break;
                     default:
                         throw new NotImplementedException();
@@ -3259,10 +3330,17 @@ namespace AnsiCParser {
                     // 引数（先頭から）
                     _context.Arguments.Clear();
                     var vars = new List<string>();
-                    foreach (var arg in ft.Arguments) {
-                        vars.Add($"#   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
-                        _context.Arguments.Add(arg.Ident.Raw, offset);
-                        offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
+                    if (ft.Arguments != null) {
+                        if (ft.Arguments.Length == 1 && ft.Arguments[0].Type.IsVoidType()) {
+                            // skip
+                            vars.Add($"#   type=void");
+                        } else {
+                            foreach (var arg in ft.Arguments) {
+                                vars.Add($"#   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
+                                _context.Arguments.Add(arg.Ident.Raw, offset);
+                                offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
+                            }
+                        }
                     }
 
                     // ラベル
@@ -3842,8 +3920,8 @@ namespace AnsiCParser {
             }
 
             public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
-                var elementSize = self.Type.BaseType.Sizeof();
-                var v = new Value(value) { Type = self.Type.BaseType };
+                var elementSize = self.Type.ElementType.Sizeof();
+                var v = new Value(value) { Type = self.Type.ElementType };
                 foreach (var init in self.Inits) {
                     init.Accept(this, v);
                     switch (v.Kind) {
@@ -3947,7 +4025,7 @@ namespace AnsiCParser {
                 var prevLocalScopeSize = _localScopeTotalSize;
 
                 _context.Generator.Emit("# enter scope");
-                foreach (var x in self.DeclsOrStmts.Where(x => x is Declaration).Cast< Declaration>().Reverse<Declaration>()) {
+                foreach (var x in self.DeclsOrStmts.Where(x => x is Declaration).Cast<Declaration>().Reverse<Declaration>()) {
                     if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
                         if (x.StorageClass == StorageClassSpecifier.Static) {
                             // static
@@ -4001,19 +4079,21 @@ namespace AnsiCParser {
 
             public Value OnDoWhileStatement(Statement.DoWhileStatement self, Value value) {
                 _context.Generator.Emit($"# {self.LocationRange}");
+                var labelHead = _context.Generator.LabelAlloc();
                 var labelContinue = _context.Generator.LabelAlloc();
                 var labelBreak = _context.Generator.LabelAlloc();
 
                 // Check Loop Condition
-                _context.Generator.Label(labelContinue);
+                _context.Generator.Label(labelHead);
                 _context.ContinueTarget.Push(labelContinue);
                 _context.BreakTarget.Push(labelBreak);
                 self.Stmt.Accept(this, value);
                 _context.ContinueTarget.Pop();
                 _context.BreakTarget.Pop();
 
+                _context.Generator.Label(labelContinue);
                 self.Cond.Accept(this, value);
-                _context.Generator.JmpTrue(labelContinue);
+                _context.Generator.JmpTrue(labelHead);
                 _context.Generator.Label(labelBreak);
                 return new Value { Kind = Value.ValueKind.Void };
             }
@@ -4332,6 +4412,20 @@ namespace AnsiCParser {
             }
 
             public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
+                var lv = self.Lhs.Accept(this, value);
+                var rv = self.Rhs.Accept(this, value);
+                if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.IntConst) {
+                    lv.IntConst += rv.IntConst;
+                    return lv;
+                } 
+                if (lv.Kind == Value.ValueKind.Ref && rv.Kind == Value.ValueKind.IntConst) {
+                    lv.Offset += (int)rv.IntConst;
+                    return lv;
+                } 
+                if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.Ref) {
+                    lv.Offset += (int)rv.IntConst;
+                    return lv;
+                } 
                 throw new NotImplementedException();
             }
 
@@ -4488,7 +4582,9 @@ namespace AnsiCParser {
             }
 
             public Value OnTypeConversionExpression(Expression.TypeConversionExpression self, Value value) {
-                throw new NotImplementedException();
+                var v = self.Expr.Accept(this, value);
+                v.Type = self.Type;
+                return v;
             }
 
             public Value OnUnaryAddressExpression(Expression.UnaryAddressExpression self, Value value) {
@@ -4553,7 +4649,7 @@ namespace AnsiCParser {
                 }
 
                 var arrayType = self.Type.Unwrap() as ArrayType;
-                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.BaseType.Sizeof();
+                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.Sizeof();
                 while (filledSize > 0) {
                     if (filledSize >= 4) {
                         _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));

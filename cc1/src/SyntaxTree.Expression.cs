@@ -540,34 +540,44 @@ namespace AnsiCParser.SyntaxTree {
                     throw new CompilerException.TypeMissmatchError(LocationRange.Start, LocationRange.End, "呼び出される関数を表す式は，void を返す関数へのポインタ型，又は配列型以外のオブジェクト型を返す関数へのポインタ型をもたなければならない");
                     Valid:
                     if (functionType.Arguments != null) {
-                        // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
-                        if (functionType.HasVariadic) { // 可変長引数を持つ
-                            if (functionType.Arguments.Length > args.Count) {
-                                throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)よりも少ない。");
-                            }
-                        } else {
-                            if (functionType.Arguments.Length != args.Count) {
-                                throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)と一致しない。");
+                        if (functionType.Arguments.Length == 1 && functionType.Arguments[0].Type.IsVoidType()) {
+                            if (0 != args.Count) {
+                                throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数(0個)と一致しない。");
                             }
                         }
-                        // 関数が呼び出される又は定義されるときには完全型になっていなければならない。
-                        // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
-                        for (var i = 0; i < functionType.Arguments.Length; i++) {
-                            var targ = functionType.Arguments[i];
-                            if (targ.Type.IsIncompleteType()) {
-                                throw new CompilerException.SpecificationErrorException(targ.Range, $"呼び出し先の関数の引数が不完全型をもっています。");
+                        else {
+                            // 呼び出される関数を表す式が関数原型を含む型をもつ場合，実引数の個数は，仮引数の個数と一致しなければならない。
+                            if (functionType.HasVariadic) {
+                                // 可変長引数を持つ
+                                if (functionType.Arguments.Length > args.Count) {
+                                    throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)よりも少ない。");
+                                }
                             }
-                            var lhs = targ.Type.UnwrapTypeQualifier();
-                            var rhs = args[i];
-                            args[i] = AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
-                        }
+                            else {
+                                if (functionType.Arguments.Length != args.Count) {
+                                    throw new CompilerException.SpecificationErrorException(LocationRange.Start, LocationRange.End, $"実引数の個数({args.Count}個)が，仮引数の個数({functionType.Arguments.Length}個)と一致しない。");
+                                }
+                            }
 
-                        if (functionType.HasVariadic) {
-                            for (var i = functionType.Arguments.Length; i < args.Count; i++) {
-                                args[i] = TypeConversionExpression.Apply(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
+                            // 関数が呼び出される又は定義されるときには完全型になっていなければならない。
+                            // 各実引数は，対応する仮引数の型の非修飾版をもつオブジェクトにその値を代入することのできる型をもたなければならない。
+                            for (var i = 0; i < functionType.Arguments.Length; i++) {
+                                var targ = functionType.Arguments[i];
+                                if (targ.Type.IsIncompleteType()) {
+                                    throw new CompilerException.SpecificationErrorException(targ.Range, $"呼び出し先の関数の引数が不完全型をもっています。");
+                                }
+
+                                var lhs = targ.Type.UnwrapTypeQualifier();
+                                var rhs = args[i];
+                                args[i] = AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(rhs.LocationRange, lhs, rhs);
+                            }
+
+                            if (functionType.HasVariadic) {
+                                for (var i = functionType.Arguments.Length; i < args.Count; i++) {
+                                    args[i] = TypeConversionExpression.Apply(args[i].LocationRange, args[i].Type.DefaultArgumentPromotion(), args[i]);
+                                }
                             }
                         }
-
                     } else {
                         // 呼び出される関数を表す式が，関数原型を含まない型をもつ場合，各実引数に対して既定の実引数拡張を行う。
                         args = args.Select(x => (Expression)TypeConversionExpression.Apply(x.LocationRange, Specification.DefaultArgumentPromotion(x.Type), x)).ToList();
@@ -1699,10 +1709,10 @@ namespace AnsiCParser.SyntaxTree {
                         thenExpr = thenExprPtr;
                         elseExpr = elseExprPtr;
 
-                        if (Specification.IsCompatible(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType()) == false) {
+                        if (Specification.IsCompatible(thenExpr.Type.GetBasePointerType().Unwrap(), elseExpr.Type.GetBasePointerType().Unwrap()) == false) {
                             throw new CompilerException.SpecificationErrorException(thenExpr.LocationRange.Start, elseExpr.LocationRange.End, "条件演算子の第 2, 第 3 オペランドが適合する型ではない。");
                         }
-                        var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType(), elseExpr.Type.GetBasePointerType());
+                        var baseType = CType.CompositeType(thenExpr.Type.GetBasePointerType().Unwrap(), elseExpr.Type.GetBasePointerType().Unwrap());
                         Debug.Assert(baseType != null);
                         TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);

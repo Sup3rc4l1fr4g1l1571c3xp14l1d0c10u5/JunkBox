@@ -12,7 +12,7 @@ namespace AnsiCParser {
 
             public Schene.Pair OnArrayType(DataType.ArrayType self, Schene.Pair value) {
                 _visited.Add(self);
-                return Schene.Util.makeList(Schene.Util.makeSym("array"), Schene.Util.makeNum(self.Length), self.BaseType.Accept(this, null));
+                return Schene.Util.makeList(Schene.Util.makeSym("array"), Schene.Util.makeNum(self.Length), self.ElementType.Accept(this, null));
             }
 
             public Schene.Pair OnBasicType(DataType.BasicType self, Schene.Pair value) {
@@ -110,7 +110,7 @@ namespace AnsiCParser {
 
             public Schene.Pair OnPointerType(DataType.PointerType self, Schene.Pair value) {
                 _visited.Add(self);
-                return Schene.Util.makeList(Schene.Util.makeSym("pointer"), self.BaseType.Accept(this, null));
+                return Schene.Util.makeList(Schene.Util.makeSym("pointer"), self.ReferencedType.Accept(this, null));
             }
 
             public Schene.Pair OnStructUnionType(DataType.TaggedType.StructUnionType self, Schene.Pair value) {
@@ -145,7 +145,7 @@ namespace AnsiCParser {
                 return Schene.Util.makeList(Schene.Util.makeSym("$"));
             }
 
-            public Schene.Pair OnTypedefedType(DataType.TypedefedType self, Schene.Pair value) {
+            public Schene.Pair OnTypedefType(DataType.TypedefType self, Schene.Pair value) {
                 _visited.Add(self);
                 return Schene.Util.makeList(Schene.Util.makeSym("typedef"), Schene.Util.makeStr(self.Ident?.Raw));
             }

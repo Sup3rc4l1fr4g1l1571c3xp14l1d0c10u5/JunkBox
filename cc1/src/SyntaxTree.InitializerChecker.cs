@@ -178,7 +178,7 @@ namespace AnsiCParser.SyntaxTree {
                 if (it.Current == null) {
                     break;
                 }
-                assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
+                assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
             }
             if (type.Length == -1) {
                 // 型の長さを確定させる
@@ -199,7 +199,16 @@ namespace AnsiCParser.SyntaxTree {
         /// <returns></returns>
         private static Initializer CheckInitializerArrayByStringExpressionInitializerToCharArray(int depth, ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
             // 文字配列が対象の場合
-            var sexpr = it.AsSimpleInitializer().AssignmentExpression as Expression.PrimaryExpression.StringExpression;
+            var expr = it.AsSimpleInitializer().AssignmentExpression;
+            while (expr is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                expr = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression) expr).ParenthesesExpression;
+            }
+
+            if (!(expr is Expression.PrimaryExpression.StringExpression)) {
+                throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "文字列以外が文字配列型に単純初期化子として与えられている。");
+            }
+
+            var sexpr = expr as Expression.PrimaryExpression.StringExpression;
             if (type.Length == -1) {
                 if (depth != 1) {
                     throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
@@ -209,7 +218,7 @@ namespace AnsiCParser.SyntaxTree {
                 var loc = it.Current.LocationRange;
                 var len = sexpr.Value.Count;
                 foreach (var b in sexpr.Value) {
-                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.BaseType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
+                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.ElementType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
                 }
                 // 型の長さを確定させる
                 type.Length = len;
@@ -225,7 +234,7 @@ namespace AnsiCParser.SyntaxTree {
                 List<Initializer> assigns = new List<Initializer>();
                 var loc = it.Current.LocationRange;
                 foreach (var b in sexpr.Value.Take(len)) {
-                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.BaseType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
+                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.ElementType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
                 }
                 it.Next();
                 return new Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -251,7 +260,7 @@ namespace AnsiCParser.SyntaxTree {
                 var loc = it.Current.LocationRange;
                 var len = 0;
                 while (it.Current != null) {
-                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
+                    assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
                     len++;
                 }
                 // 型の長さを確定させる
@@ -263,7 +272,7 @@ namespace AnsiCParser.SyntaxTree {
                 List<Initializer> assigns = new List<Initializer>();
                 var loc = it.Current.LocationRange;
                 while (it.Current != null && len > 0) {
-                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
+                    assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
                     len--;
                 }
                 return new Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -279,7 +288,7 @@ namespace AnsiCParser.SyntaxTree {
         /// <param name="isLocalVariableInit"></param>
         /// <returns></returns>
         private static Initializer CheckInitializerArrayByStringExpressionInitializer(int depth, ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
-            if (type.BaseType.IsBasicType(BasicType.TypeKind.Char, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar)) {
+            if (type.ElementType.IsBasicType(BasicType.TypeKind.Char, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar)) {
                 return CheckInitializerArrayByStringExpressionInitializerToCharArray(depth, type, it, isLocalVariableInit);
             }
 
@@ -305,7 +314,7 @@ namespace AnsiCParser.SyntaxTree {
                 var loc = it.Current.LocationRange;
                 var len = 0;
                 while (it.Current != null) {
-                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
+                    assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
                     len++;
                 }
                 // 型の長さを確定させる
@@ -317,7 +326,7 @@ namespace AnsiCParser.SyntaxTree {
                 List<Initializer> assigns = new List<Initializer>();
                 var loc = it.Current.LocationRange;
                 while (it.Current != null && len > 0) {
-                    assigns.Add(CheckInitializerBase(depth, type.BaseType, it, isLocalVariableInit));
+                    assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
                     len--;
                 }
                 return new Initializer.ArrayAssignInitializer(loc, type, assigns);
@@ -333,8 +342,15 @@ namespace AnsiCParser.SyntaxTree {
         /// <param name="isLocalVariableInit"></param>
         /// <returns></returns>
         private static Initializer CheckInitializerArrayBySimpleInitializer(int depth, ArrayType type, InitializerIterator it, bool isLocalVariableInit) {
-            if (it.AsSimpleInitializer().AssignmentExpression is Expression.PrimaryExpression.StringExpression) {
-                return CheckInitializerArrayByStringExpressionInitializer(depth, type, it, isLocalVariableInit);
+            if (it.IsSimpleInitializer()) {
+                Expression ae = it.AsSimpleInitializer().AssignmentExpression;
+                while (ae is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                    ae = ((Expression.PrimaryExpression.EnclosedInParenthesesExpression) ae).ParenthesesExpression;
+                }
+                if (ae is Expression.PrimaryExpression.StringExpression) {
+                    return CheckInitializerArrayByStringExpressionInitializer(depth, type, it, isLocalVariableInit);
+                }
+                //throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "配列型に対する単純初期化式の要素が文字列ではありません。");
             }
 
             if (it.IsInComplexInitializer()) {

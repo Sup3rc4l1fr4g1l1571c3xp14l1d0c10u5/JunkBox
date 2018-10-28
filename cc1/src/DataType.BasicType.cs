@@ -71,7 +71,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override CType Duplicate() {
-                return this;    // new BasicType(this.Kind);
+                return this;
             }
 
             public static BasicType FromTypeSpecifier(TypeSpecifier typeSpecifier) {

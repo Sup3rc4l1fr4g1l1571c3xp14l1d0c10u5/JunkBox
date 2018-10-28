@@ -39,9 +39,9 @@ namespace AnsiCParser {
         /// </summary>
         private static string FS { get; } = @"(?:f|F|l|L)?";
 
-        /// <summary>
-        /// 整数数形式のサフィックスに一致する正規表現。
-        /// </summary>
+        ///// <summary>
+        ///// 整数数形式のサフィックスに一致する正規表現。
+        ///// </summary>
         //private static string IS { get; } = @"(?:u|U|l|L)*";
 
         /// <summary>
@@ -54,19 +54,19 @@ namespace AnsiCParser {
         /// </summary>
         private static Regex RegexHeximalFloat { get; } = new Regex($@"^0[xX](?<Fact>(?:{H}*?\.{H}+|{H}+\.?))[pP](?<Exp>[\+\-]?{D}+)(?<Suffix>{FS})$", RegexOptions.Compiled);
 
-        /// <summary>
-        /// 10進数形式に一致する正規表現
-        /// </summary>
+        ///// <summary>
+        ///// 10進数形式に一致する正規表現
+        ///// </summary>
         //private static Regex RegexDecimal { get; } = new Regex($@"^(?<Body>{D}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
-        /// <summary>
-        /// 16進数形式に一致する正規表現
-        /// </summary>
+        ///// <summary>
+        ///// 16進数形式に一致する正規表現
+        ///// </summary>
         //private static Regex RegexHeximal { get; } = new Regex($@"^0[xX](?<Body>{H}+)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
-        /// <summary>
-        /// 8進数形式に一致する正規表現
-        /// </summary>
+        ///// <summary>
+        ///// 8進数形式に一致する正規表現
+        ///// </summary>
         //private static Regex RegexOctal { get; } = new Regex($@"^(?<Body>0{D}*)(?<Suffix>{IS})$", RegexOptions.Compiled);
 
         /// <summary>
@@ -75,13 +75,13 @@ namespace AnsiCParser {
         /// <param name="str"></param>
         /// <returns></returns>
         public static Tuple<int, string, string, string> ScanFloat(string str) {
-            var m = RegexDecimalFloat.Match(str);
-            if (m.Success) {
-                return Tuple.Create(10, m.Groups["Body"].Value, "", String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
-            }
-            m = RegexHeximalFloat.Match(str);
+            var m = RegexHeximalFloat.Match(str);
             if (m.Success) {
                 return Tuple.Create(16, m.Groups["Fact"].Value, m.Groups["Exp"].Value, String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
+            }
+            m = RegexDecimalFloat.Match(str);
+            if (m.Success) {
+                return Tuple.Create(10, m.Groups["Body"].Value, "", String.Concat(m.Groups["Suffix"].Value.ToCharArray().OrderBy(x => x)));
             }
             throw new Exception();
         }
@@ -124,17 +124,6 @@ namespace AnsiCParser {
             // 8進数形式に一致する正規表現
             //   ^0(?<Body>{D}+)(?<Suffix>{IS})$
 
-            //   ^{D}+      {E} {FS}$ = DFloat
-            //   ^{D}+\.{D}*{E}?{FS}$ = DFloat
-            //   ^    \.{D}+{E}?{FS}$ = DFloat
-            //   ^{D}+{IS}$ = DInt
-            //   ^0[xX]    \.{H}+[pP][\+\-]?{D}+{FS}$ = HFloat
-            //   ^0[xX]{H}+\.{H}+[pP][\+\-]?{D}+{FS}$ = HFloat
-            //   ^0[xX]{H}+      [pP][\+\-]?{D}+{FS}$ = HFloat
-            //   ^0[xX]{H}+\.    [pP][\+\-]?{D}+{FS}$ = HFloat
-            //   ^0[xX]{H}+{IS}$ = HInt
-            //   ^0{D}+{IS}$ = OInt
-
             private string _str;
             private int _index;
 
@@ -167,11 +156,13 @@ namespace AnsiCParser {
                 }
                 return true;
             }
+
             private void ManyHex() {
                 while (IsHexDigit(CurrentCh)) {
                     NextCh();
                 }
             }
+
             private void IntSuffix() {
                 while (IsIntSuffix(CurrentCh)) {
                     NextCh();
@@ -1090,8 +1081,8 @@ namespace AnsiCParser {
         /// 現在のトークンの読み取り位置
         /// </summary>
         private int _currentTokenPos;
-        /// <summary>
 
+        /// <summary>
         /// 読み取り位置情報の保存スタック
         /// </summary>
         private readonly Stack<int> _contextSaveStack = new Stack<int>();
@@ -1142,7 +1133,7 @@ namespace AnsiCParser {
             if (n < 0) {
                 throw new ArgumentOutOfRangeException($"{nameof(n)}に負数が与えられた。");
             }
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 if (_inputText[_inputPos + i] == '\n') {
                     _line++;
                     _column = 1;
@@ -1292,12 +1283,14 @@ namespace AnsiCParser {
             if (Peek('#')) {
                 if (_beginOfLine) {
                     // 前処理指令（#lineや#pragma等）
-                    while (Peek('\n') == false) {
+                    while (Peek() != -1 && Peek('\n') == false) {
                         IncPos(1);
                     }
                     var end = GetCurrentLocationWithInputPos();
                     var str = Substring(start.Item2, end.Item2);
-                    IncPos(1);
+                    if (Peek() != -1) {
+                        IncPos(1);
+                    }
 
                     {
                         // line 指令

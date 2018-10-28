@@ -98,10 +98,6 @@ namespace AnsiCParser.SyntaxTree {
             public SimpleAssignInitializer(LocationRange locationRange, CType type, Expression expr) : base(locationRange) {
                 Type = type;
                 Expr = Specification.TypeConvert(type, expr);
-                if (!CType.IsEqual(Type,Expr.Type))
-                {
-                    System.Diagnostics.Debugger.Break();
-                }
             }
         }
 

@@ -239,7 +239,7 @@ namespace AnsiCParser.SyntaxTree {
                                 throw new NotSupportedException();
                         }
                     } else if (self.Type.Unwrap().IsPointerType()) {
-                        return new Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.SignedInt));
+                        return new Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", ret.LongValue(), BasicType.TypeKind.SignedInt));
                     } else {
                         throw new NotSupportedException();
                     }
@@ -456,11 +456,27 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnMemberDirectAccess(Expression.PostfixExpression.MemberDirectAccess self, Expression value) {
-                throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式がメンバアクセス演算子を含んでいます。");
+                throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中に直接メンバアクセス演算子が含まれています。");
             }
 
             public Expression OnMemberIndirectAccess(Expression.PostfixExpression.MemberIndirectAccess self, Expression value) {
-                throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式がメンバアクセス演算子を含んでいます。");
+                var expr = this.AcceptTo(self.Expr, value);
+                if (!(expr is Expression.PrimaryExpression.AddressConstantExpression)) {
+                    throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中ではアドレス定数以外に間接メンバアクセス演算子を適用できません。");
+                }
+
+                var addrConstExpr = expr as Expression.PrimaryExpression.AddressConstantExpression;
+                return new Expression.PrimaryExpression.AddressConstantExpression(
+                    self.LocationRange, 
+                    addrConstExpr.Identifier, 
+                    self.MemberInfo.Type, 
+                    new Expression.PrimaryExpression.Constant.IntegerConstant(
+                        self.LocationRange, 
+                        "", 
+                        self.MemberInfo.Offset + addrConstExpr.Offset.Value, 
+                        BasicType.TypeKind.SignedInt
+                    )
+                );
             }
 
             public Expression OnMultiplicitiveExpression(Expression.MultiplicitiveExpression self, Expression value) {
@@ -726,7 +742,12 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, Expression value) {
-                throw new Exception();
+                if (!(self.Expr is Expression.UnaryAddressExpression)) {
+                    throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式中でアドレス演算子と対にならない間接演算子が使用されています。");
+                }
+                else {
+                    return this.AcceptTo(self.Expr, value);
+                }
             }
 
             public Expression OnUndefinedIdentifierExpression(Expression.PrimaryExpression.IdentifierExpression.UndefinedIdentifierExpression self, Expression value) {

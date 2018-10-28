@@ -12,7 +12,7 @@ namespace AnsiCParser {
             /// <param name="type">要素型</param>
             public ArrayType(int length, CType type) {
                 Length = length;
-                BaseType = type;
+                ElementType = type;
             }
 
             /// <summary>
@@ -20,7 +20,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override CType Duplicate() {
-                return new ArrayType(Length, BaseType);
+                return new ArrayType(Length, ElementType);
             }
 
             /// <summary>
@@ -33,7 +33,7 @@ namespace AnsiCParser {
             /// <summary>
             /// 要素型
             /// </summary>
-            public CType BaseType {
+            public CType ElementType {
                 get; private set;
             }
 
@@ -42,17 +42,17 @@ namespace AnsiCParser {
             /// </summary>
             /// <param name="type"></param>
             public override void Fixup(CType type) {
-                if (BaseType is StubType) {
-                    BaseType = type;
+                if (ElementType is StubType) {
+                    ElementType = type;
                 } else {
-                    BaseType.Fixup(type);
+                    ElementType.Fixup(type);
                 }
                 // 6.2.5 (36) オブジェクト型は不完全型を含まないので，不完全型の配列は作ることができない。
                 // 「不完全配列」と「不完全型の配列」は違うので注意
-                if (BaseType.IsIncompleteType()) {
+                if (ElementType.IsIncompleteType()) {
                     throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "不完全型の配列を作ることはできない");
                 }
-                if (BaseType.Unwrap().IsContainFlexibleArrayMemberStruct()) {
+                if (ElementType.Unwrap().IsContainFlexibleArrayMemberStruct()) {
                     throw new CompilerException.SpecificationErrorException(LocationRange.Empty, "フレキシブル配列メンバを持つ要素の配列を作ることはできない");
                 }
             }
@@ -62,7 +62,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int Sizeof() {
-                return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : BaseType.Sizeof() * Length;
+                return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : ElementType.Sizeof() * Length;
             }
 
         }

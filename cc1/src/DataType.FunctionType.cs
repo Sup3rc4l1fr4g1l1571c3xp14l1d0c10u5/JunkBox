@@ -9,7 +9,6 @@ namespace AnsiCParser {
         ///     関数型
         /// </summary>
         public class FunctionType : CType {
-            private ArgumentInfo[] _arguments;
             public Scope<TaggedType> PrototypeScope {
                 get;
             }
@@ -43,40 +42,43 @@ namespace AnsiCParser {
             ///     仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
             /// </summary>
             public ArgumentInfo[] Arguments {
-                get {
-                    return _arguments;
-                }
-                set {
-                    if (value != null) {
-                        // 6.7.5.3 関数宣言子（関数原型を含む）
-                        // 制約 
-                        // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
-                        foreach (var arg in value) {
-                            if (arg.StorageClass != StorageClassSpecifier.None && arg.StorageClass != StorageClassSpecifier.Register) {
-                                throw new CompilerException.SpecificationErrorException(arg.Range, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
-                            }
-                            if (arg.Type.IsFunctionType()) {
-                                // 仮引数を“～型を返却する関数”とする宣言は，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整する。
-                                Logger.Warning(arg.Range, "仮引数は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
-                                arg.Type = CreatePointer(arg.Type);
-                            }
+                get; private set;
+            }
+
+            /// <summary>
+            /// 引数情報の設定
+            /// </summary>
+            /// <param name="value"></param>
+            public void SetArguments(ArgumentInfo[] value) {
+                if (value != null) {
+                    // 6.7.5.3 関数宣言子（関数原型を含む）
+                    // 制約 
+                    // 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
+                    foreach (var arg in value) {
+                        if (arg.StorageClass != StorageClassSpecifier.None && arg.StorageClass != StorageClassSpecifier.Register) {
+                            throw new CompilerException.SpecificationErrorException(arg.Range, "仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。");
                         }
-                        // 意味規則
-                        // 並びの中の唯一の項目が void 型で名前のない仮引数であるという特別な場合，関数が仮引数をもたないことを指定する。
-                        if (value.Any(x => x.Type.IsVoidType())) {
-                            if (value.Length != 1) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並びがvoid 型を含むが唯一ではない。");
-                            }
-                            if (value.First().Ident != null) {
-                                throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並び中のvoid型が名前を持っている。");
-                            }
-                            // 空で置き換える。
-                            value = new ArgumentInfo[0];
+                        if (arg.Type.IsFunctionType()) {
+                            // 仮引数を“～型を返却する関数”とする宣言は，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整する。
+                            Logger.Warning(arg.Range, "仮引数は“～型を返却する関数”として宣言されていますが，6.3.2.1 の規定に従い，“～型を返却する関数へのポインタ”に型調整します。");
+                            arg.Type = CreatePointer(arg.Type);
                         }
                     }
-
-                    _arguments = value;
+                    // 意味規則
+                    // 並びの中の唯一の項目が void 型で名前のない仮引数であるという特別な場合，関数が仮引数をもたないことを指定する。
+                    if (value.Any(x => x.Type.IsVoidType())) {
+                        if (value.Length != 1) {
+                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並びがvoid 型を含むが唯一ではない。");
+                        }
+                        if (value.First().Ident != null) {
+                            throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "仮引数宣言並び中のvoid型が名前を持っている。");
+                        }
+                        // 空で置き換える。
+                        value = new ArgumentInfo[0];
+                    }
                 }
+
+                Arguments = value;
             }
 
             /// <summary>

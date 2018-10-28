@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using AnsiCParser.DataType;
 
 namespace AnsiCParser {
-    public static partial class Ext {
+    public static class Ext {
         private class LambdaEqualityComparer<TSource> : IEqualityComparer<TSource> {
 
             public LambdaEqualityComparer(Func<TSource, TSource, bool> comparer) {

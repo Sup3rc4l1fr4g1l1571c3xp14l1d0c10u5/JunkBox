@@ -115,7 +115,7 @@ namespace AnsiCParser {
                 if (at.Length == -1) {
                     return true;
                 }
-                return at.BaseType.IsIncompleteType();
+                return at.ElementType.IsIncompleteType();
             }
             // 内容の分からない構造体型又は共用体型
             if (unwrappedSelf is TaggedType.StructUnionType) {
@@ -368,7 +368,7 @@ namespace AnsiCParser {
         public static bool IsArrayType(this CType self, out CType elementType) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf is ArrayType) {
-                elementType = (unwrappedSelf as ArrayType).BaseType;
+                elementType = (unwrappedSelf as ArrayType).ElementType;
                 return true;
             } else {
                 elementType = null;
@@ -386,7 +386,7 @@ namespace AnsiCParser {
         public static bool IsArrayType(this CType self, out CType elementType, out int len) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf is ArrayType) {
-                elementType = (unwrappedSelf as ArrayType).BaseType;
+                elementType = (unwrappedSelf as ArrayType).ElementType;
                 len = (unwrappedSelf as ArrayType).Length;
                 return true;
             } else {
@@ -468,7 +468,7 @@ namespace AnsiCParser {
         public static bool IsPointerType(this CType self, out CType referencedType) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf is PointerType) {
-                referencedType = (unwrappedSelf as PointerType).BaseType;
+                referencedType = (unwrappedSelf as PointerType).ReferencedType;
                 return true;
             } else {
                 referencedType = null;
@@ -662,10 +662,11 @@ namespace AnsiCParser {
                     case BasicType.TypeKind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
-                    case BasicType.TypeKind.SignedInt:
-                        // 無条件でint型に変換できる
+                    case BasicType.TypeKind.SignedInt:  // 無条件でint型に変換できる
+                    case BasicType.TypeKind.SignedLongInt:  // sizeof(int) == sizeof(long)に限り変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                     case BasicType.TypeKind.UnsignedInt:
+                    case BasicType.TypeKind.UnsignedLongInt: // sizeof(int) == sizeof(long)に限り変換できる
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
                         if (bitfield.Value == 4 * 8) {
                             // unsigned int でないと表現できない
@@ -1474,12 +1475,12 @@ namespace AnsiCParser {
                 if (ReferenceEquals(t1, t2)) {
                     return true;
                 }
-                if (t1 is TypedefedType || t2 is TypedefedType) {
-                    if (t1 is TypedefedType) {
-                        t1 = (t1 as TypedefedType).Type;
+                if (t1 is TypedefType || t2 is TypedefType) {
+                    if (t1 is TypedefType) {
+                        t1 = (t1 as TypedefType).Type;
                     }
-                    if (t2 is TypedefedType) {
-                        t2 = (t2 as TypedefedType).Type;
+                    if (t2 is TypedefType) {
+                        t2 = (t2 as TypedefType).Type;
                     }
                     continue;
                 }
@@ -1590,8 +1591,8 @@ namespace AnsiCParser {
                 // 6.7.5.1 ポインタ宣言子
                 // 二つのポインタ型が適合するためには，いずれも同一の修飾がなされていなければならず，かつ両者が適合する型へのポインタでなければならない。
                 if (t1 is PointerType && t2 is PointerType) {
-                    t1 = (t1 as PointerType).BaseType;
-                    t2 = (t2 as PointerType).BaseType;
+                    t1 = (t1 as PointerType).ReferencedType;
+                    t2 = (t2 as PointerType).ReferencedType;
                     continue;
                 }
 
@@ -1603,8 +1604,8 @@ namespace AnsiCParser {
                     if (((t1 as ArrayType).Length != -1 && (t2 as ArrayType).Length != -1) && ((t1 as ArrayType).Length != (t2 as ArrayType).Length)) {
                         return false;
                     }
-                    t1 = (t1 as ArrayType).BaseType;
-                    t2 = (t2 as ArrayType).BaseType;
+                    t1 = (t1 as ArrayType).ElementType;
+                    t2 = (t2 as ArrayType).ElementType;
                     continue;
                 }
 

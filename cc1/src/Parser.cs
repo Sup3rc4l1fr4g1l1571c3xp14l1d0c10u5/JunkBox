@@ -24,7 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode _mode = LanguageMode.C99;
+        private LanguageMode _mode = LanguageMode.C89;
 
         /// <summary>
         /// 名前空間(ステートメント ラベル)
@@ -91,11 +91,9 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="type"></param>
-        /// <returns></returns>
-        private Declaration AddImplicitTypeDeclaration(Token ident, CType type) {
+        private void AddImplicitTypeDeclaration(Token ident, CType type) {
             var typeDecl = new Declaration.TypeDeclaration(ident.Range, ident.Raw, type);
             _insertImplicitDeclarationOperatorStack.Peek().Add(typeDecl);
-            return typeDecl;
         }
 
         /// <summary>
@@ -289,8 +287,6 @@ namespace AnsiCParser {
             { "U", new[] { BasicType.TypeKind.UnsignedInt, BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.UnsignedLongLongInt } },
             { "", new[] { BasicType.TypeKind.SignedInt, BasicType.TypeKind.SignedLongInt, BasicType.TypeKind.SignedLongLongInt } }
         };
-
-
 
         /// <summary>
         /// 6.4.4.1 整数定数
@@ -589,12 +585,21 @@ namespace AnsiCParser {
             // その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
             foreach (var entry in _linkageObjectTable.LinkageObjects) {
                 if (entry.Definition == null) {
-                    if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
-                        throw new CompilerException.SpecificationErrorException(entry.TentativeDefinitions.First().LocationRange, "不完全型のままの識別子があります。");
+                    {
+                        var definition = entry.TentativeDefinitions.FirstOrDefault(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType());
+                        if (definition != null) {
+                        //if (entry.TentativeDefinitions.Any(x => x.Type.IsIncompleteType() && !x.Type.IsNoLengthArrayType())) {
+                            throw new CompilerException.SpecificationErrorException(definition.LocationRange, "不完全型のままの識別子があります。");
+                        }
                     }
-                    if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
-                        entry.Definition = entry.TentativeDefinitions[0];
-                        entry.TentativeDefinitions.RemoveAt(0);
+
+                    {
+                        var definition = entry.TentativeDefinitions.FirstOrDefault(x => x.StorageClass != AnsiCParser.StorageClassSpecifier.Extern);
+                        if (definition != null) {
+                        //if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
+                            entry.Definition = entry.TentativeDefinitions[0];
+                            entry.TentativeDefinitions.RemoveAt(0);
+                        }
                     }
                 }
             }
@@ -642,7 +647,7 @@ namespace AnsiCParser {
 
             // 関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない
             // (これは，関数定義の型を typedef から受け継ぐことはできないことを意味する。)。
-            if (type.UnwrapTypeQualifier() is TypedefedType) {
+            if (type.UnwrapTypeQualifier() is TypedefType) {
                 throw new CompilerException.SpecificationErrorException(ident.Range, "関数定義で宣言する識別子（その関数の名前）の型が関数型であることは，その関数定義の宣言子の部分で指定しなければならない。");
             }
 
@@ -663,7 +668,7 @@ namespace AnsiCParser {
                 // 識別子並び: なし
                 // 仮引数型並び: なし
                 // -> ANSI形式で引数無し(引数部がvoid)の関数定義（関数宣言時とは意味が違う）
-                ftype.Arguments = new FunctionType.ArgumentInfo[0];
+                ftype.SetArguments(new FunctionType.ArgumentInfo[0]);
             } else if (ftype.Arguments != null && argmuents != null) {
                 // 識別子並びあり、仮引数並びあり。
 
@@ -697,7 +702,7 @@ namespace AnsiCParser {
                     return new FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion());
                 }).ToList();
 
-                ftype.Arguments = mapped.ToArray();
+                ftype.SetArguments(mapped.ToArray());
 
             } else if (ftype.Arguments != null && argmuents == null) {
                 // 識別子並びあり
@@ -706,7 +711,7 @@ namespace AnsiCParser {
                 switch (ftype.GetFunctionStyle()) {
                     case FunctionType.FunctionStyle.OldStyle:
                         // 関数宣言が古い形式である
-                        ftype.Arguments = ftype.Arguments.Select(x => new FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion())).ToArray();
+                        ftype.SetArguments(ftype.Arguments.Select(x => new FunctionType.ArgumentInfo(x.Range, x.Ident, AnsiCParser.StorageClassSpecifier.None, CType.CreateSignedInt().DefaultArgumentPromotion())).ToArray());
                         break;
                     case FunctionType.FunctionStyle.NewStyle:
                     case FunctionType.FunctionStyle.AmbiguityStyle:
@@ -719,7 +724,9 @@ namespace AnsiCParser {
                 }
 
                 // 関数型中に不完全型が無いことを確認する
-                if (/*ftype.ResultType.IsIncompleteType() || */ftype.Arguments.Any(x => x.Type.IsIncompleteType())) {
+                if (ftype.Arguments.Length == 1 && ftype.Arguments[0].Type.IsVoidType()) {
+                    // 唯一の引数が void 型なので問題なし
+                } else if (/*ftype.ResultType.IsIncompleteType() || */ftype.Arguments.Any(x => x.Type.IsIncompleteType())) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, "関数宣言中で不完全型を直接使うことはできません。");
                 }
 
@@ -740,14 +747,20 @@ namespace AnsiCParser {
 
             // 引数をスコープに追加
             if (ftype.Arguments != null) {
-                foreach (var arg in ftype.Arguments) {
-                    if (arg.Ident == null) {
-                        throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
+                if (ftype.Arguments.Length == 1 && ftype.Arguments[0].Type.IsVoidType()) {
+                    if (ftype.Arguments[0].Ident != null) {
+                        throw new CompilerException.SpecificationErrorException(ftype.Arguments[0].Range, "void 型の引数に名前を与えることはできません。");
                     }
-                    if (arg.Type.IsIncompleteType()) {
-                        throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
+                } else {
+                    foreach (var arg in ftype.Arguments) {
+                        if (arg.Ident == null) {
+                            throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
+                        }
+                        if (arg.Type.IsIncompleteType()) {
+                            throw new CompilerException.SpecificationErrorException(arg.Range, "関数定義では引数名を省略することはできません。");
+                        }
+                        _identScope.Add(arg.Ident.Raw, new Declaration.ArgumentDeclaration(arg.Ident.Range, arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
                     }
-                    _identScope.Add(arg.Ident.Raw, new Declaration.ArgumentDeclaration(arg.Ident.Range, arg.Ident.Raw, arg.Type, arg.StorageClass));    // 引数は無結合
                 }
             }
 
@@ -1426,19 +1439,28 @@ namespace AnsiCParser {
             if (IsIdentifier(true)) {
                 var ident = Identifier(true);
                 TaggedType taggedType;
-                if (_tagScope.TryGetValue(ident.Raw, out taggedType) == false) {
+                bool newDecl = false;
+                bool isCurrent;
+                if (_tagScope.TryGetValue(ident.Raw, out taggedType, out isCurrent) == false) {
                     // タグ名前表に無い場合は新しく追加する。
                     taggedType = new TaggedType.EnumType(ident.Raw, false);
                     _tagScope.Add(ident.Raw, taggedType);
                     AddImplicitTypeDeclaration(ident, taggedType);
-
+                    newDecl = true;
                 } else if (!(taggedType is TaggedType.EnumType)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に構造体/共用体として定義されています。");
                 }
 
                 if (_lexer.ReadTokenIf('{')) {
-                    if ((taggedType as TaggedType.EnumType).Members != null) {
-                        throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
+                    if (isCurrent == false && newDecl == false) {
+                        // 今のスコープで宣言されていないので新しく追加する。
+                        taggedType = new TaggedType.EnumType(ident.Raw, false);
+                        _tagScope.Add(ident.Raw, taggedType);
+                        AddImplicitTypeDeclaration(ident, taggedType);
+                    } else {
+                        if ((taggedType as TaggedType.EnumType).Members != null) {
+                            throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
+                        }
                     }
 
                     // 不完全型として定義されているので完全型にするために書き換え対象とする
@@ -2016,14 +2038,10 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="v"></param>
         /// <returns></returns>
-        private bool IsTypedefedType(string v) {
+        private bool IsTypedefType(string v) {
             Declaration.TypeDeclaration typeDeclaration;
             return _identScope.TryGetValue(v, out typeDeclaration);
         }
-
-        #region 6.7.8 初期化(初期化式の型検査)
-
-        #endregion
 
         /// <summary>
         /// 6.7.8 初期化
@@ -2076,7 +2094,7 @@ namespace AnsiCParser {
                 return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER;
             }
 
-            return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER && !IsTypedefedType(_lexer.CurrentToken().Raw);
+            return _lexer.CurrentToken().Kind == Token.TokenKind.IDENTIFIER && !IsTypedefType(_lexer.CurrentToken().Raw);
         }
 
         private Token Identifier(bool includeTypeName) {
@@ -3358,7 +3376,7 @@ namespace AnsiCParser {
                 if (type != null) {
                     throw new Exception("");
                 }
-                type = new TypedefedType(_lexer.CurrentToken(), value.Type);
+                type = new TypedefType(_lexer.CurrentToken(), value.Type);
                 _lexer.NextToken();
             } else if (flags.HasFlag(ReadDeclarationSpecifierPartFlag.TypeQualifier) && IsTypeQualifier()) {
                 // 型修飾子

@@ -13,7 +13,7 @@ namespace AnsiCParser {
 
             public string OnArrayType(ArrayType self, string value) {
                 _visited.Add(self);
-                return $"{self.BaseType.Accept(this, value + $"[{(self.Length != -1 ? self.Length.ToString() : "")}]")}";
+                return $"{self.ElementType.Accept(this, value + $"[{(self.Length != -1 ? self.Length.ToString() : "")}]")}";
             }
 
             public string OnBasicType(BasicType self, string value) {
@@ -140,11 +140,11 @@ namespace AnsiCParser {
 
             public string OnPointerType(PointerType self, string value) {
                 _visited.Add(self);
-                if (self.BaseType is ArrayType || self.BaseType is FunctionType) {
-                    return $"{self.BaseType.Accept(this, $"(*{value})")}";
+                if (self.ReferencedType is ArrayType || self.ReferencedType is FunctionType) {
+                    return $"{self.ReferencedType.Accept(this, $"(*{value})")}";
                 }
 
-                return $"{self.BaseType.Accept(this, $"*{value}")}";
+                return $"{self.ReferencedType.Accept(this, $"*{value}")}";
             }
 
             public string OnStructUnionType(TaggedType.StructUnionType self, string value) {
@@ -172,7 +172,7 @@ namespace AnsiCParser {
                 return "$";
             }
 
-            public string OnTypedefedType(TypedefedType self, string value) {
+            public string OnTypedefType(TypedefType self, string value) {
                 _visited.Add(self);
                 return self.Ident.Raw + (String.IsNullOrEmpty(value) ? "" : (" " + value));
             }
