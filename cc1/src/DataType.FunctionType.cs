@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using AnsiCParser.SyntaxTree;
+
 namespace AnsiCParser {
 
     namespace DataType {
@@ -9,11 +11,14 @@ namespace AnsiCParser {
         ///     関数型
         /// </summary>
         public class FunctionType : CType {
-            public Scope<TaggedType> PrototypeScope {
+            public Scope<TaggedType> PrototypeTaggedScope {
+                get;
+            }
+            public Scope<Declaration> PrototypeIdentScope {
                 get;
             }
 
-            public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType, Scope<TaggedType> prototypeScope = null) {
+            public FunctionType(List<ArgumentInfo> arguments, bool hasVariadic, CType resultType, Scope<TaggedType> prototypeTaggedScope = null, Scope<Declaration> prototypeIdentScope = null) {
                 // 6.7.5.3 関数宣言子（関数原型を含む）
                 // 制約 
                 // 関数宣言子は，関数型又は配列型を返却値の型として指定してはならない。(返却値の型が確定するFixupメソッド中で行う)
@@ -25,11 +30,12 @@ namespace AnsiCParser {
                 Arguments = arguments?.ToArray();
                 ResultType = resultType;
                 HasVariadic = hasVariadic;
-                PrototypeScope = prototypeScope;
+                PrototypeTaggedScope = prototypeTaggedScope;
+                PrototypeIdentScope = prototypeIdentScope;
             }
 
             public override CType Duplicate() {
-                var ret = new FunctionType(Arguments?.Select(x => x.Duplicate()).ToList(), HasVariadic, ResultType.Duplicate());
+                var ret = new FunctionType(Arguments?.Select(x => x.Duplicate()).ToList(), HasVariadic, ResultType.Duplicate(),PrototypeTaggedScope,PrototypeIdentScope);
                 return ret;
             }
 

@@ -2459,7 +2459,11 @@ namespace AnsiCParser {
                                         } else {
                                             Emit($"shrb ${8 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %al");
                                         }
-                                        Emit($"movb %al, (%esi)");
+                                        if (type.IsSignedIntegerType()) {
+                                            Emit("movsbl %al, %eax");
+                                        } else {
+                                            Emit("movzbl %al, %eax");
+                                        }
                                         break;
                                     case 2:
                                         Emit($"movw (%esi), %ax");
@@ -2469,7 +2473,11 @@ namespace AnsiCParser {
                                         } else {
                                             Emit($"shrw ${16 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %ax");
                                         }
-                                        Emit($"movw %ax, (%esi)");
+                                        if (type.IsSignedIntegerType()) {
+                                            Emit("movswl %al, %eax");
+                                        } else {
+                                            Emit("movzwl %al, %eax");
+                                        }
                                         break;
                                     case 4:
                                         Emit($"movl (%esi), %eax");
@@ -2479,24 +2487,12 @@ namespace AnsiCParser {
                                         } else {
                                             Emit($"shrl ${32 - (bft.BitOffset + bft.BitWidth) + bft.BitOffset}, %eax");
                                         }
-                                        Emit($"movl %eax, (%esi)");
                                         break;
                                     case 8:
                                     default:
                                         throw new NotSupportedException();
                                 }
-
-                                // コピー先を確保
-                                Emit($"subl ${StackAlign(valueType.Sizeof())}, %esp");
-                                Emit("movl %esp, %edi");
-
-                                // 転送
-                                Emit("pushl %ecx");
-                                Emit($"movl ${valueType.Sizeof()}, %ecx");
-                                Emit("cld");
-                                Emit("rep movsb");
-                                Emit("popl %ecx");
-
+                                Emit($"push %eax");
                             } else {
 
                                 // コピー先を確保
@@ -3919,12 +3915,14 @@ namespace AnsiCParser {
             public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
                 var elementSize = self.Type.ElementType.Sizeof();
                 var v = new Value(value) { Type = self.Type.ElementType };
+                var writed = 0;
                 foreach (var init in self.Inits) {
                     init.Accept(this, v);
                     switch (v.Kind) {
                         case Value.ValueKind.Var:
                             if (v.Label == null) {
                                 v.Offset += elementSize;
+                                writed += elementSize;
                             } else {
                                 throw new NotImplementedException();
                             }
@@ -3935,6 +3933,33 @@ namespace AnsiCParser {
                     }
                 }
 
+                while (self.Type.Sizeof() > writed) {
+                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
+                    switch (sz) {
+                        case 4:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedInt());
+                            _context.Generator.Discard();
+                            break;
+                        case 3:
+                        case 2:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedShortInt());
+                            _context.Generator.Discard();
+                            break;
+                        case 1:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedChar());
+                            _context.Generator.Discard();
+                            break;
+                    }
+                    v.Offset += sz;
+                    writed += sz;
+                }
+
                 return new Value { Kind = Value.ValueKind.Void };
             }
 
@@ -3942,9 +3967,37 @@ namespace AnsiCParser {
                 // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
                 // 共用体は初期化式が一つのはず
                 Value v = new Value(value);
+                var writed = 0;
                 foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
                     member.Item2.Accept(this, v);
                     v.Offset += member.Item1.Type.Sizeof();
+                    writed += member.Item1.Type.Sizeof();
+                }
+                while (self.Type.Sizeof() > writed) {
+                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
+                    switch (sz) {
+                        case 4:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedInt());
+                            _context.Generator.Discard();
+                            break;
+                        case 3:
+                        case 2:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedShortInt());
+                            _context.Generator.Discard();
+                            break;
+                        case 1:
+                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
+                            _context.Generator.Push(v);
+                            _context.Generator.Assign(CType.CreateUnsignedChar());
+                            _context.Generator.Discard();
+                            break;
+                    }
+                    v.Offset += sz;
+                    writed += sz;
                 }
                 return new Value { Kind = Value.ValueKind.Void };
             }

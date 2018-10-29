@@ -405,6 +405,7 @@ namespace AnsiCParser.SyntaxTree {
                     if (member.Ident == null) {
                         // padding
                         var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+
                         assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, kind)));
                         continue;
                     }
@@ -473,7 +474,11 @@ namespace AnsiCParser.SyntaxTree {
                 var loc = it.Current.LocationRange;
                 it.Enter();
                 it.Next();
-                assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it, isLocalVariableInit));
+                var mem = type.Members.FirstOrDefault(x => !((x.Type is BitFieldType) && (x.Ident == null || (x.Type as BitFieldType).BitWidth == 0)));
+                if (mem == null) {
+                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "無名もしくはビット幅0のビットフィールドしかない共用体を初期化しようとしました。");
+                }
+                assigns.Add(CheckInitializerBase(depth, mem.Type, it, isLocalVariableInit));
                 if (it.Current != null) {
                     Logger.Warning(it.Current.LocationRange, "初期化子の要素数が型で指定された領域サイズを超えているため、切り捨てられました。");
                 }
@@ -487,7 +492,11 @@ namespace AnsiCParser.SyntaxTree {
                 // 最初の要素とのみチェック
                 List<Initializer> assigns = new List<Initializer>();
                 var loc = it.Current.LocationRange;
-                assigns.Add(CheckInitializerBase(depth, type.Members[0].Type, it, isLocalVariableInit));
+                var mem = type.Members.FirstOrDefault(x => !((x.Type is BitFieldType) && (x.Ident == null || (x.Type as BitFieldType).BitWidth == 0)));
+                if (mem == null) {
+                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "無名もしくはビット幅0のビットフィールドしかない共用体を初期化しようとしました。");
+                }
+                assigns.Add(CheckInitializerBase(depth, mem.Type, it, isLocalVariableInit));
                 return new Initializer.StructUnionAssignInitializer(loc, type, assigns);
             }
 

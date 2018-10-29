@@ -740,8 +740,8 @@ namespace AnsiCParser {
             var funcdecl = FunctionDeclaration(ident, ftype, storageClass, functionSpecifier, ScopeKind.FileScope, true);
 
             // 各スコープを積む
-            _tagScope = ftype.PrototypeScope ?? _tagScope.Extend();
-            _identScope = _identScope.Extend();
+            _tagScope = ftype.PrototypeTaggedScope ?? _tagScope.Extend();
+            _identScope = ftype.PrototypeIdentScope ?? _identScope.Extend();
             _labelScope = _labelScope.Extend();
             _currentFuncDecl = funcdecl;
 
@@ -1693,7 +1693,7 @@ namespace AnsiCParser {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
+                    stack[index] = new FunctionType(args.Item3, vargs, stack[index], args.Item1, args.Item2);
                     _lexer.ReadToken(')');
                     MoreDirectDeclarator(stack, index);
 
@@ -1713,8 +1713,9 @@ namespace AnsiCParser {
         /// 6.7.5 宣言子(仮引数型並び)
         /// </summary>
         /// <returns></returns>
-        private Tuple<Scope<TaggedType>, List<FunctionType.ArgumentInfo>> ParameterTypeList(ref bool vargs) {
-            var prototypeScope = _tagScope = _tagScope.Extend();
+        private Tuple<Scope<TaggedType>, Scope<Declaration>, List<FunctionType.ArgumentInfo>> ParameterTypeList(ref bool vargs) {
+            var prototypeTagScope = _tagScope = _tagScope.Extend();
+            var prototypeIdentScope = _identScope = _identScope.Extend();
 
             var items = new List<FunctionType.ArgumentInfo>();
             items.Add(ParameterDeclaration());
@@ -1727,7 +1728,8 @@ namespace AnsiCParser {
                 items.Add(ParameterDeclaration());
             }
             _tagScope = _tagScope.Parent;
-            return Tuple.Create(prototypeScope, items);
+            _identScope = _identScope.Parent;
+            return Tuple.Create(prototypeTagScope, prototypeIdentScope, items);
         }
 
         /// <summary>
@@ -1821,7 +1823,7 @@ namespace AnsiCParser {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
+                    stack[index] = new FunctionType(args.Item3, vargs, stack[index], args.Item1, args.Item2);
                 } else {
                     // 直接宣言子 中の '(' 宣言子 ')'  もしくは 直接抽象宣言子 中の '(' 抽象宣言子 ')'
                     stack.Add(new StubType());
@@ -1853,7 +1855,7 @@ namespace AnsiCParser {
                     // 仮引数型並び
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
+                    stack[index] = new FunctionType(args.Item3, vargs, stack[index], args.Item1, args.Item2);
                 } else {
                     // 識別子並び
                     var args = IdentifierList().Select(x =>
@@ -1995,7 +1997,7 @@ namespace AnsiCParser {
                     // ANSI形式
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
+                    stack[index] = new FunctionType(args.Item3, vargs, stack[index], args.Item1, args.Item2);
                 } else {
                     // K&R形式もしくは引数省略されたANSI形式（いわゆる曖昧な宣言）
                     stack[index] = new FunctionType(null, false, stack[index]);
@@ -2024,7 +2026,7 @@ namespace AnsiCParser {
                 if (_lexer.PeekToken(')') == false) {
                     bool vargs = false;
                     var args = ParameterTypeList(ref vargs);
-                    stack[index] = new FunctionType(args.Item2, vargs, stack[index], args.Item1);
+                    stack[index] = new FunctionType(args.Item3, vargs, stack[index], args.Item1, args.Item2);
                 } else {
                     stack[index] = new FunctionType(null, false, stack[index]);
                 }
@@ -3622,6 +3624,7 @@ namespace AnsiCParser {
             StorageClassSpecifier storageClass = AnsiCParser.StorageClassSpecifier.None;
             FunctionSpecifier functionSpecifier = AnsiCParser.FunctionSpecifier.None;
             var start = _lexer.CurrentToken().Start;
+            var currentIdentScope = _identScope;
             if (scope == ScopeKind.FileScope) {
                 // ファイルスコープでの宣言
                 if (ReadDeclarationSpecifiers(ref baseType, ref storageClass, ref functionSpecifier, ReadDeclarationSpecifierPartFlag.ExternalDeclaration) < 1) {
@@ -3666,6 +3669,7 @@ namespace AnsiCParser {
                 if (CType.CheckContainOldStyleArgument(baseType)) {
                     throw new CompilerException.SpecificationErrorException(start, end, "関数型中に型の無い仮引数名があります。");
                 }
+
                 return decls;
             } else {
                 Token ident = null;
