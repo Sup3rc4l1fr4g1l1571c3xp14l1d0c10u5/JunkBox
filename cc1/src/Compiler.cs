@@ -889,6 +889,10 @@ namespace AnsiCParser {
                                     // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
                                     Emit($"sall ${32 - bft.BitWidth}, %ecx");
                                     Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                } else {
+                                    // ビットフィールドの最上位ビットより上をを消す
+                                    Emit($"andl ${srcMask}, %ecx");
+
                                 }
                                 Emit("pushl %ecx");
 
@@ -915,6 +919,9 @@ namespace AnsiCParser {
                                     // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
                                     Emit($"sall ${32 - bft.BitWidth}, %ecx");
                                     Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                } else {
+                                    // ビットフィールドの最上位ビットより上をを消す
+                                    Emit($"andl ${srcMask}, %ecx");
                                 }
                                 Emit("pushl %ecx");
 
@@ -942,6 +949,9 @@ namespace AnsiCParser {
                                     // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
                                     Emit($"sall ${32 - bft.BitWidth}, %ecx");
                                     Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                } else {
+                                    // ビットフィールドの最上位ビットより上をを消す
+                                    Emit($"andl ${srcMask}, %ecx");
                                 }
                                 Emit("pushl %ecx");
 
@@ -951,7 +961,7 @@ namespace AnsiCParser {
 
                                 // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
                                 Emit($"movl (%eax), %edx");
-                                Emit($"andl ${(UInt16)dstMask}, %edx");
+                                Emit($"andl ${(UInt32)dstMask}, %edx");
                                 // ビットを結合させてから書き込む
                                 Emit($"orl  %edx, %ecx");
                                 Emit($"movl %ecx, (%eax)");
@@ -1911,7 +1921,7 @@ namespace AnsiCParser {
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                             var byteReg = ToByteReg(register);
-                                            Emit($"movb (%eax), {byteReg}");
+                                            Emit($"movb {src}, {byteReg}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -1930,7 +1940,7 @@ namespace AnsiCParser {
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                             var wordReg = ToWordReg(register);
-                                            Emit($"movw (%eax), {wordReg}");
+                                            Emit($"movw {src}, {wordReg}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -1950,7 +1960,7 @@ namespace AnsiCParser {
                                             UInt32 dstMask = ~(srcMask << (offsetBit));
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            Emit($"movl (%eax), {register}");
+                                            Emit($"movl {src}, {register}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -3915,14 +3925,20 @@ namespace AnsiCParser {
             public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
                 var elementSize = self.Type.ElementType.Sizeof();
                 var v = new Value(value) { Type = self.Type.ElementType };
-                var writed = 0;
+
+                // 初期化対象を０クリア
+                _context.Generator.Push(value);
+                _context.Generator.LoadVariableAddress($"%edi");
+                _context.Generator.Emit($"xorl %eax, %eax");
+                _context.Generator.Emit($"movl ${self.Type.Sizeof()}, %ecx");
+                _context.Generator.Emit($"rep stosb");
+
                 foreach (var init in self.Inits) {
                     init.Accept(this, v);
                     switch (v.Kind) {
                         case Value.ValueKind.Var:
                             if (v.Label == null) {
                                 v.Offset += elementSize;
-                                writed += elementSize;
                             } else {
                                 throw new NotImplementedException();
                             }
@@ -3933,33 +3949,6 @@ namespace AnsiCParser {
                     }
                 }
 
-                while (self.Type.Sizeof() > writed) {
-                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
-                    switch (sz) {
-                        case 4:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedInt());
-                            _context.Generator.Discard();
-                            break;
-                        case 3:
-                        case 2:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedShortInt());
-                            _context.Generator.Discard();
-                            break;
-                        case 1:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedChar());
-                            _context.Generator.Discard();
-                            break;
-                    }
-                    v.Offset += sz;
-                    writed += sz;
-                }
-
                 return new Value { Kind = Value.ValueKind.Void };
             }
 
@@ -3967,37 +3956,17 @@ namespace AnsiCParser {
                 // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
                 // 共用体は初期化式が一つのはず
                 Value v = new Value(value);
-                var writed = 0;
+
+                // 初期化対象を０クリア
+                _context.Generator.Push(value);
+                _context.Generator.LoadVariableAddress($"%edi");
+                _context.Generator.Emit($"xorl %eax, %eax");
+                _context.Generator.Emit($"movl ${self.Type.Sizeof()}, %ecx");
+                _context.Generator.Emit($"rep stosb");
+
                 foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
+                    v.Offset = value.Offset + member.Item1.Offset;
                     member.Item2.Accept(this, v);
-                    v.Offset += member.Item1.Type.Sizeof();
-                    writed += member.Item1.Type.Sizeof();
-                }
-                while (self.Type.Sizeof() > writed) {
-                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
-                    switch (sz) {
-                        case 4:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedInt());
-                            _context.Generator.Discard();
-                            break;
-                        case 3:
-                        case 2:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedShortInt());
-                            _context.Generator.Discard();
-                            break;
-                        case 1:
-                            _context.Generator.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
-                            _context.Generator.Push(v);
-                            _context.Generator.Assign(CType.CreateUnsignedChar());
-                            _context.Generator.Discard();
-                            break;
-                    }
-                    v.Offset += sz;
-                    writed += sz;
                 }
                 return new Value { Kind = Value.ValueKind.Void };
             }

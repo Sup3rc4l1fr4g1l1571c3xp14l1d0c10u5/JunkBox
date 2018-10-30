@@ -637,8 +637,9 @@ namespace AnsiCParser {
         /// - シフト演算子（ &lt;&lt; >> ）の各オペランド
         /// - 既定の実引数拡張中
         /// </remarks>
-        public static Expression IntegerPromotion(Expression expr, int? bitfield = null) {
-            if (bitfield.HasValue == false) {
+        public static Expression IntegerPromotion(Expression expr/*, int? bitfield = null*/) {
+            var ty = expr.Type.Unwrap(CType.UnwrapFlag.TypeQualifierType | CType.UnwrapFlag.TypedefType);
+            if (ty.IsBitField() == false) {
                 // ビットフィールドではない
                 // 整数変換の順位が int 型及び unsigned int 型より低い整数型をもつオブジェクト又は式?
                 if (IntegerConversionRank(expr.Type) < -5) {
@@ -656,8 +657,9 @@ namespace AnsiCParser {
                     return expr;
                 }
             } else {
+                var bft = ty as BitFieldType;
                 // ビットフィールドである
-                switch ((expr.Type.Unwrap() as BasicType)?.Kind) {
+                switch ((bft.Type.Unwrap() as BasicType)?.Kind) {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
                     case BasicType.TypeKind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
@@ -666,9 +668,9 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.SignedLongInt:  // sizeof(int) == sizeof(long)に限り変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                     case BasicType.TypeKind.UnsignedInt:
-                    case BasicType.TypeKind.UnsignedLongInt: // sizeof(int) == sizeof(long)に限り変換できる
+                    case BasicType.TypeKind.UnsignedLongInt: // sizeof(uint) == sizeof(ulong)に限り変換できる
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
-                        if (bitfield.Value == 4 * 8) {
+                        if (bft.BitWidth == 4 * 8) {
                             // unsigned int でないと表現できない
                             return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
                         } else {

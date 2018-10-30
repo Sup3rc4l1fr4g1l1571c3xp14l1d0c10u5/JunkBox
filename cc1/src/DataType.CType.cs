@@ -386,24 +386,33 @@ namespace AnsiCParser {
                 }
             }
 
+            [Flags]
+            public enum UnwrapFlag {
+                None = 0x00,
+                TypedefType = 0x01,
+                TypeQualifierType = 0x02,
+                BitFieldType = 0x04,
+                All = UnwrapFlag.TypedefType | UnwrapFlag.TypeQualifierType | UnwrapFlag.BitFieldType 
+            }
+
             /// <summary>
             ///     型別名と型修飾（とビットフィールド修飾）を無視した型を得る。
             /// </summary>
             /// <returns></returns>
-            public CType Unwrap() {
+            public CType Unwrap(UnwrapFlag unwrapFlag = UnwrapFlag.All) {
                 var self = this;
                 for (;;) {
-                    if (self is TypedefType) {
+                    if (unwrapFlag.HasFlag(UnwrapFlag.TypedefType) && self is TypedefType) {
                         self = (self as TypedefType).Type;
                         continue;
                     }
 
-                    if (self is TypeQualifierType) {
+                    if (unwrapFlag.HasFlag(UnwrapFlag.TypeQualifierType) && self is TypeQualifierType) {
                         self = (self as TypeQualifierType).Type;
                         continue;
                     }
 
-                    if (self is BitFieldType) {
+                    if (unwrapFlag.HasFlag(UnwrapFlag.BitFieldType) && self is BitFieldType) {
                         self = (self as BitFieldType).Type;
                         continue;
                     }
