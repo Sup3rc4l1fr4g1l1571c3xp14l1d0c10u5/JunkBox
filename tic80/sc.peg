@@ -1,0 +1,238 @@
+// https://pegjs.org/online
+StatementList
+  = ((Statement / Declaration) _ )*
+
+Statement
+  = IfStatement
+  / IterationStatement
+  / SwitchStatement
+  / BreakStatement
+  / ContinueStatement
+  / ReturnStatement
+  / BlockStatement
+  / ExpressionStatement
+  / _ ";"
+  
+IfStatement
+  = _ "if" _ "(" _ condExpr:Expression _ ")" _ thenStmt:Statement elseStmt:( _ "else" _ stmt:Statement { return stmt; } )?
+  { return { type:"if", condExpr:condExpr, thenStmt:thenStmt, elseStmt:elseStmt }; }
+  
+IterationStatement
+  = _ "do" _ bodyStmt:Statement _ "while" _ "(" _ condExpr:Expression _ ")" _ ";"
+  { return { type:"do", condExpr:condExpr, bodyStmt:bodyStmt }; }
+  / _ "while" _ "(" _ condExpr:Expression _ ")" _ bodyStmt:Statement
+  { return { type:"while", condExpr:condExpr, bodyStmt:bodyStmt }; }
+  / _ "for" _ "(" _ initExpr:(LexicalDeclaration / (expr:Expression? _ ";" { return expr; } )) _ condExpr:Expression? _ ";" _ updateExpr:Expression? _ ")" _ bodyStmt:Statement
+  { return { type:"for", initExpr:initExpr, condExpr:condExpr, updateExpr:updateExpr, bodyStmt:bodyStmt }; }
+
+LexicalDeclaration
+  = _ "let" _ binds:LexicalBindings _ ";"
+  { return { type: "let", binds: binds }; }
+  
+LexicalBindings
+  = x:LexicalBinding xs:(_ "," _ binding:LexicalBinding { return binding; })*
+  { return [x].concat(xs); }
+
+LexicalBinding
+  = ident:BindingIdentifier initExpr:(_ "=" _ expr:AssignmentExpression { return expr; })?
+  { return { type: "bind", ident: ident, initExpr:initExpr }; }
+
+BindingIdentifier
+  = Identifier
+  
+SwitchStatement
+  = _ "switch" _ "(" _ expr:Expression _ ")" _ cases:CaseBlock
+  { return { type: "switch", expr:expr, cases:cases }; }
+
+CaseBlock
+  = _ "{" _ clause:CaseClause+ _ "}" 
+  { return clause; }
+
+CaseClause
+  = _ "case" _ Expression _ ":" _ stmnt:Statement?
+  { return { type: "case", expr:expr, stmnt:stmnt }; }
+  / _ "default" _ ":" _ Statement?
+  { return { type: "default", stmnt:stmnt }; }
+
+BreakStatement
+  = _ "break" _ ";"
+  { return { type: "break" }; }
+
+ContinueStatement
+  = _ "continue" _ ";"
+  { return { type: "continue" }; }
+
+ReturnStatement
+  = _ "return" _ expr:Expression? _ ";"
+  { return { type: "return", expr:expr }; }
+
+BlockStatement
+  = _ "{" _ stmts:StatementList _ "}"
+  { return { type: "block", stmts:stmts }; }
+
+ExpressionStatement
+  = expr:Expression _ ";"
+  { return expr; }
+  
+Expression
+  = x:AssignmentExpression xs:(_ "," _ e:AssignmentExpression { return e; })*
+  { return { type: ",", expr:[x].concat(xs) }; }
+  
+AssignmentExpression
+  = ArrowFunction
+  / lhs:LeftHandSideExpression _ op:AssignmentOperator _ rhs:AssignmentExpression
+  { return { type: op, lhs:lhs, rhs:rhs}; }
+  / ConditionalExpression
+
+ArrowFunction
+  = params:ArrowParameters _ "=>" _ body:ConciseBody
+  { return { type: "=>", params:params, body:body}; }
+
+ArrowParameters
+  = _ "(" _ v:(x:ArrowParameter xs:(_ "," _ p:ArrowParameter { return p; })* { return [x].concat(xs); })? ")"
+  { return v; }
+
+ArrowParameter
+  = _ spread:"..."? _ id:BindingIdentifier
+  { return { id:id, spread: (spread!=null) }; }
+
+ConciseBody
+  = AssignmentExpression
+  / _ "{" _ FunctionBody _ "}"
+
+FunctionBody
+  = StatementList
+
+Declaration
+  = LexicalDeclaration
+  / FunctionDeclaration
+  
+FunctionDeclaration
+  = _ "function" _ BindingIdentifier _ "(" _ FormalParameters _ ")" _ "{" _ FunctionBody _ "}"
+
+FormalParameters
+  = BindingElements (_ "," _ BindingRestElement)?
+  / BindingRestElement?
+
+BindingElements
+  = BindingElement (_ "," _ BindingElement)*
+
+BindingElement
+  = BindingIdentifier (_ "=" _ AssignmentExpression)?
+
+BindingRestElement
+  = "..." _ BindingIdentifier
+
+AssignmentOperator
+  = "*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / "="
+
+ConditionalExpression = LogicalORExpression ( _ "?" _ AssignmentExpression _ ":" _ AssignmentExpression )?
+LogicalORExpression  = LogicalANDExpression (_ "||" _ LogicalANDExpression)*
+LogicalANDExpression = BitwiseORExpression (_ "&&" _ BitwiseORExpression)*
+BitwiseORExpression  = BitwiseXORExpression (_ "|" _ BitwiseXORExpression)*
+BitwiseXORExpression = BitwiseANDExpression (_ "^" _ BitwiseANDExpression)*
+BitwiseANDExpression = EqualityExpression (_ "&" _ EqualityExpression)*
+EqualityExpression = RelationalExpression (_ EqualityOperator _ RelationalExpression)*
+EqualityOperator = "==" / "!="
+RelationalExpression = ShiftExpression (_ RelationalOperator _ ShiftExpression)*
+RelationalOperator = ">=" / ">" / "<=" / "<"
+ShiftExpression = AdditiveExpression (_ ShiftOperator _ AdditiveExpression)*
+ShiftOperator = "<<<" / "<<" / ">>>" / ">>"
+AdditiveExpression = MultiplicativeExpression (_ AdditiveOperator _ MultiplicativeExpression)*
+AdditiveOperator = "+" / "-"
+MultiplicativeExpression = ExponentiationExpression (_ MultiplicativeOperator _ ExponentiationExpression)*
+MultiplicativeOperator = "*" / "/"
+ExponentiationExpression = UpdateExpression (_ "**" _ UpdateExpression)*
+UpdateExpression
+  = LeftHandSideExpression (_ "++" / "--")?
+  / ("++"/"--") _ UnaryExpression
+
+UnaryExpression  = (UnaryOperator _) * UpdateExpression
+UnaryOperator = "+" / "-" / "~" / "!"
+
+LeftHandSideExpression
+  = NewExpression
+  / CallExpression
+  
+NewExpression
+  = CallExpression
+  / MemberExpression
+
+CallExpression
+  = MemberExpression (_ "[" _ Expression _ "]" / _ "." _ Identifier)* Arguments
+
+Arguments
+  = _ "(" _ ( Expression ( _ "," _ Expression )* )? _ ")"
+
+MemberExpression
+  = PrimaryExpression MemberExpressionPost *
+
+MemberExpressionPost
+  = _ "[" _ Expression _ "]"
+  / _ "." _ Identifier
+
+PrimaryExpression
+  = Identifier
+  / Literal
+  / ArrayLiteral
+  / ObjectLiteral
+  / FunctionExpression
+  / _ "(" _ Expression _ ")"
+  
+Literal
+  = NullLiteral
+  / BooleanLiteral
+  / NumericLiteral
+  / StringLiteral
+
+ArrayLiteral  = _ "[" ( _ AssignmentExpression (_ "," AssignmentExpression)* )? "]"
+ObjectLiteral = _ "{" _ PropertyDefinitionList? _ "}"
+FunctionExpression  = "function" _ "(" _ FormalParameters _ ")" _ "{" _ FunctionBody _ "}"
+PropertyDefinitionList
+  = PropertyDefinition (_ "," _ PropertyDefinition)*
+PropertyDefinition = PropertyName _ ":" _ AssignmentExpression
+PropertyName
+  = Identifier
+  / StringLiteral
+  / NumericLiteral
+  
+NullLiteral = "null"
+BooleanLiteral = "true" / "false"
+NumericLiteral = [0-9]+ ( "." [0-9]+)? { return parseInt(text(), 10); }
+StringLiteral = "\"" ([^\"] / "\\" [.])* "\""
+Identifier "identifier" = [A-Za-z_][A-Za-z0-9_]* { return text(); }
+_ "whitespace" = [ \t\n\r]*
+
+/*
+function foo(x,y) {
+  let f;
+  let g = 1;
+  let m = (x,y,z) => 1;
+  let m = (x,...f) => {};
+  let m = (x,y,z) => {};
+  x = 1;
+  if (1) { } else {}
+  if (a) 1; else {}
+  if (x == y) { } else {}
+  for (;;) ;
+  for (;;) {}
+  for (i=0;i<10;i++) { break; continue; }
+  for (let i=0, x=0;i<10;i++,j++) { break; continue; }
+  while (1) {}
+  while (x = y = z) {}
+  while (x) {}
+  do { 1; } while (x);
+  do 1; while (x);
+  do {} while (x);
+  break ;
+  continue ;
+  return;
+  return x;
+  { ; }
+  ;
+  let x = [];
+  let y = { x:1 };
+  x[5] = y.f.g();
+  y.f = {};
+}
+*/
