@@ -1,9 +1,319 @@
-// https://pegjs.org/online
+{
+class Program {
+  constructor(stmts) {
+    this.stmts = stmts;
+  }
+}
+
+class EmptyStatement {
+  constructor() {
+  }
+}
+
+class IfStatement {
+  constructor(condExpr, thenStmt, elseStmt) {
+    this.condExpr = condExpr;
+    this.thenStmt = thenStmt;
+    this.elseStmt = elseStmt;
+  }
+}
+
+class DoStatement {
+  constructor(condExpr, bodyStmt) {
+    this.condExpr = condExpr;
+    this.bodyStmt = bodyStmt;
+  }
+}
+
+class WhileStatement {
+  constructor(condExpr, bodyStmt) {
+    this.condExpr = condExpr;
+    this.bodyStmt = bodyStmt;
+  }
+}
+
+class ForStatement {
+  constructor(initExpr, condExpr, updateExpr, bodyStmt) {
+    this.initExpr = initExpr;
+    this.condExpr = condExpr;
+    this.updateExpr = updateExpr;
+    this.bodyStmt = bodyStmt;
+  }
+}
+
+class LexicalDeclaration {
+  constructor(binds) {
+    this.binds = binds;
+  }
+}
+
+class LexicalBinding {
+  constructor(ident, initExpr) {
+    this.ident = ident;
+    this.initExpr = initExpr;
+  }
+}
+
+class SwitchStatement {
+  constructor(expr, clauses) {
+    this.expr = expr;
+    this.clauses = clauses;
+  }
+}
+
+class CaseBlock {
+  constructor(clauses, stmt) {
+    this.clauses = clauses;
+    this.stmt = stmt;
+  }
+}
+
+class CaseClause {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+class DefaultClause {
+  constructor() {
+  }
+}
+
+class BreakStatement {
+  constructor() {
+  }
+}
+
+class ContinueStatement {
+  constructor() {
+  }
+}
+
+class ReturnStatement {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+class BlockStatement {
+  constructor(stmts) {
+    this.stmts = stmts;
+  }
+}
+
+class ExpressionStatement {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+class CommaExpression {
+  constructor(exprs) {
+    this.exprs = exprs
+  }
+}
+
+class AssignmentExpression {
+  constructor(op, lhs, rhs) {
+    this.op = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class ConditionalExpression {
+  constructor(condExpr, thenExpr, elseExpr) {
+    this.condExpr = condExpr;
+    this.thenExpr = thenExpr;
+    this.elseExpr = elseExpr;
+  }
+}
+
+class LogicalORExpression  {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class LogicalANDExpression {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class BitwiseORExpression  {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class BitwiseXORExpression {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class BitwiseANDExpression {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class EqualityExpression {
+  constructor(op, lhs, rhs) {
+    this.op  = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class RelationalExpression {
+  constructor(op, lhs, rhs) {
+    this.op  = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class ShiftExpression {
+  constructor(op, lhs, rhs) {
+    this.op  = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class AdditiveExpression {
+  constructor(op, lhs, rhs) {
+    this.op  = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class MultiplicativeExpression {
+  constructor(op, lhs, rhs) {
+    this.op  = op;
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class ExponentiationExpression {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+class UnaryExpression  {
+  constructor(op, rhs) {
+    this.op  = op;
+    this.rhs = rhs;
+  }
+}
+
+class CallExpression {
+  constructor(lhs, args) {
+    this.lhs = lhs;
+    this.args = args;
+  }
+}
+
+class ArrayIndexExpression {
+  constructor(lhs, index) {
+    this.lhs = lhs;
+    this.index = index;
+  }
+}
+
+class ObjectMemberExpression {
+  constructor(lhs, member) {
+    this.lhs = lhs;
+    this.member = member;
+  }
+}
+
+class EnclosedInParenthesesExpression {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+class ArrayLiteral  {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+class ObjectLiteral {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+class PropertyDefinition {
+  constructor(key,value) {
+    this.key = key;
+    this.value = value;
+  }
+}
+
+class FunctionExpression {
+  constructor(params, body) {
+    this.params = params;
+    this.body = body;
+  }
+}
+
+class FunctionParameter {
+  constructor(ident, init, spread) {
+    this.ident = ident;
+    this.init = init;
+    this.spread = spread;
+  }
+}
+
+class NullLiteral {
+  constructor() {
+  }
+}
+
+class BooleanLiteral {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+class NumericLiteral {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+class StringLiteral {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+
+}
+
+Program
+  = stmts:StatementList { return null;new Program(stmts); }
+
 StatementList
-  = ((Statement / Declaration) _ )*
+  = Statement*
 
 Statement
-  = IfStatement
+  = Declaration
+  / IfStatement
   / IterationStatement
   / SwitchStatement
   / BreakStatement
@@ -11,165 +321,151 @@ Statement
   / ReturnStatement
   / BlockStatement
   / ExpressionStatement
-  / _ ";"
+  / EmptyStatement
+
+EmptyStatement
+  = _ ";" { return new EmptyStatement(); }
   
 IfStatement
-  = _ "if" _ "(" _ condExpr:Expression _ ")" _ thenStmt:Statement elseStmt:( _ "else" _ stmt:Statement { return stmt; } )?
-  { return { type:"if", condExpr:condExpr, thenStmt:thenStmt, elseStmt:elseStmt }; }
-  
+  = _ "if" _ "(" _ condExpr:Expression _ ")" _ thenStmt:Statement _ "else" _ elseStmt:Statement { return new IfStatement( condExpr, thenStmt, elseStmt ); }
+  / _ "if" _ "(" _ condExpr:Expression _ ")" _ thenStmt:Statement                               { return new IfStatement( condExpr, thenStmt, null     ); }
+
 IterationStatement
-  = _ "do" _ bodyStmt:Statement _ "while" _ "(" _ condExpr:Expression _ ")" _ ";"
-  { return { type:"do", condExpr:condExpr, bodyStmt:bodyStmt }; }
-  / _ "while" _ "(" _ condExpr:Expression _ ")" _ bodyStmt:Statement
-  { return { type:"while", condExpr:condExpr, bodyStmt:bodyStmt }; }
-  / _ "for" _ "(" _ initExpr:(LexicalDeclaration / (expr:Expression? _ ";" { return expr; } )) _ condExpr:Expression? _ ";" _ updateExpr:Expression? _ ")" _ bodyStmt:Statement
-  { return { type:"for", initExpr:initExpr, condExpr:condExpr, updateExpr:updateExpr, bodyStmt:bodyStmt }; }
+  = _ "do" _ bodyStmt:Statement _ "while" _ "(" _ condExpr:Expression _ ")" _ ";" { return new DoStatement(condExpr, bodyStmt); }
+  / _ "while" _ "(" _ condExpr:Expression _ ")" _ bodyStmt:Statement              { return new WhileStatement(condExpr, bodyStmt); }
+  / _ "for" _ "(" _ initExpr:LexicalDeclaration _ condExpr:Expression? _ ";" _ updateExpr:Expression? _ ")" _ bodyStmt:Statement { return new ForStatement(initExpr, condExpr, updateExpr, bodyStmt); }
+  / _ "for" _ "(" _ initExpr:Expression? _  ";" _ condExpr:Expression? _ ";" _ updateExpr:Expression? _ ")" _ bodyStmt:Statement { return new ForStatement(initExpr, condExpr, updateExpr, bodyStmt); }
 
 LexicalDeclaration
-  = _ "let" _ binds:LexicalBindings _ ";"
-  { return { type: "let", binds: binds }; }
+  = _ "let" _ binds:LexicalBindings _ ";" { return new LexicalDeclaration(binds); }
   
 LexicalBindings
-  = x:LexicalBinding xs:(_ "," _ binding:LexicalBinding { return binding; })*
-  { return [x].concat(xs); }
+  = x:LexicalBinding xs:(_ "," _ binding:LexicalBinding { return binding; })* { return [x].concat(xs); }
 
 LexicalBinding
-  = ident:BindingIdentifier initExpr:(_ "=" _ expr:AssignmentExpression { return expr; })?
-  { return { type: "bind", ident: ident, initExpr:initExpr }; }
+  = ident:BindingIdentifier _ "=" _ initExpr:AssignmentExpression { return new LexicalBinding(ident, initExpr); }
+  / ident:BindingIdentifier                                       { return new LexicalBinding(ident, null); }
 
 BindingIdentifier
   = Identifier
   
 SwitchStatement
-  = _ "switch" _ "(" _ expr:Expression _ ")" _ cases:CaseBlock
-  { return { type: "switch", expr:expr, cases:cases }; }
+  = _ "switch" _ "(" _ expr:Expression _ ")" _ "{" _ blocks:CaseBlock _ "}" { return new SwitchStatement(expr, blocks); }
 
 CaseBlock
-  = _ "{" _ clause:CaseClause+ _ "}" 
-  { return clause; }
+  =  clauses:CaseClause+ _ stmt:Statement  { return new CaseBlock(clauses, stmt); }
 
 CaseClause
-  = _ "case" _ Expression _ ":" _ stmnt:Statement?
-  { return { type: "case", expr:expr, stmnt:stmnt }; }
-  / _ "default" _ ":" _ Statement?
-  { return { type: "default", stmnt:stmnt }; }
+  = _ "case" _ expr:Expression _ ":" { return new CaseClause(expr); }
+  / _ "default" _ ":"           { return new DefaultClause(); }
 
 BreakStatement
-  = _ "break" _ ";"
-  { return { type: "break" }; }
+  = _ "break" _ ";" { return new BreakStatement(); }
 
 ContinueStatement
-  = _ "continue" _ ";"
-  { return { type: "continue" }; }
+  = _ "continue" _ ";" { return new ContinueStatement(); }
 
 ReturnStatement
-  = _ "return" _ expr:Expression? _ ";"
-  { return { type: "return", expr:expr }; }
+  = _ "return" _ expr:Expression _ ";" { return new ReturnStatement(expr); }
+  / _ "return" _                   ";" { return new ReturnStatement(null); }
 
 BlockStatement
-  = _ "{" _ stmts:StatementList _ "}"
-  { return { type: "block", stmts:stmts }; }
+  = _ "{" _ stmts:StatementList _ "}"  { return new BlockStatement(stmts); }
 
 ExpressionStatement
-  = expr:Expression _ ";"
-  { return expr; }
+  = expr:Expression _ ";" { return new ExpressionStatement(expr); }
   
 Expression
-  = x:AssignmentExpression xs:(_ "," _ e:AssignmentExpression { return e; })*
-  { return { type: ",", expr:[x].concat(xs) }; }
+  = CommaExpression
+
+CommaExpression
+  = x:AssignmentExpression xs:(_ "," _ e:AssignmentExpression { return e; })* { return new CommaExpression([x].concat(xs)); }
   
 AssignmentExpression
   = ArrowFunction
-  / lhs:LeftHandSideExpression _ op:AssignmentOperator _ rhs:AssignmentExpression
-  { return { type: op, lhs:lhs, rhs:rhs}; }
+  / lhs:LeftHandSideExpression _ op:AssignmentOperator _ rhs:AssignmentExpression { return new AssignmentExpression(op, lhs, rhs); }
   / ConditionalExpression
 
+AssignmentOperator
+  = "*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / ((!"=>") "=")
+
 ArrowFunction
-  = params:ArrowParameters _ "=>" _ body:ConciseBody
-  { return { type: "=>", params:params, body:body}; }
-
-ArrowParameters
-  = _ "(" _ v:(x:ArrowParameter xs:(_ "," _ p:ArrowParameter { return p; })* { return [x].concat(xs); })? ")"
-  { return v; }
-
-ArrowParameter
-  = _ spread:"..."? _ id:BindingIdentifier
-  { return { id:id, spread: (spread!=null) }; }
+  = "(" _ params:FunctionParameters? _ ")" _ "=>" _ body:ConciseBody { return new FunctionExpression(params, body); }
 
 ConciseBody
-  = AssignmentExpression
-  / _ "{" _ FunctionBody _ "}"
+  = expr:AssignmentExpression  { return new ReturnStatement(expr); }
+  / FunctionBody
 
 FunctionBody
-  = StatementList
+  = BlockStatement
 
 Declaration
   = LexicalDeclaration
   / FunctionDeclaration
   
 FunctionDeclaration
-  = _ "function" _ BindingIdentifier _ "(" _ FormalParameters _ ")" _ "{" _ FunctionBody _ "}"
+  = _ "function" _ ident:BindingIdentifier _ "(" _ params:FunctionParameters? _ ")" _ body:FunctionBody
+  { return new LexicalDeclaration([new LexicalBinding(ident, new FunctionExpression(params, body))]); }
 
-FormalParameters
-  = BindingElements (_ "," _ BindingRestElement)?
-  / BindingRestElement?
+FunctionParameters
+  = xs:BindingElements x:(_ "," _ e:BindingRestElement { return e; } )? { return x ? xs + [x] : xs; }
+  / BindingRestElement
 
 BindingElements
-  = BindingElement (_ "," _ BindingElement)*
+  = x:BindingElement xs:(_ "," _ e:BindingElement { return e; })* { return [x].concat(xs); }
 
 BindingElement
-  = BindingIdentifier (_ "=" _ AssignmentExpression)?
+  = name:BindingIdentifier _ "=" _ init:AssignmentExpression { return new FunctionParameter( name, init, false); }
+  / name:BindingIdentifier                                   { return new FunctionParameter( name, null, false); }
 
 BindingRestElement
-  = "..." _ BindingIdentifier
+  = "..." _ name:BindingIdentifier { return new FunctionParameter( name, null, true);  }
 
-AssignmentOperator
-  = "*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / "="
+ConditionalExpression 
+  = condExpr:LogicalORExpression _ "?" _ thenExpr:AssignmentExpression _ ":" _ elseExpr:AssignmentExpression { return new ConditionalExpression(condExpr, thenExpr, elseExpr); }
+  / LogicalORExpression 
 
-ConditionalExpression = LogicalORExpression ( _ "?" _ AssignmentExpression _ ":" _ AssignmentExpression )?
-LogicalORExpression  = LogicalANDExpression (_ "||" _ LogicalANDExpression)*
-LogicalANDExpression = BitwiseORExpression (_ "&&" _ BitwiseORExpression)*
-BitwiseORExpression  = BitwiseXORExpression (_ "|" _ BitwiseXORExpression)*
-BitwiseXORExpression = BitwiseANDExpression (_ "^" _ BitwiseANDExpression)*
-BitwiseANDExpression = EqualityExpression (_ "&" _ EqualityExpression)*
-EqualityExpression = RelationalExpression (_ EqualityOperator _ RelationalExpression)*
+LogicalORExpression  = e1:LogicalANDExpression e2:(_ "||" _ LogicalANDExpression)* { return e2.reduce((s,x) => new LogicalORExpression(s, x[3]), e1); }
+LogicalANDExpression = e1:BitwiseORExpression  e2:(_ "&&" _ BitwiseORExpression)*  { return e2.reduce((s,x) => new LogicalANDExpression(s, x[3]), e1); }
+BitwiseORExpression  = e1:BitwiseXORExpression e2:(_ "|" _ BitwiseXORExpression)*  { return e2.reduce((s,x) => new BitwiseORExpression(s, x[3]), e1); }
+BitwiseXORExpression = e1:BitwiseANDExpression e2:(_ "^" _ BitwiseANDExpression)*  { return e2.reduce((s,x) => new BitwiseXORExpression(s, x[3]), e1); }
+BitwiseANDExpression = e1:EqualityExpression   e2:(_ "&" _ EqualityExpression)*    { return e2.reduce((s,x) => new BitwiseANDExpression(s, x[3]), e1); }
+EqualityExpression = e1:RelationalExpression   e2:(_ EqualityOperator _ RelationalExpression)* { return e2.reduce((s,x) => new EqualityExpression(x[1], s, x[3]), e1); }
 EqualityOperator = "==" / "!="
-RelationalExpression = ShiftExpression (_ RelationalOperator _ ShiftExpression)*
+RelationalExpression = e1:ShiftExpression e2:(_ RelationalOperator _ ShiftExpression)* { return e2.reduce((s,x) => new RelationalExpression(x[1], s, x[3]), e1); }
 RelationalOperator = ">=" / ">" / "<=" / "<"
-ShiftExpression = AdditiveExpression (_ ShiftOperator _ AdditiveExpression)*
-ShiftOperator = "<<<" / "<<" / ">>>" / ">>"
-AdditiveExpression = MultiplicativeExpression (_ AdditiveOperator _ MultiplicativeExpression)*
-AdditiveOperator = "+" / "-"
-MultiplicativeExpression = ExponentiationExpression (_ MultiplicativeOperator _ ExponentiationExpression)*
-MultiplicativeOperator = "*" / "/"
-ExponentiationExpression = UpdateExpression (_ "**" _ UpdateExpression)*
-UpdateExpression
-  = LeftHandSideExpression (_ "++" / "--")?
-  / ("++"/"--") _ UnaryExpression
 
-UnaryExpression  = (UnaryOperator _) * UpdateExpression
+ShiftExpression = e1:AdditiveExpression e2:(_ ShiftOperator _ AdditiveExpression)* { return e2.reduce((s,x) => new ShiftExpression(x[1], s, x[3]), e1); }
+ShiftOperator = "<<<" / "<<" / ">>>" / ">>"
+
+AdditiveExpression = e1:MultiplicativeExpression e2:(_ AdditiveOperator _ MultiplicativeExpression)* { return e2.reduce((s,x) => new AdditiveExpression(x[1], s, x[3]), e1); }
+AdditiveOperator "AdditiveOperator" = "+" / "-"
+
+MultiplicativeExpression = e1:ExponentiationExpression e2:(_ MultiplicativeOperator _ ExponentiationExpression)* { return e2.reduce((s,x) => new MultiplicativeExpression(x[1], s, x[3]), e1); }
+MultiplicativeOperator "MultiplicativeOperator" = "*" / "/"
+
+ExponentiationExpression = e1:UnaryExpression e2:(_ "**" _ UnaryExpression)* { return e2.reduce((s,x) => new ExponentiationExpression(s, x[3]), e1); }
+
+UnaryExpression  = op:UnaryOperator _ e:UnaryExpression { return new UnaryExpression(op,e); }
+                 / LeftHandSideExpression
 UnaryOperator = "+" / "-" / "~" / "!"
 
 LeftHandSideExpression
-  = NewExpression
-  / CallExpression
-  
-NewExpression
-  = CallExpression
-  / MemberExpression
+  = e:PrimaryExpression es:(CallExpression / MemberExpressionPost)* { return es.reduce((s,x) => (x.lhs = s, x), e); }
 
 CallExpression
-  = MemberExpression (_ "[" _ Expression _ "]" / _ "." _ Identifier)* Arguments
+  = args:Arguments { return new CallExpression(null, args); }
 
 Arguments
-  = _ "(" _ ( Expression ( _ "," _ Expression )* )? _ ")"
+  = _ "(" _ x: Expression xs:( _ "," _ e:Expression { return e; })* _ ")" { return [x].concat(xs); }
+  / _ "("  _ ")" { return []; }
 
 MemberExpression
-  = PrimaryExpression MemberExpressionPost *
+  = e:PrimaryExpression es:MemberExpressionPost * { return es.reduce((s,x) => (x.lhs = s, x), e); }
 
 MemberExpressionPost
-  = _ "[" _ Expression _ "]"
-  / _ "." _ Identifier
+  = _ "[" _ expr:Expression _ "]" { return new ArrayIndexExpression(null, expr); }
+  / _ "." _ name:Identifier { return new ArrayIndexExpression(null, name); }
 
 PrimaryExpression
   = Identifier
@@ -177,29 +473,36 @@ PrimaryExpression
   / ArrayLiteral
   / ObjectLiteral
   / FunctionExpression
-  / _ "(" _ Expression _ ")"
-  
+  / _ "(" _ expr:Expression _ ")" { return new EnclosedInParenthesesExpression(expr); }
+
 Literal
   = NullLiteral
   / BooleanLiteral
   / NumericLiteral
   / StringLiteral
 
-ArrayLiteral  = _ "[" ( _ AssignmentExpression (_ "," AssignmentExpression)* )? "]"
-ObjectLiteral = _ "{" _ PropertyDefinitionList? _ "}"
-FunctionExpression  = "function" _ "(" _ FormalParameters _ ")" _ "{" _ FunctionBody _ "}"
-PropertyDefinitionList
-  = PropertyDefinition (_ "," _ PropertyDefinition)*
-PropertyDefinition = PropertyName _ ":" _ AssignmentExpression
+ArrayLiteral  = _ "[" _ v:ArrayLiteralList _ "]" { return new ArrayLiteral(v); }
+              / _ "[" _ "]" { return new ArrayLiteral([]); }
+ArrayLiteralList = x:AssignmentExpression xs:(_ "," _ e:AssignmentExpression { return e; })* { return [x].concat(xs); }
+
+ObjectLiteral = _ "{" _ v:PropertyDefinitionList _ "}" { return new ObjectLiteral(v); }
+              / _ "{" _ "}" { return new ObjectLiteral([]); }
+PropertyDefinitionList = x:PropertyDefinition xs:(_ "," _ e:PropertyDefinition { return e; })* { return [x].concat(xs); }
+PropertyDefinition = name:PropertyName _ ":" _ value:AssignmentExpression { return new PropertyDefinition(name, value); }
 PropertyName
   = Identifier
   / StringLiteral
   / NumericLiteral
-  
-NullLiteral = "null"
-BooleanLiteral = "true" / "false"
-NumericLiteral = [0-9]+ ( "." [0-9]+)? { return parseInt(text(), 10); }
-StringLiteral = "\"" ([^\"] / "\\" [.])* "\""
+
+FunctionExpression  = _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{" _ body:FunctionBody _ "}"
+  { return new FunctionExpression(params, body); }
+
+NullLiteral = _ "null" { return new NullLiteral(); }
+BooleanLiteral = "true"  { return new BooleanLiteral(true); }
+               / "false" { return new BooleanLiteral(false); }
+NumericLiteral = [0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(text()); }
+StringLiteral = "\"" ([^\"] / "\\" [.])* "\"" { return new StringLiteral(text()); }
+
 Identifier "identifier" = [A-Za-z_][A-Za-z0-9_]* { return text(); }
 _ "whitespace" = [ \t\n\r]*
 
@@ -216,8 +519,8 @@ function foo(x,y) {
   if (x == y) { } else {}
   for (;;) ;
   for (;;) {}
-  for (i=0;i<10;i++) { break; continue; }
-  for (let i=0, x=0;i<10;i++,j++) { break; continue; }
+  for (i=0;i<10;i+=1) { break; continue; }
+  for (let i=0, x=0;i<10;i+=1,j+=1) { break; continue; }
   while (1) {}
   while (x = y = z) {}
   while (x) {}
