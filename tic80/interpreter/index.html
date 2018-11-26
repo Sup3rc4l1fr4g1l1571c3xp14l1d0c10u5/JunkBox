@@ -1,312 +1,39 @@
-{
-class Program {
-  constructor(stmts) {
-    this.stmts = stmts;
-  }
-}
 
-class EmptyStatement {
-  constructor() {
-  }
-}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        html, body {
+            width: 100vw;
+            height: 100vh;
+        }
 
-class IfStatement {
-  constructor(condExpr, thenStmt, elseStmt) {
-    this.condExpr = condExpr;
-    this.thenStmt = thenStmt;
-    this.elseStmt = elseStmt;
-  }
-}
+        html, body, div, textarea, a {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            outline: 0;
+            font-size: 100%;
+            vertical-align: baseline;
+            background: transparent;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            display: inline;
+        }
 
-class DoStatement {
-  constructor(condExpr, bodyStmt) {
-    this.condExpr = condExpr;
-    this.bodyStmt = bodyStmt;
-  }
-}
+        a {
+            background-color: lightgray;
+        }
 
-class WhileStatement {
-  constructor(condExpr, bodyStmt) {
-    this.condExpr = condExpr;
-    this.bodyStmt = bodyStmt;
-  }
-}
-
-class ForStatement {
-  constructor(initExpr, condExpr, updateExpr, bodyStmt) {
-    this.initExpr = initExpr;
-    this.condExpr = condExpr;
-    this.updateExpr = updateExpr;
-    this.bodyStmt = bodyStmt;
-  }
-}
-
-class LexicalDeclaration {
-  constructor(binds) {
-    this.binds = binds;
-  }
-}
-
-class LexicalBinding {
-  constructor(ident, initExpr) {
-    this.ident = ident;
-    this.initExpr = initExpr;
-  }
-}
-
-class SwitchStatement {
-  constructor(expr, clauses) {
-    this.expr = expr;
-    this.clauses = clauses;
-  }
-}
-
-class CaseBlock {
-  constructor(clauses, stmt) {
-    this.clauses = clauses;
-    this.stmt = stmt;
-  }
-}
-
-class CaseClause {
-  constructor(expr) {
-    this.expr = expr;
-  }
-}
-
-class DefaultClause {
-  constructor() {
-  }
-}
-
-class BreakStatement {
-  constructor() {
-  }
-}
-
-class ContinueStatement {
-  constructor() {
-  }
-}
-
-class ReturnStatement {
-  constructor(expr) {
-    this.expr = expr;
-  }
-}
-
-class BlockStatement {
-  constructor(stmts) {
-    this.stmts = stmts;
-  }
-}
-
-class ExpressionStatement {
-  constructor(expr) {
-    this.expr = expr;
-  }
-}
-
-class CommaExpression {
-  constructor(exprs) {
-    this.exprs = exprs
-  }
-}
-
-class AssignmentExpression {
-  constructor(op, lhs, rhs) {
-    this.op = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class ConditionalExpression {
-  constructor(condExpr, thenExpr, elseExpr) {
-    this.condExpr = condExpr;
-    this.thenExpr = thenExpr;
-    this.elseExpr = elseExpr;
-  }
-}
-
-class LogicalORExpression  {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class LogicalANDExpression {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class BitwiseORExpression  {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class BitwiseXORExpression {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class BitwiseANDExpression {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class EqualityExpression {
-  constructor(op, lhs, rhs) {
-    this.op  = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class RelationalExpression {
-  constructor(op, lhs, rhs) {
-    this.op  = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class ShiftExpression {
-  constructor(op, lhs, rhs) {
-    this.op  = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class AdditiveExpression {
-  constructor(op, lhs, rhs) {
-    this.op  = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class MultiplicativeExpression {
-  constructor(op, lhs, rhs) {
-    this.op  = op;
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class ExponentiationExpression {
-  constructor(lhs, rhs) {
-    this.lhs = lhs;
-    this.rhs = rhs;
-  }
-}
-
-class UnaryExpression  {
-  constructor(op, rhs) {
-    this.op  = op;
-    this.rhs = rhs;
-  }
-}
-
-class CallExpression {
-  constructor(lhs, args) {
-    this.lhs = lhs;
-    this.args = args;
-  }
-}
-
-class ArrayIndexExpression {
-  constructor(lhs, index) {
-    this.lhs = lhs;
-    this.index = index;
-  }
-}
-
-class ObjectMemberExpression {
-  constructor(lhs, member) {
-    this.lhs = lhs;
-    this.member = member;
-  }
-}
-
-class EnclosedInParenthesesExpression {
-  constructor(expr) {
-    this.expr = expr;
-  }
-}
-
-class ArrayLiteral  {
-  constructor(value) {
-    this.value = value;
-  }
-}
-
-class ObjectLiteral {
-  constructor(value) {
-    this.value = value;
-  }
-}
-
-class PropertyDefinition {
-  constructor(key,value) {
-    this.key = key;
-    this.value = value;
-  }
-}
-
-class FunctionExpression {
-  constructor(params, body) {
-    this.params = params;
-    this.body = body;
-  }
-}
-
-class FunctionParameter {
-  constructor(ident, init, spread) {
-    this.ident = ident;
-    this.init = init;
-    this.spread = spread;
-  }
-}
-
-class NullLiteral {
-  constructor() {
-  }
-}
-
-class BooleanLiteral {
-  constructor(value) {
-    this.value = value;
-  }
-}
-
-class NumericLiteral {
-  constructor(value) {
-    this.value = value;
-  }
-}
-
-class StringLiteral {
-  constructor(value) {
-    this.value = value;
-  }
-}
-
-
-}
-
+        textarea {
+            resize: none;
+            outline: 0;
+            border: 1px solid lightgray;
+        }
+    </style>
+    <script type="text/peg-js">
 Program
-  = stmts:StatementList { return null;new Program(stmts); }
+  = stmts:StatementList _ { return new Program(stmts); }
 
 StatementList
   = Statement*
@@ -393,8 +120,8 @@ ArrowFunction
   = "(" _ params:FunctionParameters? _ ")" _ "=>" _ body:ConciseBody { return new FunctionExpression(params, body); }
 
 ConciseBody
-  = expr:AssignmentExpression  { return new ReturnStatement(expr); }
-  / FunctionBody
+  = FunctionBody
+  / expr:AssignmentExpression  { return new ReturnStatement(expr); }
 
 FunctionBody
   = BlockStatement
@@ -498,44 +225,26 @@ FunctionExpression  = _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{"
   { return new FunctionExpression(params, body); }
 
 NullLiteral = _ "null" { return new NullLiteral(); }
-BooleanLiteral = "true"  { return new BooleanLiteral(true); }
-               / "false" { return new BooleanLiteral(false); }
-NumericLiteral = [0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(text()); }
-StringLiteral = "\"" ([^\"] / "\\" [.])* "\"" { return new StringLiteral(text()); }
+BooleanLiteral = _ "true"  { return new BooleanLiteral(true); }
+               / _ "false" { return new BooleanLiteral(false); }
+NumericLiteral = _ number:([0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(text()); }) { return number; }
+StringLiteral = _ string:("\"" ([^\"] / "\\" [.])* "\"" { return new StringLiteral(text()); }) { return string; }
 
-Identifier "identifier" = [A-Za-z_][A-Za-z0-9_]* { return text(); }
+Identifier "identifier" = _ ident:([A-Za-z_][A-Za-z0-9_]* { return new IdentifierLiteral(text()); }) { return ident; }
 _ "whitespace" = [ \t\n\r]*
 
-/*
-function foo(x,y) {
-  let f;
-  let g = 1;
-  let m = (x,y,z) => 1;
-  let m = (x,...f) => {};
-  let m = (x,y,z) => {};
-  x = 1;
-  if (1) { } else {}
-  if (a) 1; else {}
-  if (x == y) { } else {}
-  for (;;) ;
-  for (;;) {}
-  for (i=0;i<10;i+=1) { break; continue; }
-  for (let i=0, x=0;i<10;i+=1,j+=1) { break; continue; }
-  while (1) {}
-  while (x = y = z) {}
-  while (x) {}
-  do { 1; } while (x);
-  do 1; while (x);
-  do {} while (x);
-  break ;
-  continue ;
-  return;
-  return x;
-  { ; }
-  ;
-  let x = [];
-  let y = { x:1 };
-  x[5] = y.f.g();
-  y.f = {};
-}
-*/
+    </script>
+    <script src="./peg.js"></script>
+    <script src="./app.js"></script>
+    <script src="./jsDump.js"></script>
+</head>
+<body>
+    <div style="display:flex; width:100vw; height:100vh; flex-direction: column; flex-wrap: wrap;">
+        <div style="display:flex; "><a id="eval">eval</a></div>
+        <div style="display:flex; flex:1; flex-direction: row; flex-wrap: wrap;">
+            <div style="display:flex; flex:1;"><textarea id="code" style="width:100%; height:100%;"></textarea></div>
+            <div style="display:flex; flex:1;"><textarea id="output" style="width:100%; height:100%;"></textarea></div>
+        </div>
+    </div>
+</body>
+</html>
