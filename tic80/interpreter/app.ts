@@ -1,6 +1,27 @@
 ﻿/// <reference path="typings/pegjs.d.ts" />
+/// <reference path="typings/generated-parser.d.ts" />
 
-import * as Api from "./typings/api";
+///import * as Api from "./typings/api";
+
+interface Array<T> {
+    peek(): T;
+}
+Array.prototype.peek = function () {
+    return this[this.length - 1];
+}
+
+type AssignmentOperator = "*=" | "/=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | ">>>=" | "<<<=" | "&=" | "^=" | "|=" | "**=" | "=";
+type LogicalOperator = "&&" | "||";
+type BitwiseOperator = "&" | "|" | "^";
+type EqualityOperator = "==" | "!=";
+type RelationalOperator = ">=" | ">" | "<=" | "<";
+type ShiftOperator = "<<<" | "<<" | ">>>" | ">>";
+type AdditiveOperator = "+" | "-";
+type MultiplicativeOperator = "*" | "/" | "%";
+type ExponentiationOperator = "**";
+type UnaryOperator = "+" | "-" | "~" | "!";
+type ConditionalOperator = EqualityOperator | RelationalOperator;
+type BinaryOperator = BitwiseOperator | ShiftOperator | AdditiveOperator | MultiplicativeOperator | ExponentiationOperator;
 
 interface IStatement { }
 
@@ -82,7 +103,7 @@ class CommaExpression implements IExpression {
 }
 
 class AssignmentExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: AssignmentOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class ConditionalExpression implements IExpression {
@@ -110,23 +131,23 @@ class BitwiseANDExpression implements IExpression {
 }
 
 class EqualityExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: EqualityOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class RelationalExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: RelationalOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class ShiftExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: ShiftOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class AdditiveExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: AdditiveOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class MultiplicativeExpression implements IExpression {
-    constructor(public op: string, public lhs: IExpression, public rhs: IExpression) { }
+    constructor(public op: MultiplicativeOperator, public lhs: IExpression, public rhs: IExpression) { }
 }
 
 class ExponentiationExpression implements IExpression {
@@ -134,7 +155,7 @@ class ExponentiationExpression implements IExpression {
 }
 
 class UnaryExpression implements IExpression {
-    constructor(public op: string, public rhs: IExpression) { }
+    constructor(public op: UnaryOperator, public rhs: IExpression) { }
 }
 
 class CallExpression implements IExpression {
@@ -200,88 +221,82 @@ class LabelInstruction implements IInstruction {
 
 }
 class JumpInstruction implements IInstruction {
-    constructor(public label: LabelInstruction) {}
+    constructor(public label: LabelInstruction) { }
 }
 class BranchInstruction implements IInstruction {
-    constructor(public thenLabel: LabelInstruction, public elseLabel: LabelInstruction) {}
+    constructor(public thenLabel: LabelInstruction, public elseLabel: LabelInstruction) { }
 }
 class BindInstruction implements IInstruction {
-    constructor(public ident: string) {}
+    constructor(public ident: string) { }
 }
 class ReturnInstruction implements IInstruction {
-    constructor(public hasValue: boolean) {}
+    constructor(public hasValue: boolean) { }
 }
 class EnterInstruction implements IInstruction {
-    constructor() {}
+    constructor() { }
 }
 class LeaveInstruction implements IInstruction {
-    constructor() {}
+    constructor() { }
 }
 class PopInstruction implements IInstruction {
-    constructor() {}
+    constructor() { }
 }
-class AssignmentInstruction implements IInstruction {
-    constructor(public op:string) {}
+class SimpleAssignmentInstruction implements IInstruction {
+    constructor(public op: AssignmentOperator) { }
+}
+class ArrayAssignmentInstruction implements IInstruction {
+    constructor(public op: AssignmentOperator) { }
+}
+class MemberAssignmentInstruction implements IInstruction {
+    constructor(public op: AssignmentOperator) { }
 }
 class ConditionalInstruction implements IInstruction {
-    constructor(public op:string) {}
-}
-class LogicalInstruction implements IInstruction {
-    constructor(public op:string) {}
-}
-class BitwiseInstruction implements IInstruction {
-    constructor(public op:string) {}
-}
-class EqualityInstruction implements IInstruction {
-    constructor(public op:string) {}
-}
-class RelationalInstruction implements IInstruction {
-    constructor(public op:string) {}
+    constructor(public op: ConditionalOperator) { }
 }
 class BinaryInstruction implements IInstruction {
-    constructor(public op:string) {}
+    constructor(public op: BinaryOperator) { }
 }
 class UnaryInstruction implements IInstruction {
-    constructor(public op:string) {}
+    constructor(public op: UnaryOperator) { }
 }
 class CallInstruction implements IInstruction {
-    constructor(public argc:number) {}
+    constructor(public argc: number) { }
 }
 class ArrayIndexInstruction implements IInstruction {
-    constructor() {}
+    constructor() { }
 }
 class ObjectMemberInstruction implements IInstruction {
-    constructor(public member:string) {}
+    constructor(public member: string) { }
 }
 class ArrayLiteralInstruction implements IInstruction {
-    constructor(public count:number) {}
+    constructor(public count: number) { }
 }
 class ObjectLiteralInstruction implements IInstruction {
-    constructor(public count:number) {}
+    constructor(public count: number) { }
 }
 class StringLiteralInstruction implements IInstruction {
-    constructor(public value:string) {}
+    constructor(public value: string) { }
 }
 class FunctionInstruction implements IInstruction {
-    constructor(public params:FunctionParameter[], public instructions:IInstruction[]) {}
+    constructor(public params: FunctionParameter[], public instructions: IInstruction[]) { }
 }
 class NumericLiteralInstruction implements IInstruction {
-    constructor(public value:number) {}
+    constructor(public value: number) { }
 }
 class NullLiteralInstruction implements IInstruction {
-    constructor() {}
+    constructor() { }
 }
 class BooleanLiteralInstruction implements IInstruction {
-    constructor(public value:boolean) {}
+    constructor(public value: boolean) { }
 }
 class IdentifierLiteralInstruction implements IInstruction {
-    constructor(public value:string) {}
+    constructor(public value: string) { }
 }
 
 class Compiler {
-    instructions:IInstruction[];
-    breakTarget:LabelInstruction[];
-    continueTarget:LabelInstruction[];
+    instructions: IInstruction[];
+    breakTarget: LabelInstruction[];
+    continueTarget: LabelInstruction[];
     constructor() {
         this.instructions = [];
         this.breakTarget = [];
@@ -314,7 +329,7 @@ class Compiler {
         this.instructions.push(elseLabel);
         this.accept(self.elseStmt);
         this.instructions.push(new JumpInstruction(joinLabel));
-        
+
         this.instructions.push(joinLabel);
 
         return null;
@@ -328,7 +343,7 @@ class Compiler {
 
         this.instructions.push(headLabel);
         this.accept(self.bodyStmt);
-        
+
         this.instructions.push(contLabel);
         this.accept(self.condExpr);
         this.instructions.push(new BranchInstruction(headLabel, brakLabel));
@@ -351,7 +366,7 @@ class Compiler {
         this.instructions.push(headLabel);
         this.accept(self.bodyStmt);
         this.instructions.push(new JumpInstruction(contLabel));
-        
+
         this.instructions.push(brakLabel);
 
         return null;
@@ -398,12 +413,12 @@ class Compiler {
         this.breakTarget.push(brakLabel);
         let defaultLabel = brakLabel;
 
-        let labels: [LabelInstruction,IStatement][] = [];
+        let labels: [LabelInstruction, IStatement][] = [];
 
-        const elseLabel = self.clauses.reduce((s,x) => {
+        const elseLabel = self.clauses.reduce((s, x) => {
             this.instructions.push(s);
             const matchLabel = new LabelInstruction();
-            labels.push([matchLabel,x.stmt]);
+            labels.push([matchLabel, x.stmt]);
             s = x.clauses.reduce((s, y) => {
                 if (y instanceof CaseClause) {
                     this.instructions.push(s);
@@ -432,11 +447,11 @@ class Compiler {
     //onCaseClause(self: CaseClause) { return null; }
     //onDefaultClause(self: DefaultClause) { return null; }
     onBreakStatement(self: BreakStatement) {
-        this.instructions.push(this.breakTarget[this.breakTarget.length-1]);
+        this.instructions.push(this.breakTarget.peek());
         return null;
     }
     onContinueStatement(self: ContinueStatement) {
-        this.instructions.push(this.continueTarget[this.continueTarget.length-1]);
+        this.instructions.push(this.continueTarget.peek());
         return null;
     }
     onReturnStatement(self: ReturnStatement) {
@@ -472,8 +487,20 @@ class Compiler {
     }
     onAssignmentExpression(self: AssignmentExpression) {
         this.accept(self.rhs);
-        this.accept(self.lhs);
-        this.instructions.push(new AssignmentInstruction(self.op));
+        if (self.lhs instanceof IdentifierLiteral) {
+            this.instructions.push(new IdentifierLiteralInstruction(self.lhs.value));
+            this.instructions.push(new SimpleAssignmentInstruction(self.op));
+        } else if (self.lhs instanceof ArrayIndexExpression) {
+            this.accept(self.lhs.lhs);
+            this.accept(self.lhs.index);
+            this.instructions.push(new ArrayAssignmentInstruction(self.op));
+        } else if (self.lhs instanceof ObjectMemberExpression) {
+            this.accept(self.lhs.lhs);
+            this.instructions.push(new IdentifierLiteralInstruction(self.lhs.member));
+            this.instructions.push(new ArrayAssignmentInstruction(self.op));
+        } else {
+            throw new Error();
+        }
         return null;
     }
     onConditionalExpression(self: ConditionalExpression) {
@@ -491,51 +518,79 @@ class Compiler {
         this.instructions.push(elseLabel);
         this.accept(self.elseExpr);
         this.instructions.push(new JumpInstruction(joinLabel));
-        
+
         this.instructions.push(joinLabel);
 
         return null;
     }
     onLogicalORExpression(self: LogicalORExpression) {
-        this.accept(self.rhs);
+        const thenLabel = new LabelInstruction();
+        const elseLabel = new LabelInstruction();
+        const joinLabel = new LabelInstruction();
+
         this.accept(self.lhs);
-        this.instructions.push(new LogicalInstruction("Or"));
+        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+
+        this.instructions.push(thenLabel);
+        this.instructions.push(new BooleanLiteralInstruction(true));
+        this.instructions.push(new JumpInstruction(joinLabel));
+
+        this.instructions.push(elseLabel);
+        this.accept(self.rhs);
+        this.instructions.push(new JumpInstruction(joinLabel));
+
+        this.instructions.push(joinLabel);
+
         return null;
     }
     onLogicalANDExpression(self: LogicalANDExpression) {
-        this.accept(self.rhs);
+        const thenLabel = new LabelInstruction();
+        const elseLabel = new LabelInstruction();
+        const joinLabel = new LabelInstruction();
+
         this.accept(self.lhs);
-        this.instructions.push(new LogicalInstruction("And"));
+        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+
+        this.instructions.push(thenLabel);
+        this.accept(self.rhs);
+        this.instructions.push(new JumpInstruction(joinLabel));
+
+        this.instructions.push(elseLabel);
+        this.instructions.push(new BooleanLiteralInstruction(false));
+        this.instructions.push(new JumpInstruction(joinLabel));
+
+        this.instructions.push(joinLabel);
+
         return null;
     }
     onBitwiseORExpression(self: BitwiseORExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BitwiseInstruction("Or"));
+        this.instructions.push(new BinaryInstruction("|"));
         return null;
     }
     onBitwiseXORExpression(self: BitwiseXORExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BitwiseInstruction("Xor"));
+        this.instructions.push(new BinaryInstruction("^"));
         return null;
     }
     onBitwiseANDExpression(self: BitwiseANDExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BitwiseInstruction("And"));
+        this.instructions.push(new BinaryInstruction("&"));
         return null;
     }
     onEqualityExpression(self: EqualityExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new EqualityInstruction(self.op));
+        this.instructions.push(new ConditionalInstruction(self.op));
         return null;
     }
     onRelationalExpression(self: RelationalExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new RelationalInstruction(self.op));
+        this.instructions.push(new ConditionalInstruction(self.op));
         return null;
     }
     onShiftExpression(self: ShiftExpression) {
@@ -550,30 +605,30 @@ class Compiler {
         this.instructions.push(new BinaryInstruction(self.op));
         return null;
     }
-    onMultiplicativeExpression(self: MultiplicativeExpression)  {
+    onMultiplicativeExpression(self: MultiplicativeExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
         this.instructions.push(new BinaryInstruction(self.op));
         return null;
     }
-    onExponentiationExpression(self: ExponentiationExpression)  {
+    onExponentiationExpression(self: ExponentiationExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
         this.instructions.push(new BinaryInstruction("**"));
         return null;
     }
-    onUnaryExpression(self: UnaryExpression)  {
+    onUnaryExpression(self: UnaryExpression) {
         this.accept(self.rhs);
         this.instructions.push(new UnaryInstruction(self.op));
         return null;
     }
-    onCallExpression(self: CallExpression)  {
+    onCallExpression(self: CallExpression) {
         self.args.forEach(x => this.accept(x));
         this.accept(self.lhs);
         this.instructions.push(new CallInstruction(self.args.length));
         return null;
     }
-    onArrayIndexExpression(self: ArrayIndexExpression)  {
+    onArrayIndexExpression(self: ArrayIndexExpression) {
         this.accept(self.index);
         this.accept(self.lhs);
         this.instructions.push(new ArrayIndexInstruction());
@@ -595,7 +650,7 @@ class Compiler {
         this.instructions.push(new ArrayLiteralInstruction(self.values.length));
         return null;
     }
-    onObjectLiteral(self: ObjectLiteral)  {
+    onObjectLiteral(self: ObjectLiteral) {
         self.values.forEach(expr => {
             this.accept(expr.value);
             this.instructions.push(new StringLiteralInstruction(expr.key));
@@ -619,57 +674,485 @@ class Compiler {
         this.instructions.push(new BooleanLiteralInstruction(self.value));
         return null;
     }
-    onNumericLiteral(self: NumericLiteral)  {
+    onNumericLiteral(self: NumericLiteral) {
         this.instructions.push(new NumericLiteralInstruction(self.value));
         return null;
     }
-    onStringLiteral(self: StringLiteral)  {
+    onStringLiteral(self: StringLiteral) {
         this.instructions.push(new StringLiteralInstruction(self.value));
         return null;
     }
-    onIdentifierLiteral(self: StringLiteral)  {
+    onIdentifierLiteral(self: StringLiteral) {
         this.instructions.push(new IdentifierLiteralInstruction(self.value));
         return null;
     }
 }
-interface IValue {
-    kind:string;
+
+class IScope {
+    values: { [key: string]: IValue };
+    prev: IScope;
+    constructor(prev: IScope) {
+        this.values = {};
+        this.prev = prev;
+    }
 }
-class 
+
+type Closure = { func: IInstruction[], scope: IScope };
+class IValue {
+    kind: "number" | "boolean" | "string" | "closure" | "array" | "object" | "null";
+    value: number | boolean | string | Closure | IValue[] | { [key: string]: IValue };
+    constructor() {
+        this.kind = "null";
+        this.value = null;
+    }
+    toBoolean() {
+        switch (this.kind) {
+            case "number":
+                return (<number>this.value) != 0;
+            case "boolean":
+                return (<boolean>this.value);
+            case "string":
+                return true;
+            case "closure":
+                return true;
+            case "array":
+                return true;
+            case "object":
+                return true;
+            case "null":
+                return false;
+            default:
+                throw new Error();
+        }
+    }
+    toNumber() {
+        switch (this.kind) {
+            case "number":
+                return (<number>this.value);
+            case "boolean":
+                return (<boolean>this.value) ? 1 : 0;
+            case "string":
+            case "closure":
+            case "array":
+            case "object":
+            case "null":
+            default:
+                throw new Error();
+        }
+    }
+}
 
 class Context {
-    instructions : IInstruction[];
-    pc:number;
-    stack:IValue[];
+    instructions: IInstruction[];
+    pc: number;
+    stack: IValue[];
+    scope: IScope;
+    callStack: Context[];
+    constructor(context?: Context) {
+        if (context) {
+            this.instructions = context.instructions;
+            this.pc = context.pc;
+            this.stack = context.stack;
+            this.scope = context.scope;
+            this.callStack = context.callStack;
+        } else {
+            this.instructions = null;
+            this.pc = null;
+            this.stack = null;
+            this.scope = null;
+            this.callStack = null;
+        }
+    }
 }
 class VM {
-static onLabelInstruction(context:Context) : Context { return context; }
-static onJumpInstruction(context:Context) : Context { return context; }
-static onBranchInstruction(context:Context) : Context { return context; }
-static onBindInstruction(context:Context) : Context { return context; }
-static onReturnInstruction(context:Context) : Context { return context; }
-static onEnterInstruction(context:Context) : Context { return context; }
-static onLeaveInstruction(context:Context) : Context { return context; }
-static onPopInstruction(context:Context) : Context { return context; }
-static onAssignmentInstruction(context:Context) : Context { return context; }
-static onConditionalInstruction(context:Context) : Context { return context; }
-static onLogicalInstruction(context:Context) : Context { return context; }
-static onBitwiseInstruction(context:Context) : Context { return context; }
-static onEqualityInstruction(context:Context) : Context { return context; }
-static onRelationalInstruction(context:Context) : Context { return context; }
-static onBinaryInstruction(context:Context) : Context { return context; }
-static onUnaryInstruction(context:Context) : Context { return context; }
-static onCallInstruction(context:Context) : Context { return context; }
-static onArrayIndexInstruction(context:Context) : Context { return context; }
-static onObjectMemberInstruction(context:Context) : Context { return context; }
-static onArrayLiteralInstruction(context:Context) : Context { return context; }
-static onObjectLiteralInstruction(context:Context) : Context { return context; }
-static onStringLiteralInstruction(context:Context) : Context { return context; }
-static onFunctionInstruction(context:Context) : Context { return context; }
-static onNumericLiteralInstruction(context:Context) : Context { return context; }
-static onNullLiteralInstruction(context:Context) : Context { return context; }
-static onBooleanLiteralInstruction(context:Context) : Context { return context; }
-static onIdentifierLiteralInstruction(context:Context) : Context { return context; }
+    static accept(context: Context): Context {
+        const inst : any = context.instructions[context.pc];
+        if (inst == null) {
+            return context;
+        }
+        const callName = "on" + inst.__proto__.constructor.name;
+        if (this[callName]) {
+            return VM[callName].call(null, inst, context);
+        } else {
+            throw new Error(`${callName} is not found`);
+        }
+    }
+
+    static onLabelInstruction(self: LabelInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onJumpInstruction(self: JumpInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.pc = ctx.instructions.findIndex(x => x == self.label) + 1;
+        return ctx;
+    }
+    static onBranchInstruction(self: BranchInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        if (context.stack.pop().toBoolean()) {
+            ctx.pc = ctx.instructions.findIndex(x => x == self.thenLabel) + 1;
+        } else {
+            ctx.pc = ctx.instructions.findIndex(x => x == self.elseLabel) + 1;
+        }
+        return ctx;
+    }
+    static onBindInstruction(self: BindInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx[self.ident] = context.stack.pop();
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onReturnInstruction(self: ReturnInstruction, context: Context): Context {
+        const ctx = context.callStack.pop();
+        ctx.stack.push(context.stack.pop());
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onEnterInstruction(self: EnterInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.scope = new IScope(ctx.scope);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onLeaveInstruction(self: LeaveInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.scope = ctx.scope.prev;
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onPopInstruction(self: PopInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.stack.pop();
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onAssignmentInstruction(self: AssignmentInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const lhs = ctx.stack.pop();
+        const rhs = ctx.stack.peek();
+        switch (self.op) {
+            case "=":
+                lhs.kind = rhs.kind;
+                lhs.value = rhs.value;
+                break;
+            case "+=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() + rhs.toNumber();
+                break;
+            case "-=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() - rhs.toNumber();
+                break;
+            case "*=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() * rhs.toNumber();
+                break;
+            case "/=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() / rhs.toNumber();
+                break;
+            case "%=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() % rhs.toNumber();
+                break;
+            case "<<=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() << rhs.toNumber();
+                break;
+            case "<<<=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() << rhs.toNumber();
+                break;
+            case ">>=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() >> rhs.toNumber();
+                break;
+            case ">>>=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() >>> rhs.toNumber();
+                break;
+            case "&=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() & rhs.toNumber();
+                break;
+            case "^=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() ^ rhs.toNumber();
+                break;
+            case "|=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() | rhs.toNumber();
+                break;
+            case "**=":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() ** rhs.toNumber();
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onConditionalInstruction(self: ConditionalInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const lhs = ctx.stack.pop();
+        const rhs = ctx.stack.pop();
+        const ret = new IValue();
+        switch (self.op) {
+            case "==":
+                ret.kind = "boolean";
+                ret.value = (lhs.kind == rhs.kind) && (lhs.value == rhs.value);
+                break;
+            case "!=":
+                ret.kind = "boolean";
+                ret.value = !((lhs.kind == rhs.kind) && (lhs.value == rhs.value));
+                break;
+            case ">=":
+                ret.kind = "boolean";
+                ret.value = lhs.toNumber() >= rhs.toNumber();
+                break;
+            case "<=":
+                ret.kind = "boolean";
+                ret.value = lhs.toNumber() <= rhs.toNumber();
+                break;
+            case ">":
+                ret.kind = "number";
+                ret.value = lhs.toNumber() > rhs.toNumber();
+                break;
+            case "<":
+                ret.kind = "number";
+                ret.value = lhs.toNumber() < rhs.toNumber();
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onBinaryInstruction(self: BinaryInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const lhs = ctx.stack.pop();
+        const rhs = ctx.stack.pop();
+        const ret = new IValue();
+        switch (self.op) {
+            case "+":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() + rhs.toNumber();
+                break;
+            case "-":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() - rhs.toNumber();
+                break;
+            case "*":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() * rhs.toNumber();
+                break;
+            case "/":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() / rhs.toNumber();
+                break;
+            case "%":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() % rhs.toNumber();
+                break;
+            case "<<":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() << rhs.toNumber();
+                break;
+            case "<<<":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() << rhs.toNumber();
+                break;
+            case ">>":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() >> rhs.toNumber();
+                break;
+            case ">>>":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() >>> rhs.toNumber();
+                break;
+            case "&":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() & rhs.toNumber();
+                break;
+            case "^":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() ^ rhs.toNumber();
+                break;
+            case "|":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() | rhs.toNumber();
+                break;
+            case "**":
+                lhs.kind = "number";
+                lhs.value = lhs.toNumber() ** rhs.toNumber();
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onUnaryInstruction(self: UnaryInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const rhs = ctx.stack.pop();
+        const ret = new IValue();
+        switch (self.op) {
+            case "+":
+                ret.kind = "number";
+                ret.value = rhs.toNumber();
+                break;
+            case "-":
+                ret.kind = "number";
+                ret.value = -rhs.toNumber();
+                break;
+            case "~":
+                ret.kind = "number";
+                ret.value = ~rhs.toNumber();
+                break;
+            case "!":
+                ret.kind = "boolean";
+                ret.value = !rhs.toBoolean();
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onCallInstruction(self: CallInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const args = [];
+        for (let i = 0; i < self.argc; i++) {
+            args.push(ctx.stack.pop());
+        }
+
+        const lhs = ctx.stack.pop();
+        if (lhs.kind != "closure") {
+            throw new Error();
+        }
+
+        const closure = <Closure>lhs.value;
+        ctx.instructions = closure.func;
+        ctx.pc = 0;
+        ctx.callStack.push(context)
+        ctx.stack = args;
+        ctx.scope = new IScope(closure.scope);
+        return ctx;
+    }
+    static onArrayIndexInstruction(self: ArrayIndexInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const lhs = ctx.stack.pop();
+        const rhs = ctx.stack.pop();
+        if (lhs.kind != "array" || rhs.kind != "number") {
+            throw new Error();
+        }
+        const array = <IValue[]>lhs.value;
+        const ret = array[rhs.toNumber()] || new IValue(); 
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onObjectMemberInstruction(self: ObjectMemberInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const lhs = ctx.stack.pop();
+        const rhs = ctx.stack.pop();
+        if (lhs.kind != "object" || rhs.kind != "string") {
+            throw new Error();
+        }
+        const obj = <{ [key: string]: IValue }>lhs.value;
+        const ret = obj[rhs.toString()] || new IValue(); 
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onArrayLiteralInstruction(self: ArrayLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const values = [];
+        for (let i = 0; i < self.count; i++) {
+            values.push(ctx.stack.pop());
+        }
+        values.reverse();
+        const ret = new IValue();
+        ret.kind = "array";
+        ret.value = values;
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onObjectLiteralInstruction(self: ObjectLiteralInstruction, context: Context): Context  {
+        const ctx = new Context(context);
+        const values = {};
+        for (let i = 0; i < self.count; i++) {
+            const key = ctx.stack.pop();
+            const value = ctx.stack.pop();
+            if (key.kind != "string") {
+                throw new Error();
+            }
+            values[<string>(key.value)] = value;
+        }
+        const ret = new IValue();
+        ret.kind = "object";
+        ret.value = values;
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onStringLiteralInstruction(self: StringLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const ret = new IValue();
+        ret.kind = "string";
+        ret.value = self.value;
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onFunctionInstruction(self: FunctionInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const ret = new IValue();
+        ret.kind = "closure";
+        ret.value = { func: self.instructions, scope: context.scope };
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onNumericLiteralInstruction(self: NumericLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const ret = new IValue();
+        ret.kind = "number";
+        ret.value = self.value;
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onNullLiteralInstruction(self: NullLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const ret = new IValue();
+        ret.kind = "null";
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onBooleanLiteralInstruction(self: BooleanLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const ret = new IValue();
+        ret.kind = "boolean";
+        ret.value = self.value;
+        ctx.stack.push(ret);
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onIdentifierLiteralInstruction(self: IdentifierLiteralInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.stack.push(context.scope.values[self.value] || new IValue());
+        ctx.pc += 1;
+        return ctx;
+    }
+
 }
 declare var jsDump: {
     parse(code: any): string;
@@ -678,12 +1161,13 @@ declare var jsDump: {
 declare const parser: peg.GeneratedParser<Program>;
 
 window.onload = () => {
+    console.log("loaded");
     const $ = document.getElementById.bind(document);
-    let parser : Api.GeneratedParser = null;
+    let parser: peg.GeneratedParser = null;
     {
         const dom = document.querySelector("script[type='text/peg-js']");
         const grammer = dom.innerHTML;
-        parser = peg.generate(grammer, <Api.IBuildOptions<"parser">>{ cache:false, optimize:"speed", output: "parser"});
+        parser = <peg.GeneratedParser<Program>>peg.generate(grammer, { cache: false, optimize: "speed", output: "parser" });
     }
 
     $("eval").onclick = () => {
@@ -691,11 +1175,24 @@ window.onload = () => {
             const result = parser.parse($("code").value);
             const c = new Compiler();
             c.accept(result);
-            
+
             //$("output").value = JSON.stringify(c.instructions);
-            $("output").value = jsDump.parse(c.instructions);
+            //$("output").value = jsDump.parse(c.instructions);
+
+
+            let context = new Context();
+            context.instructions = c.instructions;
+            context.pc = 0;
+            context.scope = new IScope(null);
+            context.stack = [];
+            context.callStack = null;
+
+            for (let i = 0; i < 100; i++) {
+                context = VM.accept(context);
+            }
+            $("output").value = jsDump.parse(context);
         } catch (e) {
-        console.log(e);
+            console.log(e);
             if (e instanceof parser.SyntaxError) {
                 $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
             } else {
