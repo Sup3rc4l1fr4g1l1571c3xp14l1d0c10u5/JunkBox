@@ -114,7 +114,7 @@ AssignmentExpression
   / ConditionalExpression
 
 AssignmentOperator
-  = "*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / ((!"=>") "=")
+  = ("*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / ((!"=>") "=")) { return text(); }
 
 ArrowFunction
   = "(" _ params:FunctionParameters? _ ")" _ "=>" _ body:ConciseBody { return new FunctionExpression(params, body); }
@@ -227,7 +227,7 @@ FunctionExpression  = _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{"
 NullLiteral = _ "null" { return new NullLiteral(); }
 BooleanLiteral = _ "true"  { return new BooleanLiteral(true); }
                / _ "false" { return new BooleanLiteral(false); }
-NumericLiteral = _ number:([0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(text()); }) { return number; }
+NumericLiteral = _ number:([0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(Number.parseFloat(text())); }) { return number; }
 StringLiteral = _ string:("\"" ([^\"] / "\\" [.])* "\"" { return new StringLiteral(text()); }) { return string; }
 
 Identifier "identifier" = _ ident:([A-Za-z_][A-Za-z0-9_]* { return new IdentifierLiteral(text()); }) { return ident; }

@@ -57,7 +57,7 @@ class LexicalDeclaration implements IStatement {
 }
 
 class LexicalBinding {
-    constructor(public ident: string, public initExpr: IExpression) { }
+    constructor(public ident: IdentifierLiteral, public initExpr: IExpression) { }
 }
 
 class SwitchStatement implements IStatement {
@@ -292,6 +292,10 @@ class BooleanLiteralInstruction implements IInstruction {
 class IdentifierLiteralInstruction implements IInstruction {
     constructor(public value: string) { }
 }
+class LoadInstruction implements IInstruction {
+    constructor(public value: string) { }
+}
+
 
 class Compiler {
     instructions: IInstruction[];
@@ -402,7 +406,7 @@ class Compiler {
     }
     onLexicalBinding(self: LexicalBinding) {
         this.accept(self.initExpr);
-        this.instructions.push(new BindInstruction(self.ident));
+        this.instructions.push(new BindInstruction(self.ident.value));
         return null;
     }
     onSwitchStatement(self: SwitchStatement) {
@@ -497,7 +501,7 @@ class Compiler {
         } else if (self.lhs instanceof ObjectMemberExpression) {
             this.accept(self.lhs.lhs);
             this.instructions.push(new IdentifierLiteralInstruction(self.lhs.member));
-            this.instructions.push(new ArrayAssignmentInstruction(self.op));
+            this.instructions.push(new MemberAssignmentInstruction(self.op));
         } else {
             throw new Error();
         }
@@ -683,7 +687,7 @@ class Compiler {
         return null;
     }
     onIdentifierLiteral(self: StringLiteral) {
-        this.instructions.push(new IdentifierLiteralInstruction(self.value));
+        this.instructions.push(new LoadInstruction(self.value));
         return null;
     }
 }
@@ -695,15 +699,36 @@ class IScope {
         this.values = {};
         this.prev = prev;
     }
+    getScope(key: string) {
+        for (let self : IScope= this; self != null; self = self.prev) {
+            if (key in self.values) {
+                return self;
+            }
+        }
+        return null;
+    }
+    get(key: string) {
+        for (let self : IScope= this; self != null; self = self.prev) {
+            if (key in self.values) {
+                return self.values[key];
+            }
+        }
+        return null;
+    }
 }
 
 type Closure = { func: IInstruction[], scope: IScope };
 class IValue {
-    kind: "number" | "boolean" | "string" | "closure" | "array" | "object" | "null";
+    kind: "number" | "boolean" | "string" | "symbol" | "closure" | "array" | "object" | "null";
     value: number | boolean | string | Closure | IValue[] | { [key: string]: IValue };
-    constructor() {
-        this.kind = "null";
-        this.value = null;
+    constructor(value?:IValue) {
+        if (value == undefined) {
+            this.kind = "null";
+            this.value = null;
+        } else {
+            this.kind = value.kind;
+            this.value = value.value;
+        }
     }
     toBoolean() {
         switch (this.kind) {
@@ -712,6 +737,8 @@ class IValue {
             case "boolean":
                 return (<boolean>this.value);
             case "string":
+                return true;
+            case "symbol":
                 return true;
             case "closure":
                 return true;
@@ -732,6 +759,7 @@ class IValue {
             case "boolean":
                 return (<boolean>this.value) ? 1 : 0;
             case "string":
+            case "symbol":
             case "closure":
             case "array":
             case "object":
@@ -799,7 +827,7 @@ class VM {
     }
     static onBindInstruction(self: BindInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx[self.ident] = context.stack.pop();
+        ctx.scope.values[self.ident] = context.stack.pop();
         ctx.pc += 1;
         return ctx;
     }
@@ -827,66 +855,260 @@ class VM {
         ctx.pc += 1;
         return ctx;
     }
-    static onAssignmentInstruction(self: AssignmentInstruction, context: Context): Context {
+    static onSimpleAssignmentInstruction(self: SimpleAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const lhs = ctx.stack.pop();
+        const symbol = ctx.stack.pop();
+        if (!(symbol instanceof IValue && symbol.kind == "symbol")) {
+            throw new Error();
+        }
+        const scope = ctx.scope.getScope(<string>symbol.value);
+        if (scope == null) {
+            throw new Error();
+        }
+        const ret = new IValue(scope.values[<string>symbol.value]);
         const rhs = ctx.stack.peek();
         switch (self.op) {
             case "=":
-                lhs.kind = rhs.kind;
-                lhs.value = rhs.value;
+                scope.values[<string>symbol.value] = new IValue(rhs);
                 break;
             case "+=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() + rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() + rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "-=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() - rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() - rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "*=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() * rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() * rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "/=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() / rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() / rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "%=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() % rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() % rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "<<=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() << rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "<<<=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() << rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case ">>=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() >> rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() >> rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case ">>>=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() >>> rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() >>> rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "&=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() & rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() & rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "^=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() ^ rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() ^ rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "|=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() | rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() | rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
                 break;
             case "**=":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() ** rhs.toNumber();
+                ret.kind = "number";
+                ret.value = ret.toNumber() ** rhs.toNumber();
+                scope.values[<string>symbol.value] = ret;
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onArrayAssignmentInstruction(self: ArrayAssignmentInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const index = ctx.stack.pop();
+        if (!(index instanceof IValue)) {
+            throw new Error();
+        }
+        const array = ctx.stack.pop();
+        if (!(array instanceof IValue && array.kind == "array")) {
+            throw new Error();
+        }
+        const ret = new IValue(array.value[index.toNumber()]);
+        const rhs = ctx.stack.peek();
+        switch (self.op) {
+            case "=":
+                array.value[index.toNumber()] = new IValue(rhs);
+                break;
+            case "+=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() + rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "-=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() - rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "*=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() * rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "/=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() / rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "%=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() % rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "<<=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "<<<=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case ">>=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() >> rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case ">>>=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() >>> rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "&=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() & rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "^=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() ^ rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "|=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() | rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            case "**=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() ** rhs.toNumber();
+                array.value[index.toNumber()] = ret;
+                break;
+            default:
+                throw new Error();
+        }
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onMemberAssignmentInstruction(self: MemberAssignmentInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const symbol = ctx.stack.pop();
+        if (!(symbol instanceof IValue && symbol.kind == "symbol")) {
+            throw new Error();
+        }
+        const object = ctx.stack.pop();
+        if (!(object instanceof IValue && object.kind == "object")) {
+            throw new Error();
+        }
+        const ret = new IValue(object.value[<string>symbol.value]);
+        const rhs = ctx.stack.peek();
+        switch (self.op) {
+            case "=":
+                object.value[<string>symbol.value] = new IValue(rhs);
+                break;
+            case "+=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() + rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "-=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() - rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "*=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() * rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "/=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() / rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "%=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() % rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "<<=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "<<<=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() << rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case ">>=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() >> rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case ">>>=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() >>> rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "&=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() & rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "^=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() ^ rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "|=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() | rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
+                break;
+            case "**=":
+                ret.kind = "number";
+                ret.value = ret.toNumber() ** rhs.toNumber();
+                object.value[<string>symbol.value] = ret;
                 break;
             default:
                 throw new Error();
@@ -917,11 +1139,11 @@ class VM {
                 ret.value = lhs.toNumber() <= rhs.toNumber();
                 break;
             case ">":
-                ret.kind = "number";
+                ret.kind = "boolean";
                 ret.value = lhs.toNumber() > rhs.toNumber();
                 break;
             case "<":
-                ret.kind = "number";
+                ret.kind = "boolean";
                 ret.value = lhs.toNumber() < rhs.toNumber();
                 break;
             default:
@@ -1148,11 +1370,20 @@ class VM {
     }
     static onIdentifierLiteralInstruction(self: IdentifierLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push(context.scope.values[self.value] || new IValue());
+        const symbol = new IValue();
+        symbol.kind = "symbol";
+        symbol.value = self.value;
+        ctx.stack.push(symbol);
         ctx.pc += 1;
         return ctx;
     }
-
+    static onLoadInstruction(self: LoadInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        ctx.stack.push(context.scope.get(self.value) || new IValue());
+        ctx.pc += 1;
+        return ctx;
+    }
+            
 }
 declare var jsDump: {
     parse(code: any): string;
