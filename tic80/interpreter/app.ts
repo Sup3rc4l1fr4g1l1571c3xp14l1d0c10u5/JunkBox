@@ -167,7 +167,7 @@ class ArrayIndexExpression implements IExpression {
 }
 
 class ObjectMemberExpression implements IExpression {
-    constructor(public lhs: IExpression, public member: string) { }
+    constructor(public lhs: IExpression, public member: IdentifierLiteral) { }
 }
 
 class EnclosedInParenthesesExpression implements IExpression {
@@ -183,7 +183,7 @@ class ObjectLiteral implements IExpression {
 }
 
 class PropertyDefinition {
-    constructor(public key: string, public value: IExpression) { }
+    constructor(public key: IdentifierLiteral, public value: IExpression) { }
 }
 
 class FunctionExpression implements IExpression {
@@ -191,7 +191,7 @@ class FunctionExpression implements IExpression {
 }
 
 class FunctionParameter implements IExpression {
-    constructor(public ident: string, public init: IExpression, public spread: boolean) { }
+    constructor(public ident: IdentifierLiteral, public init: IExpression, public spread: boolean) { }
 }
 
 class NullLiteral implements IExpression {
@@ -214,97 +214,178 @@ class IdentifierLiteral implements IExpression {
     constructor(public value: string) { }
 }
 
-interface IInstruction {
+type IInstruction =
+    LabelInstruction |
+    JumpInstruction |
+    BranchInstruction |
+    BindInstruction |
+    BindArgInstruction |
+    ReturnInstruction |
+    EnterInstruction |
+    LeaveInstruction |
+    PopInstruction |
+    SimpleAssignmentInstruction |
+    ArrayAssignmentInstruction |
+    MemberAssignmentInstruction |
+    ConditionalInstruction |
+    BinaryInstruction |
+    UnaryInstruction |
+    CallInstruction |
+    ArrayIndexInstruction |
+    ObjectMemberInstruction |
+    ArrayLiteralInstruction |
+    ObjectLiteralInstruction |
+    StringLiteralInstruction |
+    FunctionInstruction |
+    NumericLiteralInstruction |
+    NullLiteralInstruction |
+    BooleanLiteralInstruction |
+    IdentifierLiteralInstruction |
+    LoadInstruction;
+
+type LabelInstruction = {
+    kind: "LabelInstruction",
 
 }
-class LabelInstruction implements IInstruction {
+type JumpInstruction = {
+    kind: "JumpInstruction",
+    label: LabelInstruction
+}
+type BranchInstruction = {
+    kind: "BranchInstruction",
+    thenLabel: LabelInstruction,
+    elseLabel: LabelInstruction
+}
+type BindInstruction = {
+    kind: "BindInstruction",
+    ident: string
+}
+type BindArgInstruction = {
+    kind: "BindArgInstruction",
+    ident: string,
+    spread: boolean
+}
+type ReturnInstruction = {
+    kind: "ReturnInstruction",
+    hasValue: boolean
+}
+type EnterInstruction = {
+    kind: "EnterInstruction",
+}
+type LeaveInstruction = {
+    kind: "LeaveInstruction",
+    level: number
+}
+type PopInstruction = {
+    kind: "PopInstruction",
+}
+type SimpleAssignmentInstruction = {
+    kind: "SimpleAssignmentInstruction",
+    op: AssignmentOperator
+}
+type ArrayAssignmentInstruction = {
+    kind: "ArrayAssignmentInstruction",
+    op: AssignmentOperator
+}
+type MemberAssignmentInstruction = {
+    kind: "MemberAssignmentInstruction",
+    op: AssignmentOperator
+}
+type ConditionalInstruction = {
+    kind: "ConditionalInstruction",
+    op: ConditionalOperator
+}
+type BinaryInstruction = {
+    kind: "BinaryInstruction",
+    op: BinaryOperator
+}
+type UnaryInstruction = {
+    kind: "UnaryInstruction",
+    op: UnaryOperator
+}
+type CallInstruction = {
+    kind: "CallInstruction",
+    argc: number
+}
+type ArrayIndexInstruction = {
+    kind: "ArrayIndexInstruction",
+}
+type ObjectMemberInstruction = {
+    kind: "ObjectMemberInstruction",
+    member: string
+}
+type ArrayLiteralInstruction = {
+    kind: "ArrayLiteralInstruction",
+    count: number
+}
+type ObjectLiteralInstruction = {
+    kind: "ObjectLiteralInstruction",
+    count: number
+}
+type StringLiteralInstruction = {
+    kind: "StringLiteralInstruction",
+    value: string
+}
+type FunctionInstruction = {
+    kind: "FunctionInstruction",
+    params: FunctionParameter[],
+    instructions: number
+}
+type NumericLiteralInstruction = {
+    kind: "NumericLiteralInstruction",
+    value: number
+}
+type NullLiteralInstruction = {
+    kind: "NullLiteralInstruction",
+}
+type BooleanLiteralInstruction = {
+    kind: "BooleanLiteralInstruction",
+    value: boolean
+}
+type IdentifierLiteralInstruction = {
+    kind: "IdentifierLiteralInstruction",
+    value: string
+}
+type LoadInstruction = {
+    kind: "LoadInstruction",
+    value: string
+}
 
+type CompilerContext = {
+    instructions: IInstruction[];
+    breakTarget: { level: number, target: LabelInstruction }[];
+    continueTarget: { level: number, target: LabelInstruction }[];
+    blockLevel: number;
 }
-class JumpInstruction implements IInstruction {
-    constructor(public label: LabelInstruction) { }
-}
-class BranchInstruction implements IInstruction {
-    constructor(public thenLabel: LabelInstruction, public elseLabel: LabelInstruction) { }
-}
-class BindInstruction implements IInstruction {
-    constructor(public ident: string) { }
-}
-class ReturnInstruction implements IInstruction {
-    constructor(public hasValue: boolean) { }
-}
-class EnterInstruction implements IInstruction {
-    constructor() { }
-}
-class LeaveInstruction implements IInstruction {
-    constructor() { }
-}
-class PopInstruction implements IInstruction {
-    constructor() { }
-}
-class SimpleAssignmentInstruction implements IInstruction {
-    constructor(public op: AssignmentOperator) { }
-}
-class ArrayAssignmentInstruction implements IInstruction {
-    constructor(public op: AssignmentOperator) { }
-}
-class MemberAssignmentInstruction implements IInstruction {
-    constructor(public op: AssignmentOperator) { }
-}
-class ConditionalInstruction implements IInstruction {
-    constructor(public op: ConditionalOperator) { }
-}
-class BinaryInstruction implements IInstruction {
-    constructor(public op: BinaryOperator) { }
-}
-class UnaryInstruction implements IInstruction {
-    constructor(public op: UnaryOperator) { }
-}
-class CallInstruction implements IInstruction {
-    constructor(public argc: number) { }
-}
-class ArrayIndexInstruction implements IInstruction {
-    constructor() { }
-}
-class ObjectMemberInstruction implements IInstruction {
-    constructor(public member: string) { }
-}
-class ArrayLiteralInstruction implements IInstruction {
-    constructor(public count: number) { }
-}
-class ObjectLiteralInstruction implements IInstruction {
-    constructor(public count: number) { }
-}
-class StringLiteralInstruction implements IInstruction {
-    constructor(public value: string) { }
-}
-class FunctionInstruction implements IInstruction {
-    constructor(public params: FunctionParameter[], public instructions: IInstruction[]) { }
-}
-class NumericLiteralInstruction implements IInstruction {
-    constructor(public value: number) { }
-}
-class NullLiteralInstruction implements IInstruction {
-    constructor() { }
-}
-class BooleanLiteralInstruction implements IInstruction {
-    constructor(public value: boolean) { }
-}
-class IdentifierLiteralInstruction implements IInstruction {
-    constructor(public value: string) { }
-}
-class LoadInstruction implements IInstruction {
-    constructor(public value: string) { }
-}
-
 
 class Compiler {
-    instructions: IInstruction[];
-    breakTarget: LabelInstruction[];
-    continueTarget: LabelInstruction[];
+    instructionBlocks: IInstruction[][];
+    contexts: CompilerContext[];
+
+    get instructions() { return this.contexts.peek().instructions; }
+    get breakTarget() { return this.contexts.peek().breakTarget; }
+    get continueTarget() { return this.contexts.peek().continueTarget; }
+    get blockLevel() { return this.contexts.peek().blockLevel; }
+    set blockLevel(value) { this.contexts.peek().blockLevel = value; }
+
     constructor() {
-        this.instructions = [];
-        this.breakTarget = [];
-        this.continueTarget = [];
+        this.instructionBlocks = [];
+        this.contexts = [];
+        this.pushContext();
+    }
+    pushContext() {
+        const context = {
+            instructions: [],
+            breakTarget: [],
+            continueTarget: [],
+            blockLevel: 0
+        };
+        this.contexts.push(context);
+        this.instructionBlocks.push(context.instructions);
+
+    }
+    popContext() {
+        this.contexts.pop();
     }
     accept(ast: any, ...args: any[]): any {
         const callName = "on" + ast.__proto__.constructor.name;
@@ -319,82 +400,95 @@ class Compiler {
     }
     onEmptyStatement(self: EmptyStatement) { return null; }
     onIfStatement(self: IfStatement) {
-        const thenLabel = new LabelInstruction();
-        const elseLabel = new LabelInstruction();
-        const joinLabel = new LabelInstruction();
+        const thenLabel: LabelInstruction = { kind: "LabelInstruction" };
+        const elseLabel: LabelInstruction = { kind: "LabelInstruction" };
+        const joinLabel: LabelInstruction = { kind: "LabelInstruction" };
 
         this.accept(self.condExpr);
-        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+        this.instructions.push({kind: "BranchInstruction", thenLabel: thenLabel, elseLabel: elseLabel });
 
         this.instructions.push(thenLabel);
-        this.accept(self.thenStmt);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        if (self.thenStmt) {
+            this.accept(self.thenStmt);
+        }
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(elseLabel);
-        this.accept(self.elseStmt);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        if (self.elseStmt) {
+            this.accept(self.elseStmt);
+        }
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(joinLabel);
 
         return null;
     }
     onDoStatement(self: DoStatement) {
-        const headLabel = new LabelInstruction();
-        const contLabel = new LabelInstruction();
-        const brakLabel = new LabelInstruction();
-        this.breakTarget.push(brakLabel);
-        this.continueTarget.push(contLabel);
+        const headLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const contLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const brakLabel : LabelInstruction = { kind: "LabelInstruction" };
+        this.breakTarget.push({ level: this.blockLevel, target: brakLabel });
+        this.continueTarget.push({ level: this.blockLevel, target: brakLabel });
 
         this.instructions.push(headLabel);
         this.accept(self.bodyStmt);
 
         this.instructions.push(contLabel);
         this.accept(self.condExpr);
-        this.instructions.push(new BranchInstruction(headLabel, brakLabel));
+        this.instructions.push({ kind: "BranchInstruction", thenLabel: headLabel, elseLabel: brakLabel } );
 
         this.instructions.push(brakLabel);
 
         return null;
     }
     onWhileStatement(self: WhileStatement) {
-        const headLabel = new LabelInstruction();
-        const contLabel = new LabelInstruction();
-        const brakLabel = new LabelInstruction();
-        this.breakTarget.push(brakLabel);
-        this.continueTarget.push(contLabel);
+        const headLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const contLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const brakLabel : LabelInstruction = { kind: "LabelInstruction" };
+        this.breakTarget.push({ level: this.blockLevel, target: brakLabel });
+        this.continueTarget.push({ level: this.blockLevel, target: brakLabel });
 
         this.instructions.push(contLabel);
         this.accept(self.condExpr);
-        this.instructions.push(new BranchInstruction(headLabel, brakLabel));
+        this.instructions.push({ kind: "BranchInstruction", thenLabel: headLabel, elseLabel: brakLabel } );
 
         this.instructions.push(headLabel);
         this.accept(self.bodyStmt);
-        this.instructions.push(new JumpInstruction(contLabel));
+        this.instructions.push({ kind: "JumpInstruction", label: contLabel });
 
         this.instructions.push(brakLabel);
 
         return null;
     }
     onForStatement(self: ForStatement) {
-        const headLabel = new LabelInstruction();
-        const contLabel = new LabelInstruction();
-        const brakLabel = new LabelInstruction();
-        const bodyLabel = new LabelInstruction();
-        this.breakTarget.push(brakLabel);
-        this.continueTarget.push(contLabel);
+        const headLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const contLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const brakLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const bodyLabel : LabelInstruction = { kind: "LabelInstruction" };
+        this.breakTarget.push({ level: this.blockLevel, target: brakLabel });
+        this.continueTarget.push({ level: this.blockLevel, target: contLabel });
 
-        this.accept(self.initExpr);
+        if (self.initExpr) {
+            this.accept(self.initExpr);
+        }
 
         this.instructions.push(headLabel);
-        this.accept(self.condExpr);
-        this.instructions.push(new BranchInstruction(bodyLabel, brakLabel));
+        if (self.condExpr) {
+            this.accept(self.condExpr);
+            this.instructions.push({ kind: "BranchInstruction", thenLabel: bodyLabel, elseLabel: brakLabel });
+        }
 
         this.instructions.push(bodyLabel);
-        this.accept(self.bodyStmt);
+        if (self.bodyStmt) {
+            this.accept(self.bodyStmt);
+        }
 
         this.instructions.push(contLabel);
-        this.accept(self.updateExpr);
-        this.instructions.push(new JumpInstruction(headLabel));
+        if (self.updateExpr) {
+            this.accept(self.updateExpr);
+            this.instructions.push({ kind: "PopInstruction" });
+        }
+        this.instructions.push({ kind: "JumpInstruction", label: headLabel });
 
         this.instructions.push(brakLabel);
 
@@ -406,39 +500,38 @@ class Compiler {
     }
     onLexicalBinding(self: LexicalBinding) {
         this.accept(self.initExpr);
-        this.instructions.push(new BindInstruction(self.ident.value));
+        this.instructions.push({ kind: "BindInstruction", ident: self.ident.value });
         return null;
     }
     onSwitchStatement(self: SwitchStatement) {
 
         this.accept(self.expr);
 
-        const brakLabel = new LabelInstruction();
-        this.breakTarget.push(brakLabel);
+        const brakLabel : LabelInstruction = { kind: "LabelInstruction" };
+        this.breakTarget.push({ level: this.blockLevel, target: brakLabel });
         let defaultLabel = brakLabel;
 
         let labels: [LabelInstruction, IStatement][] = [];
 
-        const elseLabel = self.clauses.reduce((s, x) => {
+        const elseLabel = self.clauses.reduce<LabelInstruction>((s, x) => {
             this.instructions.push(s);
-            const matchLabel = new LabelInstruction();
+            const matchLabel : LabelInstruction = { kind: "LabelInstruction" };
             labels.push([matchLabel, x.stmt]);
-            s = x.clauses.reduce((s, y) => {
+            return x.clauses.reduce<LabelInstruction>((s, y) => {
                 if (y instanceof CaseClause) {
                     this.instructions.push(s);
-                    s = new LabelInstruction();
+                    s = <LabelInstruction>{ kind: "LabelInstruction" };
                     this.accept(y.expr);
-                    this.instructions.push(new BranchInstruction(matchLabel, s));
+                    this.instructions.push({ kind: "BranchInstruction", thenLabel: matchLabel, elseLabel: s });
                 } else {
                     defaultLabel = matchLabel;
                 }
                 return s;
-            }, s);
-            return s;
-        }, new LabelInstruction());
+            }, <LabelInstruction>s);
+        }, <LabelInstruction>{ kind: "LabelInstruction" });
 
         this.instructions.push(elseLabel);
-        this.instructions.push(new JumpInstruction(defaultLabel));
+        this.instructions.push({ kind: "JumpInstruction", label: defaultLabel });
 
         labels.forEach(([matchLabel, stmt]) => {
             this.instructions.push(matchLabel);
@@ -451,39 +544,49 @@ class Compiler {
     //onCaseClause(self: CaseClause) { return null; }
     //onDefaultClause(self: DefaultClause) { return null; }
     onBreakStatement(self: BreakStatement) {
-        this.instructions.push(this.breakTarget.peek());
+        const info = this.breakTarget.peek();
+        if (this.blockLevel > info.level) {
+            this.instructions.push({ kind: "LeaveInstruction", level: this.blockLevel - info.level });
+        }
+        this.instructions.push({ kind: "JumpInstruction", label: info.target });
         return null;
     }
     onContinueStatement(self: ContinueStatement) {
-        this.instructions.push(this.continueTarget.peek());
+        const info = this.continueTarget.peek();
+        if (this.blockLevel > info.level) {
+            this.instructions.push({ kind: "LeaveInstruction", level: this.blockLevel - info.level });
+        }
+        this.instructions.push({ kind: "JumpInstruction", label: info.target });
         return null;
     }
     onReturnStatement(self: ReturnStatement) {
         if (self.expr) {
             this.accept(self.expr);
-            this.instructions.push(new ReturnInstruction(true));
+            this.instructions.push({ kind: "ReturnInstruction", hasValue: true });
         } else {
-            this.instructions.push(new ReturnInstruction(false));
+            this.instructions.push({ kind: "ReturnInstruction", hasValue: false });
         }
         return null;
     }
     onBlockStatement(self: BlockStatement) {
-        this.instructions.push(new EnterInstruction());
+        this.instructions.push({ kind: "EnterInstruction" });
+        this.blockLevel += 1;
         for (const statement of self.statements) {
             this.accept(statement);
         }
-        this.instructions.push(new LeaveInstruction());
+        this.blockLevel -= 1;
+        this.instructions.push({ kind: "LeaveInstruction", level: 1 });
         return null;
     }
     onExpressionStatement(self: ExpressionStatement) {
         this.accept(self.expr);
-        this.instructions.push(new PopInstruction());
+        this.instructions.push({ kind: "PopInstruction" });
         return null;
     }
     onCommaExpression(self: CommaExpression) {
         self.exprs.forEach((expr, i) => {
             if (i !== 0) {
-                this.instructions.push(new PopInstruction());
+                this.instructions.push({ kind: "PopInstruction" });
             }
             this.accept(expr);
         });
@@ -492,76 +595,76 @@ class Compiler {
     onAssignmentExpression(self: AssignmentExpression) {
         this.accept(self.rhs);
         if (self.lhs instanceof IdentifierLiteral) {
-            this.instructions.push(new IdentifierLiteralInstruction(self.lhs.value));
-            this.instructions.push(new SimpleAssignmentInstruction(self.op));
+            this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.lhs.value });
+            this.instructions.push({ kind: "SimpleAssignmentInstruction", op: self.op });
         } else if (self.lhs instanceof ArrayIndexExpression) {
             this.accept(self.lhs.lhs);
             this.accept(self.lhs.index);
-            this.instructions.push(new ArrayAssignmentInstruction(self.op));
+            this.instructions.push({ kind: "ArrayAssignmentInstruction", op: self.op });
         } else if (self.lhs instanceof ObjectMemberExpression) {
             this.accept(self.lhs.lhs);
-            this.instructions.push(new IdentifierLiteralInstruction(self.lhs.member));
-            this.instructions.push(new MemberAssignmentInstruction(self.op));
+            this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.lhs.member.value });
+            this.instructions.push({ kind: "MemberAssignmentInstruction", op: self.op });
         } else {
             throw new Error();
         }
         return null;
     }
     onConditionalExpression(self: ConditionalExpression) {
-        const thenLabel = new LabelInstruction();
-        const elseLabel = new LabelInstruction();
-        const joinLabel = new LabelInstruction();
+        const thenLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const elseLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const joinLabel : LabelInstruction = { kind: "LabelInstruction" };
 
         this.accept(self.condExpr);
-        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+        this.instructions.push({ kind: "BranchInstruction", thenLabel: thenLabel, elseLabel: elseLabel });
 
         this.instructions.push(thenLabel);
         this.accept(self.thenExpr);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(elseLabel);
         this.accept(self.elseExpr);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(joinLabel);
 
         return null;
     }
     onLogicalORExpression(self: LogicalORExpression) {
-        const thenLabel = new LabelInstruction();
-        const elseLabel = new LabelInstruction();
-        const joinLabel = new LabelInstruction();
+        const thenLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const elseLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const joinLabel : LabelInstruction = { kind: "LabelInstruction" };
 
         this.accept(self.lhs);
-        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+        this.instructions.push({ kind: "BranchInstruction", thenLabel: thenLabel, elseLabel: elseLabel });
 
         this.instructions.push(thenLabel);
-        this.instructions.push(new BooleanLiteralInstruction(true));
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind: "BooleanLiteralInstruction", value: true });
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(elseLabel);
         this.accept(self.rhs);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(joinLabel);
 
         return null;
     }
     onLogicalANDExpression(self: LogicalANDExpression) {
-        const thenLabel = new LabelInstruction();
-        const elseLabel = new LabelInstruction();
-        const joinLabel = new LabelInstruction();
+        const thenLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const elseLabel : LabelInstruction = { kind: "LabelInstruction" };
+        const joinLabel : LabelInstruction = { kind: "LabelInstruction" };
 
         this.accept(self.lhs);
-        this.instructions.push(new BranchInstruction(thenLabel, elseLabel));
+        this.instructions.push({ kind: "BranchInstruction", thenLabel: thenLabel, elseLabel: elseLabel });
 
         this.instructions.push(thenLabel);
         this.accept(self.rhs);
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(elseLabel);
-        this.instructions.push(new BooleanLiteralInstruction(false));
-        this.instructions.push(new JumpInstruction(joinLabel));
+        this.instructions.push({ kind: "BooleanLiteralInstruction", value: false });
+        this.instructions.push({ kind:"JumpInstruction", label: joinLabel});
 
         this.instructions.push(joinLabel);
 
@@ -570,77 +673,77 @@ class Compiler {
     onBitwiseORExpression(self: BitwiseORExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction("|"));
+        this.instructions.push({ kind: "BinaryInstruction", op: "|" });
         return null;
     }
     onBitwiseXORExpression(self: BitwiseXORExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction("^"));
+        this.instructions.push({ kind: "BinaryInstruction", op: "^" });
         return null;
     }
     onBitwiseANDExpression(self: BitwiseANDExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction("&"));
+        this.instructions.push({ kind: "BinaryInstruction", op: "&" });
         return null;
     }
     onEqualityExpression(self: EqualityExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new ConditionalInstruction(self.op));
+        this.instructions.push({ kind: "ConditionalInstruction", op: self.op });
         return null;
     }
     onRelationalExpression(self: RelationalExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new ConditionalInstruction(self.op));
+        this.instructions.push({ kind: "ConditionalInstruction", op: self.op });
         return null;
     }
     onShiftExpression(self: ShiftExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction(self.op));
+        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
         return null;
     }
     onAdditiveExpression(self: AdditiveExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction(self.op));
+        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
         return null;
     }
     onMultiplicativeExpression(self: MultiplicativeExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction(self.op));
+        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
         return null;
     }
     onExponentiationExpression(self: ExponentiationExpression) {
         this.accept(self.rhs);
         this.accept(self.lhs);
-        this.instructions.push(new BinaryInstruction("**"));
+        this.instructions.push({ kind: "BinaryInstruction", op: "**" });
         return null;
     }
     onUnaryExpression(self: UnaryExpression) {
         this.accept(self.rhs);
-        this.instructions.push(new UnaryInstruction(self.op));
+        this.instructions.push({ kind: "UnaryInstruction", op: self.op });
         return null;
     }
     onCallExpression(self: CallExpression) {
         self.args.forEach(x => this.accept(x));
         this.accept(self.lhs);
-        this.instructions.push(new CallInstruction(self.args.length));
+        this.instructions.push({ kind: "CallInstruction", argc: self.args.length });
         return null;
     }
     onArrayIndexExpression(self: ArrayIndexExpression) {
         this.accept(self.index);
         this.accept(self.lhs);
-        this.instructions.push(new ArrayIndexInstruction());
+        this.instructions.push({ kind: "ArrayIndexInstruction" });
         return null;
     }
     onObjectMemberExpression(self: ObjectMemberExpression) {
         this.accept(self.lhs);
-        this.instructions.push(new ObjectMemberInstruction(self.member));
+        this.instructions.push({ kind: "ObjectMemberInstruction", member: self.member.value });
         return null;
     }
     onEnclosedInParenthesesExpression(self: EnclosedInParenthesesExpression) {
@@ -651,49 +754,57 @@ class Compiler {
         self.values.forEach(expr => {
             this.accept(expr);
         });
-        this.instructions.push(new ArrayLiteralInstruction(self.values.length));
+        this.instructions.push({ kind: "ArrayLiteralInstruction", count: self.values.length });
         return null;
     }
     onObjectLiteral(self: ObjectLiteral) {
         self.values.forEach(expr => {
             this.accept(expr.value);
-            this.instructions.push(new StringLiteralInstruction(expr.key));
+            this.instructions.push({ kind: "IdentifierLiteralInstruction", value: expr.key.value });
         });
-        this.instructions.push(new ObjectLiteralInstruction(self.values.length));
+        this.instructions.push({ kind: "ObjectLiteralInstruction", count: self.values.length });
         return null;
     }
     //onPropertyDefinition(self: PropertyDefinition) { return null; }
     onFunctionExpression(self: FunctionExpression) {
-        const compiler = new Compiler();
-        compiler.accept(self.body)
-        this.instructions.push(new FunctionInstruction(self.params, compiler.instructions));
+        this.pushContext();
+        const index = this.instructionBlocks.length;
+
+        if (self.params.length > 0) {
+            for (let i = 0; i < self.params.length; i++) {
+                this.instructions.push({ kind: "BindArgInstruction",ident:self.params[i].ident.value, spread:self.params[i].spread});
+            }
+        }
+        this.accept(self.body);
+        this.popContext();
+        this.instructions.push({ kind: "FunctionInstruction", params: self.params, instructions: index });
         return null;
     }
     //onFunctionParameter(self: FunctionParameter) { return null; }
     onNullLiteral(self: NullLiteral) {
-        this.instructions.push(new NullLiteralInstruction());
+        this.instructions.push({ kind: "NullLiteralInstruction" });
         return null;
     }
     onBooleanLiteral(self: BooleanLiteral) {
-        this.instructions.push(new BooleanLiteralInstruction(self.value));
+        this.instructions.push({ kind: "BooleanLiteralInstruction", value: self.value });
         return null;
     }
     onNumericLiteral(self: NumericLiteral) {
-        this.instructions.push(new NumericLiteralInstruction(self.value));
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: self.value });
         return null;
     }
     onStringLiteral(self: StringLiteral) {
-        this.instructions.push(new StringLiteralInstruction(self.value));
+        this.instructions.push({ kind: "StringLiteralInstruction", value: self.value });
         return null;
     }
     onIdentifierLiteral(self: StringLiteral) {
-        this.instructions.push(new LoadInstruction(self.value));
+        this.instructions.push({ kind: "LoadInstruction", value: self.value });
         return null;
     }
 }
 
 class IScope {
-    values: { [key: string]: IValue };
+    values: { [key: string]: Value };
     prev: IScope;
     constructor(prev: IScope) {
         this.values = {};
@@ -717,74 +828,77 @@ class IScope {
     }
 }
 
-type Closure = { func: IInstruction[], scope: IScope };
-class IValue {
-    kind: "number" | "boolean" | "string" | "symbol" | "closure" | "array" | "object" | "null";
-    value: number | boolean | string | Closure | IValue[] | { [key: string]: IValue };
-    constructor(value?:IValue) {
-        if (value == undefined) {
-            this.kind = "null";
-            this.value = null;
-        } else {
-            this.kind = value.kind;
-            this.value = value.value;
-        }
+type Value = NumberValue | BooleanValue | StringValue | SymbolValue | ClosureValue | ArrayValue | ObjectValue | NullValue;
+type NumberValue  = { kind: "number", value: number };
+type BooleanValue = { kind: "boolean", value: boolean };
+type StringValue  = { kind: "string", value: string };
+type SymbolValue  = { kind: "symbol", value: string };
+type ClosureValue = { kind: "closure", value: { func: number, scope: IScope } };
+type ArrayValue   = { kind: "array", value: Value[] };
+type ObjectValue  = { kind: "object", value:{ [key: string]: Value } };
+type NullValue    = { kind: "null", value:null};
+
+function copyValue(self: Value) : Value {
+    return <Value>{ kind: self.kind, value: self.value };
+}
+
+function toBoolean(self: Value) {
+    switch (self.kind) {
+        case "number":
+            return self.value != 0;
+        case "boolean":
+            return self.value;
+        case "string":
+            return true;
+        case "symbol":
+            return true;
+        case "closure":
+            return true;
+        case "array":
+            return true;
+        case "object":
+            return true;
+        case "null":
+            return false;
+        default:
+            throw new Error();
     }
-    toBoolean() {
-        switch (this.kind) {
-            case "number":
-                return (<number>this.value) != 0;
-            case "boolean":
-                return (<boolean>this.value);
-            case "string":
-                return true;
-            case "symbol":
-                return true;
-            case "closure":
-                return true;
-            case "array":
-                return true;
-            case "object":
-                return true;
-            case "null":
-                return false;
-            default:
-                throw new Error();
-        }
-    }
-    toNumber() {
-        switch (this.kind) {
-            case "number":
-                return (<number>this.value);
-            case "boolean":
-                return (<boolean>this.value) ? 1 : 0;
-            case "string":
-            case "symbol":
-            case "closure":
-            case "array":
-            case "object":
-            case "null":
-            default:
-                throw new Error();
-        }
+}
+function toNumber(self: Value) {
+    switch (self.kind) {
+        case "number":
+            return this.value;
+        case "boolean":
+            return this.value ? 1 : 0;
+        case "string":
+        case "symbol":
+        case "closure":
+        case "array":
+        case "object":
+        case "null":
+        default:
+            throw new Error();
     }
 }
 
 class Context {
-    instructions: IInstruction[];
+    instructionBlocks: IInstruction[][];
+    instructions: number;
     pc: number;
-    stack: IValue[];
+    stack: Value[];
     scope: IScope;
     callStack: Context[];
     constructor(context?: Context) {
         if (context) {
+            this.instructionBlocks = context.instructionBlocks;
             this.instructions = context.instructions;
             this.pc = context.pc;
             this.stack = context.stack;
             this.scope = context.scope;
             this.callStack = context.callStack;
         } else {
-            this.instructions = null;
+            this.instructionBlocks = null;
+            this.instructions = 0;
             this.pc = null;
             this.stack = null;
             this.scope = null;
@@ -794,11 +908,15 @@ class Context {
 }
 class VM {
     static accept(context: Context): Context {
-        const inst : any = context.instructions[context.pc];
+        const block = context.instructionBlocks[context.instructions];
+        if (block == null) {
+            return context;
+        }
+        const inst = block[context.pc];
         if (inst == null) {
             return context;
         }
-        const callName = "on" + inst.__proto__.constructor.name;
+        const callName = "on" + inst.kind;
         if (this[callName]) {
             return VM[callName].call(null, inst, context);
         } else {
@@ -813,21 +931,33 @@ class VM {
     }
     static onJumpInstruction(self: JumpInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.pc = ctx.instructions.findIndex(x => x == self.label) + 1;
+        ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.label) + 1;
         return ctx;
     }
     static onBranchInstruction(self: BranchInstruction, context: Context): Context {
         const ctx = new Context(context);
-        if (context.stack.pop().toBoolean()) {
-            ctx.pc = ctx.instructions.findIndex(x => x == self.thenLabel) + 1;
+        if (toBoolean(context.stack.pop())) {
+            ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.thenLabel) + 1;
         } else {
-            ctx.pc = ctx.instructions.findIndex(x => x == self.elseLabel) + 1;
+            ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.elseLabel) + 1;
         }
         return ctx;
     }
     static onBindInstruction(self: BindInstruction, context: Context): Context {
         const ctx = new Context(context);
         ctx.scope.values[self.ident] = context.stack.pop();
+        ctx.pc += 1;
+        return ctx;
+    }
+    static onBindArgInstruction(self: BindArgInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        if (self.spread) {
+            const spread : ArrayValue = { kind: "array", value: context.stack.slice().reverse() };
+            ctx.scope.values[self.ident] = spread
+            context.stack.length = 0;
+        } else {
+            ctx.scope.values[self.ident] = context.stack.pop();
+        }
         ctx.pc += 1;
         return ctx;
     }
@@ -845,7 +975,9 @@ class VM {
     }
     static onLeaveInstruction(self: LeaveInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.scope = ctx.scope.prev;
+        for (let i = 0; i < self.level; i++) {
+            ctx.scope = ctx.scope.prev;
+        }
         ctx.pc += 1;
         return ctx;
     }
@@ -858,83 +990,83 @@ class VM {
     static onSimpleAssignmentInstruction(self: SimpleAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
         const symbol = ctx.stack.pop();
-        if (!(symbol instanceof IValue && symbol.kind == "symbol")) {
+        if (symbol.kind != "symbol") {
             throw new Error();
         }
-        const scope = ctx.scope.getScope(<string>symbol.value);
+        const scope = ctx.scope.getScope(symbol.value);
         if (scope == null) {
             throw new Error();
         }
-        const ret = new IValue(scope.values[<string>symbol.value]);
+        const ret = copyValue(scope.values[symbol.value]);
         const rhs = ctx.stack.peek();
         switch (self.op) {
             case "=":
-                scope.values[<string>symbol.value] = new IValue(rhs);
+                scope.values[symbol.value] = copyValue(rhs);
                 break;
             case "+=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() + rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) + toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "-=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() - rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) - toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "*=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() * rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) * toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "/=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() / rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) / toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "%=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() % rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) % toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "<<=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) << toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "<<<=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) << toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case ">>=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() >> rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) >> toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case ">>>=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() >>> rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) >>> toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "&=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() & rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) & toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "^=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() ^ rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) ^ toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "|=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() | rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) | toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             case "**=":
                 ret.kind = "number";
-                ret.value = ret.toNumber() ** rhs.toNumber();
-                scope.values[<string>symbol.value] = ret;
+                ret.value = toNumber(ret) ** toNumber(rhs);
+                scope.values[symbol.value] = ret;
                 break;
             default:
                 throw new Error();
@@ -945,83 +1077,57 @@ class VM {
     static onArrayAssignmentInstruction(self: ArrayAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
         const index = ctx.stack.pop();
-        if (!(index instanceof IValue)) {
+        if (index.kind != "number") {
             throw new Error();
         }
         const array = ctx.stack.pop();
-        if (!(array instanceof IValue && array.kind == "array")) {
+        if (array.kind != "array") {
             throw new Error();
         }
-        const ret = new IValue(array.value[index.toNumber()]);
+        const lhs = array.value[index.value];
         const rhs = ctx.stack.peek();
         switch (self.op) {
             case "=":
-                array.value[index.toNumber()] = new IValue(rhs);
+                array.value[index.value] = copyValue(rhs);
                 break;
             case "+=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() + rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) + toNumber(rhs)};
                 break;
             case "-=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() - rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) - toNumber(rhs)};
                 break;
             case "*=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() * rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) * toNumber(rhs)};
                 break;
             case "/=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() / rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) / toNumber(rhs)};
                 break;
             case "%=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() % rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) % toNumber(rhs)};
                 break;
             case "<<=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) << toNumber(rhs)};
                 break;
             case "<<<=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) << toNumber(rhs)};
                 break;
             case ">>=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() >> rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) >> toNumber(rhs)};
                 break;
             case ">>>=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() >>> rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) >>> toNumber(rhs)};
                 break;
             case "&=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() & rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) & toNumber(rhs)};
                 break;
             case "^=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() ^ rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) ^ toNumber(rhs)};
                 break;
             case "|=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() | rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) | toNumber(rhs)};
                 break;
             case "**=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() ** rhs.toNumber();
-                array.value[index.toNumber()] = ret;
+                array.value[index.value] = {kind:"number", value:toNumber(lhs) ** toNumber(rhs)};
                 break;
             default:
                 throw new Error();
@@ -1032,83 +1138,57 @@ class VM {
     static onMemberAssignmentInstruction(self: MemberAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
         const symbol = ctx.stack.pop();
-        if (!(symbol instanceof IValue && symbol.kind == "symbol")) {
+        if (symbol.kind != "symbol") {
             throw new Error();
         }
         const object = ctx.stack.pop();
-        if (!(object instanceof IValue && object.kind == "object")) {
+        if (object.kind != "object") {
             throw new Error();
         }
-        const ret = new IValue(object.value[<string>symbol.value]);
+        const lhs = object.value[symbol.value];
         const rhs = ctx.stack.peek();
         switch (self.op) {
             case "=":
-                object.value[<string>symbol.value] = new IValue(rhs);
+                object.value[symbol.value] = copyValue(rhs);
                 break;
             case "+=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() + rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) + toNumber(rhs)};
                 break;
             case "-=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() - rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) - toNumber(rhs)};
                 break;
             case "*=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() * rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) * toNumber(rhs)};
                 break;
             case "/=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() / rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) / toNumber(rhs)};
                 break;
             case "%=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() % rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) % toNumber(rhs)};
                 break;
             case "<<=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) << toNumber(rhs)};
                 break;
             case "<<<=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() << rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) << toNumber(rhs)};
                 break;
             case ">>=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() >> rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) >> toNumber(rhs)};
                 break;
             case ">>>=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() >>> rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) >>> toNumber(rhs)};
                 break;
             case "&=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() & rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) & toNumber(rhs)};
                 break;
             case "^=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() ^ rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) ^ toNumber(rhs)};
                 break;
             case "|=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() | rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) | toNumber(rhs)};
                 break;
             case "**=":
-                ret.kind = "number";
-                ret.value = ret.toNumber() ** rhs.toNumber();
-                object.value[<string>symbol.value] = ret;
+                object.value[symbol.value] = {kind:"number", value:toNumber(lhs) ** toNumber(rhs)};
                 break;
             default:
                 throw new Error();
@@ -1120,31 +1200,25 @@ class VM {
         const ctx = new Context(context);
         const lhs = ctx.stack.pop();
         const rhs = ctx.stack.pop();
-        const ret = new IValue();
+        let ret: Value;
         switch (self.op) {
             case "==":
-                ret.kind = "boolean";
-                ret.value = (lhs.kind == rhs.kind) && (lhs.value == rhs.value);
+                ret = { kind: "boolean", value: (lhs.kind == rhs.kind) && (lhs.value == rhs.value) };
                 break;
             case "!=":
-                ret.kind = "boolean";
-                ret.value = !((lhs.kind == rhs.kind) && (lhs.value == rhs.value));
+                ret = { kind: "boolean", value: !((lhs.kind == rhs.kind) && (lhs.value == rhs.value)) };
                 break;
             case ">=":
-                ret.kind = "boolean";
-                ret.value = lhs.toNumber() >= rhs.toNumber();
+                ret = { kind: "boolean", value: toNumber(lhs) >= toNumber(rhs) };
                 break;
             case "<=":
-                ret.kind = "boolean";
-                ret.value = lhs.toNumber() <= rhs.toNumber();
+                ret = { kind: "boolean", value: toNumber(lhs) <= toNumber(rhs) };
                 break;
             case ">":
-                ret.kind = "boolean";
-                ret.value = lhs.toNumber() > rhs.toNumber();
+                ret = { kind: "boolean", value: toNumber(lhs) > toNumber(rhs) };
                 break;
             case "<":
-                ret.kind = "boolean";
-                ret.value = lhs.toNumber() < rhs.toNumber();
+                ret = { kind: "boolean", value: toNumber(lhs) < toNumber(rhs) };
                 break;
             default:
                 throw new Error();
@@ -1157,59 +1231,46 @@ class VM {
         const ctx = new Context(context);
         const lhs = ctx.stack.pop();
         const rhs = ctx.stack.pop();
-        const ret = new IValue();
+        let ret: Value;
         switch (self.op) {
             case "+":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() + rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) + toNumber(rhs) };
                 break;
             case "-":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() - rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) - toNumber(rhs) };
                 break;
             case "*":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() * rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) * toNumber(rhs) };
                 break;
             case "/":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() / rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) / toNumber(rhs) };
                 break;
             case "%":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() % rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) % toNumber(rhs) };
                 break;
             case "<<":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() << rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) << toNumber(rhs) };
                 break;
             case "<<<":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() << rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) << toNumber(rhs) };
                 break;
             case ">>":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() >> rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) >> toNumber(rhs) };
                 break;
             case ">>>":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() >>> rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) >>> toNumber(rhs) };
                 break;
             case "&":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() & rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) & toNumber(rhs) };
                 break;
             case "^":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() ^ rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) ^ toNumber(rhs) };
                 break;
             case "|":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() | rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) | toNumber(rhs) };
                 break;
             case "**":
-                lhs.kind = "number";
-                lhs.value = lhs.toNumber() ** rhs.toNumber();
+                ret = { kind: "number", value: toNumber(lhs) ** toNumber(rhs) };
                 break;
             default:
                 throw new Error();
@@ -1221,23 +1282,19 @@ class VM {
     static onUnaryInstruction(self: UnaryInstruction, context: Context): Context {
         const ctx = new Context(context);
         const rhs = ctx.stack.pop();
-        const ret = new IValue();
+        let ret: Value;
         switch (self.op) {
             case "+":
-                ret.kind = "number";
-                ret.value = rhs.toNumber();
+                ret = { kind: "number", value: toNumber(rhs) };
                 break;
             case "-":
-                ret.kind = "number";
-                ret.value = -rhs.toNumber();
+                ret = { kind: "number", value: -toNumber(rhs) };
                 break;
             case "~":
-                ret.kind = "number";
-                ret.value = ~rhs.toNumber();
+                ret = { kind: "number", value: ~toNumber(rhs) };
                 break;
             case "!":
-                ret.kind = "boolean";
-                ret.value = !rhs.toBoolean();
+                ret = { kind: "boolean", value: !toBoolean(rhs) };
                 break;
             default:
                 throw new Error();
@@ -1248,17 +1305,19 @@ class VM {
     }
     static onCallInstruction(self: CallInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const args = [];
-        for (let i = 0; i < self.argc; i++) {
-            args.push(ctx.stack.pop());
-        }
 
         const lhs = ctx.stack.pop();
         if (lhs.kind != "closure") {
             throw new Error();
         }
 
-        const closure = <Closure>lhs.value;
+        const args = [];
+        for (let i = 0; i < self.argc; i++) {
+            args.push(ctx.stack.pop());
+        }
+
+
+        const closure = lhs.value;
         ctx.instructions = closure.func;
         ctx.pc = 0;
         ctx.callStack.push(context)
@@ -1273,8 +1332,8 @@ class VM {
         if (lhs.kind != "array" || rhs.kind != "number") {
             throw new Error();
         }
-        const array = <IValue[]>lhs.value;
-        const ret = array[rhs.toNumber()] || new IValue(); 
+        const array = lhs.value;
+        const ret = array[toNumber(rhs)] || {kind:"null",value:null}; 
         ctx.stack.push(ret);
         ctx.pc += 1;
         return ctx;
@@ -1283,26 +1342,23 @@ class VM {
         const ctx = new Context(context);
         const lhs = ctx.stack.pop();
         const rhs = ctx.stack.pop();
-        if (lhs.kind != "object" || rhs.kind != "string") {
+        if (lhs.kind != "object" || rhs.kind != "symbol") {
             throw new Error();
         }
-        const obj = <{ [key: string]: IValue }>lhs.value;
-        const ret = obj[rhs.toString()] || new IValue(); 
+        const obj = <{ [key: string]: Value }>lhs.value;
+        const ret = obj[<string>rhs.value] || {kind:"null",value:null}; 
         ctx.stack.push(ret);
         ctx.pc += 1;
         return ctx;
     }
     static onArrayLiteralInstruction(self: ArrayLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const values = [];
+        const values : Value[] = [];
         for (let i = 0; i < self.count; i++) {
             values.push(ctx.stack.pop());
         }
         values.reverse();
-        const ret = new IValue();
-        ret.kind = "array";
-        ret.value = values;
-        ctx.stack.push(ret);
+        ctx.stack.push({ kind: "array", value: values });
         ctx.pc += 1;
         return ctx;
     }
@@ -1312,74 +1368,54 @@ class VM {
         for (let i = 0; i < self.count; i++) {
             const key = ctx.stack.pop();
             const value = ctx.stack.pop();
-            if (key.kind != "string") {
+            if (key.kind != "symbol") {
                 throw new Error();
             }
             values[<string>(key.value)] = value;
         }
-        const ret = new IValue();
-        ret.kind = "object";
-        ret.value = values;
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "object", value: values});
         ctx.pc += 1;
         return ctx;
     }
     static onStringLiteralInstruction(self: StringLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const ret = new IValue();
-        ret.kind = "string";
-        ret.value = self.value;
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "string", value: self.value});
         ctx.pc += 1;
         return ctx;
     }
     static onFunctionInstruction(self: FunctionInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const ret = new IValue();
-        ret.kind = "closure";
-        ret.value = { func: self.instructions, scope: context.scope };
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "closure", value:{ func: self.instructions, scope: context.scope }});
         ctx.pc += 1;
         return ctx;
     }
     static onNumericLiteralInstruction(self: NumericLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const ret = new IValue();
-        ret.kind = "number";
-        ret.value = self.value;
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "number", value: self.value});
         ctx.pc += 1;
         return ctx;
     }
     static onNullLiteralInstruction(self: NullLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const ret = new IValue();
-        ret.kind = "null";
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "null", value: null});
         ctx.pc += 1;
         return ctx;
     }
     static onBooleanLiteralInstruction(self: BooleanLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const ret = new IValue();
-        ret.kind = "boolean";
-        ret.value = self.value;
-        ctx.stack.push(ret);
+        ctx.stack.push({kind: "boolean", value: self.value});
         ctx.pc += 1;
         return ctx;
     }
     static onIdentifierLiteralInstruction(self: IdentifierLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const symbol = new IValue();
-        symbol.kind = "symbol";
-        symbol.value = self.value;
-        ctx.stack.push(symbol);
+        ctx.stack.push({kind: "symbol", value: self.value});
         ctx.pc += 1;
         return ctx;
     }
     static onLoadInstruction(self: LoadInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push(context.scope.get(self.value) || new IValue());
+        ctx.stack.push(context.scope.get(self.value) || {kind: "null", value: null});
         ctx.pc += 1;
         return ctx;
     }
@@ -1392,32 +1428,48 @@ declare var jsDump: {
 declare const parser: peg.GeneratedParser<Program>;
 
 window.onload = () => {
-    console.log("loaded");
     const $ = document.getElementById.bind(document);
+
+    console.log("loaded");
     let parser: peg.GeneratedParser = null;
     {
         const dom = document.querySelector("script[type='text/peg-js']");
         const grammer = dom.innerHTML;
         parser = <peg.GeneratedParser<Program>>peg.generate(grammer, { cache: false, optimize: "speed", output: "parser" });
     }
+    let context: Context= null
 
-    $("eval").onclick = () => {
+    $("compile").onclick = () => {
         try {
+            $("run").setAttribute("disabled", "");
+            $("step").setAttribute("disabled", "");
             const result = parser.parse($("code").value);
             const c = new Compiler();
             c.accept(result);
+            $("output").value = jsDump.parse(c.instructionBlocks);
 
-            //$("output").value = JSON.stringify(c.instructions);
-            //$("output").value = jsDump.parse(c.instructions);
-
-
-            let context = new Context();
-            context.instructions = c.instructions;
+            context = new Context();
+            context.instructionBlocks = c.instructionBlocks;
+            context.instructions = 0;
             context.pc = 0;
             context.scope = new IScope(null);
             context.stack = [];
-            context.callStack = null;
+            context.callStack = [];
 
+            $("run").removeAttribute("disabled");
+            $("step").removeAttribute("disabled");
+        } catch(e) {
+            console.log(e);
+            if (e instanceof parser.SyntaxError) {
+                $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
+            } else {
+                $("output").value = `${e.toString()}: ${e.message}`;
+            }
+        }
+    }
+
+    $("run").onclick = () => {
+        try {
             for (let i = 0; i < 100; i++) {
                 context = VM.accept(context);
             }
@@ -1431,4 +1483,17 @@ window.onload = () => {
             }
         }
     };
-};
+
+    $("step").onclick = () => {
+        try {
+            context = VM.accept(context);
+            $("output").value = jsDump.parse(context);
+        } catch (e) {
+            console.log(e);
+            if (e instanceof parser.SyntaxError) {
+                $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
+            } else {
+                $("output").value = `${e.toString()}: ${e.message}`;
+            }
+        }
+    };};

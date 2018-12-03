@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -136,7 +135,7 @@ FunctionDeclaration
 
 FunctionParameters
   = xs:BindingElements x:(_ "," _ e:BindingRestElement { return e; } )? { return x ? xs + [x] : xs; }
-  / BindingRestElement
+  / x:BindingRestElement { return [x]; }
 
 BindingElements
   = x:BindingElement xs:(_ "," _ e:BindingElement { return e; })* { return [x].concat(xs); }
@@ -184,7 +183,7 @@ CallExpression
   = args:Arguments { return new CallExpression(null, args); }
 
 Arguments
-  = _ "(" _ x: Expression xs:( _ "," _ e:Expression { return e; })* _ ")" { return [x].concat(xs); }
+  = _ "(" _ x: AssignmentExpression xs:( _ "," _ e:AssignmentExpression { return e; })* _ ")" { return [x].concat(xs); }
   / _ "("  _ ")" { return []; }
 
 MemberExpression
@@ -192,7 +191,7 @@ MemberExpression
 
 MemberExpressionPost
   = _ "[" _ expr:Expression _ "]" { return new ArrayIndexExpression(null, expr); }
-  / _ "." _ name:Identifier { return new ArrayIndexExpression(null, name); }
+  / _ "." _ name:Identifier { return new ObjectMemberExpression(null, name); }
 
 PrimaryExpression
   = Identifier
@@ -218,8 +217,6 @@ PropertyDefinitionList = x:PropertyDefinition xs:(_ "," _ e:PropertyDefinition {
 PropertyDefinition = name:PropertyName _ ":" _ value:AssignmentExpression { return new PropertyDefinition(name, value); }
 PropertyName
   = Identifier
-  / StringLiteral
-  / NumericLiteral
 
 FunctionExpression  = _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{" _ body:FunctionBody _ "}"
   { return new FunctionExpression(params, body); }
@@ -240,7 +237,7 @@ _ "whitespace" = [ \t\n\r]*
 </head>
 <body>
     <div style="display:flex; width:100vw; height:100vh; flex-direction: column; flex-wrap: wrap;">
-        <div style="display:flex; "><a id="eval">eval</a></div>
+        <div style="display:flex; "><a id="compile">Compile</a>|<a id="run">Run</a>|<a id="step">Step</a></div>
         <div style="display:flex; flex:1; flex-direction: row; flex-wrap: wrap;">
             <div style="display:flex; flex:1;"><textarea id="code" style="width:100%; height:100%;"></textarea></div>
             <div style="display:flex; flex:1;"><textarea id="output" style="width:100%; height:100%;"></textarea></div>
