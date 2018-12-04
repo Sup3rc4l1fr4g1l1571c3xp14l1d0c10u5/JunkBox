@@ -116,7 +116,7 @@ AssignmentOperator
   = ("*=" / "/=" / "%=" / "+=" / "-=" / "<<=" / ">>=" / ">>>=" / "<<<=" / "&=" / "^=" / "|=" / "**=" / ((!"=>") "=")) { return text(); }
 
 ArrowFunction
-  = "(" _ params:FunctionParameters? _ ")" _ "=>" _ body:ConciseBody { return new FunctionExpression(params, body); }
+  = "(" _ params:FunctionParameters _ ")" _ "=>" _ body:ConciseBody { return new FunctionExpression(params, body); }
 
 ConciseBody
   = FunctionBody
@@ -130,12 +130,13 @@ Declaration
   / FunctionDeclaration
   
 FunctionDeclaration
-  = _ "function" _ ident:BindingIdentifier _ "(" _ params:FunctionParameters? _ ")" _ body:FunctionBody
+  = _ "function" _ ident:BindingIdentifier _ "(" _ params:FunctionParameters _ ")" _ body:FunctionBody
   { return new LexicalDeclaration([new LexicalBinding(ident, new FunctionExpression(params, body))]); }
 
 FunctionParameters
   = xs:BindingElements x:(_ "," _ e:BindingRestElement { return e; } )? { return x ? xs + [x] : xs; }
   / x:BindingRestElement { return [x]; }
+  / &")" { return []; }
 
 BindingElements
   = x:BindingElement xs:(_ "," _ e:BindingElement { return e; })* { return [x].concat(xs); }
@@ -148,14 +149,14 @@ BindingRestElement
   = "..." _ name:BindingIdentifier { return new FunctionParameter( name, null, true);  }
 
 ConditionalExpression 
-  = condExpr:LogicalORExpression _ "?" _ thenExpr:AssignmentExpression _ ":" _ elseExpr:AssignmentExpression { return new ConditionalExpression(condExpr, thenExpr, elseExpr); }
-  / LogicalORExpression 
+  = condExpr:LogicalOrExpression _ "?" _ thenExpr:AssignmentExpression _ ":" _ elseExpr:AssignmentExpression { return new ConditionalExpression(condExpr, thenExpr, elseExpr); }
+  / LogicalOrExpression 
 
-LogicalORExpression  = e1:LogicalANDExpression e2:(_ "||" _ LogicalANDExpression)* { return e2.reduce((s,x) => new LogicalORExpression(s, x[3]), e1); }
-LogicalANDExpression = e1:BitwiseORExpression  e2:(_ "&&" _ BitwiseORExpression)*  { return e2.reduce((s,x) => new LogicalANDExpression(s, x[3]), e1); }
-BitwiseORExpression  = e1:BitwiseXORExpression e2:(_ "|" _ BitwiseXORExpression)*  { return e2.reduce((s,x) => new BitwiseORExpression(s, x[3]), e1); }
-BitwiseXORExpression = e1:BitwiseANDExpression e2:(_ "^" _ BitwiseANDExpression)*  { return e2.reduce((s,x) => new BitwiseXORExpression(s, x[3]), e1); }
-BitwiseANDExpression = e1:EqualityExpression   e2:(_ "&" _ EqualityExpression)*    { return e2.reduce((s,x) => new BitwiseANDExpression(s, x[3]), e1); }
+LogicalOrExpression  = e1:LogicalAndExpression e2:(_ "||" _ LogicalAndExpression)* { return e2.reduce((s,x) => new LogicalOrExpression(s, x[3]), e1); }
+LogicalAndExpression = e1:BitwiseOrExpression  e2:(_ "&&" _ BitwiseOrExpression)*  { return e2.reduce((s,x) => new LogicalAndExpression(s, x[3]), e1); }
+BitwiseOrExpression  = e1:BitwiseXorExpression e2:(_ "|" _ BitwiseXorExpression)*  { return e2.reduce((s,x) => new BitwiseOrExpression(s, x[3]), e1); }
+BitwiseXorExpression = e1:BitwiseAndExpression e2:(_ "^" _ BitwiseAndExpression)*  { return e2.reduce((s,x) => new BitwiseXorExpression(s, x[3]), e1); }
+BitwiseAndExpression = e1:EqualityExpression   e2:(_ "&" _ EqualityExpression)*    { return e2.reduce((s,x) => new BitwiseAndExpression(s, x[3]), e1); }
 EqualityExpression = e1:RelationalExpression   e2:(_ EqualityOperator _ RelationalExpression)* { return e2.reduce((s,x) => new EqualityExpression(x[1], s, x[3]), e1); }
 EqualityOperator = "==" / "!="
 RelationalExpression = e1:ShiftExpression e2:(_ RelationalOperator _ ShiftExpression)* { return e2.reduce((s,x) => new RelationalExpression(x[1], s, x[3]), e1); }
@@ -168,7 +169,7 @@ AdditiveExpression = e1:MultiplicativeExpression e2:(_ AdditiveOperator _ Multip
 AdditiveOperator "AdditiveOperator" = "+" / "-"
 
 MultiplicativeExpression = e1:ExponentiationExpression e2:(_ MultiplicativeOperator _ ExponentiationExpression)* { return e2.reduce((s,x) => new MultiplicativeExpression(x[1], s, x[3]), e1); }
-MultiplicativeOperator "MultiplicativeOperator" = "*" / "/"
+MultiplicativeOperator "MultiplicativeOperator" = "*" / "/" / "%"
 
 ExponentiationExpression = e1:UnaryExpression e2:(_ "**" _ UnaryExpression)* { return e2.reduce((s,x) => new ExponentiationExpression(s, x[3]), e1); }
 
@@ -218,8 +219,8 @@ PropertyDefinition = name:PropertyName _ ":" _ value:AssignmentExpression { retu
 PropertyName
   = Identifier
 
-FunctionExpression  = _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{" _ body:FunctionBody _ "}"
-  { return new FunctionExpression(params, body); }
+FunctionExpression  = 
+  _ "function" _ "(" _ params:FunctionParameters _ ")" _ "{" _ body:FunctionBody _ "}" { return new FunctionExpression(params, body); }
 
 NullLiteral = _ "null" { return new NullLiteral(); }
 BooleanLiteral = _ "true"  { return new BooleanLiteral(true); }
