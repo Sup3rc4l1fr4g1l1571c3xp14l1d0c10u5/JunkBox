@@ -8,6 +8,37 @@ Array.prototype.peek = function () {
     return this[this.length - 1];
 };
 
+function parseStr(str: string): string {
+    let ret = "";
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] !== "\\") {
+            ret += str[i];
+        } else {
+            switch (str[i + 1]) {
+                case "t": ret += "\t"; i += 1; break;
+                case "r": ret += "\r"; i += 1; break;
+                case "n": ret += "\n"; i += 1; break;
+                default: ret += str[i + 1]; i += 1; break;
+            }
+        }
+    }
+    return ret;
+}
+function escapeStr(str: string): string {
+    let ret = "";
+    for (let i = 0; i < str.length; i++) {
+        switch (str[i + 1]) {
+            case "\t": ret += "\\t"; break;
+            case "\r": ret += "\\r"; break;
+            case "\n": ret += "\\n"; break;
+            case "\\": ret += "\\\\"; break;
+            case "\"": ret += "\\\""; break;
+            default: ret += str[i]; break;
+        }
+    }
+    return ret;
+}
+
 type AssignmentOperator = "*=" | "/=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | ">>>=" | "<<<=" | "&=" | "^=" | "|=" | "**=" | "=";
 type LogicalOperator = "&&" | "||";
 type BitwiseOperator = "&" | "|" | "^";
@@ -61,8 +92,7 @@ class DoStatement implements IStatement {
 }
 
 class WhileStatement implements IStatement {
-    constructor(public condExpr: IExpression, public bodyStmt: IStatement) {
-    }
+    constructor(public condExpr: IExpression, public bodyStmt: IStatement) { }
 }
 
 class ForStatement implements IStatement {
@@ -242,13 +272,10 @@ type Instruction =
     LeaveInstruction |
     PopInstruction |
     SimpleAssignmentInstruction |
-    ArrayAssignmentInstruction |
     MemberAssignmentInstruction |
     ConditionalInstruction |
-    BinaryInstruction |
-    UnaryInstruction |
     CallInstruction |
-    ArrayIndexInstruction |
+    MemberCallInstruction |
     ObjectMemberInstruction |
     ArrayLiteralInstruction |
     ObjectLiteralInstruction |
@@ -300,10 +327,6 @@ type SimpleAssignmentInstruction = {
     kind: "SimpleAssignmentInstruction";
     op: AssignmentOperator;
 }
-type ArrayAssignmentInstruction = {
-    kind: "ArrayAssignmentInstruction";
-    op: AssignmentOperator;
-}
 type MemberAssignmentInstruction = {
     kind: "MemberAssignmentInstruction";
     op: AssignmentOperator;
@@ -312,19 +335,11 @@ type ConditionalInstruction = {
     kind: "ConditionalInstruction";
     op: ConditionalOperator;
 }
-type BinaryInstruction = {
-    kind: "BinaryInstruction";
-    op: BinaryOperator;
-}
-type UnaryInstruction = {
-    kind: "UnaryInstruction";
-    op: UnaryOperator;
-}
 type CallInstruction = {
     kind: "CallInstruction";
 }
-type ArrayIndexInstruction = {
-    kind: "ArrayIndexInstruction";
+type MemberCallInstruction = {
+    kind: "MemberCallInstruction";
 }
 type ObjectMemberInstruction = {
     kind: "ObjectMemberInstruction";
@@ -438,7 +453,7 @@ class Compiler {
         const continueLabel: LabelInstruction = { kind: "LabelInstruction", pc: 0 };
         const breakLabel: LabelInstruction = { kind: "LabelInstruction", pc: 0 };
         this.breakTarget.push({ level: this.blockLevel, target: breakLabel });
-        this.continueTarget.push({ level: this.blockLevel, target: breakLabel });
+        this.continueTarget.push({ level: this.blockLevel, target: continueLabel });
 
         headLabel.pc = this.instructions.length;
         this.instructions.push(headLabel);
@@ -457,7 +472,7 @@ class Compiler {
         const continueLabel: LabelInstruction = { kind: "LabelInstruction", pc: 0 };
         const breakLabel: LabelInstruction = { kind: "LabelInstruction", pc: 0 };
         this.breakTarget.push({ level: this.blockLevel, target: breakLabel });
-        this.continueTarget.push({ level: this.blockLevel, target: breakLabel });
+        this.continueTarget.push({ level: this.blockLevel, target: continueLabel });
 
         continueLabel.pc = this.instructions.length;
         this.instructions.push(continueLabel);
@@ -605,12 +620,14 @@ class Compiler {
             this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.lhs.value });
             this.instructions.push({ kind: "SimpleAssignmentInstruction", op: self.op });
         } else if (self.lhs instanceof ArrayIndexExpression) {
-            this.accept(self.lhs.lhs);
             this.accept(self.lhs.index);
-            this.instructions.push({ kind: "ArrayAssignmentInstruction", op: self.op });
-        } else if (self.lhs instanceof ObjectMemberExpression) {
+            this.instructions.push({ kind: "NumericLiteralInstruction", value: 2 });
             this.accept(self.lhs.lhs);
+            this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "[]=" });
+            this.instructions.push({ kind: "MemberCallInstruction" });
+        } else if (self.lhs instanceof ObjectMemberExpression) {
             this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.lhs.member.value });
+            this.accept(self.lhs.lhs);
             this.instructions.push({ kind: "MemberAssignmentInstruction", op: self.op });
         } else {
             throw new Error();
@@ -681,18 +698,24 @@ class Compiler {
     }
     onBitwiseOrExpression(self: BitwiseOrExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: "|" });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "|" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onBitwiseXorExpression(self: BitwiseXorExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: "^" });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "^" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onBitwiseAndExpression(self: BitwiseAndExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: "&" });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "&" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onEqualityExpression(self: EqualityExpression): void {
         this.accept(self.rhs);
@@ -706,42 +729,67 @@ class Compiler {
     }
     onShiftExpression(self: ShiftExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.op });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onAdditiveExpression(self: AdditiveExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.op });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onMultiplicativeExpression(self: MultiplicativeExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: self.op });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.op });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onExponentiationExpression(self: ExponentiationExpression): void {
         this.accept(self.rhs);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "BinaryInstruction", op: "**" });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "**" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onUnaryExpression(self: UnaryExpression): void {
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 0 });
         this.accept(self.rhs);
-        this.instructions.push({ kind: "UnaryInstruction", op: self.op });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.op + "@" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onCallExpression(self: CallExpression): void {
         self.args.forEach(x => this.accept(x));
-        this.accept(self.lhs);
         this.instructions.push({ kind: "NumericLiteralInstruction", value: self.args.length });
-        this.instructions.push({ kind: "CallInstruction" });
+        let lhs = self.lhs;
+        for (; ;) {
+            if (lhs instanceof ObjectMemberExpression) {
+                this.accept(lhs.lhs);
+                this.instructions.push({ kind: "IdentifierLiteralInstruction", value: lhs.member.value });
+                this.instructions.push({ kind: "MemberCallInstruction" });
+                break;
+            } else if (lhs instanceof EnclosedInParenthesesExpression) {
+                lhs = lhs.expr;
+            } else {
+                this.accept(lhs);
+                this.instructions.push({ kind: "CallInstruction" });
+                break;
+            }
+        }
     }
     onArrayIndexExpression(self: ArrayIndexExpression): void {
         this.accept(self.index);
+        this.instructions.push({ kind: "NumericLiteralInstruction", value: 1 });
         this.accept(self.lhs);
-        this.instructions.push({ kind: "ArrayIndexInstruction" });
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: "[]" });
+        this.instructions.push({ kind: "MemberCallInstruction" });
     }
     onObjectMemberExpression(self: ObjectMemberExpression): void {
-        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.member.value });
         this.accept(self.lhs);
+        this.instructions.push({ kind: "IdentifierLiteralInstruction", value: self.member.value });
         this.instructions.push({ kind: "ObjectMemberInstruction" });
     }
     onEnclosedInParenthesesExpression(self: EnclosedInParenthesesExpression): void {
@@ -763,6 +811,7 @@ class Compiler {
     onFunctionExpression(self: FunctionExpression): void {
         const index = this.instructionBlocks.length;
         this.pushContext();
+        this.instructions.push({ kind: "BindArgInstruction", ident: "this", spread: false });
         self.params.forEach((param, i) => {
             this.instructions.push({ kind: "BindArgInstruction", ident: self.params[i].ident.value, spread: self.params[i].spread });
         });
@@ -788,134 +837,428 @@ class Compiler {
     }
 }
 
-type Scope = {
-    kind: "Scope";
-    values: { [key: string]: Value };
-    prev: Scope | null;
+class Dictionary {
+    items: { key: Value, value: Value }[] = [];
+
+    constructor(src?: Dictionary) {
+        if (src) {
+            for (const item of src.items) {
+                this.items.push({ key: item.key, value: item.value });
+            }
+        }
+    }
+    keys() {
+        return this.items.map(x => x.key);
+    }
+    values() {
+        return this.items.map(x => x.value);
+    }
+    has(key: Value) {
+        const item = this.items.find(x => equalValue(x.key, key));
+        return (item != null);
+    }
+    get(key: Value) {
+        const item = this.items.find(x => equalValue(x.key, key));
+        if (item != null) {
+            return item.value;
+        } else {
+            return null;
+        }
+    }
+    set(key: Value, value: Value) {
+        const item = this.items.find(x => equalValue(x.key, key));
+        if (item != null) {
+            item.value = value;
+        } else {
+            this.items.push({ key: key, value: value });
+        }
+    }
+    remove(key: Value) {
+        const index = this.items.findIndex(x => equalValue(x.key, key));
+        if (index !== -1) {
+            this.items.splice(index, 1);
+        }
+    }
+    static equal(lhs: Dictionary, rhs: Dictionary) {
+        if (lhs.items.length !== rhs.items.length) {
+            return false;
+        }
+        for (const key of lhs.keys()) {
+            if (!lhs.has(key) || !rhs.has(key)) {
+                return false;
+            }
+            const x = lhs.get(key);
+            const y = rhs.get(key);
+            if (equalValue(x, y) === false) {
+                return false;
+            }
+        }
+        return true;
+    }
+    toString() {
+        return "{ " + this.items.map(x => `${toStr(x.key)}: ${toStr(x.value)}`).join(",\r\n") + "}";
+    }
 }
 
+class ArrayDictionary {
+    arrayItems: { key: Value, value: Value }[] = [];
+
+    constructor(src?: ArrayDictionary) {
+        if (src) {
+            src.arrayItems.forEach((item, i) => {
+                this.arrayItems[i] = ({ key: item.key, value: item.value });
+            });
+        }
+    }
+    length() {
+        return this.arrayItems.length;
+    }
+    keys() {
+        return this.arrayItems.map(x => x.key);
+    }
+    values() {
+        return this.arrayItems.map(x => x.value);
+    }
+    push(value: Value) {
+        this.arrayItems[this.arrayItems.length] = ({ key: createNumberValue(this.arrayItems.length), value: value });
+    }
+    pop() {
+        const ret = this.arrayItems.pop();
+        return ret.value;
+    }
+    reverse() {
+        this.arrayItems.reverse();
+    }
+    has(key: Value) {
+        if (key.kind === "Number") {
+            const item = this.arrayItems.find(x => x != null && equalValue(x.key, key));
+            return (item != null);
+        } else {
+            return false;
+        }
+    }
+    get(key: Value) {
+        if (key.kind === "Number") {
+            const item = this.arrayItems.find(x => x != null && equalValue(x.key, key));
+            if (item != null) {
+                return item.value;
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+    set(key: Value, value: Value) {
+        if (key.kind === "Number") {
+            this.arrayItems[toNumber(key)] = { key: key, value: value };
+        }
+    }
+    remove(key: Value) {
+        if (key.kind === "Number") {
+            const item = this.arrayItems[toNumber(key)];
+            if (item != null) {
+                this.arrayItems.splice(toNumber(key), 1);
+            }
+        }
+    }
+    static equal(lhs: ArrayDictionary, rhs: ArrayDictionary) {
+        if (lhs.arrayItems.length !== rhs.arrayItems.length) {
+            return false;
+        }
+        for (const key of lhs.keys()) {
+            if (!lhs.has(key) || !rhs.has(key)) {
+                return false;
+            }
+            const x = lhs.get(key);
+            const y = rhs.get(key);
+            if (equalValue(x, y) === false) {
+                return false;
+            }
+        }
+        return true;
+    }
+    toString() {
+        return "[ " + this.arrayItems.map(x => `${toStr(x.key)}: ${toStr(x.value)}`).join(",\r\n") + "]";
+    }
+}
+
+type Scope = { kind: "Scope", value: { [key: string]: Value }, extend: Scope | null }
+
+function createScope(parent: Scope = null): Scope {
+    return { kind: "Scope", value: {}, extend: parent };
+}
 function findScope(self: Scope, key: string): Scope | null {
-    for (let s: Scope = self; s != null; s = s.prev) {
-        if (key in s.values) {
+    for (let s: Scope = self; s != null; s = s.extend) {
+        if (key in s.value) {
             return s;
         }
     }
     return null;
 }
 function getScope(self: Scope, key: string): Value | null {
-    for (let s: Scope = self; s != null; s = s.prev) {
-        if (key in s.values) {
-            return s.values[key];
+    for (let s: Scope = self; s != null; s = s.extend) {
+        if (key in s.value) {
+            return s.value[key];
         }
     }
     return null;
 }
 
-type Value = NumberValue | BooleanValue | StringValue | SymbolValue | ClosureValue | ArrayValue | ObjectValue | NullValue;
-type NumberValue  = { kind: "Number", value: number };
-type BooleanValue = { kind: "Boolean", value: boolean };
-type StringValue  = { kind: "String", value: string };
-type SymbolValue  = { kind: "Symbol", value: string };
-type ClosureValue = { kind: "Closure", value: { func: number, scope: Scope } };
-type ArrayValue   = { kind: "Array", value: Value[] };
-type ObjectValue  = { kind: "Object", value: { [key: string]: Value } };
-type NullValue    = { kind: "Null", value: null };
+const objectClass: ObjectValue = { kind: "Object", value: new Dictionary(), extend: null };
+const nativeFuncClass: ObjectValue = createObjectValue();
+const numberClass: ObjectValue = createObjectValue();
+const booleanClass: ObjectValue = createObjectValue();
+const stringClass: ObjectValue = createObjectValue();
+const closureClass: ObjectValue = createObjectValue();
+const arrayClass: ObjectValue = createObjectValue();
+const nullClass: ObjectValue = createObjectValue();
+
+type Value = NumberValue | BooleanValue | StringValue | ClosureValue | NativeFuncValue | ArrayValue | ObjectValue | NullValue;
+type ObjectValue = { kind: "Object", value: Dictionary, extend: ObjectValue };
+type NumberValue = { kind: "Number", value: number, extend: ObjectValue };
+type BooleanValue = { kind: "Boolean", value: boolean, extend: ObjectValue };
+type StringValue = { kind: "String", value: string, extend: ObjectValue };
+type ClosureValue = { kind: "Closure", value: { func: number, scope: Scope }, extend: ObjectValue };
+type NativeFuncValue = { kind: "Native", value: (self: Instruction, context: Context, receiver: Value, args: Value[]) => void, extend: ObjectValue };
+type ArrayValue = { kind: "Array", value: ArrayDictionary, extend: ObjectValue };
+type NullValue = { kind: "Null", value: null, extend: ObjectValue };
+
+function createObjectValue(value?: Dictionary, extend?: ObjectValue): ObjectValue {
+    return { kind: "Object", value: new Dictionary(value), extend: extend ? extend : objectClass };
+}
+function createNumberValue(value: number): NumberValue {
+    return { kind: "Number", value: value, extend: numberClass };
+}
+function createBooleanValue(value: boolean): BooleanValue {
+    return { kind: "Boolean", value: value, extend: booleanClass };
+}
+function createStringValue(value: string): StringValue {
+    return { kind: "String", value: value, extend: stringClass };
+}
+function createClosureValue(func: number, scope: Scope): ClosureValue {
+    return { kind: "Closure", value: { func: func, scope: scope }, extend: stringClass };
+}
+function createNativeFuncValue(value: (self: Instruction, context: Context, receiver: Value, args: Value[]) => void): NativeFuncValue {
+    return { kind: "Native", value: value, extend: nativeFuncClass };
+}
+function createArrayValue(value: ArrayDictionary): ArrayValue {
+    return { kind: "Array", value: new ArrayDictionary(value), extend: arrayClass };
+}
+function createNullValue(): NullValue {
+    return { kind: "Null", value: null, extend: nullClass };
+}
+
+function getField(name: Value, value: Value) {
+    if (value.extend === objectClass) {
+        const objValue = <ObjectValue>value;
+        if (objValue.value.has(name)) {
+            return objValue.value.get(name);
+        }
+    }
+    for (let extend = value.extend; extend != null; extend = extend.extend) {
+        if (extend.value.has(name)) {
+            return extend.value.get(name);
+        }
+    }
+    return null;
+}
+
+function equalValue(lhs: Value, rhs: Value) {
+    switch (lhs.kind) {
+        case "Number": return (lhs.kind === rhs.kind) && lhs.value === rhs.value;
+        case "Boolean": return (lhs.kind === rhs.kind) && lhs.value === rhs.value;
+        case "String": return (lhs.kind === rhs.kind) && lhs.value === rhs.value;
+        case "Closure": return (lhs.kind === rhs.kind) && lhs.value.func === rhs.value.func;
+        case "Native": return (lhs.kind === rhs.kind) && lhs.value === rhs.value;
+        case "Array": return (lhs.kind === rhs.kind) && ArrayDictionary.equal(lhs.value, rhs.value);
+        case "Object": return (lhs.kind === rhs.kind) && Dictionary.equal(lhs.value, rhs.value);
+        case "Null": return (lhs.kind === rhs.kind);
+        default: throw new Error();
+    }
+}
 
 function copyValue(self: Value): Value {
-    return <Value>{ kind: self.kind, value: self.value };
+    return <Value>{ kind: self.kind, value: self.value, extend: self.extend };
 }
 
 function toBoolean(self: Value) {
     switch (self.kind) {
-        case "Number":
-            return self.value !== 0;
-        case "Boolean":
-            return self.value;
-        case "String":
-            return true;
-        case "Symbol":
-            return true;
-        case "Closure":
-            return true;
-        case "Array":
-            return true;
-        case "Object":
-            return true;
-        case "Null":
-            return false;
-        default:
-            throw new Error();
+        case "Number": return self.value !== 0;
+        case "Boolean": return self.value;
+        case "String": return true;
+        case "Closure": return true;
+        case "Native": return true;
+        case "Array": return true;
+        case "Object": return true;
+        case "Null": return false;
+        default: throw new Error();
+    }
+}
+
+function toStr(self: Value) {
+    switch (self.kind) {
+        case "Number": return self.value.toString();
+        case "Boolean": return self.value.toString();
+        case "String": return `"${escapeStr(self.value.toString())}"`;
+        case "Closure": return "<Closure>";
+        case "Native": return "<Native>";
+        case "Array": return self.value.toString();
+        case "Object": return self.value.toString();
+        case "Null": return "<Null>";
+        default: throw new Error();
     }
 }
 
 function toNumber(self: Value) {
     switch (self.kind) {
-        case "Number":
-            return self.value;
-        case "Boolean":
-            return self.value ? 1 : 0;
+        case "Number": return self.value;
+        case "Boolean": return self.value ? 1 : 0;
         case "String":
-        case "Symbol":
         case "Closure":
+        case "Native":
         case "Array":
         case "Object":
         case "Null":
+        default: throw new Error();
+    }
+}
+function applyUnaryOperator(op: string, rhs: Value): Value {
+    switch (op) {
+        case "+@": return createNumberValue(toNumber(rhs));
+        case "-@": return createNumberValue(-toNumber(rhs));
+        case "~@": return createNumberValue(~toNumber(rhs));
+        case "!@": return createBooleanValue(!toBoolean(rhs));
         default:
             throw new Error();
     }
 }
-
 function applyBinaryOperator(op: BinaryOperator, lhs: Value, rhs: Value): Value {
     switch (op) {
-        case "+":
-            return { kind: "Number", value: toNumber(lhs) + toNumber(rhs) };
-        case "-":
-            return { kind: "Number", value: toNumber(lhs) - toNumber(rhs) };
-        case "*":
-            return { kind: "Number", value: toNumber(lhs) * toNumber(rhs) };
-        case "/":
-            return { kind: "Number", value: toNumber(lhs) / toNumber(rhs) };
-        case "%":
-            return { kind: "Number", value: toNumber(lhs) % toNumber(rhs) };
-        case "<<":
-            return { kind: "Number", value: toNumber(lhs) << toNumber(rhs) };
-        case "<<<":
-            return { kind: "Number", value: toNumber(lhs) << toNumber(rhs) };
-        case ">>":
-            return { kind: "Number", value: toNumber(lhs) >> toNumber(rhs) };
-        case ">>>":
-            return { kind: "Number", value: toNumber(lhs) >>> toNumber(rhs) };
-        case "&":
-            return { kind: "Number", value: toNumber(lhs) & toNumber(rhs) };
-        case "^":
-            return { kind: "Number", value: toNumber(lhs) ^ toNumber(rhs) };
-        case "|":
-            return { kind: "Number", value: toNumber(lhs) | toNumber(rhs) };
-        case "**":
-            return { kind: "Number", value: toNumber(lhs) ** toNumber(rhs) };
-        default:
-            throw new Error();
+        case "+": return createNumberValue(toNumber(lhs) + toNumber(rhs));
+        case "-": return createNumberValue(toNumber(lhs) - toNumber(rhs));
+        case "*": return createNumberValue(toNumber(lhs) * toNumber(rhs));
+        case "/": return createNumberValue(toNumber(lhs) / toNumber(rhs));
+        case "%": return createNumberValue(toNumber(lhs) % toNumber(rhs));
+        case "<<": return createNumberValue(toNumber(lhs) << toNumber(rhs));
+        case "<<<": return createNumberValue(toNumber(lhs) << toNumber(rhs));
+        case ">>": return createNumberValue(toNumber(lhs) >> toNumber(rhs));
+        case ">>>": return createNumberValue(toNumber(lhs) >>> toNumber(rhs));
+        case "&": return createNumberValue(toNumber(lhs) & toNumber(rhs));
+        case "^": return createNumberValue(toNumber(lhs) ^ toNumber(rhs));
+        case "|": return createNumberValue(toNumber(lhs) | toNumber(rhs));
+        case "**": return createNumberValue(toNumber(lhs) ** toNumber(rhs));
+        default: throw new Error();
     }
 }
 function applyConditionalOperator(op: ConditionalOperator, lhs: Value, rhs: Value): BooleanValue {
     switch (op) {
-        case "==":
-            return { kind: "Boolean", value: (lhs.kind === rhs.kind) && (lhs.value === rhs.value) };
-        case "!=":
-            return { kind: "Boolean", value: !((lhs.kind === rhs.kind) && (lhs.value === rhs.value)) };
-        case ">=":
-            return { kind: "Boolean", value: toNumber(lhs) >= toNumber(rhs) };
-        case "<=":
-            return { kind: "Boolean", value: toNumber(lhs) <= toNumber(rhs) };
-        case ">":
-            return { kind: "Boolean", value: toNumber(lhs) > toNumber(rhs) };
-        case "<":
-            return { kind: "Boolean", value: toNumber(lhs) < toNumber(rhs) };
-        default:
-            throw new Error();
+        case "==": return createBooleanValue((lhs.kind === rhs.kind) && (lhs.value === rhs.value));
+        case "!=": return createBooleanValue(!((lhs.kind === rhs.kind) && (lhs.value === rhs.value)));
+        case ">=": return createBooleanValue(toNumber(lhs) >= toNumber(rhs));
+        case "<=": return createBooleanValue(toNumber(lhs) <= toNumber(rhs));
+        case ">": return createBooleanValue(toNumber(lhs) > toNumber(rhs));
+        case "<": return createBooleanValue(toNumber(lhs) < toNumber(rhs));
+        default: throw new Error();
     }
 }
 
+objectClass.value.set(createStringValue("to_s"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    context.stack.push(createStringValue("to_s"));
+}));
+objectClass.value.set(createStringValue("[]="), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (args.length !== 2) {
+        throw new Error();
+    }
+    if (receiver.kind !== "Object") {
+        throw new Error();
+    }
+    const key = args[1];
+    const value = args[0];
+    receiver.value.set(key, value);
+    context.stack.push(value);
+}));
+objectClass.value.set(createStringValue("[]"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (args.length !== 1) {
+        throw new Error();
+    }
+    const key = args[0];
+    context.stack.push(getField(key, receiver) || createNullValue());
+}));
+
+numberClass.value.set(createStringValue("abs"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    context.stack.push(createNumberValue(Math.abs(toNumber(receiver))));
+}));
+(<BinaryOperator[]>["*", "/", "%", "+", "-", "<<", ">>", ">>>", "<<<", "&", "^", "|", "**"]).forEach(v => {
+    numberClass.value.set(createStringValue(v), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+        if (args.length !== 1) {
+            throw new Error();
+        }
+        context.stack.push(applyBinaryOperator(v, receiver, args[0]));
+    }));
+});
+["+@", "-@", "~@", "!@"].forEach(v => {
+    numberClass.value.set(createStringValue(v), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+        if (args.length !== 0) {
+            throw new Error();
+        }
+        context.stack.push(applyUnaryOperator(v, receiver));
+    }));
+});
+
+stringClass.value.set(createStringValue("length"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (receiver.kind !== "String") {
+        throw new Error();
+    }
+    context.stack.push(createNumberValue(receiver.value.length));
+}));
+stringClass.value.set(createStringValue("+"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (receiver.kind !== "String") {
+        throw new Error();
+    }
+    if (args.length !== 1) {
+        throw new Error();
+    }
+    context.stack.push(createStringValue(receiver.value + toStr(args[0])));
+}));
+arrayClass.value.set(createStringValue("length"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (receiver.kind !== "Array") {
+        throw new Error();
+    }
+    if (args.length !== 0) {
+        throw new Error();
+    }
+    context.stack.push(createNumberValue(receiver.value.length()));
+}));
+arrayClass.value.set(createStringValue("[]="), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (args.length !== 2) {
+        throw new Error();
+    }
+    if (receiver.kind !== "Array") {
+        throw new Error();
+    }
+    const key = args[1];
+    const value = args[0];
+    if (key.kind !== "Number") {
+        throw new Error();
+    }
+    receiver.value.set(key, value);
+    context.stack.push(value);
+}));
+arrayClass.value.set(createStringValue("[]"), createNativeFuncValue((self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+    if (args.length !== 1) {
+        throw new Error();
+    }
+    if (receiver.kind !== "Array") {
+        throw new Error();
+    }
+    const key = args[0];
+    if (key.kind === "Number") {
+        context.stack.push(receiver.value.get(key) || createNullValue());
+    } else {
+        context.stack.push(getField(key, receiver) || createNullValue());
+    }
+}));
 class Context {
     instructionBlocks: Instruction[][];
     instructions: number;
@@ -940,7 +1283,6 @@ class Context {
             this.callStack = null;
         }
     }
-
 }
 
 class Vm {
@@ -969,35 +1311,33 @@ class Vm {
     }
     static onJumpInstruction(self: JumpInstruction, context: Context): Context {
         const ctx = new Context(context);
-        //ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.label) + 1;
         ctx.pc = self.label.pc + 1;
         return ctx;
     }
     static onBranchInstruction(self: BranchInstruction, context: Context): Context {
         const ctx = new Context(context);
         if (toBoolean(context.stack.pop())) {
-            //ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.thenLabel) + 1;
             ctx.pc = self.thenLabel.pc + 1;
         } else {
-            //ctx.pc = context.instructionBlocks[context.instructions].findIndex(x => x == self.elseLabel) + 1;
             ctx.pc = self.elseLabel.pc + 1;
         }
         return ctx;
     }
     static onBindInstruction(self: BindInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.scope.values[self.ident] = context.stack.pop();
+        ctx.scope.value[self.ident] = context.stack.pop();
         ctx.pc += 1;
         return ctx;
     }
     static onBindArgInstruction(self: BindArgInstruction, context: Context): Context {
         const ctx = new Context(context);
         if (self.spread) {
-            const spread: ArrayValue = { kind: "Array", value: context.stack.slice().reverse() };
-            ctx.scope.values[self.ident] = spread;
+            const ad: ArrayDictionary = context.stack.slice().reverse().reduce((s, v, i) => { s.set(createNumberValue(i), v); return s; }, new ArrayDictionary());
+            const spread: ArrayValue = createArrayValue(ad);
+            ctx.scope.value[self.ident] = spread;
             context.stack.length = 0;
         } else {
-            ctx.scope.values[self.ident] = context.stack.pop();
+            ctx.scope.value[self.ident] = context.stack.pop();
         }
         ctx.pc += 1;
         return ctx;
@@ -1010,14 +1350,14 @@ class Vm {
     }
     static onEnterInstruction(self: EnterInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.scope = { kind: "Scope", values: {}, prev: ctx.scope };
+        ctx.scope = createScope(ctx.scope);
         ctx.pc += 1;
         return ctx;
     }
     static onLeaveInstruction(self: LeaveInstruction, context: Context): Context {
         const ctx = new Context(context);
         for (let i = 0; i < self.level; i++) {
-            ctx.scope = ctx.scope.prev;
+            ctx.scope = ctx.scope.extend;
         }
         ctx.pc += 1;
         return ctx;
@@ -1031,60 +1371,36 @@ class Vm {
     static onSimpleAssignmentInstruction(self: SimpleAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
         const symbol = ctx.stack.pop();
-        if (symbol.kind !== "Symbol") {
+        if (symbol.kind !== "String") {
             throw new Error();
         }
         const scope = findScope(ctx.scope, symbol.value);
         if (scope == null) {
             throw new Error();
         }
-        const lhs = scope.values[symbol.value];
+        const lhs = scope.value[symbol.value];
         const rhs = ctx.stack.pop();
         if (self.op === "=") {
-            scope.values[symbol.value] = copyValue(rhs);
+            scope.value[symbol.value] = copyValue(rhs);
         } else {
-            scope.values[symbol.value] = applyBinaryOperator(assignmentOperatorToBinaryOperator(self.op), lhs, rhs);
+            scope.value[symbol.value] = applyBinaryOperator(assignmentOperatorToBinaryOperator(self.op), lhs, rhs);
         }
-        ctx.stack.push(scope.values[symbol.value]);
-        ctx.pc += 1;
-        return ctx;
-    }
-    static onArrayAssignmentInstruction(self: ArrayAssignmentInstruction, context: Context): Context {
-        const ctx = new Context(context);
-        const index = ctx.stack.pop();
-        if (index.kind !== "Number") {
-            throw new Error();
-        }
-        const array = ctx.stack.pop();
-        if (array.kind !== "Array") {
-            throw new Error();
-        }
-        const lhs = array.value[index.value];
-        const rhs = ctx.stack.pop();
-        if (self.op === "=") {
-            array.value[index.value] = copyValue(rhs);
-        } else {
-            array.value[index.value] = applyBinaryOperator(assignmentOperatorToBinaryOperator(self.op), lhs, rhs);
-        }
-        ctx.stack.push(array.value[index.value]);
+        ctx.stack.push(scope.value[symbol.value]);
         ctx.pc += 1;
         return ctx;
     }
     static onMemberAssignmentInstruction(self: MemberAssignmentInstruction, context: Context): Context {
         const ctx = new Context(context);
+        const receiver = ctx.stack.pop();
         const symbol = ctx.stack.pop();
-        const object = ctx.stack.pop();
-        if (symbol.kind !== "Symbol" || object.kind !== "Object") {
+        if (receiver.kind !== "Object") {
             throw new Error();
         }
-        const lhs = object.value[symbol.value];
+        const lhs = getField(symbol, receiver);
         const rhs = ctx.stack.pop();
-        if (self.op === "=") {
-            object.value[symbol.value] = copyValue(rhs);
-        } else {
-            object.value[symbol.value] = applyBinaryOperator(assignmentOperatorToBinaryOperator(self.op), lhs, rhs);
-        }
-        ctx.stack.push(object.value[symbol.value]);
+        const value = (self.op === "=") ? copyValue(rhs) : applyBinaryOperator(assignmentOperatorToBinaryOperator(self.op), lhs, rhs);
+        receiver.value.set(symbol, value);
+        ctx.stack.push(value);
         ctx.pc += 1;
         return ctx;
     }
@@ -1097,160 +1413,153 @@ class Vm {
         ctx.pc += 1;
         return ctx;
     }
-    static onBinaryInstruction(self: BinaryInstruction, context: Context): Context {
-        const ctx = new Context(context);
-        const lhs = ctx.stack.pop();
-        const rhs = ctx.stack.pop();
-        const ret = applyBinaryOperator(self.op, lhs, rhs);
-        ctx.stack.push(ret);
-        ctx.pc += 1;
-        return ctx;
-    }
-    static onUnaryInstruction(self: UnaryInstruction, context: Context): Context {
-        const ctx = new Context(context);
-        const rhs = ctx.stack.pop();
-        let ret: Value;
-        switch (self.op) {
-            case "+":
-                ret = { kind: "Number", value: toNumber(rhs) };
-                break;
-            case "-":
-                ret = { kind: "Number", value: -toNumber(rhs) };
-                break;
-            case "~":
-                ret = { kind: "Number", value: ~toNumber(rhs) };
-                break;
-            case "!":
-                ret = { kind: "Boolean", value: !toBoolean(rhs) };
-                break;
-            default:
-                throw new Error();
-        }
-        ctx.stack.push(ret);
-        ctx.pc += 1;
-        return ctx;
-    }
     static onCallInstruction(self: CallInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const argc = ctx.stack.pop();
+        const receiver: NullValue = createNullValue();
         const lhs = ctx.stack.pop();
-        if (argc.kind !== "Number" || lhs.kind !== "Closure") {
+
+        const argc = ctx.stack.pop();
+        if (argc.kind !== "Number") {
             throw new Error();
         }
 
-        const args : Value[] = [];
+        const args: Value[] = [];
         for (let i = 0; i < argc.value; i++) {
             args.push(ctx.stack.pop());
         }
 
+        if (lhs.kind === "Closure") {
+            args.push(receiver);
 
-        const closure = lhs.value;
-        ctx.instructions = closure.func;
-        ctx.pc = 0;
-        ctx.callStack.push(context);
-        ctx.stack = args;
-        ctx.scope = { kind: "Scope", values: {}, prev: closure.scope };
-        return ctx;
-    }
-    static onArrayIndexInstruction(self: ArrayIndexInstruction, context: Context): Context {
-        const ctx = new Context(context);
-        const lhs = ctx.stack.pop();
-        const rhs = ctx.stack.pop();
-        if (lhs.kind !== "Array" || rhs.kind !== "Number") {
+            const closure = lhs.value;
+            ctx.instructions = closure.func;
+            ctx.pc = 0;
+            ctx.callStack.push(context);
+            ctx.stack = args;
+            ctx.scope = createScope(closure.scope);
+            return ctx;
+        } else if (lhs.kind === "Native") {
+            ctx.pc += 1;
+            lhs.value(self, ctx, receiver, args);
+            return ctx;
+        } else {
             throw new Error();
         }
-        const array = lhs.value;
-        const ret = array[toNumber(rhs)] || { kind: "Null", value: null };
-        ctx.stack.push(ret);
-        ctx.pc += 1;
-        return ctx;
+    }
+    static onMemberCallInstruction(self: MemberCallInstruction, context: Context): Context {
+        const ctx = new Context(context);
+        const rhs = ctx.stack.pop();
+        const receiver = ctx.stack.pop();
+        const lhs = getField(rhs, receiver);
+
+        const argc = ctx.stack.pop();
+        if (argc.kind !== "Number") {
+            throw new Error();
+        }
+
+        const args: Value[] = [];
+        for (let i = 0; i < argc.value; i++) {
+            args.push(ctx.stack.pop());
+        }
+        args.push(receiver);
+
+        if (lhs.kind === "Closure") {
+            const closure = lhs.value;
+            ctx.instructions = closure.func;
+            ctx.pc = 0;
+            ctx.callStack.push(context);
+            ctx.stack = args;
+            ctx.scope = createScope(closure.scope);
+            return ctx;
+        } else if (lhs.kind === "Native") {
+            ctx.pc += 1;
+            lhs.value(self, ctx, receiver, args);
+            return ctx;
+        } else {
+            throw new Error();
+        }
     }
     static onObjectMemberInstruction(self: ObjectMemberInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const lhs = ctx.stack.pop();
         const rhs = ctx.stack.pop();
-        if (lhs.kind !== "Object" || rhs.kind !== "Symbol") {
-            throw new Error();
-        }
-        const obj = lhs.value;
-        const ret = obj[rhs.value] || { kind: "Null", value: null };
+        const receiver = ctx.stack.pop();
+        const ret = getField(rhs, receiver) || createNullValue();
         ctx.stack.push(ret);
         ctx.pc += 1;
         return ctx;
     }
     static onArrayLiteralInstruction(self: ArrayLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const values: Value[] = [];
+        const values: ArrayDictionary = new ArrayDictionary();
         for (let i = 0; i < self.count; i++) {
             values.push(ctx.stack.pop());
         }
         values.reverse();
-        ctx.stack.push({ kind: "Array", value: values });
+        ctx.stack.push(createArrayValue(values));
         ctx.pc += 1;
         return ctx;
     }
     static onObjectLiteralInstruction(self: ObjectLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        const values: { [key: string]: Value } = {};
+        const values = new Dictionary();
         for (let i = 0; i < self.count; i++) {
             const key = ctx.stack.pop();
             const value = ctx.stack.pop();
-            if (key.kind !== "Symbol") {
+            if (key.kind !== "String") {
                 throw new Error();
             }
-            values[key.value] = value;
+            values.set(key, value);
         }
-        ctx.stack.push({ kind: "Object", value: values });
+        ctx.stack.push(createObjectValue(values));
         ctx.pc += 1;
         return ctx;
     }
     static onStringLiteralInstruction(self: StringLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "String", value: self.value });
+        ctx.stack.push(createStringValue(self.value));
         ctx.pc += 1;
         return ctx;
     }
     static onFunctionInstruction(self: FunctionInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "Closure", value: { func: self.instructions, scope: context.scope } });
+        ctx.stack.push(createClosureValue(self.instructions, context.scope));
         ctx.pc += 1;
         return ctx;
     }
     static onNumericLiteralInstruction(self: NumericLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "Number", value: self.value });
+        ctx.stack.push(createNumberValue(self.value));
         ctx.pc += 1;
         return ctx;
     }
     static onNullLiteralInstruction(self: NullLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "Null", value: null });
+        ctx.stack.push(createNullValue());
         ctx.pc += 1;
         return ctx;
     }
     static onBooleanLiteralInstruction(self: BooleanLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "Boolean", value: self.value });
+        ctx.stack.push(createBooleanValue(self.value));
         ctx.pc += 1;
         return ctx;
     }
     static onIdentifierLiteralInstruction(self: IdentifierLiteralInstruction, context: Context): Context {
         const ctx = new Context(context);
-        ctx.stack.push({ kind: "Symbol", value: self.value });
+        ctx.stack.push(createStringValue(self.value));
         ctx.pc += 1;
         return ctx;
     }
     static onLoadInstruction(self: LoadInstruction, context: Context): Context {
         const ctx = new Context(context);
         const sym = ctx.stack.pop();
-        if (sym.kind !== "Symbol") {
+        if (sym.kind !== "String") {
             throw new Error();
         }
-        ctx.stack.push(getScope(context.scope, sym.value) || { kind: "Null", value: null });
+        ctx.stack.push(getScope(context.scope, sym.value) || createNullValue());
         ctx.pc += 1;
         return ctx;
     }
-
 }
 
 type ToStringContext = { scopes: Scope[], values: Value[] };
@@ -1262,9 +1571,9 @@ function objectToString(context: ToStringContext, self: Scope | Instruction | Va
             if (id === -1) {
                 id = context.scopes.length;
                 context.scopes.push(self);
-                const values = Object.keys(self.values).map(key => `${key}: ${objectToString(context, self.values[key])}`).join(',\r\n');
-                const prev = self.prev ? objectToString(context, self.prev) : null;
-                return `{ kind: "${self.kind}", id: "${id}", values: {\r\n${values}\r\n},\r\n prev: {\r\n${prev}\r\n}`;
+                const values = Object.keys(self.value).map(key => `${key}: ${objectToString(context, self.value[key])}`).join(',\r\n');
+                const extend = self.extend ? objectToString(context, self.extend) : null;
+                return `{ kind: "${self.kind}", id: "${id}", values: {\r\n${values}\r\n},\r\n extend: {\r\n${extend}\r\n} }`;
             } else {
                 return `{ kind: "${self.kind}", ref: "${id}" }`;
             }
@@ -1300,25 +1609,16 @@ function objectToString(context: ToStringContext, self: Scope | Instruction | Va
         case "SimpleAssignmentInstruction": {
             return `{ kind: "${self.kind}", op: "${self.op}" }`;
         }
-        case "ArrayAssignmentInstruction": {
-            return `{ kind: "${self.kind}", op: "${self.op}" }`;
-        }
         case "MemberAssignmentInstruction": {
             return `{ kind: "${self.kind}", op: "${self.op}" }`;
         }
         case "ConditionalInstruction": {
             return `{ kind: "${self.kind}", op: "${self.op}" }`;
         }
-        case "BinaryInstruction": {
-            return `{ kind: "${self.kind}", op: "${self.op}" }`;
-        }
-        case "UnaryInstruction": {
-            return `{ kind: "${self.kind}", op: "${self.op}" }`;
-        }
         case "CallInstruction": {
             return `{ kind: "${self.kind}" }`;
         }
-        case "ArrayIndexInstruction": {
+        case "MemberCallInstruction": {
             return `{ kind: "${self.kind}" }`;
         }
         case "ObjectMemberInstruction": {
@@ -1361,18 +1661,18 @@ function objectToString(context: ToStringContext, self: Scope | Instruction | Va
         case "String": {
             return `{ kind: "${self.kind}", value: "${self.value.toString().replace(/"/g, '\\"')}" }`;
         }
-        case "Symbol": {
-            return `{ kind: "${self.kind}", value: "${self.value.toString().replace(/"/g, '\\"')}" }`;
-        }
         case "Closure": {
             return `{ kind: "${self.kind}", func: ${self.value.func}, scope: ${objectToString(context, self.value.scope)} }`;
+        }
+        case "Native": {
+            return `{ kind: "${self.kind}", value: ${self.value.toString()} }`;
         }
         case "Array": {
             if (context.values.indexOf(self) !== -1) {
                 return `{ kind: "${self.kind}", value: [ ... ] }`;
             } else {
                 context.values.push(self);
-                return `{ kind: "${self.kind}", value: [ ${self.value.map(x => objectToString(context, x)).join(", ")} ] }`;
+                return `{ kind: "${self.kind}", value: [ ${self.value.values().map(x => objectToString(context, x)).join(", ")} ] }`;
             }
         }
         case "Object": {
@@ -1380,7 +1680,7 @@ function objectToString(context: ToStringContext, self: Scope | Instruction | Va
                 return `{ kind: "${self.kind}", value: { ... } }`;
             } else {
                 context.values.push(self);
-                return `{ kind: "${self.kind}", value: { ${Object.keys(self.value).map(x => x + ": " + objectToString(context, self.value[x])).join(", ")} } }`;
+                return `{ kind: "${self.kind}", value: ${self.value.toString()}`;
             }
         }
         case "Null": {
@@ -1392,19 +1692,19 @@ function objectToString(context: ToStringContext, self: Scope | Instruction | Va
 
 function contextToString(self: Context) {
     let ret: string[] = [];
-    ret.push(`{`);
-    {
-        const context: ToStringContext = { scopes: [], values: [] };
-        ret.push(`instructionBlocks: {`);
-        self.instructionBlocks.forEach((block, i) => {
-            ret.push(`${i}: [`);
-            block.forEach(inst => ret.push(objectToString(context, inst)+","));
-            ret.push(`],`);
-            ret.push(`},`);
-        });
-    }
-    ret.push(`instructions: ${self.instructions},`);
+    //ret.push(`{`);
+    //{
+    //    const context: ToStringContext = { scopes: [], values: [] };
+    //    ret.push(`instructionBlocks: {`);
+    //    self.instructionBlocks.forEach((block, i) => {
+    //        ret.push(`${i}: [`);
+    //        block.forEach(inst => ret.push(objectToString(context, inst) + ","));
+    //        ret.push(`],`);
+    //        ret.push(`},`);
+    //    });
+    //}
     ret.push(`pc: ${self.pc},`);
+    ret.push(`instructions: ${self.instructions},`);
     {
         const context: ToStringContext = { scopes: [], values: [] };
         ret.push(`scope: ${objectToString(context, self.scope)},`);
@@ -1419,10 +1719,6 @@ function contextToString(self: Context) {
     return ret.join("\r\n");
 }
 
-declare var jsDump: {
-    parse(code: any): string;
-};
-
 declare const parser: peg.GeneratedParser<Program>;
 
 window.onload = () => {
@@ -1436,6 +1732,11 @@ window.onload = () => {
         parser = <peg.GeneratedParser<Program>>peg.generate(grammar, { cache: false, optimize: "speed", output: "parser" });
     }
     let context: Context = null;
+    $("new").onclick = () => {
+        $("run").setAttribute("disabled", "");
+        $("step").setAttribute("disabled", "");
+        $("output").value = $("code").value = $("console").value = "";
+    };
 
     $("compile").onclick = () => {
         try {
@@ -1444,13 +1745,39 @@ window.onload = () => {
             const result = parser.parse($("code").value);
             const c = new Compiler();
             c.accept(result);
-            $("output").value = jsDump.parse(c.instructionBlocks);
+
+            {
+                const context: ToStringContext = { scopes: [], values: [] };
+                var ret: string[] = [];
+                ret.push(`instructionBlocks: {`);
+                c.instructionBlocks.forEach((block, i) => {
+                    ret.push(`${i}: [`);
+                    block.forEach(inst => ret.push(objectToString(context, inst) + ","));
+                    ret.push(`],`);
+                    ret.push(`},`);
+                });
+                $("instruction").value = ret.join("\r\n");
+            }
 
             context = new Context();
             context.instructionBlocks = c.instructionBlocks;
             context.instructions = 0;
             context.pc = 0;
-            context.scope = { kind: "Scope", values: {}, prev: null };
+            context.scope = createScope(null);
+            context.scope.value["print"] = createNativeFuncValue(
+                (self: CallInstruction, context: Context, receiver: Value, args: Value[]) => {
+                    if (args.length !== 1) {
+                        throw new Error();
+                    }
+                    const value = args[0];
+                    const toStringContext: ToStringContext = { scopes: [], values: [] };
+                    $("console").value += objectToString(toStringContext, value) + "\r\n";
+                    context.stack.push(createNullValue());
+                }
+            );
+
+            context.scope.value["Number"] = numberClass;
+            context.scope.value["Array"] = arrayClass;
             context.stack = [];
             context.callStack = [];
 
@@ -1459,9 +1786,9 @@ window.onload = () => {
         } catch (e) {
             console.log(e);
             if (e instanceof parser.SyntaxError) {
-                $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
+                $("console").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
             } else {
-                $("output").value = `${e.toString()}: ${e.message}`;
+                $("console").value = `${e.toString()}: ${e.message}`;
             }
         }
     };
@@ -1475,9 +1802,9 @@ window.onload = () => {
         } catch (e) {
             console.log(e);
             if (e instanceof parser.SyntaxError) {
-                $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
+                $("console").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
             } else {
-                $("output").value = `${e.toString()}: ${e.message}`;
+                $("console").value = `${e.toString()}: ${e.message}`;
             }
         }
     };
@@ -1489,9 +1816,9 @@ window.onload = () => {
         } catch (e) {
             console.log(e);
             if (e instanceof parser.SyntaxError) {
-                $("output").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
+                $("console").value = `line ${e.location.start.line} column ${e.location.start.column}: ${e.message}`;
             } else {
-                $("output").value = `${e.toString()}: ${e.message}`;
+                $("console").value = `${e.toString()}: ${e.message}`;
             }
         }
     };

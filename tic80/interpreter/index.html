@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
+    <meta charset="utf-8" />
     <style>
         html, body {
             width: 100vw;
             height: 100vh;
+            font-family: monospace;
         }
 
-        html, body, div, textarea, a {
+        html, body, div, textarea {
             margin: 0;
             padding: 0;
             border: 0;
@@ -20,15 +22,56 @@
             display: inline;
         }
 
-        a {
-            background-color: lightgray;
-        }
-
         textarea {
             resize: none;
             outline: 0;
             border: 1px solid lightgray;
         }
+
+        .menu-, .menu-case, .menu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .menu-case {
+            display: inline-block;
+        }
+        .menu-:after {
+            content: "";
+            display: inline-block;
+        }
+        .menu-list {
+            position: absolute;
+            opacity: 0;
+            z-index: -1;
+            width: 10em;
+            border: 1px solid black;
+            box-sizing: border-box;
+        }
+        .menu-name:hover + .menu-list, .menu-list:hover {
+            opacity: 1;
+            z-index: 1;
+        }
+        .menu-case:hover .menu-name {
+            color: #FFFFFF;
+            background-color: #000000;
+        }
+        .menu-one {
+            color: #000000;
+            background-color: #FFFFFF;
+        }
+        .menu-one:hover {
+            color: #FFFFFF;
+            background-color: #000000;
+        }
+
+        .menu-name  {
+            padding: 2px 4px;
+        }
+        .menu-one {
+            padding: 2px 4px;
+        }
+
     </style>
     <script type="text/peg-js">
 Program
@@ -149,14 +192,14 @@ BindingRestElement
   = "..." _ name:BindingIdentifier { return new FunctionParameter( name, null, true);  }
 
 ConditionalExpression 
-  = condExpr:LogicalOrExpression _ "?" _ thenExpr:AssignmentExpression _ ":" _ elseExpr:AssignmentExpression { return new ConditionalExpression(condExpr, thenExpr, elseExpr); }
-  / LogicalOrExpression 
+  = condExpr:LogicalORExpression _ "?" _ thenExpr:AssignmentExpression _ ":" _ elseExpr:AssignmentExpression { return new ConditionalExpression(condExpr, thenExpr, elseExpr); }
+  / LogicalORExpression 
 
-LogicalOrExpression  = e1:LogicalAndExpression e2:(_ "||" _ LogicalAndExpression)* { return e2.reduce((s,x) => new LogicalOrExpression(s, x[3]), e1); }
-LogicalAndExpression = e1:BitwiseOrExpression  e2:(_ "&&" _ BitwiseOrExpression)*  { return e2.reduce((s,x) => new LogicalAndExpression(s, x[3]), e1); }
-BitwiseOrExpression  = e1:BitwiseXorExpression e2:(_ "|" _ BitwiseXorExpression)*  { return e2.reduce((s,x) => new BitwiseOrExpression(s, x[3]), e1); }
-BitwiseXorExpression = e1:BitwiseAndExpression e2:(_ "^" _ BitwiseAndExpression)*  { return e2.reduce((s,x) => new BitwiseXorExpression(s, x[3]), e1); }
-BitwiseAndExpression = e1:EqualityExpression   e2:(_ "&" _ EqualityExpression)*    { return e2.reduce((s,x) => new BitwiseAndExpression(s, x[3]), e1); }
+LogicalORExpression  = e1:LogicalANDExpression e2:(_ "||" _ LogicalANDExpression)* { return e2.reduce((s,x) => new LogicalORExpression(s, x[3]), e1); }
+LogicalANDExpression = e1:BitwiseORExpression  e2:(_ "&&" _ BitwiseORExpression)*  { return e2.reduce((s,x) => new LogicalANDExpression(s, x[3]), e1); }
+BitwiseORExpression  = e1:BitwiseXORExpression e2:(_ "|" _ BitwiseXORExpression)*  { return e2.reduce((s,x) => new BitwiseORExpression(s, x[3]), e1); }
+BitwiseXORExpression = e1:BitwiseANDExpression e2:(_ "^" _ BitwiseANDExpression)*  { return e2.reduce((s,x) => new BitwiseXORExpression(s, x[3]), e1); }
+BitwiseANDExpression = e1:EqualityExpression   e2:(_ "&" _ EqualityExpression)*    { return e2.reduce((s,x) => new BitwiseANDExpression(s, x[3]), e1); }
 EqualityExpression = e1:RelationalExpression   e2:(_ EqualityOperator _ RelationalExpression)* { return e2.reduce((s,x) => new EqualityExpression(x[1], s, x[3]), e1); }
 EqualityOperator = "==" / "!="
 RelationalExpression = e1:ShiftExpression e2:(_ RelationalOperator _ ShiftExpression)* { return e2.reduce((s,x) => new RelationalExpression(x[1], s, x[3]), e1); }
@@ -195,11 +238,11 @@ MemberExpressionPost
   / _ "." _ name:Identifier { return new ObjectMemberExpression(null, name); }
 
 PrimaryExpression
-  = Identifier
-  / Literal
+  = Literal
   / ArrayLiteral
   / ObjectLiteral
   / FunctionExpression
+  / Identifier
   / _ "(" _ expr:Expression _ ")" { return new EnclosedInParenthesesExpression(expr); }
 
 Literal
@@ -226,7 +269,7 @@ NullLiteral = _ "null" { return new NullLiteral(); }
 BooleanLiteral = _ "true"  { return new BooleanLiteral(true); }
                / _ "false" { return new BooleanLiteral(false); }
 NumericLiteral = _ number:([0-9]+ ( "." [0-9]+)?  { return new NumericLiteral(Number.parseFloat(text())); }) { return number; }
-StringLiteral = _ string:("\"" ([^\"] / "\\" [.])* "\"" { return new StringLiteral(text()); }) { return string; }
+StringLiteral = _ "\"" string:( ([^\"] / "\\" [.])* { return parseStr(text()); }) "\"" { return new StringLiteral(string); }
 
 Identifier "identifier" = _ ident:([A-Za-z_][A-Za-z0-9_]* { return new IdentifierLiteral(text()); }) { return ident; }
 _ "whitespace" = [ \t\n\r]*
@@ -234,14 +277,36 @@ _ "whitespace" = [ \t\n\r]*
     </script>
     <script src="./peg.js"></script>
     <script src="./app.js"></script>
-    <script src="./jsDump.js"></script>
 </head>
 <body>
     <div style="display:flex; width:100vw; height:100vh; flex-direction: column; flex-wrap: wrap;">
-        <div style="display:flex; "><a id="compile">Compile</a>|<a id="run">Run</a>|<a id="step">Step</a></div>
+        <div style="display:flex; ">
+            <ul class="menu-">
+                <li class="menu-case">
+                    <div class="menu-name">File</div>
+                    <ul class="menu-list">
+                        <li class="menu-one" id="new">New</li>
+                    </ul>
+                </li>
+                <li class="menu-case">
+                    <div class="menu-name">Build</div>
+                    <ul class="menu-list">
+                        <li class="menu-one" id="compile">Compile</li>
+                        <li class="menu-one" id="run">Run</li>
+                        <li class="menu-one" id="step">Step</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
         <div style="display:flex; flex:1; flex-direction: row; flex-wrap: wrap;">
             <div style="display:flex; flex:1;"><textarea id="code" style="width:100%; height:100%;"></textarea></div>
-            <div style="display:flex; flex:1;"><textarea id="output" style="width:100%; height:100%;"></textarea></div>
+            <div style="display:flex; flex: 1; width:100%; height:100%; flex-direction: column; flex-wrap: wrap;">
+                <div style="display:flex; flex:1;"><textarea id="instruction" style="width:100%; height:100%;"></textarea></div>
+                <div style="display:flex; flex:1;"><textarea id="output" style="width:100%; height:100%;"></textarea></div>
+            </div>
+        </div>
+        <div style="display:flex; ">
+            <textarea id="console" style="width:100%; height:100%;"></textarea>
         </div>
     </div>
 </body>
