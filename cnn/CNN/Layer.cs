@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using CNN.Extensions;
+using LibPredicate;
 
 namespace CNN {
     public class Layer {

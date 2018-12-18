@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using CNN.Extensions;
+using LibPredicate;
 
 namespace CNN {
     public class NeuralNetwork {
@@ -77,17 +77,18 @@ namespace CNN {
         /// </summary>
         /// <returns></returns>
         public int GetMaxOutput() {
-            // 出力層のノードのうち、最大値を持つノードのインデックスを返す
-            var outputLayerNodes = OutputLayer.Nodes;
-            var max = -1;
-            var maxValue = double.MinValue;
-            for (var i = 0; i < outputLayerNodes.Length; i++) {
-                if (maxValue < outputLayerNodes[i].OutputValue) {
-                    max = i;
-                    maxValue = outputLayerNodes[i].OutputValue;
-                }
-            }
-            return max;
+            return OutputLayer.Nodes.IndexOfMax(x => x.OutputValue);
+            //// 出力層のノードのうち、最大値を持つノードのインデックスを返す
+            //var outputLayerNodes = OutputLayer.Nodes;
+            //var max = -1;
+            //var maxValue = double.MinValue;
+            //for (var i = 0; i < outputLayerNodes.Length; i++) {
+            //    if (maxValue < outputLayerNodes[i].OutputValue) {
+            //        max = i;
+            //        maxValue = outputLayerNodes[i].OutputValue;
+            //    }
+            //}
+            //return max;
         }
 
         /// <summary>

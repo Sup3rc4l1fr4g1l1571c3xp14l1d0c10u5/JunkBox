@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using CNN.Extensions;
+using LibPredicate;
 
 namespace CNN {
     public class Node {
@@ -78,7 +78,7 @@ namespace CNN {
         /// 重みを正規乱数で初期化
         /// </summary>
         public void InitWeight() {
-            InputEdges.ForEach(edge => edge.Weight = Randomizer.NextNormalRandom());
+            InputEdges.ForEach(edge => edge.Weight = Randomizer.NextNormal());
         }
 
         /// <summary>

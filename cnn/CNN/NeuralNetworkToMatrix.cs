@@ -26,9 +26,7 @@ namespace CNN {
                     }
                 }
             }
-
             return adjacencyForwardMatrix.ToArray();
-
         }
     }
 }
