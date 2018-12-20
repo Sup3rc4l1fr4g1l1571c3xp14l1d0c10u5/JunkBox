@@ -7,12 +7,68 @@
     <script src="app.js"></script>
 </head>
 <body>
-    <canvas id="write" width="256" height="256"></canvas>
-    <canvas id="sample" width="28" height="28"></canvas>
-    <button id="train">Train</button>
-    <button id="clear">Clear</button>
-    <a id="save">Save</a>
-    <a id="load">Load</a>
-    <div id="output"></div>
+    <div style="display:flex; flex-direction: column; width: 100%; height:100%">
+        <div id="menu">
+            <ul class="menu-">
+                <li class="menu-case">
+                    <div class="menu-name">File</div>
+                    <ul class="menu-list">
+                        <li class="menu-one"><a class="menu-name" id="new">New</a></li>
+                        <li class="menu-one"><a class="menu-name" id="load">Load Weight</a></li>
+                        <li class="menu-one"><a class="menu-name" id="save">Save Weight</a></li>
+                    </ul>
+                </li>
+                <li class="menu-case">
+                    <div class="menu-name">View</div>
+                    <ul class="menu-list">
+                        <li class="menu-one"><a class="menu-name" href='#pad'>Pad</a></li>
+                        <li class="menu-one"><a class="menu-name" href='#data-viewer'>Data</a></li>
+                        <li class="menu-one"><a class="menu-name" href='#train-viewer'>Train</a></li>
+                    </ul>
+                </li>
+                <li class="menu-case">
+                    <div class="menu-name">Project</div>
+                    <ul class="menu-list">
+                        <li class="menu-one"><a class="menu-name" id="train" href='#train-viewer'>Train (default)</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div style="flex: 1">
+            <div id="pad" class="content">
+                <div style="display:flex; flex-direction: column">
+                    <div style="display:flex">
+                        <div>
+                            <div style="font-size:0">
+                                <canvas id="write" width="256" height="256"></canvas>
+                                <canvas id="sample" width="28" height="28"></canvas>
+                            </div>
+                            <button id="clear">Clear</button>
+                            <input id="learn-id" type="number" min="0" max="9" value="0" />
+                            <button id="learn">Learn</button>
+                        </div>
+                        <textarea id="output" cols="30"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div id="data-viewer" class="content">
+                <div>
+                    <div>Index: <input id="train-image-id" type="number" min="0" max="60000" value="0" /></div>
+                    <div>Image: <canvas id="train-image" width="28" height="28"></canvas></div>
+                    <div>Label: <span id="train-image-label"></span></div>
+                </div>
+            </div>
+
+            <div id="train-viewer" class="content">
+                <div style="display:flex; flex-direction: column">
+                    <canvas id="train-graph" width="256" height="256"></canvas>
+                    <pre id="train-log"> </pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
