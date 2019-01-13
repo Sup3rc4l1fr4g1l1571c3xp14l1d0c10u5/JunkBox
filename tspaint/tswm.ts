@@ -3,13 +3,17 @@
 
 module tswm {
     class Component {
-        private _left: number;
-        public get left(): number { return this._left + (this.parent == null ? 0 : this.parent.left); }
-        public set left(value: number) { this._left = value - (this.parent == null ? 0 : this.parent.left); }
 
-        private _top: number;
-        public get top(): number { return this._top + (this.parent == null ? 0 : this.parent.top); }
-        public set top(value: number) { this._top = value - (this.parent == null ? 0 : this.parent.top); }
+        public get screenX(): number { return this._x + (this.parent == null ? 0 : this.parent.screenX); }
+        public get screenY(): number { return this._y + (this.parent == null ? 0 : this.parent.screenY); }
+
+        private _x: number;
+        public get x(): number { return this._x; }
+        public set x(value: number) { this._x = value; }
+
+        private _y: number;
+        public get y(): number { return this._y; }
+        public set y(value: number) { this._y = value; }
 
         private _width: number;
         public get width(): number { return this._width; }
@@ -30,17 +34,19 @@ module tswm {
         public get name(): string { return this._name; }
 
         public childs: Component[];
-        public hasFocus: boolean;
 
-        constructor(name: string, left: number, top: number, width: number, height: number) {
+        private _focus: boolean;
+        public get focus(): boolean { return this._focus; }
+
+        constructor(name: string, x: number, y: number, width: number, height: number) {
             this._name = name;
             this.childs = [];
             this._visible = false;
-            this._left = left;
-            this._top = top;
+            this._x = x;
+            this._y = y;
             this._width = width;
             this._height = height;
-            this.hasFocus = false;
+            this._focus = false;
         }
 
         public addChild(x: Component): void {
@@ -65,17 +71,25 @@ module tswm {
         public draw(ctx: CanvasRenderingContext2D): void {
             if (this.visible == false) { return; }
             for (let i = this.childs.length - 1; i >= 0; i--) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
                 this.childs[i].draw(ctx);
+                ctx.restore();
             }
         }
 
         public on(msg: string, e: any): boolean {
             if (this.visible == false) { return false; }
-            return this.childs.some(x => x.on(msg, e));
+            if (this.childs.some(x => x.on(msg, e))) { return true; }
+            return this.messageProc(msg, e);
+        }
+
+        public messageProc(msg: string, e: any): boolean {
+            return false;
         }
 
         public include(x: number, y: number): boolean {
-            return this.visible && this.left <= x && x < this.left + this.width && this.top <= y && y < this.top + this.height;
+            return this.visible && this.screenX <= x && x < this.screenX + this.width && this.screenY <= y && y < this.screenY + this.height;
         }
 
         public includeChilds(x: number, y: number): boolean {
@@ -83,8 +97,8 @@ module tswm {
         }
 
         public lostFocus(): boolean {
-            if (this.hasFocus) {
-                this.hasFocus = false;
+            if (this._focus) {
+                this._focus = false;
                 console.log("lost focus " + this.name);
                 return true;
             }
@@ -92,34 +106,21 @@ module tswm {
         }
 
         public getFocus(): boolean {
-            if (!this.hasFocus) {
-                this.hasFocus = true;
+            if (!this._focus) {
+                this._focus = true;
                 console.log("get focus " + this.name);
                 return true;
             }
             return false;
         }
 
-        public createFocusList(x: number, y: number, list: Component[]): boolean {
-            if (this.include(x, y) || this.includeChilds(x, y)) {
-                list.push(this);
-                for (const child of this.childs) {
-                    if (child.include(x, y) || child.includeChilds(x, y)) {
-                        child.createFocusList(x, y, list);
-                        break;
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
-
+ 
         public show(): void {
             this._visible = true;
         }
 
         public hide(): void {
-            if (this.hasFocus) {
+            if (this._focus) {
                 this.lostFocus();
             }
             this._visible = false;
@@ -137,8 +138,8 @@ module tswm {
 
     class Window extends Component {
 
-        constructor(name: string, left: number, top: number, width: number, height: number) {
-            super(name, left, top, width, height);
+        constructor(name: string, x: number, y: number, width: number, height: number) {
+            super(name, x, y, width, height);
         }
 
         public draw(ctx: CanvasRenderingContext2D): void {
@@ -146,12 +147,15 @@ module tswm {
             ctx.save();
             ctx.fillStyle = "rgb(128,255,255)";
             ctx.beginPath();
-            ctx.rect(this.left, this.top, this.width, this.height);
+            ctx.rect(this.x, this.y, this.width, this.height);
             ctx.fill();
             ctx.stroke();
             ctx.restore();
             for (let i = this.childs.length - 1; i >= 0; i--) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
                 this.childs[i].draw(ctx);
+                ctx.restore();
             }
         }
 
@@ -164,21 +168,74 @@ module tswm {
         }
     }
 
+    class Button extends Component {
+        private isDown: boolean;
+
+        constructor(name: string, x: number, y: number, width: number, height: number) {
+            super(name, x, y, width, height);
+            this.isDown = false;
+        }
+
+        public draw(ctx: CanvasRenderingContext2D): void {
+            if (this.visible == false) { return; }
+            ctx.save();
+            ctx.fillStyle = "rgb(128,128,255)";
+            ctx.beginPath();
+            ctx.rect(this.x, this.y, this.width, this.height);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+            for (let i = this.childs.length - 1; i >= 0; i--) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                this.childs[i].draw(ctx);
+                ctx.restore();
+            }
+        }
+
+        public messageProc(msg: string, e: any): boolean {
+            switch (msg) {
+                case "mousedown":
+                    if (this.include(e.mouseX, e.mouseY)) {
+                        if (this.isDown == false) {
+                            this.isDown = true;
+                        }
+                        return true;
+                    } else {
+                        return false;
+                    }
+                case "mousemove":
+                    if (this.isDown == true) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                case "mouseup":
+                    if (this.isDown == true) {
+                        this.isDown = false;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                default:
+                    return false;
+            }
+        }
+    }
+
     class Draggable extends Window {
         private dragStart: boolean;
         private mouseX: number;
         private mouseY: number;
 
-        constructor(name: string, left: number, top: number, width: number, height: number) {
-            super(name, left, top, width, height);
+        constructor(name: string, x: number, y: number, width: number, height: number) {
+            super(name, x, y, width, height);
             this.dragStart = false;
             this.mouseX = Number.NaN;
             this.mouseY = Number.NaN;
         }
 
-        public on(msg: string, e: any): boolean {
-            if (this.visible == false) { return false; }
-            if (this.childs.find(x => x.on(msg, e))) { return true; }
+        public messageProc(msg: string, e: any): boolean {
             switch (msg) {
                 case "mousedown":
                     if (this.include(e.mouseX, e.mouseY)) {
@@ -193,8 +250,8 @@ module tswm {
                     }
                 case "mousemove":
                     if (this.dragStart == true) {
-                        this.left += (e.mouseX - this.mouseX);
-                        this.top += (e.mouseY - this.mouseY);
+                        this.x += (e.mouseX - this.mouseX);
+                        this.y += (e.mouseY - this.mouseY);
                         this.mouseX = e.mouseX;
                         this.mouseY = e.mouseY;
                         return true;
@@ -217,8 +274,8 @@ module tswm {
     class DropDown extends Window {
         private expanded: boolean;
 
-        constructor(name: string, left: number, top: number, width: number, height: number) {
-            super(name, left, top, width, height);
+        constructor(name: string, x: number, y: number, width: number, height: number) {
+            super(name, x, y, width, height);
             this.expanded = false;
         }
 
@@ -230,9 +287,7 @@ module tswm {
             return super.lostFocus();
         }
 
-        public on(msg: string, e: any): boolean {
-            if (this.visible == false) { return false; }
-            if (this.childs.find(x => x.on(msg, e))) { return true; }
+        public messageProc(msg: string, e: any): boolean {
             switch (msg) {
                 case "mousedown":
                     if (this.include(e.mouseX, e.mouseY)) {
@@ -253,12 +308,10 @@ module tswm {
         }
     }
     class DropDownItem extends Window {
-        constructor(name: string, left: number, top: number, width: number, height: number) {
-            super(name, left, top, width, height);
+        constructor(name: string, x: number, y: number, width: number, height: number) {
+            super(name, x, y, width, height);
         }
-        public on(msg: string, e: any): boolean {
-            if (this.visible == false) { return false; }
-            if (this.childs.find(x => x.on(msg, e))) { return true; }
+        public messageProc(msg: string, e: any): boolean {
             switch (msg) {
                 case "mouseup":
                     if (this.include(e.mouseX, e.mouseY)) {
@@ -273,72 +326,118 @@ module tswm {
         }
     }
 
+    class WindowManager {
+        private rootWindow: RootWindow;
+        private focusList: Component[];
+
+        public constructor() {
+            this.rootWindow = new RootWindow("<root>");
+            this.rootWindow.visible = true;
+            this.focusList = [this.rootWindow];
+        }
+
+        private createFocusList(self: Component, x: number, y: number, list: Component[]): boolean {
+            let ret: boolean = false;
+            loop:
+            for (; ;) {
+                if (self.include(x, y) || self.includeChilds(x, y)) {
+                    ret = true;
+                    list.push(self);
+                    for (const child of self.childs) {
+                        if (child.include(x, y) || child.includeChilds(x, y)) {
+                            self = child;
+                            continue loop;
+                        }
+                    }
+                }
+                return ret;
+            }
+        }
+
+        public addChild(child: Component): void {
+            this.rootWindow.addChild(child);
+        }
+
+        public draw(context: CanvasRenderingContext2D): void {
+            this.rootWindow.draw(context);
+        }
+
+        public on(msg: string, e: any) : boolean {
+            switch (msg) {
+                case "mousedown": {
+                    const traced: Component[] = [];
+                    this.createFocusList(this.rootWindow, e.mouseX, e.mouseY, traced);
+
+                    if (!(traced.length == this.focusList.length && traced[traced.length - 1] == this.focusList[this.focusList.length - 1])) {
+                        const len = Math.min(traced.length, this.focusList.length);
+                        let same = 0;
+                        for (same = 0; same < len; same++) {
+                            if (this.focusList[same] != traced[same]) {
+                                break;
+                            }
+                        }
+
+                        for (let i = this.focusList.length - 1; i >= same; i--) {
+                            const tail = this.focusList[i];
+                            tail.lostFocus();
+                            this.focusList.pop();
+                        }
+                        for (let i = same; i < traced.length; i++) {
+                            const tail = traced[i];
+                            this.focusList.push(tail);
+                        }
+                        this.focusList[this.focusList.length - 1].getFocus();
+                        for (const target of this.focusList) {
+                            target.moveTop();
+                        }
+                    }
+                    return this.focusList[this.focusList.length - 1].on("mousedown", { mouseX: e.mouseX, mouseY: e.mouseY });
+                }
+                case "mousemove": {
+                    return this.focusList[this.focusList.length - 1].on("mousemove", { mouseX: e.mouseX, mouseY: e.mouseY });
+                }
+                case "mouseup": {
+                    return this.focusList[this.focusList.length - 1].on("mouseup", { mouseX: e.mouseX, mouseY: e.mouseY });
+                }
+            }
+            return false;
+        }
+    }
+
     window.onload = () => {
 
         const canvas: HTMLCanvasElement = <HTMLCanvasElement>document.getElementById("canvas");
         const context: CanvasRenderingContext2D = canvas.getContext("2d");
 
-        const rootWindow = new RootWindow("<root>");
-        rootWindow.visible = true;
         let canvasBounds: ClientRect | DOMRect = null;
-
-        function postMessage(target: Component, msg: string, e: any): boolean {
-            return target.on(msg, e);
-        }
-
-        window.addEventListener("resize", resizeCanvas);
-        const focusList = [rootWindow];
-        canvas.addEventListener("mousedown", e => {
-            const x = e.pageX - canvasBounds.left;
-            const y = e.pageY - canvasBounds.top;
-            const traced: Component[] = [];
-            rootWindow.createFocusList(x, y, traced);
-
-            if (!(traced.length == focusList.length && traced[traced.length - 1] == focusList[focusList.length - 1])) {
-                const len = Math.min(traced.length, focusList.length);
-                let same = 0;
-                for (same = 0; same < len; same++) {
-                    if (focusList[same] != traced[same]) {
-                        break;
-                    }
-                }
-
-                for (let i = focusList.length - 1; i >= same; i--) {
-                    const tail = focusList[i];
-                    tail.lostFocus();
-                    focusList.pop();
-                }
-                for (let i = same; i < traced.length; i++) {
-                    const tail = traced[i];
-                    focusList.push(tail);
-                }
-                focusList[focusList.length - 1].getFocus();
-                for (const target of focusList) {
-                    target.moveTop();
-                }
-            }
-            postMessage(focusList[focusList.length - 1], "mousedown", { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top });
-        });
-        canvas.addEventListener("mousemove", e => postMessage(rootWindow, "mousemove", { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top }));
-        canvas.addEventListener("mouseup", e => postMessage(rootWindow, "mouseup", { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top }));
-
         function resizeCanvas(): void {
             canvasBounds = canvas.getBoundingClientRect();
             canvas.width = canvasBounds.width;
             canvas.height = canvasBounds.height;
         }
+        window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
 
-        const w1 = new Draggable("<w1>", 15, 20, 30, 50);
-        rootWindow.addChild(w1);
+        const windowManager = new WindowManager();
+        canvas.addEventListener("mousedown", e => windowManager.on("mousedown", { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top }));
+        canvas.addEventListener("mousemove", e => windowManager.on("mousemove", { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top }));
+        canvas.addEventListener("mouseup"  , e => windowManager.on("mouseup"  , { mouseX: e.pageX - canvasBounds.left, mouseY: e.pageY - canvasBounds.top }));
+
+
+        const w1 = new Draggable("<w1>", 15, 20, 100, 100);
+        windowManager.addChild(w1);
         w1.show();
 
+        const ww1 = new Button("<ww1>", 0, 50, 100, 50);
+        w1.addChild(ww1);
+        ww1.show();
+
         const w3 = new Window("<w3>", 95, 20, 30, 50);
-        rootWindow.addChild(w3);
+        windowManager.addChild(w3);
         w3.show();
 
         const m1 = new DropDown("<m1>", 55, 20, 30, 50);
-        rootWindow.addChild(m1);
+        windowManager.addChild(m1);
         m1.visible = true;
 
         const mm1 = new DropDownItem("<mm1>", 0, 50, 30, 50);
@@ -349,7 +448,7 @@ module tswm {
 
         function updateAnimationFrame(): void {
             context.clearRect(0, 0, canvas.width, canvas.height);
-            rootWindow.draw(context);
+            windowManager.draw(context);
             requestAnimationFrame(updateAnimationFrame);
         }
         updateAnimationFrame();
