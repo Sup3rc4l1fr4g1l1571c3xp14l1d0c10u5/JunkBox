@@ -19,11 +19,11 @@ namespace CSCPP {
             ws.Name = "プリプロセス情報";
 
             ws.AddColumn("処理日時", $"{Cpp.DateString} {Cpp.TimeString}");
-            ws.AddColumn("対象ファイル", CppContext.TargetFilePath);
+            ws.AddColumn("対象ファイル", Cpp.TargetFilePath);
 
             ws.AddColumn("");
 
-            CppContext.OriginalArguments.Aggregate("起動時引数", (s, x) => {
+            Cpp.OriginalArguments.Aggregate("起動時引数", (s, x) => {
                 ws.AddColumn(s, x);
                 return "";
             });
@@ -31,30 +31,30 @@ namespace CSCPP {
             ws.AddColumn("");
 
             ws.AddColumn("警告オプション設定", "");
-            foreach (var e in System.Enum.GetValues(typeof(Warning))) {
-                var state = CppContext.Warnings.Contains((Warning)e) ? "有効" : "無効";
+            foreach (var e in System.Enum.GetValues(typeof(WarningOption))) {
+                var state = Cpp.Warnings.Contains((WarningOption)e) ? "有効" : "無効";
                 ws.AddColumn(e.ToString(), state);
             }
 
             ws.AddColumn("");
 
             ws.AddColumn("機能オプション設定", "");
-            foreach (var e in System.Enum.GetValues(typeof(Feature))) {
-                var state = CppContext.Features.Contains((Feature)e) ? "有効" : "無効";
+            foreach (var e in System.Enum.GetValues(typeof(FeatureOption))) {
+                var state = Cpp.Features.Contains((FeatureOption)e) ? "有効" : "無効";
                 ws.AddColumn(e.ToString(), state);
             }
 
             ws.AddColumn("");
 
             ws.AddColumn("スイッチ設定", "");
-            foreach (var e in CppContext.Switchs) {
+            foreach (var e in Cpp.Switchs) {
                 ws.AddColumn(e.ToString(), "有効");
             }
 
             ws.AddColumn("");
 
-            ws.AddColumn("エラー件数", CppContext.ErrorCount);
-            ws.AddColumn("警告件数", CppContext.WarningCount);
+            ws.AddColumn("エラー件数", Cpp.ErrorCount);
+            ws.AddColumn("警告件数", Cpp.WarningCount);
 
             return ws;
 
@@ -141,35 +141,35 @@ namespace CSCPP {
             private static Stack<int> GroupStack { get; set; } = new Stack<int>();
 
             public static void OnIf(Position p, string expr, bool active) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, p, "#if", expr, active, GroupStack.Count(), IdCount));
                 GroupStack.Push(IdCount);
                 IdCount++;
             }
             public static void OnIfdef(Position p, string expr, bool active) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, p, "#ifdef", expr, active, GroupStack.Count(), IdCount));
                 GroupStack.Push(IdCount);
                 IdCount++;
             }
             public static void OnIfndef(Position p, string expr, bool active) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, p, "#ifndef", expr, active, GroupStack.Count(), IdCount));
                 GroupStack.Push(IdCount);
                 IdCount++;
             }
             public static void OnElif(Position position, string expr, bool active) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, position, "#elif", expr, active, GroupStack.Count()-1, GroupStack.Peek()));
                 IdCount++;
             }
             public static void OnElse(Position position, bool active) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, position, "#else", null, active, GroupStack.Count() - 1, GroupStack.Peek()));
                 IdCount++;
             }
             public static void OnEndif(Position position) {
-                if (!CppContext.Reports.Contains(Report.CompileSwitch)) { return; }
+                if (!Cpp.Reports.Contains(Report.CompileSwitch)) { return; }
                 Trace.Add(new Info(IdCount, position, "#endif", null, true, GroupStack.Count() - 1, GroupStack.Peek()));
                 GroupStack.Pop();
                 IdCount++;
@@ -183,13 +183,13 @@ namespace CSCPP {
 
         public static void CreateReport(string filename) {
             var ss = new ExcelXMLSpreadsheet();
-            if (CppContext.Reports.Contains(Report.GeneralInfo)) {
+            if (Cpp.Reports.Contains(Report.GeneralInfo)) {
                 ss.Worksheets.Add(ReportGeneralInfo());
             }
-            if (CppContext.Reports.Contains(Report.MacroInfo)) {
+            if (Cpp.Reports.Contains(Report.MacroInfo)) {
                 ss.Worksheets.Add(ReportMacroInfo());
             }
-            if (CppContext.Reports.Contains(Report.CompileSwitch)) {
+            if (Cpp.Reports.Contains(Report.CompileSwitch)) {
                 ss.Worksheets.Add(ReportTraceCompileSwitch());
             }
 

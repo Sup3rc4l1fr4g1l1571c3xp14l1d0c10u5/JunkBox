@@ -2,7 +2,7 @@ namespace CSCPP {
     /// <summary>
     /// プリプロセッサの機能フラグ
     /// </summary>
-    public enum Feature {
+    public enum FeatureOption {
         /// <summary>
         /// ANSI trigraphs サポート有効にします。
         /// </summary>

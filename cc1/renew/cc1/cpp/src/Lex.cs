@@ -27,9 +27,9 @@ namespace CSCPP {
             if (filename == "-") {
                 File.StreamPush(new File(Console.In, "-"));
             } else if (System.IO.File.Exists(filename) == false) {
-                CppContext.Error($"ファイル {filename} を開けません。");
+                Cpp.Error($"ファイル {filename} を開けません。");
             } else {
-                var sr = LibReadJEnc.ReadJEnc.CreateStreamReaderFromFile(filename, CppContext.AutoDetectEncoding, CppContext.DefaultEncoding);
+                var sr = LibReadJEnc.ReadJEnc.CreateStreamReaderFromFile(filename, Cpp.AutoDetectEncoding, Cpp.DefaultEncoding);
                 if (sr == null) {
                     return;
                 }
@@ -134,8 +134,8 @@ namespace CSCPP {
                 if (limitSpace && (c == '\f' || c == '\v')) {
                     // 6.10前処理指令
                     // 前処理指令の中（先頭の#前処理字句の直後から，最後の改行文字の直前まで）の前処理字句の間 に現れてよい空白類文字は，空白と水平タブだけとする
-                    if (CppContext.Warnings.Contains(Warning.Pedantic)) {
-                        CppContext.Warning(c.Position, $"前処理指令の中で使えない空白文字 U+{c.Code:x8} が使われています。");
+                    if (Cpp.Warnings.Contains(WarningOption.Pedantic)) {
+                        Cpp.Warning(c.Position, $"前処理指令の中で使えない空白文字 U+{c.Code:x8} が使われています。");
                     }
                 }
                 sb.Append(c.Position, (char) c);
@@ -146,7 +146,7 @@ namespace CSCPP {
             if ((c == '/') && (disableComment == false)) {
                 if (IsNextChar('*')) {
                     var commentStr = ReadBlockComment(c.Position);
-                    if (!CppContext.Switchs.Contains("-C")) {
+                    if (!Cpp.Switchs.Contains("-C")) {
                         // コメントを保持しないオプションが有効の場合は、行を空白で置き換えてしまう
                         commentStr = new string(commentStr.Where(y => y == '\n').ToArray());
                         if (commentStr.Length == 0) {
@@ -156,15 +156,15 @@ namespace CSCPP {
                     sb.Append(c.Position, commentStr);
                     return true;
                 } else if (IsNextChar('/')) {
-                    if (CppContext.Warnings.Contains(Warning.LineComment)) {
-                        CppContext.Warning(c.Position, "ISO/IEC 9899-1999 で導入された行コメントが利用されています。"+
+                    if (Cpp.Warnings.Contains(WarningOption.LineComment)) {
+                        Cpp.Warning(c.Position, "ISO/IEC 9899-1999 で導入された行コメントが利用されています。"+
                                                        "ISO/IEC 9899-1990 ではコメントとして扱われないため注意してください。");
                     }
-                    if (CppContext.Features.Contains(Feature.LineComment)) {
+                    if (Cpp.Features.Contains(FeatureOption.LineComment)) {
                         // 行コメントオプション有効時
                         System.Diagnostics.Debug.Assert(File.ReadCh() == '/');
                         var commentStr = ReadLineComment();
-                        if (!CppContext.Switchs.Contains("-C")) {
+                        if (!Cpp.Switchs.Contains("-C")) {
                             // コメントを保持しないオプションが有効の場合は、空白で置き換えてしまう
                             commentStr = " ";
                         }
@@ -363,7 +363,7 @@ namespace CSCPP {
                 case '6':
                 case '7': return ReadOctalCharLiteralStr(c);
             }
-            CppContext.Warning(c.Position, $@"\{c} は未知のエスケープ文字です。");
+            Cpp.Warning(c.Position, $@"\{c} は未知のエスケープ文字です。");
             return $@"\{c}";
         }
 
@@ -377,7 +377,7 @@ namespace CSCPP {
             for (;;) {
                 var c = File.ReadCh();
                 if (c.IsEof() || c == '\n') {
-                    CppContext.Error(pos, "文字定数が ' で終端していません。");
+                    Cpp.Error(pos, "文字定数が ' で終端していません。");
                     File.UnreadCh(c);
                     break;
                 } else if (c == '\'') {
@@ -402,7 +402,7 @@ namespace CSCPP {
             for (;;) {
                 var c = File.ReadCh();
                 if (c.IsEof() || c == '\n') {
-                    CppContext.Error(pos, "文字列が \" で終端していません。");
+                    Cpp.Error(pos, "文字列が \" で終端していません。");
                     File.UnreadCh(c);
                     break;
                 }
@@ -449,7 +449,7 @@ namespace CSCPP {
                 var c = File.Get(skipBadchar: true);
                 if (c.IsEof()) {
                     // EOFの場合
-                    CppContext.Error(startPosition, "ブロックコメントが閉じられないまま、ファイル末尾に到達しました。");
+                    Cpp.Error(startPosition, "ブロックコメントが閉じられないまま、ファイル末尾に到達しました。");
                     break;
                 } else if (escape) {
                     // エスケープシーケンスの次の文字の場合
@@ -632,10 +632,10 @@ namespace CSCPP {
                     }
                 case 'L': {
                         if (IsNextChar('"')) {
-                            CppContext.Warning(tokenPosition, "ワイド文字列リテラルが使われています。");
+                            Cpp.Warning(tokenPosition, "ワイド文字列リテラルが使われています。");
                             return ReadString(tokenPosition, Token.EncType.Wide);
                         } else if (IsNextChar('\'')) {
-                            CppContext.Warning(tokenPosition, "ワイド文字定数が使われています。");
+                            Cpp.Warning(tokenPosition, "ワイド文字定数が使われています。");
                             return ReadChar(tokenPosition, Token.EncType.Wide);
                         } else {
                             goto default;
@@ -643,13 +643,13 @@ namespace CSCPP {
                     }
                 case 'u': {
                         if (IsNextStr("8\"")) {
-                            CppContext.Warning(tokenPosition, "UTF8文字列リテラルが使われています。");
+                            Cpp.Warning(tokenPosition, "UTF8文字列リテラルが使われています。");
                             return ReadString(tokenPosition, Token.EncType.U8);
                         } else if (IsNextChar('"')) {
-                            CppContext.Warning(tokenPosition, "UTF16文字列リテラルが使われています。");
+                            Cpp.Warning(tokenPosition, "UTF16文字列リテラルが使われています。");
                             return ReadString(tokenPosition, Token.EncType.U16);
                         } else if (IsNextChar('\'')) {
-                            CppContext.Warning(tokenPosition, "UTF16文字定数が使われています。");
+                            Cpp.Warning(tokenPosition, "UTF16文字定数が使われています。");
                             return ReadChar(tokenPosition, Token.EncType.U16);
                         } else {
                             goto default;
@@ -657,10 +657,10 @@ namespace CSCPP {
                     }
                 case 'U': {
                         if (IsNextChar('"')) {
-                            CppContext.Warning(tokenPosition, "UTF32文字列リテラルが使われています。");
+                            Cpp.Warning(tokenPosition, "UTF32文字列リテラルが使われています。");
                             return ReadString(tokenPosition, Token.EncType.U32);
                         } else if (IsNextChar('\'')) {
-                            CppContext.Warning(tokenPosition, "UTF32文字定数が使われています。");
+                            Cpp.Warning(tokenPosition, "UTF32文字定数が使われています。");
                             return ReadChar(tokenPosition, Token.EncType.U32);
                         } else {
                             goto default;
@@ -713,7 +713,7 @@ namespace CSCPP {
             while (!IsNextChar(close)) {
                 var c = File.ReadCh();
                 if (c.IsEof() || c == '\n') {
-                    CppContext.Error(hash, "ファイルパスが閉じられないまま行末に到達しました。");
+                    Cpp.Error(hash, "ファイルパスが閉じられないまま行末に到達しました。");
                     File.UnreadCh(c);
                     break;
                 }
@@ -722,7 +722,7 @@ namespace CSCPP {
 
             // チェック
             if (path.Length == 0) {
-                CppContext.Error(hash, "includeで指定されたファイル名が空です。");
+                Cpp.Error(hash, "includeで指定されたファイル名が空です。");
             }
 
             return path.ToString();
@@ -778,7 +778,7 @@ namespace CSCPP {
             tok = DoReadToken();
             if (tok.Kind != Token.TokenKind.EoF) {
                 // EOFが得られなかった、つまり、連結結果は２つ以上の前処理トークンを含む
-                CppContext.Error(pos, $"マクロ {macro.GetName()} 中のトークン連結演算子 ## の結果 {str} は不正なプリプロセッサトークンです。(マクロ {macro.GetName()} は {macro.GetFirstPosition().ToString()} で宣言されています。)");
+                Cpp.Error(pos, $"マクロ {macro.GetName()} 中のトークン連結演算子 ## の結果 {str} は不正なプリプロセッサトークンです。(マクロ {macro.GetName()} は {macro.GetFirstPosition().ToString()} で宣言されています。)");
                 // 文字列 s から得られるトークンがなくなるまで読み続ける
                 while (tok.Kind != Token.TokenKind.EoF) {
                     ret.Add(tok);
@@ -809,13 +809,13 @@ namespace CSCPP {
 
                 if (p.Kind == Token.TokenKind.MacroRangeFixup) {
                     // MacroRangeFixupトークンの場合はマクロ展開情報を記録し、トークン自体は読み捨てる
-                    CppContext.ExpandLog.Add(
+                    Cpp.ExpandLog.Add(
                         p.MacroRangeFixupTok,
                         p.MacroRangeFixupMacro,
                         p.MacroRangeFixupStartLine,
                         p.MacroRangeFixupStartColumn,
-                        CppContext.TokenWriter.OutputLine,
-                        CppContext.TokenWriter.OutputColumn
+                        Cpp.TokenWriter.OutputLine,
+                        Cpp.TokenWriter.OutputColumn
                     );
                     return LexToken(handleEof, limitSpace);
                 } else {
@@ -854,9 +854,9 @@ namespace CSCPP {
         public static Token ExceptKeyword(char ch) {
             return ExceptKeyword(ch, (tok) => {
                 if (tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"{Token.KeywordToStr((Token.Keyword)ch)} がありません。");
+                    Cpp.Error(tok, $"{Token.KeywordToStr((Token.Keyword)ch)} がありません。");
                 } else {
-                    CppContext.Error(tok, $"{Token.KeywordToStr((Token.Keyword)ch)} があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Cpp.Error(tok, $"{Token.KeywordToStr((Token.Keyword)ch)} があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
             });
         }

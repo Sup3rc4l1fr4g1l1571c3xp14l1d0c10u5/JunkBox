@@ -34,16 +34,16 @@ namespace CSCPP
         private int Body(string[] args) {
 
             // 起動時引数を保存
-            CppContext.OriginalArguments = args.ToArray();
+            Cpp.OriginalArguments = args.ToArray();
 
             // デフォルトのWarningsを設定
-            CppContext.Warnings.Add(Warning.Pedantic);
-            CppContext.Warnings.Add(Warning.Trigraphs);
-            // CppContext.Warnings.Add(Warning.UndefinedToken);
-            // CppContext.Warnings.Add(Warning.UnknownDirectives);
-            // CppContext.Warnings.Add(Warning.UnknownPragmas);
-            // CppContext.Warnings.Add(Warning.UnusedMacros);
-            // CppContext.Warnings.Add(Warning.ImplicitSystemHeaderInclude);
+            Cpp.Warnings.Add(WarningOption.Pedantic);
+            Cpp.Warnings.Add(WarningOption.Trigraphs);
+            // CppContext.Warnings.Add(WarningOption.UndefinedToken);
+            // CppContext.Warnings.Add(WarningOption.UnknownDirectives);
+            // CppContext.Warnings.Add(WarningOption.UnknownPragmas);
+            // CppContext.Warnings.Add(WarningOption.UnusedMacros);
+            // CppContext.Warnings.Add(WarningOption.ImplicitSystemHeaderInclude);
 
             // デフォルトのFeaturesを設定
             // CppContext.Features.Add(Feature.LineComment);
@@ -60,7 +60,7 @@ namespace CSCPP
                         break;
                     }
                     if (args[i].Length < 2) {
-                        CppContext.Error("空のオプション引数が与えられました。");
+                        Cpp.Error("空のオプション引数が与えられました。");
                         return -1;
                     }
                     char c = args[i][1];
@@ -75,7 +75,7 @@ namespace CSCPP
                                     value = param.Substring(idx + 1);
                                 }
                                 if (string.IsNullOrWhiteSpace(name)) {
-                                    CppContext.Error($"-{c} オプションの値 {param} でマクロ名が指定されていません。");
+                                    Cpp.Error($"-{c} オプションの値 {param} でマクロ名が指定されていません。");
                                 } else {
                                     sbDefine.AppendLine($"#ifndef {name}")
                                     .AppendLine($"#define {name} {value}")
@@ -85,7 +85,7 @@ namespace CSCPP
                             }
                         case 'U':
                             if (string.IsNullOrWhiteSpace(param)) {
-                                CppContext.Error($"-{c} オプションの値 {param} でマクロ名が指定されていません。");
+                                Cpp.Error($"-{c} オプションの値 {param} でマクロ名が指定されていません。");
                             } else {
                                 sbDefine.AppendLine($"#ifdef {param}")
                                 .AppendLine($"#undef {param}")
@@ -98,7 +98,7 @@ namespace CSCPP
                                     if (param.EndsWith("\"")) {
                                         path = param.Substring(1, param.Length - 2);
                                     } else {
-                                        CppContext.Error($"-{c} オプションの値 {param} の二重引用符の対応が取れません。");
+                                        Cpp.Error($"-{c} オプションの値 {param} の二重引用符の対応が取れません。");
                                         path = param.Substring(1);
                                     }
                                 } else {
@@ -107,11 +107,11 @@ namespace CSCPP
                                 try {
                                     var fullpath = System.IO.Path.GetFullPath(path);
                                     if (System.IO.Directory.Exists(fullpath) == false) {
-                                        CppContext.Warning($"-{c} オプションで指定されているディレクトリパス {param} を {fullpath} として解釈しましたがディレクトリが存在しません。");
+                                        Cpp.Warning($"-{c} オプションで指定されているディレクトリパス {param} を {fullpath} として解釈しましたがディレクトリが存在しません。");
                                     }
-                                    Cpp.add_user_include_path(fullpath);
+                                    Cpp.AddUserIncludePath(fullpath);
                                 } catch {
-                                    CppContext.Error($"-{c} オプションで指定されているディレクトリパス {param} はOSの解釈できない不正なパスです。無視します。");
+                                    Cpp.Error($"-{c} オプションで指定されているディレクトリパス {param} はOSの解釈できない不正なパスです。無視します。");
                                 }
                                 break;
                             }
@@ -119,14 +119,14 @@ namespace CSCPP
                             if (string.IsNullOrEmpty(param)) {
                                 // 2017/08/07: 仕様変更
                                 // -S のみを指定した場合はcscppと同じディレクトリにあるデフォルトの標準ヘッダディレクトリ(include)を追加する。
-                                Cpp.add_include_path(DefaultSystemHeaderFileDirectory);
+                                Cpp.AddSystemIncludePath(DefaultSystemHeaderFileDirectory);
                             } else {
                                 string path;
                                 if (param.StartsWith("\"")) {
                                     if (param.EndsWith("\"")) {
                                         path = param.Substring(1, param.Length - 2);
                                     } else {
-                                        CppContext.Error($"-{c} オプションの値 {param} の二重引用符の対応が取れません。");
+                                        Cpp.Error($"-{c} オプションの値 {param} の二重引用符の対応が取れません。");
                                         path = param.Substring(1);
                                     }
                                 } else {
@@ -135,86 +135,86 @@ namespace CSCPP
                                 try {
                                     var fullpath = System.IO.Path.GetFullPath(path);
                                     if (System.IO.Directory.Exists(fullpath) == false) {
-                                        CppContext.Warning($"-{c} オプションで指定されているディレクトリパス {param} を {fullpath} として解釈しましたがディレクトリが存在しません。");
+                                        Cpp.Warning($"-{c} オプションで指定されているディレクトリパス {param} を {fullpath} として解釈しましたがディレクトリが存在しません。");
                                     }
-                                    Cpp.add_include_path(fullpath);
+                                    Cpp.AddSystemIncludePath(fullpath);
                                 } catch {
-                                    CppContext.Error($"-{c} オプションで指定されているディレクトリパス {param} はOSの解釈できない不正なパスです。無視します。");
+                                    Cpp.Error($"-{c} オプションで指定されているディレクトリパス {param} はOSの解釈できない不正なパスです。無視します。");
                                 }
                             }
                             break;
                         case 'W':
                             if (param == "All") {
-                                foreach (var e in Enum.GetValues(typeof(Warning))) {
-                                    CppContext.Warnings.Add((Warning)e);
+                                foreach (var e in Enum.GetValues(typeof(WarningOption))) {
+                                    Cpp.Warnings.Add((WarningOption)e);
                                 }
                             } else {
-                                if (Enum.IsDefined(typeof(Warning), param)) {
-                                    CppContext.Warnings.Add((Warning)Enum.Parse(typeof(Warning), param));
+                                if (Enum.IsDefined(typeof(WarningOption), param)) {
+                                    Cpp.Warnings.Add((WarningOption)Enum.Parse(typeof(WarningOption), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'w':
                             if (param == "All") {
-                                CppContext.Warnings.Clear();
+                                Cpp.Warnings.Clear();
                             } else {
-                                if (Enum.IsDefined(typeof(Warning), param)) {
-                                    CppContext.Warnings.Remove(
-                                        (Warning)Enum.Parse(typeof(Warning), param));
+                                if (Enum.IsDefined(typeof(WarningOption), param)) {
+                                    Cpp.Warnings.Remove(
+                                        (WarningOption)Enum.Parse(typeof(WarningOption), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'F':
                             if (param == "All") {
-                                foreach (var e in Enum.GetValues(typeof(Feature))) {
-                                    CppContext.Features.Add((Feature)e);
+                                foreach (var e in Enum.GetValues(typeof(FeatureOption))) {
+                                    Cpp.Features.Add((FeatureOption)e);
                                 }
                             } else {
-                                if (Enum.IsDefined(typeof(Feature), param)) {
-                                    CppContext.Features.Add((Feature)Enum.Parse(typeof(Feature), param));
+                                if (Enum.IsDefined(typeof(FeatureOption), param)) {
+                                    Cpp.Features.Add((FeatureOption)Enum.Parse(typeof(FeatureOption), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'f':
                             if (param == "All") {
-                                CppContext.Features.Clear();
+                                Cpp.Features.Clear();
                             } else {
-                                if (Enum.IsDefined(typeof(Feature), param)) {
-                                    CppContext.Features.Remove(
-                                        (Feature)Enum.Parse(typeof(Feature), param));
+                                if (Enum.IsDefined(typeof(FeatureOption), param)) {
+                                    Cpp.Features.Remove(
+                                        (FeatureOption)Enum.Parse(typeof(FeatureOption), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'R':
                             if (param == "All") {
                                 foreach (var e in Enum.GetValues(typeof(Report))) {
-                                    CppContext.Reports.Add((Report)e);
+                                    Cpp.Reports.Add((Report)e);
                                 }
                             } else {
                                 if (Enum.IsDefined(typeof(Report), param)) {
-                                    CppContext.Reports.Add((Report)Enum.Parse(typeof(Report), param));
+                                    Cpp.Reports.Add((Report)Enum.Parse(typeof(Report), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'r':
                             if (param == "All") {
-                                CppContext.Reports.Clear();
+                                Cpp.Reports.Clear();
                             } else {
                                 if (Enum.IsDefined(typeof(Report), param)) {
-                                    CppContext.Reports.Remove(
+                                    Cpp.Reports.Remove(
                                         (Report)Enum.Parse(typeof(Report), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
@@ -222,44 +222,44 @@ namespace CSCPP
                             sbDefine.AppendFormat("#include \"{0}\"", param).AppendLine();
                             break;
                         case 'o':
-                            if (CppContext.OutputFilePath == null) {
-                                CppContext.OutputFilePath = param;
+                            if (Cpp.OutputFilePath == null) {
+                                Cpp.OutputFilePath = param;
                             } else {
-                                CppContext.Error($"-{c} オプションが複数回指定されました。");
+                                Cpp.Error($"-{c} オプションが複数回指定されました。");
                             }
                             break;
                         case 'l':   
-                            if (CppContext.LogFilePath == null) {
-                                CppContext.LogFilePath = param;
+                            if (Cpp.LogFilePath == null) {
+                                Cpp.LogFilePath = param;
                             } else {
-                                CppContext.Error($"-{c} オプションが複数回指定されました。");
+                                Cpp.Error($"-{c} オプションが複数回指定されました。");
                             }
                             break;
                         case 'v':
                             if (param == "All") {
-                                foreach (var e in Enum.GetValues(typeof(Verbose))) {
-                                    CppContext.Verboses.Add((Verbose)e);
+                                foreach (var e in Enum.GetValues(typeof(VerboseOption))) {
+                                    Cpp.Verboses.Add((VerboseOption)e);
                                 }
                             } else {
-                                if (Enum.IsDefined(typeof(Verbose), param)) {
-                                    CppContext.Verboses.Add((Verbose)Enum.Parse(typeof(Verbose), param));
+                                if (Enum.IsDefined(typeof(VerboseOption), param)) {
+                                    Cpp.Verboses.Add((VerboseOption)Enum.Parse(typeof(VerboseOption), param));
                                 } else {
-                                    CppContext.Error($"-{c} オプションの値 {param} は不正な値です。");
+                                    Cpp.Error($"-{c} オプションの値 {param} は不正な値です。");
                                 }
                             }
                             break;
                         case 'V':
-                            CppContext.Switchs.Add("-V");
+                            Cpp.Switchs.Add("-V");
                             break;
                         case 'C':
-                            CppContext.Switchs.Add("-C");
+                            Cpp.Switchs.Add("-C");
                             break;
                         case 'e':
                         case 'E':
-                            CppContext.AutoDetectEncoding = c == 'e';
+                            Cpp.AutoDetectEncoding = c == 'e';
 
                             if (string.IsNullOrWhiteSpace(param)) {
-                                CppContext.DefaultEncoding = System.Text.Encoding.Default;
+                                Cpp.DefaultEncoding = System.Text.Encoding.Default;
                             } else {
                                 System.Text.Encoding encoding = null;
                                 try {
@@ -275,18 +275,18 @@ namespace CSCPP
                                 if (encoding == null) {
                                     Console.Error.WriteLine($"`-{c}` オプションの値 `{param}` は不正な値です。");
                                 } else {
-                                    CppContext.DefaultEncoding = encoding;
+                                    Cpp.DefaultEncoding = encoding;
                                 }
                             }
                             break;
                         case 'P':
-                            CppContext.Switchs.Add("-P");
+                            Cpp.Switchs.Add("-P");
                             break;
                         case 'h':
                             Usage();
                             return -1;
                         default:
-                            CppContext.Error($"不正なオプション {args[i]} が指定されました。");
+                            Cpp.Error($"不正なオプション {args[i]} が指定されました。");
                             return -1;
                     }
                 }
@@ -295,59 +295,59 @@ namespace CSCPP
                 for (; i < args.Length; i++) {
                     try {
                         if (System.IO.File.Exists(System.IO.Path.GetFullPath(args[i])) == false) {
-                            CppContext.Error($"プリプロセス対象ファイル {args[i]} が見つかりません。無視します。");
+                            Cpp.Error($"プリプロセス対象ファイル {args[i]} が見つかりません。無視します。");
                         } else {
-                            CppContext.TargetFilePath = System.IO.Path.GetFullPath(args[i]);
+                            Cpp.TargetFilePath = System.IO.Path.GetFullPath(args[i]);
                         }
                     } catch {
-                        CppContext.Error($"指定されたプリプロセス対象ファイル {args[i]} はOSの解釈できない不正なパスです。無視します。");
+                        Cpp.Error($"指定されたプリプロセス対象ファイル {args[i]} はOSの解釈できない不正なパスです。無視します。");
                     }
 
                 }
-                if (CppContext.TargetFilePath == null) {
-                    CppContext.Error("有効なプリプロセス対象ファイルが指定されませんでした。");
+                if (Cpp.TargetFilePath == null) {
+                    Cpp.Error("有効なプリプロセス対象ファイルが指定されませんでした。");
                     return -1;
                 }
-                if (CppContext.OutputFilePath != null) {
-                    if (String.IsNullOrWhiteSpace(CppContext.OutputFilePath)) {
-                        CppContext.OutputFilePath = System.IO.Path.ChangeExtension(CppContext.TargetFilePath, ".i");
+                if (Cpp.OutputFilePath != null) {
+                    if (String.IsNullOrWhiteSpace(Cpp.OutputFilePath)) {
+                        Cpp.OutputFilePath = System.IO.Path.ChangeExtension(Cpp.TargetFilePath, ".i");
                     } else {
                         try {
-                            CppContext.OutputFilePath = System.IO.Path.GetFullPath(CppContext.OutputFilePath);
-                            if (CppContext.OutputFilePath == CppContext.TargetFilePath) {
-                                CppContext.Error("出力ファイルと入力ファイルが同一です。");
+                            Cpp.OutputFilePath = System.IO.Path.GetFullPath(Cpp.OutputFilePath);
+                            if (Cpp.OutputFilePath == Cpp.TargetFilePath) {
+                                Cpp.Error("出力ファイルと入力ファイルが同一です。");
                                 return -1;
                             }
                         } catch {
-                            CppContext.Error($"指定された出力ファイル {args[i]} はOSの解釈できない不正なパスです。標準出力を出力先にします。");
+                            Cpp.Error($"指定された出力ファイル {args[i]} はOSの解釈できない不正なパスです。標準出力を出力先にします。");
                         }
                     }
                     {
-                        var sw = new StreamWriter(CppContext.OutputFilePath);
+                        var sw = new StreamWriter(Cpp.OutputFilePath);
                         sw.AutoFlush = true;
                         Console.SetOut(sw);
                     }
                 }
-                if (CppContext.LogFilePath != null) {
-                    if (String.IsNullOrWhiteSpace(CppContext.LogFilePath)) {
-                        CppContext.LogFilePath = System.IO.Path.ChangeExtension(CppContext.TargetFilePath, ".i.log");
+                if (Cpp.LogFilePath != null) {
+                    if (String.IsNullOrWhiteSpace(Cpp.LogFilePath)) {
+                        Cpp.LogFilePath = System.IO.Path.ChangeExtension(Cpp.TargetFilePath, ".i.log");
                     } else {
                         try {
-                            CppContext.LogFilePath = System.IO.Path.GetFullPath(CppContext.LogFilePath);
-                            if (CppContext.LogFilePath == CppContext.TargetFilePath) {
-                                CppContext.Error("ログファイルと入力ファイルが同一です。");
+                            Cpp.LogFilePath = System.IO.Path.GetFullPath(Cpp.LogFilePath);
+                            if (Cpp.LogFilePath == Cpp.TargetFilePath) {
+                                Cpp.Error("ログファイルと入力ファイルが同一です。");
                                 return -1;
                             }
-                            if (CppContext.LogFilePath == CppContext.OutputFilePath) {
-                                CppContext.Error("ログファイルと出力ファイルが同一です。");
+                            if (Cpp.LogFilePath == Cpp.OutputFilePath) {
+                                Cpp.Error("ログファイルと出力ファイルが同一です。");
                                 return -1;
                             }
                         } catch {
-                            CppContext.Error($"指定されたログファイル {args[i]} はOSの解釈できない不正なパスです。標準出力を出力先にします。");
+                            Cpp.Error($"指定されたログファイル {args[i]} はOSの解釈できない不正なパスです。標準出力を出力先にします。");
                         }
                     }
                     {
-                        var sw = new StreamWriter(CppContext.LogFilePath);
+                        var sw = new StreamWriter(Cpp.LogFilePath);
                         sw.AutoFlush = true;
                         Console.SetError(sw);
                     }
@@ -355,7 +355,7 @@ namespace CSCPP
             }
 
             // バナー表示オプションが指定されていた場合はバナーを表示
-            if (CppContext.Switchs.Contains("-V")) {
+            if (Cpp.Switchs.Contains("-V")) {
                 ShowBanner();
             }
 
@@ -367,13 +367,13 @@ namespace CSCPP
             #region プリプロセス処理を実行
             {
                 // 字句解析器に指定されたファイルを入力ファイルとして設定する
-                Lex.Set(CppContext.TargetFilePath);
+                Lex.Set(Cpp.TargetFilePath);
 
                 // コマンドラインで指定された #include や #define コードは 入力の先頭で 記述されたファイルが include されたかのように振る舞わせる
                 File.StreamPush(new File(sbDefine.ToString(), "<command-line>"));
 
                 // 出力器を作成
-                CppContext.TokenWriter = new TokenWriter();
+                Cpp.TokenWriter = new TokenWriter();
                 for (; ; ) {
                     // 展開などの処理を行ったトークンを読み取る
                     Token tok = Cpp.ReadToken();
@@ -384,41 +384,41 @@ namespace CSCPP
                     }
 
                     // トークンを書き出す
-                    CppContext.TokenWriter.Write(tok);
+                    Cpp.TokenWriter.Write(tok);
                 }
             }
 
-            if (CppContext.Warnings.Contains(Warning.UnusedMacros)) {
+            if (Cpp.Warnings.Contains(WarningOption.UnusedMacros)) {
                 foreach (var macro in Cpp.EnumUnusedMacro()) {
-                    CppContext.Warning(macro.GetFirstPosition(), $"定義されたマクロ {macro.GetName()} は一度も参照されていません。");
+                    Cpp.Warning(macro.GetFirstPosition(), $"定義されたマクロ {macro.GetName()} は一度も参照されていません。");
                 }
             }
             #endregion
 
-            if (CppContext.ErrorCount != 0) {
-                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} のプリプロセスに失敗しました。");
+            if (Cpp.ErrorCount != 0) {
+                Console.Error.WriteLine($"{(Cpp.TargetFilePath == "-" ? "標準入力" : Cpp.TargetFilePath)} のプリプロセスに失敗しました。");
             } else {
-                Console.Error.WriteLine($"{(CppContext.TargetFilePath == "-" ? "標準入力" : CppContext.TargetFilePath)} のプリプロセスに成功しました。");
+                Console.Error.WriteLine($"{(Cpp.TargetFilePath == "-" ? "標準入力" : Cpp.TargetFilePath)} のプリプロセスに成功しました。");
             }
 
-            Console.Error.WriteLine($"  エラー: {CppContext.ErrorCount}件");
-            Console.Error.WriteLine($"  警告: {CppContext.WarningCount}件");
+            Console.Error.WriteLine($"  エラー: {Cpp.ErrorCount}件");
+            Console.Error.WriteLine($"  警告: {Cpp.WarningCount}件");
 
-            if (CppContext.Reports.Count > 0) {
-                var reportFilePath = CppContext.TargetFilePath + ".report.xml";
+            if (Cpp.Reports.Count > 0) {
+                var reportFilePath = Cpp.TargetFilePath + ".report.xml";
                 Reporting.CreateReport(reportFilePath);
             }
 
-            if (CppContext.Verboses.Contains(Verbose.TraceMacroExpand)) {
-                var expandTraceFilePath = (CppContext.TargetFilePath == "-" ? "stdin" : CppContext.TargetFilePath) + ".macro-expand-log.xml";
+            if (Cpp.Verboses.Contains(VerboseOption.TraceMacroExpand)) {
+                var expandTraceFilePath = (Cpp.TargetFilePath == "-" ? "stdin" : Cpp.TargetFilePath) + ".macro-expand-log.xml";
                 try {
-                    CppContext.ExpandLog.SaveToXml(expandTraceFilePath);
+                    Cpp.ExpandLog.SaveToXml(expandTraceFilePath);
                 } catch (System.IO.IOException) {
-                    CppContext.Error($"マクロ展開結果 {expandTraceFilePath} の作成に失敗しました。書き込み先のファイルを開いている場合は閉じて再度実行してください。");
+                    Cpp.Error($"マクロ展開結果 {expandTraceFilePath} の作成に失敗しました。書き込み先のファイルを開いている場合は閉じて再度実行してください。");
                 }
             }
 
-            return CppContext.ErrorCount != 0 ? -1 : 0;
+            return Cpp.ErrorCount != 0 ? -1 : 0;
         }
 
         private void ShowBanner() {

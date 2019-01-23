@@ -3,7 +3,7 @@ namespace CSCPP
     /// <summary>
     /// 警告オプション
     /// </summary>
-    public enum Warning {
+    public enum WarningOption {
         Trigraphs,
         UndefinedToken,
         UnusedMacros,

@@ -102,9 +102,9 @@ namespace CSCPP
             var pos = new Position(Name, Line, Column);
             var c1 = Source.Read((s) => {
                 if (skipBadchar == false) {
-                    CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
+                    Cpp.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
                 } else {
-                    CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
+                    Cpp.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
                 }
             });
 
@@ -112,7 +112,7 @@ namespace CSCPP
                 if (FromFile) {
                     // 読み取り結果がEOFの場合、直前の文字が改行文字でもEOFでもなければ改行を読みとった扱いにする
                     if (LastCharacter != '\n' && !LastCharacter.IsEof()) {
-                        if (CppContext.Warnings.Contains(Warning.Pedantic)) {
+                        if (Cpp.Warnings.Contains(WarningOption.Pedantic)) {
                             // ISO/IEC 9899：1999 5.1.1.2 翻訳フェーズの(2)で 
                             // 空でないソースファイルは，改行文字で終了しなければならない。さらに，この改行文字の直前に（接合を行う前の時点で）逆斜線があってはならない。
                             // となっている。
@@ -120,7 +120,7 @@ namespace CSCPP
                             // 空でないソースファイルが改行文字で終わっていない場合，その動作は，未定義とする。空でないソースファイルが逆斜線に続く改行文字で終わっている場合，その動作は，未定義とする。
                             // となっている
                             // Posix的にもテキストファイルは改行で終端すべしとなっている。
-                            CppContext.Warning(LastCharacter.Position, "ファイルが改行文字で終了していません。");
+                            Cpp.Warning(LastCharacter.Position, "ファイルが改行文字で終了していません。");
                         }
                         c1 = '\n';
                     }
@@ -129,9 +129,9 @@ namespace CSCPP
                 // CRLFの場合を考慮
                 var c2 = Source.Read((s) => {
                     if (skipBadchar == false) {
-                        CppContext.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
+                        Cpp.Error(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。");
                     } else {
-                        CppContext.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
+                        Cpp.Warning(pos, $@"ファイル中に文字コード上で表現できない文字 \x{s} があります。確認をしてください。");
                     }
                 });
                 if (c2 != '\n') {
@@ -216,7 +216,7 @@ namespace CSCPP
                 }
 
                 // トリグラフ処理
-                if (CppContext.Features.Contains(Feature.Trigraphs)) {
+                if (Cpp.Features.Contains(FeatureOption.Trigraphs)) {
                     var p2 = c1.Position;
                     // トライグラフの読み取りを行う
                     if (c1 == '?') {
@@ -226,13 +226,13 @@ namespace CSCPP
                             var c3 = Get(out ungetted, skipBadchar: skipBadchar);
                             var tri = Trigraph(c3);
                             if (tri != '\0') {
-                                if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
-                                    CppContext.Error(p2, $"トライグラフ ??{c3.ToString()} が {tri} に置換されました。");
+                                if (Cpp.Warnings.Contains(WarningOption.Trigraphs) && !ungetted) {
+                                    Cpp.Error(p2, $"トライグラフ ??{c3.ToString()} が {tri} に置換されました。");
                                 }
                                 return new Utf32Char(c1.Position, tri);
                             } else {
-                                if (CppContext.Warnings.Contains(Warning.Trigraphs) && !ungetted) {
-                                    CppContext.Error(p2, $"未定義のトライグラフ ??{c3.ToString()} が使用されています。");
+                                if (Cpp.Warnings.Contains(WarningOption.Trigraphs) && !ungetted) {
+                                    Cpp.Error(p2, $"未定義のトライグラフ ??{c3.ToString()} が使用されています。");
                                 }
                             }
                             UnreadCh(c3);
@@ -254,7 +254,7 @@ namespace CSCPP
                             // ISO/IEC 9899：1999 5.1.1.2 翻訳フェーズの(2)で 
                             // 空でないソースファイルは，改行文字で終了しなければならない。さらに，この改行文字の直前に（接合を行う前の時点で）逆斜線があってはならない。
                             // となっている。
-                            CppContext.Warning(c1.Position, "ファイル終端の改行文字の直前に \\ があります。");
+                            Cpp.Warning(c1.Position, "ファイル終端の改行文字の直前に \\ があります。");
                         }
                         UnreadCh(c3);
                         continue;
@@ -280,7 +280,6 @@ namespace CSCPP
                 case "-": return '~';
                 default: return '\0';
             }
-
         }
 
         /// <summary>

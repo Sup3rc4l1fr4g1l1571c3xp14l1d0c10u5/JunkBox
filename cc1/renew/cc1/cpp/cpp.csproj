@@ -49,11 +49,10 @@
     <Compile Include="src\TokenWriter.cs" />
     <Compile Include="src\EncodedTextReader.cs" />
     <Compile Include="src\Utf32Char.cs" />
-    <Compile Include="src\CppContext.cs" />
-    <Compile Include="src\CSCPP.cs" />
+    <Compile Include="src\Cpp.cs" />
     <Compile Include="src\Ctype.cs" />
     <Compile Include="src\EncodedString.cs" />
-    <Compile Include="src\Feature.cs" />
+    <Compile Include="src\FeatureOption.cs" />
     <Compile Include="src\File.cs" />
     <Compile Include="src\IntMaxT.cs" />
     <Compile Include="src\Lex.cs" />
@@ -66,9 +65,9 @@
     <Compile Include="src\Source.cs" />
     <Compile Include="src\SpaceInfo.cs" />
     <Compile Include="src\Token.cs" />
-    <Compile Include="src\Verbose.cs" />
+    <Compile Include="src\VerboseOption.cs" />
     <Compile Include="src\ApplicationBase.cs" />
-    <Compile Include="src\Warning.cs" />
+    <Compile Include="src\WarningOption.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

@@ -299,7 +299,7 @@ namespace CSCPP {
 
         }
 
-        public static Token make_macro_token(int index, bool isVarArg, string argName, File file) {
+        public static Token MakeMacroToken(int index, bool isVarArg, string argName, File file) {
             return new Token(TokenKind.MacroParam) {
                 Hideset = null,
                 File = file,
@@ -348,9 +348,9 @@ namespace CSCPP {
                 StrVal = s,
                 EncodedStrVal = EncodedString.FromCStyle(s, (e,m) => {
                     if (e) {
-                        CppContext.Error(pos, m);
+                        Cpp.Error(pos, m);
                     } else {
-                        CppContext.Warning(pos, m);
+                        Cpp.Warning(pos, m);
                     }
                 }),
                 StrEncType = encType,
@@ -414,9 +414,9 @@ namespace CSCPP {
                 StrVal = s,
                 EncodedStrVal = EncodedString.FromCStyle(s, (e, m) => {
                     if (e) {
-                        CppContext.Error(pos, m);
+                        Cpp.Error(pos, m);
                     } else {
-                        CppContext.Warning(pos, m);
+                        Cpp.Warning(pos, m);
                     }
                 },
                 encType.ToEncoding()),
@@ -514,7 +514,7 @@ namespace CSCPP {
                 case TokenKind.MacroParamRef:
                     return $"(macro-param-ref {tok.MacroParamRef.ArgName})";
             }
-            CppContext.InternalError(tok, $"トークン種別が不正な値です。(tok.Kind={tok.Kind})");
+            Cpp.InternalError(tok, $"トークン種別が不正な値です。(tok.Kind={tok.Kind})");
             return "";
         }
 
@@ -655,9 +655,9 @@ namespace CSCPP {
             } else {
                 // 整数値として不正なもの。浮動小数点数かどうか判定してメッセージを変化させる
                 if (RegexFloatingNumberPattern.IsMatch(s)) {
-                    CppContext.Error(t, $"プリプロセス指令の条件式中で浮動小数点定数 {s} が使われています。条件式中で使える定数は整数定値のみです。");
+                    Cpp.Error(t, $"プリプロセス指令の条件式中で浮動小数点定数 {s} が使われています。条件式中で使える定数は整数定値のみです。");
                 } else {
-                    CppContext.Error(t, $"{s} は整数値として不正な書式です。");
+                    Cpp.Error(t, $"{s} は整数値として不正な書式です。");
                 }
                 return IntMaxT.CreateSigned(0);
             }
@@ -672,21 +672,21 @@ namespace CSCPP {
 
             // 値は uintmax_t として読み取る
 
-            if (CppContext.Features.Contains(Feature.LongLongConstant) == false) {
+            if (Cpp.Features.Contains(FeatureOption.LongLongConstant) == false) {
                 if (size == 2) {
-                    CppContext.Error(t, $"64ビット型の定数値 `{s}` が使われています。"+
+                    Cpp.Error(t, $"64ビット型の定数値 `{s}` が使われています。"+
                                          "64ビット型の定数値は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。"+
                                          "64ビット型の定数値を有効にする場合は実行時引数に -FLongLongConstant を設定してください。");
                 }
-            } else if (CppContext.Warnings.Contains(Warning.LongLongConstant)) {
+            } else if (Cpp.Warnings.Contains(WarningOption.LongLongConstant)) {
                 if (size == 2) {
-                    CppContext.Warning(t, $"64ビット型の定数値 `{s}` が使われています。");
+                    Cpp.Warning(t, $"64ビット型の定数値 `{s}` が使われています。");
                 }
             }
 
             if (isUnsigned || value.Item1 > (ulong)IntMaxT.SignedMaxValue || value.Item2) {
                 if (IntMaxT.UnsignedMaxValue < value.Item1 || value.Item2) {
-                    CppContext.Warning(t, $"定数 `{s}` は intmax_t の範囲を超えます。");
+                    Cpp.Warning(t, $"定数 `{s}` は intmax_t の範囲を超えます。");
                 }
                 return IntMaxT.CreateUnsigned((ulong)(value.Item1 & IntMaxT.UnsignedMaxValue));
             } else {

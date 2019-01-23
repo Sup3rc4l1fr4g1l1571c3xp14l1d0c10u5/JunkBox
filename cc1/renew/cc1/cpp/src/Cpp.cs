@@ -2,9 +2,95 @@ using System;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace CSCPP {
-    public static class Cpp {
+    public static partial class Cpp {
+        /// <summary>
+        /// オリジナルの起動時引数
+        /// </summary>
+        public static string[] OriginalArguments = new string[0];
+
+        /// <summary>
+        /// プリプロセス対象ファイル
+        /// </summary>
+        public static string TargetFilePath { get; set; } = "-";
+
+        /// <summary>
+        /// 出力ファイル
+        /// </summary>
+        public static string OutputFilePath { get; set; } = null;
+
+        /// <summary>
+        /// ログファイル
+        /// </summary>
+        public static string LogFilePath { get; set; } = null;
+
+        /// <summary>
+        /// 警告フラグ
+        /// </summary>
+        public static HashSet<WarningOption> Warnings { get; } = new HashSet<WarningOption>();
+
+        /// <summary>
+        /// 機能フラグ
+        /// </summary>
+        public static HashSet<FeatureOption> Features { get; } = new HashSet<FeatureOption>();
+
+        /// <summary>
+        /// 冗長出力フラグ
+        /// </summary>
+        public static HashSet<VerboseOption> Verboses { get; } = new HashSet<VerboseOption>();
+
+        /// <summary>
+        /// オプションスイッチ
+        /// </summary>
+        public static HashSet<string> Switchs { get; } = new HashSet<string>();
+
+        /// <summary>
+        /// レポートフラグ
+        /// </summary>
+        public static HashSet<Report> Reports { get; } = new HashSet<Report>();
+
+        /// <summary>
+        /// 出力器(マクロ展開位置の正確な取得に使用)
+        /// </summary>
+        public static TokenWriter TokenWriter { get; set; } = null;
+
+        /// <summary>
+        /// マクロ展開のログを記録
+        /// </summary>
+        public static MacroExpandLog ExpandLog { get; } = new MacroExpandLog();
+
+        /// <summary>
+        /// プリプロセスエラー数
+        /// </summary>
+        public static int ErrorCount { get; private set; }
+
+        /// <summary>
+        /// プリプロセス警告数
+        /// </summary>
+        public static int WarningCount { get; private set; }
+
+        /// <summary>
+        /// デフォルト文字コード
+        /// </summary>
+        public static System.Text.Encoding DefaultEncoding { get; set; } = System.Text.Encoding.Default;
+
+        /// <summary>
+        /// 文字コード自動認識の有効/無効
+        /// </summary>
+        public static bool AutoDetectEncoding { get; set; }
+
+        /// <summary>
+        /// インクルードパス（絶対パスを格納）
+        /// </summary>
+        static List<string> UserIncludePaths { get; } = new List<string>();
+
+        /// <summary>
+        /// システムインクルードパス（絶対パスを格納）
+        /// </summary>
+        static List<string> SystemIncludePaths { get; } = new List<string>();
+
         /// <summary>
         /// マクロの定義状況を示す辞書
         /// </summary>
@@ -39,17 +125,7 @@ namespace CSCPP {
         /// <summary>
         /// #if/#ifdef/#else/#elifによる条件分岐状態スタック
         /// </summary>
-        static List<Condition> ConditionStack { get; } = new List<Condition>();
-
-        /// <summary>
-        /// インクルードパス（絶対パスを格納）
-        /// </summary>
-        static List<string> UserIncludePath { get; } = new List<string>();
-
-        /// <summary>
-        /// システムインクルードディレクトリパス（絶対パスを格納）
-        /// </summary>
-        static List<string> StdIncludePath { get; } = new List<string>();
+        static Stack<Condition> ConditionStack { get; } = new Stack<Condition>();
 
         /// <summary>
         /// (CertC PRE08-Cのために追加)
@@ -81,6 +157,108 @@ namespace CSCPP {
             };
             DateString = $"{monthName[now.Month]} {now.Day,2:D0} {now.Year,4:D4}";
             TimeString = $"{now.Hour,2:D2}:{now.Minute,2:D2}:{now.Second,2:D2}";
+        }
+
+        /// <summary>
+        /// エラーメッセージ出力
+        /// </summary>
+        /// <param name="caption">エラーの見出し</param>
+        /// <param name="pos">エラー発生位置</param>
+        /// <param name="message">エラーメッセージ</param>
+        private static void OutputError(Position pos, string caption, string message) {
+            Console.Error.Write(pos.ToString());
+            Console.Error.WriteLine($" : ** {caption} ** : {message}");
+        }
+
+        /// <summary>
+        /// 内部エラーメッセージ出力
+        /// </summary>
+        /// <param name="tok"></param>
+        /// <param name="message"></param>
+        public static void InternalError(Token tok, string message) {
+            Debug.Assert(tok != null);
+            OutputError(tok.Position, "INTERNAL-ERROR", message);
+            ErrorCount++;
+        }
+
+        /// <summary>
+        /// エラーメッセージ出力
+        /// </summary>
+        /// <param name="message"></param>
+        public static void Error(string message) {
+            OutputError(Position.Empty, "ERROR", message);
+            ErrorCount++;
+        }
+
+        /// <summary>
+        /// エラーメッセージ出力
+        /// </summary>
+        /// <param name="tok"></param>
+        /// <param name="message"></param>
+        public static void Error(Token tok, string message) {
+            Debug.Assert(tok != null);
+            Error(tok.Position, message);
+        }
+
+        /// <summary>
+        /// エラーメッセージ出力
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="message"></param>
+        public static void Error(Position pos, string message) {
+            OutputError(pos, "ERROR", message);
+            ErrorCount++;
+        }
+
+        /// <summary>
+        /// 警告メッセージ出力
+        /// </summary>
+        /// <param name="tok"></param>
+        /// <param name="message"></param>
+        public static void Warning(Token tok, string message) {
+            Debug.Assert(tok != null);
+            if (Warnings.Contains(WarningOption.Error)) {
+                Error(tok, message);
+            } else {
+                OutputError(tok.Position, "WARNING", message);
+                WarningCount++;
+            }
+        }
+
+        /// <summary>
+        /// 警告メッセージ出力
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="message"></param>
+        public static void Warning(Position pos, string message) {
+            if (Warnings.Contains(WarningOption.Error)) {
+                Error(pos, message);
+            } else {
+                OutputError(pos, "WARNING", message);
+                WarningCount++;
+            }
+        }
+
+        /// <summary>
+        /// 警告メッセージ出力
+        /// </summary>
+        /// <param name="message"></param>
+        public static void Warning(string message) {
+            if (Warnings.Contains(WarningOption.Error)) {
+                Error(message);
+            } else {
+                OutputError(Position.Empty, "WARNING", message);
+                WarningCount++;
+            }
+        }
+
+        /// <summary>
+        /// メッセージ出力
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="message"></param>
+        public static void Notify(Position pos, string message) {
+            OutputError(pos, "NOTIFY", message);
         }
 
         private static Token CppTokenZero(Token tok) {
@@ -122,10 +300,10 @@ namespace CSCPP {
         /// <summary>
         /// 行末まで読み飛ばす
         /// </summary>
-        /// <param name="token"></param>
-        /// <param name="skippedTokens"></param>
-        /// <returns></returns>
-        static Token SkipToNextLine(Token token=null, List<Token> skippedTokens = null) {
+        /// <param name="token">先読みしていたトークンがある場合は指定する</param>
+        /// <param name="skippedTokens">行末までに読み飛ばされたトークンの格納が必要な場合は指定する</param>
+        /// <returns>改行もしくはEoFトークン</returns>
+        static Token SkipToNextLine(Token token = null, List<Token> skippedTokens = null) {
             if (token == null) {
                 token = Lex.LexToken(limitSpace: true);
                 skippedTokens?.Add(token);
@@ -137,21 +315,17 @@ namespace CSCPP {
             return token;
         }
 
-        /*
-         * Macro expander
-         */
-
         /// <summary>
         /// 改行トークンを一つ読み取る。
         /// </summary>
         /// <param name="limitSpace">前処理指令中に</param>
-        public static void expect_newline(bool limitSpace = false) {
+        public static void ExpectNewLine(bool limitSpace = false) {
             Token tok = Lex.LexToken(limitSpace: limitSpace);
             if (tok.Kind != Token.TokenKind.NewLine) {
                 if (tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"改行があるべき場所にファイル終端がありました。");
+                    Error(tok, $"改行があるべき場所にファイル終端がありました。");
                 } else {
-                    CppContext.Error(tok, $"改行があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"改行があるべき場所に {Token.TokenToStr(tok)} がありました。");
                     tok = SkipToNextLine(tok);
                     if (tok.Kind == Token.TokenKind.EoF) {
                         Lex.UngetToken(tok);
@@ -160,13 +334,21 @@ namespace CSCPP {
             }
         }
 
-        static List<Token> read_one_arg(Macro.FuncMacro macro, out bool end, bool readall, bool limitSpace = false) {
+        /// <summary>
+        /// 関数形式マクロの呼び出し式の引数一つに対応するトークン列を読み取る
+        /// </summary>
+        /// <param name="macro"></param>
+        /// <param name="end"></param>
+        /// <param name="readall"></param>
+        /// <param name="limitSpace"></param>
+        /// <returns></returns>
+        static List<Token> ReadOneArg(Macro.FuncMacro macro, out bool end, bool readall, bool limitSpace = false) {
             List<Token> r = new List<Token>();
             int level = 0;
             for (; ; ) {
                 Token tok = Lex.LexToken(handleEof: true, limitSpace: limitSpace);
                 if (tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
+                    Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                     end = true;
                     Lex.UngetToken(tok);
                     return null;
@@ -178,7 +360,7 @@ namespace CSCPP {
                 }
                 if (tok.Kind == Token.TokenKind.NewLine) {
                     if (InDirectiveLine > 0) {
-                        CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
+                        Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの引数リストの始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                         end = true;
                         Lex.UngetToken(tok);
                         return null;
@@ -187,9 +369,9 @@ namespace CSCPP {
                     }
                 }
                 if (tok.BeginOfLine && tok.IsKeyword('#')) {
-                    if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
+                    if (Warnings.Contains(WarningOption.CertCCodingStandard)) {
                         // PRE32-C. 関数形式マクロの呼出しのなかで前処理指令を使用しない
-                        CppContext.Warning(tok, $@"[PRE32-C] 関数形式マクロ {macro.Name.StrVal} の呼び出しのなかで前処理指令が使用されていますが、C90以降のC言語規格では、このようなコードは未定義の動作となることが示されています(参考文献:[ISO/IEC 9899:2011] 6.10.3 P11)。このルールについては、MISRA-C:1998 95、および、MISRA-C:2004 19.9 でも触れられています。");
+                        Warning(tok, $@"[PRE32-C] 関数形式マクロ {macro.Name.StrVal} の呼び出しのなかで前処理指令が使用されていますが、C90以降のC言語規格では、このようなコードは未定義の動作となることが示されています(参考文献:[ISO/IEC 9899:2011] 6.10.3 P11)。このルールについては、MISRA-C:1998 95、および、MISRA-C:2004 19.9 でも触れられています。");
                     }
                     ParseDirective(tok);
                     continue;
@@ -218,12 +400,18 @@ namespace CSCPP {
             }
         }
 
-        static List<List<Token>> do_read_args(Macro.FuncMacro macro, bool limitSpace = false) {
+        /// <summary>
+        /// 関数形式マクロの呼び出し式の引数列を読み取る
+        /// </summary>
+        /// <param name="macro"></param>
+        /// <param name="limitSpace"></param>
+        /// <returns></returns>
+        static List<List<Token>> DoReadArgs(Macro.FuncMacro macro, bool limitSpace = false) {
             List<List<Token>> r = new List<List<Token>>();
             bool end = false;
             while (!end) {
                 bool inEllipsis = (macro.IsVarg && r.Count + 1 == macro.Args.Count);
-                var ret = read_one_arg(macro, out end, inEllipsis, limitSpace: limitSpace);
+                var ret = ReadOneArg(macro, out end, inEllipsis, limitSpace: limitSpace);
                 if (ret == null) {
                     return null;
                 }
@@ -242,32 +430,32 @@ namespace CSCPP {
                 // argument list of M() is a list containing an empty list.
                 return new List<List<Token>>();
             }
-            List<List<Token>> args = do_read_args(macro, limitSpace: limitSpace);
+            List<List<Token>> args = DoReadArgs(macro, limitSpace: limitSpace);
             if (args == null) {
                 return null;
             }
             if (args.Count != macro.Args.Count) {
-                CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の実引数の数が一致しません。" +
+                Error(tok, $"関数形式マクロ {macro.Name.StrVal} の実引数の数が一致しません。" +
                                       $"宣言時の仮引数は {macro.Args.Count} 個ですが、指定されている実引数は {args.Count} 個です。");
                 // エラー回復は呼び出し元に任せる
                 return null;
             }
 
             /* C99から利用可能となった空の実引数をチェック */
-            if (!CppContext.Features.Contains(Feature.EmptyMacroArgument)) {
+            if (!Features.Contains(FeatureOption.EmptyMacroArgument)) {
                 for (var i = 0; i < args.Count; i++) {
                     if (args[i].Count == 0) {
-                        CppContext.Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの第 {i + 1} 実引数が空です。" +
+                        Error(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの第 {i + 1} 実引数が空です。" +
                                                "空の実引数は ISO/IEC 9899-1999 以降で利用可能となった言語機能です。" +
                                                "空の実引数を有効にする場合は実行時引数に -FEmptyMacroArgument を設定してください。");
                     }
                 }
                 // プリプロセッサ内部では空の実引数に対応しているので、エラーは出力するがそのまま処理を進める。
             } else {
-                if (CppContext.Warnings.Contains(Warning.EmptyMacroArgument)) {
+                if (Warnings.Contains(WarningOption.EmptyMacroArgument)) {
                     for (var i = 0; i < args.Count; i++) {
                         if (args[i].Count == 0) {
-                            CppContext.Warning(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの第 {i + 1} 実引数が空です。");
+                            Warning(tok, $"関数形式マクロ {macro.Name.StrVal} の呼び出しの第 {i + 1} 実引数が空です。");
                         }
                     }
                 }
@@ -292,7 +480,7 @@ namespace CSCPP {
         /// <param name="m"></param>
         /// <param name="tokens"></param>
         /// <param name="tok"></param>
-        static void glue_push(Macro m, List<Token> tokens, Token tok) {
+        static void GluePush(Macro m, List<Token> tokens, Token tok) {
             var lasttoken = tokens.Pop();
 
             // トークン列の末尾要素とトークンtokを文字列として結合してからトークンの読み出しを行う
@@ -335,10 +523,10 @@ namespace CSCPP {
         /// <param name="inputTokens"></param>
         /// <param name="tmpl"></param>
         /// <returns></returns>
-        static List<Token> expand_all(List<Token> inputTokens, Token tmpl) {
+        static List<Token> ExpandAll(List<Token> inputTokens, Token tmpl) {
             Lex.TokenBufferStash(inputTokens.Reverse<Token>().ToList());
             List<Token> r = new List<Token>();
-            for (Token tok = read_expand(); tok.Kind != Token.TokenKind.EoF; tok = read_expand()) {
+            for (Token tok = ReadExpand(); tok.Kind != Token.TokenKind.EoF; tok = ReadExpand()) {
                 r.Add(tok);
             }
 
@@ -384,21 +572,21 @@ namespace CSCPP {
                         r.Add(newTok);
                         i++;
                     } else {
-                        CppContext.Error(t0, "`#` 演算子の次はマクロ仮引数名でなければなりません。");
+                        Error(t0, "`#` 演算子の次はマクロ仮引数名でなければなりません。");
                         r.Add(t0);
                     }
                 } else if (t0 != null && t0.IsKeyword(Token.Keyword.HashHash) && t1Param) {
                     // (t0,t1) = ('##', <マクロ引数1>) の場合
 
                     List<Token> arg = args[t1.ArgIndex];
-                    if (CppContext.Features.Contains(Feature.ExtensionForVariadicMacro) && t1.IsVarArg && r.Count > 0 && r.Last().IsKeyword(',')) {
+                    if (Features.Contains(FeatureOption.ExtensionForVariadicMacro) && t1.IsVarArg && r.Count > 0 && r.Last().IsKeyword(',')) {
                         /* GCC系は ,##__VA_ARGS__ と書かれた関数形式マクロの本体を展開する際に、 __VA_ARGS__ 部分のトークン列が空の場合はコンマを出力しない動作を行う
                          * #define func(x, ...) func2(x,##__VA_ARGS__) の場合
                          *   func(A, 1) は func2(A, 1)になるが
                          *   func(A   ) は func2(A   )にならないといけない
                          */
-                        if (CppContext.Warnings.Contains(Warning.ExtensionForVariadicMacro)) {
-                            CppContext.Warning(t0, $"関数形式マクロ {m.GetName()} の可変長マクロ引数の展開でISO/IEC 9899-1999 では定義されていない非標準の拡張 `,##__VA_ARGS__` が使われています。");
+                        if (Warnings.Contains(WarningOption.ExtensionForVariadicMacro)) {
+                            Warning(t0, $"関数形式マクロ {m.GetName()} の可変長マクロ引数の展開でISO/IEC 9899-1999 では定義されていない非標準の拡張 `,##__VA_ARGS__` が使われています。");
                         }
                         if (arg.Count > 0) {
                             //可変長マクロ引数があるのでそのまま出力
@@ -410,7 +598,7 @@ namespace CSCPP {
                     } else if (arg.Count > 0) {
                         // 引数の最初のトークンを出力末尾のトークンと連結し、
                         // 引数の残りのトークンは出力の末尾に追加する
-                        glue_push(m, r, arg.First());
+                        GluePush(m, r, arg.First());
                         for (int j = 1; j < arg.Count; j++) {
                             r.Add(arg[j]);
                         }
@@ -420,7 +608,7 @@ namespace CSCPP {
                     // 最初のトークンが## でその後ろに別のトークンがある（つまり連結演算子式の先頭以外の)場合 
                     hideset = t1.Hideset;
                     // トークンの連結処理を行う
-                    glue_push(m, r, t1);
+                    GluePush(m, r, t1);
 
                     i++;
                 } else if (t0Param && t1 != null && t1.IsKeyword(Token.Keyword.HashHash)) {
@@ -438,7 +626,7 @@ namespace CSCPP {
                     List<Token> arg = args[t0.ArgIndex];
 
                     // 引き数列を展開してトークン列に追加
-                    var newtokens = expand_all(arg, t0);
+                    var newtokens = ExpandAll(arg, t0);
                     if (newtokens.Count > 0) {
                         newtokens.First().HeadSpace = true;
                         newtokens.Last().TailSpace = true;
@@ -456,7 +644,7 @@ namespace CSCPP {
         /// トークン列を字句解析器に押し戻す。
         /// </summary>
         /// <param name="tokens"></param>
-        static void unget_all(List<Token> tokens) {
+        static void UngetAll(List<Token> tokens) {
             for (int i = tokens.Count - 1; i >= 0; i--) {
                 Lex.UngetToken(tokens[i]);
             }
@@ -469,7 +657,7 @@ namespace CSCPP {
         /// におけるexpandに対応するトークン読み取り処理
         /// </summary>
         /// <returns></returns>
-        static Token read_expand(bool limit_space = false) {
+        static Token ReadExpand(bool limit_space = false) {
             for (; ; ) {
                 // トークンを一つ読み取る
                 Token tok = Lex.LexToken(limitSpace: limit_space);
@@ -506,8 +694,8 @@ namespace CSCPP {
                     expandedTokens = Subst(m, m.Body, null, hideset);
 
                     // マクロ展開を記録
-                    if (CppContext.Verboses.Contains(Verbose.TraceMacroExpand)) {
-                        var rawPos = CppContext.TokenWriter.WriteDummy(tok);
+                    if (Verboses.Contains(VerboseOption.TraceMacroExpand)) {
+                        var rawPos = TokenWriter.WriteDummy(tok);
                         expandedTokens.Add(Token.make_MacroRangeFixup(new Position("dummy", -1, -1), tok, macro, (int)rawPos.Line, rawPos.Column));
                     }
 
@@ -533,7 +721,7 @@ namespace CSCPP {
                         } else {
                             // マクロ関数呼び出しではない
                             Lex.UngetToken(tok2);
-                            unget_all(lookAHeads);
+                            UngetAll(lookAHeads);
                             return tok;
                         }
                     }
@@ -556,7 +744,7 @@ namespace CSCPP {
                     } else {
 
                         if (args.Count > 127) {
-                            CppContext.Warning($"関数形式マクロ `{name}` のマクロ呼出しにおける実引数の個数が127個を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                            Warning($"関数形式マクロ `{name}` のマクロ呼出しにおける実引数の個数が127個を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
                         }
 
                         var rparen = Lex.ExceptKeyword(')');
@@ -573,7 +761,7 @@ namespace CSCPP {
                     Macro.BuildinMacro m = macro as Macro.BuildinMacro;
                     expandedTokens = m.Hander(m, tok);
                 } else {
-                    CppContext.InternalError(tok, $"マクロの型が不正です。(macro.Type={macro.GetType().FullName})");
+                    InternalError(tok, $"マクロの型が不正です。(macro.Type={macro.GetType().FullName})");
                     expandedTokens = null;
                 }
 
@@ -609,14 +797,21 @@ namespace CSCPP {
                 }
 
                 // 構築した展開後のトークンをバッファに戻す。
-                unget_all(expandedTokens);
+                UngetAll(expandedTokens);
 
                 // 再度展開処理を行う
                 continue;
             }
         }
 
-        static bool read_funclike_macro_params(Macro m, List<Tuple<string, Token>> param, out Token lastTok) {
+        /// <summary>
+        /// 関数形式マクロ m の仮引数宣言列を読み取る
+        /// </summary>
+        /// <param name="m">関数形式マクロ</param>
+        /// <param name="params">仮引数宣言の解析情報が格納される</param>
+        /// <param name="lastTok">最後に読み取ったトークン</param>
+        /// <returns></returns>
+        static bool ReadFunctionLikeMacroParams(Macro m, List<Tuple<string, Token>> @params, out Token lastTok) {
             int index = 0;
             Token prevTok = null;
             for (; ; ) {
@@ -634,13 +829,13 @@ namespace CSCPP {
                         tok = Lex.LexToken();
                     } else {
                         // コンマが無い
-                        CppContext.Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数を区切るコンマがあるべき場所に {Token.TokenToStr(tok)} がありました。");
+                        Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数を区切るコンマがあるべき場所に {Token.TokenToStr(tok)} がありました。");
                     }
                 }
 
                 // 行末が出現した場合
                 if (tok.Kind == Token.TokenKind.NewLine) {
-                    CppContext.Error(m.GetFirstPosition(), $"関数形式マクロ {m.GetName()} の宣言で仮引数宣言の括弧が閉じていません。");
+                    Error(m.GetFirstPosition(), $"関数形式マクロ {m.GetName()} の宣言で仮引数宣言の括弧が閉じていません。");
                     Lex.UngetToken(tok);
                     lastTok = prevTok;
                     return false;
@@ -648,21 +843,21 @@ namespace CSCPP {
 
                 // "..."の場合はISO C 可変個引数マクロとして処理
                 if (tok.IsKeyword(Token.Keyword.Ellipsis)) {
-                    if (CppContext.Features.Contains(Feature.VariadicMacro)) {
-                        if (CppContext.Warnings.Contains(Warning.VariadicMacro)) {
-                            CppContext.Warning(tok, $"関数形式マクロ {m.GetName()} は可変個引数マクロとして宣言されています。");
+                    if (Features.Contains(FeatureOption.VariadicMacro)) {
+                        if (Warnings.Contains(WarningOption.VariadicMacro)) {
+                            Warning(tok, $"関数形式マクロ {m.GetName()} は可変個引数マクロとして宣言されています。");
                         }
-                        var tokVaArgs = Token.make_macro_token(index, true, "__VA_ARGS__", tok.File);
-                        param.Add(Tuple.Create("__VA_ARGS__", tokVaArgs));
+                        var tokVaArgs = Token.MakeMacroToken(index, true, "__VA_ARGS__", tok.File);
+                        @params.Add(Tuple.Create("__VA_ARGS__", tokVaArgs));
                         lastTok = Lex.ExceptKeyword(')');
                         return true;
                     } else {
-                        CppContext.Error(tok, $"関数形式マクロ {m.GetName()} は可変個引数マクロとして宣言されていますが、可変個引数マクロは ISO/IEC 9899-1999 以降で利用可能となった言語機能です。可変個引数マクロを有効にする場合は実行時引数に -FVariadicMacro を設定してください。");
+                        Error(tok, $"関数形式マクロ {m.GetName()} は可変個引数マクロとして宣言されていますが、可変個引数マクロは ISO/IEC 9899-1999 以降で利用可能となった言語機能です。可変個引数マクロを有効にする場合は実行時引数に -FVariadicMacro を設定してください。");
                     }
                 }
 
                 if (tok.Kind != Token.TokenKind.Ident) {
-                    CppContext.Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数(識別子)があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数(識別子)があるべき場所に {Token.TokenToStr(tok)} がありました。");
                     Lex.UngetToken(tok);
                     lastTok = prevTok;
                     return false;
@@ -670,44 +865,41 @@ namespace CSCPP {
 
                 string arg = tok.StrVal;
                 if (Lex.NextKeyword(Token.Keyword.Ellipsis)) {
-                    if (CppContext.Features.Contains(Feature.VariadicMacro)) {
+                    if (Features.Contains(FeatureOption.VariadicMacro)) {
                         // gcc拡張の可変長引数 args... みたいな書式への対応
-                        if (CppContext.Features.Contains(Feature.ExtensionForVariadicMacro)) {
+                        if (Features.Contains(FeatureOption.ExtensionForVariadicMacro)) {
                             lastTok = Lex.ExceptKeyword(')');
-                            var tokArg = Token.make_macro_token(index, true, arg, tok.File);
-                            param.Add(Tuple.Create(arg, tokArg));
+                            var tokArg = Token.MakeMacroToken(index, true, arg, tok.File);
+                            @params.Add(Tuple.Create(arg, tokArg));
                             return true;
+                        } else {
+                            Error(tok, $"関数形式マクロ {m.GetName()} はgcc拡張を伴う可変個引数マクロとして宣言されています。gcc拡張を伴う可変個引数マクロを有効にする場合は実行時引数に -FExtensionForVariadicMacro を設定してください。");
                         }
-                        else {
-                            CppContext.Error(tok, $"関数形式マクロ {m.GetName()} はgcc拡張を伴う可変個引数マクロとして宣言されています。gcc拡張を伴う可変個引数マクロを有効にする場合は実行時引数に -FExtensionForVariadicMacro を設定してください。");
-                        }
-                    }
-                    else {
-                        CppContext.Error(tok, $"関数形式マクロ {m.GetName()} はgcc拡張を伴う可変個引数マクロとして宣言されています。gcc拡張を伴う可変個引数マクロを有効にする場合は実行時引数に -FVariadicMacro と -FExtensionForVariadicMacro を設定してください。");
+                    } else {
+                        Error(tok, $"関数形式マクロ {m.GetName()} はgcc拡張を伴う可変個引数マクロとして宣言されています。gcc拡張を伴う可変個引数マクロを有効にする場合は実行時引数に -FVariadicMacro と -FExtensionForVariadicMacro を設定してください。");
                     }
                 } else {
                     // 普通の仮引数
-                    if (param.Any(x => x.Item1 == arg)) {
-                        CppContext.Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数 {arg} が複数回定義されています。");
+                    if (@params.Any(x => x.Item1 == arg)) {
+                        Error(tok, $"関数形式マクロ {m.GetName()} の宣言で仮引数 {arg} が複数回定義されています。");
                     }
-                    var tokArg = Token.make_macro_token(index++, false, arg, tok.File);
-                    param.Add(Tuple.Create(arg, tokArg));
+                    var tokArg = Token.MakeMacroToken(index++, false, arg, tok.File);
+                    @params.Add(Tuple.Create(arg, tokArg));
                 }
                 prevTok = tok;
             }
         }
 
-        static void hashhash_check(List<Token> v) {
-            if (v.Count == 0)
-                return;
+        static void HashHashCheck(List<Token> v) {
+            if (v.Count == 0) { return; }
             if (v.First().IsKeyword(Token.Keyword.HashHash)) {
                 var tok = v.First();
-                CppContext.Error(tok, "'##' はマクロ展開部の先頭では使えません。");
+                Error(tok, "'##' はマクロ展開部の先頭では使えません。");
                 v.Insert(0, new Token(tok, Token.TokenKind.Ident) { KeywordVal = (Token.Keyword)' ' });
             }
             if (v.Last().IsKeyword(Token.Keyword.HashHash)) {
                 var tok = v.Last();
-                CppContext.Error(tok, "'##' はマクロ展開部の末尾では使えません。");
+                Error(tok, "'##' はマクロ展開部の末尾では使えません。");
                 v.Add(new Token(tok, Token.TokenKind.Ident) { KeywordVal = (Token.Keyword)' ' });
             }
         }
@@ -735,14 +927,14 @@ namespace CSCPP {
                 if (r[i].IsKeyword('#')) {
                     var next = r.ElementAtOrDefault(i + 1);
                     if (next == null || (next.Kind != Token.TokenKind.MacroParamRef)) {
-                        CppContext.Error(r[i], "前処理演算子 `#` の後ろにマクロ引数がありません。");
+                        Error(r[i], "前処理演算子 `#` の後ろにマクロ引数がありません。");
                     }
                 }
             }
-            if (CppContext.Warnings.Contains(Warning.UnspecifiedBehavior)) {
+            if (Warnings.Contains(WarningOption.UnspecifiedBehavior)) {
                 // ISO/IEC 9899-1999 6.10.3.2 意味規則: #演算子及び##演算子の評価順序は，未規定とする。 のチェック
                 if (r.Count(x => x.IsKeyword('#') || x.IsKeyword(Token.Keyword.HashHash)) > 1) {
-                    CppContext.Warning(param.First().Item2, "マクロ定義で `#`演算子 または `##`演算子 が複数回用いていますが、これらの評価順序は未規定です。(参考文献:[ISO/IEC 9899:2011] 6.10.3.2、および、MISRA-C:2004 ルール19.12)。");
+                    Warning(param.First().Item2, "マクロ定義で `#`演算子 または `##`演算子 が複数回用いていますが、これらの評価順序は未規定です。(参考文献:[ISO/IEC 9899:2011] 6.10.3.2、および、MISRA-C:2004 ルール19.12)。");
                 }
             }
             return r;
@@ -783,16 +975,16 @@ namespace CSCPP {
             List<Tuple<string, Token>> param = new List<Tuple<string, Token>>();
             Macro.FuncMacro macro = new Macro.FuncMacro(name, null, null, false);
             Token lastToken;
-            bool isVarg = read_funclike_macro_params(macro, param, out lastToken);
+            bool isVarg = ReadFunctionLikeMacroParams(macro, param, out lastToken);
 
             if (param.Count > 127) {
-                CppContext.Warning($"関数形式マクロ `{name}` の定義において仮引数が {param.Count} 個定義されています。ISO/IEC 9899 5.2.4.1 翻訳限界 で規定されている関数形式マクロの仮引数は 127 個ですので処理系依存の動作となります。");
+                Warning($"関数形式マクロ `{name}` の定義において仮引数が {param.Count} 個定義されています。ISO/IEC 9899 5.2.4.1 翻訳限界 で規定されている関数形式マクロの仮引数は 127 個ですので処理系依存の動作となります。");
             }
 
             List<Token> body = read_funclike_macro_body(macro, param);
             macro.LastToken = (body.Count > 0) ? body.Last() : lastToken;
 
-            if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
+            if (Warnings.Contains(WarningOption.CertCCodingStandard)) {
 
                 // PRE01-C: マクロ内の引数名は括弧で囲む
                 foreach (var b in body.Select((x, i) => Tuple.Create(x, i)).Where(x => x.Item1.Kind == Token.TokenKind.MacroParamRef)) {
@@ -802,7 +994,7 @@ namespace CSCPP {
                             // ok
                             continue;
                         }
-                        CppContext.Warning(b.Item1, $"[PRE01-C] 関数形式マクロ {macro.GetName()} 内の引数 {b.Item1.ArgName} が括弧で囲まれていません。");
+                        Warning(b.Item1, $"[PRE01-C] 関数形式マクロ {macro.GetName()} 内の引数 {b.Item1.ArgName} が括弧で囲まれていません。");
                     }
                 }
 
@@ -832,7 +1024,7 @@ namespace CSCPP {
                             break;
                         }
                         var locate = macro.GetFirstPosition();
-                        CppContext.Warning(locate, $"[PRE02-C] 関数形式マクロ {macro.GetName()} の置換リストが括弧で囲まれていません。");
+                        Warning(locate, $"[PRE02-C] 関数形式マクロ {macro.GetName()} の置換リストが括弧で囲まれていません。");
                     }
                 } while (false);
 
@@ -842,13 +1034,13 @@ namespace CSCPP {
                         var last = body.Last();
                         if (last.IsKeyword(';')) {
                             var locate = macro.GetFirstPosition();
-                            CppContext.Warning(locate, $"[PRE11-C] 関数形式マクロ {macro.GetName()} の置換リストがセミコロンで終端されています。");
+                            Warning(locate, $"[PRE11-C] 関数形式マクロ {macro.GetName()} の置換リストがセミコロンで終端されています。");
                         }
                     }
                 } while (false);
             }
 
-            hashhash_check(body);
+            HashHashCheck(body);
             macro.Args = param.Select(x => x.Item2).ToList();
             macro.Body = body;
             macro.IsVarg = isVarg;
@@ -856,15 +1048,15 @@ namespace CSCPP {
             Macro pre = null;
             Macros.TryGetValue(name.StrVal, out pre);
             if (pre is Macro.BuildinMacro) {
-                CppContext.Warning(name, $"マクロ {name.StrVal} は再定義できません。");
+                Warning(name, $"マクロ {name.StrVal} は再定義できません。");
             } else {
-                if (CppContext.Warnings.Contains(Warning.RedefineMacro)) {
+                if (Warnings.Contains(WarningOption.RedefineMacro)) {
                     // 再定義の判定が必要
                     if (Macros.ContainsKey(name.StrVal) == true) {
                         // 同一定義の場合は再定義と見なさない
                         if (Macro.EqualDefine(pre, macro) == false) {
                             var location = pre.GetFirstPosition();
-                            CppContext.Warning(name, $"マクロ {name.StrVal} が再定義されました。以前のマクロ {name.StrVal} は {location} で定義されました。");
+                            Warning(name, $"マクロ {name.StrVal} が再定義されました。以前のマクロ {name.StrVal} は {location} で定義されました。");
                         }
                     }
                 }
@@ -872,7 +1064,7 @@ namespace CSCPP {
                 // 5.2.4.1 翻訳限界
                 // 内部識別子又はマクロ名において意味がある先頭の文字数［各国際文字名又は各ソース拡張文字は，1個の文字とみなす。］(63)
                 if (name.StrVal.Length > 63) {
-                    CppContext.Warning(name, $"マクロ名 `{name.StrVal}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                    Warning(name, $"マクロ名 `{name.StrVal}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
                 }
 
                 Macros[name.StrVal] = macro;
@@ -885,17 +1077,17 @@ namespace CSCPP {
             List<Token> body = new List<Token>();
             SkipToNextLine(null, body);
             body.ForEach((tok) => tok.Space.Chunks.ForEach(x => x.Space = System.Text.RegularExpressions.Regex.Replace(x.Space, "\r?\n", "")));
-            hashhash_check(body);
+            HashHashCheck(body);
             var macro = new Macro.ObjectMacro(token, body);
             var locate = macro.GetFirstPosition();
 
-            if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
+            if (Warnings.Contains(WarningOption.CertCCodingStandard)) {
                 // PRE11-C: マクロ定義をセミコロンで終端しない
                 do {
                     if (body.Count > 0) {
                         var last = body.Last();
                         if (last.IsKeyword(';')) {
-                            CppContext.Warning(locate, $"[PRE11-C] オブジェクト形式マクロ {macro.GetName()} の置換リストがセミコロンで終端されています。");
+                            Warning(locate, $"[PRE11-C] オブジェクト形式マクロ {macro.GetName()} の置換リストがセミコロンで終端されています。");
                         }
                     }
                 } while (false);
@@ -904,15 +1096,15 @@ namespace CSCPP {
             Macro pre = null;
             Macros.TryGetValue(name, out pre);
             if (pre is Macro.BuildinMacro) {
-                CppContext.Warning(token, $"マクロ {name} は再定義できません。");
+                Warning(token, $"マクロ {name} は再定義できません。");
             } else {
-                if (CppContext.Warnings.Contains(Warning.RedefineMacro)) {
+                if (Warnings.Contains(WarningOption.RedefineMacro)) {
                     // 再定義の判定が必要
                     if (Macros.ContainsKey(name) == true) {
                         // 同一定義の場合は再定義と見なさない
                         if (Macro.EqualDefine(pre, macro) == false) {
                             var location = pre.GetFirstPosition();
-                            CppContext.Warning(token, $"マクロ {name} が再定義されました。以前のマクロ {name} は {location} で定義されました。");
+                            Warning(token, $"マクロ {name} が再定義されました。以前のマクロ {name} は {location} で定義されました。");
                         }
                     }
                 }
@@ -920,7 +1112,7 @@ namespace CSCPP {
                 // 5.2.4.1 翻訳限界
                 // 内部識別子又はマクロ名において意味がある先頭の文字数［各国際文字名又は各ソース拡張文字は，1個の文字とみなす。］(63)
                 if (name.Length > 63) {
-                    CppContext.Warning(token, $"マクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                    Warning(token, $"マクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
                 }
 
                 Macros[name] = macro;
@@ -938,9 +1130,9 @@ namespace CSCPP {
             Token name = Lex.LexToken(limitSpace: true);
             if (name.Kind != Token.TokenKind.Ident) {
                 if (name.Kind == Token.TokenKind.NewLine || name.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(name, $"#define 指令の引数となる識別子がありません。");
+                    Error(name, $"#define 指令の引数となる識別子がありません。");
                 } else {
-                    CppContext.Error(name, $"#define 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
+                    Error(name, $"#define 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
                 }
                 SkipToNextLine(name);
             } else {
@@ -964,13 +1156,13 @@ namespace CSCPP {
             Token name = Lex.LexToken(limitSpace: true);
             if (name.Kind != Token.TokenKind.Ident) {
                 if (name.Kind == Token.TokenKind.NewLine || name.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(name, $"#undef 指令の引数となる識別子がありません。");
+                    Error(name, $"#undef 指令の引数となる識別子がありません。");
                 } else {
-                    CppContext.Error(name, $"#undef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
+                    Error(name, $"#undef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(name)} がありました。");
                 }
                 SkipToNextLine(name);
             } else {
-                expect_newline();
+                ExpectNewLine();
                 if (name.Kind == Token.TokenKind.Ident) {
                     Macros.Remove(name.StrVal);
                 }
@@ -988,17 +1180,17 @@ namespace CSCPP {
                 tok = Lex.LexToken(limitSpace: true);
                 Lex.ExceptKeyword(')', (t) => {
                     if (t.Kind == Token.TokenKind.EoF || t.Kind == Token.TokenKind.NewLine) {
-                        CppContext.Error(t, $"defined 演算子の始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
+                        Error(t, $"defined 演算子の始め丸括弧 `(` に対応する終わり丸括弧 `)` がありません。");
                     } else {
-                        CppContext.Error(t, $"defined 演算子の始め丸括弧 `(` に対応する終わり丸括弧 `)` があるべき場所に {Token.TokenToStr(t)} がありました。");
+                        Error(t, $"defined 演算子の始め丸括弧 `(` に対応する終わり丸括弧 `)` があるべき場所に {Token.TokenToStr(t)} がありました。");
                     }
                 });
             }
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.EoF || tok.Kind == Token.TokenKind.NewLine) {
-                    CppContext.Error(tok, $"defined 演算子のオペランドとなる識別子がありません。");
+                    Error(tok, $"defined 演算子のオペランドとなる識別子がありません。");
                 } else {
-                    CppContext.Error(tok, $"defined 演算子のオペランドとなる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"defined 演算子のオペランドとなる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 return CppTokenZero(tok);
             } else {
@@ -1018,7 +1210,7 @@ namespace CSCPP {
         static List<Token> read_intexpr_line() {
             List<Token> r = new List<Token>();
             for (; ; ) {
-                Token tok = read_expand(limit_space: true);
+                Token tok = ReadExpand(limit_space: true);
                 if (tok.Kind == Token.TokenKind.NewLine) {
                     return r;
                 }
@@ -1032,11 +1224,11 @@ namespace CSCPP {
                     //   マクロ展開及び defined 単項演算子によるすべてのマクロ置き換えの実行後，
                     //   残っているすべての識別子を前処理数 0 で置き換えてから，各前処理字句を字句に変換する。
                     // つまり、前処理の条件式評価中に登場した未定義の識別子は数字 0 に置き換えられる
-                    if (!Cpp.RefMacros.Contains(tok.StrVal)) {
-                        if (CppContext.Warnings.Contains(Warning.UndefinedToken)) {
-                            CppContext.Warning(tok, $"未定義の識別子 {Token.TokenToStr(tok)} が使用されています。6.10.1 に従い 数字 0 に置き換えられます。");
+                    if (!RefMacros.Contains(tok.StrVal)) {
+                        if (Warnings.Contains(WarningOption.UndefinedToken)) {
+                            Warning(tok, $"未定義の識別子 {Token.TokenToStr(tok)} が使用されています。6.10.1 に従い 数字 0 に置き換えられます。");
                         }
-                        Cpp.RefMacros.Add(tok.StrVal);
+                        RefMacros.Add(tok.StrVal);
                     }
                     r.Add(CppTokenZero(tok));
                 } else {
@@ -1100,16 +1292,16 @@ namespace CSCPP {
             byte[] code1 = tok.EncodedStrVal.CodeAt(0);
             byte[] code2 = tok.EncodedStrVal.CodeAt(1);
             if (code1 == null || code1.Length == 0) {
-                CppContext.Error(tok, $"空の文字定数が使われています。");
+                Error(tok, $"空の文字定数が使われています。");
                 return 0;
             }
 
             var code = code1.Reverse().Aggregate(0UL, (s, x) => s << 8 | x);
 
             if (code2 != null) {
-                CppContext.Warning(tok, $"2文字以上を含む文字定数 {Token.TokenToStr(tok)} が使われていますが、その値は処理系定義の結果となります。本処理系では { code } として扱います。");
+                Warning(tok, $"2文字以上を含む文字定数 {Token.TokenToStr(tok)} が使われていますが、その値は処理系定義の結果となります。本処理系では { code } として扱います。");
             } else if (code1.Length > 8) {
-                CppContext.Warning(tok, $"文字定数  {Token.TokenToStr(tok)} も文字コードが uintmax_t を超えます。");
+                Warning(tok, $"文字定数  {Token.TokenToStr(tok)} も文字コードが uintmax_t を超えます。");
             }
             return code;
         }
@@ -1135,7 +1327,7 @@ namespace CSCPP {
                 case 'x': {
                         int c2 = str.ElementAtOrDefault(i + 1);
                         if (!CType.IsXdigit(c2)) {
-                            CppContext.Error(tok, $"\\x に続く文字 {(char)c2} は16進数表記で使える文字ではありません。\\xを x として読みます。");
+                            Error(tok, $"\\x に続く文字 {(char)c2} は16進数表記で使える文字ではありません。\\xを x として読みます。");
                             return System.Text.Encoding.UTF8.GetBytes(new[] { (char)'x' });
                         } else {
                             UInt32 r = 0;
@@ -1144,7 +1336,7 @@ namespace CSCPP {
                             for (j = 0; i + j < str.Length; j++) {
                                 if (over == false && r > Byte.MaxValue) {
                                     over = true;
-                                    CppContext.Error(tok, $"16進数文字表記 \\{str} は 文字定数の表現範囲(現時点では8bit整数値)を超えます。 ");
+                                    Error(tok, $"16進数文字表記 \\{str} は 文字定数の表現範囲(現時点では8bit整数値)を超えます。 ");
                                 }
                                 c2 = str.ElementAtOrDefault(i + 1 + j);
                                 if ('0' <= c2 && c2 <= '9') { r = (r << 4) | (UInt32)(c2 - '0'); continue; }
@@ -1178,7 +1370,7 @@ namespace CSCPP {
                         return new byte[] { (byte)r };
                     }
                 default: {
-                        CppContext.Warning(tok, $"\\{(char)c} はISO/IEC 9899：1999で定められていないエスケープ文字です。" +
+                        Warning(tok, $"\\{(char)c} はISO/IEC 9899：1999で定められていないエスケープ文字です。" +
                                                 $"規格で定められていないエスケープ文字のうち、小文字は将来に向けての予約語、それ以外は処理系定義の動作となります(ISO/IEC 9899：1999 6.4.4.4 注釈(64) および 6.11.4 参照)。" +
                                                 $"本処理系では文字 `{(char)c}` として解釈します。");
                         i += 1;
@@ -1190,16 +1382,16 @@ namespace CSCPP {
 
         private static IntMaxT Expr(int priority, int skip) {
             Token tok = Lex.LexToken(limitSpace: true);
-            Action<bool, string> handler = (e, s) => {if (e) { CppContext.Error(tok, s); } else {CppContext.Warning(tok, s); } };
+            Action<bool, string> handler = (e, s) => { if (e) { Error(tok, s); } else { Warning(tok, s); } };
             IntMaxT lhs;
             if (tok.IsKeyword('(')) {
                 lhs = Expr(0, skip);
                 tok = Lex.LexToken(limitSpace: true);
                 if (tok.IsKeyword(')') == false) {
                     if (tok.Kind == Token.TokenKind.EoF) {
-                        CppContext.Error(tok, $"プリプロセス指令の定数式中で始め丸括弧 `(` に対応する終わり丸括弧 `)` がありませんでした。");
+                        Error(tok, $"プリプロセス指令の定数式中で始め丸括弧 `(` に対応する終わり丸括弧 `)` がありませんでした。");
                     } else {
-                        CppContext.Error(tok, $"プリプロセス指令の定数式中で始め丸括弧 `(` に対応する終わり丸括弧 `)` があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                        Error(tok, $"プリプロセス指令の定数式中で始め丸括弧 `(` に対応する終わり丸括弧 `)` があるべき場所に {Token.TokenToStr(tok)} がありました。");
                     }
                     Lex.UngetToken(tok);
                 }
@@ -1223,32 +1415,32 @@ namespace CSCPP {
                 lhs = skip > 0 ? IntMaxT.CreateUnsigned(0UL) : lhs;
             } else if (tok.Kind == Token.TokenKind.Ident) {
                 if (skip == 0) {
-                    CppContext.Warning(tok, $"プリプロセス指令の定数式中に未定義の識別子 '{tok.StrVal}' が出現しています。 0 に読み替えられます。");
+                    Warning(tok, $"プリプロセス指令の定数式中に未定義の識別子 '{tok.StrVal}' が出現しています。 0 に読み替えられます。");
                 }
                 lhs = IntMaxT.CreateSigned(0L);
             } else if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                CppContext.Error(tok, "プリプロセス指令の条件式が不完全なまま行末を迎えています。");
+                Error(tok, "プリプロセス指令の条件式が不完全なまま行末を迎えています。");
                 lhs = IntMaxT.CreateSigned(0L);
             } else {
                 if (skip == 0) {
                     if (tok.Kind == Token.TokenKind.String)
-                        CppContext.Error(tok, $"プリプロセス指令の条件式中で 文字列リテラル は使用できません。");
+                        Error(tok, $"プリプロセス指令の条件式中で 文字列リテラル は使用できません。");
                 } else {
-                    CppContext.Error(tok, $"プリプロセス指令の条件式中で {Token.TokenToStr(tok)} は使用できません。");
+                    Error(tok, $"プリプロセス指令の条件式中で {Token.TokenToStr(tok)} は使用できません。");
                 }
                 lhs = IntMaxT.CreateSigned(0L);
             }
 
             for (; ; ) {
                 Token op = Lex.LexToken(limitSpace: true);
-                Action<bool, string> handler2 = (e, s) => {if (e) { CppContext.Error(op, s); } else {CppContext.Warning(op, s); } };
+                Action<bool, string> handler2 = (e, s) => { if (e) { Error(op, s); } else { Warning(op, s); } };
                 int pri = expr_priority(op); // 0 if not a binop.
                 if (pri == 0 || priority >= pri) {
                     Lex.UngetToken(op);
                     return lhs;
                 }
                 if (op.Kind != Token.TokenKind.Keyword) {
-                    CppContext.Error(op, $"演算子のあるべき場所に {Token.TokenToStr(op)} がありますが、これは演算子として定義されていません。");
+                    Error(op, $"演算子のあるべき場所に {Token.TokenToStr(op)} がありますが、これは演算子として定義されていません。");
                     lhs = IntMaxT.CreateSigned(0L);
                 }
                 switch (op.KeywordVal) {
@@ -1356,7 +1548,7 @@ namespace CSCPP {
                                 IntMaxT rhs = Expr(pri, skip);
                                 lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
-                                IntMaxT rhs = Expr(pri, skip+1);
+                                IntMaxT rhs = Expr(pri, skip + 1);
                                 lhs = IntMaxT.CreateSigned(0);
                             }
                         } else {
@@ -1371,7 +1563,7 @@ namespace CSCPP {
                                 IntMaxT rhs = Expr(pri, skip);
                                 lhs = IntMaxT.CreateSigned(IntMaxT.NotEqual(rhs, IntMaxT.CreateSigned(0)) ? 1 : 0);
                             } else {
-                                IntMaxT rhs = Expr(pri, skip+1);
+                                IntMaxT rhs = Expr(pri, skip + 1);
                                 lhs = IntMaxT.CreateSigned(1);
                             }
                         } else {
@@ -1385,7 +1577,7 @@ namespace CSCPP {
                             IntMaxT rhs1 = Expr(0, skip + (cond ? 0 : 1));
                             Token tok2 = Lex.LexToken();
                             if (tok2.IsKeyword(':') == false) {
-                                CppContext.Error(op, $"三項演算子の`:`があるべき場所に `{Token.TokenToStr(tok2)}` があります。");
+                                Error(op, $"三項演算子の`:`があるべき場所に `{Token.TokenToStr(tok2)}` があります。");
                                 return IntMaxT.CreateSigned(0);
                             }
                             IntMaxT rhs2 = Expr(0, skip + (cond ? 1 : 0));
@@ -1398,7 +1590,7 @@ namespace CSCPP {
                         }
 
                     default:
-                        CppContext.Error(op, $"演算子のあるべき場所に `{Token.TokenToStr(op)}` がありますが、これは演算子として定義されていません。");
+                        Error(op, $"演算子のあるべき場所に `{Token.TokenToStr(op)}` がありますが、これは演算子として定義されていません。");
                         return IntMaxT.CreateSigned(0);
 
                 }
@@ -1411,10 +1603,10 @@ namespace CSCPP {
             /* コンパイルスイッチの記録のために前処理トークン列を展開無しで先読みして記録する */
             {
                 exprtokens = new List<Token>();
-                Token pretok = SkipToNextLine(null,exprtokens);
+                Token pretok = SkipToNextLine(null, exprtokens);
                 exprtokens.ForEach((t) => {
                     if (t.Kind == Token.TokenKind.Invalid) {
-                        CppContext.Error(t, $@"プリプロセス指令の条件式中に不正な文字 `\u{(int)t.StrVal[0]:X4}` がありました。");
+                        Error(t, $@"プリプロセス指令の条件式中に不正な文字 `\u{(int)t.StrVal[0]:X4}` がありました。");
                     }
                 });
                 exprtokens.Add(Token.make_eof(pretok.Position));
@@ -1429,7 +1621,7 @@ namespace CSCPP {
             var expr = Expr(0, 0);
             Token tok = Lex.LexToken(limitSpace: true);
             if (tok.Kind != Token.TokenKind.EoF) {
-                CppContext.Error(tok, $"プリプロセス指令の条件式中に余分なトークン {Token.TokenToStr(tok)} がありました。");
+                Error(tok, $"プリプロセス指令の条件式中に余分なトークン {Token.TokenToStr(tok)} がありました。");
                 while (tok.Kind != Token.TokenKind.EoF) {
                     tok = Lex.LexToken(limitSpace: true);
                 }
@@ -1439,7 +1631,7 @@ namespace CSCPP {
         }
 
         static void do_read_if(bool isTrue) {
-            ConditionStack.Add(new Condition(isTrue));
+            ConditionStack.Push(new Condition(isTrue));
             if (!isTrue) {
                 Lex.SkipCondInclude();
             }
@@ -1461,13 +1653,13 @@ namespace CSCPP {
             bool cond = false;
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"#ifdef 指令の引数となる識別子がありません。");
+                    Error(tok, $"#ifdef 指令の引数となる識別子がありません。");
                 } else {
-                    CppContext.Error(tok, $"#ifdef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"#ifdef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 SkipToNextLine(tok);
             } else {
-                expect_newline();
+                ExpectNewLine();
 
                 // 参照されたことのあるマクロとして記録する
                 RefMacros.Add(tok.StrVal);
@@ -1495,13 +1687,13 @@ namespace CSCPP {
             bool cond = false;
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"#ifndef 指令の引数となる識別子がありません。");
+                    Error(tok, $"#ifndef 指令の引数となる識別子がありません。");
                 } else {
-                    CppContext.Error(tok, $"#ifndef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"#ifndef 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 SkipToNextLine(tok);
             } else {
-                expect_newline();
+                ExpectNewLine();
 
 
                 // 参照されたことのあるマクロとして記録する
@@ -1523,7 +1715,7 @@ namespace CSCPP {
                 //   二つ目が 'ifndef'
                 // の場合、「インクルードガード」パターンかもしれないので
                 // 検出の準備をする
-                Condition ci = ConditionStack.Last();
+                Condition ci = ConditionStack.Peek();
                 ci.IncludeGuard = tok.StrVal;
                 ci.File = tok.File;
             }
@@ -1536,15 +1728,15 @@ namespace CSCPP {
         static Token read_else(Token hash, Token telse) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
             if (ConditionStack.Count == 0) {
-                CppContext.Error(hash, "#if / #ifdef と対応の取れない #else がありました。");
+                Error(hash, "#if / #ifdef と対応の取れない #else がありました。");
                 // エラー回復方法がコンパイラによってまちまちなので #else を読み飛ばす方向で
                 var tok = SkipToNextLine(hash);
                 Lex.UngetToken(tok);
             } else {
                 // 現在の条件コンパイル状態を確認して、else解析中の場合、elseが多重なのでエラー
-                Condition ci = ConditionStack.Last();
+                Condition ci = ConditionStack.Peek();
                 if (ci.CurrentState == Condition.State.InElse) {
-                    CppContext.Error(hash, "#else の後に再度 #else が出現しました。");
+                    Error(hash, "#else の後に再度 #else が出現しました。");
                     // エラー回復方法がコンパイラによってまちまちなので #else を読み飛ばす方向で
                     var tok = SkipToNextLine(hash);
                     Lex.UngetToken(tok);
@@ -1554,8 +1746,8 @@ namespace CSCPP {
                     {
                         Token tok = Lex.LexToken();
                         if (tok.Kind != Token.TokenKind.NewLine) {
-                            if (CppContext.Warnings.Contains(Warning.Pedantic)) {
-                                CppContext.Warning(tok, "#else 指令の末尾に余分なトークンがあります。");
+                            if (Warnings.Contains(WarningOption.Pedantic)) {
+                                Warning(tok, "#else 指令の末尾に余分なトークンがあります。");
                             }
                             SkipToNextLine(tok);
                         }
@@ -1588,16 +1780,16 @@ namespace CSCPP {
             var nl = new Token(hash, Token.TokenKind.NewLine);
             if (ConditionStack.Count == 0) {
                 // #if ～ #endif の間以外で #elif が使われている
-                CppContext.Error(hash, "#if / #ifdef と対応の取れない #elif がありました。");
+                Error(hash, "#if / #ifdef と対応の取れない #elif がありました。");
                 // エラー回復方法がコンパイラによってまちまちなので #elif を読み飛ばす方向で
                 var tok = SkipToNextLine(hash);
                 Lex.UngetToken(tok);
             } else {
-                Condition ci = ConditionStack.Last();
+                Condition ci = ConditionStack.Peek();
                 if (ci.CurrentState == Condition.State.InElse) {
                     // #else の後に #elif  が使われている
 
-                    CppContext.Error(hash, "#else の後に #elif が出現しました。");
+                    Error(hash, "#else の後に #elif が出現しました。");
                     // エラー回復方法がコンパイラによってまちまちなので #elif を読み飛ばす方向で
                     var tok = SkipToNextLine(hash);
                     Lex.UngetToken(tok);
@@ -1626,7 +1818,7 @@ namespace CSCPP {
         static Token read_endif(Token hash, Token tendif) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
             if (ConditionStack.Count == 0) {
-                CppContext.Error(hash, "#if / #ifdef と対応の取れない #endif がありました。");
+                Error(hash, "#if / #ifdef と対応の取れない #endif がありました。");
                 // エラー回復方法がコンパイラによってまちまちなので #endif を読み飛ばす方向で
                 var tok = SkipToNextLine(hash);
                 Lex.UngetToken(tok);
@@ -1637,8 +1829,8 @@ namespace CSCPP {
                 {
                     Token tok = Lex.LexToken(limitSpace: true);
                     if (tok.Kind != Token.TokenKind.NewLine && tok.Kind != Token.TokenKind.EoF) {
-                        if (CppContext.Warnings.Contains(Warning.Pedantic)) {
-                            CppContext.Warning(tok, "#endif 指令の末尾に余分なトークンがあります。");
+                        if (Warnings.Contains(WarningOption.Pedantic)) {
+                            Warning(tok, "#endif 指令の末尾に余分なトークンがあります。");
                         }
                         SkipToNextLine(tok);
                     }
@@ -1674,11 +1866,9 @@ namespace CSCPP {
             return nl;
         }
 
-        /*
-         * #error and #warning
-         */
+        #region error/warning 指令の解析
 
-        static string read_error_message() {
+        static string ParseMessage() {
             StringBuilder sb = new StringBuilder();
             for (; ; ) {
                 Token tok = Lex.LexToken(limitSpace: true);
@@ -1689,21 +1879,21 @@ namespace CSCPP {
             }
         }
 
-        static Token read_error(Token hash, Token terror) {
+        static Token ParseErrorDirective(Token hash, Token terror) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            CppContext.Error(hash, $"#error: {read_error_message()}");
+            Error(hash, $"#error: {ParseMessage()}");
             return nl;
         }
 
-        static Token read_warning(Token hash, Token twarning) {
+        static Token ParseWarningDirective(Token hash, Token twarning) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
-            CppContext.Warning(hash, $"#warning: {read_error_message()}");
+            Warning(hash, $"#warning: {ParseMessage()}");
             return nl;
         }
 
-        /*
-         * #include 指令
-         */
+        #endregion
+
+        #region include 指令の解析
 
         /// <summary>
         /// 6.10.2 ソースファイル取込み に従って
@@ -1712,7 +1902,7 @@ namespace CSCPP {
         /// <param name="hash"></param>
         /// <param name="isGuillemet">パスが山括弧で括られている場合は真</param>
         /// <returns></returns>
-        static string read_cpp_header_name(Token hash, out bool isGuillemet) {
+        static string ReadCppHeaderName(Token hash, out bool isGuillemet) {
 
             /* 
              * ファイルパス部分の読み取り
@@ -1743,9 +1933,9 @@ namespace CSCPP {
              */
 
             // マクロ展開を有効にしてトークンを読み取る
-            Token tok = read_expand();
+            Token tok = ReadExpand();
             if (tok.Kind == Token.TokenKind.NewLine) {
-                CppContext.Error(hash, "識別子があるべき場所に改行がありました。");
+                Error(hash, "識別子があるべき場所に改行がありました。");
                 Lex.UngetToken(tok);
                 return null;
             }
@@ -1759,12 +1949,12 @@ namespace CSCPP {
             } else if (tok.IsKeyword('<')) {
                 // マクロ展開の結果'<'が得られた場合は<～>形式と推定して入力を読み進める
                 var sb = new StringBuilder();
-                bool saveComment = CppContext.Switchs.Contains("-C");
-                CppContext.Switchs.Remove("-C");
+                bool saveComment = Switchs.Contains("-C");
+                Switchs.Remove("-C");
                 for (; ; ) {
-                    Token tok2 = read_expand();
+                    Token tok2 = ReadExpand();
                     if (tok2.Kind == Token.TokenKind.NewLine) {
-                        CppContext.Error(tok, "ヘッダファイルが閉じられないまま行末に到達しました。");
+                        Error(tok, "ヘッダファイルが閉じられないまま行末に到達しました。");
                         Lex.UngetToken(tok);
                         break;
                     }
@@ -1775,7 +1965,7 @@ namespace CSCPP {
                     sb.Append(Token.TokenToStr(tok2));
                 }
                 if (saveComment) {
-                    CppContext.Switchs.Add("-C");
+                    Switchs.Add("-C");
                 }
                 isGuillemet = true;
                 // トークンを全て単純に連結した文字列を返す
@@ -1787,7 +1977,7 @@ namespace CSCPP {
                 return null;
             } else {
                 // どっちでもない場合はダメ
-                CppContext.Error(tok, $"ヘッダファイル名のあるべき場所に {Token.TokenToStr(tok)} がありました。");
+                Error(tok, $"ヘッダファイル名のあるべき場所に {Token.TokenToStr(tok)} がありました。");
                 tok = SkipToNextLine(tok);
                 Lex.UngetToken(tok);
                 return null;
@@ -1795,12 +1985,12 @@ namespace CSCPP {
         }
 
         /// <summary>
-        /// インクルードガードされているか判定
+        /// ファイルがインクルードガードされているか判定
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="path"></param>
         /// <returns></returns>
-        static bool Guarded(Token hash, string path) {
+        static bool IsIncludeGuarded(Token hash, string path) {
             string guard = IncludeGuards.ContainsKey(path) ? IncludeGuards[path] : null;
             bool r = (guard != null && Macros.ContainsKey(guard) && Macros[guard] != null);
             if (guard != null && Macros.ContainsKey(guard) && Macros[guard] != null) {
@@ -1810,12 +2000,12 @@ namespace CSCPP {
         }
 
         /// <summary>
-        /// include 対象ファイルの存在を調べる
+        /// (PRE04-C検査用) include 対象ファイルの存在を調べる
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="dir"></param>
         /// <param name="filename"></param>
-        /// <returns></returns>
+        /// <returns>存在する場合はフルパスを、存在しない場合はnullを返す</returns>
         static string SearchInclude(Token hash, string dir, string filename) {
             string path = "";
             if (System.IO.Path.IsPathRooted(filename)) {
@@ -1842,12 +2032,12 @@ namespace CSCPP {
         }
 
         /// <summary>
-        /// include を行う
+        /// include を試行する
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="dir"></param>
         /// <param name="filename"></param>
-        /// <returns></returns>
+        /// <returns>成功時は真、失敗時は偽</returns>
         static bool TryInclude(Token hash, string dir, string filename) {
             string path = "";
             if (System.IO.Path.IsPathRooted(filename)) {
@@ -1867,7 +2057,7 @@ namespace CSCPP {
                 }
             }
 
-            if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
+            if (Warnings.Contains(WarningOption.CertCCodingStandard)) {
                 #region PRE04-C. 標準ヘッダファイル名を再利用しない
                 /*
                  * PRE04-C. 標準ヘッダファイル名を再利用しない
@@ -1882,11 +2072,11 @@ namespace CSCPP {
                  *   取り込まれるソースファイルを探索する標準の位置のいずれかにある場合，その動作は未定義とする
                  */
                 var target = SearchInclude(hash, dir, filename);
-                if (target == null || StdIncludePath.Any(x => target.StartsWith(x, StringComparison.OrdinalIgnoreCase)) == false) {
-                    // システムインクルードディレクトリ内のファイルが"..."で参照するケースではないときにチェック
-                    var conflicts = StdIncludePath.Select(x => SearchInclude(hash, x, filename)).Where(x => x != null).ToList();
+                if (target == null || SystemIncludePaths.Any(x => target.StartsWith(x, StringComparison.OrdinalIgnoreCase)) == false) {
+                    // システムインクルードパス内のファイルが"..."で参照するケースではないときにチェック
+                    var conflicts = SystemIncludePaths.Select(x => SearchInclude(hash, x, filename)).Where(x => x != null).ToList();
                     if (conflicts.Count > 0) {
-                        CppContext.Warning(hash, $@"[PRE04-C] 標準ヘッダと同じ名前のファイル {filename} をシステムインクルードディレクトリ以外からインクルードしています。C90以降のC言語規格では、このようなコードは未定義の動作となることが示されています(参考文献:[ISO/IEC 9899:2011] 7.1.2 P3)。");
+                        Warning(hash, $@"[PRE04-C] 標準ヘッダと同じ名前のファイル {filename} をシステムインクルードパス以外からインクルードしています。C90以降のC言語規格では、このようなコードは未定義の動作となることが示されています(参考文献:[ISO/IEC 9899:2011] 7.1.2 P3)。");
                     }
                 }
                 #endregion
@@ -1897,7 +2087,7 @@ namespace CSCPP {
                 // #pragma once 済みの場合
                 return true;
             }
-            if (Guarded(hash, path)) {
+            if (IsIncludeGuarded(hash, path)) {
                 // インクルードガードパターンを伴う二回目以降のincludeの場合
                 return true;
             }
@@ -1907,7 +2097,7 @@ namespace CSCPP {
             }
 
             // ファイルを開いてファイルスタックに積む
-            var sr = LibReadJEnc.ReadJEnc.CreateStreamReaderFromFile(path, CppContext.AutoDetectEncoding, CppContext.DefaultEncoding);
+            var sr = LibReadJEnc.ReadJEnc.CreateStreamReaderFromFile(path, AutoDetectEncoding, DefaultEncoding);
             if (sr == null) {
                 return false;
             }
@@ -1918,6 +2108,11 @@ namespace CSCPP {
             return true;
         }
 
+        /// <summary>
+        /// 相対パスを正規化する
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
         static string NormalizeRelativePath(string path) {
             Stack<string> s = new Stack<string>();
             foreach (var part in path.Split(System.IO.Path.DirectorySeparatorChar)) {
@@ -1939,38 +2134,44 @@ namespace CSCPP {
             return System.IO.Path.Combine(s.ToArray());
         }
 
+        /// <summary>
+        /// #include 指令の処理
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <param name="tinclude"></param>
+        /// <returns></returns>
         static Token ParseIncludeDirective(Token hash, Token tinclude) {
-            //var nl = new Token(hash, Token.TokenKind.NewLine);
             var nl = new Token(hash, Token.TokenKind.Space);
-            File file = tinclude.File;
-            bool isGuillemet;
-            string filename = read_cpp_header_name(hash, out isGuillemet);
+
+            var file = tinclude.File;
+
+            bool isGuillemet;   // #include <...> 形式の場合は真になる
+            var filename = ReadCppHeaderName(hash, out isGuillemet);
 
             {
-                Token tok2 = read_expand();
+                var tok2 = ReadExpand();
                 if (tok2.Kind != Token.TokenKind.NewLine) {
-                    CppContext.Error(tok2, "#include指令の後ろに空白以外の要素があります。");
+                    Error(tok2, "#include指令の後ろに空白以外の要素があります。");
                     tok2 = SkipToNextLine(tok2);
                 }
                 Lex.UngetToken(tok2);
             }
 
             if (filename == null) {
-                // read_cpp_header_name 中でエラー出力しているはずなので何も出さずに抜ける
-                return nl;  // 失敗ケースなので、goto succ はダメ
+                // ReadCppHeaderName中でエラー出力しているので何も出さずに抜ける
+                return nl;
             } else if (System.IO.Path.IsPathRooted(filename)) {
                 // レアケースだが、絶対パスが指定されている場合はinclude形式に関係なく直接そのファイルを探して読み込む
-                if (TryInclude(hash, "/", filename)) {  // "/" を渡しているが絶対パス指定なので意味はない。
+                if (TryInclude(hash, "/", filename)) {  // ディレクトリに "/" を渡しているが絶対パス指定なので無視される
                     goto succ;
                 }
                 goto err;
             }
 
-            /* #include "..." 形式の場合、カレントディレクトリ⇒インクルードパス(-Iオプション)⇒システムインクルードディレクトリ の順で検索 */
-            /* #include <...> 形式の場合、システムインクルードディレクトリ のみ検索 */
+            // #include "..." 形式の場合、カレントディレクトリ⇒インクルードパス(-Iオプション)⇒システムインクルードパス の順で検索
+            // #include <...> 形式の場合、システムインクルードパス のみ検索
 
-
-            if (CppContext.Warnings.Contains(Warning.CertCCodingStandard)) {
+            if (Warnings.Contains(WarningOption.CertCCodingStandard)) {
                 #region PRE08-C. ヘッダファイル名が一意であることを保証する
                 /*
                  * PRE08-C. ヘッダファイル名が一意であることを保証する
@@ -2011,7 +2212,7 @@ namespace CSCPP {
                     if (PRE08IncludeFileTable.TryGetValue(key, out entries)) {
                         var other = entries.FirstOrDefault(x => x.Item1 != name);
                         if (other != null) {
-                            CppContext.Warning(hash, $@"[PRE08-C] インクルードで指定されたファイル {filename} のディレクトリと拡張子を除いたファイル名の先頭最大８文字 {key} が 別のインクルードで指定されたファイル {other.Item2} と大文字小文字を区別せずに一致するため、C言語規格上は曖昧なインクルードとなる可能性が示されています(参考文献:[ISO/IEC 9899:2011] 6.10.2)。");
+                            Warning(hash, $@"[PRE08-C] インクルードで指定されたファイル {filename} のディレクトリと拡張子を除いたファイル名の先頭最大８文字 {key} が 別のインクルードで指定されたファイル {other.Item2} と大文字小文字を区別せずに一致するため、C言語規格上は曖昧なインクルードとなる可能性が示されています(参考文献:[ISO/IEC 9899:2011] 6.10.2)。");
                         }
                         if (entries.Any(x => x.Item1 == name) == false) {
                             entries.Add(Tuple.Create(name, filename, hash.Position));
@@ -2031,7 +2232,7 @@ namespace CSCPP {
                  *  と規定されている。
                  */
 
-                /* 現在のファイルと同じディレクトリから探索 */
+                // 現在のファイルと同じディレクトリから include を試行
                 string dir = ".";
                 try {
                     dir = file.Name != null ? System.IO.Path.GetDirectoryName(file.Name) : ".";
@@ -2042,8 +2243,8 @@ namespace CSCPP {
                     goto succ;
                 }
 
-                /* -Iオプションの指定順で探索 */
-                foreach (var path in UserIncludePath) {
+                // -Iオプションの指定順で探索して include を試行
+                foreach (var path in UserIncludePaths) {
                     if (TryInclude(hash, path, filename)) {
                         goto succ;
                     }
@@ -2054,17 +2255,18 @@ namespace CSCPP {
                  */
             }
 
-            /* システムインクルードディレクトリを探索する */
+            // システムインクルードパスから探索して include を試行
             {
                 /**
                  * ISO/IEC 9899 6.10.2 ソースファイル取込み　で、
                  *   どのようにして探索の場所を指定するか，またどのようにしてヘッダを識別するかは，処理系定義とする。
                  * とされている。
                  */
-                foreach (var path in StdIncludePath) {
+                foreach (var path in SystemIncludePaths) {
                     if (TryInclude(hash, path, filename)) {
-                        if (!isGuillemet && CppContext.Warnings.Contains(Warning.ImplicitSystemHeaderInclude)) {
-                            CppContext.Warning(hash, $"二重引用符形式で指定されたファイル {filename} がインクルードパス中では見つからず、システムインクルードディレクトリ中から見つかりました。この動作は「ISO/IEC 9899 6.10.2 ソースファイル取込み」で規定されている標準動作ですが、意図したものでなければ二重引用符ではなく山括弧の利用を検討してください。");
+                        if (!isGuillemet && Warnings.Contains(WarningOption.ImplicitSystemHeaderInclude)) {
+                            Warning(hash, $"二重引用符形式で指定されたファイル {filename} がインクルードパス中では見つからず、システムインクルードパス中から見つかりました。" +
+                                          $"この動作は「ISO/IEC 9899 6.10.2 ソースファイル取込み」で規定されている標準動作ですが、意図したものでなければ二重引用符ではなく山括弧の利用を検討してください。");
                         }
                         goto succ;
                     }
@@ -2072,13 +2274,17 @@ namespace CSCPP {
                 goto err;
             }
 
-            succ:
+        succ:
             return nl;
 
-            err:
-            CppContext.Error(hash, $"#includeで指定されたファイル {(isGuillemet ? "<" : "\"")}{filename}{(isGuillemet ? ">" : "\"")} が見つかりません。");
+        err:
+            Error(hash, $"#includeで指定されたファイル {(isGuillemet ? "<" : "\"")}{filename}{(isGuillemet ? ">" : "\"")} が見つかりません。");
             return nl;
         }
+
+        #endregion
+
+        #region pragma指令の解析
 
         /// <summary>
         /// #pragma 指令の処理
@@ -2091,9 +2297,9 @@ namespace CSCPP {
             Token tok = Lex.LexToken(limitSpace: true);
             if (tok.Kind != Token.TokenKind.Ident) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"#pragma 指令の引数となる識別子がありません。");
+                    Error(tok, $"#pragma 指令の引数となる識別子がありません。");
                 } else {
-                    CppContext.Error(tok, $"#pragma 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
+                    Error(tok, $"#pragma 指令の引数となる識別子があるべき場所に {Token.TokenToStr(tok)} がありました。");
                 }
                 // pragma は処理系依存であるため、このpragma全体を素通しする
                 List<Token> tokens = new List<Token> { hash, tpragma, tok };
@@ -2130,9 +2336,9 @@ namespace CSCPP {
                         return hash;
                     }
                 default: {
-                        if (CppContext.Warnings.Contains(Warning.UnknownPragmas)) {
+                        if (Warnings.Contains(WarningOption.UnknownPragmas)) {
                             // 不明なプラグマなので警告を出す。
-                            CppContext.Warning(hash, $"#pragma {s} は不明なプラグマです。");
+                            Warning(hash, $"#pragma {s} は不明なプラグマです。");
                         }
                         List<Token> tokens = new List<Token> { hash, tpragma, tok };
                         SkipToNextLine(null, tokens);
@@ -2146,41 +2352,53 @@ namespace CSCPP {
             }
         }
 
-        /*
-         * #line指令
-         */
+        #endregion
 
+        #region line指令の解析
+
+        /// <summary>
+        /// 文字列が10進数表記か調べる
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         static bool IsDigitSequence(string str) {
             return str.All(p => CType.IsDigit(p));
         }
 
+        /// <summary>
+        /// line指令の読み取りを行う
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <param name="tok"></param>
+        /// <param name="kind"></param>
+        /// <returns></returns>
         private static Token DoParseLineDirective(Token hash, Token tok, string kind) {
             var nl = new Token(hash, Token.TokenKind.NewLine);
             if (tok.Kind != Token.TokenKind.Number || !IsDigitSequence(tok.StrVal)) {
                 if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                    CppContext.Error(tok, $"{kind} の行番号があるべき場所で行が終わっています。。");
+                    Error(tok, $"{kind} の行番号があるべき場所で行が終わっています。。");
                 } else if (tok.Kind == Token.TokenKind.Number && !IsDigitSequence(tok.StrVal)) {
-                    CppContext.Error(tok, $"{kind} の行番号の表記は10進数に限られています。");
+                    Error(tok, $"{kind} の行番号の表記は10進数に限られています。");
                 } else {
-                    CppContext.Error(tok, $"{kind} で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
+                    Error(tok, $"{kind} で指定されている {Token.TokenToStr(tok)} は行番号ではありません。");
                 }
                 SkipToNextLine(null);
                 return nl;
             } else {
                 long line = long.Parse(tok.StrVal);
                 if (line <= 0 || Int32.MaxValue < line) {
-                    CppContext.Error(tok, $"{kind} の行番号に {tok.StrVal} が指定されていますが、 1 以上 {Int32.MaxValue} 以下でなければなりません。");
+                    Error(tok, $"{kind} の行番号に {tok.StrVal} が指定されていますが、 1 以上 {Int32.MaxValue} 以下でなければなりません。");
                     SkipToNextLine(null);
                     return nl;
                 }
 
                 // ファイル名を読み取る
-                tok = read_expand(limit_space: true);
+                tok = ReadExpand(limit_space: true);
                 if (tok.Kind != Token.TokenKind.String) {
                     if (tok.Kind == Token.TokenKind.NewLine || tok.Kind == Token.TokenKind.EoF) {
-                        CppContext.Error(tok, $"{kind} のファイル名があるべき場所で行が終わっています。。");
+                        Error(tok, $"{kind} のファイル名があるべき場所で行が終わっています。。");
                     } else {
-                        CppContext.Error(tok, $"{kind} で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
+                        Error(tok, $"{kind} で指定されている {Token.TokenToStr(tok)} はファイル名ではありません。");
                     }
                     SkipToNextLine(null);
                     return nl;
@@ -2190,49 +2408,51 @@ namespace CSCPP {
                     // 残りのフラグなどは纏めて行末まで読み飛ばす
                     SkipToNextLine(null);
 
-                    /* 現在のファイルの位置情報を変更 */
+                    // 現在のファイルの位置情報を変更 
                     File.OverwriteCurrentPosition((int)line, filename);
 
                     return nl;
                 }
             }
-
         }
 
         /// <summary>
-        /// #line linenum filename 形式
+        /// 一般的なline指令(#line linenum filename 形式)の処理
         /// </summary>
         static Token ParseLineDirective(Token hash, Token tline) {
-            Token tok = read_expand(limit_space: true);
+            Token tok = ReadExpand(limit_space: true);
             return DoParseLineDirective(hash, tok, "line指令");
         }
 
         /// <summary>
-        /// GCCスタイル
-        /// # linenum filename flags
+        /// gcc形式のline指令(# linenum filename flags 形式)の処理
         /// </summary>
         /// <param name="tok"></param>
         static Token ParseGccStyleLineDirective(Token hash, Token tok) {
             return DoParseLineDirective(hash, tok, "gcc形式のline指令");
         }
 
-        /*
-         * 未知の指令の処理
-         */
+        #endregion
 
+        /// <summary>
+        /// 未知の指令の処理
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <param name="tok"></param>
+        /// <returns></returns>
         static Token UnsupportedPreprocessorDirective(Token hash, Token tok) {
-            if (CppContext.Features.Contains(Feature.UnknownDirectives)) {
-                if (CppContext.Warnings.Contains(Warning.UnknownDirectives)) {
-                    CppContext.Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
+            if (Features.Contains(FeatureOption.UnknownDirectives)) {
+                if (Warnings.Contains(WarningOption.UnknownDirectives)) {
+                    Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
                 }
                 // 行末まで読み取って、マクロ展開禁止フラグを付けて押し戻す。
                 List<Token> buf = new List<Token> { tok };
                 SkipToNextLine(null, buf);
                 buf.ForEach(x => x.Verbatim = true);
-                unget_all(buf);
+                UngetAll(buf);
                 return hash;
             } else {
-                CppContext.Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
+                Warning(tok, $"{Token.TokenToStr(tok)} は未知のプリプロセッサ指令です。");
                 SkipToNextLine(null);
                 return new Token(hash, Token.TokenKind.NewLine);
             }
@@ -2268,7 +2488,7 @@ namespace CSCPP {
                             case "elif": return read_elif(hash, tok);
                             case "else": return read_else(hash, tok);
                             case "endif": return read_endif(hash, tok);
-                            case "error": return read_error(hash, tok);
+                            case "error": return ParseErrorDirective(hash, tok);
                             case "if": return read_if(hash, tok);
                             case "ifdef": return read_ifdef(hash, tok);
                             case "ifndef": return read_ifndef(hash, tok);
@@ -2276,7 +2496,7 @@ namespace CSCPP {
                             case "line": return ParseLineDirective(hash, tok);
                             case "pragma": return ParsePragmaDirective(hash, tok);
                             case "undef": return read_undef(hash, tok);
-                            case "warning": return read_warning(hash, tok); // 非標準動作
+                            case "warning": return ParseWarningDirective(hash, tok); // 非標準動作
                         }
                         goto default;    // 未知のプリプロセッサとして処理
                     }
@@ -2287,64 +2507,71 @@ namespace CSCPP {
             }
         }
 
-        /*
-         * Special macros
-         */
-
+        /// <summary>
+        /// 組み込みマクロ
+        /// </summary>
         public static class SpecialMacros {
 
-            private static List<Token> handle_stdc_macro(Macro.BuildinMacro m, Token tmpl) {
+            private static List<Token> HandleStdcMacro(Macro.BuildinMacro m, Token tmpl) {
                 return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = "1" } }.ToList();
             }
-            private static List<Token> handle_date_macro(Macro.BuildinMacro m, Token tmpl) {
+
+            private static List<Token> HandleDateMacro(Macro.BuildinMacro m, Token tmpl) {
                 return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = DateString } }.ToList();
             }
 
-            private static List<Token> handle_time_macro(Macro.BuildinMacro m, Token tmpl) {
+            private static List<Token> HandleTimeMacro(Macro.BuildinMacro m, Token tmpl) {
                 return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = TimeString } }.ToList();
             }
 
-            private static List<Token> handle_file_macro(Macro.BuildinMacro m, Token tmpl) {
-                return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = tmpl.File.Name.Replace(@"\",@"\\") } }.ToList();
+            private static List<Token> HandleFileMacro(Macro.BuildinMacro m, Token tmpl) {
+                return new[] { new Token(tmpl, Token.TokenKind.String) { StrVal = tmpl.File.Name.Replace(@"\", @"\\") } }.ToList();
             }
 
-            private static List<Token> handle_line_macro(Macro.BuildinMacro m, Token tmpl) {
+            private static List<Token> HandleLineMacro(Macro.BuildinMacro m, Token tmpl) {
                 return new[] { new Token(tmpl, Token.TokenKind.Number) { StrVal = $"{tmpl.File.Line}" } }.ToList();
             }
 
-
             public static void Install() {
-                define_special_macro("__STDC__", handle_stdc_macro);
-                define_special_macro("__DATE__", handle_date_macro);
-                define_special_macro("__TIME__", handle_time_macro);
-                define_special_macro("__FILE__", handle_file_macro);
-                define_special_macro("__LINE__", handle_line_macro);
+                DefineSpecialMacro("__STDC__", HandleStdcMacro);
+                DefineSpecialMacro("__DATE__", HandleDateMacro);
+                DefineSpecialMacro("__TIME__", HandleTimeMacro);
+                DefineSpecialMacro("__FILE__", HandleFileMacro);
+                DefineSpecialMacro("__LINE__", HandleLineMacro);
             }
         }
 
-
-        /*
-         * Initializer
-         */
-
-        public static void add_include_path(string path) {
-            StdIncludePath.Add(path);
+        /// <summary>
+        /// システムインクルードパスを追加する
+        /// </summary>
+        /// <param name="path"></param>
+        public static void AddSystemIncludePath(string path) {
+            SystemIncludePaths.Add(path);
         }
 
-        public static void add_user_include_path(string path) {
-            UserIncludePath.Add(path);
+        /// <summary>
+        /// インクルードパスを追加する
+        /// </summary>
+        /// <param name="path"></param>
+        public static void AddUserIncludePath(string path) {
+            UserIncludePaths.Add(path);
         }
 
-        public static void define_special_macro(string name, Macro.BuildinMacro.BuiltinMacroHandler fn) {
+        /// <summary>
+        /// 組み込みマクロの定義
+        /// </summary>
+        /// <param name="name">マクロ名</param>
+        /// <param name="fn">マクロを処理するハンドラ</param>
+        public static void DefineSpecialMacro(string name, Macro.BuildinMacro.BuiltinMacroHandler fn) {
             if (name.Length > 63) {
-                CppContext.Warning($"組込みマクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
+                Warning($"組込みマクロ名 `{name}` は63文字を超えており、ISO/IEC 9899 5.2.4.1 翻訳限界 の制約に抵触しています。");
             }
             Macros[name] = new Macro.BuildinMacro(name, fn);
             DefinedMacros.Add(Macros[name]);
             Macros[name].Used = true;
         }
 
-        static void init_keywords() {
+        static void InitKeywords() {
             Keywords["->"] = Token.Keyword.Arrow;
             Keywords["+="] = Token.Keyword.AssignAdd;
             Keywords["&="] = Token.Keyword.AssignAnd;
@@ -2372,7 +2599,7 @@ namespace CSCPP {
         /// <summary>
         /// 事前定義マクロの設定
         /// </summary>
-        static void init_predefined_macros() {
+        static void InitPredefinedMacros() {
             SpecialMacros.Install();
         }
 
@@ -2380,16 +2607,16 @@ namespace CSCPP {
         /// 初期化
         /// </summary>
         public static void Init() {
-            init_keywords();
-            init_predefined_macros();
+            InitKeywords();
+            InitPredefinedMacros();
         }
 
         /// <summary>
-        /// トークンが予約語かどうかチェックし、予約後なら変換する
+        /// トークン tok が識別子の場合は予約語かどうかチェックし、予約語なら予約語トークンに変換する
         /// </summary>
         /// <param name="tok"></param>
         /// <returns></returns>
-        private static Token maybe_convert_keyword(Token tok) {
+        private static Token MaybeConvertKeyword(Token tok) {
             if (tok.Kind != Token.TokenKind.Ident) {
                 return tok;
             }
@@ -2403,6 +2630,10 @@ namespace CSCPP {
             return ret;
         }
 
+        /// <summary>
+        /// 現在のトークンを覗き見る
+        /// </summary>
+        /// <returns></returns>
         private static Token PeekToken() {
             Token r = ReadToken();
             Lex.UngetToken(r);
@@ -2415,7 +2646,7 @@ namespace CSCPP {
         /// <returns></returns>
         public static Token ReadToken() {
             for (; ; ) {
-                var tok = read_expand();
+                var tok = ReadExpand();
 
                 if (tok.BeginOfLine && tok.IsKeyword('#') && tok.Hideset == null) {
                     //プリプロセッサ指令を処理する。出力は空白行になる。
@@ -2424,7 +2655,7 @@ namespace CSCPP {
                 if (tok.Kind < Token.TokenKind.MinCppToken && tok.Verbatim == false) {
                     // 読み取ったものがプリプロセッサキーワードになり得るものかつ、verbatimでないなら
                     // プリプロセス処理を試みる
-                    return maybe_convert_keyword(tok);
+                    return MaybeConvertKeyword(tok);
                 } else {
                     // キーワードになり得ないものならそのまま
                     return tok;
@@ -2432,9 +2663,12 @@ namespace CSCPP {
             }
         }
 
-
+        /// <summary>
+        /// 未使用マクロの列挙
+        /// </summary>
+        /// <returns></returns>
         public static IEnumerable<Macro> EnumUnusedMacro() {
-            return DefinedMacros.Where(x => x.Used == false && !Cpp.RefMacros.Contains(x.GetName()));
+            return DefinedMacros.Where(x => x.Used == false && !RefMacros.Contains(x.GetName()));
         }
     }
 }

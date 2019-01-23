@@ -71,9 +71,9 @@ namespace CSCPP {
         /// <param name="isDummy"></param>
         private void WriteLineDirective(long line, string path, bool isDummy)
         {
-            if (!CppContext.Switchs.Contains("-P"))
+            if (!Cpp.Switchs.Contains("-P"))
             {
-                string pragmaStr = CppContext.Features.Contains(Feature.OutputGccStyleLineDirective) ? "" : "line";
+                string pragmaStr = Cpp.Features.Contains(FeatureOption.OutputGccStyleLineDirective) ? "" : "line";
                 WriteLine($"#{pragmaStr} {line} \"{path.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"", isDummy);
             }
         }
