@@ -1,9 +1,11 @@
 
+// 編集グラフ上のカーソル位置
 interface FarthestPoint {
     y: number;
     x: number;
 }
 
+// 編集コマンドの運類
 const enum DiffType {
     none = 0,
     removed = 1,
@@ -11,135 +13,147 @@ const enum DiffType {
     added = 3
 }
 
+// 編集コマンド
 interface DiffResult<T> {
     type: DiffType;
     value: T;
 }
 
+// 編集グラフの探索経路
 interface Route {
     prev: number;
     type: DiffType;
 }
-class Diff<T> {
-    private A: T[];
-    private B: T[];
-    private M: number;
-    private N: number;
-    private swapped: boolean;
 
-    private offset: number;
-    private delta: number;
-    private fp: FarthestPoint[];
-    private routes: Route[];
+// Diffクラス
+class Diff<T> {
+    private A: T[]; // 入力列A(長いほう)
+    private B: T[]; // 入力列B(短いほう)
+    private M: number;  // Aの要素数
+    private N: number;  // Bの要素数
+    private Swapped: boolean;   // 入力列A と 入力列B を入れ替えている場合は真にする 
+
+    private Offset: number; // 配列fp読み書き時の下駄オフセット
+    private Delta: number;  // 入力列の要素数の差の絶対値
+    private fp: FarthestPoint[];   
+    private routes: Route[];    // 探索経路配列
 
     constructor(A: T[], B: T[]) {
-        this.swapped = B.length > A.length;
-        [A, B] = this.swapped ? [B, A] : [A, B];
+        this.Swapped = B.length > A.length;
+        [A, B] = this.Swapped ? [B, A] : [A, B];
         this.A = A;
         this.B = B;
         this.M = A.length;
         this.N = B.length;
 
-        this.offset = this.N + 1;   // fp[-1]にアクセスが発生するので+1の下駄を履かせる
-        this.delta = this.M - this.N;
-        this.fp = new Array<FarthestPoint>(this.M + this.N + 1+ 2); // fp[-1]とfp[M+N+1]にアクセスが発生するので+2の下駄を履かせる
+        this.Offset = this.N + 1;   // -N-1..M+1にアクセスが発生するのでfpの添え字にN+1の下駄を履かせる
+        this.Delta = this.M - this.N;
+        this.fp = new Array<FarthestPoint>(this.M + this.N + 1 + 2); // fp[-N-1]とfp[M+1]にアクセスが発生するのでサイズに+2の下駄を履かせる
         for (let i = 0; i < this.fp.length; i++) { this.fp[i] = { y: -1, x: 0 }; }
 
         this.routes = []; // 最大経路長は M * N + size
     }
-
+    // 編集グラフの終点から始点までを辿って編集コマンド列を作る
     private backTrace(current: FarthestPoint) {
-    const result = [];
-    let a = this.M - 1;
+        const result = [];
+        let a = this.M - 1;
         let b = this.N - 1;
-        let j = this.routes[current.x].prev;
+        let prev = this.routes[current.x].prev;
         let type = this.routes[current.x].type;
-    for (; ;) {
-        switch (type) {
-            case DiffType.none: {
-                return result;
+        const removedCommand = (this.Swapped ? DiffType.removed : DiffType.added);
+        const addedCommand = (this.Swapped ? DiffType.added : DiffType.removed);
+        for (; ;) {
+            switch (type) {
+                case DiffType.none: {
+                    return result;
+                }
+                case DiffType.removed: {
+                    result.unshift({ type: removedCommand, value: this.B[b] });
+                    b -= 1;
+                    break;
+                }
+                case DiffType.added: {
+                    result.unshift({ type: addedCommand, value: this.A[a] });
+                    a -= 1;
+                    break;
+                }
+                case DiffType.common: {
+                    result.unshift({ type: DiffType.common, value: this.A[a] });
+                    a -= 1;
+                    b -= 1;
+                    break;
+                }
             }
-            case DiffType.removed: {
-                result.unshift({ type: (this.swapped ? DiffType.removed : DiffType.added), value: this.B[b] });
-                b -= 1;
-                break;
-            }
-            case DiffType.added: {
-                result.unshift({ type: (this.swapped ? DiffType.added : DiffType.removed), value: this.A[a] });
-                a -= 1;
-                break;
-            }
-            case DiffType.common: {
-                result.unshift({ type: DiffType.common, value: this.A[a] });
-                a -= 1;
-                b -= 1;
-                break;
-            }
+            const p = prev;
+            prev = this.routes[p].prev;
+            type = this.routes[p].type;
         }
-        const prev = j;
-        j = this.routes[prev].prev;
-        type = this.routes[prev].type;
     }
-}
 
+    private createFP(k: number): FarthestPoint {
+        const slide = this.fp[k - 1 + this.Offset];
+        const down = this.fp[k + 1 + this.Offset]
 
-    private createFP(slide: FarthestPoint, down: FarthestPoint, k: number): FarthestPoint {
         if ((slide.y === -1) && (down.y === -1)) {
             // 行き場がない場合はスタート地点へ
             return { y: 0, x: 0 };
-        }
-        
-        if ((down.y === -1) || k === this.M || (slide.y > down.y + 1)) {
+        } else if ((down.y === -1) || k === this.M || (slide.y > down.y + 1)) {
             // 編集操作は追加
             this.routes.push({ prev: slide.x, type: DiffType.added });
-            return { y: slide.y, x: this.routes.length-1 };
+            return { y: slide.y, x: this.routes.length - 1 };
         } else {
             // 編集操作は削除
             this.routes.push({ prev: down.x, type: DiffType.removed });
-            return { y: down.y + 1, x: this.routes.length-1 };
+            return { y: down.y + 1, x: this.routes.length - 1 };
         }
     }
 
-    private snake(k: number, slide: FarthestPoint, down: FarthestPoint): FarthestPoint {
+    private snake(k: number): FarthestPoint {
         if (k < -this.N || this.M < k) {
             return { y: -1, x: 0 };
         }
-        const fp = this.createFP(slide, down, k);
+
+        const fp = this.createFP(k);
 
         // AとBの現在の比較要素が一致している限り、共通要素として読み進める
-        // commonの場合は表を斜めに移動すればいいので、x,yともに+1すればいい
+        // 共通要素の場合は編集グラフを斜めに移動すればいい
         while (fp.y + k < this.M && fp.y < this.N && this.A[fp.y + k] === this.B[fp.y]) {
             this.routes.push({ prev: fp.x, type: DiffType.common });
-            fp.x = this.routes.length-1;
+            fp.x = this.routes.length - 1;
             fp.y += 1;
         }
         return fp;
     }
 
-diff(): DiffResult < T > [] {
+    public diff(): DiffResult<T>[] {
 
-    if (this.M == 0 && this.N == 0) {
-        return [];
-    } else if (this.N == 0) {
-        return this.A.map(a => ({ type: (this.swapped ? DiffType.added : DiffType.removed), value: a }));
-    }
-
-    for (let i = 0; i < this.fp.length; i++) { this.fp[i] = { y: -1, x: 0 }; }
-    this.routes.length = 0;
-    this.routes.push({ prev: 0, type: 0 }); // routes[0]は開始位置
-    
-    for (let p = 0; this.fp[this.delta + this.offset].y < this.N; p++) {
-        for (let k = -p; k < this.delta; ++k) {
-            this.fp[k + this.offset] = this.snake(k, this.fp[k - 1 + this.offset], this.fp[k + 1 + this.offset]);
+        if (this.M == 0 && this.N == 0) {
+            // 空要素列同士の差分は空
+            return [];
+        } else if (this.N == 0) {
+            // 一方が空の場合は追加or削除のみ
+            var cmd = this.Swapped ? DiffType.added : DiffType.removed;
+            return this.A.map(a => ({ type: cmd, value: a }));
         }
-        for (let k = this.delta + p; k > this.delta; --k) {
-            this.fp[k + this.offset] = this.snake(k, this.fp[k - 1 + this.offset], this.fp[k + 1 + this.offset]);
-        }
-        this.fp[this.delta + this.offset] = this.snake(this.delta, this.fp[this.delta - 1 + this.offset], this.fp[this.delta + 1 + this.offset]);
-    }
 
-    return this.backTrace(this.fp[this.delta + this.offset]);
-}
+        for (let i = 0; i < this.fp.length; i++) {
+            this.fp[i] = { y: -1, x: 0 };
+        }
+        this.routes.length = 0;
+        this.routes.push({ prev: 0, type: 0 }); // routes[0]は開始位置
+
+        for (let p = 0; this.fp[this.Delta + this.Offset].y < this.N; p++) {
+            for (let k = -p; k < this.Delta; ++k) {
+                this.fp[k + this.Offset] = this.snake(k);
+            }
+            for (let k = this.Delta + p; k > this.Delta; --k) {
+                this.fp[k + this.Offset] = this.snake(k);
+            }
+            this.fp[this.Delta + this.Offset] = this.snake(this.Delta);
+        }
+
+        return this.backTrace(this.fp[this.Delta + this.Offset]);
+    }
 }
 
 interface Tester<T> {
@@ -168,7 +182,7 @@ function test(msg: string, lambda: (tester: Tester<string>) => void): void {
 }
 
 window.onload = () => {
-    function diff<T>(x:T[], y:T[]) {
+    function diff<T>(x: T[], y: T[]) {
         return new Diff<T>(x, y).diff();
     }
     test('empty', t => {
