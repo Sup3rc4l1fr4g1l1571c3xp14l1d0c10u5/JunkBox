@@ -1,51 +1,176 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.Text;
 
-namespace diff {
+namespace diffcs {
 
     public class Program {
         public static void Main(string[] args) {
-            var a = new string [] { "this", "is", "a", "pen", "." };
+            var a = new string[] { "this", "is", "a", "pen", "." };
             var b = new string[] { "is", "this", "a", "pen", "?" };
 
-            var commands = Diff<string>.diff(a, b);
+            var commands = new Diff<string>(a, b).diff();
             var writer = new Diff<string>.UnifiedFormatWriter();
+            writer.WriteHeader("from", DateTime.Now, "to", DateTime.Now);
             writer.Write(a, b, commands);
             Console.WriteLine(writer.ToString());
 
+            DiffUnitTest();
+
+            var reader = new Patch<string>.UnifiedFormatReader();
+            using(var tr = new System.IO.StreamReader(@"C:\Users\whelp\Desktop\patch.txt")) {
+                reader.Parse(tr);
+            }
+        }
+        private static void SeqEq<T>(T[] x, T[] b) {
+            if (!x.SequenceEqual(b)) {
+                throw new Exception();
+            }
+        }
+        private static void test(string name, Action act) {
+            try {
+                act();
+                Console.WriteLine($"{name}: success.");
+            } catch (Exception e) {
+                Console.WriteLine($"{name}: failed. {e.ToString()}");
+            }
+        }
+        public static void DiffUnitTest() {
+            test(@"empty", () => {
+                SeqEq(new Diff<string>(new string[] { }, new string[] { }).diff(), new Diff<string>.DiffResult[] { });
+
+            });
+
+            test(@"""a"" vs ""b""", () => {
+                SeqEq(new Diff<string>(new[] { "a" }, new[] { "b" }).diff(), new[] { new Diff<string>.DiffResult(type: Diff<string>.DiffType.removed, value: "a"), new Diff<string>.DiffResult(type: Diff<string>.DiffType.added, value: "b") });
+            });
+
+            test(@"""a"" vs ""a""", () => {
+                SeqEq(
+                    new Diff<string>(new[] { "a" }, new[] { "a" }).diff(),
+                    new[] { new Diff<string>.DiffResult(type: Diff<string>.DiffType.common, value: "a") }
+                );
+            });
+
+            test(@"""a"" vs """"", () => {
+                SeqEq(
+                    new Diff<string>(new[] { "a" }, new string[] { }).diff(),
+                    new[] { new Diff<string>.DiffResult(type: Diff<string>.DiffType.removed, value: "a") }
+                );
+            });
+
+            test(@""""" vs ""a""", () => {
+                SeqEq(
+                    new Diff<string>(new string[] { }, new[] { "a" }).diff(),
+                    new[] { new Diff<string>.DiffResult(type: Diff<string>.DiffType.added, value: "a") }
+                );
+            });
+
+            test(@"""a"" vs ""a, b""", () => {
+                SeqEq(
+                    new Diff<string>(new[] { "a" }, new[] { "a", "b" }).diff(),
+                    new[] {
+                        new Diff<string>.DiffResult(type: Diff<string>.DiffType.common, value: "a"),
+                        new Diff<string>.DiffResult(type: Diff<string>.DiffType.added, value: "b")
+                    }
+                );
+            });
+
+
+            test(@"""strength"" vs ""string""", () => {
+                SeqEq(
+                    new Diff<char>(@"strength".ToCharArray(), @"string".ToCharArray()).diff(),
+                    new[] {
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.common, value: 's' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.common, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.common, value: 'r' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'e' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'i' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.common, value: 'n' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.common, value: 'g' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'h' ),
+                    }
+                );
+            });
+
+            test(@"""strength"" vs """"", () => {
+                SeqEq(
+                    new Diff<char>(@"strength".ToCharArray(), @"".ToCharArray()).diff(),
+                    new[] {
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 's' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'r' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'e' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'n' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'g' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.removed, value: 'h' ),
+                    }
+                );
+            });
+
+            test(@""""" vs ""strength""", () => {
+                SeqEq(new Diff<char>(@"".ToCharArray(), @"strength".ToCharArray()).diff(),
+                    new[] {
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 's' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'r' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'e' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'n' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'g' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 't' ),
+                        new Diff<char>.DiffResult( type: Diff<char>.DiffType.added, value: 'h' ),
+                    }
+                );
+            });
+
+
+            test(@"""abc"", ""c"" vs ""abc"", ""bcd"", ""c""", () => {
+                SeqEq(new Diff<string>(new[] { "abc", "c" }, new[] { "abc", "bcd", "c" }).diff(),
+                    new[] {
+                    new Diff<string>.DiffResult( type: Diff<string>.DiffType.common, value: "abc" ),
+                    new Diff<string>.DiffResult( type: Diff<string>.DiffType.added, value: "bcd" ),
+                    new Diff<string>.DiffResult( type: Diff<string>.DiffType.common, value: "c" ),
+                    }
+                );
+            });
         }
     }
 
+    /// <summary>
+    /// Diffã‚¯ãƒ©ã‚¹
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public class Diff<T> {
         /// <summary>
-        /// EditCommand ‚©‚ç Unified FormatŒ`® ‚Ì·•ªî•ñ ‚ğ¶¬‚·‚é Writer 
+        /// EditCommand ã‹ã‚‰ Unified Formatå½¢å¼ ã®å·®åˆ†æƒ…å ± ã‚’ç”Ÿæˆã™ã‚‹ Writer 
         /// </summary>
         public class UnifiedFormatWriter {
             /// <summary>
-            /// ‘OŒã‚É•t—^‚·‚éƒRƒ“ƒeƒLƒXƒgƒTƒCƒY
+            /// å‰å¾Œã«ä»˜ä¸ã™ã‚‹ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆã‚µã‚¤ã‚º
             /// </summary>
             private int ContextSize { get; }
 
             /// <summary>
-            /// Unified FormatŒ`® ‚Ì·•ªî•ñ‚Ì¶¬ƒoƒbƒtƒ@
+            /// Unified Formatå½¢å¼ ã®å·®åˆ†æƒ…å ±ã®ç”Ÿæˆãƒãƒƒãƒ•ã‚¡
             /// </summary>
             private StringBuilder Builder { get; }
 
             /// <summary>
-            /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+            /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
             /// </summary>
-            /// <param name="contextSize">‘OŒã‚É•t—^‚·‚éƒRƒ“ƒeƒLƒXƒgƒTƒCƒY</param>
+            /// <param name="contextSize">å‰å¾Œã«ä»˜ä¸ã™ã‚‹ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆã‚µã‚¤ã‚º</param>
             public UnifiedFormatWriter(int contextSize = 3) {
                 ContextSize = contextSize;
                 Builder = new StringBuilder();
             }
 
             /// <summary>
-            /// ƒ`ƒƒƒ“ƒN”ÍˆÍ
+            /// ãƒãƒ£ãƒ³ã‚¯ç¯„å›²
             /// </summary>
             class ChunkRegion {
                 public int PrefixContextSize { get; }
@@ -66,16 +191,16 @@ namespace diff {
             }
 
             /// <summary>
-            /// ƒ`ƒƒƒ“ƒN”ÍˆÍ‚ğ¶¬
+            /// ãƒãƒ£ãƒ³ã‚¯ç¯„å›²ã‚’ç”Ÿæˆ
             /// </summary>
-            /// <param name="source">•ÏX‘Oƒf[ƒ^—ñ</param>
-            /// <param name="dest">•ÏXŒãƒf[ƒ^—ñ</param>
-            /// <param name="sourceStartIndex">•ÏX‘O”ÍˆÍ‚ÌŠJnˆÊ’u</param>
-            /// <param name="sourceLength">•ÏX‘O”ÍˆÍ‚Ì’·‚³</param>
-            /// <param name="destStartIndex">•ÏXŒã”ÍˆÍ‚ÌŠJnˆÊ’u</param>
-            /// <param name="destLength">•ÏXŒã”ÍˆÍ‚Ì’·‚³</param>
-            /// <param name="contextSize">‘OŒã‚É•t—^‚·‚éƒRƒ“ƒeƒLƒXƒgƒTƒCƒY</param>
-            /// <returns>ƒ`ƒƒƒ“ƒN”ÍˆÍ</returns>
+            /// <param name="source">å¤‰æ›´å‰ãƒ‡ãƒ¼ã‚¿åˆ—</param>
+            /// <param name="dest">å¤‰æ›´å¾Œãƒ‡ãƒ¼ã‚¿åˆ—</param>
+            /// <param name="sourceStartIndex">å¤‰æ›´å‰ç¯„å›²ã®é–‹å§‹ä½ç½®</param>
+            /// <param name="sourceLength">å¤‰æ›´å‰ç¯„å›²ã®é•·ã•</param>
+            /// <param name="destStartIndex">å¤‰æ›´å¾Œç¯„å›²ã®é–‹å§‹ä½ç½®</param>
+            /// <param name="destLength">å¤‰æ›´å¾Œç¯„å›²ã®é•·ã•</param>
+            /// <param name="contextSize">å‰å¾Œã«ä»˜ä¸ã™ã‚‹ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆã‚µã‚¤ã‚º</param>
+            /// <returns>ãƒãƒ£ãƒ³ã‚¯ç¯„å›²</returns>
             private static ChunkRegion CreateChunkRegion(T[] source, T[] dest, int sourceStartIndex, int sourceLength, int destStartIndex, int destLength, int contextSize) {
                 int prefixContextSize = 0;
                 for (var i = 1; i <= contextSize; i++) {
@@ -99,26 +224,26 @@ namespace diff {
             }
 
             /// <summary>
-            /// •ÒWƒRƒ}ƒ“ƒh—ñ‚ğæ“ª‚©‚ç‰ğß‚µ‚Äƒ`ƒƒƒ“ƒN”ÍˆÍ—ñ‚ğ¶¬‚µ‚È‚ª‚ç—ñ‹“
+            /// ç·¨é›†ã‚³ãƒãƒ³ãƒ‰åˆ—ã‚’å…ˆé ­ã‹ã‚‰è§£é‡ˆã—ã¦ãƒãƒ£ãƒ³ã‚¯ç¯„å›²åˆ—ã‚’ç”Ÿæˆã—ãªãŒã‚‰åˆ—æŒ™
             /// </summary>
-            /// <param name="editCommands">•ÒWƒRƒ}ƒ“ƒh—ñ</param>
-            /// <returns>ƒ`ƒƒƒ“ƒN”ÍˆÍ—ñ</returns>
-            private static IEnumerable<ChunkRegion> GetChunkRegion(T[] source, T[] dest, List<EditCommand> editCommands, int contextSize) {
+            /// <param name="editCommands">ç·¨é›†ã‚³ãƒãƒ³ãƒ‰åˆ—</param>
+            /// <returns>ãƒãƒ£ãƒ³ã‚¯ç¯„å›²åˆ—</returns>
+            private static IEnumerable<ChunkRegion> GetChunkRegion(T[] source, T[] dest, DiffResult[] editCommands, int contextSize) {
                 int sourceStartIndex = 0;
                 int destStartIndex = 0;
                 int sourceLength = 0;
                 int destLength = 0;
                 foreach (var editCommand in editCommands) {
-                    switch (editCommand.Type) {
-                        case EditCommand.CommandType.Insert: {
+                    switch (editCommand.type) {
+                        case DiffType.added: {
                                 destLength++;
                                 break;
                             }
-                        case EditCommand.CommandType.Delete: {
+                        case DiffType.removed: {
                                 sourceLength++;
                                 break;
                             }
-                        case EditCommand.CommandType.Copy: {
+                        case DiffType.common: {
                                 if (sourceStartIndex != sourceLength || destStartIndex != destLength) {
                                     yield return CreateChunkRegion(source, dest, sourceStartIndex, sourceLength, destStartIndex, destLength, contextSize);
                                 }
@@ -126,7 +251,6 @@ namespace diff {
                                 sourceStartIndex = ++sourceLength;
                                 break;
                             }
-
                     }
                 }
                 if (sourceStartIndex != sourceLength || destStartIndex != destLength) {
@@ -135,12 +259,12 @@ namespace diff {
             }
 
             /// <summary>
-            /// ·•ªƒf[ƒ^‚Æ•ÒWƒRƒ}ƒ“ƒh‚ğŒ³‚ÉUnified FormatŒ`®‚Å‚Ì‘‚«‚İ‚ğs‚¤B
+            /// å·®åˆ†ãƒ‡ãƒ¼ã‚¿ã¨ç·¨é›†ã‚³ãƒãƒ³ãƒ‰ã‚’å…ƒã«Unified Formatå½¢å¼ã§ã®æ›¸ãè¾¼ã¿ã‚’è¡Œã†ã€‚
             /// </summary>
             /// <param name="source"></param>
             /// <param name="dest"></param>
             /// <param name="editCommand"></param>
-            public void Write(T[] source, T[] dest, List<EditCommand> editCommand) {
+            public void Write(T[] source, T[] dest, DiffResult[] editCommand) {
                 foreach (var chunkRegion in GetChunkRegion(source, dest, editCommand, ContextSize)) {
                     Builder.AppendLine($"@@ -{chunkRegion.SourceStartIndex - chunkRegion.PrefixContextSize + 1},{chunkRegion.SourceLength + chunkRegion.PrefixContextSize + chunkRegion.PostfixContextSize} +{chunkRegion.DestStartIndex - chunkRegion.PrefixContextSize + 1},{chunkRegion.DestLength + chunkRegion.PrefixContextSize + chunkRegion.PostfixContextSize} @@");
                     for (var i = chunkRegion.SourceStartIndex - chunkRegion.PrefixContextSize; i < chunkRegion.SourceStartIndex; i++) {
@@ -159,182 +283,358 @@ namespace diff {
             }
 
             /// <summary>
-            /// ¶¬‚³‚ê‚½ Unified FormatŒ`® ‚Ì·•ªî•ñ‚ğæ“¾
+            /// ç”Ÿæˆã•ã‚ŒãŸ Unified Formatå½¢å¼ ã®å·®åˆ†æƒ…å ±ã‚’å–å¾—
             /// </summary>
             /// <returns></returns>
             public override string ToString() {
                 return Builder.ToString();
             }
-        }
-
-        /// <summary>
-        /// •ÒWƒRƒ}ƒ“ƒh
-        /// </summary>
-        public class EditCommand {
-            /// <summary>
-            /// •ÒWƒRƒ}ƒ“ƒh‚Ìí•Ê‚ğ¦‚·—ñ‹“Œ^
-            /// </summary>
-            public enum CommandType {
-                /// <summary>
-                /// ‘}“ü
-                /// </summary>
-                Insert,
-
-                /// <summary>
-                /// íœ
-                /// </summary>
-                Delete,
-
-                /// <summary>
-                /// ƒRƒs[
-                /// </summary>
-                Copy
-            }
 
             /// <summary>
-            /// •ÒWƒRƒ}ƒ“ƒh‚Ìí•Ê
+            /// ãƒ˜ãƒƒãƒ€æƒ…å ±ã‚’æ›¸ãè¾¼ã‚€
             /// </summary>
-            public CommandType Type { get; }
-
-            /// <summary>
-            /// •ÒWƒRƒ}ƒ“ƒh‚ÌƒIƒyƒ‰ƒ“ƒh
-            /// </summary>
-            public T Value { get; }
-
-            /// <summary>
-            /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-            /// </summary>
-            /// <param name="type">•ÒWƒRƒ}ƒ“ƒh‚Ìí•Ê</param>
-            /// <param name="value">•ÒWƒRƒ}ƒ“ƒh‚ÌƒIƒyƒ‰ƒ“ƒh</param>
-            public EditCommand(CommandType type, T value) { this.Type = type; this.Value = value; }
-
-            /// <summary>
-            /// •¶š—ñ‰»
-            /// </summary>
-            /// <returns></returns>
-            public override string ToString() {
-                return $"{Type}: {Value.ToString()}";
+            /// <param name="fromFile">å·®åˆ†å…ƒãƒ•ã‚¡ã‚¤ãƒ«å</param>
+            /// <param name="fromFileModificationTime">å·®åˆ†å…ƒã‚¿ã‚¤ãƒ ã‚¹ã‚¿ãƒ³ãƒ—</param>
+            /// <param name="toFile">å·®åˆ†å…ˆãƒ•ã‚¡ã‚¤ãƒ«å</param>
+            /// <param name="toFileModificationTime">å·®åˆ†å…ˆã‚¿ã‚¤ãƒ ã‚¹ã‚¿ãƒ³ãƒ—</param>
+            public void WriteHeader(
+                string fromFile, 
+                DateTime fromFileModificationTime,
+                string toFile,
+                DateTime toFileModificationTime
+            ) {
+                Builder.AppendLine($"--- {fromFile} {fromFileModificationTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff zz00")}");
+                Builder.AppendLine($"+++ {toFile} {toFileModificationTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff zz00")}");
             }
         }
 
         /// <summary>
-        /// •ÒWƒOƒ‰ƒt‚Ì’TõŒo˜H‚ğ\¬‚·‚é’n“_î•ñ
+        /// ç·¨é›†ã‚°ãƒ©ãƒ•ä¸Šã®ä½ç½®
         /// </summary>
-        public class Path {
-            /// <summary>
-            /// ‚Ğ‚Æ‚Â‘O‚Ì’n“_‚ğ¦‚·ƒpƒXƒoƒbƒtƒ@‚ÌˆÊ’u
-            /// </summary>
-            public int pre { get; }
-
-            /// <summary>
-            /// ƒOƒ‰ƒtã‚ÌXˆÊ’u
-            /// </summary>
+        private class FarthestPoint {
             public int x { get; }
-
-            /// <summary>
-            /// ƒOƒ‰ƒtã‚ÌYˆÊ’u
-            /// </summary>
             public int y { get; }
 
-            /// <summary>
-            /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-            /// </summary>
-            /// <param name="pre"></param>
-            /// <param name="x"></param>
-            /// <param name="y"></param>
-            public Path(int pre, int x, int y) { this.pre = pre; this.x = x; this.y = y; }
-        }
+            public FarthestPoint(int x, int y) {
+                this.x = x;
+                this.y = y;
+            }
 
-        /// <summary>
-        /// “ñ‚Â‚Ìƒf[ƒ^—ñ‚Ì•ÒWƒRƒ}ƒ“ƒh‚ğZo‚·‚é
-        /// </summary>
-        /// <param name="source">•ÏX‘Oƒf[ƒ^</param>
-        /// <param name="dest">•ÏXŒãƒf[ƒ^</param>
-        /// <returns></returns>
-        public static List<EditCommand> diff(T[] source, T[] dest) {
-            if (source.Length <= dest.Length) {
-                return Diff<T>.diff_onp(source, dest, EditCommand.CommandType.Delete, EditCommand.CommandType.Insert);
-            } else {
-                return Diff<T>.diff_onp(dest, source, EditCommand.CommandType.Insert, EditCommand.CommandType.Delete);
+            public override int GetHashCode() {
+                return (x ^ y);
+            }
+
+            public override bool Equals(object other) {
+                if (Object.ReferenceEquals(other, this)) { return true; }
+                if (other == null) { return false; }
+                if (!(other is FarthestPoint)) { return false; }
+                var that = (FarthestPoint)other;
+                return this.x == that.x && this.y == that.y;
+            }
+
+            public override string ToString() {
+                return $"{{x:x{x}, y:{y}}}";
             }
         }
 
         /// <summary>
-        /// •ÒWƒOƒ‰ƒt‚ğÎ‚ß‚ÉˆÚ“®‚Å‚«‚éisource,dest‹¤‚É“¯‚¶ƒf[ƒ^‚Å‚ ‚éjŒÀ‚èƒOƒ‰ƒt‚ğÎ‚ß‚ÉˆÚ“®‚·‚é
+        /// ç·¨é›†ã‚³ãƒãƒ³ãƒ‰ã®é‹é¡
         /// </summary>
-        /// <param name="fp"></param>
-        /// <param name="lst"></param>
-        /// <param name="path"></param>
-        /// <param name="k"></param>
-        /// <param name="source"></param>
-        /// <param name="dest"></param>
-        /// <param name="m"></param>
-        /// <param name="n"></param>
-        private static void snake(Dictionary<int, int> fp, Dictionary<int, int> lst, List<Path> path, int k, T[] source, T[] dest, int m, int n) {
-            var y = fp[k - 1] + 1;
-            int pre;
-            if (y > fp[k + 1]) {
-                pre = lst[k - 1];
-            } else {
-                y = fp[k + 1];
-                pre = lst[k + 1];
-            }
-            var x = y - k;
-            while (x < m && y < n && Object.Equals(source[x], dest[y])) {
-                x++;
-                y++;
-            }
-            fp[k] = y;
-            lst[k] = path.Count;
-            path.Add(new Path(pre, x, y));
+        public enum DiffType {
+            none = 0,
+            removed = 1,
+            common = 2,
+            added = 3
         }
 
-        private static List<EditCommand> diff_onp(T[] source, T[] dest, EditCommand.CommandType del, EditCommand.CommandType ins) {
-            var m = source.Length;
-            var n = dest.Length;
-            var delta = n - m;
-            var fp = new Dictionary<int,int>();
-            var lst = new Dictionary<int, int>();
-            var path = new List<Path>();
-            var result = new List<EditCommand>();
-            for (var i = -m - 1; i <= n + 1; i++) { fp[i] = -1; lst[i] = -1; }
-            for (var p = 0; p <= m; p++) {
-                for (var k = -p; k < delta; k++) {
-                    snake(fp, lst, path, k, source, dest, m, n);
+        /// <summary>
+        /// ç·¨é›†ã‚³ãƒãƒ³ãƒ‰
+        /// </summary>
+        public class DiffResult {
+            public DiffType type { get; }
+            public T value { get; }
+            public DiffResult(DiffType type, T value) {
+                this.type = type;
+                this.value = value;
+            }
+            public override int GetHashCode() {
+                return (int)type;
+            }
+            public override bool Equals(object other) {
+                if (Object.ReferenceEquals(other, this)) { return true; }
+                if (other == null) { return false; }
+                if (!(other is DiffResult)) { return false; }
+                var that = (DiffResult)other;
+                return this.type == that.type && Object.Equals(this.value, that.value);
+            }
+            public override string ToString() {
+                return $"{{type: {type}, value:{value.ToString()}}}";
+            }
+        }
+
+        /// <summary>
+        /// ç·¨é›†ã‚°ãƒ©ãƒ•ã®æ¢ç´¢çµŒè·¯
+        /// </summary>
+        private class Route {
+            public int prev { get; }
+            public DiffType type { get; }
+            public Route(int prev, DiffType type) {
+                this.prev = prev;
+                this.type = type;
+            }
+            public override int GetHashCode() {
+                return (int)type;
+            }
+            public override bool Equals(object other) {
+                if (Object.ReferenceEquals(other, this)) { return true; }
+                if (other == null) { return false; }
+                if (!(other is Route)) { return false; }
+                var that = (Route)other;
+                return this.prev == that.prev && this.type == that.type;
+            }
+            public override string ToString() {
+                return $"{{type: {type}, prev: {prev}}}";
+            }
+        }
+
+        private T[] A { get; } // å…¥åŠ›åˆ—A(é•·ã„ã»ã†)
+        private T[] B { get; } // å…¥åŠ›åˆ—B(çŸ­ã„ã»ã†)
+        private int M { get; }  // Aã®è¦ç´ æ•°
+        private int N { get; }  // Bã®è¦ç´ æ•°
+        private bool Swapped { get; }   // å…¥åŠ›åˆ—A ã¨ å…¥åŠ›åˆ—B ã‚’å…¥ã‚Œæ›¿ãˆã¦ã„ã‚‹å ´åˆã¯çœŸã«ã™ã‚‹ 
+
+        private int Offset { get; } // é…åˆ—fpèª­ã¿æ›¸ãæ™‚ã®ä¸‹é§„ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+        private int Delta { get; }  // å…¥åŠ›åˆ—ã®è¦ç´ æ•°ã®å·®ã®çµ¶å¯¾å€¤
+        private FarthestPoint[] fp { get; }
+        private List<Route> routes { get; }    // æ¢ç´¢çµŒè·¯é…åˆ—
+
+        public Diff(T[] A, T[] B) {
+            this.Swapped = B.Length > A.Length;
+            if (this.Swapped) {
+                this.A = B;
+                this.B = A;
+            } else {
+                this.A = A;
+                this.B = B;
+            }
+            this.M = this.A.Length;
+            this.N = this.B.Length;
+
+            this.Offset = this.N + 1;   // -N-1..M+1ã«ã‚¢ã‚¯ã‚»ã‚¹ãŒç™ºç”Ÿã™ã‚‹ã®ã§fpã®æ·»ãˆå­—ã«N+1ã®ä¸‹é§„ã‚’å±¥ã‹ã›ã‚‹
+            this.Delta = this.M - this.N;
+            this.fp = new FarthestPoint[this.M + this.N + 1 + 2]; // fp[-N-1]ã¨fp[M+1]ã«ã‚¢ã‚¯ã‚»ã‚¹ãŒç™ºç”Ÿã™ã‚‹ã®ã§ã‚µã‚¤ã‚ºã«+2ã®ä¸‹é§„ã‚’å±¥ã‹ã›ã‚‹
+            for (var i = 0; i < this.fp.Length; i++) {
+                this.fp[i] = new FarthestPoint(y: -1, x: 0);
+            }
+
+            this.routes = new List<Route>();// æœ€å¤§çµŒè·¯é•·ã¯ M * N + size
+        }
+        // ç·¨é›†ã‚°ãƒ©ãƒ•ã®çµ‚ç‚¹ã‹ã‚‰å§‹ç‚¹ã¾ã§ã‚’è¾¿ã£ã¦ç·¨é›†ã‚³ãƒãƒ³ãƒ‰åˆ—ã‚’ä½œã‚‹
+        private DiffResult[] backTrace(FarthestPoint current) {
+            var result = new List<DiffResult>();
+            var a = this.M - 1;
+            var b = this.N - 1;
+            var prev = this.routes[current.x].prev;
+            var type = this.routes[current.x].type;
+            var removedCommand = (this.Swapped ? DiffType.removed : DiffType.added);
+            var addedCommand = (this.Swapped ? DiffType.added : DiffType.removed);
+            for (; ; ) {
+                switch (type) {
+                    case DiffType.none: {
+                            return result.Reverse<DiffResult>().ToArray();
+                        }
+                    case DiffType.removed: {
+                            result.Add(new DiffResult(type: removedCommand, value: this.B[b]));
+                            b -= 1;
+                            break;
+                        }
+                    case DiffType.added: {
+                            result.Add(new DiffResult(type: addedCommand, value: this.A[a]));
+                            a -= 1;
+                            break;
+                        }
+                    case DiffType.common: {
+                            result.Add(new DiffResult(type: DiffType.common, value: this.A[a]));
+                            a -= 1;
+                            b -= 1;
+                            break;
+                        }
                 }
-                for (var k = delta + p; k > delta; k--) {
-                    snake(fp, lst, path, k, source, dest, m, n);
+                var p = prev;
+                prev = this.routes[p].prev;
+
+                type = this.routes[p].type;
+            }
+        }
+
+        private FarthestPoint createFP(int k) {
+            var slide = this.fp[k - 1 + this.Offset];
+            var down = this.fp[k + 1 + this.Offset];
+
+            if ((slide.y == -1) && (down.y == -1)) {
+                // è¡Œãå ´ãŒãªã„å ´åˆã¯ã‚¹ã‚¿ãƒ¼ãƒˆåœ°ç‚¹ã¸
+                return new FarthestPoint(y: 0, x: 0);
+            } else if ((down.y == -1) || k == this.M || (slide.y > down.y + 1)) {
+                // ç·¨é›†æ“ä½œã¯è¿½åŠ 
+                this.routes.Add(new Route(prev: slide.x, type: DiffType.added));
+                return new FarthestPoint(y: slide.y, x: this.routes.Count - 1);
+            } else {
+                // ç·¨é›†æ“ä½œã¯å‰Šé™¤
+                this.routes.Add(new Route(prev: down.x, type: DiffType.removed));
+                return new FarthestPoint(y: down.y + 1, x: this.routes.Count - 1);
+            }
+        }
+
+        private FarthestPoint snake(int k) {
+            if (k < -this.N || this.M < k) {
+                return new FarthestPoint(y: -1, x: 0);
+            }
+
+            var fp = this.createFP(k);
+
+            // Aã¨Bã®ç¾åœ¨ã®æ¯”è¼ƒè¦ç´ ãŒä¸€è‡´ã—ã¦ã„ã‚‹é™ã‚Šã€å…±é€šè¦ç´ ã¨ã—ã¦èª­ã¿é€²ã‚ã‚‹
+            // å…±é€šè¦ç´ ã®å ´åˆã¯ç·¨é›†ã‚°ãƒ©ãƒ•ã‚’æ–œã‚ã«ç§»å‹•ã™ã‚Œã°ã„ã„
+            while (fp.y + k < this.M && fp.y < this.N && Object.Equals(this.A[fp.y + k], this.B[fp.y])) {
+                this.routes.Add(new Route(prev: fp.x, type: DiffType.common));
+                fp = new FarthestPoint(x: this.routes.Count - 1, y: fp.y + 1);
+            }
+            return fp;
+        }
+
+        public DiffResult[] diff() {
+
+            if (this.M == 0 && this.N == 0) {
+                // ç©ºè¦ç´ åˆ—åŒå£«ã®å·®åˆ†ã¯ç©º
+                return new DiffResult[0];
+            } else if (this.N == 0) {
+                // ä¸€æ–¹ãŒç©ºã®å ´åˆã¯è¿½åŠ orå‰Šé™¤ã®ã¿
+                var cmd = this.Swapped ? DiffType.added : DiffType.removed;
+                return this.A.Select(a => new DiffResult(type: cmd, value: a)).ToArray();
+            }
+
+            for (var i = 0; i < this.fp.Length; i++) {
+                this.fp[i] = new FarthestPoint(y: -1, x: 0);
+            }
+            this.routes.Clear();
+            this.routes.Add(new Route(prev: 0, type: 0)); // routes[0]ã¯é–‹å§‹ä½ç½®
+
+            for (var p = 0; this.fp[this.Delta + this.Offset].y < this.N; p++) {
+                for (var k = -p; k < this.Delta; ++k) {
+                    this.fp[k + this.Offset] = this.snake(k);
                 }
-                snake(fp, lst, path, delta, source, dest, m, n);
-                if (fp[delta] >= n) {
-                    var pt = lst[delta];
-                    var list = new List<Path>();
-                    while (pt >= 0) {
-                        list.Add(path[pt]);
-                        pt = path[pt].pre;
-                    }
-                    var x0 = 0;
-                    var y0 = 0;
-                    for (var i = list.Count - 1; i >= 0; i--) {
-                        var x1 = list[i].x;
-                        var y1 = list[i].y;
-                        while (x0 < x1 || y0 < y1) {
-                            if (y1 - x1 > y0 - x0) {
-                                result.Add(new EditCommand(ins, dest[y0++]));
-                            } else if (y1 - x1 < y0 - x0) {
-                                result.Add(new EditCommand(del, source[x0++]));
-                            } else {
-                                result.Add(new EditCommand(EditCommand.CommandType.Copy, source[x0++]));
-                                y0++;
+                for (var k = this.Delta + p; k > this.Delta; --k) {
+                    this.fp[k + this.Offset] = this.snake(k);
+                }
+                this.fp[this.Delta + this.Offset] = this.snake(this.Delta);
+            }
+
+            return this.backTrace(this.fp[this.Delta + this.Offset]);
+        }
+
+    }
+
+    /// <summary>
+    /// Patchã‚¯ãƒ©ã‚¹
+    /// </summary>
+    public class Patch<T> {
+        public class UnifiedFormatReader {
+
+            private Regex regexFromFileCommand = new Regex(@"^--- (?<file>[^\t]+)\t(?<modification_time>.+)$");
+            private Regex regexToFileCommand = new Regex(@"^\+\+\+ (?<file>[^\t]+)\t(?<modification_time>.+)$");
+            private Regex regexHunk = new Regex(@"^@@ -(?<from_file_line_start>\d+),(?<from_file_line_count>\d+) \+(?<to_file_line_start>\d+),(?<to_file_line_count>\d+) @@$");
+            private Regex regexModificationTime = new Regex(@"^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2}) (?<hour>\d{2}):(?<min>\d{2}):(?<sec>\d{2})(?<msec>\.\d+)?( (?<tz>[\+\-]?\d{2}00))?$");
+
+            private DateTime ParseModificationTime(string s) {
+                var match = regexModificationTime.Match(s);
+                if (!match.Success) {throw new Exception(); }
+                var year = int.Parse(match.Groups["year"].Value);
+                var month = int.Parse(match.Groups["month"].Value);
+                var day = int.Parse(match.Groups["day"].Value);
+                var hour = int.Parse(match.Groups["hour"].Value);
+                var min = int.Parse(match.Groups["min"].Value);
+                var sec = int.Parse(match.Groups["sec"].Value);
+                var msec = (int)(float.Parse(match.Groups["msec"].Value)*1000);
+                var tz = int.Parse(match.Groups["tz"].Value);
+
+                var datetime = new DateTime(
+                    year: year,
+                    month: month,
+                    day: day,
+                    hour: hour - tz / 100,
+                    minute: min - tz % 100,
+                    second: sec,
+                    millisecond: msec,
+                    kind: DateTimeKind.Utc
+                    );
+                return datetime.ToLocalTime();
+            }
+
+            public void Parse(System.IO.TextReader tr) {
+                string currentLine = null;
+                Func<bool> ReadLine = () => (currentLine = tr.ReadLine()) != null;
+
+                for (; ; ) {
+                    if (ReadLine() == false) { break; }
+                    var match1 = regexFromFileCommand.Match(currentLine);
+                    if (!match1.Success) { continue; }
+                    var fromFile = match1.Groups["file"].Value;
+                    var fromModificationTime = match1.Groups["modification_time"].Value;
+
+                    if (ReadLine() == false) { throw new Exception("invalid format"); }
+                    var match2 = regexToFileCommand.Match(currentLine);
+                    if (!match2.Success) { throw new Exception("invalid format"); }
+                    var toFile = match2.Groups["file"].Value;
+                    var toModificationTime = match2.Groups["modification_time"].Value;
+
+                    Console.WriteLine($"fromFile: {fromFile}");
+                    Console.WriteLine($"fromModificationTime: {fromModificationTime}, {ParseModificationTime(fromModificationTime).ToString()}");
+                    Console.WriteLine($"toFile: {toFile}");
+                    Console.WriteLine($"toModificationTime: {toModificationTime}, {ParseModificationTime(toModificationTime).ToString()}");
+
+                    while (ReadLine()) {
+                        var match3 = regexHunk.Match(currentLine);
+                        if (!match3.Success) { continue; }
+
+                        var fromFileLineStart = int.Parse(match3.Groups["from_file_line_start"].Value);
+                        var fromFileLineCount = int.Parse(match3.Groups["from_file_line_count"].Value);
+                        var toFileLineStart = int.Parse(match3.Groups["to_file_line_start"].Value);
+                        var toFileLineCount = int.Parse(match3.Groups["to_file_line_count"].Value);
+                        var fromLines = new List<string>();
+                        var toLines = new List<string>();
+                        while (fromLines.Count < fromFileLineCount && toLines.Count < toFileLineCount) {
+                            if (ReadLine() == false || currentLine.Length == 0) { throw new Exception("invalid format"); }
+                            switch (currentLine[0]) {
+                                case ' ': {
+                                        fromLines.Add(currentLine.Substring(1));
+                                        toLines.Add(currentLine.Substring(1));
+                                        break;
+                                    }
+                                case '-': {
+                                        fromLines.Add(currentLine.Substring(1));
+                                        break;
+                                    }
+                                case '+': {
+                                        toLines.Add(currentLine.Substring(1));
+                                        break;
+                                    }
                             }
                         }
+                        if (fromLines.Count != fromFileLineCount) { throw new Exception("invalid format"); }
+                        if (toLines.Count != toFileLineCount) { throw new Exception("invalid format"); }
+
+                        Console.WriteLine($"fromFileLineStart: {fromFileLineStart}");
+                        Console.WriteLine($"fromFileLineCount: {fromFileLineCount}");
+                        Console.WriteLine($"toFileLineStart: {toFileLineStart}");
+                        Console.WriteLine($"toFileLineCount: {toFileLineCount}");
+                        Console.WriteLine($"fromLines:");
+                        fromLines.ForEach(Console.WriteLine);
+                        Console.WriteLine($"toLines:");
+                        toLines.ForEach(Console.WriteLine);
+
                     }
-                    return result;
                 }
             }
-            throw new Exception();
         }
-
     }
 
 }
