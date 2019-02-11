@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace svm_fobos {
@@ -11,13 +11,45 @@ namespace svm_fobos {
     /// </summary>
     public class TestResult {
         /// <summary>
+        /// テスト実行
+        /// </summary>
+        /// <typeparam name="TFeature"></typeparam>
+        /// <param name="svm"></param>
+        /// <param name="fvs"></param>
+        /// <returns></returns>
+        public static TestResult Test<TFeature>(LinerSVM<TFeature> svm, IEnumerable<Tuple<int, Dictionary<TFeature, double>>> fvs) {
+            var truePositive = 0;
+            var falsePositive = 0;
+            var falseNegative = 0;
+            var trueNegative = 0;
+            foreach (var fv in fvs) {
+                var prediction = fv.Item1 >= 0;
+                var fact = svm.Predict(fv.Item2) >= 0;
+                if (prediction) {
+                    if (fact) {
+                        truePositive++;
+                    } else {
+                        falsePositive++;
+                    }
+                } else {
+                    if (fact) {
+                        falseNegative++;
+                    } else {
+                        trueNegative++;
+                    }
+                }
+            }
+            return new TestResult(truePositive, falsePositive, falseNegative, trueNegative);
+        }
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="truePositive"></param>
         /// <param name="falsePositive"></param>
         /// <param name="falseNegative"></param>
         /// <param name="trueNegative"></param>
-        public TestResult(int truePositive, int falsePositive, int falseNegative, int trueNegative) {
+        private TestResult(int truePositive, int falsePositive, int falseNegative, int trueNegative) {
             this.TruePositive = truePositive;
             this.FalsePositive = falsePositive;
             this.FalseNegative = falseNegative;
@@ -85,4 +117,6 @@ namespace svm_fobos {
         }
 
     }
+
 }
+

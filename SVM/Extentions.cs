@@ -22,6 +22,18 @@ namespace svm_fobos {
         }
 
         /// <summary>
+        /// self に 手続き proc を適用し、selfを返します。
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="self"></param>
+        /// <param name="proc"></param>
+        /// <returns></returns>
+        public static T Tap<T>(this T self, Action<T> proc) {
+            proc(self);
+            return self;
+        }
+
+        /// <summary>
         /// 辞書型から指定したキーを持つ要素を取得し返します。指定したキーを持つ要素が見つからない場合は代用値を返します。
         /// </summary>
         /// <typeparam name="TKey">ディクショナリ内のキーの型</typeparam>
@@ -40,7 +52,7 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// 要素を重複ありで n 要素ずつに区切った列挙子を返します。
+        /// シーケンスを重複ありで n 要素ずつに区切った列挙子を返します。
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="self"></param>
@@ -60,29 +72,42 @@ namespace svm_fobos {
             }
         }
 
-        public static IEnumerable<T[]> Split<T>(this IEnumerable<T> self, Func<T,bool> func) {
+        /// <summary>
+        /// シーケンス中の func が真になる要素を区切り要素と見なして分割した列挙子を返します。
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="self"></param>
+        /// <param name="func"></param>
+        /// <returns></returns>
+        public static IEnumerable<T[]> Split<T>(this IEnumerable<T> self, Func<T, bool> func) {
             var ret = new List<T>();
-            foreach (var item in self) {
-                if (func(item)) {
+            if (self.Any() == false) {
+                yield break;
+            }
+            foreach (var next in self) {
+                if (func(next)) {
                     yield return ret.ToArray();
                     ret.Clear();
-                }  else {
-                    ret.Add(item);
+                } else {
+                    ret.Add(next);
                 }
             }
             yield return ret.ToArray();
         }
 
-        public static T ElementAtOrDefault<T>(this IEnumerable<T> self, int index, T defaultValue) {
-            using (var it = self.GetEnumerator()) {
-                while (index >= 0 && it.MoveNext()) {
-                    if (index == 0) {
-                        return it.Current;
-                    } else {
-                        index--;
-                    }
-                }
+        /// <summary>
+        /// シーケンス内の指定されたインデックス位置にある要素を返します。インデックスが範囲外の場合は defaultValue を返します。
+        /// </summary>
+        /// <typeparam name="TSource">source の要素の型。</typeparam>
+        /// <param name="self">返される要素が含まれる System.Collections.Generic.IList。</param>
+        /// <param name="index">取得する要素の、0 から始まるインデックス。</param>
+        /// <param name="defaultValue">インデックスが範囲外の場合のデフォルト値</param>
+        /// <returns>インデックスがソース シーケンスの範囲外の場合は defaultValue。それ以外の場合は、ソース シーケンスの指定した位置にある要素</returns>
+        public static TSource ElementAtOrDefault<TSource>(this IList<TSource> self, int index, TSource defaultValue) {
+            if (index < 0 || index >= self.Count) {
                 return defaultValue;
+            } else {
+                return self[index];
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -20,28 +21,25 @@ namespace svm_fobos {
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        internal static IEnumerable<string> Run(string file, string input=null) {
+        internal static IEnumerable<string> Run(string arg, string input = null) {
             if (System.IO.File.Exists(ExePath) == false) {
                 throw new System.IO.FileNotFoundException(ExePath);
-            }
-            if (System.IO.File.Exists(file) == false) {
-                throw new System.IO.FileNotFoundException(file);
             }
             using (var process = new Process()) {
                 process.StartInfo.RedirectStandardInput = true;
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.FileName = Mecab.ExePath;
-                process.StartInfo.Arguments = file;
+                process.StartInfo.Arguments = arg;
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.StandardOutputEncoding = Encoding.UTF8;
                 process.StartInfo.StandardErrorEncoding = Encoding.UTF8;
-                process.ErrorDataReceived += (s, e) => { };//Console.Error.WriteLine(e.Data);
+                process.ErrorDataReceived += (s, e) => { };
                 if (process.Start()) {
                     process.BeginErrorReadLine();
                     if (input != null) {
-                        var bytes = Encoding.UTF8.GetBytes(input);
-                        process.StandardInput.BaseStream.Write(bytes, 0, bytes.Length);
+                        var buffer = Encoding.UTF8.GetBytes(input + "\r\n");
+                        process.StandardInput.BaseStream.Write(buffer, 0, buffer.Length);
                     }
                     process.StandardInput.Close();
                     while (process.StandardOutput.BaseStream.CanRead) {
@@ -54,15 +52,13 @@ namespace svm_fobos {
             }
         }
 
-        internal static Tuple<string,string[]> ParseLine(string line) {
-            var kv = line.Split("\t".ToArray(), 2);
-            if (kv[0] == "EOS") {
-                return Tuple.Create(kv[0], new string [] { });
-            } else {
-                var m = kv[0];
-                var f = kv[1].Split(",".ToArray());
-                return Tuple.Create(m, f);
-            }
+        /// <summary>
+        /// Mecabの出力1行を解析する
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        internal static Tuple<string, string[]> ParseLine(string line) {
+            return line.Split("\t".ToArray(), 2).Apply(x => Tuple.Create(x.ElementAtOrDefault(0, ""), x.ElementAtOrDefault(1, "").Split(",".ToArray())));
         }
     }
 }

@@ -1,127 +1,58 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Linq;
-using System.Text;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
 
 namespace svm_fobos {
     class Program {
         static void Main(string[] args) {
             {
-                var it = Mecab.Run("wikipedia00.txt").Select(x => x.Split("\t".ToArray(), 2));
-                var items = new List<Tuple<string, string[]>>();
-                foreach (var token in it) {
-                    if (token[0] != "EOS") {
-                        items.Add(Tuple.Create(token[0], token[1].Split(",".ToArray())));
-                    } else {
-                        foreach (var word in TermExtractor.Find(items)) {
-                            Console.WriteLine(word);
-                        }
-                        items.Clear();
-                    }
+                var items = Mecab.Run("wikipedia02.txt").Select(Mecab.ParseLine).Split(x => x.Item1 == "EOS");
+                var tex1 = new StaticTermExtractor();
+                var tex2 = new AdaptiveTermExtractor();
+                tex2.Learn(
+                    500,
+                    (new string[] {
+                        "オートマチックトランスミッション","automatic transmission", "AT", "MT", "自動変速機", "車速", "回転速度", "変速比","クラッチペダル"
+                    })
+                    .Apply(x => Mecab.Run("", String.Join(Environment.NewLine, x)))
+                    .Select(x => Mecab.ParseLine(x))
+                    .Split(x => x.Item1 == "EOS")
+                );
+                foreach (var item in items) {
+                    Console.WriteLine("静的:");
+                    tex1.Extract(item).Select(x => String.Join(" ", x)).Apply(x => String.Join("|", x)).Tap(Console.WriteLine);
+                    Console.WriteLine("適応型:");
+                    tex2.Extract(item).Select(x => String.Join(" ", x)).Apply(x => String.Join("|", x)).Tap(Console.WriteLine);
                 }
             }
 
             {
+                // wikipedia記事データから分かち書き用の教師データを作る。
                 Console.WriteLine("Create Teaching data.");
 
+                // 教師データを用いて線形SVMで分かち書きを学習
+                Console.WriteLine("Learning SVM: Start");
                 var wseg = new WordSegmenter();
-                #region 分かち書きの学習
-                {
-                    Console.WriteLine("教師データを用いた分かち書きの学習を開始");
-                    var result1 = wseg.Train(
-                        500,
-                        Mecab.Run("wikipedia00.txt")
-                             .Select(Mecab.ParseLine)
-                             .Select(ConvertMecabToWordSegmenter)
-                             .Split(x => x.Item1 == "EOS"),
-                        Mecab.Run("wikipedia01.txt")
-                             .Select(Mecab.ParseLine)
-                             .Select(ConvertMecabToWordSegmenter)
-                             .Split(x => x.Item1 == "EOS")
-                    );
+                var result = wseg.Train(500, Mecab.Run("wikipedia01.txt").Apply(WordSegmenter.CreateTeachingData));
+                // 学習結果を表示
+                Console.WriteLine(result);
 
-                    Console.WriteLine("教師データに対する評価結果:");
-                    Console.WriteLine(result1);
-
-                    Console.WriteLine("別データに対する評価結果:");
-                    var result2 = wseg.Benchmark(
-                        Mecab.Run("wikipedia02.txt")
-                             .Select(Mecab.ParseLine)
-                             .Select(ConvertMecabToWordSegmenter)
-                             .Split(x => x.Item1 == "EOS")
-                             .SelectMany(WordSegmenter.CreateTeachingData)
-                    );
-                    Console.WriteLine(result2);
-                }
-                #endregion
-
+                // 教師データを用いて構造化パーセプトロンで品詞を学習
+                Console.WriteLine("Learning Structured perceptron: Start");
                 StructuredPerceptron sp = null;
-                #region 品詞識別の学習
                 {
-                    Console.WriteLine("教師データを用いた品詞識別の学習を開始");
-                    var teatures = new[] { "wikipedia00.txt", "wikipedia01.txt" }
-                        .SelectMany(x => 
-                            Mecab.Run(x)
-                                 .Select(Mecab.ParseLine)
-                                 .Split(y => y.Item1 == "EOS"))
-                        .Select(x => x.Where(y => y.Item2.Length > 0).Select(y => Tuple.Create(y.Item1, y.Item2[0])).ToArray())
-                        .Where(x => x.Length > 0)
-                        .ToList();
-                    sp = StructuredPerceptron.Train(teatures, 10);
+                    var teatures = new[] { "wikipedia01.txt" }.SelectMany(x => WordSegmenter.CreateTrainData(Mecab.Run(x))).Select(x => x.Select(y => Tuple.Create(y.Item1, y.Item2)).ToArray()).ToList();
+                    sp = StructuredPerceptron.Train(
+                        teatures.SelectMany(x => x.Select(y => y.Item2)).ToList(),
+                        teatures,
+                        10
+                    );
 
-                    Console.WriteLine("教師データに対する評価結果:");
-                    {
-                        var table = new Dictionary<Tuple<string, string>, Dictionary<Tuple<string, string>, int>>();
-                        foreach (var teature in teatures) {
-                            var ret = sp.Predict(teature.Select(x => x.Item1).ToArray());
-                            foreach (var pair in teature.Zip(ret, Tuple.Create)) {
-                                if (table.ContainsKey(pair.Item1) == false) {
-                                    table[pair.Item1] = new Dictionary<Tuple<string, string>, int>();
-                                }
-                                if (table[pair.Item1].ContainsKey(pair.Item2) == false) {
-                                    table[pair.Item1][pair.Item2] = 0;
-                                }
-                                table[pair.Item1][pair.Item2] += 1;
-                            }
-                        }
+                    Console.WriteLine($"Learning Structured perceptron: Finish.");
 
-                        int total = table.Sum(x => x.Value.Sum(y => y.Value));
-                        int match = table.Sum(x => x.Value.Sum(y => ((x.Key.Item1 == y.Key.Item1 && x.Key.Item2 == y.Key.Item2) ? y.Value : 0)));
-                        Console.WriteLine($"Accuracy: {match}/{total} ({match * 100.0 / total}%)");
-                    }
-
-                    Console.WriteLine("別データに対する評価結果:");
-                    {
-                        var teature2 = Mecab.Run("wikipedia02.txt")
-                            .Select(Mecab.ParseLine)
-                            .Split(y => y.Item1 == "EOS")
-                            .Select(x => x.Where(y => y.Item2.Length > 0).Select(y => Tuple.Create(y.Item1, y.Item2[0])).ToArray())
-                        .Where(x => x.Length > 0)
-                            .ToList();
-                        var table = new Dictionary<Tuple<string, string>, Dictionary<Tuple<string, string>, int>>();
-                        foreach (var teature in teature2) {
-                            var ret = sp.Predict(teature.Select(x => x.Item1).ToArray());
-                            foreach (var pair in teature.Zip(ret, Tuple.Create)) {
-                                if (table.ContainsKey(pair.Item1) == false) {
-                                    table[pair.Item1] = new Dictionary<Tuple<string, string>, int>();
-                                }
-                                if (table[pair.Item1].ContainsKey(pair.Item2) == false) {
-                                    table[pair.Item1][pair.Item2] = 0;
-                                }
-                                table[pair.Item1][pair.Item2] += 1;
-                            }
-                        }
-
-                        int total = table.Sum(x => x.Value.Sum(y => y.Value));
-                        int match = table.Sum(x => x.Value.Sum(y => ((x.Key.Item1 == y.Key.Item1 && x.Key.Item2 == y.Key.Item2) ? y.Value : 0)));
-                        Console.WriteLine($"Accuracy: {match}/{total} ({match * 100.0 / total}%)");
-                    }
+                    // 学習結果を評価
+                    //Console.WriteLine(TestResult.Test(svm1, teatures));
                 }
-                #endregion
 
                 // SVMで分かち書きを行い、構造化パーセプトロンで品詞推定
                 {
@@ -140,7 +71,7 @@ namespace svm_fobos {
 
                     // 別のwikipedia記事データからテストデータを作って評価
                     {
-                        var ret = wseg.Benchmark(Mecab.Run("wikipedia02.txt").Select(Mecab.ParseLine).Split(x => x.Item1 != "EOS").SelectMany(WordSegmenter.CreateTeachingData));
+                        var ret = wseg.Benchmark(WordSegmenter.CreateTeachingData(Mecab.Run("wikipedia02.txt")));
                         Console.WriteLine(ret);
                     }
                 }
@@ -148,7 +79,7 @@ namespace svm_fobos {
             }
             //{
             //    var rand = new Random();
-            //    var data = LinerSVM<int>.ReadDataFromFile("news20.binary", int.Parse).OrderBy(x => rand.Next()).ToList();
+            //    var data = SVMLight.ReadDataFromFile<int>("news20.binary", int.Parse).OrderBy(x => rand.Next()).ToList();
             //    var tests = data.Take(data.Count / 10).ToList();
             //    var teatures = data.Skip(data.Count / 10).ToList();
             //    var svm1 = new LinerSVM<int>();
@@ -161,15 +92,5 @@ namespace svm_fobos {
             //    }
             //}
         }
-
-        /// <summary>
-        /// Mecabのデータ形式をWordSegmenter向け形式に変換する
-        /// </summary>
-        /// <param name="xs"></param>
-        /// <returns></returns>
-        public static Tuple<string, string[]> ConvertMecabToWordSegmenter(Tuple<string, string[]> x) {
-            return Tuple.Create(x.Item1, new[] { x.Item2.ElementAtOrDefault(0, "不明語"), x.Item2.ElementAtOrDefault(1, "不") });
-        }
-
     }
 }
