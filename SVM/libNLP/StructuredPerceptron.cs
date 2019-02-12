@@ -3,17 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
     /// <summary>
     /// 構造化パーセプトロン
     /// </summary>
     public class StructuredPerceptron {
+
         /// <summary>
         /// 識別結果を示すラベル
         /// </summary>
-        private List<string> Labels { get; }
+        private HashSet<string> Labels { get; }
 
         /// <summary>
         ///  識別器の重み
@@ -25,7 +26,7 @@ namespace svm_fobos {
         /// </summary>
         /// <param name="labels"></param>
         /// <param name="weight"></param>
-        public StructuredPerceptron(List<string> labels, Dictionary<string, double> weight) {
+        public StructuredPerceptron(HashSet<string> labels, Dictionary<string, double> weight) {
             this.Labels = labels;
             this.Weight = weight;
         }
@@ -44,7 +45,7 @@ namespace svm_fobos {
         /// </example>
         private static List<string> ExtractFeatures(string[] sentence, int index, string posPrev, string posNext) {
             var wordCurr = (index + 0) < sentence.Length ? sentence[index + 0] : "";
-            var wordPrev = (index - 1) >= 0 ? sentence[index - 1] : "";
+            var wordPrev = (index - 1) >= 0              ? sentence[index - 1] : "";
             var wordNext = (index + 1) < sentence.Length ? sentence[index + 1] : "";
             return new List<string>() {
                 $"transition_feature:{posPrev}+{posNext}",
@@ -76,7 +77,7 @@ namespace svm_fobos {
         /// <param name="weight"></param>
         /// <param name="labels"></param>
         /// <returns></returns>
-        private static Tuple<string, string>[] ArgMax(string[] sentence_, Dictionary<string, double> weight, List<string> labels) {
+        private static Tuple<string, string>[] ArgMax(string[] sentence_, Dictionary<string, double> weight, HashSet<string> labels) {
             var bestEdge = ForwardStep(sentence_, weight, labels);
             return BackwardStep(sentence_, bestEdge);
         }
@@ -106,29 +107,38 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// 
+        /// ビタビ経路の前方探索（１ステップ分）
         /// </summary>
         /// <param name="sentence">トークン列</param>
         /// <param name="weight">重み</param>
         /// <param name="w_idx">遷移ステップ番号</param>
-        /// <param name="w_idx_prev"></param>
+        /// <param name="prevState">現在の状態名</param>
         /// <param name="pos_next">遷移先の品詞</param>
         /// <param name="pos_prev">遷移元の品詞</param>
         /// <param name="best_score">スコア表</param>
         /// <param name="best_edge">遷移辺</param>
-        private static void ForwarsStepOne(string[] sentence, Dictionary<string, double> weight, int w_idx, string w_idx_prev, string pos_next, string pos_prev, Dictionary<string, double> best_score, Dictionary<string, string> best_edge) {
+        private static void ForwarsStepOne(string[] sentence, Dictionary<string, double> weight, int w_idx, string prevState, string pos_next, string pos_prev, Dictionary<string, double> best_score, Dictionary<string, string> best_edge) {
+            // 入力データ列の w_idx 番目（遷移先）の特徴値
             var features = ExtractFeatures(sentence, w_idx, pos_prev, pos_next);
+            // 特徴値から求めたスコア
+            var current_score = InnerProduct(features, weight);
+
+            // ビタビ経路の現在位置のスコア
             double cum_score;
-            if (best_score.TryGetValue(w_idx_prev, out cum_score) == false) {
+            if (best_score.TryGetValue(prevState, out cum_score) == false) {
                 cum_score = 0.0;
             }
-            var score = cum_score + InnerProduct(features, weight);
+
+            // ビタビ経路における現在位置から遷移先に遷移した場合の遷移先のスコア
+            var score = cum_score + current_score;
+
+            // 遷移先のスコアが今までのスコアよりもよくなっている場合は記録
             var w_next_idx = w_idx + 1;
             var w_next_idx_next = $"{w_next_idx} {pos_next}";
             double cur_score;
             if (best_score.TryGetValue(w_next_idx_next, out cur_score) == false || (cur_score <= score)) {
                 best_score[w_next_idx_next] = score;
-                best_edge[w_next_idx_next] = w_idx_prev;
+                best_edge[w_next_idx_next] = prevState;
             }
         }
 
@@ -139,7 +149,7 @@ namespace svm_fobos {
         /// <param name="weight">重みベクトル</param>
         /// <param name="labels">ラベル</param>
         /// <returns></returns>
-        private static Dictionary<string, string> ForwardStep(string[] sentence, Dictionary<string, double> weight, List<string> labels) {
+        private static Dictionary<string, string> ForwardStep(string[] sentence, Dictionary<string, double> weight, HashSet<string> labels) {
             var best_score = new Dictionary<string, double>();
             var best_edge = new Dictionary<string, string>();
             var pos_bos = "BOS";
@@ -151,16 +161,16 @@ namespace svm_fobos {
             {
                 var pos_prev = pos_bos;
                 var w_idx = 0;
-                var w_idx_prev = $"{w_idx} {pos_prev}";
+                var state = $"{w_idx} {pos_prev}";
                 foreach (var pos_next in labels) {
-                    ForwarsStepOne(sentence, weight, w_idx, w_idx_prev, pos_next, pos_prev, best_score, best_edge);
+                    ForwarsStepOne(sentence, weight, w_idx, state, pos_next, pos_prev, best_score, best_edge);
                 }
             }
             for (var w_idx = 1; w_idx < sentence.Length; w_idx++) {
                 foreach (var pos_prev in labels) {
-                    var w_idx_prev = $"{w_idx} {pos_prev}";
+                    var state = $"{w_idx} {pos_prev}";
                     foreach (var pos_next in labels) {
-                        ForwarsStepOne(sentence, weight, w_idx, w_idx_prev, pos_next, pos_prev, best_score, best_edge);
+                        ForwarsStepOne(sentence, weight, w_idx, state, pos_next, pos_prev, best_score, best_edge);
                     }
                 }
             }
@@ -187,58 +197,6 @@ namespace svm_fobos {
             return gold_features;
         }
 
-        private static void Learn(Dictionary<string, double> weight, Dictionary<string, double> cum_weight, Tuple<string, string>[] sentence, Tuple<string, string>[] predict_sentence, double n, List<string> pos_labels) {
-            List<string> gold_features = GetFeatures(sentence);
-            List<string> predict_features = GetFeatures(predict_sentence);
-
-            // 不正解の特徴についてのみ重みの更新を行う
-            // 具体的には:
-            // ・教師データに含まれる特徴の重みは+1する。
-            // ・推測データに含まれる特徴の重みは-1する。
-            // を行う
-            // こうすると、教師データにも推測データにも含まれる特徴は変動しない
-            foreach (var feature in gold_features) {
-                if (weight.ContainsKey(feature) == false) { weight[feature] = 0; }
-                if (cum_weight.ContainsKey(feature) == false) { cum_weight[feature] = 0; }
-                weight[feature] += 1;
-                cum_weight[feature] += n;
-            }
-            foreach (var feature in predict_features) {
-                if (weight.ContainsKey(feature) == false) { weight[feature] = 0; }
-                if (cum_weight.ContainsKey(feature) == false) { cum_weight[feature] = 0; }
-                weight[feature] -= 1;
-                cum_weight[feature] -= n;
-            }
-        }
-
-        private static Dictionary<string, double> GetFinalWeight(Dictionary<string, double> weight, Dictionary<string, double> cum_weight, double n) {
-            var final_weight = new Dictionary<string, double>(weight);
-            foreach (var kv in cum_weight) {
-                final_weight[kv.Key] -= kv.Value / n;
-            }
-            return final_weight;
-        }
-
-        /// <summary>
-        /// 構造推定結果の正答率を求める
-        /// </summary>
-        /// <param name="golds"></param>
-        /// <param name="predicts"></param>
-        /// <returns></returns>
-        public static double Accuracy(List<Tuple<string, string>[]> golds, List<Tuple<string, string>[]> predicts) {
-            var correct = 0.0;
-            var num = 0.0;
-            for (var index = 0; index < golds.Count; index++) {
-                var gold_pos_labels = golds[index].Select(x => x.Item2).ToList();
-                var predict_pos_labels = predicts[index].Select(x => x.Item2).ToList();
-                for (var i = 0; i < gold_pos_labels.Count; i++) {
-                    if (gold_pos_labels[i] == predict_pos_labels[i]) { correct++; }
-                    num++;
-                }
-            }
-            return correct / num;
-        }
-
         /// <summary>
         /// 識別を行う
         /// </summary>
@@ -249,13 +207,48 @@ namespace svm_fobos {
         }
 
         /// <summary>
+        /// 一つの入力データと教師データから特徴ベクトルの差を学習
+        /// </summary>
+        /// <param name="weight">重みベクトル</param>
+        /// <param name="cum_weight">特徴ごとの学習の重みの総和</param>
+        /// <param name="sentence">入力データ</param>
+        /// <param name="predict_sentence">教師データ</param>
+        /// <param name="n">この学習の重み</param>
+        /// <param name="labels">識別ラベル集合</param>
+        private static void Learn(Dictionary<string, double> weight, Dictionary<string, double> cum_weight, Tuple<string, string>[] sentence, Tuple<string, string>[] predict_sentence, double n, HashSet<string> labels) {
+            var gold_features = GetFeatures(sentence);
+            var predict_features = GetFeatures(predict_sentence);
+
+            // 不正解の特徴についてのみ重みの更新を行う
+            // 具体的には:
+            // ・教師データに含まれる特徴の重みは+1する。
+            // ・推測データに含まれる特徴の重みは-1する。
+            // を行う
+            // こうすると、教師データにも推測データにも含まれる特徴は変動しない
+            foreach (var feature in gold_features) {
+                if (weight.ContainsKey(feature) == false) { weight[feature] = 0; }
+                if (cum_weight.ContainsKey(feature) == false) { cum_weight[feature] = 0; }
+                weight[feature] += 1;   // 重みベクトル中の対応する特徴を+1
+                cum_weight[feature] += n;   // 特徴ごとの重みの総和を+n
+            }
+
+            foreach (var feature in predict_features) {
+                if (weight.ContainsKey(feature) == false) { weight[feature] = 0; }
+                if (cum_weight.ContainsKey(feature) == false) { cum_weight[feature] = 0; }
+                weight[feature] -= 1;   // 重みベクトル中の対応する特徴を-1
+                cum_weight[feature] -= n;   // 特徴ごとの重みの総和を-n
+            }
+        }
+
+        /// <summary>
         /// 学習を行う
         /// </summary>
         /// <param name="labels"></param>
         /// <param name="train_data"></param>
         /// <param name="step"></param>
         /// <returns></returns>
-        public static StructuredPerceptron Train(List<string> labels, List<Tuple<string, string>[]> train_data, int step) {
+        public static StructuredPerceptron Train(HashSet<string> labels, List<Tuple<string, string>[]> train_data, int step) {
+
             var weight = new Dictionary<string, double>();
             var cum_weight = new Dictionary<string, double>();
             var n = 1;
@@ -269,9 +262,33 @@ namespace svm_fobos {
                     }
                 }
             }
-            var final_weight = GetFinalWeight(weight, cum_weight, n);
+
+            // 得られた重みを平均化する
+            var final_weight = new Dictionary<string, double>(weight);
+            foreach (var kv in cum_weight) {
+                final_weight[kv.Key] -= kv.Value / n;
+            }
             return new StructuredPerceptron(labels, final_weight);
         }
-    }
 
+        /// <summary>
+        /// 構造推定のテストを行う
+        /// </summary>
+        /// <param name="golds"></param>
+        /// <param name="predicts"></param>
+        /// <returns></returns>
+        public TestResult Test(List<Tuple<string, string>[]> golds) {
+            var correct = 0;
+            var incorrect = 0;
+            for (var index = 0; index < golds.Count; index++) {
+                var gold_pos_labels = golds[index].Select(x => x.Item1).ToList();
+                var predicts = Predict(golds[index].Select(x => x.Item1).ToArray());
+                var predict_pos_labels = predicts.Select(x => x.Item2).ToList();
+                for (var i = 0; i < gold_pos_labels.Count; i++) {
+                    if (gold_pos_labels[i] == predict_pos_labels[i]) { correct++; } else { incorrect++; }
+                }
+            }
+            return new TestResult(correct, 0, incorrect, 0);
+        }
+    }
 }

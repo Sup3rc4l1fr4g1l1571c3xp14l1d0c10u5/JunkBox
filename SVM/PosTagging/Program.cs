@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Data;
 using System.Linq;
+using libNLP;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace PosTagging {
     class Program {
         static void Main(string[] args) {
             {
@@ -12,7 +14,8 @@ namespace svm_fobos {
                 tex2.Learn(
                     500,
                     (new string[] {
-                        "オートマチックトランスミッション","automatic transmission", "AT", "MT", "自動変速機", "車速", "回転速度", "変速比","クラッチペダル"
+                        "オートマチックトランスミッション","automatic transmission", "AT", "MT",
+                        "自動変速機", "車速", "回転速度", "変速比","クラッチペダル"
                     })
                     .Apply(x => Mecab.Run("", String.Join(Environment.NewLine, x)))
                     .Select(x => Mecab.ParseLine(x))
@@ -92,5 +95,11 @@ namespace svm_fobos {
             //    }
             //}
         }
+
+        private void Usage() {
+            Console.WriteLine("NLP");
+        }
+
     }
 }
+

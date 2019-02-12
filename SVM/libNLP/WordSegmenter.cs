@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
 
     /// <summary>
-    /// 日本語分かち書き
+    /// SVMによる日本語分かち書き
     /// </summary>
     public class WordSegmenter {
 
         /// <summary>
         /// 分類器
         /// </summary>
-        private LinerSVM<string> svm { get; }
+        private LinerSVM<string> svm;
 
         /// <summary>
         /// コンストラクタ
@@ -61,7 +61,7 @@ namespace svm_fobos {
         /// <param name="datasets">教師付きデータセット</param>
         /// <returns>モデルの評価結果</returns>
         public TestResult Benchmark(IEnumerable<Tuple<int, Dictionary<string, double>>> datasets) {
-            return TestResult.Test(svm, datasets);
+            return svm.Test(datasets);
         }
 
         /// <summary>
@@ -160,6 +160,28 @@ namespace svm_fobos {
                 }
             }
         }
-    }
+        /// <summary>
+        /// 学習モデルを読み込む
+        /// </summary>
+        /// <param name="modelPath">学習モデルファイル</param>
+        /// <returns></returns>
+        public static WordSegmenter Load(string modelPath) {
+            using (var streamReader = new System.IO.StreamReader(modelPath)) {
+                var self = new WordSegmenter();
+                self.svm = LinerSVM<string>.LoadFromStream(streamReader, x => x);
+                return self;
+            }
+        }
 
+        /// <summary>
+        /// 学習結果を保存する
+        /// </summary>
+        /// <param name="modelPath">学習モデルファイル</param>
+        public void Save(string modelPath) {
+            using (var streamWriter = new System.IO.StreamWriter(modelPath)) {
+                svm.SaveToStream(streamWriter, x => x);
+            }
+        }
+
+    }
 }

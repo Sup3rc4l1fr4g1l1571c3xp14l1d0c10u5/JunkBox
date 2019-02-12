@@ -1,27 +1,27 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
     /// <summary>
     /// Mecabバインダ
     /// </summary>
-    internal static class Mecab {
+    public static class Mecab {
         /// <summary>
-        /// Mecabパス
+        /// Mecabのパス
         /// </summary>
         public static string ExePath { get; set; } = @"C:\mecab\bin\mecab.exe";
 
         /// <summary>
-        /// Mecabを実行して実行結果を読み取る
+        /// Mecabを実行して実行結果を行単位で読み取る
         /// </summary>
-        /// <param name="file"></param>
-        /// <returns></returns>
-        internal static IEnumerable<string> Run(string arg, string input = null) {
+        /// <param name="arg">mecabの起動パラメータ</param>
+        /// <param name="input">mecabの標準入力に与えるデータ(nullの場合は標準入力を即座に閉じる)</param>
+        /// <returns>mecabの出力結果を行単位で返す列挙子</returns>
+        public static IEnumerable<string> Run(string arg, string input = null) {
             if (System.IO.File.Exists(ExePath) == false) {
                 throw new System.IO.FileNotFoundException(ExePath);
             }
@@ -53,11 +53,11 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// Mecabの出力1行を解析する
+        /// Mecabの標準的な出力１行分を解析する
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>
-        internal static Tuple<string, string[]> ParseLine(string line) {
+        public static Tuple<string, string[]> ParseLine(string line) {
             return line.Split("\t".ToArray(), 2).Apply(x => Tuple.Create(x.ElementAtOrDefault(0, ""), x.ElementAtOrDefault(1, "").Split(",".ToArray())));
         }
     }

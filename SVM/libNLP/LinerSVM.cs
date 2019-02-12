@@ -1,20 +1,52 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
+
     /// <summary>
-    /// オンライン学習可能な線形サポートベクターマシン（実装はFOBOS）
+    /// 線形サポートベクターマシン
+    /// <para>
+    /// パラメーター最適化にForward Backward Splitting (FOBOS) を用いている。
+    /// </para>
     /// </summary>
     /// <typeparam name="TFeature">特徴を示す型</typeparam>
     public class LinerSVM<TFeature> {
 
         /// <summary>
-        /// 重みベクトル
+        /// 学習モデルを示す重みベクトル
         /// </summary>
         private Dictionary<TFeature, double> Weight { get; }
+
+        /// <summary>
+        /// 学習モデルをストリームに保存する
+        /// </summary>
+        /// <param name="streamWriter">保存先ストリーム</param>
+        /// <param name="featureDeserializer">特徴情報のシリアライザ</param>
+        public void SaveToStream(System.IO.StreamWriter streamWriter, Func<TFeature, string> featureSerializer) {
+            foreach (var weight in Weight) {
+                streamWriter.Write(featureSerializer(weight.Key));
+                streamWriter.Write("\t");
+                streamWriter.Write(weight.Value);
+            }
+        }
+
+        /// <summary>
+        /// ストリームから学習モデルを読み取る
+        /// </summary>
+        /// <param name="streamReader">読み込み元ストリーム</param>
+        /// <param name="featureDeserializer">特徴情報のデシリアライザ</param>
+        /// <returns></returns>
+        public static LinerSVM<TFeature> LoadFromStream(System.IO.StreamReader streamReader, Func<string, TFeature> featureDeserializer) {
+            var ret = new LinerSVM<TFeature>();
+            string line;
+            while ((line = streamReader.ReadLine()) != null) {
+                var tokens = line.Trim().Split("\t".ToArray(), 2);
+                ret.Weight[featureDeserializer(tokens[0])] = double.Parse(tokens[1]);
+            }
+            return ret;
+        }
 
         /// <summary>
         /// パラメータ a の値を b 分だけ 0 に近づける。
@@ -28,7 +60,7 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// 重みに対してL1正則化を適用し、重みが０になった特徴を削除する
+        /// 重みに対してL1正則化を適用し、重みが 0 になった特徴を削除する
         /// </summary>
         /// <param name="lambda_hat">正則化の適用度（1未満の正の実数）</param>
         private int L1Regularize(double lambda_hat) {
@@ -104,5 +136,34 @@ namespace svm_fobos {
             return L1Regularize(lambda_hat);
         }
 
+        /// <summary>
+        /// テスト実行
+        /// </summary>
+        /// <param name="fvs"></param>
+        /// <returns></returns>
+        public TestResult Test(IEnumerable<Tuple<int, Dictionary<TFeature, double>>> fvs) {
+            var truePositive = 0;
+            var falsePositive = 0;
+            var falseNegative = 0;
+            var trueNegative = 0;
+            foreach (var fv in fvs) {
+                var prediction = fv.Item1 >= 0;
+                var fact = this.Predict(fv.Item2) >= 0;
+                if (prediction) {
+                    if (fact) {
+                        truePositive++;
+                    } else {
+                        falsePositive++;
+                    }
+                } else {
+                    if (fact) {
+                        falseNegative++;
+                    } else {
+                        trueNegative++;
+                    }
+                }
+            }
+            return new TestResult(truePositive, falsePositive, falseNegative, trueNegative);
+        }
     };
 }

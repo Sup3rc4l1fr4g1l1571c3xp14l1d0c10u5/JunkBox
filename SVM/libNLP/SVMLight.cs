@@ -2,16 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
     /// <summary>
     /// SVM-Light形式のデータを読み取る
     /// </summary>
     /// <typeparam name="TFeature">特徴を示す型</typeparam>
     public static class SVMLight {
         /// <summary>
-        /// SVMLight形式のデータをファイルから読み取る
+        /// SVM-Light形式のデータをファイルから読み取る
         /// </summary>
         /// <param name="file">読み取り対象ファイル</param>
         /// <param name="deserializer">特徴のデシリアライザ</param>
@@ -21,7 +21,7 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// SVMLight形式のデータをシーケンスから読み取る
+        /// SVM-Light形式のデータをシーケンスから読み取る
         /// </summary>
         /// <param name="lines">読み取るシーケンス</param>
         /// <param name="deserializer">特徴のデシリアライザ</param>
@@ -31,14 +31,14 @@ namespace svm_fobos {
         }
 
         /// <summary>
-        /// SVMLight形式のデータを一つ読み取る
+        /// SVM-Light形式のデータを一つ読み取る
         /// </summary>
         /// <param name="line">１データ</param>
         /// <param name="deserializer">特徴のデシリアライザ</param>
         /// <returns></returns>
         public static Tuple<int, Dictionary<TFeature, double>> ParseData<TFeature>(string line, Func<string, TFeature> deserializer) {
             return line.Trim()
-                       .Split("#".ToArray(),2).ElementAtOrDefault(0)
+                       .Split("#".ToArray(), 2).ElementAtOrDefault(0)
                        .Split(" ".ToCharArray())
                        .Apply(x => Tuple.Create(
                                         int.Parse(x[0]),

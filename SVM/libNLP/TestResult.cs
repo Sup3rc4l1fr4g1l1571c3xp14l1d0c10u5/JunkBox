@@ -3,53 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using libNLP.Extentions;
 
-namespace svm_fobos {
+namespace libNLP {
     /// <summary>
     /// テスト結果
     /// </summary>
     public class TestResult {
-        /// <summary>
-        /// テスト実行
-        /// </summary>
-        /// <typeparam name="TFeature"></typeparam>
-        /// <param name="svm"></param>
-        /// <param name="fvs"></param>
-        /// <returns></returns>
-        public static TestResult Test<TFeature>(LinerSVM<TFeature> svm, IEnumerable<Tuple<int, Dictionary<TFeature, double>>> fvs) {
-            var truePositive = 0;
-            var falsePositive = 0;
-            var falseNegative = 0;
-            var trueNegative = 0;
-            foreach (var fv in fvs) {
-                var prediction = fv.Item1 >= 0;
-                var fact = svm.Predict(fv.Item2) >= 0;
-                if (prediction) {
-                    if (fact) {
-                        truePositive++;
-                    } else {
-                        falsePositive++;
-                    }
-                } else {
-                    if (fact) {
-                        falseNegative++;
-                    } else {
-                        trueNegative++;
-                    }
-                }
-            }
-            return new TestResult(truePositive, falsePositive, falseNegative, trueNegative);
-        }
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        /// <param name="truePositive"></param>
-        /// <param name="falsePositive"></param>
-        /// <param name="falseNegative"></param>
-        /// <param name="trueNegative"></param>
-        private TestResult(int truePositive, int falsePositive, int falseNegative, int trueNegative) {
+        /// <param name="truePositive">予測が正で答えが正であるデータの件数</param>
+        /// <param name="falsePositive">予測が負で答えが正であるデータの件数</param>
+        /// <param name="falseNegative">予測が正で答えが負であるデータの件数</param>
+        /// <param name="trueNegative">予測が負で答えが負であるデータの件数</param>
+        public TestResult(int truePositive, int falsePositive, int falseNegative, int trueNegative) {
             this.TruePositive = truePositive;
             this.FalsePositive = falsePositive;
             this.FalseNegative = falseNegative;
@@ -115,8 +84,5 @@ namespace svm_fobos {
             sb.AppendLine($"  F-Measure  : {FMeasure}");
             return sb.ToString();
         }
-
     }
-
 }
-
