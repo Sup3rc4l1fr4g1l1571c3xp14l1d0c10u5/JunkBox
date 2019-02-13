@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Data;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using libNLP;
 using libNLP.Extentions;
@@ -9,100 +11,47 @@ namespace AdaptiveTermExtract {
         static void Main(string[] args) {
             string mode = "predict";
             string model = null;
-            string epoch = null;
-            string arg = null;
-            string mecab = null;
+            int epoch = -1;
             bool help = false;
 
-            for (var i = 0; i < args.Length; i++) {
-                switch (args[i + 0]) {
-                    case "-help": {
-                            help = true;
-                            break;
-                        }
-                    case "-mode": {
-                            mode = args.ElementAtOrDefault(i + 1);
-                            if (mode == null) { Console.Error.WriteLine("-mode引数が指定されていません。"); return; }
-                            i += 1;
-                            break;
-                        }
-                    case "-model": {
-                            model = args.ElementAtOrDefault(i + 1);
-                            if (model == null) { Console.Error.WriteLine("-model引数が指定されていません。"); return; }
-                            i += 1;
-                            break;
-                        }
-                    case "-epoc": {
-                            epoch = args.ElementAtOrDefault(i + 1);
-                            if (epoch == null) { Console.Error.WriteLine("-epoc引数が指定されていません。"); return; }
-                            i += 1;
-                            break;
-                        }
-                    case "-mecab": {
-                            mecab = args.ElementAtOrDefault(i + 1);
-                            if (mecab == null) { Console.Error.WriteLine("-mecab引数が指定されていません。"); return; }
-                            i += 1;
-                            break;
-                        }
-                    default: {
-                            arg = args.ElementAtOrDefault(i + 1);
-                            if (arg == null) { Console.Error.WriteLine("引数が指定されていません。"); return; }
-                            i += 1;
-                            break;
-                        }
-                }
-            }
+            var files = new OptionParser()
+                .Regist("-help", action: () => { help = true; })
+                .Regist("-mode", argc: 1, action: (v) => { mode = v[0]; }, validation: (v) => v[0] == "train" || v[0] == "predict")
+                .Regist("-model", argc: 1, action: (v) => { model = v[0]; }, validation: (v) => String.IsNullOrWhiteSpace(v[0]) == false)
+                .Regist("-epoch", argc: 1, action: (v) => { epoch = int.Parse(v[0]); }, validation: (v) => { int x; return int.TryParse(v[0], out x) == true && x > 0; })
+                .Parse(args);
 
             if (help) {
                 Console.Error.WriteLine("Usage:");
-                Console.Error.WriteLine("  AdaptiveTermExtract -mode=train -epoc=<epoch-num> -model=<model> [-mecab=<mecab-path>] <word-dictionary>");
-                Console.Error.WriteLine("  AdaptiveTermExtract -mode=predict -model=<model> [-mecab=<mecab-path>] <text-file>");
-                return;
-            }
-            if (mecab != null) {
-                Mecab.ExePath = mecab;
-            }
-            if (!System.IO.File.Exists(Mecab.ExePath)) {
-                Console.Error.WriteLine("mecabが存在しません。");
+                Console.Error.WriteLine("  AdaptiveTermExtract -mode=train -epoch=<epoch-num> -model=<model> <teature-data-file> ...");
+                Console.Error.WriteLine("  AdaptiveTermExtract -mode=predict -model=<model> <segmented-text-file> ...");
+                Console.Error.WriteLine("  AdaptiveTermExtract -help");
                 return;
             }
 
-            int _epoc;
+            if (String.IsNullOrWhiteSpace(model)) {
+                Console.Error.WriteLine("-modelパラメータが不正です。");
+                return;
+            }
+            foreach (var file in files) {
+                if (!System.IO.File.Exists(file)) {
+                    Console.Error.WriteLine($"ファイル{file}が存在しません。");
+                    return;
+                }
+            }
+
             if (mode == "train") {
-                if (epoch == null || int.TryParse(epoch, out _epoc) == false || _epoc < 0) {
-                    Console.Error.WriteLine("-epochパラメータが不正です。");
-                    return;
-                }
-                if (String.IsNullOrWhiteSpace(model)) {
-                    Console.Error.WriteLine("-modelパラメータが不正です。");
-                    return;
-                }
-                if (!System.IO.File.Exists(arg)) {
-                    Console.Error.WriteLine("学習用の辞書ファイルが存在しません。");
-                    return;
-                }
-                var words = System.IO.File.ReadAllLines(arg);
+                var words = files.SelectMany(x => Mecab.Run(x).Select(Mecab.ParseLine).Split(y => y.Item1 == "EOS"));
                 var termExtractor = new AdaptiveTermExtractor();
                 termExtractor.Learn(
-                    _epoc,
+                    epoch,
                     words
-                    .Apply(x => Mecab.Run("", String.Join(Environment.NewLine, x)))
-                    .Select(x => Mecab.ParseLine(x))
-                    .Split(x => x.Item1 == "EOS")
                 );
                 termExtractor.Save(model);
                 Console.WriteLine("学習が完了しました。");
             } else if (mode == "predict") {
-                if (String.IsNullOrWhiteSpace(model)) {
-                    Console.Error.WriteLine("-modelパラメータが不正です。");
-                    return;
-                }
-                if (!System.IO.File.Exists(arg)) {
-                    Console.Error.WriteLine("処理対象ファイルが存在しません。");
-                    return;
-                }
                 var termExtractor = AdaptiveTermExtractor.Load(model);
-                var items = Mecab.Run(arg).Select(Mecab.ParseLine).Split(x => x.Item1 == "EOS");
+                var items = files.SelectMany(x => Mecab.Run(x).Select(Mecab.ParseLine).Split(y => y.Item1 == "EOS"));
                 foreach (var item in items) {
                     termExtractor.Extract(item).Select(x => String.Join("\t", x)).Apply(x => String.Join("\r\n", x)).Tap(Console.WriteLine);
                 }
@@ -111,7 +60,5 @@ namespace AdaptiveTermExtract {
                 return;
             }
         }
-
     }
 }
-

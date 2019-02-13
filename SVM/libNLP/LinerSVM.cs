@@ -29,6 +29,7 @@ namespace libNLP {
                 streamWriter.Write(featureSerializer(weight.Key));
                 streamWriter.Write("\t");
                 streamWriter.Write(weight.Value);
+                streamWriter.WriteLine();
             }
         }
 

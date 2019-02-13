@@ -7,11 +7,16 @@ using libNLP.Extentions;
 
 namespace libNLP {
     /// <summary>
-    /// 機械学習による適応型の専門用語抽出
-    /// 専門用語辞書を元に機械学習させた結果を用いて専門用語を抽出する。
+    /// 機械学習による適応型の専門用語（複合語）抽出
+    /// <para>
+    /// 専門用語辞書から特徴ベクトルを生成して機械学習させて作成したモデルを用いて専門用語（複合語）を抽出する。
     /// 学習セットや特徴ベクトルの作り方に強く依存する。
+    /// </para>
     /// </summary>
     public class AdaptiveTermExtractor {
+        /// <summary>
+        /// 学習器
+        /// </summary>
         private LinerSVM<string> svm;
 
         /// <summary>
@@ -22,10 +27,10 @@ namespace libNLP {
         }
 
         /// <summary>
-        /// 学習する
+        /// 教師データを元に学習を行う
         /// </summary>
-        /// <param name="epoch"></param>
-        /// <param name="positive"></param>
+        /// <param name="epoch">学習回数</param>
+        /// <param name="positive">教師データ</param>
         public void Learn(int epoch, IEnumerable<Tuple<string, string[]>[]> positive) {
             List<Tuple<int, Dictionary<string, double>>> fvs1 = new List<Tuple<int, Dictionary<string, double>>>();
 
@@ -37,6 +42,14 @@ namespace libNLP {
                 }
                 fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, (string[])null, features.First() }));
                 fvs1.Add(CreateTeature(-1, new string[][] { features.Last(), (string[])null, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { ":", "補助記号" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "（", "補助記号" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "）", "補助記号" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "、", "補助記号" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "。", "補助記号" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "や", "助詞" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "の", "助詞" }, (string[])null }));
+                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "を", "助詞" }, (string[])null }));
             }
 
             for (var i = 0; i < epoch; i++) {
@@ -51,27 +64,42 @@ namespace libNLP {
         /// <summary>
         /// 教師ベクトルを生成
         /// </summary>
-        /// <param name="label"></param>
-        /// <param name="pair"></param>
-        /// <returns></returns>
+        /// <param name="label">ラベル(+1|-1)</param>
+        /// <param name="pair">trigram</param>
+        /// <returns>教師ベクトル</returns>
         private static Tuple<int, Dictionary<string, double>> CreateTeature(int label, string[][] pair) {
             return CreateTeature(label, pair[0], pair[1], pair[2]);
         }
 
+        /// <summary>
+        /// 教師ベクトルを生成
+        /// </summary>
+        /// <param name="label">ラベル(+1|-1)</param>
+        /// <param name="first">trigramの第1要素</param>
+        /// <param name="second">trigramの第2要素</param>
+        /// <param name="third">trigramの第3要素</param>
+        /// <returns>教師ベクトル</returns>
         private static Tuple<int, Dictionary<string, double>> CreateTeature(int label, string[] first, string[] second, string[] third) {
 
             return Tuple.Create(label, CreateFeature(first, second, third));
         }
-        
+
         /// <summary>
         /// 特徴ベクトルを生成
         /// </summary>
-        /// <param name="pair"></param>
+        /// <param name="pair">trigram</param>
         /// <returns></returns>
         private static Dictionary<string, double> CreateFeature(string[][] pair) {
             return CreateFeature(pair[0], pair[1], pair[2]);
         }
 
+        /// <summary>
+        /// 特徴ベクトルを生成
+        /// </summary>
+        /// <param name="first">trigramの第1要素</param>
+        /// <param name="second">trigramの第2要素</param>
+        /// <param name="third">trigramの第3要素</param>
+        /// <returns></returns>
         private static Dictionary<string, double> CreateFeature(string[] first, string[] second, string[] third) {
             var ret = new Dictionary<string, double>();
             if (second != null) {

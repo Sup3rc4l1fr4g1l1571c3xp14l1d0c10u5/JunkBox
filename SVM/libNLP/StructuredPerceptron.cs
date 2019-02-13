@@ -45,7 +45,7 @@ namespace libNLP {
         /// </example>
         private static List<string> ExtractFeatures(string[] sentence, int index, string posPrev, string posNext) {
             var wordCurr = (index + 0) < sentence.Length ? sentence[index + 0] : "";
-            var wordPrev = (index - 1) >= 0              ? sentence[index - 1] : "";
+            var wordPrev = (index - 1) >= 0 ? sentence[index - 1] : "";
             var wordNext = (index + 1) < sentence.Length ? sentence[index + 1] : "";
             return new List<string>() {
                 $"transition_feature:{posPrev}+{posNext}",
@@ -68,6 +68,41 @@ namespace libNLP {
                 if (weight.TryGetValue(feature, out w)) { ret += w; }
             }
             return ret;
+        }
+
+        /// <summary>
+        /// 学習モデルをストリームに保存する
+        /// </summary>
+        /// <param name="streamWriter">保存先ストリーム</param>
+        /// <param name="featureDeserializer">特徴情報のシリアライザ</param>
+        public void SaveToStream(System.IO.StreamWriter streamWriter) {
+            streamWriter.WriteLine(string.Join("\t", Labels));
+            foreach (var weight in Weight) {
+                streamWriter.Write(weight.Key);
+                streamWriter.Write("\t");
+                streamWriter.Write(weight.Value);
+                streamWriter.WriteLine();
+            }
+        }
+
+        /// <summary>
+        /// ストリームから学習モデルを読み取る
+        /// </summary>
+        /// <param name="streamReader">読み込み元ストリーム</param>
+        /// <param name="featureDeserializer">特徴情報のデシリアライザ</param>
+        /// <returns></returns>
+        public static StructuredPerceptron LoadFromStream(System.IO.StreamReader streamReader) {
+            string line;
+            if ((line = streamReader.ReadLine()) == null) {
+                throw new Exception("");
+            }
+            var labels = new HashSet<string>(line.Split("\t".ToArray()).Distinct());
+            var weight = new Dictionary<string, double>();
+            while ((line = streamReader.ReadLine()) != null) {
+                var tokens = line.Trim().Split("\t".ToArray(), 2);
+                weight[tokens[0]] = double.Parse(tokens[1]);
+            }
+            return new StructuredPerceptron(labels, weight);
         }
 
         /// <summary>
@@ -203,6 +238,9 @@ namespace libNLP {
         /// <param name="gold"></param>
         /// <returns></returns>
         public Tuple<string, string>[] Predict(string[] gold) {
+            if (gold.Any() == false) {
+                return new Tuple<string, string>[0] ;
+            }
             return ArgMax(gold, this.Weight, this.Labels);
         }
 
@@ -245,14 +283,14 @@ namespace libNLP {
         /// </summary>
         /// <param name="labels"></param>
         /// <param name="train_data"></param>
-        /// <param name="step"></param>
+        /// <param name="epoch"></param>
         /// <returns></returns>
-        public static StructuredPerceptron Train(HashSet<string> labels, List<Tuple<string, string>[]> train_data, int step) {
+        public static StructuredPerceptron Train(HashSet<string> labels, List<Tuple<string, string>[]> train_data, int epoch) {
 
             var weight = new Dictionary<string, double>();
             var cum_weight = new Dictionary<string, double>();
             var n = 1;
-            for (var iter = 0; iter < step; iter++) {
+            for (var iter = 0; iter < epoch; iter++) {
                 foreach (var gold in train_data) {
                     var predict = ArgMax(gold.Select(x => x.Item1).ToArray(), weight, labels);
                     // 識別結果が教師データと不一致の場合、重みを更新

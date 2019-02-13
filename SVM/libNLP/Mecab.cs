@@ -16,13 +16,21 @@ namespace libNLP {
         public static string ExePath { get; set; } = @"C:\mecab\bin\mecab.exe";
 
         /// <summary>
+        /// Mecabが存在するかチェック
+        /// </summary>
+        /// <returns></returns>
+        public static bool Exists() {
+            return System.IO.File.Exists(Mecab.ExePath);
+        }
+
+        /// <summary>
         /// Mecabを実行して実行結果を行単位で読み取る
         /// </summary>
         /// <param name="arg">mecabの起動パラメータ</param>
         /// <param name="input">mecabの標準入力に与えるデータ(nullの場合は標準入力を即座に閉じる)</param>
         /// <returns>mecabの出力結果を行単位で返す列挙子</returns>
         public static IEnumerable<string> Run(string arg, string input = null) {
-            if (System.IO.File.Exists(ExePath) == false) {
+            if (Exists() == false) {
                 throw new System.IO.FileNotFoundException(ExePath);
             }
             using (var process = new Process()) {

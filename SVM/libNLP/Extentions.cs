@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace libNLP.Extentions {
     /// <summary>
-    /// 拡張メソッド
+    /// 拡張メソッド群
     /// </summary>
     public static class Extention {
         /// <summary>

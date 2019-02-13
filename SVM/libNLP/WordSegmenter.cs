@@ -52,7 +52,7 @@ namespace libNLP {
                                     .Where(x => x.Item1 >= 0)
                                     .Select(x => x.Item2 + 1)
                                     .Apply(x => new[] { 0 }.Concat(x).Concat(new[] { line.Length }).EachCons(2).Select(y => Tuple.Create(y[0], y[1] - y[0]))).ToArray();
-            return splitPoints.Select(x => line.Substring(x.Item1, x.Item2)).ToArray();
+            return splitPoints.Where(x => x.Item2 > 0).Select(x => line.Substring(x.Item1, x.Item2)).ToArray();
         }
 
         /// <summary>
