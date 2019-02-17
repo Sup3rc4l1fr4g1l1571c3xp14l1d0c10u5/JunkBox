@@ -42,15 +42,15 @@ namespace libNLP {
                 }
                 fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, (string[])null, features.First() }));
                 fvs1.Add(CreateTeature(-1, new string[][] { features.Last(), (string[])null, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { ":", "補助記号" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "（", "補助記号" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "）", "補助記号" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "、", "補助記号" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "。", "補助記号" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "や", "助詞" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "の", "助詞" }, (string[])null }));
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "を", "助詞" }, (string[])null }));
             }
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { ":", "補助記号" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "（", "補助記号" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "）", "補助記号" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "、", "補助記号" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "。", "補助記号" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "や", "助詞" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "の", "助詞" }, (string[])null }));
+            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "を", "助詞" }, (string[])null }));
 
             for (var i = 0; i < epoch; i++) {
                 foreach (var fv in fvs1) {

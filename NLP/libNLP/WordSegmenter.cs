@@ -18,6 +18,11 @@ namespace libNLP {
         private LinerSVM<string> svm;
 
         /// <summary>
+        /// 辞書単語
+        /// </summary>
+        private static List<string> dict = System.IO.File.ReadLines(@"C:\Users\whelp\source\repos\libNLP\TestData\worddic.txt").Select(x => x.Trim()).Where(x => String.IsNullOrWhiteSpace(x) == false).Distinct().ToList().Tap(x => x.Sort(String.CompareOrdinal));
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         public WordSegmenter() {
@@ -71,12 +76,14 @@ namespace libNLP {
             foreach (var line in CreateTrainData(inputs)) {
                 var index = new List<int>();
                 var lineText = line.Select(x => x.Item1).Apply(x => String.Join(" ", x));
+                var str = line.Select(x => x.Item1).Apply(x => "\u0001"+String.Concat(x)+"\uFFFE");
                 var words = "\u0001 " + lineText + " \uFFFE";
                 for (var i = 0; i < words.Length; i++) {
                     if (words[i] != ' ') {
                         index.Add(i);
                     }
                 }
+
                 for (var i = 1; i < index.Count - 1; i++) {
                     var n = index[i - 1];
                     var m = index[i + 0];
@@ -84,10 +91,11 @@ namespace libNLP {
                     yield return
                         Tuple.Create(
                             (m + 1 != l) ? +1 : -1,
-                            new Dictionary<string, double>()
-                                .Apply(x => AppendFeatures(x, -1, 3, words[n]))
-                                .Apply(x => AppendFeatures(x, 0, 3, words[m]))
-                                .Apply(x => AppendFeatures(x, 1, 3, words[l]))
+                            CreateFeatures(i, str)
+                            //new Dictionary<string, double>()
+                            //    .Apply(x => AppendFeatures(x, -1, 3, words[n]))
+                            //    .Apply(x => AppendFeatures(x, 0, 3, words[m]))
+                            //    .Apply(x => AppendFeatures(x, 1, 3, words[l]))
                         );
                 }
 
@@ -102,10 +110,11 @@ namespace libNLP {
         public static IEnumerable<Dictionary<string, double>> CreateFeatureVector(string str) {
             var line = "\u0001" + str + "\uFFFE";
             for (var i = 1; i < line.Length - 1; i++) {
-                yield return new Dictionary<string, double>()
-                            .Apply(x => AppendFeatures(x, -1, 3, line[i - 1]))
-                            .Apply(x => AppendFeatures(x, 0, 3, line[i + 0]))
-                            .Apply(x => AppendFeatures(x, 1, 3, line[i + 1]));
+                yield return CreateFeatures(i, line);
+                //yield return new Dictionary<string, double>()
+                //            .Apply(x => AppendFeatures(x, -1, 3, line[i - 1]))
+                //            .Apply(x => AppendFeatures(x, 0, 3, line[i + 0]))
+                //            .Apply(x => AppendFeatures(x, 1, 3, line[i + 1]));
             }
         }
 
@@ -129,17 +138,109 @@ namespace libNLP {
             return char.IsDigit(v);
         }
 
-        private static Dictionary<string, double> AppendFeatures(Dictionary<string, double> fv, int nGramIndex, int nGram, char v) {
-            var sIndex = nGramIndex.ToString("+0;-0");
-            fv.Add($"{nGram}G{sIndex} {v}", 1);
-            fv.Add($"D{sIndex} ", isDigit(v) ? +1 : -1);
-            fv.Add($"A{sIndex} ", isAlpha(v) ? +1 : -1);
-            fv.Add($"S{sIndex} ", char.IsSymbol(v) ? +1 : -1);
-            fv.Add($"H{sIndex} ", isHiragana(v) ? +1 : -1);
-            fv.Add($"K{sIndex} ", isKatakana(v) ? +1 : -1);
-            fv.Add($"J{sIndex} ", isKanji(v) ? +1 : -1);
+        //private static Dictionary<string, double> AppendFeatures(Dictionary<string, double> fv, int nGramIndex, int nGram, char v) {
+        //    var sIndex = nGramIndex.ToString("+0;-0");
+        //    fv.Add($"{nGram}G{sIndex} {v}", 1);
+        //    fv.Add($"D{sIndex} ", isDigit(v) ? +1 : -1);
+        //    fv.Add($"A{sIndex} ", isAlpha(v) ? +1 : -1);
+        //    fv.Add($"S{sIndex} ", char.IsSymbol(v) ? +1 : -1);
+        //    fv.Add($"H{sIndex} ", isHiragana(v) ? +1 : -1);
+        //    fv.Add($"K{sIndex} ", isKatakana(v) ? +1 : -1);
+        //    fv.Add($"J{sIndex} ", isKanji(v) ? +1 : -1);
+
+        //    return fv;
+        //}
+
+        private static char CharKind(char ch) {
+            if (isAlpha(ch)) { return 'A'; }
+            if (isKanji(ch)) { return 'J'; }
+            if (isHiragana(ch)) { return 'H'; }
+            if (isKatakana(ch)) { return 'K'; }
+            if (isDigit(ch)) { return 'D'; }
+            if (char.IsSymbol(ch)) { return 'S'; }
+            if (char.IsWhiteSpace(ch)) { return 'W'; }
+            return 'O';
+        }
+
+        /// <summary>
+        /// 東京大学の論文を基にした素性テンプレートを生成する
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="m"></param>
+        /// <returns></returns>
+        private static Dictionary<string, double> CreateFeatures(int pos, string m) {
+            var fv = new Dictionary<string, double>();
+            var s = ("\u0002\u0001" + m + "\uFFFD\uFFFE");
+            var c = s.Select(CharKind).ToArray();
+            var p = pos + 2;
+            //文字 ngram 情報
+            fv.Add($"S-1 {s[p - 1]}", 1);
+            fv.Add($"S+0 {s[p + 0]}", 1);
+            fv.Add($"S+1 {s[p + 1]}", 1);
+            fv.Add($"S-2-1 {s[p - 2]}{s[p - 1]}", 1);
+            fv.Add($"S-1+0 {s[p - 1]}{s[p + 0]}", 1);
+            fv.Add($"S+0+1 {s[p + 0]}{s[p + 1]}", 1);
+            fv.Add($"S+1+2 {s[p + 1]}{s[p + 2]}", 1);
+
+            //文字種 ngram 情報
+            fv.Add($"C-1 {c[p - 1]}", 1);
+            fv.Add($"C+0 {c[p + 0]}", 1);
+            fv.Add($"C+1 {c[p + 1]}", 1);
+            fv.Add($"C-2-1 {c[p - 2]}{c[p - 1]}", 1);
+            fv.Add($"C-1+0 {c[p - 1]}{c[p + 0]}", 1);
+            fv.Add($"C+0+1 {c[p + 0]}{c[p + 1]}", 1);
+            fv.Add($"C+1+2 {c[p + 1]}{c[p + 2]}", 1);
+
+            // 辞書情報
+            var left = dict.Where(x => StartWith(s,p,x,4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
+            var right = dict.Where(x => EndWith(s, p-1, x,4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
+            var inset = dict.Where(x => InsetWith(s, p, x, 4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct(); ;
+            foreach (var l in left) {
+                fv.Add($"L {l}", 1);
+            }
+            foreach (var r in right) {
+                fv.Add($"R {r}", 1);
+            }
+            foreach (var i in inset) {
+                fv.Add($"I {i}", 1);
+            }
 
             return fv;
+        }
+
+        private static bool StartWith(string s1, int s1i, string s2, int max) {
+            if ((s1i < 0) || (s1i >= s1.Length) || (s1.Length - s1i) < s2.Length) {
+                return false;
+            }
+            foreach (var ch in s2) {
+                if (max-- == 0) {
+                    break;
+                }
+                if (s1[s1i++] != ch) { return false; }
+            }
+            return true;
+        }
+        private static bool EndWith(string s1, int s1i, string s2, int max) {
+            if ((s1i < 0) || (s1i < 0) || (s1i < s2.Length)) {
+                return false;
+            }
+            foreach (var ch in s2.Reverse()) {
+                if (max-- == 0) {
+                    break;
+                }
+                if (s1[s1i--] != ch) { return false; }
+            }
+            return true;
+        }
+        private static bool InsetWith(string s1, int s1i, string s2, int max) {
+
+            int s = s1i - s2.Length+1;
+            for (int i=0; i< s2.Length-2; i++) {
+                if (StartWith(s1, s + i, s2, max)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static IEnumerable<Tuple<string, string, string>[]> CreateTrainData(IEnumerable<string> inputs) {

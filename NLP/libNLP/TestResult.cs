@@ -28,7 +28,7 @@ namespace libNLP {
         /// <summary>
         /// 正解率(予測結果全体と、答えがどれぐらい一致しているか)
         /// </summary>
-        public double Accuracy => (double)(TruePositive + TrueNegative) / (TruePositive + FalsePositive + FalseNegative + TrueNegative);
+        public double Accuracy => (double)(TruePositive + TrueNegative) / Total;
 
         /// <summary>
         /// 適合率(予測を正と判断した中で、答えも正のもの)

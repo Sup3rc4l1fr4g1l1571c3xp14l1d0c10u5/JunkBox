@@ -1,6 +1,0 @@
-set PATH=%PATH%;c:\mecab\bin;C:\Users\whelp\source\repos\libNLP\bin\debug
-
-rem •ª‚©‚¿‘‚«
-wordsegment -mode train -model wikipedia00.wordsegment.txt -epoch 500 wikipedia00.mecabed.txt
-wordsegment -mode predict -model wikipedia00.wordsegment.txt wikipedia00.txt
-
