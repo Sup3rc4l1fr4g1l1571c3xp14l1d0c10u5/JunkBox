@@ -328,9 +328,9 @@ namespace libNLP {
         /// </example>
         public  List<string> ExtractFeatures(StructuredPerceptron.TeatureData[] teatureData, int i) {
             var prevWord = (0 <= i - 1 && i - 1 < teatureData.Length) ? teatureData[i - 1].Features[0] : "";
-            var prevLabel = (0 <= i - 1 && i - 1 < teatureData.Length) ? teatureData[i - 1].Label : "BOS";
+            var prevLabel = (0 <= i - 1 && i - 1 < teatureData.Length) ? teatureData[i - 1].Label : "O";
             var currWord = (0 <= i + 0 && i + 0 < teatureData.Length) ? teatureData[i + 0].Features[0] : "";
-            var currLabel = (0 <= i + 0 && i + 0 < teatureData.Length) ? teatureData[i + 0].Label : "";
+            var currLabel = (0 <= i + 0 && i + 0 < teatureData.Length) ? teatureData[i + 0].Label : "O";
             var nextWord = (0 <= i + 1 && i + 1 < teatureData.Length) ? teatureData[i + 1].Features[0] : "";
             //return new List<string>() {
             //    $"transition_feature:{prevLabel}+{currLabel}",

@@ -32,8 +32,10 @@ namespace libNLP {
         /// </summary>
         /// <param name="epoch">学習回数</param>
         /// <param name="positive">教師データ</param>
-        public void Learn(int epoch, IEnumerable<Tuple<string, string[]>[]> positive) {
-            var dics = Mecab.Run(@"C:\Users\whelp\Desktop\新しいフォルダー\libnlp\TestData\worddic.txt").Select(Mecab.ParseLine).Split(y => y.Item1 == "EOS").ToList();
+        public void Learn(int epoch, IEnumerable<Tuple<string, string[]>[]> positive, List<Tuple<string, string[]>[]> dics) {
+            if (dics == null) {
+                dics = new List<Tuple<string, string[]>[]>();
+            }
             var fvs1 = new List<StructuredPerceptron.TeatureData[]>();
             foreach (var line in positive.Where(x => x.Any())) {
                 //var features = line.Select((x, i) => new string[] { x.Item1, x.Item2[0], x.Item2[1] }).ToList();
@@ -56,69 +58,17 @@ namespace libNLP {
                 fvs1.Add(teatures.ToArray());
             }
 
-            sp = StructuredPerceptron.Train(new HashSet<string>() {"I", "O", "B"}, fvs1, 10, new PosTaggingCalcFeature());
+            sp = StructuredPerceptron.Train(new HashSet<string>() {"I", "O", "B"}, fvs1, epoch, new PosTaggingCalcFeature());
             Console.WriteLine(sp.Test(fvs1));
         }
 
         private int IoB(Tuple<string, string[]>[] line, int i, List<Tuple<string, string[]>[]> dics) {
             for (var j=0;;j++) {
-                dics = dics.Where(x => x.Length > i && line.Length > i && x[i].Item1 == line[i].Item1 && x[i].Item2[0] == line[i].Item2[0]).ToList();
-                if (dics.Any()) {
+                dics = dics.Where(x => x.Length > j && line.Length > i + j && x[j].Item1 == line[i + j].Item1 && x[j].Item2[0] == line[i+j].Item2[0]).ToList();
+                if (!dics.Any()) {
                     return j;
                 }
             }
-        }
-
-        /// <summary>
-        /// 教師ベクトルを生成
-        /// </summary>
-        /// <param name="label">ラベル(+1|-1)</param>
-        /// <param name="first">trigramの第1要素</param>
-        /// <param name="second">trigramの第2要素</param>
-        /// <param name="third">trigramの第3要素</param>
-        /// <returns>教師ベクトル</returns>
-        private static Tuple<int, Dictionary<string, double>> CreateTeature(int label, string[] first, string[] second, string[] third) {
-
-            return Tuple.Create(label, CreateFeature(first, second, third));
-        }
-
-        /// <summary>
-        /// 特徴ベクトルを生成
-        /// </summary>
-        /// <param name="pair">trigram</param>
-        /// <returns></returns>
-        private static Dictionary<string, double> CreateFeature(string[][] pair) {
-            return CreateFeature(pair[0], pair[1], pair[2]);
-        }
-
-        /// <summary>
-        /// 特徴ベクトルを生成
-        /// </summary>
-        /// <param name="first">trigramの第1要素</param>
-        /// <param name="second">trigramの第2要素</param>
-        /// <param name="third">trigramの第3要素</param>
-        /// <returns></returns>
-        private static Dictionary<string, double> CreateFeature(string[] first, string[] second, string[] third) {
-            var ret = new Dictionary<string, double>();
-            if (second != null) {
-                ret[$"W0 {second[0]}"] = 1;
-                ret[$"W1 {second[1]}"] = 1;
-                ret[$"F0 {second[0]} {second[1]}"] = 1;
-            }
-            if (first != null && third != null) {
-                ret[$"F1 {first[1]} {third[1]}"] = 1;
-            }
-            if (third != null && second != null) {
-                ret[$"F2 {third[1]} {second[0]}"] = 1;
-            }
-            if (first != null) {
-                ret[$"F3 {first[1]} {first[0]}"] = 1;
-            }
-            if (third != null) {
-                ret[$"F4 {third[1]} {third[0]}"] = 1;
-            }
-
-            return ret;
         }
 
         /// <summary>
