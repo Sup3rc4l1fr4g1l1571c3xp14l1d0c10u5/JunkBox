@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Data;
 using System.Collections.Generic;
 using System.Linq;
@@ -42,11 +43,14 @@ namespace PosTagging {
 
             if (mode == "train") {
                 StructuredPerceptron sp = null;
-                var teatures = files.SelectMany(x => WordSegmenter.CreateTrainData(System.IO.File.ReadLines(x))).Select(x => x.Select(y => Tuple.Create(y.Item1, y.Item2)).ToArray()).ToList();
+                var teatures = files.SelectMany(x => WordSegmenter.CreateTrainData(System.IO.File.ReadLines(x)))
+                                    .Select(x => x.Select(y => new StructuredPerceptron.TeatureData() { Label = y.Item2, Features = new[] { y.Item1 } }).ToArray())
+                                    .ToList();
                 sp = StructuredPerceptron.Train(
-                    new HashSet<string>(teatures.SelectMany(x => x.Select(y => y.Item2)).Distinct()),
+                    new HashSet<string>(teatures.SelectMany(x => x.Select(y => y.Label)).Distinct()),
                     teatures,
-                    epoch
+                    epoch,
+                    new PosTaggingCalcFeature()
                 );
                 using (var sw = new System.IO.StreamWriter(model)) {
                     sp.SaveToStream(sw);
@@ -54,22 +58,24 @@ namespace PosTagging {
                 Console.WriteLine(sp.Test(teatures));
                 Console.WriteLine("学習が完了しました。");
             } else if (mode == "test") {
-                    StructuredPerceptron sp = null;
-                    var teatures = files.SelectMany(x => WordSegmenter.CreateTrainData(System.IO.File.ReadLines(x))).Select(x => x.Select(y => Tuple.Create(y.Item1, y.Item2)).ToArray()).ToList();
+                StructuredPerceptron sp = null;
+                var teatures = files.SelectMany(x => WordSegmenter.CreateTrainData(System.IO.File.ReadLines(x)))
+                                    .Select(x => x.Select(y => new StructuredPerceptron.TeatureData() { Label = y.Item2, Features = new[] { y.Item1 } }).ToArray())
+                                    .ToList();
                 using (var sr = new System.IO.StreamReader(model)) {
-                    sp = StructuredPerceptron.LoadFromStream(sr);
+                    sp = StructuredPerceptron.LoadFromStream(sr, new PosTaggingCalcFeature());
                 }
                 Console.WriteLine(sp.Test(teatures));
-                } else if (mode == "predict") {
+            } else if (mode == "predict") {
                 StructuredPerceptron sp;
                 using (var sr = new System.IO.StreamReader(model)) {
-                    sp = StructuredPerceptron.LoadFromStream(sr);
+                    sp = StructuredPerceptron.LoadFromStream(sr, new PosTaggingCalcFeature());
                 }
                 var items = files.SelectMany(x => System.IO.File.ReadLines(x)).Split(x => x == "EOS");
                 foreach (var item in items) {
-                    var ret = sp.Predict(item);
+                    var ret = sp.Predict(item.Select(x => new StructuredPerceptron.InputData() { Features = new[] { x } }).ToArray());
 
-                    foreach (var x in ret) {
+                    foreach (var x in item.Zip(ret, Tuple.Create)) {
                         Console.WriteLine($"{x.Item1}\t{x.Item2}");
                     }
                 }

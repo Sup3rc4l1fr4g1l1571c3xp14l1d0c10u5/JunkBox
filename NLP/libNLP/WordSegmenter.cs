@@ -18,11 +18,6 @@ namespace libNLP {
         private LinerSVM<string> svm;
 
         /// <summary>
-        /// 辞書単語
-        /// </summary>
-        private static List<string> dict = System.IO.File.ReadLines(@"C:\Users\whelp\source\repos\libNLP\TestData\worddic.txt").Select(x => x.Trim()).Where(x => String.IsNullOrWhiteSpace(x) == false).Distinct().ToList().Tap(x => x.Sort(String.CompareOrdinal));
-
-        /// <summary>
         /// コンストラクタ
         /// </summary>
         public WordSegmenter() {
@@ -192,57 +187,72 @@ namespace libNLP {
             fv.Add($"C+1+2 {c[p + 1]}{c[p + 2]}", 1);
 
             // 辞書情報
-            var left = dict.Where(x => StartWith(s,p,x,4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
-            var right = dict.Where(x => EndWith(s, p-1, x,4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
-            var inset = dict.Where(x => InsetWith(s, p, x, 4)).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct(); ;
-            foreach (var l in left) {
-                fv.Add($"L {l}", 1);
-            }
-            foreach (var r in right) {
-                fv.Add($"R {r}", 1);
-            }
-            foreach (var i in inset) {
-                fv.Add($"I {i}", 1);
-            }
+            //var left = dict.Where(x => StartWith(s,p,x) > 0).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
+            //var right = dict.Where(x => EndWith(s, p-1, x) > 0).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct();
+            //var inset = dict.Where(x => InsetWith(s, p, x) > -1).Select(x => x.Length >= 5 ? 5 : x.Length).Where(x => x > 0).Distinct(); ;
+            //foreach (var l in left) {
+            //    fv.Add($"L {l}", 1);
+            //}
+            //foreach (var r in right) {
+            //    fv.Add($"R {r}", 1);
+            //}
+            //foreach (var i in inset) {
+            //    fv.Add($"I {i}", 1);
+            //}
 
             return fv;
         }
 
-        private static bool StartWith(string s1, int s1i, string s2, int max) {
-            if ((s1i < 0) || (s1i >= s1.Length) || (s1.Length - s1i) < s2.Length) {
-                return false;
-            }
-            foreach (var ch in s2) {
-                if (max-- == 0) {
+        /// <summary>
+        /// 文字列 str の 位置 index を開始地点として文字列 word が存在するか？
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="index"></param>
+        /// <param name="word"></param>
+        /// <param name="maxLen"></param>
+        /// <returns></returns>
+        private static int StartWith(string str, int index, string word) {
+            int n = 0;
+            foreach (var ch in word) {
+                if (0 > index + n || index + n >= str.Length) {
                     break;
                 }
-                if (s1[s1i++] != ch) { return false; }
+                if (str[index + n] != ch) { break; }
+                n++;
             }
-            return true;
+            return n;
         }
-        private static bool EndWith(string s1, int s1i, string s2, int max) {
-            if ((s1i < 0) || (s1i < 0) || (s1i < s2.Length)) {
-                return false;
+        /// <summary>
+        /// 文字列 str の 位置 index を終了地点として文字列 word が存在するか？
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="index"></param>
+        /// <param name="word"></param>
+        /// <param name="maxLen"></param>
+        /// <returns></returns>
+        private static int EndWith(string str, int index, string word) {
+            int n = 0;
+            if ((index < 0) || (index < 0) || (index < word.Length)) {
+                return n;
             }
-            foreach (var ch in s2.Reverse()) {
-                if (max-- == 0) {
+            foreach (var ch in word.Reverse()) {
+                if (0 > index - n || index - n >= str.Length) {
                     break;
                 }
-                if (s1[s1i--] != ch) { return false; }
+                if (str[index - n] != ch) { break; }
+                n++;
             }
-            return true;
+            return n;
         }
-        private static bool InsetWith(string s1, int s1i, string s2, int max) {
+        private static int InsetWith(string str, int index, string word) {
 
-            int s = s1i - s2.Length+1;
-            for (int i=0; i< s2.Length-2; i++) {
-                if (StartWith(s1, s + i, s2, max)) {
-                    return true;
+            for (int i = 0; i < word.Length; i++) {
+                if (StartWith(str, index - i, word) > 0) {
+                    return i;
                 }
             }
-            return false;
+            return -1;
         }
-
         public static IEnumerable<Tuple<string, string, string>[]> CreateTrainData(IEnumerable<string> inputs) {
             var temp = new List<Tuple<string, string, string>>();
             foreach (var x in inputs) {
