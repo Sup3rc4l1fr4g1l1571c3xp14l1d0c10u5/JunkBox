@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 using libNLP.Extentions;
 
 namespace libNLP {
@@ -15,15 +16,15 @@ namespace libNLP {
     /// </summary>
     public class AdaptiveTermExtractor {
         /// <summary>
-        /// 学習器
+        /// 構造化パーセプトロン
         /// </summary>
-        private LinerSVM<string> svm;
+        private StructuredPerceptron sp;
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
         public AdaptiveTermExtractor() {
-            this.svm = new LinerSVM<string>();
+            this.sp = null;
         }
 
         /// <summary>
@@ -32,43 +33,40 @@ namespace libNLP {
         /// <param name="epoch">学習回数</param>
         /// <param name="positive">教師データ</param>
         public void Learn(int epoch, IEnumerable<Tuple<string, string[]>[]> positive) {
-            List<Tuple<int, Dictionary<string, double>>> fvs1 = new List<Tuple<int, Dictionary<string, double>>>();
-
+            var dics = Mecab.Run(@"C:\Users\whelp\Desktop\新しいフォルダー\libnlp\TestData\worddic.txt").Select(Mecab.ParseLine).Split(y => y.Item1 == "EOS").ToList();
+            var fvs1 = new List<StructuredPerceptron.TeatureData[]>();
             foreach (var line in positive.Where(x => x.Any())) {
-                var features = line.Select((x, i) => new string[] { x.Item1, x.Item2[0], x.Item2[1] }).ToList();
+                //var features = line.Select((x, i) => new string[] { x.Item1, x.Item2[0], x.Item2[1] }).ToList();
+                var teatures = new List<StructuredPerceptron.TeatureData>();
 
-                foreach (var pair in new string[][] { (string[])null }.Concat(features).Concat(new string[][] { (string[])null }).EachCons(3)) {
-                    fvs1.Add(CreateTeature(+1, pair));
+                for (var i = 0; i < line.Length; ) {
+                    int n = IoB(line, i, dics);
+                    if (n > 0) {
+                        teatures.Add(new StructuredPerceptron.TeatureData() { Label="B", Features = new [] {line[i].Item1,line[i].Item2[0]}});
+                        for (var j = 1; j < n; j++) {
+                            teatures.Add(new StructuredPerceptron.TeatureData() { Label="I", Features = new [] {line[i+j].Item1,line[i+j].Item2[0]}});
+                        }    
+                        i += n;
+                    }
+                    else {
+                        teatures.Add(new StructuredPerceptron.TeatureData() { Label="O", Features = new [] {line[i].Item1,line[i].Item2[0]}});
+                        i++;
+                    }
                 }
-                fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, (string[])null, features.First() }));
-                fvs1.Add(CreateTeature(-1, new string[][] { features.Last(), (string[])null, (string[])null }));
+                fvs1.Add(teatures.ToArray());
             }
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { ":", "補助記号" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "（", "補助記号" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "）", "補助記号" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "、", "補助記号" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "。", "補助記号" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "や", "助詞" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "の", "助詞" }, (string[])null }));
-            fvs1.Add(CreateTeature(-1, new string[][] { (string[])null, new string[] { "を", "助詞" }, (string[])null }));
 
-            for (var i = 0; i < epoch; i++) {
-                foreach (var fv in fvs1) {
-                    svm.Train(fv.Item2, fv.Item1, 0.06);
-                }
-                svm.Regularize(0.005);
-                Console.WriteLine(svm.Test(fvs1));
-            }
+            sp = StructuredPerceptron.Train(new HashSet<string>() {"I", "O", "B"}, fvs1, 10, new PosTaggingCalcFeature());
+            Console.WriteLine(sp.Test(fvs1));
         }
 
-        /// <summary>
-        /// 教師ベクトルを生成
-        /// </summary>
-        /// <param name="label">ラベル(+1|-1)</param>
-        /// <param name="pair">trigram</param>
-        /// <returns>教師ベクトル</returns>
-        private static Tuple<int, Dictionary<string, double>> CreateTeature(int label, string[][] pair) {
-            return CreateTeature(label, pair[0], pair[1], pair[2]);
+        private int IoB(Tuple<string, string[]>[] line, int i, List<Tuple<string, string[]>[]> dics) {
+            for (var j=0;;j++) {
+                dics = dics.Where(x => x.Length > i && line.Length > i && x[i].Item1 == line[i].Item1 && x[i].Item2[0] == line[i].Item2[0]).ToList();
+                if (dics.Any()) {
+                    return j;
+                }
+            }
         }
 
         /// <summary>
@@ -129,20 +127,10 @@ namespace libNLP {
         /// <param name="line">1行分の形態素解析結果</param>
         /// <returns></returns>
         public List<string[]> Extract(IEnumerable<Tuple<string, string[]>> line) {
-            var features = line.Select((x, i) => new string[] { x.Item1, x.Item2[0], x.Item2[1] }).ToList();
-            var idx = 0;
-            var bug = new List<string>();
-            foreach (var pair in new string[][] { (string[])null }.Concat(features).Concat(new string[][] { (string[])null }).EachCons(3)) {
-                var fv = CreateFeature(pair);
-                var ret = svm.Predict(fv);
-                if (ret > 0) {
-                    bug.Add(pair[1][0]);
-                } else {
-                    bug.Add(null);
-                }
-                idx++;
-            }
-            return bug.Split(x => x == null).Where(x => x.Any()).ToList();
+            var l = line.ToList();
+            var features = l.Select((x, i) => new StructuredPerceptron.InputData { Features = new [] {x.Item1, x.Item2[0] }}).ToArray();
+            var ret = sp.Predict(features);
+            return l.Zip(ret, (x, y) => new[] {x.Item1, y}).ToList();
         }
 
         /// <summary>
@@ -153,7 +141,7 @@ namespace libNLP {
         public static AdaptiveTermExtractor Load(string modelPath) {
             using (var streamReader = new System.IO.StreamReader(modelPath)) {
                 var self = new AdaptiveTermExtractor();
-                self.svm = LinerSVM<string>.LoadFromStream(streamReader, x => x);
+                self.sp = StructuredPerceptron.LoadFromStream(streamReader, new PosTaggingCalcFeature());
                 return self;
             }
         }
@@ -164,7 +152,7 @@ namespace libNLP {
         /// <param name="modelPath">学習モデルファイル</param>
         public void Save(string modelPath) {
             using (var streamWriter = new System.IO.StreamWriter(modelPath)) {
-                svm.SaveToStream(streamWriter, x => x);
+                sp.SaveToStream(streamWriter);
             }
         }
     }
