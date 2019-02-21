@@ -2,14 +2,15 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace StructuredSVM {
     internal class Program {
         private static void Main(string[] args) {
-            Learn(new[] { "train.cps", "--verbose" });
+            Learn(new[] { "train.cps", "-verbose" });
             Console.WriteLine("learn finish");
             Console.ReadKey();
-            Eval(new[] { "test.cps", "--verbose" });
+            Eval(new[] { "test.cps", "-verbose" });
             Console.WriteLine("eval finish");
             Console.ReadKey();
             Test(new string[0]);
@@ -24,6 +25,15 @@ namespace StructuredSVM {
             }
 
             public string Banner { get; set; }
+
+            public string Help() {
+                var sb = new StringBuilder();
+                sb.AppendLine(Banner);
+                foreach (var kv in Entries) {
+                    sb.AppendLine($"{kv.Key} {Enumerable.Repeat("<arg>", kv.Value.Item1).Apply(x => string.Join(" ",x))}");
+                }
+                return sb.ToString();
+            }
 
             public void On(string key, int argc, Action<string[]> predicate) {
                 Entries[key] = Tuple.Create(argc, predicate);
@@ -73,10 +83,10 @@ namespace StructuredSVM {
 
             var dic = new Dic(dicFilename);
 
-            Learner learner = null;
+            AbstractLearner abstractLearner = null;
             switch (learnerType) {
-                case "ssvm": learner = new StructuredSupportVectorMachine(dic, featureFuncs, verboseMode); break;
-                case "learner": learner = new StructuredPerceptron(dic, featureFuncs, verboseMode); break;
+                case "ssvm": abstractLearner = new StructuredSupportVectorMachine(dic, featureFuncs, verboseMode); break;
+                case "learner": abstractLearner = new StructuredPerceptron(dic, featureFuncs, verboseMode); break;
                 default:
                     Console.Error.WriteLine("learner must be 'ssvm' or 'sperceptron'.");
                     Environment.Exit(-1);
@@ -97,11 +107,11 @@ namespace StructuredSVM {
                         Console.WriteLine(s);
                     }
                     var sentence = s.Split(" ".ToArray()).Select(x => x.Split("/".ToArray(), 2, StringSplitOptions.None).Apply(y => Tuple.Create(y[0], y[1]))).ToList();
-                    learner.Learn(sentence);
+                    abstractLearner.Learn(sentence);
                 }
             }
 
-            learner.Save(modelFilename);
+            abstractLearner.Save(modelFilename);
 
         }
 
@@ -487,37 +497,24 @@ namespace StructuredSVM {
     /// <summary>
     /// 学習器
     /// </summary>
-    internal class Learner {
+    internal abstract class AbstractLearner {
         protected Dictionary<string, double> Weight { get; }
         protected Dic Dic { get; }
-        private Decoder Decoder { get; }
         protected FeatureFuncs FeatureFuncs { get; }
         protected bool VerboseMode { get; }
         private double LearningRate { get; }
 
-        public Learner(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) {
+        protected AbstractLearner(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) {
             Weight = new Dictionary<string, double>();
             Dic = dic;
-            Decoder = new Decoder(featureFuncs);
             FeatureFuncs = featureFuncs;
             VerboseMode = verboseMode;
             LearningRate = 0.1;
         }
 
-        public virtual void Learn(List<Tuple<string, string>> sentence) {
-            var str = sentence.Select(x => x.Item2).Apply(string.Concat);
-            var graph = new Graph(Dic, str);
-            var result = Decoder.Viterbi(graph, Weight);
-            if (!sentence.SequenceEqual(result)) {
-                update_parameters(sentence, result);
-            }
-            if (VerboseMode) {
-                // puts sentence.map{|x|x[0]}.join(" ")
-                result.Select(x => x.Item1).Apply(x => string.Join(" ", x)).Apply(Console.WriteLine);
-            }
-        }
+        public abstract void Learn(List<Tuple<string, string>> sentence);
 
-        public List<Node> ConvertToNodes(List<Tuple<string, string>> sentence) {
+        protected List<Node> ConvertToNodes(List<Tuple<string, string>> sentence) {
             var ret = new List<Node>();
             var bos = new Node("", "", 0);
             ret.Add(bos);
@@ -539,10 +536,7 @@ namespace StructuredSVM {
             return ret;
         }
 
-        public virtual List<Tuple<string, string>> Convert(string str) {
-            var graph = new Graph(Dic, str);
-            return Decoder.Viterbi(graph, Weight);
-        }
+        public abstract List<Tuple<string, string>> Convert(string str);
 
         private void UpdateNodeScore(Node node, double diff) {
             Dic.Add(node.Read, node.Word);
@@ -556,7 +550,7 @@ namespace StructuredSVM {
             }
         }
 
-        public void update_edge_score(Node prevNode, Node node, double diff) {
+        private void UpdateEdgeScore(Node prevNode, Node node, double diff) {
             if (prevNode == null) { return; }
             foreach (var func in FeatureFuncs.EdgeFeatures) {
                 var feature = func(prevNode, node);
@@ -568,31 +562,64 @@ namespace StructuredSVM {
             }
         }
 
-        public void update_parameters_body(List<Tuple<string, string>> sentence, double diff) {
+        private void UpdateParametersBody(List<Tuple<string, string>> sentence, double diff) {
             var nodes = ConvertToNodes(sentence);
             Node prevNode = null;
             foreach (var node in nodes) {
                 UpdateNodeScore(node, diff);
-                update_edge_score(prevNode, node, diff);
+                UpdateEdgeScore(prevNode, node, diff);
                 prevNode = node;
             }
         }
 
-        public void update_parameters(List<Tuple<string, string>> sentence, List<Tuple<string, string>> result) {
-            update_parameters_body(sentence, LearningRate);
-            update_parameters_body(result, -1 * LearningRate);
+        /// <summary>
+        /// 学習を行う
+        /// </summary>
+        /// <param name="sentence">教師ベクトル</param>
+        /// <param name="result">結果ベクトル</param>
+        protected void UpdateParameters(
+            List<Tuple<string, string>> sentence, 
+            List<Tuple<string, string>> result
+        ) {
+            UpdateParametersBody(sentence, LearningRate);       // 正例相当
+            UpdateParametersBody(result, -1 * LearningRate);    // 負例相当
         }
 
-        public virtual void Save(string filename) {
+        public abstract void Save(string filename);
+    }
+
+    internal class StructuredPerceptron : AbstractLearner {
+        protected Decoder Decoder { get; }
+
+        public StructuredPerceptron(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) 
+            : base(dic, featureFuncs, verboseMode) {
+            Decoder = new Decoder(featureFuncs);
+        }
+        
+        public override void Learn(List<Tuple<string, string>> sentence) {
+            var str = sentence.Select(x => x.Item2).Apply(string.Concat);
+            var graph = new Graph(Dic, str);
+            var result = Decoder.Viterbi(graph, Weight);
+            if (!sentence.SequenceEqual(result)) {
+                UpdateParameters(sentence, result);
+            }
+            if (VerboseMode) {
+                // puts sentence.map{|x|x[0]}.join(" ")
+                result.Select(x => x.Item1).Apply(x => string.Join(" ", x)).Apply(Console.WriteLine);
+            }
+        }
+
+        public override List<Tuple<string, string>> Convert(string str) {
+            var graph = new Graph(Dic, str);
+            return Decoder.Viterbi(graph, Weight);
+        }
+
+        public override void Save(string filename) {
             System.IO.File.WriteAllLines(filename, Weight.Select(fv => fv.Key + "\t\t" + fv.Value.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
-    internal class StructuredPerceptron : Learner {
-        public StructuredPerceptron(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) : base(dic, featureFuncs, verboseMode) { }
-    }
-
-    internal class StructuredSupportVectorMachine : Learner {
+    internal class StructuredSupportVectorMachine : AbstractLearner {
         private StructuredSupportVectorMachineDecoder Decoder{ get; }
         private Decoder OriginalDecoder{ get; }
         private Dictionary<string, int> LastUpdated{ get; }
@@ -682,7 +709,7 @@ namespace StructuredSVM {
             var goldStandard = ConvertToGoldStandard(sentence);
             var result = Decoder.Viterbi(graph, Weight, goldStandard);
             if (!sentence.SequenceEqual(result)) {
-                update_parameters(sentence, result);
+                UpdateParameters(sentence, result);
             }
             if (VerboseMode) {
                 sentence.Select(x => x.Item1).Apply(x => String.Join(" ", x)).Apply(Console.WriteLine);
@@ -698,7 +725,7 @@ namespace StructuredSVM {
 
         public override void Save(string filename) {
             regularize_all();
-            base.Save(filename);
+            System.IO.File.WriteAllLines(filename, Weight.Select(fv => fv.Key + "\t\t" + fv.Value.ToString(CultureInfo.InvariantCulture)));
         }
 
     }
