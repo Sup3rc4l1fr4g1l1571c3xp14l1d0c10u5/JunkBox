@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 
+// GoldStandard: 教師データ、もしくは、正しいラベルのついたデータ
+
 namespace StructuredSVM {
     internal class Program {
         private static void Main(string[] args) {
@@ -81,7 +83,7 @@ namespace StructuredSVM {
 
             args = opt.Parse(args);
 
-            var dic = new Dic(dicFilename);
+            var dic = new JumanDic(dicFilename);
 
             AbstractLearner abstractLearner = null;
             switch (learnerType) {
@@ -115,8 +117,7 @@ namespace StructuredSVM {
 
         }
 
-
-        public static Dictionary<string, double> read_weight_map(string filename, Dic dic) {
+        public static Dictionary<string, double> ReadWeightMap(string filename, JumanDic jumanDic) {
             var w = new Dictionary<string, double>();
             foreach (var line in System.IO.File.ReadLines(filename).Select(x => x.Trim('\r', '\n'))) {
                 var a = line.Split(new[] { "\t\t" }, 2, StringSplitOptions.None);
@@ -125,7 +126,7 @@ namespace StructuredSVM {
                 if (b.Length == 2 && b[0][0] == 'S' && b[1][0] == 'R') {
                     var word = b[0].Substring(1);
                     var read = b[1].Substring(1);
-                    dic.Add(read, word);
+                    jumanDic.Add(read, word);
                 }
             }
             return w;
@@ -148,9 +149,9 @@ namespace StructuredSVM {
 
             opt.Parse(args);
             
-            var dic = new Dic(dicFilename);
+            var dic = new JumanDic(dicFilename);
             var decoder = new Decoder(featureFuncs);
-            var w = read_weight_map(modelFilename, dic);
+            var w = ReadWeightMap(modelFilename, dic);
 
             string line;
             while ((line = Console.ReadLine()) != null) {
@@ -183,15 +184,9 @@ namespace StructuredSVM {
 
         private static void Eval(string[] args) {
             var featureFuncs = new FeatureFuncs();
-
-            Func<Node, string> nodeFeatureSurface1 = node => "S" + node.Word;
-            featureFuncs.NodeFeatures.Add(nodeFeatureSurface1);
-
-            Func<Node, string> nodeFeatureSurface2 = node => "S" + node.Word + "\tR" + node.Read;
-            featureFuncs.NodeFeatures.Add(nodeFeatureSurface2);
-
-            Func<Node, Node, string> edgeFeatureSurface = (prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word;
-            featureFuncs.EdgeFeatures.Add(edgeFeatureSurface);
+            featureFuncs.NodeFeatures.Add(node => "S" + node.Word);
+            featureFuncs.NodeFeatures.Add(node => "S" + node.Word + "\tR" + node.Read);
+            featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
 
             var modelFilename = "mk.model";
             var dicFilename = "juman.dic";
@@ -212,9 +207,9 @@ namespace StructuredSVM {
                 return;
             }
 
-            var dic = new Dic(dicFilename);
+            var dic = new JumanDic(dicFilename);
             var decoder = new Decoder(featureFuncs);
-            var w = read_weight_map(modelFilename, dic);
+            var w = ReadWeightMap(modelFilename, dic);
 
             var lcsSum = 0;
             var sysSum = 0;
@@ -252,10 +247,10 @@ namespace StructuredSVM {
         public static T1 Apply<T1>(this T1 self, Action<T1> predicate) { predicate(self); return self; }
     }
 
-    public class Dic {
+    public class JumanDic {
         private Dictionary<string, HashSet<string>> Entries { get; }
 
-        public Dic(string filename) {
+        public JumanDic(string filename) {
             Entries = new Dictionary<string, HashSet<string>>();
 
             var lines = System.IO.File.ReadLines(filename)
@@ -327,66 +322,75 @@ namespace StructuredSVM {
         }
     }
 
+    /// <summary>
+    /// 変換候補グラフ
+    /// </summary>
     internal class Graph {
-        public List<List<Node>> Nodes { get; }
+        public List<Node>[] Nodes { get; }
         public Node Eos { get; }
-        public Graph(Dic dic, string str) {
-            Nodes = Enumerable.Repeat((List<Node>)null, str.Length + 2).ToList();
-            // push BOS
-            var bos = new Node("", "", 0);
-            Nodes[0] = new List<Node>() { bos };
+        public Graph(JumanDic dic, string str) {
+            Nodes = Enumerable.Repeat((List<Node>)null, str.Length + 2).Select(x => new List<Node>()).ToArray();
 
             // push BOS
+            var bos = new Node("", "", 0);
+            Nodes[0].Add(bos);
+
+            // push EOS
             Eos = new Node("", "", str.Length + 1);
-            Nodes[str.Length + 1] = new List<Node>() { Eos };
+            Nodes[str.Length + 1].Add(Eos);
 
             for (var i = 0; i < str.Length; i++) {
                 var n = Math.Min(str.Length, i + 16);
                 for (var j = i + 1; j < n; j++) {
                     var read = str.Substring(i, j - i);
+                    // 辞書に登録されている候補を入れる
                     foreach (var word in dic.Find(read)) {
                         var node = new Node(word, read, j);
-                        if (Nodes[j] == null) {
-                            Nodes[j] = new List<Node>();
-                        }
                         Nodes[j].Add(node);
                     }
                 }
                 {
+                    // 無変換に対応する候補を入れる
                     var read = str.Substring(i, 1);
                     if (read != "") {
                         // puts "put "+ Read
                         var node = new Node(read, read, i + 1);
-                        if (Nodes[i + 1] == null) {
-                            Nodes[i + 1] = new List<Node>();
-                        }
                         Nodes[i + 1].Add(node);
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// ノード node の前のノード集合を得る
+        /// </summary>
+        /// <param name="node"></param>
+        /// <returns></returns>
         public List<Node> GetPrevs(Node node) {
             if (node.IsEos) {
-                // eosはlengthが0なので特殊な処理が必要
+                // Eosの場合は最後のノード集合列
                 var startPos = node.EndPos - 1;
                 return Nodes[startPos];
             } else if (node.IsBos) {
-                // bosはそれより前のノードがないので特殊な処理が必要
+                // Bosの場合は空集合
                 return new List<Node>();
             } else {
+                // それ以外はノードの終端
                 var startPos = node.EndPos - node.Length;
                 return Nodes[startPos];
             }
         }
     }
 
+    public delegate string NodeFeatures(Node node);
+    public delegate string EdgeFeatures(Node prevNode,Node node);
+
     internal class FeatureFuncs {
-        public List<Func<Node, string>> NodeFeatures { get; set; }
-        public List<Func<Node, Node, string>> EdgeFeatures { get; set; }
+        public List<NodeFeatures> NodeFeatures { get; set; }
+        public List<EdgeFeatures> EdgeFeatures { get; set; }
         public FeatureFuncs() {
-            NodeFeatures = new List<Func<Node, string>>();
-            EdgeFeatures = new List<Func<Node, Node, string>>();
+            NodeFeatures = new List<NodeFeatures>();
+            EdgeFeatures = new List<EdgeFeatures>();
         }
     }
 
@@ -397,6 +401,13 @@ namespace StructuredSVM {
             FeatureFuncs = featureFuncs;
         }
 
+        /// <summary>
+        /// ノード node のスコアを求める
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="gold"></param>
+        /// <param name="w"></param>
+        /// <returns></returns>
         public virtual double GetNodeScore(Node node, List<Node> gold, Dictionary<string, double> w) {
             var score = 0.0;
             foreach (var func in FeatureFuncs.NodeFeatures) {
@@ -405,7 +416,6 @@ namespace StructuredSVM {
                 if (w.TryGetValue(feature, out v)) {
                     score += v;
                 }
-
             }
             return score;
         }
@@ -499,12 +509,12 @@ namespace StructuredSVM {
     /// </summary>
     internal abstract class AbstractLearner {
         protected Dictionary<string, double> Weight { get; }
-        protected Dic Dic { get; }
+        protected JumanDic Dic { get; }
         protected FeatureFuncs FeatureFuncs { get; }
         protected bool VerboseMode { get; }
         private double LearningRate { get; }
 
-        protected AbstractLearner(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) {
+        protected AbstractLearner(JumanDic dic, FeatureFuncs featureFuncs, bool verboseMode) {
             Weight = new Dictionary<string, double>();
             Dic = dic;
             FeatureFuncs = featureFuncs;
@@ -591,7 +601,7 @@ namespace StructuredSVM {
     internal class StructuredPerceptron : AbstractLearner {
         protected Decoder Decoder { get; }
 
-        public StructuredPerceptron(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) 
+        public StructuredPerceptron(JumanDic dic, FeatureFuncs featureFuncs, bool verboseMode) 
             : base(dic, featureFuncs, verboseMode) {
             Decoder = new Decoder(featureFuncs);
         }
@@ -626,7 +636,7 @@ namespace StructuredSVM {
         private int UpdatedCount{ get; set; }
         private double Lambda { get; }
 
-        public StructuredSupportVectorMachine(Dic dic, FeatureFuncs featureFuncs, bool verboseMode) : base(dic, featureFuncs, verboseMode) {
+        public StructuredSupportVectorMachine(JumanDic dic, FeatureFuncs featureFuncs, bool verboseMode) : base(dic, featureFuncs, verboseMode) {
 
             Decoder = new StructuredSupportVectorMachineDecoder(featureFuncs);
             OriginalDecoder = new Decoder(featureFuncs);
