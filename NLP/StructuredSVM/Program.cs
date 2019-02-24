@@ -9,17 +9,35 @@ using System.Text;
 namespace StructuredSVM {
     internal class Program {
         private static void Main(string[] args) {
-            Learn(new[] { "train.cps", "-verbose" });
-            Console.WriteLine("learn finish");
-            Console.ReadKey();
-            Eval(new[] { "test.cps", "-verbose" });
-            Console.WriteLine("eval finish");
-            Console.ReadKey();
-            Test(new string[0]);
-            Console.WriteLine("test finish");
-            Console.ReadKey();
+
+            System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+            if (true) {
+                sw.Reset();
+                Console.WriteLine("learn start.");
+                sw.Start();
+                Learn(new[] { "train.cps", "-verbose" });
+                sw.Stop();
+                Console.WriteLine($"learn finish. ({sw.ElapsedMilliseconds}ms)");
+            }
+            if (true) {
+                sw.Reset();
+                Console.WriteLine("eval start.");
+                sw.Start();
+                Eval(new[] { "test.cps", "-verbose" });
+                sw.Stop();
+                Console.WriteLine($"eval finish. ({sw.ElapsedMilliseconds}ms)");
+            }
+
+            if (true) {
+                Test(new string[0]);
+                Console.WriteLine("test finish");
+                Console.ReadKey();
+            }
         }
 
+        /// <summary>
+        /// OptParserっぽいもの
+        /// </summary>
         private class OptParse {
             private Dictionary<string, Tuple<int, Action<string[]>>> Entries { get; }
             public OptParse() {
@@ -74,7 +92,7 @@ namespace StructuredSVM {
             var iterationNum = 1;
 
             OptParse opt = new OptParse();
-            opt.Banner = "learn.rb [options] corpus_filename";
+            opt.Banner = "learn [options] corpus_filename";
             opt.On("-model", 1, v => { modelFilename = v[0]; });
             opt.On("-dic", 1, v => { dicFilename = v[0]; });
             opt.On("-learner", 1, v => { learnerType = v[0]; });
@@ -193,7 +211,7 @@ namespace StructuredSVM {
             var verboseMode = false;
 
             OptParse opt = new OptParse();
-            opt.Banner = "test [options] corpus_filename";
+            opt.Banner = "eval [options] corpus_filename";
             opt.On("-model", 1, v => { modelFilename = v[0]; });
             opt.On("-dic", 1, v => { dicFilename = v[0]; });
             opt.On("-verbose", 0, v => { verboseMode = true; });
@@ -247,6 +265,9 @@ namespace StructuredSVM {
         public static T1 Apply<T1>(this T1 self, Action<T1> predicate) { predicate(self); return self; }
     }
 
+    /// <summary>
+    /// 辞書
+    /// </summary>
     public class JumanDic {
         private Dictionary<string, HashSet<string>> Entries { get; }
 
@@ -294,12 +315,22 @@ namespace StructuredSVM {
         }
     }
 
+    /// <summary>
+    /// ラティス構造のノード
+    /// </summary>
     public class Node {
+        /// <summary>
+        /// ノードの終端位置
+        /// </summary>
         public int EndPos { get; }
         public string Word { get; }
         public string Read { get; }
         public double Score { get; set; }
         public Node Prev { get; set; }
+
+        public override string ToString() {
+            return $"<Node Pos='{EndPos - Length}' Read='{Read}' Word='{Word}' Score='{Score}' Prev='{Prev?.EndPos ?? -1}' />";
+        }
 
         public Node(string word, string read, int endPos) {
             Word = word;
@@ -309,44 +340,54 @@ namespace StructuredSVM {
             Prev = null;
         }
 
+        /// <summary>
+        /// 受理する文字列の長さ
+        /// </summary>
         public int Length {
             get { return Read.Length; }
         }
 
+        /// <summary>
+        /// グラフの先頭ノードであるか？
+        /// </summary>
         public bool IsBos {
             get { return EndPos == 0; }
         }
 
+        /// <summary>
+        /// グラフの終端ノードであるか？
+        /// </summary>
         public bool IsEos {
             get { return (Read.Length == 0 && EndPos != 0); }
         }
     }
 
     /// <summary>
-    /// 変換候補グラフ
+    /// ラティス構造（グラフ）
     /// </summary>
-    internal class Graph {
-        public List<Node>[] Nodes { get; }
+    public class Graph {
+        public IReadOnlyList<Node>[] Nodes { get; }
         public Node Eos { get; }
         public Graph(JumanDic dic, string str) {
-            Nodes = Enumerable.Repeat((List<Node>)null, str.Length + 2).Select(x => new List<Node>()).ToArray();
+            var nodes = Enumerable.Repeat((List<Node>)null, str.Length + 2).Select(x => new List<Node>()).ToArray();
 
             // push BOS
             var bos = new Node("", "", 0);
-            Nodes[0].Add(bos);
+            nodes[0].Add(bos);
 
             // push EOS
             Eos = new Node("", "", str.Length + 1);
-            Nodes[str.Length + 1].Add(Eos);
+            nodes[str.Length + 1].Add(Eos);
 
             for (var i = 0; i < str.Length; i++) {
                 var n = Math.Min(str.Length, i + 16);
-                for (var j = i + 1; j < n; j++) {
+                // 1～16gramでスキャンして辞書に登録されている候補をグラフに入れる
+                for (var j = i + 1; j <= n; j++) {
+                    // 本来はCommonPrefixSearchを使う
                     var read = str.Substring(i, j - i);
-                    // 辞書に登録されている候補を入れる
                     foreach (var word in dic.Find(read)) {
                         var node = new Node(word, read, j);
-                        Nodes[j].Add(node);
+                        nodes[j].Add(node);
                     }
                 }
                 {
@@ -355,10 +396,11 @@ namespace StructuredSVM {
                     if (read != "") {
                         // puts "put "+ Read
                         var node = new Node(read, read, i + 1);
-                        Nodes[i + 1].Add(node);
+                        nodes[i + 1].Add(node);
                     }
                 }
             }
+            Nodes = nodes;
         }
 
         /// <summary>
@@ -366,7 +408,7 @@ namespace StructuredSVM {
         /// </summary>
         /// <param name="node"></param>
         /// <returns></returns>
-        public List<Node> GetPrevs(Node node) {
+        public IReadOnlyList<Node> GetPrevs(Node node) {
             if (node.IsEos) {
                 // Eosの場合は最後のノード集合列
                 var startPos = node.EndPos - 1;
@@ -380,21 +422,53 @@ namespace StructuredSVM {
                 return Nodes[startPos];
             }
         }
+
+        public override string ToString() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("<Graph>");
+            foreach (var nodes in Nodes) {
+                sb.AppendLine("\t<Nodes>");
+                foreach (var node in nodes) {
+                    sb.AppendLine("\t\t" + node.ToString());
+                }
+                sb.AppendLine("\t</Nodes>");
+            }
+            sb.AppendLine("</Graph>");
+            return sb.ToString();
+        }
     }
 
+    /// <summary>
+    /// ノードから特徴を一つ算出するデリゲート
+    /// </summary>
+    /// <param name="node">ノード</param>
+    /// <returns></returns>
     public delegate string NodeFeatures(Node node);
+
+    /// <summary>
+    /// エッジから特徴を一つ算出するデリゲート
+    /// </summary>
+    /// <param name="prevNode">ノードに繋がっているひとつ前のノード</param>
+    /// <param name="node">ノード</param>
+    /// <returns></returns>
     public delegate string EdgeFeatures(Node prevNode,Node node);
 
-    internal class FeatureFuncs {
-        public List<NodeFeatures> NodeFeatures { get; set; }
-        public List<EdgeFeatures> EdgeFeatures { get; set; }
+    /// <summary>
+    /// ノードから特徴ベクトルを算出するクラス
+    /// </summary>
+    public class FeatureFuncs {
+        public List<NodeFeatures> NodeFeatures { get; }
+        public List<EdgeFeatures> EdgeFeatures { get; }
         public FeatureFuncs() {
             NodeFeatures = new List<NodeFeatures>();
             EdgeFeatures = new List<EdgeFeatures>();
         }
     }
 
-    internal class Decoder {
+    /// <summary>
+    /// ビタビデコーダークラス
+    /// </summary>
+    public class Decoder {
         private FeatureFuncs FeatureFuncs { get; }
 
         public Decoder(FeatureFuncs featureFuncs) {
@@ -404,11 +478,11 @@ namespace StructuredSVM {
         /// <summary>
         /// ノード node のスコアを求める
         /// </summary>
-        /// <param name="node"></param>
-        /// <param name="gold"></param>
-        /// <param name="w"></param>
+        /// <param name="node">スコアを求める対象のノード</param>
+        /// <param name="gold">正解を示すノード列</param>
+        /// <param name="w">特徴の重み表</param>
         /// <returns></returns>
-        public virtual double GetNodeScore(Node node, List<Node> gold, Dictionary<string, double> w) {
+        public virtual double GetNodeScore(Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
             var score = 0.0;
             foreach (var func in FeatureFuncs.NodeFeatures) {
                 var feature = func(node);
@@ -420,7 +494,15 @@ namespace StructuredSVM {
             return score;
         }
 
-        public virtual double GetEdgeScore(Node prevNode, Node node, List<Node> gold, Dictionary<string, double> w) {
+        /// <summary>
+        /// エッジ prevNode -> node のスコアを求める
+        /// </summary>
+        /// <param name="prevNode">エッジの元ノード</param>
+        /// <param name="node">エッジの先ノード</param>
+        /// <param name="gold">正解を示すノード列</param>
+        /// <param name="w">特徴の重み表</param>
+        /// <returns></returns>
+        public virtual double GetEdgeScore(Node prevNode, Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
             var score = 0.0;
             foreach (var func in FeatureFuncs.EdgeFeatures) {
                 var feature = func(prevNode, node);
@@ -432,7 +514,14 @@ namespace StructuredSVM {
             return score;
         }
 
-        public List<Tuple<string, string>> Viterbi(Graph graph, Dictionary<string, double> w, List<Node> gold = null) {
+        /// <summary>
+        /// ビタビアルゴリズム
+        /// </summary>
+        /// <param name="graph">グラフ</param>
+        /// <param name="w">特徴量の重み</param>
+        /// <param name="gold"></param>
+        /// <returns></returns>
+        public List<Tuple<string, string>> Viterbi(Graph graph, IReadOnlyDictionary<string, double> w, IReadOnlyList<Node> gold = null) {
 
             foreach (var nodes in graph.Nodes) {
                 foreach (var node in nodes) {
@@ -473,18 +562,34 @@ namespace StructuredSVM {
             Penalty = 0.05;
         }
 
-        private static bool IsCorrectNode(Node node, List<Node> gold) {
+        /// <summary>
+        /// ノード node の値と教師データの値が一致しているか？
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="gold"></param>
+        /// <returns></returns>
+        private static bool IsCorrectNode(Node node, IReadOnlyList<Node> gold) {
             var correctNode = gold[node.EndPos];
             return (correctNode != null && node.Word == correctNode.Word);
         }
 
-        private static bool IsCorrectEdge(Node prevNode, Node node, List<Node> gold) {
+        /// <summary>
+        /// prevNodeとnodeの間のエッジが教師データと一致しているかを判定
+        /// （ノード prevNode と node の値がそれぞれ教師データと一致しているかどうかをもって結果としている）
+        /// </summary>
+        /// <param name="prevNode"></param>
+        /// <param name="node"></param>
+        /// <param name="gold"></param>
+        /// <returns></returns>
+        private static bool IsCorrectEdge(Node prevNode, Node node, IReadOnlyList<Node> gold) {
             return IsCorrectNode(node, gold) && IsCorrectNode(prevNode, gold);
         }
 
-        public override double GetNodeScore(Node node, List<Node> gold, Dictionary<string, double> w) {
+        public override double GetNodeScore(Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
             var score = 0.0;
             if (IsCorrectNode(node, gold)) {
+                // スコアが大きい＝尤もらしさが高いのはずなのに
+                // 正しく分類できている場合にスコアからペナルティを減算するのはなぜ？
                 score -= Penalty;
             }
 
@@ -492,9 +597,11 @@ namespace StructuredSVM {
             return score;
         }
 
-        public override double GetEdgeScore(Node prevNode, Node node, List<Node> gold, Dictionary<string, double> w) {
+        public override double GetEdgeScore(Node prevNode, Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
             var score = 0.0;
             if (IsCorrectEdge(prevNode, node, gold)) {
+                // スコアが大きい＝尤もらしさが高いのはずなのに
+                // 正しく分類できている場合にスコアからペナルティを減算するのはなぜ？
                 score -= Penalty;
             }
 
@@ -522,9 +629,9 @@ namespace StructuredSVM {
             LearningRate = 0.1;
         }
 
-        public abstract void Learn(List<Tuple<string, string>> sentence);
+        public abstract void Learn(IList<Tuple<string, string>> sentence);
 
-        protected List<Node> ConvertToNodes(List<Tuple<string, string>> sentence) {
+        protected List<Node> ConvertToNodes(IList<Tuple<string, string>> sentence) {
             var ret = new List<Node>();
             var bos = new Node("", "", 0);
             ret.Add(bos);
@@ -572,7 +679,7 @@ namespace StructuredSVM {
             }
         }
 
-        private void UpdateParametersBody(List<Tuple<string, string>> sentence, double diff) {
+        private void UpdateParametersBody(IList<Tuple<string, string>> sentence, double diff) {
             var nodes = ConvertToNodes(sentence);
             Node prevNode = null;
             foreach (var node in nodes) {
@@ -583,13 +690,13 @@ namespace StructuredSVM {
         }
 
         /// <summary>
-        /// 学習を行う
+        /// 教師ベクトルと結果ベクトルを基に重みを更新する
         /// </summary>
         /// <param name="sentence">教師ベクトル</param>
         /// <param name="result">結果ベクトル</param>
         protected void UpdateParameters(
-            List<Tuple<string, string>> sentence, 
-            List<Tuple<string, string>> result
+            IList<Tuple<string, string>> sentence,
+            IList<Tuple<string, string>> result
         ) {
             UpdateParametersBody(sentence, LearningRate);       // 正例相当
             UpdateParametersBody(result, -1 * LearningRate);    // 負例相当
@@ -606,10 +713,16 @@ namespace StructuredSVM {
             Decoder = new Decoder(featureFuncs);
         }
         
-        public override void Learn(List<Tuple<string, string>> sentence) {
+        /// <summary>
+        /// 学習
+        /// </summary>
+        /// <param name="sentence"></param>
+        public override void Learn(IList<Tuple<string, string>> sentence) {
             var str = sentence.Select(x => x.Item2).Apply(string.Concat);
             var graph = new Graph(Dic, str);
+
             var result = Decoder.Viterbi(graph, Weight);
+
             if (!sentence.SequenceEqual(result)) {
                 UpdateParameters(sentence, result);
             }
@@ -646,7 +759,7 @@ namespace StructuredSVM {
             Lambda = 1.0e-22;
         }
 
-        public List<Node> ConvertToGoldStandard(List<Tuple<string, string>> sentence) {
+        private List<Node> ConvertToGoldStandard(IList<Tuple<string, string>> sentence) {
             var nodes = ConvertToNodes(sentence);
             var ret = Enumerable.Repeat((Node)null, nodes.Max(x => x.EndPos) + 1).ToList();
             foreach (var node in nodes) {
@@ -655,11 +768,11 @@ namespace StructuredSVM {
             return ret;
         }
 
-        public static double Clip(double a, double b) {
+        private static double Clip(double a, double b) {
             return Math.Sign(a) * Math.Max(Math.Abs(a) - b, 0);
         }
 
-        public void RegularizeFeature(string feature) {
+        private void RegularizeFeature(string feature) {
             double value;
             if (Weight.TryGetValue(feature, out value)) {
                 int lastUpdated;
@@ -674,14 +787,14 @@ namespace StructuredSVM {
             }
         }
 
-        public void RegularizeNode(Node node) {
+        private void RegularizeNode(Node node) {
             foreach (var func in FeatureFuncs.NodeFeatures) {
                 var feature = func(node);
                 RegularizeFeature(feature);
             }
         }
 
-        public void RegularizeEdge(Node prevNode, Node node) {
+        private void RegularizeEdge(Node prevNode, Node node) {
             foreach (var func in FeatureFuncs.EdgeFeatures) {
                 var feature = func(prevNode, node);
                 RegularizeFeature(feature);
@@ -689,10 +802,11 @@ namespace StructuredSVM {
         }
 
 
-        // graphに出てくるところだけ正則化をかける
-        // 雑誌のナイーブなコードでも動作速度以外は問題ないが、今回は遅すぎるのでこのテクニックを使う。
-        // 詳しくは Efficient Online and Batch Learning Using Forward Backward Splitting; John Duchi, Yoram Singer; Journal of Machine Learning Research 10(Dec):2899-2934, 2009 を参照。
-        public void Regularize(Graph graph) {
+        /// <summary>
+        /// 遅延付きL1正則化
+        /// </summary>
+        /// <param name="graph"></param>
+        private void Regularize(Graph graph) {
             foreach (var nodes in graph.Nodes) {
                 foreach (var node in nodes) {
                     if (node.IsBos) { continue; }
@@ -705,19 +819,24 @@ namespace StructuredSVM {
         }
 
         // ファイルにパラメーターを保存する前に正則化をかけるために使う
-        public void regularize_all() {
+        private void RegularizeAll() {
             foreach (var feature in Weight.Keys.ToList()) {
                 RegularizeFeature(feature);
             }
         }
 
-        public override void Learn(List<Tuple<string, string>> sentence) {
-            var str = sentence.Select(x => x.Item1).Apply(String.Concat);
+        /// <summary>
+        /// 学習する
+        /// </summary>
+        /// <param name="sentence"></param>
+        public override void Learn(IList<Tuple<string, string>> sentence) {
+            var str = sentence.Select(x => x.Item2).Apply(String.Concat);
             var graph = new Graph(Dic, str);
-            Regularize(graph);
+            Regularize(graph);  // L1正則化
 
             var goldStandard = ConvertToGoldStandard(sentence);
             var result = Decoder.Viterbi(graph, Weight, goldStandard);
+
             if (!sentence.SequenceEqual(result)) {
                 UpdateParameters(sentence, result);
             }
@@ -734,7 +853,7 @@ namespace StructuredSVM {
         }
 
         public override void Save(string filename) {
-            regularize_all();
+            RegularizeAll();
             System.IO.File.WriteAllLines(filename, Weight.Select(fv => fv.Key + "\t\t" + fv.Value.ToString(CultureInfo.InvariantCulture)));
         }
 
