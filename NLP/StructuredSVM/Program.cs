@@ -368,7 +368,6 @@ namespace StructuredSVM {
         /// スコア
         /// </summary>
         public double Score { get; set; }
-        var featureFuncs = CreateFeatureFuncs();
 
         /// <summary>
         /// このノードが接続されているひとつ前のノード
@@ -466,7 +465,7 @@ namespace StructuredSVM {
                     }
                 }
             }
-            Nodes = nodes;
+            Nodes = nodes.Cast<IReadOnlyList<Node>>().ToArray();
         }
 
         /// <summary>
@@ -495,7 +494,7 @@ namespace StructuredSVM {
             foreach (var nodes in Nodes) {
                 sb.AppendLine("\t<Nodes>");
                 foreach (var node in nodes) {
-                    sb.AppendLine("\t\t" + node.ToString());
+                    sb.AppendLine("\t\t" + node);
                 }
                 sb.AppendLine("\t</Nodes>");
             }
@@ -992,6 +991,7 @@ namespace StructuredSVM {
         /// <summary>
         /// 辺 prevNode -> Node の特徴に対応する重みの正則化
         /// </summary>
+        /// <param name="prevNode"></param>
         /// <param name="node">ノード</param>
         private void RegularizeEdge(Node prevNode, Node node) {
             foreach (var func in FeatureFuncs.EdgeFeatures) {
