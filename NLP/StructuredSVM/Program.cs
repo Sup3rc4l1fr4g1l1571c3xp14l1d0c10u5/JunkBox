@@ -79,11 +79,16 @@ namespace StructuredSVM {
             }
         }
 
-        private static void Learn(string[] args) {
+        private static FeatureFuncs CreateFeatureFuncs() {
             var featureFuncs = new FeatureFuncs();
             featureFuncs.NodeFeatures.Add(node => "S" + node.Word);
             featureFuncs.NodeFeatures.Add(node => "S" + node.Word + "\tR" + node.Read);
             featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
+            return featureFuncs;
+        }
+
+        private static void Learn(string[] args) {
+            var featureFuncs = CreateFeatureFuncs();
 
             var modelFilename = "mk.model";
             var dicFilename = "juman.dic";
@@ -151,11 +156,7 @@ namespace StructuredSVM {
         }
 
         private static void Test(string[] args) {
-            var featureFuncs = new FeatureFuncs();
-
-            featureFuncs.NodeFeatures.Add(node => "S" + node.Word);
-            featureFuncs.NodeFeatures.Add(node => "S" + node.Word + "\tR" + node.Read);
-            featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
+            var featureFuncs = CreateFeatureFuncs();
 
             var modelFilename = "mk.model";
             var dicFilename = "juman.dic";
@@ -201,10 +202,7 @@ namespace StructuredSVM {
         }
 
         private static void Eval(string[] args) {
-            var featureFuncs = new FeatureFuncs();
-            featureFuncs.NodeFeatures.Add(node => "S" + node.Word);
-            featureFuncs.NodeFeatures.Add(node => "S" + node.Word + "\tR" + node.Read);
-            featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
+            var featureFuncs = CreateFeatureFuncs();
 
             var modelFilename = "mk.model";
             var dicFilename = "juman.dic";
@@ -279,12 +277,23 @@ namespace StructuredSVM {
     /// 辞書の実装
     /// </summary>
     public class Dic : IDic {
+        /// <summary>
+        /// 読み⇒書き表（書きは文字列集合）
+        /// </summary>
         private Dictionary<string, HashSet<string>> Entries { get; }
 
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
         public Dic() {
             Entries = new Dictionary<string, HashSet<string>>();
         }
 
+        /// <summary>
+        /// 要素追加
+        /// </summary>
+        /// <param name="read">読み</param>
+        /// <param name="word">書き</param>
         public void Add(string read, string word) {
             HashSet<string> value;
             if (Entries.TryGetValue(read, out value)) {
@@ -296,6 +305,12 @@ namespace StructuredSVM {
             }
         }
 
+        /// <summary>
+        /// 読み str の最大 max 文字までの共通接頭語を返す
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="max"></param>
+        /// <returns></returns>
         public List<string[]> CommonPrefixSearch(string str, int max) {
             var result = new List<string[]>();
             var limit = Math.Max(str.Length, max);
@@ -353,6 +368,7 @@ namespace StructuredSVM {
         /// スコア
         /// </summary>
         public double Score { get; set; }
+        var featureFuncs = CreateFeatureFuncs();
 
         /// <summary>
         /// このノードが接続されているひとつ前のノード
