@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>ガントチャート</title>
+    <script>
+        window.onload = function () {
+            function $svg(name, attr = {}) {
+                var svg = document.createElementNS("http://www.w3.org/2000/svg", name);
+                for (var key of Object.keys(attr)) {
+                    svg.setAttribute(key, attr[key]);
+                }
+                return svg;
+            }
+
+            let svg = $svg("svg", { x: 0, y: 0, width: "100%", height: "100%" });
+            document.body.appendChild(svg);
+
+            let g = null;
+
+            let fontSize = 15;
+            let dateBoxHeight = fontSize + 5;
+            let dateBoxWidth = fontSize * 4;
+
+            let deltaX = 0;
+            let baseDate = new Date();
+            baseDate.setUTCHours(0, 0, 0, 0);
+
+            let projects = [
+                { name: "書類作成", start: new Date("2019-03-02"), end: new Date("2019-03-04"), linkto: "書類承認手続き" },
+                { name: "書類承認手続き", start: new Date("2019-03-05"), end: new Date("2019-03-07") },
+                { name: "書類提出", start: new Date("2019-03-08"), end: new Date("2019-03-10") },
+                { name: "ＭＴＧ", start: new Date("2019-03-07"), end: new Date("2019-03-07") },
+            ];
+
+
+            let scrollXValue = 0;
+            svg.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                let sx = e.clientX;
+                let sy = e.clientY;
+                let moveEventHandler = (e) => { e.preventDefault(); scrollXValue += e.clientX - sx; sx = e.clientX; update(); }
+                let releaseEventHandler = (e) => { e.preventDefault(); svg.removeEventListener("mousemove", moveEventHandler, false); svg.removeEventListener("mouseup", releaseEventHandler, false); }
+                svg.addEventListener("mousemove", moveEventHandler, false);
+                svg.addEventListener("mouseup", releaseEventHandler, false);
+                update();
+            });
+
+            window.addEventListener("resize", (e) => update());
+
+            function update() {
+                let prevG = g;
+                g = $svg("g");
+
+                let rect = svg.getBoundingClientRect();
+
+                let widthByDate = ~~((rect.width + dateBoxWidth - 1) / dateBoxWidth);
+
+                let midDate = new Date(baseDate); midDate.setUTCHours(midDate.getUTCHours() - ~~(scrollXValue / dateBoxWidth) * 24); midDate.setUTCHours(0, 0, 0, 0);
+                let startDate = new Date(midDate); startDate.setUTCDate(startDate.getUTCDate() - 4);
+                let endDate = new Date(startDate); endDate.setUTCDate(endDate.getUTCDate() + ~~(rect.width / dateBoxWidth));
+
+                let scrollX = scrollXValue % dateBoxWidth;
+
+                if (1) {
+                    let rightRight = widthByDate * dateBoxWidth;
+                    let rightLeft  = Math.max(dateBoxWidth * 4, rightRight - endDate.getUTCDate() * dateBoxWidth + scrollX);
+                    let rightWidth = rightRight - rightLeft;
+                    let leftRight = rightLeft;
+                    let leftLeft = dateBoxWidth * 4;
+                    let leftWidth = Math.max(leftRight-leftLeft, 0);
+
+                    {
+                        let m = startDate.getYear() * 12 + startDate.getMonth();
+
+                        let monthBox = $svg("rect", { x: leftLeft, y: 0, width: leftWidth, height: dateBoxHeight, fill: (m % 2) ? "#EEFFEE" : "#EEEEFF" });
+                        g.appendChild(monthBox);
+
+                        let monthText = $svg("text", { x: leftLeft, y: dateBoxHeight, dx: leftWidth / 2, dy: -dateBoxHeight / 2, "font-family": "monospace", "font-size": fontSize, "text-anchor": "middle", "dominant-baseline": "central" });
+                        monthText.innerHTML = `${startDate.getMonth() + 1}月`;
+                        g.appendChild(monthText);
+                    }
+                    {
+                        let m = endDate.getYear() * 12 + endDate.getMonth();
+
+                        let monthBox = $svg("rect", { x: rightLeft, y: 0, width: rightWidth, height: dateBoxHeight, fill: (m % 2) ? "#EEFFEE" : "#EEEEFF" });
+                        g.appendChild(monthBox);
+
+                        let monthText = $svg("text", { x: rightLeft, y: dateBoxHeight, dx: rightWidth / 2, dy: -dateBoxHeight / 2, "font-family": "monospace", "font-size": fontSize, "text-anchor": "middle", "dominant-baseline": "central" });
+                        monthText.innerHTML = `${endDate.getMonth() + 1}月`;
+                        g.appendChild(monthText);
+                    }
+                }
+
+                let date = new Date(midDate);
+                date.setUTCDate(date.getUTCDate() - 4);
+                let nd = ~~(date.getTime() / (1000 * 60 * 60 * 24));
+                for (let i = 0; i <= widthByDate; i++) {
+                    {
+                        let dateBox = $svg("rect", { x: i * dateBoxWidth + scrollX, y: dateBoxHeight, width: dateBoxWidth, height: dateBoxHeight, fill: ((nd + i) % 2) ? "#FFFFCC" : "#CCFFCC" });
+                        g.appendChild(dateBox);
+
+                        let dateText = $svg("text", { x: i * dateBoxWidth + scrollX, y: dateBoxHeight + dateBoxHeight, dx: dateBoxWidth / 2, dy: -dateBoxHeight / 2, "font-family": "monospace", "font-size": fontSize, "text-anchor": "middle", "dominant-baseline": "central" });
+                        dateText.innerHTML = `${date.getDate()}(${"日月火水木金土"[date.getDay()]})`;
+                        g.appendChild(dateText);
+                    }
+
+                    date.setUTCDate(date.getUTCDate()+1);
+                }
+
+                if (1) {
+                    let projNameBoxWidth = dateBoxWidth * 4;
+                    let projNameBoxHeight = fontSize + 10;
+
+                    {
+                        let blankBox = $svg("rect", { x: 0, y: 0, width: projNameBoxWidth, height: projNameBoxHeight * 2, fill: "#FFFFFF" });
+                        g.appendChild(blankBox);
+                    }
+                    for (let i = 0; i < projects.length; i++) {
+                        for (let j = 0; j <= widthByDate; j++) {
+                            {
+                                let projDateCell = $svg("rect", { x: j * dateBoxWidth + scrollX, y: dateBoxHeight + dateBoxHeight + projNameBoxHeight * i, width: dateBoxWidth, height: projNameBoxHeight, fill: ((nd + j) % 2) ? "#EEEEEE" : "#E0E0E0" });
+                                g.appendChild(projDateCell);
+                            }
+                        }
+
+                        {
+                            let localStart = 0;
+                            if (projects[i].start < startDate) {
+                                localStart = 0;
+                            } else if (startDate <= projects[i].start && projects[i].start <= endDate) {
+                                localStart = Math.ceil((projects[i].start - startDate) / (1000 * 60 * 60 * 24));
+                            } else {
+                                localStart = widthByDate;
+                            }
+
+                            let localEnd = -1;
+                            if (projects[i].end < startDate) {
+                                localEnd = -1;
+                            } else if (startDate <= projects[i].end && projects[i].end <= endDate) {
+                                localEnd = Math.ceil((projects[i].end - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                            } else {
+                                localEnd = widthByDate;
+                            }
+                            if (localStart < localEnd) {
+                                let projNameBox = $svg("rect", { x: localStart * dateBoxWidth + scrollX, y: dateBoxHeight + dateBoxHeight + projNameBoxHeight * i + 5, width: (localEnd - localStart) * dateBoxWidth, height: projNameBoxHeight - 10, fill: "#FFAAAA" });
+                                g.appendChild(projNameBox);
+                            }
+                        }
+
+                    }
+
+                    for (let i = 0; i < projects.length; i++) {
+                        let linktoName = projects[i].linkto;
+                        if (linktoName == null) { continue; }
+                        let targetProjectId = projects.findIndex(x => x.name == linktoName);
+                        if (targetProjectId == -1) { continue; }
+                        const targetProject = projects[targetProjectId];
+
+                        let toX = 0;
+                        let toY = dateBoxHeight + dateBoxHeight + projNameBoxHeight * targetProjectId + ~~(projNameBoxHeight / 2);
+                        if ((targetProject.start < startDate) && (projects[i].end < startDate)) {
+                            continue;
+                        } else if ((endDate < targetProject.start) && (endDate <= projects[i].end)) {
+                            continue;
+                        }
+                        if (targetProject.start < startDate) {
+                            toX = 0;
+                        } else if (endDate < targetProject.start) {
+                            toX = rect.width;
+                        } else {
+                            toX = ~~((targetProject.start - startDate) / (24 * 60 * 60 * 1000)) * dateBoxWidth + scrollX;
+                        }
+
+                        let fromX = 0;
+                        let fromY = dateBoxHeight + dateBoxHeight + projNameBoxHeight * i + ~~(projNameBoxHeight / 2);
+                        if (projects[i].end < startDate) {
+                            fromX = 0;
+                        } else if (endDate < projects[i].end) {
+                            fromX = rect.width;
+                        } else {
+                            fromX = ~~((projects[i].end - startDate) / (24 * 60 * 60 * 1000) + 1) * dateBoxWidth + scrollX;
+                        }
+                        let linkLine = $svg("line", { x1: fromX, y1: fromY, x2: toX, y2: toY, stroke: "#FF0000", "stroke-width": 3, "stroke-linecap": "round" });
+                        g.appendChild(linkLine);
+                        let linkLine2 = $svg("polyline", { points: [[toX-10, toY-10], [toX, toY], [toX+10, toY-10]].map(x => `${x[0]}, ${x[1]}`).join(" "), stroke: "#FF0000", "stroke-width": 3, "stroke-linecap": "round", fill: "none" });
+                        g.appendChild(linkLine2);
+                    }
+
+
+
+                    for (let i = 0; i < projects.length; i++) {
+                        {
+                            let projNameBox = $svg("rect", { x: 0, y: dateBoxHeight + dateBoxHeight + projNameBoxHeight * i, width: projNameBoxWidth, height: projNameBoxHeight, fill: (i % 2) ? "#EEFFFF" : "#EEEEFF" });
+                            g.appendChild(projNameBox);
+
+                            let projNameText = $svg("text", { x: 0, y: dateBoxHeight + dateBoxHeight + projNameBoxHeight + projNameBoxHeight * i, dx: 0, dy: -projNameBoxHeight / 2, "font-family": "monospace", "font-size": fontSize, "text-anchor": "left", "dominant-baseline": "central" });
+                            let project = projects[i];
+                            projNameText.innerHTML = `${project.name}`;
+                            projNameText.addEventListener("mousedown", (e) => { baseDate = new Date(project.start); scrollXValue = 0; update();  })
+                            g.appendChild(projNameText);
+                        }
+                    } 
+                }
+                if (prevG != null) {
+                    svg.removeChild(prevG);
+                }
+                svg.appendChild(g);
+            }
+            update();
+
+
+            //svg.appendChild(polygon);
+            //svg.appendChild(line);
+        };
+
+    </script>
+</head>
+<body>
+</body>
+
+</html>
