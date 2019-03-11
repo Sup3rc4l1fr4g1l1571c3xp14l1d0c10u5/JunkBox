@@ -7,32 +7,43 @@ using System.Text;
 namespace KanaKanji {
     class Program {
         static void Main(string[] args) {
+            if (System.Diagnostics.Debugger.IsAttached) {
+                //FixCopus(@"copus.txt", new[] { @"wikipedia00.mecabed.txt" , @"wikipedia01.mecabed.txt" , @"wikipedia02.mecabed.txt" });
+                //TrainWakachi(@"wakachi.model", new[] { @"copus.txt" });
+                //Wakachi(@"wakachi.model", "juman.dic");
+                TrainKanaKanji(@"kanakanji.model", new[] { @"copus.txt" });
+                return;
+            }
             switch (args[0]) {
-                case "--mode=create-copus":
-                    CreateCopus(args[1], args.Skip(2).ToArray());
+                case "--mode=fix-copus":
+                    FixCopus(args[1], args.Skip(2).ToArray());
                     break;
-                case "--mode=train":
-                    Train(args[1], args.Skip(2).ToArray());
+                case "--mode=train-wakachi":
+                    TrainWakachi(args[1], args.Skip(2).ToArray());
                     break;
                 case "--mode=wakachi":
                     Wakachi(args[1], args[2]);
                     break;
-                case "--mode=convert":
-                    Convert(args[1], args[2]);
+                case "--mode=train-kanakanji":
+                    TrainKanaKanji(args[1], args.Skip(2).ToArray());
+                    break;
+                case "--mode=kanakanji":
+                    KanaKanji(args[1], args[2]/*, args.Skip(3).ToArray()*/);
                     break;
                 default:
                     Console.WriteLine("Usage: ");
-                    Console.WriteLine("  KanaKanji --mode=fix-copus <copusFile> <inputFiles> ...");
-                    Console.WriteLine("  KanaKanji --mode=train     <modelFile> <copusFiles> ...");
-                    Console.WriteLine("  KanaKanji --mode=wakachi   <modelFile> <dicFile>");
-                    Console.WriteLine("  KanaKanji --mode=convert   <modelFile> <dicFile>");
+                    Console.WriteLine("  KanaKanji --mode=fix-copus       <copusFile> <inputFiles> ...");
+                    Console.WriteLine("  KanaKanji --mode=train-wakachi   <wakachiModelFile> <copusFiles> ...");
+                    Console.WriteLine("  KanaKanji --mode=wakachi         <wakachiModelFile> <dicFile>");
+                    Console.WriteLine("  KanaKanji --mode=train-kanakanji <kanakanjiModelFile> <copusFiles> ...");
+                    Console.WriteLine("  KanaKanji --mode=kanakanji       <kanakanjiModelFile> <dicFile>");
                     break;
             }
         }
 
         private static string toHiragana(string str) => str.Select(x => (0x30A1 <= x && x <= 0x30F3) ? (char)(x - (0x30A1 - 0x3041)) : (char)x).Apply(String.Concat);
 
-        private static void CreateCopus(string copusFile, string[] inputs) {
+        private static void FixCopus(string copusFile, string[] inputs) {
             // mecab --node-format=%m/%f[0]/%f[20]\t --eos-format=\n --unk-format=%M//%M wikipedia01.txt > wikipedia01.mecabed.txt
             using (var writer = new System.IO.StreamWriter(copusFile)) {
                 foreach (var file in inputs) {
@@ -47,13 +58,13 @@ namespace KanaKanji {
             }
         }
 
-        private static void Train(string modelFile, string[] copusFiles) {
+        private static void TrainWakachi(string modelFile, string[] copusFiles) {
             var featureFuncs = new FeatureFuncs();
             featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word);
             featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word + "\tR" + nodes[index].Read);
             featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
 
-            var ssvm = new StructuredSupportVectorMachine(new Dic(), featureFuncs, false);
+            var ssvm = new StructuredSupportVectorMachine<Graph>(new Dic(), featureFuncs, false);
             foreach (var copusFile in copusFiles) {
                 foreach (var line in System.IO.File.ReadLines(copusFile)) {
                     ssvm.Learn(line.Split("\t".ToArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Split("/".ToArray())).Select(x => Tuple.Create(x[1], x[2])).ToList());
@@ -69,10 +80,10 @@ namespace KanaKanji {
             featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
 
             var dic = new Dic();
-            var ssvm = new StructuredSupportVectorMachine(dic, featureFuncs, false);
+            var ssvm = new StructuredSupportVectorMachine<Graph>(dic, featureFuncs, false);
             ssvm.Load(modelFile);
             foreach (var line in System.IO.File.ReadLines(dicFile)) {
-                var entry = line.Split("/".ToArray());
+                var entry = line.Split("\t".ToArray());
                 dic.Add(entry[2], entry[1]);
             }
 
@@ -83,26 +94,52 @@ namespace KanaKanji {
 
         }
 
-        private static void Convert(string modelFile, string dicFile) {
+        private static void TrainKanaKanji(string modelFile, string[] copusFiles) {
             var featureFuncs = new FeatureFuncs();
             featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word);
             featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word + "\tR" + nodes[index].Read);
             featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
 
-            var dic = new Dic();
-            var ssvm = new StructuredSupportVectorMachine(dic, featureFuncs, false);
-            ssvm.Load(modelFile);
-            foreach (var line in System.IO.File.ReadLines(dicFile)) {
-                var entry = line.Split("/".ToArray());
-                dic.Add(entry[2], entry[1]);
+            var ssvm = new StructuredSupportVectorMachine<Graph>(new Dic(), featureFuncs, false);
+            foreach (var copusFile in copusFiles) {
+                foreach (var line in System.IO.File.ReadLines(copusFile)) {
+                    ssvm.Learn(line.Split("\t".ToArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Split("/".ToArray())).Select(x => Tuple.Create(x[0], x[1]+"/"+ x[2])).ToList());
+                }
             }
+            ssvm.Save(modelFile);
+        }
+
+        private static void KanaKanji(string wakachiModelFile, string kanakanjiModelFile/*, string dicFile*/) {
+            var featureFuncs = new FeatureFuncs();
+            featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word);
+            featureFuncs.NodeFeatures.Add((nodes, index) => "S" + nodes[index].Word + "\tR" + nodes[index].Read);
+            featureFuncs.EdgeFeatures.Add((prevNode, node) => "S" + prevNode.Word + "\tS" + node.Word);
+
+            var dicWakachi = new Dic();
+            var ssvmWakachi = new StructuredSupportVectorMachine<Graph>(dicWakachi, featureFuncs, false);
+            ssvmWakachi.Load(wakachiModelFile);
+            //foreach (var line in System.IO.File.ReadLines(dicFile)) {
+            //    var entry = line.Split("\t".ToArray());
+            //    dicWakachi.Add(entry[2], entry[1]);
+            //}
+
+            var dicKanaKanji = new Dic();
+            var ssvmKanaKanji = new StructuredSupportVectorMachine<Graph>(dicKanaKanji, featureFuncs, false);
+            ssvmKanaKanji.Load(kanakanjiModelFile);
+            //foreach (var line in System.IO.File.ReadLines(dicFile)) {
+            //    var entry = line.Split("\t".ToArray());
+            //    dicWakachi.Add(entry[2], entry[1]);
+            //}
 
             for (string line; (line = Console.ReadLine()) != null;) {
-                var ret = ssvm.Convert(line);
-                Console.WriteLine(String.Join(", ", ret.Select(x => $"{x.Item1}/{x.Item2}")));
-
+                var ret1 = ssvmWakachi.Convert(line);
+                var input = String.Join("\t", ret1.Select(x => $"{x.Item1}/{x.Item2}"));
+                var ret2 = ssvmKanaKanji.Convert(input);
+                Console.WriteLine(String.Join(", ", ret2.Select(x => $"{x.Item1}/{x.Item2}")));
             }
+
         }
+
     }
 
     public static class Ext {
@@ -260,10 +297,16 @@ namespace KanaKanji {
         }
     }
 
-    /// <summary>
-    /// グラフ（単語ラティス）
-    /// </summary>
-    public class Graph {
+    public interface IGraph {
+        IReadOnlyList<Node>[] Nodes { get; }
+        Node Eos { get; }
+        IReadOnlyList<Node> GetPrevs(Node node);
+    }
+
+        /// <summary>
+        /// グラフ（単語ラティス）
+        /// </summary>
+        public class Graph : IGraph {
         /// <summary>
         /// グラフ中の単語構造列
         /// </summary>
@@ -287,7 +330,7 @@ namespace KanaKanji {
             nodes[0].Add(bos);
 
             // EOSを単語ラティスの末尾に設定
-            var Eos = new Node("", "", str.Length + 1);
+            Eos = new Node("", "", str.Length + 1);
             nodes[str.Length + 1].Add(Eos);
 
             for (var i = 0; i < str.Length; i++) {
@@ -510,7 +553,7 @@ namespace KanaKanji {
     /// <summary>
     /// 構造化SVM学習器
     /// </summary>
-    internal class StructuredSupportVectorMachine {
+    internal class StructuredSupportVectorMachine<TGraph> where TGraph : IGraph {
         /// <summary>
         /// 重み（特徴⇒重みの疎行列）
         /// </summary>

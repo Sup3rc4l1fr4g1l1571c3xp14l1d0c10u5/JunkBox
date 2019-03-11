@@ -1,18 +1,19 @@
 ﻿module Scheme {
 
-    type Symbol = { type: "symbol", value: string };
-    type Cell = { type: "cell", car: Value, cdr: Value };
-    type String = { type: "string", value: string };
-    type Number = { type: "number", value: number };
-    type Boolean = { type: "bool", value: boolean };
+    type Symbol    = { type: "symbol", value: string };
+    type Cell      = { type: "cell", car: Value, cdr: Value };
+    type String    = { type: "string", value: string };
+    type Number    = { type: "number", value: number };
+    type Boolean   = { type: "bool", value: boolean };
     type Primitive = { type: "primitive", value: ((arg: Value) => Value) };
-    type Value = Symbol | Cell | String | Number | Boolean | Primitive;
+    type Error     = { type: "error", subtype: string, value: string, opt: any };
+    type Value = Symbol | Cell | String | Number | Boolean | Primitive | Error;
 
     const Nil: Cell = { type: "cell", car: null, cdr: null };
     const False: Boolean = { type: "bool", value: false };
     const True: Boolean = { type: "bool", value: true };
 
-    function escapeString(str: string) : string {
+    function escapeString(str: string): string {
         let buf = '';
         for (let i = 0; i < str.length; i++) {
             switch (str[i]) {
@@ -29,64 +30,62 @@
         return buf;
     }
 
-    export function toString(value: Value | Error): string {
-        if (value instanceof Error) {
-            return `<error:${value.message}>`;
-        }
-        if (value === Nil  ) { return '()' };
+    export function toString(value: Value, isCdr: boolean = false): string {
+        if (value === Nil) { return '()' };
         if (value === False) { return '#f' };
         if (value === True) { return '#t' };
         switch (value.type) {
             case "symbol": return value.value;
-            case "cell": return `${toString(value.car)} ${(value.cdr.type == "cell" && value.cdr !== Nil) ? "" : "." } ${toString(value.cdr)}`;
+            case "cell": return `${(isCdr == false) ? "(" : ""}${toString(value.car)} ${(value.cdr.type == "cell" && value.cdr !== Nil) ? "" : "."} ${toString(value.cdr, true)}${(isCdr == false) ? ")" : ""}`;
             case "string": return `"${escapeString(value.value)}"`;
             case "number": return value.value.toString();
             case "bool": return value.value ? '#t' : '#f';
             case "primitive": return `<primitive:${value.value.name}>`;
+            case "error": return `<${value.subtype}:${value.value} ${value.opt == null ? "" : value.opt}>`;
         }
     }
 
     function car(x: Value): Value {
-        if (ispair(x) == False || isnull(x) === True) { throw new Error(`Error: Attempt to apply car on ${x}`); }
+        if (ispair(x) == False || isnull(x) === True) { return error('runtime error', `Attempt to apply car on ${x}`); }
         return (<Cell>x).car;
     }
 
     function cdr(x: Value): Value {
-        if (ispair(x) == False || isnull(x) === True) { throw new Error(`Error: Attempt to apply cdr on ${x}`); }
+        if (ispair(x) == False || isnull(x) === True) { return error('runtime error', `Attempt to apply cdr on ${x}`); }
         return (<Cell>x).cdr;
     }
 
-    function cadr(x) { return car(cdr(x)); }
-    function caddr(x) { return car(cdr(cdr(x))); }
-    function cadddr(x) { return car(cdr(cdr(cdr(x)))); }
-    function cddr(x) { return cdr(cdr(x)); }
-    function cdddr(x) { return cdr(cdr(cdr(x))); }
+    function cadr(x: Value): Value { return car(cdr(x)); }
+    function caddr(x: Value): Value { return car(cdr(cdr(x))); }
+    function cadddr(x: Value): Value { return car(cdr(cdr(cdr(x)))); }
+    function cddr(x: Value): Value { return cdr(cdr(x)); }
+    function cdddr(x: Value): Value { return cdr(cdr(cdr(x))); }
 
-    export function cons(x: Value, y: Value): Cell { return { type: "cell", car: x, cdr: y }; }
+    function cons(x: Value, y: Value): Cell { return { type: "cell", car: x, cdr: y }; }
 
     function isnull(x: Value): Boolean { return x === Nil ? True : False; }
     function issymbol(x: Value): Boolean { return x.type == "symbol" ? True : False; }
-
-    export function nil(): Cell { return Nil; }
-    export function symbol(x: string): Symbol { return { type: "symbol", value: x }; }
-    export function number(x: number): Number { return { type: "number", value: x }; }
-    export function string(x: string): String { return { type: "string", value: x }; }
-    export function boolean(x: boolean): Boolean { return x ? True : False; }
-
     function ispair(x: Value): Boolean { return x.type == "cell" ? True : False; }
-    export function list(...xs: Value[]): Cell { return xs.reduceRight<Cell>((s, x) => cons(x, s), nil()); }
+    function iserror(x: Value): Boolean { return x.type == "error" ? True : False; }
+
+    function nil(): Cell { return Nil; }
+    function symbol(x: string): Symbol { return { type: "symbol", value: x }; }
+    function number(x: number): Number { return { type: "number", value: x }; }
+    function string(x: string): String { return { type: "string", value: x }; }
+    function boolean(x: boolean): Boolean { return x ? True : False; }
+    function primitive(v: any): Primitive { return { type: "primitive", value: v }; }
+    function error(subtype: string, x: string, opt: any = null): Error { return { type: "error", subtype: subtype, value: x, opt: opt } }
+
+    function list(...xs: Value[]): Cell { return xs.reduceRight<Cell>((s, x) => cons(x, s), nil()); }
     function list2(...xs: Value[]): Cell {
         const tail = xs.splice(xs.length - 2, 2);
         return xs.reduceRight<Cell>((s, x) => cons(x, s), cons(tail[0], tail[1]));
     }
+
     function length(x: Value): number {
         for (let i = 0; ; i++) {
-            if (ispair(x) === False) {
-                throw new Error();
-            }
-            if (isnull(x) === True) {
-                return i;
-            }
+            if (ispair(x) === False) { throw new Error("bad"); }
+            if (isnull(x) === True) { return i; }
             x = cdr(x);
         }
     }
@@ -96,16 +95,14 @@
         }
         return x;
     }
-    function primitive(v: any): Primitive {
-        return { type: "primitive", value: v };
-    }
     function eq(x: Value, y: Value): Boolean {
         if (x.type == y.type) {
             switch (x.type) {
                 case "symbol": return (x.value == (<Symbol>y).value) ? True : False;
-                case "cell": return (x === y) ? True : False;
+                case "cell"  : return (x === y) ? True : False;
                 case "number": return (x.value === (<Number>y).value) ? True : False;
                 case "string": return (x.value === (<String>y).value) ? True : False;
+                case "bool"  : return (x.value === (<Boolean>y).value) ? True : False;
             }
         }
         return False;
@@ -141,7 +138,10 @@
     }
 
     // S 式をコンパイルする
-    function compile(expr: Value) {
+    export function compile(expr: Value): Value {
+        if (iserror(expr) === True) {
+            return expr;
+        }
         return comp(expr, Nil, list(symbol("stop")));
     }
 
@@ -218,11 +218,11 @@
     // 大域変数
     let global_environment: Cell =
         list(
-            list(symbol("car"), symbol("primitive"), primitive(car)),
-            list(symbol("cdr"), symbol("primitive"), primitive(cdr)),
-            list(symbol("cons"), symbol("primitive"), primitive(cons)),
-            list(symbol("eq?"), symbol("primitive"), primitive(eq)),
-            list(symbol("pair?"), symbol("primitive"), primitive(ispair)),
+            list(symbol("car"), symbol("primitive"), primitive((xs) => car(car(xs)))),
+            list(symbol("cdr"), symbol("primitive"), primitive((xs) => cdr(car(xs)))),
+            list(symbol("cons"), symbol("primitive"), primitive((xs) => cons(car(xs), cadr(xs)))),
+            list(symbol("eq?"), symbol("primitive"), primitive((xs) => eq(car(xs), cadr(xs)))),
+            list(symbol("pair?"), symbol("primitive"), primitive((xs) => ispair(car(xs)))),
             list(symbol("+"), symbol("primitive"), primitive((xs) => {
                 let v = 0;
                 while (isnull(xs) === False) {
@@ -251,7 +251,7 @@
         if (val !== False) {
             return cdr(val);
         } else {
-            throw new Error(`unbound variable: ${sym}`);
+            return error('runtime error', `unbound variable: ${sym}`);
         }
     }
 
@@ -376,30 +376,21 @@
                 }
                 default:
                     {
-                        throw new Error("unknown opcode");
+                        return error('runtime error', `unknown opcode '${v.value}'`);
                     }
             }
         }
-        throw new Error("timeout");
+        return error('runtime error', "timeout");
     }
 
-
-
-    export function Run(expr: Value): Value {
-        return vm(Nil, Nil, compile(expr), Nil);
-    }
-
-
-
-    class SyntaxError extends Error {
-        constructor(...args) {
-            super(...args);
+    export function run(expr: Value): Value {
+        if (iserror(expr) === True) {
+            return expr;
         }
-        public line: number;
-        public col: number;
+        return vm(Nil, Nil, expr, Nil);
     }
 
-    export function parse(stream: string): Value | Error {
+    export function parse(stream: string): Value {
         const not_whitespace_or_end = /^(\S|$)/;
         const space_quote_paren_escaped_or_end = /^(\s|\\|"|'|`|,|\(|\)|$)/;
         const string_or_escaped_or_end = /^(\\|"|$)/;
@@ -416,11 +407,8 @@
             stream: stream
         };
 
-        function syntax_error(msg: string): SyntaxError {
-            const e = new SyntaxError('Syntax error: ' + msg);
-            e.line = this._line + 1;
-            e.col = this._col + 1;
-            return e;
+        function syntax_error(msg: string): Error {
+            return error('syntax error', msg, { line: this._line + 1, col: this._col + 1 });
         }
 
         function peek_char(): string {
@@ -514,7 +502,7 @@
             return string(buf);
         }
 
-        function parse_atom(): Value | Error | null{
+        function parse_atom(): Value | null {
             if (peek_char() == '"') {
                 return parse_string();
             }
@@ -539,7 +527,7 @@
             return Number.isNaN(num) ? symbol(atom) : number(num);
         }
 
-        function parse_quoted(): Cell | Error {
+        function parse_quoted(): Value {
             let q = consume_char();
             let quote = quotes_map[q];
 
@@ -553,7 +541,7 @@
             until_char(not_whitespace_or_end);
             const quotedExpr = parse_expr();
 
-            if (quotedExpr instanceof Error) {
+            if (iserror(quotedExpr) === True) {
                 return quotedExpr;
             }
 
@@ -565,7 +553,7 @@
             return list(symbol(quote), quotedExpr);
         }
 
-        function parse_expr(): Value | Error | null {
+        function parse_expr(): Value | null {
             // ignore whitespace
             until_char(not_whitespace_or_end);
 
@@ -574,14 +562,14 @@
             }
 
             const expr = peek_char() == '(' ? parse_list() : parse_atom();
-            
+
             // ignore whitespace
             until_char(not_whitespace_or_end);
 
             return expr;
         }
 
-        function parse_list() : Cell | Error {
+        function parse_list(): Value {
             if (peek_char() != '(') {
                 return syntax_error('Expected `(` - saw `' + peek_char() + '` instead.');
             }
@@ -591,7 +579,7 @@
             const ls = [];
             let v = parse_expr();
 
-            if (v instanceof Error) {
+            if (iserror(v) === True) {
                 return v;
             }
 
@@ -599,7 +587,7 @@
                 ls.push(v);
 
                 while ((v = parse_expr()) !== null) {
-                    if (v instanceof Error) { return v; }
+                    if (iserror(v) === True) { return v; }
                     ls.push(v);
                 }
             }
@@ -611,12 +599,12 @@
             // consume that closing paren
             consume_char();
 
-            return ls.reduceRight((s,x) => cons(x,s), nil());
+            return ls.reduceRight((s, x) => cons(x, s), nil());
         }
 
         const expression = parse_expr();
 
-        if (expression instanceof Error) {
+        if (iserror(expression) === True) {
             return expression;
         }
 
@@ -630,8 +618,24 @@
 }
 
 window.onload = () => {
-    const el = document.getElementById('content');
-    console.log(Scheme.toString(Scheme.parse("(+ 5 10)")));
-    console.log(Scheme.list(Scheme.symbol("+"), Scheme.number(1), Scheme.number(2)));
-    console.log(Scheme.Run(Scheme.list(Scheme.symbol("+"), Scheme.number(1), Scheme.number(2))));
+    const textAreaInput = document.createElement("textarea");
+    const textAreaOutput = document.createElement("textarea");
+    const buttonRun = document.createElement("button");
+    document.body.appendChild(textAreaInput);
+    document.body.appendChild(textAreaOutput);
+    document.body.appendChild(buttonRun);
+    buttonRun.innerHTML = "run";
+    buttonRun.addEventListener("click", () => {
+        const source = textAreaInput.value;
+        const parsed = Scheme.parse(source);
+        textAreaOutput.value = '';
+        textAreaOutput.value += Scheme.toString(parsed);
+        textAreaOutput.value += '\r\n';
+        const compiled = Scheme.compile(parsed);
+        textAreaOutput.value += Scheme.toString(compiled);
+        textAreaOutput.value += '\r\n';
+        const result = Scheme.run(compiled);
+        textAreaOutput.value += Scheme.toString(result);
+        textAreaOutput.value += '\r\n';
+    });
 };
