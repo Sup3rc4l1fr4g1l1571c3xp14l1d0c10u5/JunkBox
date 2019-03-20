@@ -9,9 +9,9 @@
     type Error     = { type: "error", subtype: string, value: string, opt: any };
     type Value = Symbol | Cell | String | Number | Boolean | Primitive | Error;
 
-    const Nil: Cell = { type: "cell", car: null, cdr: null };
-    const False: Boolean = { type: "bool", value: false };
-    const True: Boolean = { type: "bool", value: true };
+    const Nil   : Cell = { type: "cell", car: null, cdr: null };
+    const False : Boolean = { type: "bool", value: false };
+    const True  : Boolean = { type: "bool", value: true };
 
     function escapeString(str: string): string {
         let buf = '';
@@ -132,7 +132,7 @@
     }
 
     // 自己評価フォームか
-    function is_self_evaluation(expr: Value) {
+    function is_self_evaluation(expr: Value): boolean {
         return (ispair(expr) === False) && (issymbol(expr) === False);
 
     }
@@ -218,19 +218,22 @@
     // 大域変数
     let global_environment: Cell =
         list(
-            list(symbol("car"), symbol("primitive"), primitive((xs) => car(car(xs)))),
-            list(symbol("cdr"), symbol("primitive"), primitive((xs) => cdr(car(xs)))),
-            list(symbol("cons"), symbol("primitive"), primitive((xs) => cons(car(xs), cadr(xs)))),
-            list(symbol("eq?"), symbol("primitive"), primitive((xs) => eq(car(xs), cadr(xs)))),
-            list(symbol("pair?"), symbol("primitive"), primitive((xs) => ispair(car(xs)))),
-            list(symbol("+"), symbol("primitive"), primitive((xs) => {
+            cons(symbol("#t"), True),
+            cons(symbol("#f"), False),
+
+            cons(symbol("car"), list(symbol("primitive"), primitive((xs) => car(car(xs))))),
+            cons(symbol("cdr"), list(symbol("primitive"), primitive((xs) => cdr(car(xs))))),
+            cons(symbol("cons"), list(symbol("primitive"), primitive((xs) => cons(car(xs), cadr(xs))))),
+            cons(symbol("eq?"), list(symbol("primitive"), primitive((xs) => eq(car(xs), cadr(xs))))),
+            cons(symbol("pair?"), list(symbol("primitive"), primitive((xs) => ispair(car(xs))))),
+            cons(symbol("+"), list(symbol("primitive"), primitive((xs) => {
                 let v = 0;
                 while (isnull(xs) === False) {
                     v += (<Number>car(xs)).value;
                     xs = cdr(xs);
                 }
                 return number(v);
-            }))
+            })))
         );
 
     function assoc(sym: Value, dic: Value): Value {
@@ -255,139 +258,214 @@
         }
     }
 
-    // 仮想マシンでコードを実行する
-    function vm(s: Value, e: Value, c: Value, d: Value): Value {
-        let halt = false;
-        setTimeout(x => halt = true, 10000);
-        while (!halt) {
-            const v = <Symbol>car(c); c = cdr(c);
-            switch (v.value) {
-                case "ld": {
-                    const pos = car(c); c = cdr(c);
-                    s = cons(get_lvar(e, (<Number>car(pos)).value, (<Number>cdr(pos)).value), s);
-                    e = e;
-                    c = cdr(c);
-                    d = d;
-                    continue;
-                }
-                case "ldc": {
-                    s = cons(car(c), s);
-                    e = e;
-                    c = cdr(c);
-                    d = d;
-                    continue;
-                }
-                case "ldg": {
-                    s = cons(get_gvar(car(c)), s);
-                    e = e;
-                    c = cdr(c);
-                    d = d;
-                    continue;
-                }
-                case "ldf": {
-                    s = cons(list(symbol("closure"), car(c), e), s);
-                    e = e;
-                    c = cdr(c);
-                    d = d;
-                    continue;
-                }
-                case "app": {
-                    const clo = car(s);
-                    const lvar = cadr(s);
-                    if (eq(car(clo), symbol("primitive")) === True) {
-                        const ret = (<Primitive>cadr(clo)).value(lvar);
-                        s = cons(ret, cddr(s));
-                        e = e;
-                        c = c;
-                        d = d;
-                        continue;
-                    } else {
-                        s = nil();
-                        e = cons(lvar, caddr(clo));
-                        c = cadr(clo);
-                        d = cons(list(cddr(s), e, c), d);
-                        continue;
-                    }
-                }
-                case "rtn": {
-                    const save = car(d);
-                    s = cons(car(s), cdr(save));
-                    e = cadr(save);
-                    c = caddr(save);
-                    d = cdr(d);
-                    continue;
-                }
-                case "sel": {
-                    const t_clause = car(c);
-                    const e_clause = cadr(c);
-                    const v = (<Boolean>car(s)).value;
-                    if (v) {
-                        s = cdr(s);
-                        e = e;
-                        c = t_clause;
-                        d = cons(cddr(c), d);
-                    } else {
-                        s = cdr(s);
-                        e = e;
-                        c = e_clause;
-                        d = cons(cddr(c), d);
-                    }
-                    continue;
-                }
-                case "join": {
-                    s = s;
-                    e = e;
-                    c = car(d);
-                    d = cdr(d);
-                    continue;
-                }
-                case "pop": {
-                    s = cdr(s);
-                    e = e;
-                    c = c;
-                    d = d;
-                    continue;
-                }
-                case "args": {
-                    for (let n = (<Number>car(c)).value, a = Nil; ; n--) {
-                        if (n == 0) {
-                            s = cons(a, s);
-                            e = e;
-                            c = cdr(c);
-                            d = d;
-                            break;
-                        }
-                        a = cons(car(s), a)
-                        s = cdr(s);
-                    }
-                    continue;
-                }
-                case "def": {
-                    const sym = car(c);
-                    global_environment = cons(cons(sym, car(s)), global_environment);
-                    s = cons(sym, cdr(s));
-                    e = e;
-                    c = cdr(c);
-                    d = d;
-                    continue;
-                }
-                case "stop": {
-                    return car(s);
-                }
-                default:
-                    {
-                        return error('runtime error', `unknown opcode '${v.value}'`);
-                    }
-            }
-        }
-        return error('runtime error', "timeout");
+    interface VMContext {
+        trace: boolean;
+        halt: boolean;
+        s: Value;
+        e: Value;
+        c: Value;
+        d: Value;
     }
 
-    export function run(expr: Value): Value {
-        if (iserror(expr) === True) {
-            return expr;
+    // 仮想マシンでコードを実行する
+    function vm({ trace, halt, s, e, c, d }: VMContext): VMContext {
+        if (halt) {
+            return {
+                trace: trace, 
+                halt: true,
+                s: s,
+                e: e,
+                c: c,
+                d: d
+            };
         }
-        return vm(Nil, Nil, expr, Nil);
+        const v = <Symbol>car(c);
+        if (iserror(v) === True) {
+            return {
+                trace: trace, 
+                halt: true,
+                s: cons(v, s),
+                e: e,
+                c: c,
+                d: d
+            };
+        }
+        c = cdr(c);
+        switch (v.value) {
+            case "ld": {
+                const pos = car(c);
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(get_lvar(e, (<Number>car(pos)).value, (<Number>cdr(pos)).value), s),
+                    e: e,
+                    c: cdr(c),
+                    d: d,
+                };
+            }
+            case "ldc": {
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(car(c), s),
+                    e: e,
+                    c: cdr(c),
+                    d: d,
+                };
+            }
+            case "ldg": {
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(get_gvar(car(c)), s),
+                    e: e,
+                    c: cdr(c),
+                    d: d,
+                };
+            }
+            case "ldf": {
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(list(symbol("closure"), car(c), e), s),
+                    e: e,
+                    c: cdr(c),
+                    d: d,
+                };
+            }
+            case "app": {
+                const clo = car(s);
+                const lvar = cadr(s);
+                if (eq(car(clo), symbol("primitive")) === True) {
+                    const ret = (<Primitive>cadr(clo)).value(lvar);
+                    return {
+                        trace: trace, 
+                        halt: false,
+                        s: cons(ret, cddr(s)),
+                        e: e,
+                        c: c,
+                        d: d,
+                    };
+                } else {
+                    return {
+                        trace: trace, 
+                        halt: false,
+                        s: nil(),
+                        e: cons(lvar, caddr(clo)),
+                        c: cadr(clo),
+                        d: cons(list(cddr(s), e, c), d),
+                    };
+                }
+            }
+            case "rtn": {
+                const save = car(d);
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(car(s), cdr(save)),
+                    e: cadr(save),
+                    c: caddr(save),
+                    d: cdr(d),
+                };
+            }
+            case "sel": {
+                const t_clause = car(c);
+                const e_clause = cadr(c);
+                const v = (<Boolean>car(s)).value;
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cdr(s),
+                    e: e,
+                    c: v ? t_clause : e_clause,
+                    d: cons(cddr(c), d),
+                };
+            }
+            case "join": {
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: s,
+                    e: e,
+                    c: car(d),
+                    d: cdr(d),
+                };
+            }
+            case "pop": {
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cdr(s),
+                    e: e,
+                    c: c,
+                    d: d,
+                };
+            }
+            case "args": {
+                for (let n = (<Number>car(c)).value, a = Nil; ; n--) {
+                    if (n == 0) {
+                        return {
+                            trace: trace, 
+                            halt: false,
+                            s: cons(a, s),
+                            e: e,
+                            c: cdr(c),
+                            d: d,
+                        };
+                    }
+                    a = cons(car(s), a)
+                    s = cdr(s);
+                }
+            }
+            case "def": {
+                const sym = car(c);
+                global_environment = cons(cons(sym, car(s)), global_environment);
+                return {
+                    trace: trace, 
+                    halt: false,
+                    s: cons(sym, cdr(s)),
+                    e: e,
+                    c: cdr(c),
+                    d: d,
+                };
+            }
+            case "stop": {
+                return {
+                    trace: trace, 
+                    halt: true,
+                    s: s,
+                    e: e,
+                    c: c,
+                    d: d
+                };
+            }
+            default: {
+                return {
+                    trace: trace, 
+                    halt: true,
+                    s: cons(error('runtime error', `unknown opcode '${v.value}'`), s),
+                    e: e,
+                    c: c,
+                    d: d
+                };
+            }
+        }
+    }
+
+    export function run(expr: Value, timeout: number = 1000): Value {
+
+        if (iserror(expr) === True) { return expr; }
+
+        let run = true;
+        let context: VMContext = { trace: false, halt: false, s: Nil, e: Nil, c: expr, d: Nil };
+
+        const handle = setTimeout(() => run = false, timeout);
+        while (run && !context.halt) {
+            context = vm(context);
+        }
+        clearTimeout(handle);
+
+        return isnull(context.s) == True ? Nil : car(context.s);
     }
 
     export function parse(stream: string): Value {
@@ -466,40 +544,45 @@
 
                 if (next == '') {
                     return syntax_error('Unterminated string literal');
-                }
-
-                if (next == '"') {
+                } else if (next == '"') {
                     consume_char();
                     break;
-                }
-
-                if (next == '\\') {
+                } else if (next == '\\') {
                     consume_char();
-                    next = peek_char();
-
-                    if (next == 'r') {
-                        consume_char();
-                        buf += '\r';
-                    } else if (next == 't') {
-                        consume_char();
-                        buf += '\t';
-                    } else if (next == 'n') {
-                        consume_char();
-                        buf += '\n';
-                    } else if (next == 'f') {
-                        consume_char();
-                        buf += '\f';
-                    } else if (next == 'b') {
-                        consume_char();
-                        buf += '\b';
-                    } else {
-                        buf += consume_char();
+                    switch (peek_char()) {
+                        case 'r':
+                            consume_char();
+                            buf += '\r';
+                            break;
+                        case 't':
+                            consume_char();
+                            buf += '\t';
+                            break;
+                        case 'n':
+                            consume_char();
+                            buf += '\n';
+                            break;
+                        case 'f':
+                            consume_char();
+                            buf += '\f';
+                            break;
+                        case 'b':
+                            consume_char();
+                            buf += '\b';
+                            break;
+                        default:
+                            buf += consume_char();
+                            break;
                     }
                 }
             }
 
             // wrap in object to make strings distinct from symbols
             return string(buf);
+        }
+
+        function ignore_whitespace() {
+            return until_char(not_whitespace_or_end);
         }
 
         function parse_atom(): Value | null {
@@ -537,8 +620,7 @@
                 q = ',@';
             }
 
-            // ignore whitespace
-            until_char(not_whitespace_or_end);
+            ignore_whitespace();
             const quotedExpr = parse_expr();
 
             if (iserror(quotedExpr) === True) {
@@ -554,19 +636,15 @@
         }
 
         function parse_expr(): Value | null {
-            // ignore whitespace
-            until_char(not_whitespace_or_end);
+            ignore_whitespace();
 
             if (quotes.test(peek_char())) {
                 return parse_quoted();
+            } else {
+                const expr = peek_char() == '(' ? parse_list() : parse_atom();
+                ignore_whitespace()
+                return expr;
             }
-
-            const expr = peek_char() == '(' ? parse_list() : parse_atom();
-
-            // ignore whitespace
-            until_char(not_whitespace_or_end);
-
-            return expr;
         }
 
         function parse_list(): Value {
@@ -583,11 +661,18 @@
                 return v;
             }
 
+            let tail = <Value>nil();
             if (v !== null) {
                 ls.push(v);
 
                 while ((v = parse_expr()) !== null) {
                     if (iserror(v) === True) { return v; }
+                    if (issymbol(v) && (<Symbol>v).value === ".") { 
+                        if ((v = parse_expr()) === null) { return syntax_error('no expr exists'); }
+                        if (iserror(v) === True) { return v; }
+                        tail = v;
+                        break;
+                    }
                     ls.push(v);
                 }
             }
@@ -599,7 +684,7 @@
             // consume that closing paren
             consume_char();
 
-            return ls.reduceRight((s, x) => cons(x, s), nil());
+            return ls.reduceRight((s, x) => cons(x, s), tail);
         }
 
         const expression = parse_expr();
@@ -622,18 +707,21 @@ window.onload = () => {
     const textAreaOutput = document.createElement("textarea");
     const buttonRun = document.createElement("button");
     document.body.appendChild(textAreaInput);
-    document.body.appendChild(textAreaOutput);
     document.body.appendChild(buttonRun);
+    document.body.appendChild(textAreaOutput);
     buttonRun.innerHTML = "run";
     buttonRun.addEventListener("click", () => {
         const source = textAreaInput.value;
         const parsed = Scheme.parse(source);
         textAreaOutput.value = '';
+        textAreaOutput.value += '<src>\r\n';
         textAreaOutput.value += Scheme.toString(parsed);
         textAreaOutput.value += '\r\n';
+        textAreaOutput.value += '<compile>\r\n';
         const compiled = Scheme.compile(parsed);
         textAreaOutput.value += Scheme.toString(compiled);
         textAreaOutput.value += '\r\n';
+        textAreaOutput.value += '<run>\r\n';
         const result = Scheme.run(compiled);
         textAreaOutput.value += Scheme.toString(result);
         textAreaOutput.value += '\r\n';
