@@ -163,14 +163,15 @@ let compile (expr:Value) : Inst list =
             | None -> Ldg(expr) :: code
         else 
             match expr with
-            | Cell ((Symbol "quote"), _) ->  
-                Ldc(cadr expr) :: code
-            | Cell ((Symbol "if"), _) -> 
-                let t_clause = (comp (caddr expr) env [Join])
-                let f_clause = if (isnull (cdddr expr)) 
-                               then [Ldc (Symbol "*undef"); Join] 
-                               else comp (cadddr expr) env [Join]
-                in  comp (cadr expr) env (Sel (t_clause, f_clause) :: code)
+            | Cell (Symbol("quote"), Cell(v, Nil)) -> Ldc(v) :: code
+            | Cell (Symbol("if"), Cell(cond, Cell(t, Nil))) -> 
+                let t_clause = comp t env [Join]
+                let f_clause = [Ldc (Symbol "*undef"); Join] 
+                in  comp cond env (Sel (t_clause, f_clause) :: code)
+            | Cell (Symbol("if"), Cell(cond, Cell(t, Cell(e, Nil)))) -> 
+                let t_clause = comp t env [Join]
+                let f_clause = comp e env [Join]
+                in  comp cond env (Sel (t_clause, f_clause) :: code)
             | Cell ((Symbol "lambda"), _) ->
                 let body = comp_body (cddr expr) (cadr expr :: env) [Rtn]
                 in  Ldf(body) :: code
