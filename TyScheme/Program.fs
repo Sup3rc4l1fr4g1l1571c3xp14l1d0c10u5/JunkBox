@@ -5,10 +5,17 @@ open System.Text.RegularExpressions;
 (* Value Type *)
 
 type NumberV =
-      ComplexV of real:NumberV * imaginary:NumberV
+      ComplexV  of real:NumberV * imaginary:NumberV
     | FractionV of numerator:int * denominator:int
-    | IntV of value : int
-    | RealV of value : double
+    | IntV      of value : int
+    | RealV     of value : double
+
+let rec valueToString v =
+    match v with
+    | ComplexV (r,i) -> (valueToString r) + "+" + (valueToString i) + "i" 
+    | FractionV (n,d) -> n.ToString() + "/" + d.ToString()
+    | IntV v -> v.ToString()
+    | RealV v -> v.ToString()
 
 module NumberVOp =
     let toComplex v =
@@ -43,15 +50,15 @@ module NumberVOp =
         match (lhs, rhs) with
         | ComplexV (r1,i1), ComplexV (r2,i2)  -> ComplexV (add r1 r2, add i1 i2)
         | ComplexV _, _  -> add lhs (toComplex rhs)
-        | _, ComplexV _  -> add (toComplex lhs) rhs
+        | _, ComplexV  _  -> add (toComplex lhs) rhs
 
         | FractionV (n1,d1), FractionV (n2,d2) -> FractionV (n1*d2+n2*d1,d1*d2)
         | FractionV _,_ -> add lhs (toFraction rhs)
         | _, FractionV _ -> add (toFraction lhs) rhs
 
-        | RealV v1, RealV v2   -> RealV (v1 + v2)
-        | RealV _,_ -> add lhs (toReal rhs)
-        | _, RealV _ -> add (toReal lhs) rhs
+        | RealV v1, RealV v2 -> RealV (v1 + v2)
+        | RealV  _,       _  -> add lhs (toReal rhs)
+        |        _, RealV _  -> add (toReal lhs) rhs
 
         | IntV v1, IntV v2 -> IntV (v1 + v2)
         | IntV _ ,_        -> add lhs (toInt rhs)
@@ -76,7 +83,8 @@ type Value  =
     | Number of value : NumberV
     | Boolean of value : bool
     | Primitive of value : (Value -> Value)
-    | Closure of Inst list * Value list
+    | Closure of body:Inst list * env:Value list
+    | Macro of body:Inst list // append to implements macro
     | Error of subtype: string * message : string 
 
 and Inst =
@@ -89,22 +97,22 @@ and Inst =
     | App
     | Pop
     | Sel  of t_clause:(Inst list) * f_clause:(Inst list)
-    | Def  of Value
+    | Def  of Value // append to implements macro
+    | Defm of Value
     | Args of int
     | Stop
-
 
 let escapeString (str:string) =
     let rec loop (str:char list) (result:string list) =
         match str with
-            | [] -> result |> List.rev |> List.toSeq |> String.concat ""
-            | '\r' :: xs -> loop xs ("\\r"::result)
-            | '\t' :: xs -> loop xs ("\\t"::result)
-            | '\n' :: xs -> loop xs ("\\n"::result)
-            | '\f' :: xs -> loop xs ("\\f"::result)
-            | '\b' :: xs -> loop xs ("\\b"::result)
-            | '\\' :: xs -> loop xs ("\\"::result)
-            |    x :: xs -> loop xs (string(x)::result)
+        | [] -> result |> List.rev |> List.toSeq |> String.concat ""
+        | '\r' :: xs -> loop xs ("\\r"::result)
+        | '\t' :: xs -> loop xs ("\\t"::result)
+        | '\n' :: xs -> loop xs ("\\n"::result)
+        | '\f' :: xs -> loop xs ("\\f"::result)
+        | '\b' :: xs -> loop xs ("\\b"::result)
+        | '\\' :: xs -> loop xs ("\\"::result)
+        |    x :: xs -> loop xs (string(x)::result)
     in loop (str.ToCharArray() |> Array.toList) []
 
 let toString (value:Value) = 
@@ -113,21 +121,30 @@ let toString (value:Value) =
         | Symbol value -> value
         | Nil -> "()"
         | Array v -> "#(" + String.Join(", ", (List.map (fun x -> loop x false) v)) + ")"
-        | Cell (car, cdr) -> 
+        | Cell (car, Nil) -> 
+            match isCdr with
+            | false -> "(" + (loop car false) + ")"
+            | true  -> (loop car false)
+        | Cell (car, (Cell _ as cdr)) -> 
             match isCdr with
             | false -> "(" + (loop car false) + " " + (loop cdr true) + ")"
             | true  -> (loop car false) + " " + (loop cdr true)
+        | Cell (car,  cdr) -> 
+            match isCdr with
+            | false -> "(" + (loop car false) + " . " + (loop cdr true) + ")"
+            | true  -> (loop car false) + " . " + (loop cdr true)
         | Char value -> 
             match value with
             | '\n' -> "#\\newline"
             | ' ' -> "#\\space"
             | _ -> "#\\" + value.ToString()
         | String value -> escapeString value
-        | Number value -> value.ToString ()
+        | Number value -> valueToString value
         | Boolean false -> "#f"
         | Boolean true  -> "#t"
         | Primitive value -> sprintf "<Primitive: %s>" (value.ToString ())
         | Closure (value, env) -> sprintf "<Closure: %s>" (value.ToString ())
+        | Macro (value) -> sprintf "<Macro: %s>" (value.ToString ())
         | Error (subtype, message) -> sprintf "<%s: %s>" subtype message
     in loop value false
 
@@ -145,19 +162,9 @@ let cdr (x: Value): Value =
 
 let cadr = car << cdr
 
-let isnull x =
-    match x with
-    | Nil -> true
-    | _   -> false
-
 let issymbol x = 
     match x with
     | Symbol _ -> true
-    | _        -> false
-
-let isnumber x = 
-    match x with
-    | Number _ -> true
     | _        -> false
 
 let ispair x = 
@@ -182,6 +189,38 @@ let length (x:Value) : int =
         | _ -> failwith "not pair"
     in  loop x 0
 
+let rec ceq (x:Value) (y:Value) : bool =
+    match (x,y) with
+    | (Symbol         v1, Symbol         v2) -> (v1 = v2)
+    | (Cell      (a1,d1), Cell      (a2,d2)) -> (ceq a1 a2) && (ceq d1 d2)
+    | (Array          v1, Array          v2) -> (List.forall2 ceq v1 v2)
+    | (Number         v1, Number         v2) -> (v1 = v2)
+    | (Char           v1, Char           v2) -> (v1 = v2)
+    | (String         v1, String         v2) -> (v1 = v2)
+    | (Boolean        v1, Boolean        v2) -> (v1 = v2)
+    | (Primitive      v1, Primitive      v2) -> (Object.Equals(v1,v2))
+    | (Closure   (i1,e1), Closure   (i2,e2)) -> (List.forall2 ieq i1 i2) && (List.forall2 ceq e1 e2)
+    | (Macro          i1, Macro          i2) -> (List.forall2 ieq i1 i2)
+    | (Nil              , Nil              ) -> true
+    | (                _,                 _) -> false
+
+and ieq (x:Inst) (y:Inst) : bool =
+    match (x,y) with
+    | (Ld   (i1,j1), Ld   (i2,j2)) -> (i1=i2) && (j1=j2)
+    | (Ldc     (v1), Ldc     (v2)) -> ceq v1 v2
+    | (Ldg     (v1), Ldg     (v2)) -> ceq v1 v2
+    | (Ldf     (i1), Ldf     (i2)) -> List.forall2 ieq i1 i2
+    | (Join        , Join        ) -> true
+    | (Rtn         , Rtn         ) -> true
+    | (App         , App         ) -> true
+    | (Pop         , Pop         ) -> true
+    | (Sel  (t1,f1), Sel  (t2,f2)) -> (List.forall2 ieq t1 t2) && (List.forall2 ieq f1 f2)
+    | (Def       v1, Def       v2) -> ceq v1 v2 // append to implements macro
+    | (Defm      v1, Defm      v2) -> ceq v1 v2
+    | (Args      i1, Args      i2) -> (i1=i2) 
+    | (Stop        , Stop        ) -> true
+    | (           _,            _) -> false
+
 let eq (x:Value) (y:Value) : bool =
     match (x,y) with
     | (Symbol   v1, Symbol   v2) -> (v1 = v2)//(Object.Equals(x,y))
@@ -192,6 +231,7 @@ let eq (x:Value) (y:Value) : bool =
     | (String   v1, String   v2) -> (v1 = v2)
     | (Boolean  v1, Boolean  v2) -> (v1 = v2)
     | (Primitive _, Primitive _) -> (Object.Equals(x,y))
+    | (Closure   _, Closure   _) -> (Object.Equals(x,y))
     | (Nil        , Nil        ) -> true
     | (          _,           _) -> false
 
@@ -201,104 +241,15 @@ let rec equal (x:Value) (y:Value) : bool =
     | (Cell     (a1,d1), Cell     (a2,d2)) -> (equal a1 a2) && (equal d1 d2)
     | (Array         v1, Array         v2) -> (List.forall2 equal v1 v2)
     | (Number        v1, Number        v2) -> (v1 = v2)
-    | (Char     v1, Char     v2) -> (v1 = v2)
+    | (Char          v1, Char          v2) -> (v1 = v2)
     | (String        v1, String        v2) -> (v1 = v2)
     | (Boolean       v1, Boolean       v2) -> (v1 = v2)
     | (Primitive      _, Primitive      _) -> (Object.Equals(x,y))
+    | (Closure        _, Closure        _) -> (Object.Equals(x,y))
     | (Nil             , Nil             ) -> true
     | (               _,                _) -> false
 
-(* compiler *)
-module Compiler =
-    let compile (expr:Value) : Inst list =
-        let position_var (sym:Value) (ls:Value) : int option =
-            let rec loop (ls:Value) (i:int) =
-                match ls with
-                | Nil            -> None
-                | Symbol(_) as y -> if (eq sym y) then Some (-(i + 1)) else None
-                | Cell(a, d)     -> if (eq sym a) then Some i else loop d (i + 1)
-                | _              -> failwith "bad variable table"
-            in loop ls 0
-
-        let location (sym:Value) (ls:Value list) : (int * int) option  =
-            let rec loop (ls:Value list) (i:int) =
-                match ls with
-                | [] -> None
-                | a::d ->
-                    match position_var sym a with
-                    | Some j -> Some(i, j)
-                    | None   -> loop d (i + 1)
-            in loop ls 0
-
-        let is_self_evaluation (expr:Value) : bool =
-            ((ispair expr)) = false && ((issymbol expr) = false)
-
-        let rec comp (expr: Value) (env: Value list) (code: Inst list): Inst list =
-            if is_self_evaluation expr 
-            then Ldc(expr) :: code
-            else 
-                match expr with
-                | Symbol _ ->
-                    match location expr env with
-                    | Some (i, j) -> Ld(i, j) :: code
-                    | None -> Ldg(expr) :: code
-                | Cell(Symbol("quote"), Cell(v, Nil)) -> 
-                    Ldc(v) :: code
-                | Cell(Symbol("if"), Cell(cond, Cell(t, Nil))) -> 
-                    let t_clause = comp t env [Join]
-                    let f_clause = [Ldc (Symbol "*undef"); Join] 
-                    in  comp cond env (Sel (t_clause, f_clause) :: code)
-                | Cell(Symbol("if"), Cell(cond, Cell(t, Cell(e, Nil)))) -> 
-                    let t_clause = comp t env [Join]
-                    let f_clause = comp e env [Join]
-                    in  comp cond env (Sel (t_clause, f_clause) :: code)
-                | Cell((Symbol "lambda"), Cell(name, body)) ->
-                    let body = comp_body body (name :: env) [Rtn]
-                    in  Ldf(body) :: code
-                | Cell((Symbol "define"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
-                    comp body env (Def(sym)::code)
-                | Cell(fn, args) -> 
-                    complis args env ((Args (length args))::(comp fn env (App :: code)))
-                | _ -> failwith "syntax error"
-            
-        and comp_body (body: Value) (env: Value list) (code: Inst list) : Inst list =
-            match body with
-            | Cell(x, Nil) -> comp x env code
-            | Cell(x, xs) -> comp x env (Pop :: (comp_body xs env code))
-            | _ -> failwith "syntax error"
-        and complis (expr: Value) (env: Value list) (code: Inst list): Inst list =
-            match (expr) with 
-            | Nil -> code 
-            | Cell(a,d) -> comp a env (complis d env code)
-            | _ -> failwith "syntax error"
-        in
-            if iserror(expr)
-            then [Ldc expr; Stop]
-            else comp expr [] [Stop]
-
-(* secd virtual machine *)
-module VM =
-    let get_lvar (e: Value list) (i: int) (j: int) : Value =
-        let rec list_ref (x:Value) (n:int) : Value = 
-            match x with
-                | Nil -> failwith "out of range"
-                | Cell(a,d) -> 
-                    if n < 0 then failwith "out of range"
-                    else if n = 0 then a
-                    else list_ref d (n - 1)
-                | _  -> failwith "not cell"
-        let rec drop (ls: Value) (n: int): Value =
-            if n <= 0 
-            then ls
-            else 
-                match ls with
-                | Cell (a, d) -> drop d (n - 1)
-                | _ -> failwith "not cell"
-        in
-            if 0 <= j
-            then list_ref (List.item i e) j
-            else drop     (List.item i e) -(j + 1)
-  
+module Scheme =
     let sum (x:Value) : Value = 
         match x with
         | Cell (Number l, xs) -> 
@@ -337,50 +288,165 @@ module VM =
 
     type Context = { s: Value list; e: Value list; c: (Inst list); d: (Value list * Value list * (Inst list)) list; halt: bool }
 
-    let vm (context:Context) : Context =
-        if context.halt 
-        then context
-        else 
-            match (context.c, context.s, context.e, context.d) with
-            | (Ld(i,j)  ::c',                         s , e,                 d ) -> { context with s = (get_lvar e i j) :: s; e = e; c = c'; d = d }
-            | (Ldc(v)   ::c',                         s , e,                 d ) -> { context with s = v::s; e = e; c = c'; d = d }
-            | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s; e = e; c = c'; d = d }
-            | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e)::s; e = e; c = c'; d = d }
-            | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'; e = e; c = c'; d = d }
-            | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []; e = arg :: e'; c = f; d = (s', e, c') :: d }
-            | (Rtn      ::_ ,                     s1::[], e, (s2, e', c') :: d') -> { context with s = s1 :: s2; e = e'; c = c'; d = d' }
-            | (Sel(t, f)::c',          (Boolean v) :: s', e,                 d ) -> { context with s = s'; e = e; c = (if v then t else f); d = ([],[],c') :: d }
-            | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s; e = e; c = c'; d = d' }
-            | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'; e = e; c = c'; d = d }
-            | (Args(v)  ::c',                         s , e,                 d ) -> 
-                let rec loop a s n =
-                    match (s,n) with
-                    | (         _, 0) -> { context with s = a :: s; e = e; c = c'; d = d }
-                    | (car :: cdr, _) -> loop (Cell(car, a)) cdr (n - 1)
-                    | _               -> failwith "bad args"
-                in loop Nil s v
-            | (Def(sym):: c', body :: s', e, d) -> 
-                global_environment := (sym, body) :: !global_environment;
-                { context with s = sym :: s'; e = e; c = c'; d = d };
-            | (Stop::c', s, e, d) -> { context with halt= true }
-            | _ -> failwith "bad context"
+    
+    let rec compile (expr:Value) : Inst list =
+        (* compiler *)
+        let position_var (sym:Value) (ls:Value) : int option =
+            let rec loop (ls:Value) (i:int) =
+                match ls with
+                | Nil            -> None
+                | Symbol(_) as y -> if (eq sym y) then Some (-(i + 1)) else None
+                | Cell(a, d)     -> if (eq sym a) then Some i else loop d (i + 1)
+                | _              -> failwith "bad variable table"
+            in loop ls 0
+
+        let location (sym:Value) (ls:Value list) : (int * int) option  =
+            let rec loop (ls:Value list) (i:int) =
+                match ls with
+                | [] -> None
+                | a::d ->
+                    match position_var sym a with
+                    | Some j -> Some(i, j)
+                    | None   -> loop d (i + 1)
+            in loop ls 0
+
+        let is_self_evaluation (expr:Value) : bool =
+            ((ispair expr)) = false && ((issymbol expr) = false)
+
+        (*  start: append to implements macro *)
+        let ismacro (sym:Value) : bool =
+            match assoc sym global_environment with
+            | Some (key, Macro _ ) -> true
+            | _ -> false
+
+        let get_macro_code (sym:Value) : Inst list =
+            match (get_gvar sym |> (cdr << cdr << car)) with
+            | Macro v -> v
+            | _ -> failwith "not macro"
+
+        (*  end: append to implements macro *)
+
+        let rec comp (expr: Value) (env: Value list) (code: Inst list): Inst list =
+            if is_self_evaluation expr 
+            then Ldc(expr) :: code
+            else 
+                match expr with
+                | Symbol _ ->
+                    match location expr env with
+                    | Some (i, j) -> Ld(i, j)  :: code
+                    | None        -> Ldg(expr) :: code
+                | Cell(Symbol("quote"), Cell(v, Nil)) -> 
+                    Ldc(v) :: code
+                | Cell(Symbol("if"), Cell(cond, Cell(t, Nil))) -> 
+                    let t_clause = comp t env [Join]
+                    let f_clause = [Ldc (Symbol "*undef"); Join] 
+                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                | Cell(Symbol("if"), Cell(cond, Cell(t, Cell(e, Nil)))) -> 
+                    let t_clause = comp t env [Join]
+                    let f_clause = comp e env [Join]
+                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                | Cell((Symbol "lambda"), Cell(name, body)) ->
+                    let body = comp_body body (name :: env) [Rtn]
+                    in  Ldf(body) :: code
+                | Cell((Symbol "define"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
+                    comp body env (Def(sym)::code)
+                (*  start: append to implements macro *)
+                | Cell((Symbol "define-macro"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
+                    comp body env (Defm(sym)::code)
+                (*  end: append to implements macro *)
+                | Cell(fn, args) -> 
+                    complis args env ((Args (length args))::(comp fn env (App :: code)))
+                (*  start: append to implements macro *)
+                | _ when ismacro (car expr) -> 
+                    let context = { s= []; e= [cdr expr] ; c= get_macro_code (car expr); d= [([], [], [Stop])]; halt= false }
+                    let newexpr = vm context
+                    in  comp newexpr.s.Head env code
+                (*  end: append to implements macro *)
+                | _ -> failwith "syntax error"
+            
+        and comp_body (body: Value) (env: Value list) (code: Inst list) : Inst list =
+            match body with
+            | Cell(x, Nil) -> comp x env code
+            | Cell(x, xs)  -> comp x env (Pop :: (comp_body xs env code))
+            | _            -> failwith "syntax error"
+        and complis (expr: Value) (env: Value list) (code: Inst list): Inst list =
+            match (expr) with 
+            | Nil       -> code 
+            | Cell(a,d) -> comp a env (complis d env code)
+            | _         -> failwith "syntax error"
+        in
+            if iserror(expr)
+            then [Ldc expr; Stop]
+            else comp expr [] [Stop]
+
+
+    (* secd virtual machine *)
+    and vm (context:Context) : Context =
+        let get_lvar (e: Value list) (i: int) (j: int) : Value =
+            let rec list_ref (x:Value) (n:int) : Value = 
+                match x with
+                    | Nil -> failwith "out of range"
+                    | Cell(a,d) -> 
+                        if n < 0 then failwith "out of range"
+                        else if n = 0 then a
+                        else list_ref d (n - 1)
+                    | _  -> failwith "not cell"
+            let rec drop (ls: Value) (n: int): Value =
+                if n <= 0 
+                then ls
+                else 
+                    match ls with
+                    | Cell (a, d) -> drop d (n - 1)
+                    | _ -> failwith "not cell"
+            in
+                if 0 <= j
+                then list_ref (List.item i e) j
+                else drop     (List.item i e) -(j + 1)
+        in
+            if context.halt 
+            then context
+            else 
+                match (context.c, context.s, context.e, context.d) with
+                | (Ld(i,j)  ::c',                         s , e,                 d ) -> { context with s = (get_lvar e i j) :: s; e = e; c = c'; d = d }
+                | (Ldc(v)   ::c',                         s , e,                 d ) -> { context with s = v::s; e = e; c = c'; d = d }
+                | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s; e = e; c = c'; d = d }
+                | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e)::s; e = e; c = c'; d = d }
+                | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'; e = e; c = c'; d = d }
+                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []; e = arg :: e'; c = f; d = (s', e, c') :: d }
+                | (Rtn      ::_ ,                     s1::[], e, (s2, e', c') :: d') -> { context with s = s1 :: s2; e = e'; c = c'; d = d' }
+                | (Sel(t, f)::c',          (Boolean v) :: s', e,                 d ) -> { context with s = s'; e = e; c = (if v then t else f); d = ([],[],c') :: d }
+                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s; e = e; c = c'; d = d' }
+                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'; e = e; c = c'; d = d }
+                | (Args(v)  ::c',                         s , e,                 d ) -> 
+                    let rec loop a s n =
+                        match (s,n) with
+                        | (         _, 0) -> { context with s = a :: s; e = e; c = c'; d = d }
+                        | (car :: cdr, _) -> loop (Cell(car, a)) cdr (n - 1)
+                        | _               -> failwith "bad args"
+                    in loop Nil s v
+                | (Def(sym):: c', body :: s', e, d) -> 
+                    global_environment := (sym, body) :: !global_environment;
+                    { context with s = sym :: s'; e = e; c = c'; d = d };
+                | (Stop::c', s, e, d) -> { context with halt= true }
+                | _ -> failwith "bad context"
 
 (* parser combinator *)
 module ParserCombinator =
-    type ParserState<'a> = { pos:int; value:'a }
-    type Parser<'a> = string -> int -> ParserState<'a> option
+    type ParserState<'a> = Success of pos:int * value:'a
+                         | Fail    of pos:int * message:string
+    type Parser<'a> = string -> int -> ParserState<'a>
 
     let char (pred : char -> bool) = 
         fun (str:string) (pos:int) -> 
             if (str.Length > pos) && (pred str.[pos]) 
-            then Some({ pos=pos+1; value=str.[pos]}) 
-            else None
+            then Success (pos+1, str.[pos]) 
+            else Fail    (pos, "char: not match character "+(if (str.Length > pos) then str.[pos].ToString() else "EOS"))
 
     let anychar (chs:string) = 
         fun (str:string) (pos:int) -> 
             if (str.Length > pos) && (chs.IndexOf(str.[pos]) <> -1 )
-            then Some({ pos=pos+1; value=str.[pos]}) 
-            else None
+            then Success (pos+1, str.[pos]) 
+            else Fail    (pos, "anychar: not match character  "+(if (str.Length > pos) then str.[pos].ToString() else "EOS"))
 
     let submatch (s1:string) (i1:int) (s2:string) =
         if (i1 < 0) || (s1.Length < s2.Length + i1) 
@@ -399,110 +465,110 @@ module ParserCombinator =
     let str (s:string) =
         fun (str:string) (pos:int) -> 
             if submatch str pos s 
-            then Some({ pos=pos+s.Length; value=s}) 
-            else None
+            then Success (pos+s.Length, s) 
+            else Fail    (pos, "str: require is '"+s+"' but get"+(if (str.Length > pos) then str.[pos].ToString() else "EOS")+".")
 
     let any () = 
         fun (str:string) (pos:int) -> 
             if str.Length > pos 
-            then Some({ pos=pos+1; value=str.[pos]}) 
-            else None
+            then Success (pos+1, str.[pos]) 
+            else Fail    (pos, "any: require anychar but get EOF.")
 
     let not (parser:Parser<'a>) = 
         fun (str:string) (pos:int) -> 
             match parser str pos with
-            | None   -> Some { pos=pos; value=() }
-            | Some _ -> None
+            | Fail    _ -> Success (pos, ())
+            | Success _ -> Fail    (pos, "not: require rule was fail but success.")
 
     let select (pred:'a->'b) (parser:Parser<'a>) = 
         fun (str:string) (pos:int) -> 
             match parser str pos  with
-            | None   -> None
-            | Some {pos=pos; value=value} -> Some {pos=pos; value=pred value}
+            | Fail    (pos, value) -> Fail (pos, value)
+            | Success (pos, value) -> Success (pos, (pred value))
 
     let where (pred:'a->bool) (parser:Parser<'a>) = 
         fun (str:string) (pos:int) -> 
             match parser str pos with
-            | None   -> None
-            | Some {pos=pos; value=value} as ret -> if pred value then ret else None
+            | Fail    (pos, value) -> Fail (pos, value)
+            | Success (_, value) as f -> if pred value then f else Fail (pos, "where: require rule was fail but success.")
 
     let opt (parser:Parser<'a>) = 
         fun (str:string) (pos:int) ->       
             match parser str pos with
-            | None   -> Some {pos=pos; value=None}
-            | Some {pos=pos; value=value} -> Some {pos=pos; value=Some(value)} 
+            | Fail _               -> Success (pos, None)
+            | Success (pos, value) -> Success (pos, Some(value))
 
     let seq (parsers:Parser<'a> list) =
         fun (str:string) (pos:int) -> 
             let rec loop (parsers:Parser<'a> list) (pos:int) (values: 'a list) =
                 match parsers with
-                | []   -> Some {pos=pos; value=List.rev values}
+                | []   -> Success (pos, List.rev values)
                 | x::xs -> 
                     match x str pos with
-                    | None -> None
-                    | Some {pos=pos; value=value} -> loop xs pos (value :: values)
+                    | Fail    (pos, value) -> Fail (pos, value)
+                    | Success (pos, value) -> loop xs pos (value :: values)
             in loop parsers pos [];
     
     let choice(parsers:Parser<'a> list) =
         fun (str:string) (pos:int) -> 
             let rec loop (parsers:Parser<'a> list) (pos:int) =
                 match parsers with
-                | []   -> None
+                | []   -> Fail (pos, "choice: not match any rules.")
                 | x::xs -> 
                     match x str pos with
-                    | None -> loop xs pos
-                    | Some _ as ret -> ret;
+                    | Fail _  -> loop xs pos
+                    | Success _ as ret -> ret;
             in loop parsers pos;
 
     let repeat (parser:Parser<'a>) = 
         fun (str:string) (pos : int) -> 
             let rec loop pos values = 
                 match parser str pos with
-                | None -> Some {pos=pos;value=List.rev values}
-                | Some {pos=pos; value=value} -> loop pos (value :: values)
+                | Fail _  -> Success (pos, List.rev values)
+                | Success (pos, value) -> loop pos (value :: values)
             in loop pos []
 
     let repeat1 (parser:Parser<'a>) = 
         fun (str:string) (pos : int) -> 
             let rec loop pos values = 
                 match parser str pos with
-                | None -> Some {pos=pos;value=List.rev values}
-                | Some {pos=pos; value=value} -> loop pos (value :: values)
+                | Fail _  -> Success (pos, List.rev values)
+                | Success (pos, value) -> loop pos (value :: values)
             in 
                 match parser str pos with
-                | None -> None
-                | Some {pos=pos; value=value} -> loop pos [value]
+                | Fail    (pos, value) -> Fail (pos, value)
+                | Success (pos, value) -> loop pos [value]
 
 
     let andBoth (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (str:string) (pos : int) -> 
             match lhs str pos with
-            | None -> None
-            | Some {pos=pos; value=value1} -> 
+            | Fail    (pos, value) -> Fail (pos, value)
+            | Success (pos, value1) -> 
                 match rhs str pos with
-                | None -> None
-                | Some {pos=pos; value=value2} -> 
-                    Some {pos=pos; value=(value1, value2)} 
+                | Fail    (pos, value) -> Fail (pos, value)
+                | Success (pos, value2) -> 
+                    Success (pos, (value1, value2)) 
 
     let andRight (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (str:string) (pos : int) -> 
             match lhs str pos with
-            | None -> None
-            | Some {pos=pos; value=value1} -> 
+            | Fail    (pos, value) -> Fail (pos, value)
+            | Success (pos, value1) -> 
                 match rhs str pos with
-                | None -> None
-                | Some {pos=pos; value=value2} -> 
-                    Some {pos=pos; value=value2} 
+                | Fail    (pos, value) -> Fail (pos, value)
+                | Success (pos, value2) -> 
+                     Success (pos, value2) 
 
     let andLeft (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (str:string) (pos : int) -> 
             match lhs str pos with
-            | None -> None
-            | Some {pos=pos; value=value1} -> 
+            | Fail    (pos, value) -> Fail (pos, value)
+            | Success (pos, value1) -> 
                 match rhs str pos with
-                | None -> None
-                | Some {pos=pos; value=value2} -> 
-                    Some {pos=pos; value=value1} 
+                | Fail    (pos, value) -> Fail (pos, value)
+                | Success (pos, value2) -> 
+                     Success (pos, value1) 
 
     let lazy_ (p:unit -> Parser<'a>) = 
         fun (str:string) (pos:int) ->  (p ()) str pos
@@ -544,8 +610,10 @@ module Parser =
     let isspace  (ch:char) = " \t\r\n".IndexOf(ch) <> -1
 
     let rec whitespace = (ParserCombinator.char isspace).Many()
+    
+    and eof = not(any())
 
-    and start = whitespace.AndR(expr).AndL(whitespace)
+    and start = whitespace.AndR(eof.Select(fun _ -> None).Or(expr.Select(Some).AndL(whitespace)))
 
     and expr = lazy_(fun () -> whitespace.AndR(quoted.Or(list_).Or(vector).Or(atom)))
     
@@ -584,7 +652,7 @@ module Parser =
             let d1 = (str ".").AndR(digit_num).AndL((str "#").Many()).Select(fun d -> ("0."+d.ToString()) |> double |> RealV )
             let d2 = (digit_num.Many1()).AndL(str ".").And(digit_num).AndL((str "#").Many()).Select(fun (i,d) -> (i.ToString()+"."+d.ToString()) |> double |> RealV )
             let d3 = (digit_num.Many1()).AndL((str "#").Many1()).AndL(str ".").AndL((str "#").Many()).Select(fun i -> i.ToString() |> double |> RealV )
-            let d4 = (digit_num.Many1()).Select(fun i -> i.ToString() |> int |> IntV )
+            let d4 = (digit_num.Many1()).Select(fun i -> (List.fold (fun s x -> s + x.ToString()) "" i) |> int |> IntV )
             in  d1.Or(d2).Or(d3).Or(d4) 
          let digit_usreal = 
             let faction = digit_usint.AndL(whitespace.And(str "/").And(whitespace)).And(digit_usint).Select(fun v -> FractionV v)
@@ -597,7 +665,7 @@ module Parser =
             let p3 = digit_real.AndL(str "-i").Select(fun real -> ComplexV (real, RealV -1.0))
             let p4 = digit_real.AndL(str "-" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, NumberVOp.neg imaginary))
             in p1.Or(p2).Or(p3).Or(p4)
-         in accuracy_prefix.And(digit_complex).Select(fun (a,v) -> Number v )
+         in prefix.And(digit_complex.Or(digit_real)).Select(fun (a,v) -> Number v )
     and  ident = 
          let normal = 
             let head = ParserCombinator.char ishead
@@ -629,40 +697,52 @@ module Parser =
         in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> Array v | None -> Nil)
 
 
-let run (context:VM.Context) :VM.Context =
+let run (context:Scheme.Context) :Scheme.Context =
     let rec loop context =
-        let context = VM.vm context
+        let context = Scheme.vm context
         in  if context.halt then context else loop context
     in loop context
 
-let create_context () : VM.Context =
+let create_context () : Scheme.Context =
     { s=[]; e=[]; c=[Stop]; d=[]; halt = true }
 
-let update_context(context: VM.Context) (expr:Inst list) : VM.Context =
+let update_context(context: Scheme.Context) (expr:Inst list) : Scheme.Context =
     { context with c=expr; halt = false }
 
 [<EntryPoint>]
 let main argv =
-    let test (s:string) (expr:Value) (ret:Value) (ctx:VM.Context): VM.Context = 
+    let test (s:string) (expr:Value) (ret:Value) (ctx:Scheme.Context): Scheme.Context = 
         printfn "Test:";
         printfn "  Input Code: %s" s;
-        match Parser.start s 0 with
-        | None -> failwith "syntax error"
-        | Some {value=v} -> 
-            printfn "  Parsed   AST: %A" v;
+        match Parser.expr s 0 with
+        | ParserCombinator.Fail    (pos, value) -> printfn "Parse Failed at (%d): %s" pos value; ctx;
+        | ParserCombinator.Success (pos, value) -> 
+            printfn "  Parsed   AST: %A" value;
             printfn "  Expected AST: %A" expr;
-            if (equal v expr) = false 
+            if (ceq value expr) = false 
             then (printfn "  -> AST Not Match"); ctx
             else
-                let code = v |> Compiler.compile
+                let code = value |> Scheme.compile
                 let ctx' = update_context ctx code
                 let result = run ctx'
                 in  
                     result.s.[0] |> toString |> printfn "  Execute  Result: %s";
                     ret          |> toString |> printfn "  Expected Result: %s";
-                    (if equal ret result.s.[0] then printfn "  All Match" else printfn "  -> Result Not Match");
+                    (if ceq ret result.s.[0] then printfn "  All Match" else printfn "  -> Result Not Match");
                     ctx'
-    
+    let eval (s:string) (ctx:Scheme.Context): Scheme.Context = 
+        let rec loop pos ctx = 
+            match Parser.start s pos with
+            | ParserCombinator.Fail    (pos, value) -> printfn "Parse Failed at (%d): %s" pos value; ctx;
+            | ParserCombinator.Success (pos, Some value) -> 
+                let code = value |> Scheme.compile
+                let ctx' = update_context ctx code
+                let result = run ctx'
+                in  
+                    result.s.[0] |> toString |> printfn "%s";
+                    loop pos ctx' 
+            | ParserCombinator.Success (pos, None) -> ctx
+        in loop 0 ctx
     in
         create_context () |>
         test "(quote a)" (list [Symbol("quote"); Symbol("a")]) (Symbol "a")|>
@@ -693,6 +773,85 @@ let main argv =
 
         test "foo" (Symbol("foo")) (Closure ([Ldg (Symbol "x"); Rtn], [])) |>
         test "bar" (Symbol("bar")) (Closure ([Args 0; Ldg (Symbol "foo"); App; Rtn], [] )) |>
+
+        eval "
+(define null? (lambda (x) (eq? x '())))
+(define not (lambda (x) (if (eq? x #f) #t #f)))
+(define null? (lambda (x) (eq? x '())))
+(define append
+  (lambda (xs ys)
+    (if (null? xs)
+        ys
+      (cons (car xs) (append (cdr xs) ys)))))
+      
+(define reverse
+  (lambda (ls)
+    (if (null? ls)
+        '()
+      (append (reverse (cdr ls)) (list (car ls))))))" |>
+
+        eval "(append '(a b c) '(d e f))" |> //"(a b c d e f)"
+        eval "(append '((a b) (c d)) '(e f g))" |> //((a b) (c d) e f g)
+        eval "(reverse '(a b c d e))" |> //(e d c b a)
+        eval "(reverse '((a b) c (d e)))" |> //((d e) c (a b))
+
+        eval "
+(define memq
+  (lambda (x ls)
+    (if (null? ls)
+        #f
+        (if (eq? x (car ls))
+            ls
+          (memq x (cdr ls))))))
+
+(define assq
+  (lambda (x ls)
+    (if (null? ls)
+        #f
+      (if (eq? x (car (car ls)))
+          (car ls)
+        (assq x (cdr ls))))))" |>
+
+        eval "(memq 'a '(a b c d e))" |> //(a b c d e)
+        eval "(memq 'c '(a b c d e))" |> //(c d e)
+        eval "(memq 'f '(a b c d e))" |> //#f
+        eval "(assq 'a '((a 1) (b 2) (c 3) (d 4) (e 5)))" |> //(a 1)
+        eval "(assq 'e '((a 1) (b 2) (c 3) (d 4) (e 5)))" |> //(e 5)
+        eval "(assq 'f '((a 1) (b 2) (c 3) (d 4) (e 5)))" |> //#f
+
+        eval "
+(define map
+  (lambda (fn ls)
+    (if (null? ls)
+        '()
+      (cons (fn (car ls)) (map fn (cdr ls))))))
+
+(define filter
+  (lambda (fn ls)
+    (if (null? ls)
+        '()
+      (if (fn (car ls))
+          (cons (car ls) (filter fn (cdr ls)))
+        (filter fn (cdr ls))))))
+
+(define fold-right
+  (lambda (fn a ls)
+    (if (null? ls)
+        a
+      (fn (car ls) (fold-right fn a (cdr ls))))))
+
+(define fold-left
+  (lambda (fn a ls)
+    (if (null? ls)
+        a
+      (fold-left fn (fn a (car ls)) (cdr ls)))))" |>
+
+        eval "(map car '((a 1) (b 2) (c 3) (d 4) (e 5)))" |> //(a b c d e)
+        eval "(map cdr '((a 1) (b 2) (c 3) (d 4) (e 5)))" |> //((1) (2) (3) (4) (5))
+        eval "(map (lambda (x) (cons x x)) '(a b c d e))" |> //((a . a) (b . b) (c . c) (d . d) (e . e))
+        eval "(filter (lambda (x) (not (eq? x 'a))) '(a b c a b c a b c))" |> //(b c b c b c)
+        eval "(fold-left cons '() '(a b c d e))" |> //(((((() . a) . b) . c) . d) . e)
+        eval "(fold-right cons '() '(a b c d e))" |> //(a b c d e)
 
         ignore;
         
