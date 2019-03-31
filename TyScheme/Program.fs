@@ -1,6 +1,7 @@
 ﻿open System
 open System.Linq.Expressions
 open System.Text.RegularExpressions;
+open Microsoft.FSharp.Core;
 
 (* Value Type *)
 
@@ -77,7 +78,7 @@ type Value  =
       Symbol of value : string
     | Nil
     | Array of value : Value list
-    | Cell of car: Value * cdr: Value
+    | Cell of car: (Value ref) * cdr: (Value ref)
     | String of value : string
     | Char of value : char
     | Number of value : NumberV
@@ -100,7 +101,13 @@ and Inst =
     | Def  of Value // append to implements macro
     | Defm of Value
     | Args of int
+    | Lset of pos:(int * int) // append to implements set!
+    | Gset of sym:Value // append to implements set!
     | Stop
+
+let set_car (c : Value) (v : Value) =
+    match c with
+    | Cell (x, y) -> x := v
 
 let escapeString (str:string) =
     let rec loop (str:char list) (result:string list) =
@@ -169,7 +176,6 @@ let issymbol x =
 
 let ispair x = 
     match x with
-    | Nil  _
     | Cell _ -> true
     | _      -> false
 
@@ -284,7 +290,7 @@ module Scheme =
     let get_gvar (sym:Value) : Value =
         match assoc sym global_environment with
         | Some (key, value) -> value
-        | _ -> Error ("runtime error", String.Format("unbound variable:{0}",sym))
+        | _ -> Error ("runtime error", String.Format("unbound variable:{0}",toString sym))
 
     type Context = { s: Value list; e: Value list; c: (Inst list); d: (Value list * Value list * (Inst list)) list; halt: bool }
 
@@ -354,6 +360,13 @@ module Scheme =
                 | Cell((Symbol "define-macro"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
                     comp body env (Defm(sym)::code)
                 (*  end: append to implements macro *)
+                (*  start: append to implements set! *)
+                | Cell((Symbol "set!"), Cell(sym,Cell(body, _))) -> 
+                    let pos = location sym env
+                    match pos with
+                    | Some pos -> comp body env (Lset (pos)::code)
+                    | None -> comp body env (Gset (sym)::code)
+                (*  end: append to implements set! *)
                 | Cell(fn, args) -> 
                     complis args env ((Args (length args))::(comp fn env (App :: code)))
                 (*  start: append to implements macro *)
@@ -391,6 +404,7 @@ module Scheme =
                         else if n = 0 then a
                         else list_ref d (n - 1)
                     | _  -> failwith "not cell"
+
             let rec drop (ls: Value) (n: int): Value =
                 if n <= 0 
                 then ls
@@ -402,33 +416,38 @@ module Scheme =
                 if 0 <= j
                 then list_ref (List.item i e) j
                 else drop     (List.item i e) -(j + 1)
+        let set_lvar e i j value =
+            if 0 <= j
+            then set_car (drop (list-ref e i) j) value
+            else if j = -1
+              then set_car (drop e i) value
+              else set_cdr (drop (list-ref e i) (- (j + 2))) value
         in
             if context.halt 
             then context
             else 
                 match (context.c, context.s, context.e, context.d) with
-                | (Ld(i,j)  ::c',                         s , e,                 d ) -> { context with s = (get_lvar e i j) :: s; e = e; c = c'; d = d }
-                | (Ldc(v)   ::c',                         s , e,                 d ) -> { context with s = v::s; e = e; c = c'; d = d }
-                | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s; e = e; c = c'; d = d }
-                | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e)::s; e = e; c = c'; d = d }
-                | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'; e = e; c = c'; d = d }
-                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []; e = arg :: e'; c = f; d = (s', e, c') :: d }
-                | (Rtn      ::_ ,                     s1::[], e, (s2, e', c') :: d') -> { context with s = s1 :: s2; e = e'; c = c'; d = d' }
-                | (Sel(t, f)::c',          (Boolean v) :: s', e,                 d ) -> { context with s = s'; e = e; c = (if v then t else f); d = ([],[],c') :: d }
-                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s; e = e; c = c'; d = d' }
-                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'; e = e; c = c'; d = d }
-                | (Args(v)  ::c',                         s , e,                 d ) -> 
-                    let rec loop a s n =
-                        match (s,n) with
-                        | (         _, 0) -> { context with s = a :: s; e = e; c = c'; d = d }
-                        | (car :: cdr, _) -> loop (Cell(car, a)) cdr (n - 1)
-                        | _               -> failwith "bad args"
-                    in loop Nil s v
-                | (Def(sym):: c', body :: s', e, d) -> 
-                    global_environment := (sym, body) :: !global_environment;
-                    { context with s = sym :: s'; e = e; c = c'; d = d };
-                | (Stop::c', s, e, d) -> { context with halt= true }
-                | _ -> failwith "bad context"
+                | (Ld(i,j)  ::c',                         s , e,                 d ) -> { context with s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }
+                | (Ldc(v)   ::c',                         s , e,                 d ) -> { context with s = v :: s                ; e = e        ; c = c'; d = d }
+                | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }
+                | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }
+                | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'         ; e = e        ; c = c'; d = d }
+                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f; d = (s', e, c') :: d }
+                | (Rtn      ::_ ,                   s1 :: [], e, (s2, e', c') :: d') -> { context with s = s1 :: s2              ; e = e'       ; c = c'; d = d' }
+                | (Sel(t, f)::c',          (Boolean v) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = (if v then t else f); d = ([],[],c') :: d }
+                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e; c = c'; d = d' }
+                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e; c = c'; d = d }
+                | (Args(v)  ::c',                         s , e,                 d ) -> let (a'',s') = List.splitAt v s
+                                                                                        let a' = List.fold (fun s x -> Cell(x,s))  Nil a''
+                                                                                        in { context with s = a' :: s'; e = e; c = c'; d = d }
+                | (Def(sym) ::c',                 body :: s', e,                 d ) -> global_environment := (sym, body) :: !global_environment;
+                                                                                        { context with s = sym :: s'; e = e; c = c'; d = d };
+                (*  start: append to implements macro *)
+                | (Defm(sym)::c',                 body :: s', e,                 d ) -> global_environment := (sym, body) :: !global_environment;
+                                                                                        { context with s = sym :: s'; e = e; c = c'; d = d };
+                (*  end: append to implements set! *)
+                | (Stop     ::c',                          s, e,                 d ) -> { context with halt= true }
+                | _                                                                  -> failwith "bad context"
 
 (* parser combinator *)
 module ParserCombinator =
@@ -609,7 +628,10 @@ module Parser =
     let istail   (ch:char) = issptail(ch) || isalpha(ch) || isdigit(ch)
     let isspace  (ch:char) = " \t\r\n".IndexOf(ch) <> -1
 
-    let rec whitespace = (ParserCombinator.char isspace).Many()
+    let rec whitespace = 
+        let space = (ParserCombinator.char isspace).Select(fun _ -> " ")
+        let comment = (ParserCombinator.char (fun x -> x = ';')).AndR((ParserCombinator.char (fun x -> x <> '\n')).Many()).Select(fun _ -> " ");
+        in space.Or(comment).Many()
     
     and eof = not(any())
 
@@ -635,7 +657,7 @@ module Parser =
             let lf        = (str "\\n" ).Select(fun _ -> '\n')
             let tab       = (str "\\t" ).Select(fun _ -> '\t')
             let formfeed  = (str "\\f" ).Select(fun _ -> '\f')
-            let notescape = ParserCombinator.char (fun x -> x <> '\\')
+            let notescape = ParserCombinator.char (fun x -> x <> '\\' && x <> '"')
             in  dquote.Or(cr).Or(lf).Or(tab).Or(formfeed).Or(notescape)
         in whitespace.AndR(ParserCombinator.char (fun x -> x = '"')).AndR(ch.Many()).AndL(ParserCombinator.char (fun x -> x = '"')).Select(fun x -> List.fold (fun s x -> s + x.ToString()) "" x |> String)
 
@@ -735,7 +757,7 @@ let main argv =
             match Parser.start s pos with
             | ParserCombinator.Fail    (pos, value) -> printfn "Parse Failed at (%d): %s" pos value; ctx;
             | ParserCombinator.Success (pos, Some value) -> 
-                let code = value |> Scheme.compile
+                let code = printfn "%A" value; value |> Scheme.compile
                 let ctx' = update_context ctx code
                 let result = run ctx'
                 in  
@@ -775,6 +797,99 @@ let main argv =
         test "bar" (Symbol("bar")) (Closure ([Args 0; Ldg (Symbol "foo"); App; Rtn], [] )) |>
 
         eval "
+(define = eq?)
+
+; 述語
+(define not (lambda (x) (if x #f #t)))
+(define null? (lambda (x) (eq? x ())))
+
+; 数
+(define zero? (lambda (x) (= x 0)))
+(define positive? (lambda (x) (< 0 x)))
+(define negative? (lambda (x) (> 0 x)))
+(define even? (lambda (x) (zero? (mod x 2))))
+(define odd? (lambda (x) (not (even? x))))
+(define abs (lambda (x) (if (negative? x) (- x) x)))
+(define max
+  (lambda (x . xs)
+    (fold-left (lambda (a b) (if (< a b) b a)) x xs)))
+(define min
+  (lambda (x . xs)
+    (fold-left (lambda (a b) (if (> a b) b a)) x xs)))
+
+(define gcdi
+  (lambda (a b)
+    (if (zero? b)
+	a
+      (gcdi b (mod a b)))))
+(define gcd
+  (lambda xs
+    (if (null? xs)
+	0
+      (fold-left (lambda (a b) (gcdi a b)) (car xs) (cdr xs)))))
+
+(define lcmi (lambda (a b) (/ (* a b) (gcdi a b))))
+(define lcm
+  (lambda xs
+    (if (null? xs)
+	1
+      (fold-left (lambda (a b) (lcmi a b)) (car xs) (cdr xs)))))
+
+; cxxr
+(define caar (lambda (xs) (car (car xs))))
+(define cadr (lambda (xs) (car (cdr xs))))
+(define cdar (lambda (xs) (cdr (car xs))))
+(define cddr (lambda (xs) (cdr (cdr xs))))
+
+; cxxxr
+(define caaar (lambda (xs) (car (caar xs))))
+(define caadr (lambda (xs) (car (cadr xs))))
+(define cadar (lambda (xs) (car (cdar xs))))
+(define caddr (lambda (xs) (car (cddr xs))))
+(define cdaar (lambda (xs) (cdr (caar xs))))
+(define cdadr (lambda (xs) (cdr (cadr xs))))
+(define cddar (lambda (xs) (cdr (cdar xs))))
+(define cdddr (lambda (xs) (cdr (cddr xs))))
+
+
+; リスト操作
+
+(define list (lambda x x))
+
+(define append-1
+  (lambda (xs ys)
+    (if (null? xs)
+	ys
+      (cons (car xs) (append-1 (cdr xs) ys)))))
+
+(define append
+  (lambda xs
+    (if (null? xs)
+	'()
+      (if (null? (cdr xs))
+	  (car xs)
+	(append-1 (car xs) (apply append (cdr xs)))))))
+
+(define length
+  (lambda (xs)
+    (fold-left (lambda (a x) (+ a 1)) 0 xs)))
+
+(define reverse
+  (lambda (xs)
+    (fold-left (lambda (a x) (cons x a)) () xs)))
+
+(define list-tail
+  (lambda (xs k)
+    (if (zero? k)
+	xs
+      (list-tail (cdr xs) (- k 1)))))
+
+(define list-ref 
+  (lambda (xs k)
+    (if (zero? k)
+	(car xs)
+      (list-ref (cdr xs) (- k 1)))))
+
 (define null? (lambda (x) (eq? x '())))
 (define not (lambda (x) (if (eq? x #f) #t #f)))
 (define null? (lambda (x) (eq? x '())))
@@ -852,6 +967,94 @@ let main argv =
         eval "(filter (lambda (x) (not (eq? x 'a))) '(a b c a b c a b c))" |> //(b c b c b c)
         eval "(fold-left cons '() '(a b c d e))" |> //(((((() . a) . b) . c) . d) . e)
         eval "(fold-right cons '() '(a b c d e))" |> //(a b c d e)
+
+        eval "
+(define unquote
+  (lambda (x) (error \"unquote appeared outside quasiquote\")))
+
+(define unquote-splicing
+  (lambda (x) (error \"unquote-splicing appeared outside quasiquote\")))
+
+(define translator-sub
+  (lambda (sym ls n succ)
+    (list 'list
+	  (list 'quote sym)
+	  (translator ls (+ n succ)))))
+
+(define translator-unquote
+  (lambda (ls n)
+    (list 'cons
+	  (if (zero? n)
+	      (cadar ls)
+	    (translator-sub 'unquote (cadar ls) n -1))
+	  (translator (cdr ls) n))))
+
+(define translator-unquote-splicing
+  (lambda (ls n)
+    (if (zero? n)
+	(list 'append (cadar ls) (translator (cdr ls) n))
+      (list 'cons
+	    (translator-sub 'unquote-splicing (cadar ls) n -1)
+	    (translator (cdr ls) n)))))
+
+(define translator-quasiquote
+  (lambda (ls n)
+    (list 'cons
+	  (translator-sub 'quasiquote (cadar ls) n 1)
+	  (translator (cdr ls) n))))
+
+(define translator-list
+  (lambda (ls n)
+    (if (eq? (caar ls) 'unquote)
+	(translator-unquote ls n)
+      (if (eq? (caar ls) 'unquote-splicing)
+	  (translator-unquote-splicing ls n)
+	(if (eq? (caar ls) 'quasiquote)
+	    (translator-quasiquote ls n)
+	  (list 'cons
+		(translator (car ls) n)
+		(translator (cdr ls) n)))))))
+
+(define translator-atom
+  (lambda (ls n)
+    (if (eq? (car ls) 'unquote)
+	(if (zero? n)
+	    (cadr ls)
+	  (if (= n 1)
+	      (if (eq? (car (cadr ls)) 'unquote-splicing)
+		  (list 'cons (list 'quote 'unquote) (cadr (cadr ls)))
+		(translator-sub 'unquote (cadr ls) n -1))
+	    (translator-sub 'unquote (cadr ls) n -1)))
+      (if (eq? (car ls) 'unquote-splicing)
+	  (if (zero? n)
+	      (error \"invalid unquote-splicing form\")
+	    (if (= n 1)
+		(if (eq? (car (cadr ls)) 'unquote-splicing)
+		    (list 'cons (list 'quote 'unquote-splicing) (cadr (cadr ls)))
+		  (translator-sub 'unquote-splicing (cadr ls) n -1))
+	      (translator-sub 'unquote-splicing (cadr ls) n -1)))
+	(if (eq? (car ls) 'quasiquote)
+	    (translator-sub 'quasiquote (cadr ls) n 1)
+	  (list 'cons 
+		(list 'quote (car ls))
+		(translator (cdr ls) n)))))))
+
+(define translator
+  (lambda (ls n)
+    (if (pair? ls)
+        (if (pair? (car ls))
+	    (translator-list ls n)
+	  (translator-atom ls n))
+      (list 'quote ls))))
+
+(define-macro quasiquote (lambda (x) (translator x 0)))        
+        " |>
+
+        eval "(translator '(a b c) 0)" |>
+        eval "(translator '(,a b c) 0)" |>
+        eval "(translator '(,a ,@b c) 0)" |>
+        eval "(translator '(,(car a) ,@(cdr b) c) 0)" |>
+
 
         ignore;
         
