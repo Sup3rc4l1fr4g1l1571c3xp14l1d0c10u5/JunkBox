@@ -85,7 +85,7 @@ type Value  =
     | Boolean of value : bool
     | Primitive of value : (Value -> Value)
     | Closure of body:Inst list * env:Value list
-    | Macro of body:Inst list // append to implements macro
+    | Macro of value : Value // append to implements macro
     | Error of subtype: string * message : string 
 
 and Inst =
@@ -105,9 +105,35 @@ and Inst =
     | Gset of sym:Value // append to implements set!
     | Stop
 
+let nil    = Nil
+let true'  = Boolean true
+let false' = Boolean false
+
+let gemSym =
+    let dic = ref Map.empty
+    in fun str -> 
+        match Map.tryFind str !dic with
+        | Some x -> x
+        | None   -> let v = Symbol str
+                    in dic := (!dic).Add(str, v); v;
+
+let toBool value = 
+    if value then true' else false'
+
+let (|Cons|_|) value =
+    match value with
+    | Cell (x,y) -> Some(!x, !y)
+    | _ -> None
+
 let set_car (c : Value) (v : Value) =
     match c with
     | Cell (x, y) -> x := v
+    | _ -> failwith "cannot change"
+
+let set_cdr (c : Value) (v : Value) =
+    match c with
+    | Cell (x, y) -> y := v
+    | _ -> failwith "cannot change"
 
 let escapeString (str:string) =
     let rec loop (str:char list) (result:string list) =
@@ -128,15 +154,15 @@ let toString (value:Value) =
         | Symbol value -> value
         | Nil -> "()"
         | Array v -> "#(" + String.Join(", ", (List.map (fun x -> loop x false) v)) + ")"
-        | Cell (car, Nil) -> 
+        | Cons (car, Nil) -> 
             match isCdr with
             | false -> "(" + (loop car false) + ")"
             | true  -> (loop car false)
-        | Cell (car, (Cell _ as cdr)) -> 
+        | Cons (car, (Cons _ as cdr)) -> 
             match isCdr with
             | false -> "(" + (loop car false) + " " + (loop cdr true) + ")"
             | true  -> (loop car false) + " " + (loop cdr true)
-        | Cell (car,  cdr) -> 
+        | Cons (car,  cdr) -> 
             match isCdr with
             | false -> "(" + (loop car false) + " . " + (loop cdr true) + ")"
             | true  -> (loop car false) + " . " + (loop cdr true)
@@ -150,7 +176,7 @@ let toString (value:Value) =
         | Boolean false -> "#f"
         | Boolean true  -> "#t"
         | Primitive value -> sprintf "<Primitive: %s>" (value.ToString ())
-        | Closure (value, env) -> sprintf "<Closure: %s>" (value.ToString ())
+        | Closure (value, env) -> sprintf "<Closure: %A>" (value)
         | Macro (value) -> sprintf "<Macro: %s>" (value.ToString ())
         | Error (subtype, message) -> sprintf "<%s: %s>" subtype message
     in loop value false
@@ -159,12 +185,12 @@ let toString (value:Value) =
 
 let car (x: Value): Value =
     match x with
-    | Cell (car, cdr) -> car
+    | Cons (car, cdr) -> car
     | _               -> Error ("runtime error", (sprintf "Attempt to apply car on %s" (toString x)))
 
 let cdr (x: Value): Value =
     match x with
-    | Cell (car, cdr) -> cdr
+    | Cons (car, cdr) -> cdr
     | _               -> Error ("runtime error", (sprintf "Attempt to apply cdr on %s" (toString x)))
 
 let cadr = car << cdr
@@ -176,7 +202,7 @@ let issymbol x =
 
 let ispair x = 
     match x with
-    | Cell _ -> true
+    | Cons _ -> true
     | _      -> false
 
 let iserror x = 
@@ -185,12 +211,12 @@ let iserror x =
     | _       -> false
 
 let list (values : Value list) : Value =
-    List.foldBack (fun x y -> Cell (x,y)) values Nil
+    List.foldBack (fun x y -> Cell (ref x,ref y)) values nil
 
 let length (x:Value) : int = 
     let rec loop (x:Value) (n:int) =
         match x with
-        | Cell (a, d) -> loop d (n + 1)
+        | Cons (a, d) -> loop d (n + 1)
         | Nil -> n
         | _ -> failwith "not pair"
     in  loop x 0
@@ -198,7 +224,7 @@ let length (x:Value) : int =
 let rec ceq (x:Value) (y:Value) : bool =
     match (x,y) with
     | (Symbol         v1, Symbol         v2) -> (v1 = v2)
-    | (Cell      (a1,d1), Cell      (a2,d2)) -> (ceq a1 a2) && (ceq d1 d2)
+    | (Cons      (a1,d1), Cons      (a2,d2)) -> (ceq a1 a2) && (ceq d1 d2)
     | (Array          v1, Array          v2) -> (List.forall2 ceq v1 v2)
     | (Number         v1, Number         v2) -> (v1 = v2)
     | (Char           v1, Char           v2) -> (v1 = v2)
@@ -206,7 +232,7 @@ let rec ceq (x:Value) (y:Value) : bool =
     | (Boolean        v1, Boolean        v2) -> (v1 = v2)
     | (Primitive      v1, Primitive      v2) -> (Object.Equals(v1,v2))
     | (Closure   (i1,e1), Closure   (i2,e2)) -> (List.forall2 ieq i1 i2) && (List.forall2 ceq e1 e2)
-    | (Macro          i1, Macro          i2) -> (List.forall2 ieq i1 i2)
+    | (Macro          i1, Macro          i2) -> (ceq i1 i2)
     | (Nil              , Nil              ) -> true
     | (                _,                 _) -> false
 
@@ -228,60 +254,50 @@ and ieq (x:Inst) (y:Inst) : bool =
     | (           _,            _) -> false
 
 let eq (x:Value) (y:Value) : bool =
+    Object.ReferenceEquals(x,y)
+
+let rec eqv (x:Value) (y:Value) : bool =
     match (x,y) with
-    | (Symbol   v1, Symbol   v2) -> (v1 = v2)//(Object.Equals(x,y))
-    | (Cell      _, Cell      _) -> (Object.Equals(x,y))
-    | (Array     _, Array     _) -> (Object.Equals(x,y))
-    | (Number   v1, Number   v2) -> (v1 = v2)
-    | (Char     v1, Char     v2) -> (v1 = v2)
-    | (String   v1, String   v2) -> (v1 = v2)
-    | (Boolean  v1, Boolean  v2) -> (v1 = v2)
-    | (Primitive _, Primitive _) -> (Object.Equals(x,y))
-    | (Closure   _, Closure   _) -> (Object.Equals(x,y))
-    | (Nil        , Nil        ) -> true
-    | (          _,           _) -> false
+    | (Number        v1, Number        v2) -> (v1 = v2)
+    | (Char          v1, Char          v2) -> (v1 = v2)
+    | (Boolean       v1, Boolean       v2) -> (v1 = v2)
+    | _ -> eq x y
 
 let rec equal (x:Value) (y:Value) : bool =
     match (x,y) with
-    | (Symbol        v1, Symbol        v2) -> (v1 = v2)//(Object.Equals(x,y))
-    | (Cell     (a1,d1), Cell     (a2,d2)) -> (equal a1 a2) && (equal d1 d2)
+    | (Cons     (a1,d1), Cons     (a2,d2)) -> (equal a1 a2) && (equal d1 d2)
     | (Array         v1, Array         v2) -> (List.forall2 equal v1 v2)
-    | (Number        v1, Number        v2) -> (v1 = v2)
-    | (Char          v1, Char          v2) -> (v1 = v2)
     | (String        v1, String        v2) -> (v1 = v2)
-    | (Boolean       v1, Boolean       v2) -> (v1 = v2)
-    | (Primitive      _, Primitive      _) -> (Object.Equals(x,y))
-    | (Closure        _, Closure        _) -> (Object.Equals(x,y))
-    | (Nil             , Nil             ) -> true
-    | (               _,                _) -> false
+    | _ -> eqv x y
 
 module Scheme =
     let sum (x:Value) : Value = 
         match x with
-        | Cell (Number l, xs) -> 
+        | Cons (Number l, xs) -> 
             let rec loop (x:Value) (n:NumberV) =
                 match x with
                 | Nil                 -> Number n
-                | Cell (Number l, xs) -> loop xs (NumberVOp.add n l)
+                | Cons (Number l, xs) -> loop xs (NumberVOp.add n l)
                 | _ -> failwith "bad argument"
             in  loop xs l
         | _ -> failwith "bad argument"
 
-    let global_environment: ((Value * Value) list) ref =
+    let global_environment: ((Value * (Value ref)) list) ref =
         ref [
-                (Symbol "#t",    Boolean true);
-                (Symbol "#f",    Boolean false);
+                (gemSym "#t",   ref (true')) ;
+                (gemSym "#f",    ref (false'));
 
-                (Symbol "car",   Primitive (fun xs -> car (car xs)));
-                (Symbol "cdr",   Primitive (fun xs -> cdr (car xs)));
-                (Symbol "cons",  Primitive (fun xs -> Cell (car xs, cadr xs)));
-                (Symbol "eq?",   Primitive (fun xs -> Boolean (eq (car xs) (cadr xs))));
-                (Symbol "pair?", Primitive (fun xs -> Boolean (ispair (car xs))));
-                (Symbol "+",     Primitive sum);
+                (gemSym "car",   ref (Primitive (fun xs -> car (car xs))));
+                (gemSym "cdr",   ref (Primitive (fun xs -> cdr (car xs))));
+                (gemSym "cons",  ref (Primitive (fun xs -> Cell (ref (car xs), ref (cadr xs)))));
+                (gemSym "eq?",   ref (Primitive (fun xs -> toBool (eq  (car xs) (cadr xs)))));
+                (gemSym "eqv?",  ref (Primitive (fun xs -> toBool (eqv (car xs) (cadr xs)))));
+                (gemSym "pair?", ref (Primitive (fun xs -> toBool (ispair (car xs)))));
+                (gemSym "+",     ref (Primitive sum));
             ]
 
-    let assoc (sym: Value) (dic: ((Value*Value) list) ref) : (Value * Value) option =
-        let rec loop (dic: (Value*Value) list) =
+    let assoc (sym: Value) (dic: ((Value*(Value ref)) list) ref) : (Value * Value ref) option =
+        let rec loop (dic: (Value*(Value ref)) list) =
             match dic with
             | [] -> None
             | ((key, value) as entry) :: d -> if (eq key sym) then Some entry else loop d
@@ -289,7 +305,7 @@ module Scheme =
         
     let get_gvar (sym:Value) : Value =
         match assoc sym global_environment with
-        | Some (key, value) -> value
+        | Some (key, value) -> !value
         | _ -> Error ("runtime error", String.Format("unbound variable:{0}",toString sym))
 
     type Context = { s: Value list; e: Value list; c: (Inst list); d: (Value list * Value list * (Inst list)) list; halt: bool }
@@ -302,7 +318,7 @@ module Scheme =
                 match ls with
                 | Nil            -> None
                 | Symbol(_) as y -> if (eq sym y) then Some (-(i + 1)) else None
-                | Cell(a, d)     -> if (eq sym a) then Some i else loop d (i + 1)
+                | Cons(a, d)     -> if (eq sym a) then Some i else loop d (i + 1)
                 | _              -> failwith "bad variable table"
             in loop ls 0
 
@@ -322,12 +338,12 @@ module Scheme =
         (*  start: append to implements macro *)
         let ismacro (sym:Value) : bool =
             match assoc sym global_environment with
-            | Some (key, Macro _ ) -> true
+            | Some (key, { contents=Macro _ }) -> true
             | _ -> false
 
         let get_macro_code (sym:Value) : Inst list =
-            match (get_gvar sym |> (cdr << cdr << car)) with
-            | Macro v -> v
+            match get_gvar sym with
+            | Macro (Closure (v,e)) -> v
             | _ -> failwith "not macro"
 
         (*  end: append to implements macro *)
@@ -341,51 +357,51 @@ module Scheme =
                     match location expr env with
                     | Some (i, j) -> Ld(i, j)  :: code
                     | None        -> Ldg(expr) :: code
-                | Cell(Symbol("quote"), Cell(v, Nil)) -> 
+                | Cons(Symbol("quote"), Cons(v, Nil)) -> 
                     Ldc(v) :: code
-                | Cell(Symbol("if"), Cell(cond, Cell(t, Nil))) -> 
+                | Cons(Symbol("if"), Cons(cond, Cons(t, Nil))) -> 
                     let t_clause = comp t env [Join]
-                    let f_clause = [Ldc (Symbol "*undef"); Join] 
+                    let f_clause = [Ldc (gemSym "*undef"); Join] 
                     in  comp cond env (Sel (t_clause, f_clause) :: code)
-                | Cell(Symbol("if"), Cell(cond, Cell(t, Cell(e, Nil)))) -> 
+                | Cons(Symbol("if"), Cons(cond, Cons(t, Cons(e, Nil)))) -> 
                     let t_clause = comp t env [Join]
                     let f_clause = comp e env [Join]
                     in  comp cond env (Sel (t_clause, f_clause) :: code)
-                | Cell((Symbol "lambda"), Cell(name, body)) ->
+                | Cons((Symbol "lambda"), Cons(name, body)) ->
                     let body = comp_body body (name :: env) [Rtn]
                     in  Ldf(body) :: code
-                | Cell((Symbol "define"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
+                | Cons((Symbol "define"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
                     comp body env (Def(sym)::code)
                 (*  start: append to implements macro *)
-                | Cell((Symbol "define-macro"), Cell((Symbol _) as sym, Cell(body, Nil))) -> 
+                | Cons((Symbol "define-macro"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
                     comp body env (Defm(sym)::code)
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
-                | Cell((Symbol "set!"), Cell(sym,Cell(body, _))) -> 
+                | Cons((Symbol "set!"), Cons(sym,Cons(body, _))) -> 
                     let pos = location sym env
                     match pos with
                     | Some pos -> comp body env (Lset (pos)::code)
                     | None -> comp body env (Gset (sym)::code)
                 (*  end: append to implements set! *)
-                | Cell(fn, args) -> 
-                    complis args env ((Args (length args))::(comp fn env (App :: code)))
                 (*  start: append to implements macro *)
-                | _ when ismacro (car expr) -> 
-                    let context = { s= []; e= [cdr expr] ; c= get_macro_code (car expr); d= [([], [], [Stop])]; halt= false }
-                    let newexpr = vm context
-                    in  comp newexpr.s.Head env code
+                |  Cons(fn, args) when ismacro fn -> 
+                    let context = { s= []; e= [args] ; c= get_macro_code fn; d= [([], [], [Stop])]; halt= false }
+                    let newexpr = run context
+                    in  printfn "macro(%s) => %s" (toString fn) (toString newexpr.s.Head); comp newexpr.s.Head env code
                 (*  end: append to implements macro *)
+                | Cons(fn, args) -> 
+                    complis args env ((Args (length args))::(comp fn env (App :: code)))
                 | _ -> failwith "syntax error"
             
         and comp_body (body: Value) (env: Value list) (code: Inst list) : Inst list =
             match body with
-            | Cell(x, Nil) -> comp x env code
-            | Cell(x, xs)  -> comp x env (Pop :: (comp_body xs env code))
+            | Cons(x, Nil) -> comp x env code
+            | Cons(x, xs)  -> comp x env (Pop :: (comp_body xs env code))
             | _            -> failwith "syntax error"
         and complis (expr: Value) (env: Value list) (code: Inst list): Inst list =
             match (expr) with 
             | Nil       -> code 
-            | Cell(a,d) -> comp a env (complis d env code)
+            | Cons(a,d) -> comp a env (complis d env code)
             | _         -> failwith "syntax error"
         in
             if iserror(expr)
@@ -395,33 +411,40 @@ module Scheme =
 
     (* secd virtual machine *)
     and vm (context:Context) : Context =
-        let get_lvar (e: Value list) (i: int) (j: int) : Value =
-            let rec list_ref (x:Value) (n:int) : Value = 
-                match x with
-                    | Nil -> failwith "out of range"
-                    | Cell(a,d) -> 
-                        if n < 0 then failwith "out of range"
-                        else if n = 0 then a
-                        else list_ref d (n - 1)
-                    | _  -> failwith "not cell"
+        let rec drop (ls: Value) (n: int): Value =
+            if n <= 0 
+            then ls
+            else 
+                match ls with
+                | Cons (a, d) -> drop d (n - 1)
+                | _ -> failwith "not cell"
+        let rec list_ref (x:Value) (n:int) : Value = 
+            match x with
+                | Nil -> failwith "out of range"
+                | Cons(a,d) -> 
+                    if n < 0 then failwith "out of range"
+                    else if n = 0 then a
+                    else list_ref d (n - 1)
+                | _  -> failwith "not cell"
 
-            let rec drop (ls: Value) (n: int): Value =
-                if n <= 0 
-                then ls
-                else 
-                    match ls with
-                    | Cell (a, d) -> drop d (n - 1)
-                    | _ -> failwith "not cell"
-            in
-                if 0 <= j
-                then list_ref (List.item i e) j
-                else drop     (List.item i e) -(j + 1)
-        let set_lvar e i j value =
+        let get_lvar (e: Value list) (i: int) (j: int) : Value =
             if 0 <= j
-            then set_car (drop (list-ref e i) j) value
+            then list_ref (List.item i e) j
+            else drop     (List.item i e) -(j + 1)
+
+        let set_lvar (e: Value list) (i: int) (j: int) (value:Value) =
+            if 0 <= j
+            then set_car (drop (List.item i e) j) value
             else if j = -1
-              then set_car (drop e i) value
-              else set_cdr (drop (list-ref e i) (- (j + 2))) value
+              then set_car (List.item i e) value
+              else set_cdr (drop (List.item i e) (- (j + 2))) value
+
+        let set_gvar (sym:Value) (value:Value) =
+            match assoc sym global_environment with
+            | Some (car,cdr) -> cdr := value
+            | None -> failwith "unbound variable: " sym
+
+
         in
             if context.halt 
             then context
@@ -432,22 +455,41 @@ module Scheme =
                 | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }
                 | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }
                 | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'         ; e = e        ; c = c'; d = d }
-                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f; d = (s', e, c') :: d }
+                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }
                 | (Rtn      ::_ ,                   s1 :: [], e, (s2, e', c') :: d') -> { context with s = s1 :: s2              ; e = e'       ; c = c'; d = d' }
-                | (Sel(t, f)::c',          (Boolean v) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = (if v then t else f); d = ([],[],c') :: d }
-                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e; c = c'; d = d' }
-                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e; c = c'; d = d }
+                | (Sel(_, f)::c',      (Boolean false) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }
+                | (Sel(t, _)::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }
+                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e        ; c = c'; d = d' }
+                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = c'; d = d }
                 | (Args(v)  ::c',                         s , e,                 d ) -> let (a'',s') = List.splitAt v s
-                                                                                        let a' = List.fold (fun s x -> Cell(x,s))  Nil a''
+                                                                                        let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
                                                                                         in { context with s = a' :: s'; e = e; c = c'; d = d }
-                | (Def(sym) ::c',                 body :: s', e,                 d ) -> global_environment := (sym, body) :: !global_environment;
+                | (Def(sym) ::c',                 body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
                                                                                         { context with s = sym :: s'; e = e; c = c'; d = d };
                 (*  start: append to implements macro *)
-                | (Defm(sym)::c',                 body :: s', e,                 d ) -> global_environment := (sym, body) :: !global_environment;
+                | (Defm(sym)::c',   (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
                                                                                         { context with s = sym :: s'; e = e; c = c'; d = d };
+                (*  end: append to implements macro *)
+                (*  start: append to implements set! *)
+                | (Lset(i,j)::c',                value :: s', e,                 d ) -> set_lvar e i j value; 
+                                                                                        { context with s = context.s; e = e; c = c'; d = d };
+                | (Gset(sym)::c',                value :: s', e,                 d ) -> set_gvar sym value;
+                                                                                        { context with s = context.s; e = e; c = c'; d = d };
                 (*  end: append to implements set! *)
                 | (Stop     ::c',                          s, e,                 d ) -> { context with halt= true }
                 | _                                                                  -> failwith "bad context"
+    and run (context:Context) :Context =
+        let rec loop context =
+            let context = vm context
+            in  if context.halt then context else loop context
+        in loop context
+
+    let create_context () : Context =
+        { s=[]; e=[]; c=[Stop]; d=[]; halt = true }
+
+    let update_context(context: Context) (expr:Inst list) : Context =
+        { context with c=expr; halt = false }
+
 
 (* parser combinator *)
 module ParserCombinator =
@@ -642,13 +684,13 @@ module Parser =
     and char = 
         let space     = (str "#\\space").Select(fun _ -> ' ')
         let newline   = (str "#\\newline").Select(fun _ -> '\n')
-        let character = (str "#\\").AndL(any()).Select(fun x -> x.[0])
+        let character = (str "#\\").AndR(any())
         in  whitespace.AndR(space.Or(newline).Or(character)).Select(Char)
 
     and bool = 
         let trueV  = (str "#t").Select(fun _ -> true)
         let falseV = (str "#f").Select(fun _ -> false)
-        in  whitespace.AndR(trueV.Or(falseV)).Select(Boolean)
+        in  whitespace.AndR(trueV.Or(falseV)).Select(toBool)
 
     and string = 
         let ch = 
@@ -696,40 +738,28 @@ module Parser =
          let plus  = str "+"
          let minus = str "-"
          let dots  = str "..."
-         in whitespace.AndR(normal.Or(plus).Or(minus).Or(dots)).Select(Symbol)
+         in whitespace.AndR(normal.Or(plus).Or(minus).Or(dots)).Select(gemSym)
     and atom = whitespace.AndR(string.Or(char).Or(bool).Or(number).Or(ident))
     and quoted = 
-        let quote = (str "'").AndR(expr).Select(fun x -> list [Symbol "quote"; x])
-        let quasiquote = (str "`").AndR(expr).Select(fun x -> list [Symbol "quasiquote"; x])
-        let unquote_splicing = (str ".@").AndR(expr).Select(fun x -> list [Symbol "unquote-splicing"; x])
-        let unquote = (str ",").AndR(expr).Select(fun x -> list [Symbol "unquote"; x])
+        let quote = (str "'").AndR(expr).Select(fun x -> list [gemSym "quote"; x])
+        let quasiquote = (str "`").AndR(expr).Select(fun x -> list [gemSym "quasiquote"; x])
+        let unquote_splicing = (str ",@").AndR(expr).Select(fun x -> list [gemSym "unquote-splicing"; x])
+        let unquote = (str ",").AndR(expr).Select(fun x -> list [gemSym "unquote"; x])
         in whitespace.AndR(quote.Or(quasiquote).Or(unquote_splicing).Or(unquote))
     and list_ = 
         let h    = (str "(").And(whitespace)
         let body = 
             let a = expr.Many1()
-            let d = whitespace.AndR(str ".").AndR(expr).Option().Select(fun x -> match x with Some v -> v | None -> Nil)
-            in a.And(d).Select( fun (a,d) -> List.foldBack (fun x s -> Cell(x,s)) a d)
+            let d = whitespace.AndR(str ".").AndR(expr).Option().Select(fun x -> match x with Some v -> v | None -> nil)
+            in a.And(d).Select( fun (a,d) -> List.foldBack (fun x s -> Cell(ref x,ref s)) a d)
         let t    = whitespace.And(str ")")
-        in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> v | None -> Nil)
+        in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> v | None -> nil)
     and vector = 
         let h    = (str "#(").And(whitespace)
         let body = expr.Many1()
         let t    = whitespace.And(str ")")
-        in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> Array v | None -> Nil)
+        in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> Array v | None -> nil)
 
-
-let run (context:Scheme.Context) :Scheme.Context =
-    let rec loop context =
-        let context = Scheme.vm context
-        in  if context.halt then context else loop context
-    in loop context
-
-let create_context () : Scheme.Context =
-    { s=[]; e=[]; c=[Stop]; d=[]; halt = true }
-
-let update_context(context: Scheme.Context) (expr:Inst list) : Scheme.Context =
-    { context with c=expr; halt = false }
 
 [<EntryPoint>]
 let main argv =
@@ -745,65 +775,66 @@ let main argv =
             then (printfn "  -> AST Not Match"); ctx
             else
                 let code = value |> Scheme.compile
-                let ctx' = update_context ctx code
-                let result = run ctx'
+                let ctx' = Scheme.update_context ctx code
+                let result = Scheme.run ctx'
                 in  
                     result.s.[0] |> toString |> printfn "  Execute  Result: %s";
                     ret          |> toString |> printfn "  Expected Result: %s";
                     (if ceq ret result.s.[0] then printfn "  All Match" else printfn "  -> Result Not Match");
                     ctx'
     let eval (s:string) (ctx:Scheme.Context): Scheme.Context = 
+        printfn "Eval: %s" s;
         let rec loop pos ctx = 
             match Parser.start s pos with
             | ParserCombinator.Fail    (pos, value) -> printfn "Parse Failed at (%d): %s" pos value; ctx;
             | ParserCombinator.Success (pos, Some value) -> 
-                let code = printfn "%A" value; value |> Scheme.compile
-                let ctx' = update_context ctx code
-                let result = run ctx'
+                //let code = value |> Scheme.compile
+                let code = value |> toString |> printfn "%s";value |> printfn "%A"; value |> Scheme.compile
+                let ctx' = Scheme.update_context ctx code
+                let result = Scheme.run ctx'
                 in  
                     result.s.[0] |> toString |> printfn "%s";
                     loop pos ctx' 
             | ParserCombinator.Success (pos, None) -> ctx
         in loop 0 ctx
     in
-        create_context () |>
-        test "(quote a)" (list [Symbol("quote"); Symbol("a")]) (Symbol "a")|>
-        test "(if #t 'a 'b)" (list [Symbol("if"); Boolean  true; list [Symbol("quote"); Symbol("a")]; list [Symbol("quote"); Symbol("b")]]) (Symbol "a")|>
-        test "(if #f 'a 'b)" (list [Symbol("if"); Boolean false; list [Symbol("quote"); Symbol("a")]; list [Symbol("quote"); Symbol("b")]]) (Symbol "b")|>
+        Scheme.create_context () |>
+        eval "((lambda (x) (set! x 2) x) 1)" |>
+        test "(quote a)" (list [gemSym("quote"); gemSym("a")]) (gemSym "a")|>
+        test "(if #t 'a 'b)" (list [gemSym("if");  true'; list [gemSym("quote"); gemSym("a")]; list [gemSym("quote"); gemSym("b")]]) (gemSym "a")|>
+        test "(if #f 'a 'b)" (list [gemSym("if"); false'; list [gemSym("quote"); gemSym("a")]; list [gemSym("quote"); gemSym("b")]]) (gemSym "b")|>
 
-        test "(car '(a b c))" (list [Symbol("car"); list [Symbol("quote"); list[Symbol("a");Symbol("b");Symbol("c")]]]) (Symbol "a")|>
-        test "(cdr '(a b c))" (list [Symbol("cdr"); list [Symbol("quote"); list[Symbol("a");Symbol("b");Symbol("c")]]]) (list[Symbol("b");Symbol("c")])|>
-        test "(cons 'a 'b)" (list [Symbol("cons"); list [Symbol("quote");Symbol("a")]; list [Symbol("quote");Symbol("b")]]) (Cell (Symbol "a", Symbol "b"))|>
-        test "(eq? 'a 'a)" (list [Symbol("eq?"); list [Symbol("quote"); Symbol("a")]; list [Symbol("quote"); Symbol("a")]]) (Boolean true)|>
-        test "(eq? 'a 'b)" (list [Symbol("eq?"); list [Symbol("quote"); Symbol("a")]; list [Symbol("quote"); Symbol("b")]]) (Boolean false)|>
-        test "(pair? '(a b c))" (list [Symbol("pair?"); list [Symbol("quote"); list [Symbol("a"); Symbol("b"); Symbol("c")]]]) (Boolean true)|>
-        test "(pair? 'a)" (list [Symbol("pair?"); list [Symbol("quote"); Symbol("a")]]) (Boolean false)|>
+        test "(car '(a b c))" (list [gemSym("car"); list [gemSym("quote"); list[gemSym("a");gemSym("b");gemSym("c")]]]) (gemSym "a")|>
+        test "(cdr '(a b c))" (list [gemSym("cdr"); list [gemSym("quote"); list[gemSym("a");gemSym("b");gemSym("c")]]]) (list[gemSym("b");gemSym("c")])|>
+        test "(cons 'a 'b)" (list [gemSym("cons"); list [gemSym("quote");gemSym("a")]; list [gemSym("quote");gemSym("b")]]) (Cell (ref (gemSym "a"), ref (gemSym "b")))|>
+        test "(eq? 'a 'a)" (list [gemSym("eq?"); list [gemSym("quote"); gemSym("a")]; list [gemSym("quote"); gemSym("a")]]) (true')|>
+        test "(eq? 'a 'b)" (list [gemSym("eq?"); list [gemSym("quote"); gemSym("a")]; list [gemSym("quote"); gemSym("b")]]) (false')|>
+        test "(pair? '(a b c))" (list [gemSym("pair?"); list [gemSym("quote"); list [gemSym("a"); gemSym("b"); gemSym("c")]]]) (true')|>
+        test "(pair? 'a)" (list [gemSym("pair?"); list [gemSym("quote"); gemSym("a")]]) false' |>
 
-        test "(define a 'b)" (list [Symbol("define");Symbol("a");list[Symbol("quote");Symbol("b")]]) (Symbol "a") |>
-        test "a" (Symbol "a") (Symbol "b")|>
-        test "(lambda (x) x)" (list [Symbol "lambda"; list [Symbol "x"]; Symbol "x"]) (Closure ([Ld (0, 0); Rtn], [])) |>
-        test "((lambda (x) x) 'a)" (list [list [Symbol "lambda"; list [Symbol "x"]; Symbol "x"]; list[Symbol "quote"; Symbol "a"]]) (Symbol "a") |>
-        test "(define list (lambda x x))" (list [Symbol "define"; Symbol "list"; list [Symbol "lambda"; Symbol "x"; Symbol "x"]]) (Symbol "list") |>
-        test "(list 'a 'b 'c 'd 'e)" (list [Symbol "list"; list [Symbol "quote";Symbol "a"]; list [Symbol "quote";Symbol "b"]; list [Symbol "quote";Symbol "c"]; list [Symbol "quote";Symbol "d"]; list [Symbol "quote";Symbol "e"]]) (list [Symbol "a";Symbol "b";Symbol "c";Symbol "d";Symbol "e"]) |> 
+        test "(define a 'b)" (list [gemSym("define");gemSym("a");list[gemSym("quote");gemSym("b")]]) (gemSym "a") |>
+        test "a" (gemSym "a") (gemSym "b")|>
+        test "(lambda (x) x)" (list [gemSym "lambda"; list [gemSym "x"]; gemSym "x"]) (Closure ([Ld (0, 0); Rtn], [])) |>
+        test "((lambda (x) x) 'a)" (list [list [gemSym "lambda"; list [gemSym "x"]; gemSym "x"]; list[gemSym "quote"; gemSym "a"]]) (gemSym "a") |>
+        test "(define list (lambda x x))" (list [gemSym "define"; gemSym "list"; list [gemSym "lambda"; gemSym "x"; gemSym "x"]]) (gemSym "list") |>
+        test "(list 'a 'b 'c 'd 'e)" (list [gemSym "list"; list [gemSym "quote";gemSym "a"]; list [gemSym "quote";gemSym "b"]; list [gemSym "quote";gemSym "c"]; list [gemSym "quote";gemSym "d"]; list [gemSym "quote";gemSym "e"]]) (list [gemSym "a";gemSym "b";gemSym "c";gemSym "d";gemSym "e"]) |> 
         
-        test "(define x 'a)" (list [Symbol("define"); Symbol("x"); list [Symbol("quote"); Symbol("a")]]) (Symbol "x")|>
-        test "x" (Symbol "x") (Symbol "a")|>
-        test "(define foo (lambda () x))" (list [Symbol("define"); Symbol("foo"); list [Symbol("lambda"); Nil; Symbol("x") ]]) (Symbol "foo")|>
-        test "(foo)" (list [Symbol("foo")]) (Symbol "a")|>
-        test "(define bar (lambda (x) (foo)))"  (list [Symbol("define"); Symbol("bar"); list [Symbol("lambda"); list[Symbol("x")]; list[Symbol("foo")] ]]) (Symbol "bar")|>
-        test "(bar 'b)" (list [Symbol("bar"); list [Symbol("quote"); Symbol("b")]]) (Symbol "a")|>
+        test "(define x 'a)" (list [gemSym("define"); gemSym("x"); list [gemSym("quote"); gemSym("a")]]) (gemSym "x")|>
+        test "x" (gemSym "x") (gemSym "a")|>
+        test "(define foo (lambda () x))" (list [gemSym("define"); gemSym("foo"); list [gemSym("lambda"); nil; gemSym("x") ]]) (gemSym "foo")|>
+        test "(foo)" (list [gemSym("foo")]) (gemSym "a")|>
+        test "(define bar (lambda (x) (foo)))"  (list [gemSym("define"); gemSym("bar"); list [gemSym("lambda"); list[gemSym("x")]; list[gemSym("foo")] ]]) (gemSym "bar")|>
+        test "(bar 'b)" (list [gemSym("bar"); list [gemSym("quote"); gemSym("b")]]) (gemSym "a")|>
 
-        test "foo" (Symbol("foo")) (Closure ([Ldg (Symbol "x"); Rtn], [])) |>
-        test "bar" (Symbol("bar")) (Closure ([Args 0; Ldg (Symbol "foo"); App; Rtn], [] )) |>
+        test "foo" (gemSym("foo")) (Closure ([Ldg (gemSym "x"); Rtn], [])) |>
+        test "bar" (gemSym("bar")) (Closure ([Args 0; Ldg (gemSym "foo"); App; Rtn], [] )) |>
 
         eval "
 (define = eq?)
 
-; 述語
 (define not (lambda (x) (if x #f #t)))
 (define null? (lambda (x) (eq? x ())))
 
-; 数
 (define zero? (lambda (x) (= x 0)))
 (define positive? (lambda (x) (< 0 x)))
 (define negative? (lambda (x) (> 0 x)))
@@ -850,9 +881,6 @@ let main argv =
 (define cdadr (lambda (xs) (cdr (cadr xs))))
 (define cddar (lambda (xs) (cdr (cdar xs))))
 (define cdddr (lambda (xs) (cdr (cddr xs))))
-
-
-; リスト操作
 
 (define list (lambda x x))
 
@@ -969,92 +997,115 @@ let main argv =
         eval "(fold-right cons '() '(a b c d e))" |> //(a b c d e)
 
         eval "
-(define unquote
-  (lambda (x) (error \"unquote appeared outside quasiquote\")))
-
-(define unquote-splicing
-  (lambda (x) (error \"unquote-splicing appeared outside quasiquote\")))
-
-(define translator-sub
-  (lambda (sym ls n succ)
-    (list 'list
-	  (list 'quote sym)
-	  (translator ls (+ n succ)))))
-
-(define translator-unquote
-  (lambda (ls n)
-    (list 'cons
-	  (if (zero? n)
-	      (cadar ls)
-	    (translator-sub 'unquote (cadar ls) n -1))
-	  (translator (cdr ls) n))))
-
-(define translator-unquote-splicing
-  (lambda (ls n)
-    (if (zero? n)
-	(list 'append (cadar ls) (translator (cdr ls) n))
-      (list 'cons
-	    (translator-sub 'unquote-splicing (cadar ls) n -1)
-	    (translator (cdr ls) n)))))
-
-(define translator-quasiquote
-  (lambda (ls n)
-    (list 'cons
-	  (translator-sub 'quasiquote (cadar ls) n 1)
-	  (translator (cdr ls) n))))
-
-(define translator-list
-  (lambda (ls n)
-    (if (eq? (caar ls) 'unquote)
-	(translator-unquote ls n)
-      (if (eq? (caar ls) 'unquote-splicing)
-	  (translator-unquote-splicing ls n)
-	(if (eq? (caar ls) 'quasiquote)
-	    (translator-quasiquote ls n)
-	  (list 'cons
-		(translator (car ls) n)
-		(translator (cdr ls) n)))))))
-
-(define translator-atom
-  (lambda (ls n)
-    (if (eq? (car ls) 'unquote)
-	(if (zero? n)
-	    (cadr ls)
-	  (if (= n 1)
-	      (if (eq? (car (cadr ls)) 'unquote-splicing)
-		  (list 'cons (list 'quote 'unquote) (cadr (cadr ls)))
-		(translator-sub 'unquote (cadr ls) n -1))
-	    (translator-sub 'unquote (cadr ls) n -1)))
-      (if (eq? (car ls) 'unquote-splicing)
-	  (if (zero? n)
-	      (error \"invalid unquote-splicing form\")
-	    (if (= n 1)
-		(if (eq? (car (cadr ls)) 'unquote-splicing)
-		    (list 'cons (list 'quote 'unquote-splicing) (cadr (cadr ls)))
-		  (translator-sub 'unquote-splicing (cadr ls) n -1))
-	      (translator-sub 'unquote-splicing (cadr ls) n -1)))
-	(if (eq? (car ls) 'quasiquote)
-	    (translator-sub 'quasiquote (cadr ls) n 1)
-	  (list 'cons 
-		(list 'quote (car ls))
-		(translator (cdr ls) n)))))))
-
-(define translator
-  (lambda (ls n)
+(define transfer
+  (lambda (ls)
     (if (pair? ls)
         (if (pair? (car ls))
-	    (translator-list ls n)
-	  (translator-atom ls n))
+            (if (eq? (caar ls) 'unquote)
+                (list 'cons (cadar ls) (transfer (cdr ls)))
+              (if (eq? (caar ls) 'unquote-splicing)
+                  (list 'append (cadar ls) (transfer (cdr ls)))
+                (list 'cons (transfer (car ls)) (transfer (cdr ls)))))
+          (list 'cons (list 'quote (car ls)) (transfer (cdr ls))))
       (list 'quote ls))))
 
-(define-macro quasiquote (lambda (x) (translator x 0)))        
+(define-macro quasiquote (lambda (x) (transfer x)))
+
+
+" |>
+        eval "(transfer '(a b c) )" |>
+        eval "(transfer '(,a b c) )" |>
+        eval "(transfer '(,a ,@b c) )" |>
+        eval "(transfer '(,(car a) ,@(cdr b) c) )" |>
+
+        eval "(define a '(1 2 3))"|>
+        eval "`(a b c)"|>
+        eval "`(,a b c)"|>
+        eval "`(,@a b c)"|>
+
+        eval "
+
+(define cadr (lambda (x) (car (cdr x))))
+(define cdar (lambda (x) (cdr (car x))))
+(define caar (lambda (x) (car (car x))))
+(define cddr (lambda (x) (cdr (cdr x))))
+
+(define-macro let
+  (lambda (args . body)
+    `((lambda ,(map car args) ,@body) ,@(map cadr args))))
+    " |>
+
+        eval "
+(define a 0)
+(define b 1)
+(let ((a 10) (b 20)) (cons a b))
+a
+b
         " |>
 
-        eval "(translator '(a b c) 0)" |>
-        eval "(translator '(,a b c) 0)" |>
-        eval "(translator '(,a ,@b c) 0)" |>
-        eval "(translator '(,(car a) ,@(cdr b) c) 0)" |>
+        eval "
+(define-macro and
+  (lambda args
+    (if (null? args)
+        #t
+      (if (null? (cdr args))
+          (car args)
+        `(if ,(car args) (and ,@(cdr args)) #f)))))
 
+(define-macro or
+  (lambda args
+    (if (null? args)
+        #f
+      (if (null? (cdr args))
+          (car args)
+        `(let ((*value* ,(car args)))
+          (if *value* *value* (or ,@(cdr args))))))))
+" |>
+
+        eval "(and 1 2 3)" |>
+        eval "(and 1 #f 3)" |>
+        eval "(or 1 2 3)" |>
+        eval "(or #f #f 3)" |>
+        eval "(or #f #f #f)" |>
+
+        eval "
+(define-macro let*
+  (lambda (args . body) 
+    (if (null? (cdr args))
+        `(let (,(car args)) ,@body)
+      `(let (,(car args)) (let* ,(cdr args) ,@body)))))        
+        " |>
+
+        eval "(let* ((a 100) (b a) (c (cons a b))) c)" |>
+
+        eval "
+(define map-2
+  (lambda (fn xs ys)
+    (if (null? xs)
+        '()
+      (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
+
+(define-macro letrec
+  (lambda (args . body)
+    (let ((vars (map car args))
+          (vals (map cadr args)))
+      `(let ,(map (lambda (x) `(,x '*undef*)) vars)
+            ,@(map-2 (lambda (x y) `(set! ,x ,y)) vars vals)
+            ,@body))))
+
+ (define reverse
+  (lambda (ls)
+    (letrec ((iter (lambda (ls a)
+                     (if (null? ls)
+                         a
+                       (iter (cdr ls) (cons (car ls) a))))))
+      (iter ls '()))))           
+        " |>
+
+        eval "(reverse '(a b c d e))" |>
+        eval "(reverse '())" |>
+        eval "(letrec ((a a)) a)" |>
+        //eval "" |>
 
         ignore;
         
