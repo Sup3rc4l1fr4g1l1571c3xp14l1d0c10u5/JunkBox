@@ -6,56 +6,56 @@ open Microsoft.FSharp.Core;
 (* Value Type *)
 
 type NumberV =
-      ComplexV  of real:NumberV * imaginary:NumberV
-    | FractionV of numerator:int * denominator:int
-    | IntV      of value : int
+      IntV      of value : int
     | RealV     of value : double
+    //| ComplexV  of real:NumberV * imaginary:NumberV
+    //| FractionV of numerator:int * denominator:int
 
 let rec valueToString v =
     match v with
-    | ComplexV (r,i) -> (valueToString r) + "+" + (valueToString i) + "i" 
-    | FractionV (n,d) -> n.ToString() + "/" + d.ToString()
+    //| ComplexV (r,i) -> (valueToString r) + "+" + (valueToString i) + "i" 
+    //| FractionV (n,d) -> n.ToString() + "/" + d.ToString()
     | IntV v -> v.ToString()
     | RealV v -> v.ToString()
 
 module NumberVOp =
-    let toComplex v =
-        match v with
-        | ComplexV _ -> v
-        | FractionV _ -> ComplexV (v, IntV 0)
-        | IntV _ -> ComplexV (v, IntV 0)
-        | RealV _  -> ComplexV (v, IntV 0)
+    //let toComplex v =
+    //    match v with
+    //    | ComplexV _ -> v
+    //    | FractionV _ -> ComplexV (v, IntV 0)
+    //    | IntV _ -> ComplexV (v, IntV 0)
+    //    | RealV _  -> ComplexV (v, IntV 0)
 
-    let toFraction v =
-        match v with
-        | ComplexV _ -> failwith "cannt convert"
-        | FractionV _ -> v
-        | IntV v -> FractionV (v, 1)
-        | RealV v  -> FractionV (int (v * 10000.0), 10000)
+    //let toFraction v =
+    //    match v with
+    //    | ComplexV _ -> failwith "cannt convert"
+    //    | FractionV _ -> v
+    //    | IntV v -> FractionV (v, 1)
+    //    | RealV v  -> FractionV (int (v * 10000.0), 10000)
 
     let toInt v =
         match v with
-        | ComplexV _ -> failwith "cannt convert"
-        | FractionV _ -> failwith "cannt convert"
+        //| ComplexV _ -> failwith "cannt convert"
+        //| FractionV _ -> failwith "cannt convert"
         | IntV _ -> v
         | RealV _  -> failwith "cannt convert"
 
     let toReal v =
         match v with
-        | ComplexV _ -> failwith "cannt convert"
-        | FractionV _ -> v
+        //| ComplexV _ -> failwith "cannt convert"
+        //| FractionV _ -> v
         | IntV v -> RealV ( float v)
         | RealV _  -> v
 
     let rec add lhs rhs =
         match (lhs, rhs) with
-        | ComplexV (r1,i1), ComplexV (r2,i2)  -> ComplexV (add r1 r2, add i1 i2)
-        | ComplexV _, _  -> add lhs (toComplex rhs)
-        | _, ComplexV  _  -> add (toComplex lhs) rhs
+        //| ComplexV (r1,i1), ComplexV (r2,i2)  -> ComplexV (add r1 r2, add i1 i2)
+        //| ComplexV _, _  -> add lhs (toComplex rhs)
+        //| _, ComplexV  _  -> add (toComplex lhs) rhs
 
-        | FractionV (n1,d1), FractionV (n2,d2) -> FractionV (n1*d2+n2*d1,d1*d2)
-        | FractionV _,_ -> add lhs (toFraction rhs)
-        | _, FractionV _ -> add (toFraction lhs) rhs
+        //| FractionV (n1,d1), FractionV (n2,d2) -> FractionV (n1*d2+n2*d1,d1*d2)
+        //| FractionV _,_ -> add lhs (toFraction rhs)
+        //| _, FractionV _ -> add (toFraction lhs) rhs
 
         | RealV v1, RealV v2 -> RealV (v1 + v2)
         | RealV  _,       _  -> add lhs (toReal rhs)
@@ -69,8 +69,8 @@ module NumberVOp =
 
     let neg v =
         match v with
-        | ComplexV _ -> failwith "cannot neg" 
-        | FractionV (n,d) -> FractionV (-n,d)
+        //| ComplexV _ -> failwith "cannot neg" 
+        //| FractionV (n,d) -> FractionV (-n,d)
         | IntV v -> IntV (-v)
         | RealV v -> RealV (-v)
 
@@ -98,8 +98,8 @@ and Inst =
     | App
     | Pop
     | Sel  of t_clause:(Inst list) * f_clause:(Inst list)
-    | Def  of Value // append to implements macro
-    | Defm of Value
+    | Def  of Value
+    | Defm of Value // append to implements macro
     | Args of int
     | Lset of pos:(int * int) // append to implements set!
     | Gset of sym:Value // append to implements set!
@@ -135,20 +135,20 @@ let set_cdr (c : Value) (v : Value) =
     | Cell (x, y) -> y := v
     | _ -> failwith "cannot change"
 
-let escapeString (str:string) =
-    let rec loop (str:char list) (result:string list) =
-        match str with
-        | [] -> result |> List.rev |> List.toSeq |> String.concat ""
-        | '\r' :: xs -> loop xs ("\\r"::result)
-        | '\t' :: xs -> loop xs ("\\t"::result)
-        | '\n' :: xs -> loop xs ("\\n"::result)
-        | '\f' :: xs -> loop xs ("\\f"::result)
-        | '\b' :: xs -> loop xs ("\\b"::result)
-        | '\\' :: xs -> loop xs ("\\"::result)
-        |    x :: xs -> loop xs (string(x)::result)
-    in loop (str.ToCharArray() |> Array.toList) []
 
 let toString (value:Value) = 
+    let escapeString (str:string) =
+        let rec loop (str:char list) (result:string list) =
+            match str with
+            | [] -> result |> List.rev |> List.toSeq |> String.concat ""
+            | '\r' :: xs -> loop xs ("\\r"::result)
+            | '\t' :: xs -> loop xs ("\\t"::result)
+            | '\n' :: xs -> loop xs ("\\n"::result)
+            | '\f' :: xs -> loop xs ("\\f"::result)
+            | '\b' :: xs -> loop xs ("\\b"::result)
+            | '\\' :: xs -> loop xs ("\\"::result)
+            |    x :: xs -> loop xs (string(x)::result)
+        in loop (str.ToCharArray() |> Array.toList) []
     let rec loop (value:Value) (isCdr : bool) =
         match value with 
         | Symbol value -> value
@@ -157,15 +157,15 @@ let toString (value:Value) =
         | Cons (car, Nil) -> 
             match isCdr with
             | false -> "(" + (loop car false) + ")"
-            | true  -> (loop car false)
+            | true  ->       (loop car false)
         | Cons (car, (Cons _ as cdr)) -> 
             match isCdr with
             | false -> "(" + (loop car false) + " " + (loop cdr true) + ")"
-            | true  -> (loop car false) + " " + (loop cdr true)
+            | true  ->       (loop car false) + " " + (loop cdr true)
         | Cons (car,  cdr) -> 
             match isCdr with
             | false -> "(" + (loop car false) + " . " + (loop cdr true) + ")"
-            | true  -> (loop car false) + " . " + (loop cdr true)
+            | true  ->       (loop car false) + " . " + (loop cdr true)
         | Char value -> 
             match value with
             | '\n' -> "#\\newline"
@@ -213,13 +213,26 @@ let iserror x =
 let list (values : Value list) : Value =
     List.foldBack (fun x y -> Cell (ref x,ref y)) values nil
 
-let length (x:Value) : int = 
+let list_length (x:Value) : int = 
     let rec loop (x:Value) (n:int) =
         match x with
         | Cons (a, d) -> loop d (n + 1)
         | Nil -> n
         | _ -> failwith "not pair"
     in  loop x 0
+
+let list_reduce (f : Value -> 'a -> 'a) (ridentity:'a) (list:Value) =
+    let rec loop (ridentity:'a) (list:Value) =
+        match list with
+        | Nil                 -> ridentity
+        | Cons (x, xs) -> loop (f x ridentity) xs
+        | _ -> failwith "bad argument"
+    in  loop ridentity list
+
+let list_fold (f : Value -> Value -> Value) (list:Value) : Value =
+    match list with
+        | Cons (x, xs) -> list_reduce f x xs
+        | _            -> failwith "bad argument"
 
 let rec ceq (x:Value) (y:Value) : bool =
     match (x,y) with
@@ -270,19 +283,12 @@ let rec equal (x:Value) (y:Value) : bool =
     | (String        v1, String        v2) -> (v1 = v2)
     | _ -> eqv x y
 
-module Scheme =
-    let sum (x:Value) : Value = 
-        match x with
-        | Cons (Number l, xs) -> 
-            let rec loop (x:Value) (n:NumberV) =
-                match x with
-                | Nil                 -> Number n
-                | Cons (Number l, xs) -> loop xs (NumberVOp.add n l)
-                | _ -> failwith "bad argument"
-            in  loop xs l
-        | _ -> failwith "bad argument"
 
-    let global_environment: ((Value * (Value ref)) list) ref =
+module Scheme =
+    type EnvEntry = Value * (Value ref)
+    type Env = EnvEntry list
+
+    let global_environment: Env ref =
         ref [
                 (gemSym "#t",   ref (true')) ;
                 (gemSym "#f",    ref (false'));
@@ -293,10 +299,10 @@ module Scheme =
                 (gemSym "eq?",   ref (Primitive (fun xs -> toBool (eq  (car xs) (cadr xs)))));
                 (gemSym "eqv?",  ref (Primitive (fun xs -> toBool (eqv (car xs) (cadr xs)))));
                 (gemSym "pair?", ref (Primitive (fun xs -> toBool (ispair (car xs)))));
-                (gemSym "+",     ref (Primitive sum));
+                (gemSym "+",     ref (Primitive (list_fold (fun x s -> match s,x with | Number l, Number r -> Number (NumberVOp.add l r) | _ -> failwith "bad argument" ))));
             ]
 
-    let assoc (sym: Value) (dic: ((Value*(Value ref)) list) ref) : (Value * Value ref) option =
+    let assoc (sym: Value) (dic: Env ref) : EnvEntry option =
         let rec loop (dic: (Value*(Value ref)) list) =
             match dic with
             | [] -> None
@@ -384,13 +390,13 @@ module Scheme =
                     | None -> comp body env (Gset (sym)::code)
                 (*  end: append to implements set! *)
                 (*  start: append to implements macro *)
-                |  Cons(fn, args) when ismacro fn -> 
+                | Cons(fn, args) when ismacro fn -> 
                     let context = { s= []; e= [args] ; c= get_macro_code fn; d= [([], [], [Stop])]; halt= false }
                     let newexpr = run context
                     in  printfn "macro(%s) => %s" (toString fn) (toString newexpr.s.Head); comp newexpr.s.Head env code
                 (*  end: append to implements macro *)
                 | Cons(fn, args) -> 
-                    complis args env ((Args (length args))::(comp fn env (App :: code)))
+                    complis args env ((Args (list_length args))::(comp fn env (App :: code)))
                 | _ -> failwith "syntax error"
             
         and comp_body (body: Value) (env: Value list) (code: Inst list) : Inst list =
@@ -719,17 +725,19 @@ module Parser =
             let d4 = (digit_num.Many1()).Select(fun i -> (List.fold (fun s x -> s + x.ToString()) "" i) |> int |> IntV )
             in  d1.Or(d2).Or(d3).Or(d4) 
          let digit_usreal = 
-            let faction = digit_usint.AndL(whitespace.And(str "/").And(whitespace)).And(digit_usint).Select(fun v -> FractionV v)
-            in  faction.Or(digit_decimals).Or(digit_usint.Select(IntV))
+            //let faction = digit_usint.AndL(whitespace.And(str "/").And(whitespace)).And(digit_usint).Select(fun v -> FractionV v)
+            //in  faction.Or(digit_decimals).Or(digit_usint.Select(IntV))
+            digit_decimals.Or(digit_usint.Select(IntV))
          let digit_real = sign.And(digit_usreal).Select(fun (s,v) -> match s with Some("+") -> v | Some("-") -> NumberVOp.neg v | _ -> v)
-         let digit_complex = 
-            // digit_real.AndL(str "@").AndR(digit_real) <- ?
-            let p1 = digit_real.AndL(str "+i").Select(fun real -> ComplexV (real, RealV 1.0))
-            let p2 = digit_real.AndL(str "+" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, imaginary))
-            let p3 = digit_real.AndL(str "-i").Select(fun real -> ComplexV (real, RealV -1.0))
-            let p4 = digit_real.AndL(str "-" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, NumberVOp.neg imaginary))
-            in p1.Or(p2).Or(p3).Or(p4)
-         in prefix.And(digit_complex.Or(digit_real)).Select(fun (a,v) -> Number v )
+         //let digit_complex = 
+         //   // digit_real.AndL(str "@").AndR(digit_real) <- ?
+         //   let p1 = digit_real.AndL(str "+i").Select(fun real -> ComplexV (real, RealV 1.0))
+         //   let p2 = digit_real.AndL(str "+" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, imaginary))
+         //   let p3 = digit_real.AndL(str "-i").Select(fun real -> ComplexV (real, RealV -1.0))
+         //   let p4 = digit_real.AndL(str "-" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, NumberVOp.neg imaginary))
+         //   in p1.Or(p2).Or(p3).Or(p4)
+         //in prefix.And(digit_complex.Or(digit_real)).Select(fun (a,v) -> Number v )
+         in prefix.And(digit_real).Select(fun (a,v) -> Number v )
     and  ident = 
          let normal = 
             let head = ParserCombinator.char ishead
@@ -759,7 +767,40 @@ module Parser =
         let body = expr.Many1()
         let t    = whitespace.And(str ")")
         in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> Array v | None -> nil)
+    let test () =
+        let check (p:Parser<'a>) (s:string) (ret:ParserState<'a>) (comp:('a -> 'a -> bool)) =
+            let result = 
+                match (p s 0), ret with
+                | Fail (p1, _), Fail (p2, _) -> p1 = p2
+                | Success (p1, v1), Success  (p2, v2) -> p1 = p2 && comp v1 v2
+                | _ -> false
+            in  (if result then "." else "!") |> printfn "%s"
+        in  
+            check char "#\\space" (Success(7, Char ' ')) ceq;
+            check char "#\\newline" (Success(9, Char '\n')) ceq;
+            check char "#\\a" (Success(3, Char 'a')) ceq;
+            check char "#\\&" (Success(3, Char '&')) ceq;
+            check char "#\\1" (Success(3, Char '1')) ceq;
 
+            check bool "#t" (Success(2, true')) ceq;
+            check bool "#f" (Success(2, false')) ceq;
+
+            check string "\"\"" (Success(2, String "")) ceq;
+            check string "\"abc\"" (Success(5, String "abc")) ceq;
+            check string "\"xy\\rz\"" (Success(7, String "xy\rz")) ceq;
+            check string "\"ab\\ncd\"" (Success(8, String "ab\ncd")) ceq;
+            check string "\"\\t123\"" (Success(7, String "\t123")) ceq;
+            check string "\"\\f\\f\"" (Success(6, String "\f\f")) ceq;
+            check string "\"1\\\"23\"" (Success(7, String "1\"23")) ceq;
+
+            check quoted "'a" (Success(2, list [gemSym "quote"; gemSym "a"])) ceq;
+            check quoted "`a" (Success(2, list [gemSym "quasiquote"; gemSym "a"])) ceq;
+            check quoted ",@a" (Success(3, list [gemSym "unquote-splicing"; gemSym "a"])) ceq;
+            check quoted ",a" (Success(2, list [gemSym "unquote"; gemSym "a"])) ceq;
+
+            check list_ "(1 2 3 4)" (Success(9, list [Number (IntV 1); Number (IntV 2); Number (IntV 3); Number (IntV 4)])) ceq;
+
+            check vector "#(1 2 3)" (Success(8, Array [Number (IntV 1); Number (IntV 2); Number (IntV 3)])) ceq            
 
 [<EntryPoint>]
 let main argv =
@@ -798,6 +839,7 @@ let main argv =
             | ParserCombinator.Success (pos, None) -> ctx
         in loop 0 ctx
     in
+        Parser.test();
         Scheme.create_context () |>
         eval "((lambda (x) (set! x 2) x) 1)" |>
         test "(quote a)" (list [gemSym("quote"); gemSym("a")]) (gemSym "a")|>
@@ -933,10 +975,10 @@ let main argv =
         '()
       (append (reverse (cdr ls)) (list (car ls))))))" |>
 
-        eval "(append '(a b c) '(d e f))" |> //"(a b c d e f)"
-        eval "(append '((a b) (c d)) '(e f g))" |> //((a b) (c d) e f g)
-        eval "(reverse '(a b c d e))" |> //(e d c b a)
-        eval "(reverse '((a b) c (d e)))" |> //((d e) c (a b))
+        eval "(append '(a b c) '(d e f))" |>        //"(a b c d e f)"
+        eval "(append '((a b) (c d)) '(e f g))" |>  //((a b) (c d) e f g)
+        eval "(reverse '(a b c d e))" |>            //(e d c b a)
+        eval "(reverse '((a b) c (d e)))" |>        //((d e) c (a b))
 
         eval "
 (define memq
@@ -1105,9 +1147,131 @@ b
         eval "(reverse '(a b c d e))" |>
         eval "(reverse '())" |>
         eval "(letrec ((a a)) a)" |>
+        
+        eval "
+(define-macro let
+  (lambda (args . body)
+    (if (pair? args)
+        `((lambda ,(map car args) ,@body) ,@(map cadr args))
+      ; named-let
+      `(letrec ((,args (lambda ,(map car (car body)) ,@(cdr body))))
+        (,args ,@(map cadr (car body)))))))        
+        " |>
+
+        eval "
+(define reversei
+  (lambda (ls)
+    (let loop ((ls ls) (a '()))
+      (if (null? ls)
+          a
+          (loop (cdr ls) (cons (car ls) a))))))      
+        " |>
+
+        eval "(reversei '(a b c d e))" |>
+        eval "(reversei '())" |>
+        
+        eval "
+(define-macro begin
+  (lambda args
+    (if (null? args)
+        `((lambda () '*undef*))
+      `((lambda () ,@args)))))        
+" |>
+
+        eval "(begin)" |>
+        eval "(begin 1 2 3 4 5)" |>
+
+        eval "
+(define-macro cond
+  (lambda args
+    (if (null? args)
+        '*undef*
+      (if (eq? (caar args) 'else)
+          `(begin ,@(cdar args))
+        (if (null? (cdar args))
+            `(let ((*value* ,(caar args)))
+              (if *value* *value* (cond ,@(cdr args))))
+          `(if ,(caar args)
+               (begin ,@(cdar args))
+            (cond ,@(cdr args))))))))        
+        " |>
+        
+        eval "(define cond-test
+  (lambda (x)
+    (cond ((eq? x 'a) 1)
+          ((eq? x 'b) 2)
+          ((eq? x 'c) 3)
+          (else 0))))" |>
+
+        eval "(cond-test 'a)" |>
+        eval "(cond-test 'b)" |>
+        eval "(cond-test 'c)" |>
+        eval "(cond-test 'd)" |>
+        eval "(cond-test 'e)" |>
+
+        eval "
+(define memv
+  (lambda (x ls)
+    (if (null? ls)
+        #f
+        (if (eqv? x (car ls))
+            ls
+          (memv x (cdr ls))))))
+
+(define-macro case
+  (lambda (key . args)
+    (if (null? args)
+        '*undef*
+      (if (eq? (caar args) 'else)
+          `(begin ,@(cdar args))
+        `(if (memv ,key ',(caar args))
+             (begin ,@(cdar args))
+           (case ,key ,@(cdr args)))))))        
+        " |>
+
+        eval "
+(define case-test
+  (lambda (x)
+    (case x
+      ((a b c) 1)
+      ((d e f) 2)
+      ((g h i) 3)
+      (else    0))))        
+        " |>
+
+        eval "
+(define-macro do
+  (lambda (var-form test-form . args)
+    (let ((vars (map car var-form))
+          (vals (map cadr var-form))
+          (step (map cddr var-form)))
+      `(letrec ((loop (lambda ,vars
+                        (if ,(car test-form)
+                            (begin ,@(cdr test-form))
+                          (begin
+                            ,@args
+                            (loop ,@(map-2 (lambda (x y)
+                                             (if (null? x) y (car x)))
+                                           step
+                                           vars)))))))
+        (loop ,@vals)))))        
+        " |>
+
+        
+        eval "
+(define reverse-do
+  (lambda (xs)
+    (do ((ls xs (cdr ls)) (result '()))
+        ((null? ls) result)
+      (set! result (cons (car ls) result)))))        
+        " |>
+
+        eval "(reverse-do '(a b c d e))" |>
+
         //eval "" |>
 
         ignore;
         
         0
 
+// http://www.ccs.neu.edu/home/dorai/mbe/mbe-imps.html
