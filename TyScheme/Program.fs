@@ -87,22 +87,25 @@ type Value  =
     | Closure of body:Inst list * env:Value list
     | Macro of value : Value // append to implements macro
     | Error of subtype: string * message : string 
+    | Continuation of s: Value list * e: Value list * c: (Inst list) * d: (Value list * Value list * (Inst list)) list // append to implements call/cc
 
 and Inst =
-      Ld   of i:int * j:int
-    | Ldc  of Value
-    | Ldg  of Value
-    | Ldf  of Inst list
+      Ld     of i:int * j:int
+    | Ldc    of Value
+    | Ldg    of Value
+    | Ldf    of Inst list
     | Join
     | Rtn
     | App
     | Pop
-    | Sel  of t_clause:(Inst list) * f_clause:(Inst list)
-    | Def  of Value
-    | Defm of Value // append to implements macro
-    | Args of int
-    | Lset of pos:(int * int) // append to implements set!
-    | Gset of sym:Value // append to implements set!
+    | Sel    of t_clause:(Inst list) * f_clause:(Inst list)
+    | Def    of Value
+    | Defm   of Value // append to implements macro
+    | Args   of int
+    | Lset   of pos:(int * int) // append to implements set!
+    | Gset   of sym:Value // append to implements set!
+    | Ldct   of Inst list // append to implements call/cc
+    | ArgsAp of int // append to implements call/cc
     | Stop
 
 let nil    = Nil
@@ -233,6 +236,12 @@ let list_fold (f : Value -> Value -> Value) (list:Value) : Value =
     match list with
         | Cons (x, xs) -> list_reduce f x xs
         | _            -> failwith "bad argument"
+
+let list_rev (list:Value) : Value = 
+    list_reduce (fun x s -> Cell (ref x, ref s)) nil list
+
+let list_copy (list:Value) : Value = 
+    list |> list_rev |> list_rev
 
 let rec ceq (x:Value) (y:Value) : bool =
     match (x,y) with
@@ -389,6 +398,12 @@ module Scheme =
                     | Some pos -> comp body env (Lset (pos)::code)
                     | None -> comp body env (Gset (sym)::code)
                 (*  end: append to implements set! *)
+                (*  start: append to implements call/cc *)
+                | Cons((Symbol "call/cc"), Cons(body,_)) -> 
+                    [Ldct code; Args 1] @ (comp body env (App::code))
+                | Cons((Symbol "apply"), Cons(func, args)) -> 
+                    complis args env (ArgsAp (list_length args)::(comp func env (App::code)))
+                (*  end: append to implements call/cc *)
                 (*  start: append to implements macro *)
                 | Cons(fn, args) when ismacro fn -> 
                     let context = { s= []; e= [args] ; c= get_macro_code fn; d= [([], [], [Stop])]; halt= false }
@@ -450,40 +465,56 @@ module Scheme =
             | Some (car,cdr) -> cdr := value
             | None -> failwith "unbound variable: " sym
 
-
         in
             if context.halt 
             then context
             else 
                 match (context.c, context.s, context.e, context.d) with
-                | (Ld(i,j)  ::c',                         s , e,                 d ) -> { context with s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }
-                | (Ldc(v)   ::c',                         s , e,                 d ) -> { context with s = v :: s                ; e = e        ; c = c'; d = d }
-                | (Ldg(v)   ::c',                         s , e,                 d ) -> { context with s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }
-                | (Ldf(v)   ::c',                         s , e,                 d ) -> { context with s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }
-                | (App      ::c', Primitive(f)  :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'         ; e = e        ; c = c'; d = d }
-                | (App      ::c', Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }
-                | (Rtn      ::_ ,                   s1 :: [], e, (s2, e', c') :: d') -> { context with s = s1 :: s2              ; e = e'       ; c = c'; d = d' }
-                | (Sel(_, f)::c',      (Boolean false) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }
-                | (Sel(t, _)::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }
-                | (Join     ::_ ,                         s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e        ; c = c'; d = d' }
-                | (Pop      ::c',                    _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = c'; d = d }
-                | (Args(v)  ::c',                         s , e,                 d ) -> let (a'',s') = List.splitAt v s
-                                                                                        let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
-                                                                                        in { context with s = a' :: s'; e = e; c = c'; d = d }
-                | (Def(sym) ::c',                 body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
-                                                                                        { context with s = sym :: s'; e = e; c = c'; d = d };
+                | (Ld(i,j)   ::c',                                    s , e,                 d ) -> { context with s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }
+                | (Ldc(v)    ::c',                                    s , e,                 d ) -> { context with s = v :: s                ; e = e        ; c = c'; d = d }
+                | (Ldg(v)    ::c',                                    s , e,                 d ) -> { context with s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }
+                | (Ldf(v)    ::c',                                    s , e,                 d ) -> { context with s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }
+                | (App       ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'         ; e = e        ; c = c'; d = d }
+                (*  start: append to implements call/cc *)
+                | (App       ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with s = (arg) :: s'           ; e = e'       ; c = c'; d = d' }
+                (*  end: append to implements call/cc *)
+                | (App       ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }
+                | (Rtn       ::_ ,                              s1 :: [], e, (s2, e', c') :: d') -> { context with s = s1 :: s2              ; e = e'       ; c = c'; d = d' }
+                | (Sel(_, f) ::c',                 (Boolean false) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }
+                | (Sel(t, _) ::c',                               _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }
+                | (Join      ::_ ,                                    s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e        ; c = c'; d = d' }
+                | (Pop       ::c',                               _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = c'; d = d }
+                | (Args(v)   ::c',                                    s , e,                 d ) -> let (a'',s') = List.splitAt v s
+                                                                                                    let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
+                                                                                                    in { context with s = a' :: s'; e = e; c = c'; d = d }
+                | (Def(sym)  ::c',                            body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
+                                                                                                    { context with s = sym :: s'; e = e; c = c'; d = d };
                 (*  start: append to implements macro *)
-                | (Defm(sym)::c',   (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
-                                                                                        { context with s = sym :: s'; e = e; c = c'; d = d };
+                | (Defm(sym) ::c',              (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
+                                                                                                    { context with s = sym :: s'; e = e; c = c'; d = d };
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
-                | (Lset(i,j)::c',                value :: s', e,                 d ) -> set_lvar e i j value; 
-                                                                                        { context with s = context.s; e = e; c = c'; d = d };
-                | (Gset(sym)::c',                value :: s', e,                 d ) -> set_gvar sym value;
-                                                                                        { context with s = context.s; e = e; c = c'; d = d };
+                | (Lset(i,j) ::c',                           value :: s', e,                 d ) -> set_lvar e i j value; 
+                                                                                                    { context with s = context.s; e = e; c = c'; d = d };
+                | (Gset(sym) ::c',                           value :: s', e,                 d ) -> set_gvar sym value;
+                                                                                                    { context with s = context.s; e = e; c = c'; d = d };
                 (*  end: append to implements set! *)
-                | (Stop     ::c',                          s, e,                 d ) -> { context with halt= true }
-                | _                                                                  -> failwith "bad context"
+                (*  start: append to implements call/cc *)
+                | (Ldct(code)::c',                                    s , e,                 d ) -> let cont = Continuation (s, e, code, d)
+                                                                                                    in { context with s = cont :: s; e = e; c = c'; d = d };
+
+                | (ArgsAp(v) ::c',                           value :: s', e,                 d ) -> 
+                    let rec loop n a s =
+                        match s with
+                        | [] -> failwith "bad arg"
+                        | x :: xs -> 
+                            if n = 0 
+                            then { context with s = a :: s; e = e; c = c'; d = d };
+                            else loop (n - 1) (Cell(ref x, ref a)) xs
+                    in loop (v - 1) (list_copy value) s'
+                (*  end: append to implements call/cc *)
+                | (Stop      ::c',                                    s , e,                 d ) -> { context with halt= true }
+                | _                                                                              -> failwith "bad context"
     and run (context:Context) :Context =
         let rec loop context =
             let context = vm context
@@ -1267,6 +1298,13 @@ b
         " |>
 
         eval "(reverse-do '(a b c d e))" |>
+
+        eval "(apply cons '(1 2))" |> // (1 . 2)
+        eval "(apply cons 1 '(2))" |> // (1 . 2)
+        eval "(define a '(1 2 3 4 5))" |> // a
+        eval "(define foo (lambda (a b . c) (set! a 10) (set! b 20) (set! c 30)))" |> // foo
+        eval "(apply foo a)" |> // 30
+        eval "a" |>     // (1 2 3 4 5)        
 
         //eval "" |>
 
