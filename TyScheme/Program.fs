@@ -182,6 +182,7 @@ let toString (value:Value) =
         | Closure (value, env) -> sprintf "<Closure: %A>" (value)
         | Macro (value) -> sprintf "<Macro: %s>" (value.ToString ())
         | Error (subtype, message) -> sprintf "<%s: %s>" subtype message
+        | Continuation (s,e,c,d) -> sprintf "<Continuation: (%A,%A,%A,%A)>" s e c d
     in loop value false
 
 (* Scheme's primitive functions *)
@@ -299,16 +300,19 @@ module Scheme =
 
     let global_environment: Env ref =
         ref [
-                (gemSym "#t",   ref (true')) ;
-                (gemSym "#f",    ref (false'));
+                (gemSym "#t"     , ref (true')) ;
+                (gemSym "#f"     , ref (false'));
 
-                (gemSym "car",   ref (Primitive (fun xs -> car (car xs))));
-                (gemSym "cdr",   ref (Primitive (fun xs -> cdr (car xs))));
-                (gemSym "cons",  ref (Primitive (fun xs -> Cell (ref (car xs), ref (cadr xs)))));
-                (gemSym "eq?",   ref (Primitive (fun xs -> toBool (eq  (car xs) (cadr xs)))));
-                (gemSym "eqv?",  ref (Primitive (fun xs -> toBool (eqv (car xs) (cadr xs)))));
-                (gemSym "pair?", ref (Primitive (fun xs -> toBool (ispair (car xs)))));
-                (gemSym "+",     ref (Primitive (list_fold (fun x s -> match s,x with | Number l, Number r -> Number (NumberVOp.add l r) | _ -> failwith "bad argument" ))));
+                (gemSym "car"    , ref (Primitive (fun xs -> car (car xs))));
+                (gemSym "cdr"    , ref (Primitive (fun xs -> cdr (car xs))));
+                (gemSym "cons"   , ref (Primitive (fun xs -> Cell (ref (car xs), ref (cadr xs)))));
+                (gemSym "eq?"    , ref (Primitive (fun xs -> toBool (eq  (car xs) (cadr xs)))));
+                (gemSym "eqv?"   , ref (Primitive (fun xs -> toBool (eqv (car xs) (cadr xs)))));
+                (gemSym "pair?"  , ref (Primitive (fun xs -> toBool (ispair (car xs)))));
+
+                (gemSym "display", ref (Primitive (fun xs -> printf "%s" (toString (car xs)); nil)));
+                
+                (gemSym "+"      , ref (Primitive (list_fold (fun x s -> match s,x with | Number l, Number r -> Number (NumberVOp.add l r) | _ -> failwith "bad argument" ))));
             ]
 
     let assoc (sym: Value) (dic: Env ref) : EnvEntry option =
@@ -505,12 +509,10 @@ module Scheme =
 
                 | (ArgsAp(v) ::c',                           value :: s', e,                 d ) -> 
                     let rec loop n a s =
-                        match s with
-                        | [] -> failwith "bad arg"
-                        | x :: xs -> 
-                            if n = 0 
-                            then { context with s = a :: s; e = e; c = c'; d = d };
-                            else loop (n - 1) (Cell(ref x, ref a)) xs
+                        match n,s with
+                        | 0,[] -> { context with s = a :: s; e = e; c = c'; d = d };
+                        | n,x :: xs when n > 0-> loop (n - 1) (Cell(ref x, ref a)) xs
+                        | _ -> failwith "bad arg"
                     in loop (v - 1) (list_copy value) s'
                 (*  end: append to implements call/cc *)
                 | (Stop      ::c',                                    s , e,                 d ) -> { context with halt= true }
@@ -1306,6 +1308,19 @@ b
         eval "(apply foo a)" |> // 30
         eval "a" |>     // (1 2 3 4 5)        
 
+        eval "(define list (lambda x x))" |> // list
+        eval "(define a #f)" |> // a
+        eval "(list 'a 'b (call/cc (lambda (k) (set! a k) 'c)) 'd)" |> // (a b c d)
+        eval "a" |> // (continuation (b a) () (ldc d args 4 ldg list app stop) ())
+        eval "(a 'e)" |> // (a b e d)
+        eval "(a 'f)" |> // (a b f d)
+
+        eval "(define bar1 (lambda (cont) (display \"call bar1\\n\")))" |>
+        eval "(define bar2 (lambda (cont) (display \"call bar2\\n\") (cont #f)))" |>
+        eval "(define bar3 (lambda (cont) (display \"call bar3\\n\")))" |>
+        eval "(define test (lambda (cont) (bar1 cont) (bar2 cont) (bar3 cont)))" |>
+
+        eval "(call/cc (lambda (cont) (test cont)))" |> // call bar1\ncall bar2\n#f
         //eval "" |>
 
         ignore;
