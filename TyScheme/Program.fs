@@ -67,6 +67,26 @@ module NumberVOp =
 
         | _ -> failwith "cannot add"
 
+    let rec sub lhs rhs =
+        match (lhs, rhs) with
+        //| ComplexV (r1,i1), ComplexV (r2,i2)  -> ComplexV (add r1 r2, add i1 i2)
+        //| ComplexV _, _  -> add lhs (toComplex rhs)
+        //| _, ComplexV  _  -> add (toComplex lhs) rhs
+
+        //| FractionV (n1,d1), FractionV (n2,d2) -> FractionV (n1*d2+n2*d1,d1*d2)
+        //| FractionV _,_ -> add lhs (toFraction rhs)
+        //| _, FractionV _ -> add (toFraction lhs) rhs
+
+        | RealV v1, RealV v2 -> RealV (v1 - v2)
+        | RealV  _,       _  -> sub lhs (toReal rhs)
+        |        _, RealV _  -> sub (toReal lhs) rhs
+
+        | IntV v1, IntV v2 -> IntV (v1 - v2)
+        | IntV _ ,_        -> sub lhs (toInt rhs)
+        |       _, IntV _  -> sub (toInt lhs) rhs
+
+        | _ -> failwith "cannot sub"
+
     let neg v =
         match v with
         //| ComplexV _ -> failwith "cannot neg" 
@@ -74,39 +94,50 @@ module NumberVOp =
         | IntV v -> IntV (-v)
         | RealV v -> RealV (-v)
 
-type Value  = 
+type DeBruijnIndex = ((*i*)int * (*j*)int)
+type Register = { 
+        s: Value list; 
+        e: Value list; 
+        c: (Inst list); 
+        d: (Value list * Value list * (Inst list)) list; 
+    }
+and Value  = 
       Symbol of value : string
     | Nil
-    | Array of value : Value list
-    | Cell of car: (Value ref) * cdr: (Value ref)
-    | String of value : string
-    | Char of value : char
-    | Number of value : NumberV
-    | Boolean of value : bool
-    | Primitive of value : (Value -> Value)
-    | Closure of body:Inst list * env:Value list
-    | Macro of value : Value // append to implements macro
-    | Error of subtype: string * message : string 
-    | Continuation of s: Value list * e: Value list * c: (Inst list) * d: (Value list * Value list * (Inst list)) list // append to implements call/cc
+    | Array         of value : Value list
+    | Cell          of car: (Value ref) * cdr: (Value ref)
+    | String        of value : string
+    | Char          of value : char
+    | Number        of value : NumberV
+    | Boolean       of value : bool
+    | Primitive     of value : (Value -> Value)
+    | Closure       of body:Inst list * env:Value list
+    | Macro         of value : Value // append to implements macro
+    | Error         of subtype: string * message : string 
+    | Continuation  of s: Value list * e: Value list * c: (Inst list) * d: (Value list * Value list * (Inst list)) list // append to implements call/cc
 
 and Inst =
-      Ld     of i:int * j:int
-    | Ldc    of Value
-    | Ldg    of Value
-    | Ldf    of Inst list
+      Ld     of index : DeBruijnIndex
+    | Ldc    of value : Value
+    | Ldg    of symbol : Value
+    | Ldf    of body : Inst list
     | Join
     | Rtn
     | App
+    | TApp                                                  // append to implements Tail-call optimization
     | Pop
     | Sel    of t_clause:(Inst list) * f_clause:(Inst list)
-    | Def    of Value
-    | Defm   of Value // append to implements macro
-    | Args   of int
-    | Lset   of pos:(int * int) // append to implements set!
-    | Gset   of sym:Value // append to implements set!
-    | Ldct   of Inst list // append to implements call/cc
-    | ArgsAp of int // append to implements call/cc
+    | SelR   of t_clause:(Inst list) * f_clause:(Inst list) // append to implements Tail-call optimization
+    | Def    of symbol : Value
+    | Defm   of symbol : Value                              // append to implements macro
+    | Args   of argc : int
+    | Lset   of index : DeBruijnIndex                       // append to implements set!
+    | Gset   of symbol : Value                              // append to implements set!
+    | LdCt   of next : Inst list                            // append to implements call/cc
+    | ArgsAp of argc : int                                  // append to implements call/cc
     | Stop
+
+type Context = { reg:Register; halt: bool }
 
 let nil    = Nil
 let true'  = Boolean true
@@ -268,11 +299,17 @@ and ieq (x:Inst) (y:Inst) : bool =
     | (Join        , Join        ) -> true
     | (Rtn         , Rtn         ) -> true
     | (App         , App         ) -> true
+    | (TApp        , TApp        ) -> true
     | (Pop         , Pop         ) -> true
     | (Sel  (t1,f1), Sel  (t2,f2)) -> (List.forall2 ieq t1 t2) && (List.forall2 ieq f1 f2)
-    | (Def       v1, Def       v2) -> ceq v1 v2 // append to implements macro
-    | (Defm      v1, Defm      v2) -> ceq v1 v2
+    | (SelR (t1,f1), SelR (t2,f2)) -> (List.forall2 ieq t1 t2) && (List.forall2 ieq f1 f2) // append to implements Tail-call optimization
+    | (Def       v1, Def       v2) -> ceq v1 v2
+    | (Defm      v1, Defm      v2) -> ceq v1 v2 // append to implements macro
     | (Args      i1, Args      i2) -> (i1=i2) 
+    | (Lset (i1,j1), Lset (i2,j2)) -> (i1=i2) && (j1=j2) // append to implements set!
+    | (Gset    (v1), Gset    (v2)) -> ceq v1 v2 // append to implements set!
+    | (LdCt    (i1), LdCt    (i2)) -> List.forall2 ieq i1 i2    // append to implements call/cc
+    | (ArgsAp    i1, ArgsAp    i2) -> (i1=i2)   // append to implements call/cc
     | (Stop        , Stop        ) -> true
     | (           _,            _) -> false
 
@@ -313,6 +350,7 @@ module Scheme =
                 (gemSym "display", ref (Primitive (fun xs -> printf "%s" (toString (car xs)); nil)));
                 
                 (gemSym "+"      , ref (Primitive (list_fold (fun x s -> match s,x with | Number l, Number r -> Number (NumberVOp.add l r) | _ -> failwith "bad argument" ))));
+                (gemSym "-"      , ref (Primitive (list_fold (fun x s -> match s,x with | Number l, Number r -> Number (NumberVOp.sub l r) | _ -> failwith "bad argument" ))));
             ]
 
     let assoc (sym: Value) (dic: Env ref) : EnvEntry option =
@@ -322,14 +360,22 @@ module Scheme =
             | ((key, value) as entry) :: d -> if (eq key sym) then Some entry else loop d
         in loop !dic        
         
-    let get_gvar (sym:Value) : Value =
-        match assoc sym global_environment with
-        | Some (key, value) -> !value
-        | _ -> Error ("runtime error", String.Format("unbound variable:{0}",toString sym))
+    (*  before: append to implements appendix#1 *)
+    //let get_gvar (sym:Value) : Value =
+    //    match assoc sym global_environment with
+    //    | Some (key, value) -> !value
+    //    | _ -> Error ("runtime error", String.Format("unbound variable:{0}",toString sym))
+    (*  after: append to implements appendix#1 *)
+    let location_gvar (expr : Value) : EnvEntry =
+        match assoc expr global_environment with
+        | None -> let cell = EnvEntry( expr, ref(gemSym("undef"))) in global_environment  := cell :: !global_environment; cell
+        | Some cell -> cell
 
-    type Context = { s: Value list; e: Value list; c: (Inst list); d: (Value list * Value list * (Inst list)) list; halt: bool }
+    let get_gvar (expr:Value) = 
+        match location_gvar(expr) with
+        | (car, cdr) -> !cdr
+    (*  end: append to implements appendix#1 *)
 
-    
     let rec compile (expr:Value) : Inst list =
         (* compiler *)
         let position_var (sym:Value) (ls:Value) : int option =
@@ -367,7 +413,7 @@ module Scheme =
 
         (*  end: append to implements macro *)
 
-        let rec comp (expr: Value) (env: Value list) (code: Inst list): Inst list =
+        let rec comp (expr: Value) (env: Value list) (code: Inst list) (* start: append to implements Tail-call optimization *) (tail:bool) (* end: append to implements Tail-call optimization *) : Inst list =
             if is_self_evaluation expr 
             then Ldc(expr) :: code
             else 
@@ -379,59 +425,87 @@ module Scheme =
                 | Cons(Symbol("quote"), Cons(v, Nil)) -> 
                     Ldc(v) :: code
                 | Cons(Symbol("if"), Cons(cond, Cons(t, Nil))) -> 
-                    let t_clause = comp t env [Join]
-                    let f_clause = [Ldc (gemSym "*undef"); Join] 
-                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    (* before: append to implements Tail-call optimization *)
+//                    let t_clause = comp t env [Join]
+//                    let f_clause = [Ldc (gemSym "*undef"); Join] 
+//                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    (* after: append to implements Tail-call optimization *)
+                    if tail 
+                    then
+                        let t_clause = comp t env [Rtn] true
+                        let f_clause = [Ldc (gemSym "*undef"); Rtn]
+                        in    comp cond env (SelR(t_clause, f_clause)::code.Tail) false
+                    else
+                        let t_clause = comp t env [Join] false
+                        let f_clause = [Ldc (gemSym "*undef"); Join]
+                        in    comp cond env (Sel(t_clause, f_clause)::code) false
+                    (* end: append to implements Tail-call optimization *)
                 | Cons(Symbol("if"), Cons(cond, Cons(t, Cons(e, Nil)))) -> 
-                    let t_clause = comp t env [Join]
-                    let f_clause = comp e env [Join]
-                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    (* before: append to implements Tail-call optimization *)
+//                    let t_clause = comp t env [Join]
+//                    let f_clause = comp e env [Join]
+//                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    (* after: append to implements Tail-call optimization *)
+                    if tail 
+                    then
+                        let t_clause = comp t env [Rtn] true
+                        let f_clause = comp e env [Rtn] true
+                        in    comp cond env (SelR(t_clause, f_clause)::code.Tail) false
+                    else
+                        let t_clause = comp t env [Join] false
+                        let f_clause = comp e env [Join] false
+                        in    comp cond env (Sel (t_clause, f_clause)::code) false
+                    (* end: append to implements Tail-call optimization *)
                 | Cons((Symbol "lambda"), Cons(name, body)) ->
                     let body = comp_body body (name :: env) [Rtn]
                     in  Ldf(body) :: code
                 | Cons((Symbol "define"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
-                    comp body env (Def(sym)::code)
+                    comp body env (Def(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
                 (*  start: append to implements macro *)
                 | Cons((Symbol "define-macro"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
-                    comp body env (Defm(sym)::code)
+                    comp body env (Defm(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
                 | Cons((Symbol "set!"), Cons(sym,Cons(body, _))) -> 
                     let pos = location sym env
                     match pos with
-                    | Some pos -> comp body env (Lset (pos)::code)
-                    | None -> comp body env (Gset (sym)::code)
+                    | Some pos -> comp body env (Lset (pos)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    | None -> comp body env (Gset (sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
                 (*  end: append to implements set! *)
                 (*  start: append to implements call/cc *)
                 | Cons((Symbol "call/cc"), Cons(body,_)) -> 
-                    [Ldct code; Args 1] @ (comp body env (App::code))
+                    [LdCt code; Args 1] @ (comp body env (App::code)) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
                 | Cons((Symbol "apply"), Cons(func, args)) -> 
-                    complis args env (ArgsAp (list_length args)::(comp func env (App::code)))
+                    complis args env (ArgsAp (list_length args)::(comp func env (App::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *))) 
                 (*  end: append to implements call/cc *)
                 (*  start: append to implements macro *)
                 | Cons(fn, args) when ismacro fn -> 
-                    let context = { s= []; e= [args] ; c= get_macro_code fn; d= [([], [], [Stop])]; halt= false }
-                    let newexpr = run context
-                    in  printfn "macro(%s) => %s" (toString fn) (toString newexpr.s.Head); comp newexpr.s.Head env code
+                    let context = { reg={s= []; e= [args] ; c= get_macro_code fn; d= [([], [], [Stop])]}; halt= false }
+                    let context = run context
+                    in  printfn "macro(%s) => %s" (toString fn) (toString context.reg.s.Head); comp context.reg.s.Head env code (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
                 (*  end: append to implements macro *)
                 | Cons(fn, args) -> 
-                    complis args env ((Args (list_length args))::(comp fn env (App :: code)))
+                    (* before: append to implements Tail-call optimization *)
+                    //complis args env ((Args (list_length args))::(comp fn env (App :: code)
+                    (* after: append to implements Tail-call optimization *)
+                    complis args env ((Args (list_length args))::(comp fn env ((if tail then TApp else App) :: code) false  ))
+                    (* end: append to implements Tail-call optimization *)
                 | _ -> failwith "syntax error"
             
         and comp_body (body: Value) (env: Value list) (code: Inst list) : Inst list =
             match body with
-            | Cons(x, Nil) -> comp x env code
-            | Cons(x, xs)  -> comp x env (Pop :: (comp_body xs env code))
+            | Cons(x, Nil) -> comp x env code (* start: append to implements Tail-call optimization *) true (* end: append to implements Tail-call optimization *)
+            | Cons(x, xs)  -> comp x env (Pop :: (comp_body xs env code )) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
             | _            -> failwith "syntax error"
         and complis (expr: Value) (env: Value list) (code: Inst list): Inst list =
             match (expr) with 
             | Nil       -> code 
-            | Cons(a,d) -> comp a env (complis d env code)
+            | Cons(a,d) -> comp a env (complis d env code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
             | _         -> failwith "syntax error"
         in
             if iserror(expr)
             then [Ldc expr; Stop]
-            else comp expr [] [Stop]
+            else comp expr [] [Stop] (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
 
 
     (* secd virtual machine *)
@@ -467,56 +541,61 @@ module Scheme =
         let set_gvar (sym:Value) (value:Value) =
             match assoc sym global_environment with
             | Some (car,cdr) -> cdr := value
-            | None -> failwith "unbound variable: " sym
+            | None -> failwithf "unbound variable: %A" sym
 
         in
             if context.halt 
             then context
             else 
-                match (context.c, context.s, context.e, context.d) with
-                | (Ld(i,j)   ::c',                                    s , e,                 d ) -> { context with s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }
-                | (Ldc(v)    ::c',                                    s , e,                 d ) -> { context with s = v :: s                ; e = e        ; c = c'; d = d }
-                | (Ldg(v)    ::c',                                    s , e,                 d ) -> { context with s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }
-                | (Ldf(v)    ::c',                                    s , e,                 d ) -> { context with s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }
-                | (App       ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with s = (f arg) :: s'         ; e = e        ; c = c'; d = d }
+                match (context.reg.c, context.reg.s, context.reg.e, context.reg.d) with
+                | (Ld(i,j)   ::c',                                    s , e,                 d ) -> { context with reg={s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }}
+                | (Ldc(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = v :: s                ; e = e        ; c = c'; d = d }}
+                | (Ldg(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }}
+                | (Ldf(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }}
+                | (App       ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
                 (*  start: append to implements call/cc *)
-                | (App       ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with s = (arg) :: s'           ; e = e'       ; c = c'; d = d' }
+                | (App       ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
                 (*  end: append to implements call/cc *)
-                | (App       ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }
-                | (Rtn       ::_ ,                              s1 :: [], e, (s2, e', c') :: d') -> { context with s = s1 :: s2              ; e = e'       ; c = c'; d = d' }
-                | (Sel(_, f) ::c',                 (Boolean false) :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }
-                | (Sel(t, _) ::c',                               _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }
-                | (Join      ::_ ,                                    s , e,   (_, _, c') :: d') -> { context with s = s                     ; e = e        ; c = c'; d = d' }
-                | (Pop       ::c',                               _ :: s', e,                 d ) -> { context with s = s'                    ; e = e        ; c = c'; d = d }
+                | (App       ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }}
+                | (Rtn       ::_ ,                              s1 :: [], e, (s2, e', c') :: d') -> { context with reg={s = s1 :: s2              ; e = e'       ; c = c'; d = d'}}
+                | (Sel(_, f) ::c',                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }}
+                | (Sel(t, _) ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }}
+                | (Join      ::_ ,                                    s , e,   (_, _, c') :: d') -> { context with reg={s = s                     ; e = e        ; c = c'; d = d'}}
+                | (Pop       ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = c'; d = d }}
                 | (Args(v)   ::c',                                    s , e,                 d ) -> let (a'',s') = List.splitAt v s
                                                                                                     let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
-                                                                                                    in { context with s = a' :: s'; e = e; c = c'; d = d }
+                                                                                                    in { context with reg={s = a' :: s'; e = e; c = c'; d = d }}
                 | (Def(sym)  ::c',                            body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
-                                                                                                    { context with s = sym :: s'; e = e; c = c'; d = d };
+                                                                                                    { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
                 (*  start: append to implements macro *)
                 | (Defm(sym) ::c',              (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
-                                                                                                    { context with s = sym :: s'; e = e; c = c'; d = d };
+                                                                                                    { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
                 | (Lset(i,j) ::c',                           value :: s', e,                 d ) -> set_lvar e i j value; 
-                                                                                                    { context with s = context.s; e = e; c = c'; d = d };
+                                                                                                    { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
                 | (Gset(sym) ::c',                           value :: s', e,                 d ) -> set_gvar sym value;
-                                                                                                    { context with s = context.s; e = e; c = c'; d = d };
+                                                                                                    { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
                 (*  end: append to implements set! *)
                 (*  start: append to implements call/cc *)
-                | (Ldct(code)::c',                                    s , e,                 d ) -> let cont = Continuation (s, e, code, d)
-                                                                                                    in { context with s = cont :: s; e = e; c = c'; d = d };
-
-                | (ArgsAp(v) ::c',                           value :: s', e,                 d ) -> 
-                    let rec loop n a s =
-                        match n,s with
-                        | 0,[] -> { context with s = a :: s; e = e; c = c'; d = d };
-                        | n,x :: xs when n > 0-> loop (n - 1) (Cell(ref x, ref a)) xs
-                        | _ -> failwith "bad arg"
-                    in loop (v - 1) (list_copy value) s'
+                | (LdCt(code)::c',                                    s , e,                 d ) -> let cont = Continuation (s, e, code, d)
+                                                                                                    in { context with reg={s = cont :: s; e = e; c = c'; d = d }}
+                | (ArgsAp(v) ::c',                           value :: s', e,                 d ) -> let rec loop n a s =
+                                                                                                        match n,s with
+                                                                                                        | 0,[] -> { context with reg={s = a :: s; e = e; c = c'; d = d }}
+                                                                                                        | n,x :: xs when n > 0-> loop (n - 1) (Cell(ref x, ref a)) xs
+                                                                                                        | _ -> failwith "bad arg"
+                                                                                                    in loop (v - 1) (list_copy value) s'
                 (*  end: append to implements call/cc *)
+                (*  start: append to implements Tail-call optimization *)
+                | (SelR(_, f)::_ ,                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = d }}
+                | (SelR(t, _)::_ ,                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = d }}
+                | (TApp      ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
+                | (TApp      ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
+                | (TApp      ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = s'                    ; e = arg :: e'; c = f ; d = d }}
+                (*  end: append to implements Tail-call optimization *)
                 | (Stop      ::c',                                    s , e,                 d ) -> { context with halt= true }
-                | _                                                                              -> failwith "bad context"
+                | (_, _, _, _)                                                                   -> failwith "bad context"
     and run (context:Context) :Context =
         let rec loop context =
             let context = vm context
@@ -524,10 +603,10 @@ module Scheme =
         in loop context
 
     let create_context () : Context =
-        { s=[]; e=[]; c=[Stop]; d=[]; halt = true }
+        { reg={s=[]; e=[]; c=[Stop]; d=[]}; halt = true }
 
     let update_context(context: Context) (expr:Inst list) : Context =
-        { context with c=expr; halt = false }
+        { context with reg={context.reg with c=expr}; halt = false }
 
 
 (* parser combinator *)
@@ -837,7 +916,7 @@ module Parser =
 
 [<EntryPoint>]
 let main argv =
-    let test (s:string) (expr:Value) (ret:Value) (ctx:Scheme.Context): Scheme.Context = 
+    let test (s:string) (expr:Value) (ret:Value) (ctx:Context): Context = 
         printfn "Test:";
         printfn "  Input Code: %s" s;
         match Parser.expr s 0 with
@@ -852,11 +931,11 @@ let main argv =
                 let ctx' = Scheme.update_context ctx code
                 let result = Scheme.run ctx'
                 in  
-                    result.s.[0] |> toString |> printfn "  Execute  Result: %s";
-                    ret          |> toString |> printfn "  Expected Result: %s";
-                    (if ceq ret result.s.[0] then printfn "  All Match" else printfn "  -> Result Not Match");
+                    result.reg.s.[0] |> toString |> printfn "  Execute  Result: %s";
+                    ret                  |> toString |> printfn "  Expected Result: %s";
+                    (if ceq ret result.reg.s.[0] then printfn "  All Match" else printfn "  -> Result Not Match");
                     ctx'
-    let eval (s:string) (ctx:Scheme.Context): Scheme.Context = 
+    let eval (s:string) (ctx:Context): Context = 
         printfn "Eval: %s" s;
         let rec loop pos ctx = 
             match Parser.start s pos with
@@ -867,7 +946,7 @@ let main argv =
                 let ctx' = Scheme.update_context ctx code
                 let result = Scheme.run ctx'
                 in  
-                    result.s.[0] |> toString |> printfn "%s";
+                    result.reg.s.[0] |> toString |> printfn "%s";
                     loop pos ctx' 
             | ParserCombinator.Success (pos, None) -> ctx
         in loop 0 ctx
@@ -1321,10 +1400,42 @@ b
         eval "(define test (lambda (cont) (bar1 cont) (bar2 cont) (bar3 cont)))" |>
 
         eval "(call/cc (lambda (cont) (test cont)))" |> // call bar1\ncall bar2\n#f
-        //eval "" |>
 
+        eval "
+(define fact
+  (lambda (n a)
+    (if (= n 0)
+        a
+      (fact (- n 1) (* a n)))))" |>
+
+        eval "fact" |>
+
+        eval "
+(define sum
+  (lambda (x)
+    (if (eqv? x 0)
+        0
+      (+ x (sum (- x 1))))))" |>
+
+        eval "
+(define sum
+  (lambda (x)
+    (if (eqv? x 0)
+        0
+      (+ x (sum (- x 1))))))" |>
+        eval "(sum  100000)" |>
+                  
+        eval "
+(define sum1
+  (lambda (x a)
+    (if (eqv? x 0)
+        a
+      (sum1 (- x 1) (+ a x)))))" |>
+        eval "(sum1 100000 0)" |>
+
+        //eval "" |>
         ignore;
-        
+
         0
 
 // http://www.ccs.neu.edu/home/dorai/mbe/mbe-imps.html
