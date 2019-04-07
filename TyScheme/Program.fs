@@ -119,7 +119,11 @@ and Value  =
 and Inst =
       Ld     of index : DeBruijnIndex
     | Ldc    of value : Value
-    | Ldg    of symbol : Value
+    (*  before: append to implements appendix#1 *)
+    //| Ldg    of symbol : Value
+    (*  after: append to implements appendix#1 *)
+    | Ldg    of entry: EnvEntry
+    (*  end: append to implements appendix#1 *)
     | Ldf    of body : Inst list
     | Join
     | Rtn
@@ -128,14 +132,25 @@ and Inst =
     | Pop
     | Sel    of t_clause:(Inst list) * f_clause:(Inst list)
     | SelR   of t_clause:(Inst list) * f_clause:(Inst list) // append to implements Tail-call optimization
-    | Def    of symbol : Value
-    | Defm   of symbol : Value                              // append to implements macro
+    (*  before: append to implements appendix#1 *)
+    //| Def    of symbol : Value
+    //| Defm   of symbol : Value                              // append to implements macro
+    (*  after: append to implements appendix#1 *)
+    | Def    of entry : EnvEntry
+    | Defm   of entry : EnvEntry                            // append to implements macro
+    (*  end: append to implements appendix#1 *)
     | Args   of argc : int
     | Lset   of index : DeBruijnIndex                       // append to implements set!
-    | Gset   of symbol : Value                              // append to implements set!
+    (*  before: append to implements appendix#1 *)
+    //| Gset   of symbol : Value                              // append to implements set!
+    (*  after: append to implements appendix#1 *)
+    | Gset   of entry : EnvEntry                            // append to implements set!
+    (*  end: append to implements appendix#1 *)
     | LdCt   of next : Inst list                            // append to implements call/cc
     | ArgsAp of argc : int                                  // append to implements call/cc
     | Stop
+and EnvEntry = Value * (Value ref)
+and Env = EnvEntry list
 
 type Context = { reg:Register; halt: bool }
 
@@ -294,7 +309,11 @@ and ieq (x:Inst) (y:Inst) : bool =
     match (x,y) with
     | (Ld   (i1,j1), Ld   (i2,j2)) -> (i1=i2) && (j1=j2)
     | (Ldc     (v1), Ldc     (v2)) -> ceq v1 v2
-    | (Ldg     (v1), Ldg     (v2)) -> ceq v1 v2
+    (*  before: append to implements appendix#1 *)
+    //| (Ldg     (v1), Ldg     (v2)) -> ceq v1 v2
+    (*  after: append to implements appendix#1 *)
+    | (Ldg  (s1,v1), Ldg  (s2,v2)) -> ceq s1 s2 && ceq !v1 !v2
+    (*  end: append to implements appendix#1 *)
     | (Ldf     (i1), Ldf     (i2)) -> List.forall2 ieq i1 i2
     | (Join        , Join        ) -> true
     | (Rtn         , Rtn         ) -> true
@@ -303,11 +322,20 @@ and ieq (x:Inst) (y:Inst) : bool =
     | (Pop         , Pop         ) -> true
     | (Sel  (t1,f1), Sel  (t2,f2)) -> (List.forall2 ieq t1 t2) && (List.forall2 ieq f1 f2)
     | (SelR (t1,f1), SelR (t2,f2)) -> (List.forall2 ieq t1 t2) && (List.forall2 ieq f1 f2) // append to implements Tail-call optimization
-    | (Def       v1, Def       v2) -> ceq v1 v2
-    | (Defm      v1, Defm      v2) -> ceq v1 v2 // append to implements macro
+    (*  before: append to implements appendix#1 *)
+    //| (Def       v1, Def       v2) -> ceq v1 v2
+    //| (Defm      v1, Defm      v2) -> ceq v1 v2 // append to implements macro
+    (*  after: append to implements appendix#1 *)
+    | (Def  (s1,v1), Def  (s2,v2)) -> ceq s1 s2 && ceq !v1 !v2
+    | (Defm (s1,v1), Defm (s2,v2)) -> ceq s1 s2 && ceq !v1 !v2 // append to implements macro
+    (*  end: append to implements appendix#1 *)
     | (Args      i1, Args      i2) -> (i1=i2) 
     | (Lset (i1,j1), Lset (i2,j2)) -> (i1=i2) && (j1=j2) // append to implements set!
-    | (Gset    (v1), Gset    (v2)) -> ceq v1 v2 // append to implements set!
+    (*  before: append to implements appendix#1 *)
+    //| (Gset    (v1), Gset    (v2)) -> ceq v1 v2 // append to implements set!
+    (*  after: append to implements appendix#1 *)
+    | (Gset (s1,v1), Gset (s2,v2)) -> ceq s1 s2 && ceq !v1 !v2 // append to implements set!
+    (*  end: append to implements appendix#1 *)
     | (LdCt    (i1), LdCt    (i2)) -> List.forall2 ieq i1 i2    // append to implements call/cc
     | (ArgsAp    i1, ArgsAp    i2) -> (i1=i2)   // append to implements call/cc
     | (Stop        , Stop        ) -> true
@@ -332,8 +360,6 @@ let rec equal (x:Value) (y:Value) : bool =
 
 
 module Scheme =
-    type EnvEntry = Value * (Value ref)
-    type Env = EnvEntry list
 
     let global_environment: Env ref =
         ref [
@@ -421,14 +447,18 @@ module Scheme =
                 | Symbol _ ->
                     match location expr env with
                     | Some (i, j) -> Ld(i, j)  :: code
-                    | None        -> Ldg(expr) :: code
+                    (*  before: append to implements appendix#1 *)
+                    //| None        -> Ldg(expr) :: code
+                    (*  after: append to implements appendix#1 *)
+                    | None        -> Ldg(location_gvar expr) :: code
+                    (*  end: append to implements appendix#1 *)
                 | Cons(Symbol("quote"), Cons(v, Nil)) -> 
                     Ldc(v) :: code
                 | Cons(Symbol("if"), Cons(cond, Cons(t, Nil))) -> 
                     (* before: append to implements Tail-call optimization *)
-//                    let t_clause = comp t env [Join]
-//                    let f_clause = [Ldc (gemSym "*undef"); Join] 
-//                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    //let t_clause = comp t env [Join]
+                    //let f_clause = [Ldc (gemSym "*undef"); Join] 
+                    //in  comp cond env (Sel (t_clause, f_clause) :: code)
                     (* after: append to implements Tail-call optimization *)
                     if tail 
                     then
@@ -442,9 +472,9 @@ module Scheme =
                     (* end: append to implements Tail-call optimization *)
                 | Cons(Symbol("if"), Cons(cond, Cons(t, Cons(e, Nil)))) -> 
                     (* before: append to implements Tail-call optimization *)
-//                    let t_clause = comp t env [Join]
-//                    let f_clause = comp e env [Join]
-//                    in  comp cond env (Sel (t_clause, f_clause) :: code)
+                    //let t_clause = comp t env [Join]
+                    //let f_clause = comp e env [Join]
+                    //in  comp cond env (Sel (t_clause, f_clause) :: code)
                     (* after: append to implements Tail-call optimization *)
                     if tail 
                     then
@@ -460,17 +490,32 @@ module Scheme =
                     let body = comp_body body (name :: env) [Rtn]
                     in  Ldf(body) :: code
                 | Cons((Symbol "define"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
-                    comp body env (Def(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  before: append to implements appendix#1 *)
+                    //comp body env (Def(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  after: append to implements appendix#1 *)
+                    comp body env (Def(location_gvar sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  end: append to implements appendix#1 *)
                 (*  start: append to implements macro *)
                 | Cons((Symbol "define-macro"), Cons((Symbol _) as sym, Cons(body, Nil))) -> 
-                    comp body env (Defm(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  before: append to implements appendix#1 *)
+                    //comp body env (Defm(sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  after: append to implements appendix#1 *)
+                    comp body env (Defm(location_gvar sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  end: append to implements appendix#1 *)
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
                 | Cons((Symbol "set!"), Cons(sym,Cons(body, _))) -> 
+                    (*  before: append to implements appendix#1 *)
+                    //let pos = location sym env
+                    //match pos with
+                    //| Some pos -> comp body env (Lset (pos)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    //| None -> comp body env (Gset (sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  after: append to implements appendix#1 *)
                     let pos = location sym env
                     match pos with
                     | Some pos -> comp body env (Lset (pos)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
-                    | None -> comp body env (Gset (sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    | None -> comp body env (Gset (location_gvar sym)::code) (* start: append to implements Tail-call optimization *) false (* end: append to implements Tail-call optimization *)
+                    (*  end: append to implements appendix#1 *)
                 (*  end: append to implements set! *)
                 (*  start: append to implements call/cc *)
                 | Cons((Symbol "call/cc"), Cons(body,_)) -> 
@@ -548,54 +593,78 @@ module Scheme =
             then context
             else 
                 match (context.reg.c, context.reg.s, context.reg.e, context.reg.d) with
-                | (Ld(i,j)   ::c',                                    s , e,                 d ) -> { context with reg={s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }}
-                | (Ldc(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = v :: s                ; e = e        ; c = c'; d = d }}
-                | (Ldg(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }}
-                | (Ldf(v)    ::c',                                    s , e,                 d ) -> { context with reg={s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }}
-                | (App       ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
+                | (Ld(i,j)    ::c',                                    s , e,                 d ) -> { context with reg={s = (get_lvar e i j) :: s ; e = e        ; c = c'; d = d }}
+                | (Ldc(v)     ::c',                                    s , e,                 d ) -> { context with reg={s = v :: s                ; e = e        ; c = c'; d = d }}
+                (*  before: append to implements appendix#1 *)
+                //| (Ldg(v)     ::c',                                    s , e,                 d ) -> { context with reg={s = (get_gvar v) :: s     ; e = e        ; c = c'; d = d }}
+                (*  after: append to implements appendix#1 *)
+                | (Ldg(sym,v) ::c',                                    s , e,                 d ) -> if eq !v (gemSym "*undef*")
+                                                                                                     then failwithf "unbound variable:%A" v
+                                                                                                     else { context with reg={s = !v :: s     ; e = e        ; c = c'; d = d }}
+                (*  end: append to implements appendix#1 *)
+                | (Ldf(v)     ::c',                                    s , e,                 d ) -> { context with reg={s = Closure (v, e) :: s   ; e = e        ; c = c'; d = d }}
+                | (App        ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
                 (*  start: append to implements call/cc *)
-                | (App       ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
+                | (App        ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
                 (*  end: append to implements call/cc *)
-                | (App       ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }}
-                | (Rtn       ::_ ,                              s1 :: [], e, (s2, e', c') :: d') -> { context with reg={s = s1 :: s2              ; e = e'       ; c = c'; d = d'}}
-                | (Sel(_, f) ::c',                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }}
-                | (Sel(t, _) ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }}
-                | (Join      ::_ ,                                    s , e,   (_, _, c') :: d') -> { context with reg={s = s                     ; e = e        ; c = c'; d = d'}}
-                | (Pop       ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = c'; d = d }}
-                | (Args(v)   ::c',                                    s , e,                 d ) -> let (a'',s') = List.splitAt v s
-                                                                                                    let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
-                                                                                                    in { context with reg={s = a' :: s'; e = e; c = c'; d = d }}
-                | (Def(sym)  ::c',                            body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
-                                                                                                    { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                | (App        ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = []                    ; e = arg :: e'; c = f ; d = (s', e, c') :: d }}
+                | (Rtn        ::_ ,                              s1 :: [], e, (s2, e', c') :: d') -> { context with reg={s = s1 :: s2              ; e = e'       ; c = c'; d = d'}}
+                | (Sel(_, f)  ::c',                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = ([],[],c') :: d }}
+                | (Sel(t, _)  ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = ([],[],c') :: d }}
+                | (Join       ::_ ,                                    s , e,   (_, _, c') :: d') -> { context with reg={s = s                     ; e = e        ; c = c'; d = d'}}
+                | (Pop        ::c',                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = c'; d = d }}
+                | (Args(v)    ::c',                                    s , e,                 d ) -> let (a'',s') = List.splitAt v s
+                                                                                                     let a' = List.fold (fun s x -> Cell(ref x,ref s))  nil a''
+                                                                                                     in { context with reg={s = a' :: s'; e = e; c = c'; d = d }}
+                (*  before: append to implements appendix#1 *)
+                //| (Def(sym)   ::c',                            body :: s', e,                 d ) -> global_environment := (sym, ref body) :: !global_environment;
+                //                                                                                     { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                (*  after: append to implements appendix#1 *)
+                | (Def(sym,v) ::c',                            body :: s', e,                 d ) -> v := body;
+                                                                                                     { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                (*  end: append to implements appendix#1 *)
                 (*  start: append to implements macro *)
-                | (Defm(sym) ::c',              (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
-                                                                                                    { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                (*  before: append to implements appendix#1 *)
+                //| (Defm(sym)  ::c',              (Closure _ as body):: s', e,                 d ) -> global_environment := (sym, ref (Macro body)) :: !global_environment;
+                //                                                                                     { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                (*  before: append to implements appendix#1 *)
+                (*  after: append to implements appendix#1 *)
+                | (Defm(sym,v)::c',              (Closure _ as body):: s', e,                 d ) -> v := Macro body;
+                                                                                                     { context with reg={s = sym :: s'; e = e; c = c'; d = d }}
+                (*  end: append to implements appendix#1 *)
                 (*  end: append to implements macro *)
                 (*  start: append to implements set! *)
-                | (Lset(i,j) ::c',                           value :: s', e,                 d ) -> set_lvar e i j value; 
-                                                                                                    { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
-                | (Gset(sym) ::c',                           value :: s', e,                 d ) -> set_gvar sym value;
-                                                                                                    { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
+                | (Lset(i,j)  ::c',                           value :: s', e,                 d ) -> set_lvar e i j value; 
+                                                                                                     { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
+                (*  before: append to implements appendix#1 *)
+                //| (Gset(sym)  ::c',                           value :: s', e,                 d ) -> set_gvar sym value;
+                //                                                                                     { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
+                (*  after: append to implements appendix#1 *)
+                | (Gset(sym,v)::c',                           value :: s', e,                 d ) -> if eq !v (gemSym "*undef*")
+                                                                                                     then failwithf "unbound variable:%A" v
+                                                                                                     else v := value;
+                                                                                                          { context with reg={s = context.reg.s; e = e; c = c'; d = d }}
+                (*  end: append to implements appendix#1 *)
                 (*  end: append to implements set! *)
                 (*  start: append to implements call/cc *)
-                | (LdCt(code)::c',                                    s , e,                 d ) -> let cont = Continuation (s, e, code, d)
-                                                                                                    in { context with reg={s = cont :: s; e = e; c = c'; d = d }}
-                | (ArgsAp(v) ::c',                           value :: s', e,                 d ) -> let rec loop n a s =
-                                                                                                        match n,s with
-                                                                                                        | 0,[] -> { context with reg={s = a :: s; e = e; c = c'; d = d }}
-                                                                                                        | n,x :: xs when n > 0-> loop (n - 1) (Cell(ref x, ref a)) xs
-                                                                                                        | _ -> failwith "bad arg"
-                                                                                                    in loop (v - 1) (list_copy value) s'
+                | (LdCt(code) ::c',                                    s , e,                 d ) -> let cont = Continuation (s, e, code, d)
+                                                                                                     in { context with reg={s = cont :: s; e = e; c = c'; d = d }}
+                | (ArgsAp(v)  ::c',                           value :: s', e,                 d ) -> let rec loop n a s =
+                                                                                                         match n,s with
+                                                                                                         | 0,[] -> { context with reg={s = a :: s; e = e; c = c'; d = d }}
+                                                                                                         | n,x :: xs when n > 0-> loop (n - 1) (Cell(ref x, ref a)) xs
+                                                                                                         | _ -> failwith "bad arg"
+                                                                                                     in loop (v - 1) (list_copy value) s'
                 (*  end: append to implements call/cc *)
                 (*  start: append to implements Tail-call optimization *)
-                | (SelR(_, f)::_ ,                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = d }}
-                | (SelR(t, _)::_ ,                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = d }}
-                | (TApp      ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
-                | (TApp      ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
-                | (TApp      ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = s'                    ; e = arg :: e'; c = f ; d = d }}
+                | (SelR(_, f) ::_ ,                 (Boolean false) :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = f ; d = d }}
+                | (SelR(t, _) ::_ ,                               _ :: s', e,                 d ) -> { context with reg={s = s'                    ; e = e        ; c = t ; d = d }}
+                | (TApp       ::c',             Primitive(f) :: arg :: s', e,                 d ) -> { context with reg={s = (f arg) :: s'         ; e = e        ; c = c'; d = d }}
+                | (TApp       ::_, Continuation(s',e',c',d') :: arg :: _ , _,                 _ ) -> { context with reg={s = (arg) :: s'           ; e = e'       ; c = c'; d = d'}}
+                | (TApp       ::c',            Closure(f,e') :: arg :: s', e,                 d ) -> { context with reg={s = s'                    ; e = arg :: e'; c = f ; d = d }}
                 (*  end: append to implements Tail-call optimization *)
-                | (Stop      ::c',                                    s , e,                 d ) -> { context with halt= true }
-                | (_, _, _, _)                                                                   -> failwith "bad context"
+                | (Stop       ::c',                                    s , e,                 d ) -> { context with halt= true }
+                | (_, _, _, _)                                                                    -> failwith "bad context"
     and run (context:Context) :Context =
         let rec loop context =
             let context = vm context
@@ -788,29 +857,25 @@ module Parser =
     let istail   (ch:char) = issptail(ch) || isalpha(ch) || isdigit(ch)
     let isspace  (ch:char) = " \t\r\n".IndexOf(ch) <> -1
 
-    let rec whitespace = 
+    let whitespace = 
         let space = (ParserCombinator.char isspace).Select(fun _ -> " ")
         let comment = (ParserCombinator.char (fun x -> x = ';')).AndR((ParserCombinator.char (fun x -> x <> '\n')).Many()).Select(fun _ -> " ");
         in space.Or(comment).Many()
     
-    and eof = not(any())
-
-    and start = whitespace.AndR(eof.Select(fun _ -> None).Or(expr.Select(Some).AndL(whitespace)))
-
-    and expr = lazy_(fun () -> whitespace.AndR(quoted.Or(list_).Or(vector).Or(atom)))
-    
-    and char = 
+    let char = 
         let space     = (str "#\\space").Select(fun _ -> ' ')
         let newline   = (str "#\\newline").Select(fun _ -> '\n')
         let character = (str "#\\").AndR(any())
         in  whitespace.AndR(space.Or(newline).Or(character)).Select(Char)
 
-    and bool = 
+    let eof = not(any())
+
+    let bool = 
         let trueV  = (str "#t").Select(fun _ -> true)
         let falseV = (str "#f").Select(fun _ -> false)
         in  whitespace.AndR(trueV.Or(falseV)).Select(toBool)
 
-    and string = 
+    let string = 
         let ch = 
             let dquote    = (str "\\\"").Select(fun _ -> '"')
             let cr        = (str "\\r" ).Select(fun _ -> '\r')
@@ -821,36 +886,37 @@ module Parser =
             in  dquote.Or(cr).Or(lf).Or(tab).Or(formfeed).Or(notescape)
         in whitespace.AndR(ParserCombinator.char (fun x -> x = '"')).AndR(ch.Many()).AndL(ParserCombinator.char (fun x -> x = '"')).Select(fun x -> List.fold (fun s x -> s + x.ToString()) "" x |> String)
 
-    and  number = whitespace.AndR(digit)
+    let number = 
+        let digit = 
+             let digit_prefix = (str "#d").Option()
+             let accuracy_prefix = (str "#i").Or(str "#e").Option()
+             let prefix = digit_prefix.AndR(accuracy_prefix).Or(accuracy_prefix.AndL(digit_prefix))
+             let sign = (str "+").Or(str "-").Option()
+             let digit_num = ParserCombinator.char isdigit
+             let digit_usint = digit_num.Many1().AndL((str "#").Many()).Select(fun x -> List.fold (fun s x -> s + x.ToString()) "" x |> int)
+             let digit_decimals = 
+                let d1 = (str ".").AndR(digit_num).AndL((str "#").Many()).Select(fun d -> ("0."+d.ToString()) |> double |> RealV )
+                let d2 = (digit_num.Many1()).AndL(str ".").And(digit_num).AndL((str "#").Many()).Select(fun (i,d) -> (i.ToString()+"."+d.ToString()) |> double |> RealV )
+                let d3 = (digit_num.Many1()).AndL((str "#").Many1()).AndL(str ".").AndL((str "#").Many()).Select(fun i -> i.ToString() |> double |> RealV )
+                let d4 = (digit_num.Many1()).Select(fun i -> (List.fold (fun s x -> s + x.ToString()) "" i) |> int |> IntV )
+                in  d1.Or(d2).Or(d3).Or(d4) 
+             let digit_usreal = 
+                //let faction = digit_usint.AndL(whitespace.And(str "/").And(whitespace)).And(digit_usint).Select(fun v -> FractionV v)
+                //in  faction.Or(digit_decimals).Or(digit_usint.Select(IntV))
+                digit_decimals.Or(digit_usint.Select(IntV))
+             let digit_real = sign.And(digit_usreal).Select(fun (s,v) -> match s with Some("+") -> v | Some("-") -> NumberVOp.neg v | _ -> v)
+             //let digit_complex = 
+             //   // digit_real.AndL(str "@").AndR(digit_real) <- ?
+             //   let p1 = digit_real.AndL(str "+i").Select(fun real -> ComplexV (real, RealV 1.0))
+             //   let p2 = digit_real.AndL(str "+" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, imaginary))
+             //   let p3 = digit_real.AndL(str "-i").Select(fun real -> ComplexV (real, RealV -1.0))
+             //   let p4 = digit_real.AndL(str "-" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, NumberVOp.neg imaginary))
+             //   in p1.Or(p2).Or(p3).Or(p4)
+             //in prefix.And(digit_complex.Or(digit_real)).Select(fun (a,v) -> Number v )
+             in prefix.And(digit_real).Select(fun (a,v) -> Number v )
+        in  whitespace.AndR(digit)
 
-    and  digit = 
-         let digit_prefix = (str "#d").Option()
-         let accuracy_prefix = (str "#i").Or(str "#e").Option()
-         let prefix = digit_prefix.AndR(accuracy_prefix).Or(accuracy_prefix.AndL(digit_prefix))
-         let sign = (str "+").Or(str "-").Option()
-         let digit_num = ParserCombinator.char isdigit
-         let digit_usint = digit_num.Many1().AndL((str "#").Many()).Select(fun x -> List.fold (fun s x -> s + x.ToString()) "" x |> int)
-         let digit_decimals = 
-            let d1 = (str ".").AndR(digit_num).AndL((str "#").Many()).Select(fun d -> ("0."+d.ToString()) |> double |> RealV )
-            let d2 = (digit_num.Many1()).AndL(str ".").And(digit_num).AndL((str "#").Many()).Select(fun (i,d) -> (i.ToString()+"."+d.ToString()) |> double |> RealV )
-            let d3 = (digit_num.Many1()).AndL((str "#").Many1()).AndL(str ".").AndL((str "#").Many()).Select(fun i -> i.ToString() |> double |> RealV )
-            let d4 = (digit_num.Many1()).Select(fun i -> (List.fold (fun s x -> s + x.ToString()) "" i) |> int |> IntV )
-            in  d1.Or(d2).Or(d3).Or(d4) 
-         let digit_usreal = 
-            //let faction = digit_usint.AndL(whitespace.And(str "/").And(whitespace)).And(digit_usint).Select(fun v -> FractionV v)
-            //in  faction.Or(digit_decimals).Or(digit_usint.Select(IntV))
-            digit_decimals.Or(digit_usint.Select(IntV))
-         let digit_real = sign.And(digit_usreal).Select(fun (s,v) -> match s with Some("+") -> v | Some("-") -> NumberVOp.neg v | _ -> v)
-         //let digit_complex = 
-         //   // digit_real.AndL(str "@").AndR(digit_real) <- ?
-         //   let p1 = digit_real.AndL(str "+i").Select(fun real -> ComplexV (real, RealV 1.0))
-         //   let p2 = digit_real.AndL(str "+" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, imaginary))
-         //   let p3 = digit_real.AndL(str "-i").Select(fun real -> ComplexV (real, RealV -1.0))
-         //   let p4 = digit_real.AndL(str "-" ).And(digit_usreal).AndL(str "i").Select(fun (real,imaginary) -> ComplexV (real, NumberVOp.neg imaginary))
-         //   in p1.Or(p2).Or(p3).Or(p4)
-         //in prefix.And(digit_complex.Or(digit_real)).Select(fun (a,v) -> Number v )
-         in prefix.And(digit_real).Select(fun (a,v) -> Number v )
-    and  ident = 
+    let ident = 
          let normal = 
             let head = ParserCombinator.char ishead
             let tail = ParserCombinator.char istail
@@ -859,7 +925,12 @@ module Parser =
          let minus = str "-"
          let dots  = str "..."
          in whitespace.AndR(normal.Or(plus).Or(minus).Or(dots)).Select(gemSym)
-    and atom = whitespace.AndR(string.Or(char).Or(bool).Or(number).Or(ident))
+
+    let atom = whitespace.AndR(string.Or(char).Or(bool).Or(number).Or(ident))
+
+    let rec expr = 
+        lazy_ (fun () -> whitespace.AndR(quoted.Or(list_).Or(vector).Or(atom)))
+
     and quoted = 
         let quote = (str "'").AndR(expr).Select(fun x -> list [gemSym "quote"; x])
         let quasiquote = (str "`").AndR(expr).Select(fun x -> list [gemSym "quasiquote"; x])
@@ -879,6 +950,10 @@ module Parser =
         let body = expr.Many1()
         let t    = whitespace.And(str ")")
         in whitespace.And(h).AndR(body.Option()).AndL(t).Select(fun x -> match x with Some v -> Array v | None -> nil)
+
+    
+    let start = whitespace.AndR(eof.Select(fun _ -> None).Or(expr.Select(Some).AndL(whitespace)))
+
     let test () =
         let check (p:Parser<'a>) (s:string) (ret:ParserState<'a>) (comp:('a -> 'a -> bool)) =
             let result = 
@@ -947,6 +1022,7 @@ let main argv =
                 let result = Scheme.run ctx'
                 in  
                     result.reg.s.[0] |> toString |> printfn "%s";
+                    System.GC.Collect();
                     loop pos ctx' 
             | ParserCombinator.Success (pos, None) -> ctx
         in loop 0 ctx
@@ -980,8 +1056,13 @@ let main argv =
         test "(define bar (lambda (x) (foo)))"  (list [gemSym("define"); gemSym("bar"); list [gemSym("lambda"); list[gemSym("x")]; list[gemSym("foo")] ]]) (gemSym "bar")|>
         test "(bar 'b)" (list [gemSym("bar"); list [gemSym("quote"); gemSym("b")]]) (gemSym "a")|>
 
-        test "foo" (gemSym("foo")) (Closure ([Ldg (gemSym "x"); Rtn], [])) |>
-        test "bar" (gemSym("bar")) (Closure ([Args 0; Ldg (gemSym "foo"); App; Rtn], [] )) |>
+    (*  before: append to implements appendix#1 *)
+        //test "foo" (gemSym("foo")) (Closure ([Ldg (gemSym "x"); Rtn], [])) |>
+        //test "bar" (gemSym("bar")) (Closure ([Args 0; Ldg (gemSym "foo"); App; Rtn], [] )) |>
+    (*  after: append to implements appendix#1 *)
+        test "foo" (gemSym("foo")) (Closure ([Ldg (EnvEntry((gemSym "x"), ref (gemSym "a"))); Rtn], [])) |>
+        test "bar" (gemSym("bar")) (Closure ([Args 0; Ldg (EnvEntry((gemSym "foo"), ref (Closure ([Ldg (EnvEntry((gemSym "x"), ref (gemSym "a"))); Rtn], [])))); App; Rtn], [] )) |>
+    (*  end: append to implements appendix#1 *)
 
         eval "
 (define = eq?)
