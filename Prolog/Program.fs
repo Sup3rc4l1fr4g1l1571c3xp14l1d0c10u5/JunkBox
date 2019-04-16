@@ -1,4 +1,6 @@
-﻿(* parser combinator *)
+﻿open System
+
+(* parser combinator *)
 module ParserCombinator =
     type MaxPosition = (int * string)
     type ParserState<'a> = Success of pos:int * value:'a * max:MaxPosition
@@ -176,60 +178,14 @@ module ParserCombinatorExt =
         [<Extension>]
         static member inline AsString(self: Parser<'T list>) = asString self 
 
-type
-    Value =
-          Symbol of string
-        | Cell of (Value ref ) * (Value ref ) 
-        | Nil
-
-let (|Cons|_|) x =
-    match x with
-    | Cell (x,y) -> Some (!x, !y)
-    | _ -> None
-
-let Cons (x, y) = Cell (ref x, ref y)
-let CList xs = List.foldBack (fun x s -> x::s) xs []
-
-let car = function
-    | Cell (car, cdr) -> !car
-    | _ -> failwith "not cell"
-
-let cdr = function
-    | Cell (car, cdr) -> !cdr
-    | _ -> failwith "not cell"
-
-let cadr = car << cdr 
-let caddr = car << cdr << cdr 
-
-let mapcar fn vs =
-    let rec loop vs ls = 
-        match vs with
-            | Cons(car, cdr) -> loop cdr (car::ls)
-            | Nil -> List.fold (fun s x -> Cons(fn x,s)) Nil ls
-    in loop vs []
-
-let list_length vs  =
-    let rec loop vs ls = 
-        match vs with
-            | Cons(car, cdr) -> loop cdr (ls + 1)
-            | Nil -> ls
-    in loop vs 0
-
-let list_reverse vs = 
-    let rec loop vs ls = 
-        match vs with
-            | Cons(car, cdr) -> loop cdr (Cons (car, ls))
-            | Nil -> ls
-    in loop vs Nil
-
 // http://www.kitcc.org/share/lime/lime56.pdf
 // https://github.com/matsud224/wamcompiler/blob/master/wamcompiler.lisp
 
-let unbound_variable = Symbol null
-let structure = Symbol null
+let unbound_variable = null
+let structure = null
 
 
-let operator_list = Nil
+let operator_list = []
 let predicate_type_table = Map.empty // user-defined or builtin
 let clause_code_table = Map.empty // key (functor . arity). 
 let dispatching_code_table = Map.empty 
@@ -243,7 +199,7 @@ module Parser =
 
     let whitespace = (char (fun x -> "\r\n\t\a ".IndexOf x <> -1)).Select(fun _ -> ())
     let comment = (char (fun x -> x = '%')).And((char (fun x -> x <> '\n')).Many()).And(char (fun x -> x = '\n')).Select(fun _ -> ())
-    let isupper = fun x -> 'A' <= x && x <= 'Z'
+    let isupper = fun x -> 'A' <= x && x <= 'Z' 
     let islower = fun x -> 'a' <= x && x <= 'z'
     let upper = char isupper
     let lower = char islower
@@ -259,6 +215,8 @@ module Parser =
         | VerticalBar
         | Dot
         | Atom of string
+        | Struct of ((*Atom*)Token * (Token list))
+        | List of (Token list)
         | Int of int
         | Variable of string
 
@@ -272,35 +230,52 @@ module Parser =
         let alphanum_atom = 
             (alphanum_chars.Many1().AsString()).Select(fun x -> if (isupper x.[0]) || ('_' = x.[0]) then Variable x else Atom x)
         in
-            whitespaces.AndR(choice[
-                (char (fun x -> x = ')')).Select(fun _ -> RParen);
-                (char (fun x -> x = '(')).Select(fun _ -> LParen);
-                (char (fun x -> x = ']')).Select(fun _ -> RBracket);
-                (char (fun x -> x = '[')).Select(fun _ -> LBracket);
-                (char (fun x -> x = ',')).Select(fun _ -> Atom "|,|");
-                (char (fun x -> x = ';')).Select(fun _ -> Atom "|;|");
-                (char (fun x -> x = '!')).Select(fun _ -> Atom "|!|");
-                quoted_atom;
-                int_atom;
-                non_alphanum_atom;
-                alphanum_atom;
-            ])
+            whitespaces.AndR(
+                choice[
+                    (char (fun x -> x = ')')).Select(fun _ -> RParen);
+                    (char (fun x -> x = '(')).Select(fun _ -> LParen);
+                    (char (fun x -> x = ']')).Select(fun _ -> RBracket);
+                    (char (fun x -> x = '[')).Select(fun _ -> LBracket);
+                    (char (fun x -> x = ',')).Select(fun _ -> Atom ",");
+                    (char (fun x -> x = ';')).Select(fun _ -> Atom ";");
+                    (char (fun x -> x = '!')).Select(fun _ -> Atom "!");
+                    quoted_atom;
+                    int_atom;
+                    non_alphanum_atom;
+                    alphanum_atom;
+                ]
+            )
 
-    let commap x = (x = Atom "|,|")
+    type Operator = ((*op_atom:*)string * (*op_prec:*)int * (*op_assoc:*)string)
 
-    let operator_list : (((*op_atom:*)string * (*op_prec:*)int * (*op_assoc:*)string) list) ref = ref []
-    let register_operator (y:(string*int*string)) =
+    // 大小比較（ソート用） 
+    let op_comp x y = 
+        let (atom:string, predic:int, assoc:string) = x
+        let (atom',predic',assoc') = y
+        in
+            if (predic > predic') then -1 
+            else if (predic < predic') then 1
+            else // if (predic = predic') then
+                if String.length assoc < String.length assoc' then -1 
+                else if String.length assoc > String.length assoc' then 1 
+                else // if String.length assoc = String.length assoc' then 
+                    if System.String.CompareOrdinal(assoc, assoc') < 0 then -1
+                    else if System.String.CompareOrdinal(assoc, assoc') > 0 then 1
+                    else (*if System.String.CompareOrdinal(assoc, assoc') = 0 then *) System.String.Compare(atom, atom')
+
+    let operator_list : (Operator list) ref = ref []
+    let register_operator (y:Operator) =
         let (atom:string, predic:int, assoc:string) = y
         let rec insert ls heads =
             match ls with
-            | ((atom',predic',assoc') as x)::xs ->
-                if (predic < predic') || (predic = predic' && System.String.CompareOrdinal(atom, atom') < 0)
-                then (List.rev (y::heads)) @ ls
+            | x::xs ->
+                if op_comp y x < 0
+                then (List.rev (y::heads)) @ ls;
                 else insert xs (x::heads)
             | _ -> (List.rev (y::heads)) 
         in operator_list := insert (!operator_list) []
 
-    let operators = [
+    let operators : Operator list = [
        ("?-", 1200, "fx");
        (":-", 1200, "fx");
        (":-", 1200, "xfx");
@@ -372,174 +347,217 @@ module Parser =
 
     let _ = List.fold (fun s x -> register_operator x) () operators
 
-    let op_prec x = let (atom,prec,assoc) = x in prec
+    let op_atom  (x:Operator) = let (atom,prec,assoc) = x in atom
+    let op_prec  (x:Operator) = let (atom,prec,assoc) = x in prec
+    let op_assoc (x:Operator) = let (atom,prec,assoc) = x in assoc
 
     let parse str = 
         let tokenstack = 
             let rec loop p ret = 
-                match token str p (0,"") with | Success (x,y,z) -> loop x (y::ret) | Fail _ -> ret
+                match token str p (0,"") with 
+                | Success (x,y,z) -> loop x (y::ret) 
+                | Fail (x,y) -> ret |> List.rev
             in ref (loop 0 [])
+
         let next_token () =
             match !tokenstack with
             | x::xs -> tokenstack := xs; x
             | _ -> failwith "eos"
+
         let unget_token t =
             tokenstack := t :: !tokenstack
-        let next_prec_head head = 
-            let (_,current_prec,_) = List.head head
-            let rec scan h =
-                match h with
-                | (_,prec,_) :: xs when prec == current_prec -> scan xs 
-                | _ -> h
-            in scan head
-        let rec arrange tree = 
-            let rec make_listterm elements =
-                if (list_length elements) = 2
-                then Cons(Symbol "|.|" ,elements)
-                else Cons(Symbol "|.|" ,Cons(car elements, make_listterm (cdr elements)))
-            in
-                match tree with
-                    | Cons(Symbol "struct", Cons(cadr, cddr)) -> (Cons (cadr, mapcar arrange cddr))
-                    | Cons(Symbol "list", cdr) -> make_listterm (mapcar arrange cdr)
-                    | Cons(Symbol "int", cdr) -> cdr
-                    | Cons(Symbol "variable", cdr) -> cdr
-                    | _ -> failwithf "prolog-syntax-error: %A" tree
-        let rec parse_arguments () =
-            let next = next_token()
-            in
-                if next = LParen 
-                then 
-                    let rec get_args acc = 
-                        let arg = parse_sub !operator_list t
-                        let n = next_token ()
-                        in
-                            if n = RParen then arg::acc
-                            else if n = (Atom "|,|") then get_args (arg::acc)
-                            else failwith "prolog-syntax-error: invalid argument list"
-                    in  get_args [] |> list_reverse
-                else
-                    progn (unget_token next) []
-        and parse_list () =
+
+        let next_prec_head (head : Operator list) = 
+            match head with
+            | (_,current_prec,_)::xs -> List.skipWhile (fun (_,prec,_) -> prec = current_prec) xs
+            | [] -> []
+
+//        let rec arrange (tree : Token) = 
+//            let rec make_listterm elements =
+//                if (list_length elements) = 2
+//                then Cons(Symbol "." ,elements)
+//                else Cons(Symbol "." ,Cons(car elements, make_listterm (cdr elements)))
+//            in
+//                match tree with
+//                    | Struct (cadr, cddr) -> cadr :: (List.foldBack (fun x s -> x @ s) (List.map arrange cddr) [] )
+//                    | List (cdr) -> make_listterm (List.foldBack (fun x s -> x @ s) (List.map arrange cdr) [] )
+//                    | Int cdr -> [tree]
+//                    | Variable cdr -> [tree]
+//                    | _ -> failwithf "prolog-syntax-error: %A" tree
+
+
+        let rec parse_list () : Token =
           let next = next_token()
           in
             match next with
-            | RBracket -> Cons(Symbol "struct", Cons(Symbol "|[]|", Nil))
+            | RBracket -> Struct (Atom "[]", [])
             | _ ->
-                let get_args acc = 
-                    let arg = parse_sub !operator_list t 
+                let rec get_args acc = 
+                    let arg = parse_sub !operator_list true
                     let n = next_token()
                     in
                         match n with 
-                        | RBracket    -> Cons(Cons(Symbol "struct", Cons(Symbol "|[]|", Nil)), Cons(arg,acc))
+                        | RBracket    -> [Struct (Atom "[]", arg::acc)]
                         | VerticalBar -> 
-                            let car = prog1 (parse_sub !operator_list t)
-                            let cdr = if next_token() != RBracket 
+                            let car = parse_sub !operator_list true
+                            let cdr = if next_token() <> RBracket 
                                       then failwith "prolog-syntax-error: mismatched brackets" 
-                                      else Cons(arg,acc)
-                            in  Cons( car, cdr)
-                        | Atom "|,|" -> get_args (Cons(arg,acc))
+                                      else arg::acc
+                            in  car::cdr
+                        | Atom "," -> get_args (arg::acc)
                         | _ -> failwith "prolog-syntax-error: near argument list"
                 in
                     unget_token next;
-                    Cons (Symbol "list", get_args Nil |> list_reverse)
+                    List (get_args [] |> List.rev)
 
-        and parse_prim ignore_comma =
+        and parse_prim (ignore_comma:bool) : Token =
             let next = next_token()
             in
                 match next with
                     | LParen ->
+                        // '(' sub ')'
                         let inside = parse_sub !operator_list ignore_comma
                         in  if next_token () = RParen 
                             then inside 
                             else failwith "prolog-syntax-error: mismatched parentheses"
-                    | Atom cdr -> Cons(Symbol "struct", cdr, parse_arguments ())
+                    | Atom cdr -> 
+                        let arguments = 
+                            match next_token() with
+                            | LParen ->
+                                // <atom> '(' sub ')'
+                                let rec loop acc = 
+                                    let arg = parse_sub !operator_list true
+                                    in  match next_token () with
+                                        | RParen -> arg::acc |> List.rev
+                                        | Atom "," -> loop (arg::acc)
+                                        | _ -> failwith "prolog-syntax-error: invalid argument list"
+                                in  loop []
+                            | other ->
+                                // <atom>
+                                unget_token other;
+                                []
+                        in  Struct (next, arguments)
                     | LBracket -> parse_list ()
                     | _ -> next
-        and separatorp tok ignore_comma = 
-            (ignore_comma && (commap tok)) || (match tok with RParen|Dot|RBracket|VerticalBar -> true |_-> false)
-
-        and parse_sub head' ignore_comma(*=nil*) =
+        and parse_sub operators ignore_comma(*=nil*) : Token =
+            // 区切りとなるトークンであるか？
+            let separatorp (tok :Token) (ignore_comma : bool) : bool = 
+                match tok with
+                | RParen
+                | Dot
+                | RBracket
+                | VerticalBar -> true 
+                | Atom "," when ignore_comma -> true
+                | _ -> false
+            // 演算子であるか？
             let operatorp tok =
                 match tok with
-                | Atom v -> symbolp v && get v "op"
+                | Atom v -> 
+                    let ret = List.tryFind (fun (a,_,_) -> a = v) !operator_list
+                    in  match ret with
+                        | Some x -> true
+                        | None -> false
                 | _ -> false
-            let head = head'
-            let (_.current_prec,) = List.head !head
-            let current_head = !head
-            let next_head = next_prec_head !head
-            let gottok = next_token()
-            let r1 = 
-                if separatorp gottok ignore_comma then failwith "prolog-syntax-error: unexpected end of clause"
-                else if !head = [] then unget_token gottok; Some (parse_prim ignore_comma)
-                else if operatorp gottok then
-                    let next = next_token ()
-                    in
-                        if separatorp next ignore_comma 
-                        then
-                            unget_token next; 
-                            Some ( Cons( Symbol "struct" ,(cdr gottok)) )
-                        else
-                            unget_token next; 
-                            let rec loop () = 
-                                let op = List.head !head
-                                let _ = head := List.tail !head
-                                let stop = (op = Nil) || (current_prec <> (op_prec op)) || (match (op_prec op) with | "fx" | "fy" -> false | _ -> true)
-                                let _ = unget_token gottok;
-                                if stop 
-                                then None
-                                else
-                                    if (cdr gottok) = (op_atom op)
-                                    then
-                                        match (op_assoc op) with
-                                        | "fx" -> Some (Cons((Symbol "struct"), Cons((op_atom op), Cons((parse_sub next_head ignore_comma), Nil))))
-                                        | "fy" -> Some (Cons((Symbol "struct"), Cons((op_atom op), Cons((parse_sub current_head ignore_comma), Nil))))
-                                        | _ -> loop ()
-                            in
-                                loop ()
-                else
-                    Some (unget_token gottok)
-            in
-                match r1 with
-                | Some x -> x
-                | None ->
-                    let operand_1 = parse_sub next_head ignore_comma
-                    let gottok = next_token()
-                    let r2 = 
-                        if (separatorp gottok ignore_comma) 
-                        then (unget_token gottok); Some (operand_1)
-                        else
-                            if (operatorp gottok) 
+
+            if operators = [] 
+            then parse_prim ignore_comma
+            else
+                let head = ref operators
+                let shift_head () : Unit =
+                    match !head with
+                    | x::xs -> head := xs
+                    | [] -> ()
+                let peek_head () =
+                    match !head with
+                    | x::xs -> Some x
+                    | [] -> None
+
+                let (_,current_prec,_) = List.head operators
+                let current_head = operators
+                let next_head = next_prec_head (operators)
+                let gottok = next_token()
+
+                let r1 = // 単項演算子の可能性を調べる
+                    if separatorp gottok ignore_comma then failwith "prolog-syntax-error: unexpected end of clause"
+                    else if operators = [] then unget_token gottok; Some (parse_prim ignore_comma)
+                    else if operatorp gottok then
+                        let next = next_token ()
+                        in
+                            if separatorp next ignore_comma 
                             then
-                                let gottok_2 = let n = next_token() in unget_token n; n
-                                let next_sep = separatorp gottok_2 ignore_comma
+                                // 続くトークンは区切り要素
+                                unget_token next; 
+                                Some (Struct (gottok, []))
+                            else
+                                // 続くトークンは区切り要素ではない
+                                unget_token next; 
+                                // 現在の演算子優先度においてgottokが前置演算子か調べる
+                                let rec loop () = 
+                                    let op = peek_head ()
+                                    in  match op with
+                                        | Some(atom,predic,assoc) when current_prec = predic && (assoc = "fx" || assoc = "fy") -> 
+                                            match gottok with 
+                                            | Atom p when p = atom ->
+                                                match assoc with
+                                                | "fx" -> Some (Struct (Atom atom, [parse_sub next_head    ignore_comma]))
+                                                | "fy" -> Some (Struct (Atom atom, [parse_sub current_head ignore_comma]))
+                                                | _ -> failwith "not reach here"
+                                            | _ -> shift_head (); loop ()
+                                        | _ -> unget_token gottok; None
                                 in
-                                    let rec loop () = 
-                                        let op = car !head
-                                        let _ = head := cdr !head
-                                        let break = (op = Nil) || (current_prec <> (op_prec op))
-                                        in 
-                                            if break then None else unget_token gottok; Some (operand_1)
-                                    in loop ()
-                    in
-                        match r2 with
-                        | Some x -> x
-                        | None -> 
-                            if (cdr gottok) = (op_atom op) 
-                            then
-                                if (next_sep = false)
-                                then 
-                                    match op_assoc op with
-                                    | "xfy" -> CList [Symbol "struct"; op_atom op; operand_1; parse_sub current_head ignore_comma]
-                                    | "xfx" -> CList [Symbol "struct"; op_atom op; operand_1; parse_sub next_head ignore_comma]
-                                    | "yfx" -> CList [Symbol "struct"; op_atom op; operand_1; parse_sub next_head ignore_comma] |> unget_token ; 
-                                               parse_sub current_head ignore_comma
-                                else
-                                    match op_assoc op with
-                                    | "xf" -> CList [Symbol "struct"; op_atom op; operand_1]
-                                    | "yf" -> CList [Symbol "struct"; op_atom op; operand_1] |> unget_token;
-                                              parse_sub current_head ignore_comma
+                                    loop ()
+                    else
+                        unget_token gottok; None
+                in
+                    match r1 with
+                    | Some x -> x   // 単項前置演算子であった
+                    | None ->   // 前置演算子ではなかった
+                        let operand_1 = parse_sub next_head ignore_comma    // より低い演算子優先度で先頭から解析（二項演算子の左辺部分相当）
+                        let gottok = next_token()
+                        in
+                            if separatorp gottok ignore_comma then 
+                                // 続くトークンは区切り要素なので左辺部分相当をそのまま項として返す
+                                unget_token gottok; 
+                                operand_1
+                            else if operatorp gottok then
+                                // 続くトークンは演算子要素なので中置もしくは後置演算子を想定して解析
+                                let gottok_2 = let n = next_token() in (unget_token n; n)   // トークンを一つ先読みする
+                                let next_sep = separatorp gottok_2 ignore_comma // 先読みしたトークンが区切り要素か調べておく。
+                                let rec loop () = 
+                                    let op = peek_head ()
+                                    if (op.IsNone) || (current_prec <> (op_prec op.Value)) 
+                                    then 
+                                        // 合致する演算子はなかったので左辺部分相当をそのまま項として返す
+                                        unget_token gottok; 
+                                        operand_1
+                                    else 
+                                        let (atom,_,assoc) = op.Value
+                                        in
+                                            match gottok with 
+                                            | Atom p when p = atom ->
+                                                if (next_sep = false)
+                                                then 
+                                                    // 先読みした続くトークンは区切り要素ではないのでgottokを中置演算子として扱う
+                                                    match assoc with
+                                                    | "xfy" -> Struct (Atom atom, [operand_1; parse_sub current_head ignore_comma])
+                                                    | "xfx" -> Struct (Atom atom, [operand_1; parse_sub next_head ignore_comma])
+                                                    | "yfx" -> Struct (Atom atom, [operand_1; parse_sub next_head ignore_comma]) |> unget_token ; 
+                                                               parse_sub current_head ignore_comma
+                                                    | _ -> shift_head(); loop ()
+                                                else
+                                                    // 先読みした続くトークンは区切り要素なのでgottokを後置演算子として扱う
+                                                    match assoc with
+                                                    | "xf" -> Struct (Atom atom, [operand_1])
+                                                    | "yf" -> Struct (Atom atom, [operand_1]) |> unget_token;
+                                                              parse_sub current_head ignore_comma
+                                                    | _ -> shift_head(); loop ()
+                                            | _ -> shift_head(); loop ()
+                                in loop ()
+                            else
+                                failwith "error"
         in
-            let result = arrange (parse_sub operator_list)
+            //let result = arrange (parse_sub !operator_list false)
+            let result = parse_sub !operator_list false
             in
                 if (next_token () <> Dot) 
                 then failwith "prolog-syntax-error: operator arity error"
@@ -547,6 +565,12 @@ module Parser =
     
 [<EntryPoint>]
 let main argv = 
+    Parser.parse "p(X, bar, a(bar,X))." |> printfn "%A";
+    Parser.parse "?- p(foo, X, a(X,foo))." |> printfn "%A";
+    Parser.parse "p(X,Y) :- q(Y), r(X),s(Z)." |> printfn "%A";
+    Parser.parse "a :- b(X),c(X)." |> printfn "%A";
+    Parser.parse "X is 1 + 2 + 3." |> printfn "%A";
+    
     0
 (*
 (* parser combinator *)
