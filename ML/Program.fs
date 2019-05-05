@@ -222,7 +222,31 @@
 module Interpreter =
     module Syntax =
         type id = string
+
         type binOp = Plus | Minus | Mult | Divi | Lt | Gt | Le | Ge | Eq | Ne | Cons
+
+        type tyvar = int
+        type ty = 
+              TyInt  
+            | TyBool 
+            | TyFunc of ty * ty
+            | TyList of ty
+            | TyVar of tyvar
+
+        let fresh_tyvar = 
+            let counter = ref 0
+            let body () = let v = !counter in counter := v + 1; v
+            in  body
+
+        let freevar_ty ty =
+            let rec loop ty ret =
+                match ty with
+                | TyInt  -> ret
+                | TyBool -> ret
+                | TyFunc (tyarg,tyret) -> loop tyarg ret |> loop tyret
+                | TyList ty -> loop ty ret
+                | TyVar id -> Set.add id ret     
+            in loop ty Set.empty
 
         type pattern = 
               VarP of id
@@ -471,7 +495,7 @@ module Interpreter =
     module Environment =
 
         type 'a t = (Syntax.id * 'a) list
-        
+            
         exception Not_bound
         
         let empty = []
@@ -489,6 +513,31 @@ module Interpreter =
             match env with
             | [] -> a
             | (_, v)::rest -> f v (fold_right f rest a)
+
+    //module Set = 
+    //    type 'a t = 'a list
+
+    //    let empty = []
+
+    //    let singleton x = [x]
+
+    //    let to_list x = x
+
+    //    let rec insert x = function
+    //        [] -> [x]
+    //      | y::rest -> if x = y then y :: rest else y :: insert x rest
+
+    //    let union xs ys = 
+    //      List.fold (fun zs x -> insert x zs) ys xs
+
+    //    let rec remove x = function
+    //        [] -> []
+    //      | y::rest -> if x = y then rest else y :: remove x rest
+
+    //    let diff xs ys =
+    //      List.fold (fun zs x -> remove x zs) xs ys
+
+    //    let memq = List.contains
     
     module Eval =
         open Syntax;
@@ -630,26 +679,259 @@ module Interpreter =
                 in  dummyenv := snd ret;
                     ret
 
+    module Typing =
+        open Syntax
+        type tyenv = ty Environment.t
+
+        type subst = (tyvar * ty) list
+
+        let rec subst_type ss ty = 
+            let rec subst_type' s ty = 
+                let (v, t) = s
+                in  match ty with
+                    | TyInt -> TyInt
+                    | TyBool -> TyBool
+                    | TyFunc (arg, ret)-> TyFunc (subst_type' s arg, subst_type' s ret)
+                    | TyList ty -> TyList (subst_type' s ty)
+                    | TyVar n -> if v = n then t else ty
+            in
+                List.fold (fun s x -> subst_type' x s) ty ss
+
+        let eqs_of_subst (s:subst) : (ty*ty) list = 
+            List.map (fun (v,t) -> (TyVar v, t)) s
+
+        let subst_eqs (s:subst) (eqs: (ty*ty) list) : (ty*ty) list = 
+            List.map (fun (t1,t2) -> (subst_type s t1 , subst_type s t2)) eqs
+
+        let unify (eqs:(ty*ty) list) : subst =
+            let rec loop eqs ret =
+                match eqs with
+                | [] -> ret
+                | (ty1,ty2) :: eqs when ty1 = ty2 -> loop eqs ret
+                | (TyVar id, ty) :: eqs 
+                | (ty, TyVar id) :: eqs ->
+                    if Set.contains id (Syntax.freevar_ty ty) 
+                    then failwith "error"
+                    else 
+                        let ret = (id,ty) :: ret
+                        let eqs = List.map (fun (ty1,ty2) -> (subst_type ret ty1, subst_type ret ty2)) eqs
+                        in  loop eqs ret
+                | (TyFunc (tyarg1, tyret1), TyFunc (tyarg2, tyret2)) :: eqs  -> loop ((tyarg1, tyarg2)::(tyret1, tyret2)::eqs) ret
+                | _ -> failwith "error"
+            in  loop eqs List.empty
+            
+        let rec pp_ty v =
+            match v with
+            | TyInt -> "int"
+            | TyBool -> "bool"
+            | TyFunc (arg, ret)-> sprintf "%s -> %s" (pp_ty arg) (pp_ty ret)
+            | TyList ty -> sprintf "%s list" (pp_ty ty)
+            | TyVar n -> sprintf "'%c" (char n + 'a')
+
+        let ty_prim op t1 t2 =
+            match (op, t1, t2) with
+            | Plus, TyInt, TyInt-> ([(t1,TyInt);(t2,TyInt)],TyInt)
+            | Plus, _, _ -> failwith ("Both arguments must be integer: +")
+            | Minus, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
+            | Minus, _, _ -> failwith ("Both arguments must be integer: -")
+            | Mult, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
+            | Mult, _, _ -> failwith ("Both arguments must be integer: *")
+            | Divi, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
+            | Divi, _, _ -> failwith ("Both arguments must be integer: /")
+            | Lt, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Lt, _, _ -> failwith ("Both arguments must be integer: <")
+            | Le, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Le, _, _ -> failwith ("Both arguments must be integer: <=")
+            | Gt, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Gt, _, _ -> failwith ("Both arguments must be integer: >")
+            | Ge, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Ge, _, _ -> failwith ("Both arguments must be integer: >=")
+            | Eq, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Eq, TyBool, TyBool -> ([(t1,TyBool);(t2,TyBool)],TyBool)
+            | Eq, _, _ -> failwith ("Both arguments must be integer: =")
+            | Ne, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
+            | Ne, TyBool, TyBool -> ([(t1,TyBool);(t2,TyBool)],TyBool)
+            | Ne, _, _ -> failwith ("Both arguments must be integer: <>")
+            | Cons, t1, TyList t2 -> ([(t1,t2)],TyList t2)
+            | Cons, _, _ -> failwith ("right arguments must be list: ::")
+
+        let rec ty_try_match ty pat env = 
+            failwith "not impl"
+            //match pat with 
+            //| VarP id -> (ty, ((id, ty) :: env))
+            //| AnyP -> (ty, env)
+            //| ILitP v when ty = TyInt -> (TyInt, env)
+            //| BLitP v when ty = TyBool -> (TyBool, env)
+            //| LLitP pats -> 
+            //    let rec loop p v env =
+            //        match p, v with 
+            //        | [], ty -> (TyList ty, env)
+            //        | (p::ps), ty -> 
+            //            let (t, e) = ty_try_match v p env 
+            //            in  if ty = TyAny || ty = t then loop ps t e else failwith "list item missmatch"
+            //    in  loop pats value env
+            //| NilP -> (TyList TyAny, env)
+            //| ConsP (x,y) ->
+            //    let (t1, e1) = ty_try_match value x env 
+            //    let (t2, e2) = ty_try_match value t e1 
+            //    in  if value = TyAny || ty = t then loop ps t e else failwith "list item missmatch"
+
+
+        let rec ty_exp tyenv = function
+            | Var x -> 
+                try ([], Environment.lookup x tyenv) with 
+                    | Environment.Not_bound -> failwithf "Variable not bound: %A" x
+            | ILit i -> ([], TyInt)
+            | BLit b -> ([], TyBool)
+            | BinOp (op, exp1, exp2) ->
+                let (s1, arg1) = ty_exp tyenv exp1
+                let (s2, arg2) = ty_exp tyenv exp2
+                let (eqs, ret) = ty_prim op arg1 arg2
+                let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ eqs 
+                let s3 = unify eqs
+                in  (s3, subst_type s3 ret)
+            | IfExp (exp1, exp2, exp3) ->
+                let (s1,c) = ty_exp tyenv exp1
+                let (s2,t) = ty_exp tyenv exp2
+                let (s3,e) = ty_exp tyenv exp3 
+                let eqs = [(c,TyBool);(t,e)]@(eqs_of_subst s1)@(eqs_of_subst s2)@(eqs_of_subst s3)
+                let s3 = unify eqs
+                in  (s3, subst_type s3 t)
+            | LetExp (ss,b) ->
+                
+                let (newtyenv,newsubst) = 
+                    List.fold 
+                        (fun (newtyenv,newsubst) s -> 
+                            List.fold 
+                                (fun (newtyenv',newsubst') (id,e) -> 
+                                    let (subst,ty) = ty_exp newtyenv e 
+                                    let newtyenv' = (id, ty)::newtyenv' 
+                                    let newsubst' = subst@newsubst' 
+                                    in (newtyenv', newsubst') )
+                                (newtyenv,newsubst)
+                                s 
+                        ) 
+                        (tyenv, List.empty) 
+                        ss
+                //let newenv = List.fold (fun tyenv (id,e) -> let v = eval_exp tyenv e in  (id, v)::tyenv ) tyenv ss
+                let (subst,ty) = ty_exp newtyenv b
+                let eqs = eqs_of_subst (newsubst @ subst)
+                let s3 = unify eqs
+                in (s3, (subst_type s3 ty))
+
+            | LetRecExp (ss,b) ->
+                let dummytyenv = ref Environment.empty
+                let (newtyenv,newsubst) = 
+                    List.fold 
+                        (fun (newtyenv,newsubst) s -> 
+                            List.fold 
+                                (fun (newtyenv',newsubst') (id,e) -> 
+                                    let (subst,ty) = ty_exp newtyenv e 
+                                    let newtyenv' = (id, ty)::newtyenv' 
+                                    let newsubst' = subst@newsubst' 
+                                    in (newtyenv', newsubst') )
+                                (newtyenv,newsubst)
+                                s 
+                        ) 
+                        (tyenv, List.empty) 
+                        ss
+                //let dummytyenv = ref Environment.empty
+                //let newtyenv = List.fold (fun tyenv s -> List.fold (fun tyenv' (id,e) -> (id, e)::tyenv') tyenv s ) tyenv ss
+                //in  dummytyenv := newtyenv;
+                //    ty_exp newtyenv b
+
+            | FunExp (id, exp) -> 
+                failwith "not impl"
+                //let ret = ty_exp tyenv exp 
+                //in  TyFunc (TyNil, ret)
+            | MatchExp (expr, cases) ->
+                failwith "not impl"
+                //let value = ty_exp tyenv expr
+                //let rec loop cases retty =
+                //    match cases with
+                //    | [] -> retty;
+                //    | (pat,body)::xs -> 
+                //        let (ty, tyenv) = ty_try_match value pat tyenv 
+                //        in  let ty = ty_exp tyenv body 
+                //            in  if retty.IsNone || ty = retty.Value then loop xs (Some ty) else failwith "body type missmatch"
+                //in 
+                //    match loop cases None with
+                //    | None -> TyNil
+                //    | Some ty -> ty
+            | AppExp (exp1, exp2) ->
+                failwith "not impl"
+                //let funval = ty_exp env exp1 in
+                //let arg = ty_exp env exp2 in
+                //    match funval with
+                //    | TyFunc (arg,ret) when arg = ret -> ret
+                //    | _ -> failwith ("Non-function value is applied")
+            | LLit v -> 
+                //failwith "not impl"
+                let ety = TyVar (fresh_tyvar())
+                let ty = TyList ety
+                let (s,t) = List.foldBack (fun x (s,t) -> let (s',t') = ty_exp tyenv x in ((t',ety)::t,(eqs_of_subst s')@s)) v ([],[])
+                let eqs = s@t
+                let s3 = unify eqs
+                in  (s3, subst_type s3 ty)
+        let ty_decl tyenv = function
+            | ExpStmt e -> 
+                let (s, t) = ty_exp tyenv e in ([("-", t)], tyenv) 
+            | LetStmt ss -> 
+                //failwith "not impl"
+                //List.fold (fun (ret,env) (id,e) -> let v = eval_exp env e in  ((id, v)::ret,(id, v)::env)) ([],env) s
+                //List.fold (fun s x -> List.fold (fun (ret,env') (id,e) -> let v = ty_exp env e in  (id, v)::ret,(id, v)::env') s x ) ([],env) ss
+                let (newtyenv,newsubst,ret) = 
+                    List.fold 
+                        (fun (newtyenv,newsubst,ret) s -> 
+                            List.fold 
+                                (fun (newtyenv',newsubst',ret') (id,e) -> 
+                                    let (subst,ty) = ty_exp newtyenv e 
+                                    let newtyenv' = (id, ty)::newtyenv' 
+                                    let newsubst' = subst@newsubst' 
+                                    let newret' = (id,ty)::ret' 
+                                    in (newtyenv', newsubst', newret') )
+                                (newtyenv,newsubst,ret)
+                                s 
+                        ) 
+                        (tyenv, List.empty, List.empty) 
+                        ss
+                //let newenv = List.fold (fun tyenv (id,e) -> let v = eval_exp tyenv e in  (id, v)::tyenv ) tyenv ss
+                //let (subst,ty) = ty_exp newtyenv b
+                let eqs = eqs_of_subst (newsubst)
+                let s3 = unify eqs
+                let ret = List.map (fun (id,ty) -> (id, subst_type s3 ty)) ret
+                in  (ret, newtyenv)
+ 
+            | LetRecStmt ss -> 
+                failwith "not impl"
+                //let dummyenv = ref Environment.empty
+                //let ret = List.fold (fun env s -> List.fold (fun (ret,env') (id,e) -> (id, e)::ret,(id, e)::env') env s ) ([],env) ss
+                //in  dummyenv := snd ret;
+                //    ret
+
     module Repl =
         open Syntax
+        open Typing
         open Eval
 
-        let rec read_eval_print env =
+        let rec read_eval_print env tyenv =
             printf "# ";
             match Parser.toplevel (ParserCombinator.ParserReader System.Console.In) 0 (0, "") with
                 | ParserCombinator.Success (p,decl,_) -> 
                     try 
-                        printfn "%A" decl;
+                        let _ = printfn "%A" decl
+                        let (tyrets, newtyenv) = Typing.ty_decl tyenv decl
+                        let _ = List.iter (fun (id,v) -> printfn "type %s = %s" id (pp_ty v)) tyrets;
                         let (rets, newenv) = eval_decl env decl in
                             List.iter (fun (id,v) -> printfn "val %s = %s" id (pp_val v)) rets;
-                            read_eval_print newenv
+                            read_eval_print newenv newtyenv
                     with
                         | v -> printfn "%s" v.Message;
-                               read_eval_print env
+                               read_eval_print env tyenv
 
                 | ParserCombinator.Fail(p,(i,msg)) ->
                     printfn "Syntax error[%d]: %s" i msg;
-                    read_eval_print env
+                    read_eval_print env tyenv
 
         let initial_env =
             Environment.empty |>
@@ -657,9 +939,25 @@ module Interpreter =
             (Environment.extend "v" (IntV  5)) |>
             (Environment.extend "i" (IntV 1))
 
-        let run () = read_eval_print initial_env
+        let initial_tyenv =
+            Environment.empty |>
+            (Environment.extend "x" TyInt) |> 
+            (Environment.extend "v" TyInt) |>
+            (Environment.extend "i" TyInt)
+
+        let run () = read_eval_print initial_env initial_tyenv
 
 [<EntryPoint>]
 let main argv = 
-    Interpreter.Repl.run (); 0 // 整数の終了コードを返します
+    let alpha = Interpreter.Syntax.fresh_tyvar () 
+    let beta = Interpreter.Syntax.fresh_tyvar () 
+    let ans1 = Interpreter.Typing.subst_type [(alpha, Interpreter.Syntax.TyInt)] (Interpreter.Syntax.TyFunc (Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyBool))
+    let _ = printfn "%A" ans1
+    let ans2 = Interpreter.Typing.subst_type [(beta, (Interpreter.Syntax.TyFunc (Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyInt))); (alpha, Interpreter.Syntax.TyBool)] (Interpreter.Syntax.TyVar beta)
+    let _ = printfn "%A" ans2
+    let subst1 = Interpreter.Typing.unify [(Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyInt)]
+    let _ = printfn "%A" subst1
+    let subst2 = Interpreter.Typing.unify [(Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyBool), Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyInt, Interpreter.Syntax.TyVar beta), Interpreter.Syntax.TyVar beta))]
+    let _ = printfn "%A" subst2
+    in  Interpreter.Repl.run (); 0 // 整数の終了コードを返します
 
