@@ -1,84 +1,117 @@
-﻿module ParserCombinator =
-    type ParserReader = 
-         class 
-            val reader: System.IO.TextReader; 
-            val buffer: System.Text.StringBuilder;
-            new (reader) = { reader = reader; buffer = System.Text.StringBuilder(); }
-            member x.Item 
-                with get i = 
-                    let rec loop () =
-                        if i < x.buffer.Length 
-                        then ()
-                        else 
-                            let ch = x.reader.Read()
-                            in  if ch = -1 
-                                then () 
-                                else x.buffer.Append(char ch) |> ignore; loop ()
-                    let _ = loop ()
-                    in  if i < x.buffer.Length then x.buffer.[i] else '\u0000'
-            member x.submatch (i1:int) (s2:string) =
-                if (i1 < 0) || (x.[s2.Length + i1 - 1] = '\u0000') 
-                then false
+﻿module Position =
+    type t = (int * int * int) 
+
+    let start = (0,1,1)
+
+    let incc ((i,l,c):t) (ch:char) =
+        if ch = '\n' then (i + 1, l + 1, 1) 
+                     else (i + 1, l, c + 1) 
+
+    let inc ((i,l,c):t) (str:string) =
+        let chars = Array.ofSeq str
+        let len = Array.length chars
+        let line = Array.fold (fun s x -> if x = '\n' then s + 1 else s) 0 chars
+        let col = len - (match Array.tryFindIndexBack (fun x -> x = '\n') chars with | None -> 0 | Some v -> v)
+        in  if len > 0 then (i + len, l + line, col + 1) 
+                       else (i + len, l, c + col) 
+
+module Reader = 
+    type t = { reader: System.IO.TextReader; buffer: System.Text.StringBuilder; }
+    let create reader = { reader = reader; buffer = System.Text.StringBuilder(); }
+    let Item (x:t) i = 
+        let rec loop () =
+            if i < x.buffer.Length 
+            then ()
+            else 
+                let ch = x.reader.Read()
+                in  if ch = -1 
+                    then () 
+                    else x.buffer.Append(char ch) |> ignore; loop ()
+        let _ = loop ()
+        in  if i < x.buffer.Length then x.buffer.[i] else '\u0000'
+    
+    let submatch (x:t) (i1:int) (s2:string) =
+        if (i1 < 0) || (Item x (s2.Length + i1 - 1) = '\u0000') 
+        then false
+        else
+            let rec loop (i1:int) (i2:int) = 
+                if (i2 = 0) 
+                then true 
                 else
-                    let rec loop (i1:int) (i2:int) = 
-                        if (i2 = 0) 
-                        then true 
-                        else
-                            let i1, i2 = (i1-1, i2-1)
-                            in  if x.buffer.[i1] = s2.[i2]
-                                then loop i1 i2
-                                else false
-                    in  loop (i1 + s2.Length) (s2.Length)
-         end
+                    let i1, i2 = (i1-1, i2-1)
+                    in  if x.buffer.[i1] = s2.[i2]
+                        then loop i1 i2
+                        else false
+            in  loop (i1 + s2.Length) (s2.Length)
 
-    type ErrorPosition = (int * string) 
-    type ParserState<'a> = Success of pos:int * value:'a * errPos:ErrorPosition
-                         | Fail    of pos:int * errPos:ErrorPosition
+    let trunc (reader:t) (pos:Position.t) =
+        let (i,l,c) = pos
+        let _ = reader.buffer.Remove(0,i) 
+        in  (reader, (0,l,c))
 
-    type Parser<'a> = ParserReader -> int -> ErrorPosition -> ParserState<'a>
+module ParserCombinator =
+    type FailInformation = (Position.t * string)
+    type ParserState<'a> = Success of pos:Position.t * value:'a * failInfo:FailInformation
+                         | Fail    of pos:Position.t            * failInfo:FailInformation
 
-    let succ (pos:int) (value:'a ) (errPos:ErrorPosition) =
-        Success (pos, value, errPos)            
+    type Parser<'a> = Reader.t -> Position.t -> FailInformation -> ParserState<'a>
 
-    let fail (pos:int) (msg:string) (errPos:ErrorPosition) =
-        let (maxpos,_) = errPos
-        in  if pos > maxpos 
+    let succ (pos:Position.t) (value:'a ) (failInfo:FailInformation) =
+        Success (pos, value, failInfo)            
+
+    let fail (pos:Position.t) (msg:string) (failInfo:FailInformation) =
+        let (i,l,c) = pos
+        let ((fi,fl,fc),_) = failInfo
+        in  if i > fi 
             then Fail (pos, (pos, msg)) 
-            else Fail (pos, errPos) 
+            else Fail (pos, failInfo) 
             
+    let action (act: ((Reader.t * Position.t * FailInformation) -> 'a)) =
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let v = act (reader,pos,failInfo)
+            in  succ pos v failInfo 
+
     let char (pred : char -> bool) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            if (reader.[pos] <> '\u0000') && (pred reader.[pos]) 
-            then succ (pos+1) reader.[pos] errPos 
-            else fail pos ("char: not match character "+(if (reader.[pos] <> '\u0000') then reader.[pos].ToString() else "EOS")) errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let (i,l,c) = pos
+            let ch = Reader.Item reader i in
+            if (ch <> '\u0000') && (pred ch) 
+            then succ (Position.incc pos ch) ch failInfo 
+            else fail pos ("char: not match character "+(if (ch <> '\u0000') then ch.ToString() else "EOS")) failInfo
 
     let anychar (chs:string) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            if (reader.[pos] <> '\u0000') && (chs.IndexOf(reader.[pos]) <> -1 )
-            then succ (pos+1) reader.[pos] errPos
-            else fail pos ("anychar: not match character  "+(if (reader.[pos] <> '\u0000') then reader.[pos].ToString() else "EOS")) errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let (i,l,c) = pos
+            let ch = Reader.Item reader i in
+            if (ch <> '\u0000') && (chs.IndexOf(ch) <> -1 )
+            then succ (Position.incc pos ch) ch failInfo
+            else fail pos ("anychar: not match character  "+(if (ch <> '\u0000') then ch.ToString() else "EOS")) failInfo
 
     let str (s:string) =
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            if reader.submatch pos s 
-            then succ (pos+s.Length) s errPos
-            else fail pos ("str: require is '"+s+"' but get"+(if (reader.[pos] <> '\u0000') then reader.[pos].ToString() else "EOS")+".") errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let (i,l,c) = pos
+            let ch = Reader.Item reader i in
+            if Reader.submatch reader i s 
+            then succ (Position.inc pos s) s failInfo
+            else fail pos ("str: require is '"+s+"' but get"+(if (ch <> '\u0000') then ch.ToString() else "EOS")+".") failInfo
 
     let any () = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            if reader.[pos] <> '\u0000' 
-            then succ (pos+1) reader.[pos]  errPos
-            else fail pos "any: require any but get EOF." errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let (i,l,c) = pos
+            let ch = Reader.Item reader i in
+            if ch <> '\u0000' 
+            then succ (Position.incc pos ch) ch  failInfo
+            else fail pos "any: require any but get EOF." failInfo
 
     let not (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            match parser reader pos errPos with
-            | Fail    _ -> succ pos () errPos
-            | Success _ -> fail pos "not: require rule was fail but success." errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            match parser reader pos failInfo with
+            | Fail    _ -> succ pos () failInfo
+            | Success _ -> fail pos "not: require rule was fail but success." failInfo
 
     let select (pred:'a->'b) (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            match parser reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            match parser reader pos failInfo with
             | Fail    (pos, max2) -> Fail (pos, max2)
             | Success (pos, value, max2) -> succ pos (pred value) max2
 
@@ -86,61 +119,61 @@
         select (fun x -> List.fold (fun s x -> s + x.ToString()) "" x) parser
 
     let where (pred:'a->bool) (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            match parser reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            match parser reader pos failInfo with
             | Fail    (pos, max2) -> Fail (pos, max2)
             | Success (_, value, max2) as f -> if pred value then f else fail pos "where: require rule was fail but success." max2
 
     let opt (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  ->       
-            match parser reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->       
+            match parser reader pos failInfo with
             | Fail (pos, max2)  -> succ pos None max2
             | Success (pos, value, max2) -> succ pos (Some value) max2
 
     let seq (parsers:Parser<'a> list) =
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            let rec loop (parsers:Parser<'a> list) (pos:int) (errPos:ErrorPosition) (values: 'a list) =
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let rec loop (parsers:Parser<'a> list) (pos:Position.t) (failInfo:FailInformation) (values: 'a list) =
                 match parsers with
-                | []   -> succ pos (List.rev values) errPos
+                | []   -> succ pos (List.rev values) failInfo
                 | x::xs -> 
-                    match x reader pos errPos with
+                    match x reader pos failInfo with
                     | Fail    (pos, max2) -> Fail (pos, max2)
                     | Success (pos, value, max2) -> loop xs pos max2 (value :: values)
-            in loop parsers pos errPos [];
+            in loop parsers pos failInfo [];
 
     let choice(parsers:Parser<'a> list) =
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  -> 
-            let rec loop (parsers:Parser<'a> list) (pos:int) (errPos:ErrorPosition) =
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let rec loop (parsers:Parser<'a> list) (pos:Position.t) (failInfo:FailInformation) =
                 match parsers with
-                | []   -> fail pos "choice: not match any rules." errPos
+                | []   -> fail pos "choice: not match any rules." failInfo
                 | x::xs -> 
-                    match x reader pos errPos with
+                    match x reader pos failInfo with
                     | Fail (_, max2) -> loop xs pos max2
                     | Success _ as ret -> ret;
-            in loop parsers pos errPos;
+            in loop parsers pos failInfo;
 
     let repeat (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos : int) (errPos:ErrorPosition) -> 
-            let rec loop pos values errPos = 
-                match parser reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
+            let rec loop pos values failInfo = 
+                match parser reader pos failInfo with
                 | Fail (pos,max2)  -> succ pos (List.rev values) max2
                 | Success (pos, value, max2) -> loop pos (value :: values) max2
-            in loop pos [] errPos
+            in loop pos [] failInfo
 
     let repeat1 (parser:Parser<'a>) = 
-        fun (reader:ParserReader) (pos : int) (errPos:ErrorPosition) -> 
-            let rec loop pos values errPos = 
-                match parser reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
+            let rec loop pos values failInfo = 
+                match parser reader pos failInfo with
                 | Fail (pos,max2)  -> succ pos (List.rev values) max2
                 | Success (pos, value, max2) -> loop pos (value :: values) max2
             in 
-                match parser reader pos errPos with
+                match parser reader pos failInfo with
                 | Fail    (pos, max2) -> fail pos "repeat1: not match rule" max2
                 | Success (pos, value, max2) -> loop pos [value] max2
 
     let andBoth (rhs : Parser<'b>) (lhs : Parser<'a>) =
-        fun (reader:ParserReader) (pos : int) (errPos:ErrorPosition) -> 
-            match lhs reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
+            match lhs reader pos failInfo with
             | Fail    (pos1, max2) -> fail pos "andBoth: not match left rule" max2
             | Success (pos1, value1, max2) -> 
                 match rhs reader pos1 max2 with
@@ -148,8 +181,8 @@
                 | Success (pos2, value2, max3) -> succ pos2 (value1, value2) max3 
 
     let andRight (rhs : Parser<'b>) (lhs : Parser<'a>) =
-        fun (reader:ParserReader) (pos : int) (errPos:ErrorPosition) -> 
-            match lhs reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
+            match lhs reader pos failInfo with
             | Fail    (pos1, max2) -> fail pos "andRight: not match left rule" max2
             | Success (pos1, value1, max2) -> 
                 match rhs reader pos1 max2 with
@@ -157,8 +190,8 @@
                 | Success (pos2, value2, max3) ->  succ pos2 value2 max3
 
     let andLeft (rhs : Parser<'b>) (lhs : Parser<'a>) =
-        fun (reader:ParserReader) (pos : int) (errPos:ErrorPosition)-> 
-            match lhs reader pos errPos with
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)-> 
+            match lhs reader pos failInfo with
             | Fail    (pos1, max2) -> fail pos "andLeft: not match left rule" max2
             | Success (pos1, value1, max2) -> 
                 match rhs reader pos1 max2 with
@@ -166,13 +199,13 @@
                 | Success (pos2, value2, max3) -> succ pos2 value1 max3 
 
     let quote (p:unit -> Parser<'a>) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  ->  (p ()) reader pos errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->  (p ()) reader pos failInfo
 
-    let success (p:unit->'a) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  ->  succ pos (p ()) errPos
+    let hole () = 
+        ref (fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->  failwith "hole syntax")
 
     let failure (msg:string) = 
-        fun (reader:ParserReader) (pos:int) (errPos:ErrorPosition)  ->  fail pos msg errPos
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->  fail pos msg failInfo
 
     type Memoizer = { add: (unit -> unit) -> unit; reset : unit -> unit }
     let memoizer () = 
@@ -184,13 +217,14 @@
             }
         
     let memoize (memoizer: Memoizer) (f : Parser<'a>) = 
-        let dic = System.Collections.Generic.Dictionary<(ParserReader * int * ErrorPosition), ParserState<'a>> ()
+        let dic = System.Collections.Generic.Dictionary<(Reader.t * int * FailInformation), ParserState<'a>> ()
         let _ = memoizer.add (fun () -> dic.Clear() )
         in  fun x y z -> 
-                match dic.TryGetValue((x,y,z)) with 
+                let (i,l,c) = y in
+                match dic.TryGetValue((x,i,z)) with 
                 | true, r -> r
-                | _       -> dic.[(x,y,z)] <- f x y z;
-                             dic.[(x,y,z)]
+                | _       -> dic.[(x,i,z)] <- f x y z;
+                             dic.[(x,i,z)]
 
     module OperatorExtension =
         open System.Runtime.CompilerServices;
@@ -220,18 +254,23 @@
             static member inline AsString(self: Parser<'T list>) = asString self 
 
 module Interpreter =
-    module Syntax =
-        type id = string
-
-        type binOp = Plus | Minus | Mult | Divi | Lt | Gt | Le | Ge | Eq | Ne | Cons
-
+    module Ty = 
         type tyvar = int
-        type ty = 
+
+        type t = 
               TyInt  
             | TyBool 
-            | TyFunc of ty * ty
-            | TyList of ty
+            | TyFunc of t * t
+            | TyList of t
             | TyVar of tyvar
+
+        let rec ToString ty =
+            match ty with
+            | TyInt -> "int"
+            | TyBool -> "bool"
+            | TyFunc (arg, ret)-> sprintf "%s -> %s" (ToString arg) (ToString ret)
+            | TyList ty -> sprintf "%s list" (ToString ty)
+            | TyVar n -> sprintf "'%c" (char n + 'a')
 
         let fresh_tyvar = 
             let counter = ref 0
@@ -241,12 +280,17 @@ module Interpreter =
         let freevar_ty ty =
             let rec loop ty ret =
                 match ty with
-                | TyInt  -> ret
-                | TyBool -> ret
-                | TyFunc (tyarg,tyret) -> loop tyarg ret |> loop tyret
-                | TyList ty -> loop ty ret
-                | TyVar id -> Set.add id ret     
+                | t.TyInt  -> ret
+                | t.TyBool -> ret
+                | t.TyFunc (tyarg,tyret) -> loop tyarg ret |> loop tyret
+                | t.TyList ty -> loop ty ret
+                | t.TyVar id -> Set.add id ret     
             in loop ty Set.empty
+
+    module Syntax =
+        type id = string
+
+        type binOp = Plus | Minus | Mult | Divi | Lt | Gt | Le | Ge | Eq | Ne | Cons
 
         type pattern = 
               VarP of id
@@ -316,10 +360,10 @@ module Interpreter =
         let MINUS= ws(str "-")
         let EQ = ws(str "=")
         let NE = ws(str "<>")
-        let LT = ws(str "<")
-        let GT = ws(str ">")
         let LE = ws(str "<=")
         let GE = ws(str ">=")
+        let LT = ws(str "<")
+        let GT = ws(str ">")
         let RARROW = ws(str "->")
         let SEMISEMI = ws(str ";;")
         let ANDAND = ws(str "&&")
@@ -331,7 +375,7 @@ module Interpreter =
         let SEMI = ws(str ";")
         let US = ws(str "_")
 
-        let Expr_ = ref (success(fun () -> ILit 0))
+        let Expr_ = hole ()
         let Expr = quote(fun () -> !Expr_)|> memoize memor
 
         let BinOpExpr = 
@@ -352,7 +396,7 @@ module Interpreter =
         let FunExpr =
             FUN.AndR(ID.Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun x s -> FunExp (x, s)) args e)
 
-        let PatternExpr_ = ref (success(fun () -> ILitP 0))
+        let PatternExpr_ = hole ()
         let PatternExpr = quote(fun () -> !PatternExpr_)|> memoize memor
 
         let PatternAExpr = 
@@ -411,9 +455,8 @@ module Interpreter =
             IF.AndR(Expr).AndL(THEN).And(Expr).AndL(ELSE).And(Expr).Select( fun ((c,t),e) -> IfExp (c, t, e) )
 
         let LetPrim =
-            (ID.Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | id::[] -> (id,e) | id::args -> (id,List.foldBack (fun x s -> FunExp (x, s)) args e))) |> memoize memor
+            (ID.Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | id::[] -> (id,e) | id::args -> (id,List.foldBack (fun x s -> FunExp (x, s)) args e))) |> memoize memor
             
-
         let LetAndExpr =
             LET.AndR(LetPrim).And(AND.AndR(LetPrim).Many()).Select(fun (x,xs) -> (x::xs))
 
@@ -447,23 +490,48 @@ module Interpreter =
 
         let AppExpr = AExpr.Many1().Select( fun x -> List.reduce (fun s x -> AppExp (s, x) ) x )
 
-        let MExpr = AppExpr.And(choice[MULT;DIV].And(AppExpr).Many()).Select(fun (l,r) -> List.fold (fun l (op,r) -> match op with |"*" -> BinOp (Mult, l, r)|"/" -> BinOp (Divi, l, r)) l r);
-        let PExpr = MExpr.And(choice[PLUS;MINUS].And(MExpr).Many()).Select(fun (l,r) -> List.fold (fun l (op,r) -> match op with |"+" -> BinOp (Plus, l, r)|"-" -> BinOp (Minus, l, r)) l r);
+        let MExpr = 
+            let op = choice[
+                        MULT.Select(fun _ -> Mult);
+                        DIV.Select(fun _ -> Divi)
+                     ]
+            in
+                AppExpr.And(op.And(AppExpr).Many()).Select(fun (l,r) -> List.fold (fun l (op,r) -> BinOp (op, l, r)) l r)
+
+        let PExpr = 
+            let op = choice[
+                        PLUS.Select(fun _ -> Plus);
+                        MINUS.Select(fun _ -> Minus)
+                     ]
+            in
+                MExpr.And(op.And(MExpr).Many()).Select(fun (l,r) -> List.fold (fun l (op,r) -> BinOp (op, l, r)) l r)
 
         let ConsExpr = 
-            PExpr.And(COLCOL.AndR(PExpr).Many()).Select(fun (head, tail) -> List.reduceBack (fun x s -> BinOp(Cons, x, s)) (head::tail) );
+            PExpr.And(COLCOL.AndR(PExpr).Many()).Select(fun (head, tail) -> List.reduceBack (fun x s -> BinOp(Cons, x, s)) (head::tail) )
 
         let EqExpr = 
-            choice [ 
-                ConsExpr.And(choice[EQ;NE]).And(ConsExpr).Select(fun ((l,op), r) -> match op with |"=" -> BinOp (Eq, l, r)|"<>" -> BinOp (Ne, l, r) );
-                ConsExpr;
-            ]
+            let op = choice[
+                        EQ.Select(fun _ -> Eq);
+                        NE.Select(fun _ -> Ne)
+                    ]
+            in
+                choice [ 
+                    ConsExpr.And(op).And(ConsExpr).Select(fun ((l,op), r) -> BinOp (op, l, r) )
+                    ConsExpr;
+                ]
 
         let LTExpr = 
-            choice [ 
-                EqExpr.And(choice[LE;GE;LT;GT]).And(EqExpr).Select(fun ((l,op), r) -> match op with |"<=" -> BinOp (Le, l, r)|">=" -> BinOp (Ge, l, r) |"<" -> BinOp (Lt, l, r)|">" -> BinOp (Gt, l, r));
-                EqExpr;
-            ]
+            let op = choice[
+                        LE.Select(fun _ -> Le);
+                        GE.Select(fun _ -> Ge);
+                        LT.Select(fun _ -> Lt);
+                        GT.Select(fun _ -> Gt)
+                    ]
+            in
+                choice [ 
+                    EqExpr.And(op).And(EqExpr).Select(fun ((l,op), r) -> BinOp (op, l, r) );
+                    EqExpr;
+                ]
 
         let LAndExpr = 
             choice [ 
@@ -477,8 +545,6 @@ module Interpreter =
                 LAndExpr;
             ]
 
-
-
         let _ = Expr_ := LOrExpr
 
         let LetStmt =
@@ -490,7 +556,37 @@ module Interpreter =
         let ExprStmt =
             Expr.Select( fun x -> ExpStmt x)
 
-        let toplevel = (success(fun () -> ()).Select(fun _ -> memor.reset() )).AndR(choice[ LetRecStmt; LetStmt; ExprStmt ].AndL(SEMISEMI))
+        let toplevel = (action (fun _ -> memor.reset() )).AndR(choice[ LetRecStmt; LetStmt; ExprStmt ].AndL(SEMISEMI))
+        
+        let errorRecover reader p = 
+            let token = ws(choice [
+                            Ident;
+                            RARROW;
+                            SEMISEMI;
+                            ANDAND;
+                            OROR;
+                            LBRACKET.Select(fun x -> x.ToString());
+                            RBRACKET.Select(fun x -> x.ToString());
+                            COLCOL;
+                            BAR;
+                            SEMI;
+                            US;
+                            INTV.Select(fun x -> x.ToString());
+                            LPAREN.Select(fun x -> x.ToString());
+                            RPAREN.Select(fun x -> x.ToString());
+                            MULT;DIV;PLUS;MINUS;EQ;NE;LE;GE;LT;GT;
+                            any().Select(fun x -> x.ToString())
+                        ])
+            let rec loop p lp =
+                match token reader p (p,"") with
+                | ParserCombinator.Success (p,t,_) -> 
+                    match t,lp with 
+                    | ("(",_) | ("[",_) -> loop p (t::lp)
+                    | (")","("::lp) | ("]","["::lp) -> loop p lp
+                    | (";;",[]) -> (reader, p)
+                    | _ -> loop p lp
+                | ParserCombinator.Fail (p,(fp,msg)) -> failwith "cannot recover from error"
+            in  loop p []
 
     module Environment =
 
@@ -514,31 +610,6 @@ module Interpreter =
             | [] -> a
             | (_, v)::rest -> f v (fold_right f rest a)
 
-    //module Set = 
-    //    type 'a t = 'a list
-
-    //    let empty = []
-
-    //    let singleton x = [x]
-
-    //    let to_list x = x
-
-    //    let rec insert x = function
-    //        [] -> [x]
-    //      | y::rest -> if x = y then y :: rest else y :: insert x rest
-
-    //    let union xs ys = 
-    //      List.fold (fun zs x -> insert x zs) ys xs
-
-    //    let rec remove x = function
-    //        [] -> []
-    //      | y::rest -> if x = y then rest else y :: remove x rest
-
-    //    let diff xs ys =
-    //      List.fold (fun zs x -> remove x zs) xs ys
-
-    //    let memq = List.contains
-    
     module Eval =
         open Syntax;
 
@@ -562,6 +633,7 @@ module Interpreter =
                     match v with
                     | NilV -> List.rev ret
                     | ConsV (x,xs) -> loop xs ((pp_val x)::ret)
+                    | _ -> failwith "not cons or nil"
                 let items = loop v []
                 in  sprintf "[%s]" (String.concat "; " items)
 
@@ -681,108 +753,138 @@ module Interpreter =
 
     module Typing =
         open Syntax
-        type tyenv = ty Environment.t
+        type tyenv = Ty.t Environment.t
 
-        type subst = (tyvar * ty) list
+        type subst = (Ty.tyvar * Ty.t) list
 
         let rec subst_type ss ty = 
             let rec subst_type' s ty = 
                 let (v, t) = s
                 in  match ty with
-                    | TyInt -> TyInt
-                    | TyBool -> TyBool
-                    | TyFunc (arg, ret)-> TyFunc (subst_type' s arg, subst_type' s ret)
-                    | TyList ty -> TyList (subst_type' s ty)
-                    | TyVar n -> if v = n then t else ty
+                    | Ty.TyInt -> Ty.TyInt
+                    | Ty.TyBool -> Ty.TyBool
+                    | Ty.TyFunc (arg, ret)-> Ty.TyFunc (subst_type' s arg, subst_type' s ret)
+                    | Ty.TyList ty -> Ty.TyList (subst_type' s ty)
+                    | Ty.TyVar n -> if v = n then t else ty
             in
                 List.fold (fun s x -> subst_type' x s) ty ss
 
-        let eqs_of_subst (s:subst) : (ty*ty) list = 
-            List.map (fun (v,t) -> (TyVar v, t)) s
+        let eqs_of_subst (s:subst) : (Ty.t*Ty.t) list = 
+            List.map (fun (v,t) -> (Ty.TyVar v, t)) s
 
-        let subst_eqs (s:subst) (eqs: (ty*ty) list) : (ty*ty) list = 
+        let subst_eqs (s:subst) (eqs: (Ty.t*Ty.t) list) : (Ty.t*Ty.t) list = 
             List.map (fun (t1,t2) -> (subst_type s t1 , subst_type s t2)) eqs
 
-        let unify (eqs:(ty*ty) list) : subst =
+        let unify (eqs:(Ty.t*Ty.t) list) : subst =
             let rec loop eqs ret =
                 match eqs with
                 | [] -> ret
                 | (ty1,ty2) :: eqs when ty1 = ty2 -> loop eqs ret
-                | (TyVar id, ty) :: eqs 
-                | (ty, TyVar id) :: eqs ->
-                    if Set.contains id (Syntax.freevar_ty ty) 
-                    then failwith "error"
+                | (Ty.TyVar id, ty) :: eqs 
+                | (ty, Ty.TyVar id) :: eqs ->
+                    if Set.contains id (Ty.freevar_ty ty) 
+                    then failwith "unification error"
                     else 
                         let ret = (id,ty) :: ret
                         let eqs = List.map (fun (ty1,ty2) -> (subst_type ret ty1, subst_type ret ty2)) eqs
                         in  loop eqs ret
-                | (TyFunc (tyarg1, tyret1), TyFunc (tyarg2, tyret2)) :: eqs  -> loop ((tyarg1, tyarg2)::(tyret1, tyret2)::eqs) ret
-                | _ -> failwith "error"
+                | (Ty.TyFunc (tyarg1, tyret1), Ty.TyFunc (tyarg2, tyret2)) :: eqs  -> loop ((tyarg1, tyarg2)::(tyret1, tyret2)::eqs) ret
+                | (Ty.TyList ty1, Ty.TyList ty2) :: eqs  -> loop ((ty1, ty2)::eqs) ret
+                | _ -> failwith "unification error"
             in  loop eqs List.empty
             
-        let rec pp_ty v =
-            match v with
-            | TyInt -> "int"
-            | TyBool -> "bool"
-            | TyFunc (arg, ret)-> sprintf "%s -> %s" (pp_ty arg) (pp_ty ret)
-            | TyList ty -> sprintf "%s list" (pp_ty ty)
-            | TyVar n -> sprintf "'%c" (char n + 'a')
-
         let ty_prim op t1 t2 =
             match (op, t1, t2) with
-            | Plus, TyInt, TyInt-> ([(t1,TyInt);(t2,TyInt)],TyInt)
-            | Plus, _, _ -> failwith ("Both arguments must be integer: +")
-            | Minus, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
-            | Minus, _, _ -> failwith ("Both arguments must be integer: -")
-            | Mult, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
-            | Mult, _, _ -> failwith ("Both arguments must be integer: *")
-            | Divi, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyInt)
-            | Divi, _, _ -> failwith ("Both arguments must be integer: /")
-            | Lt, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Lt, _, _ -> failwith ("Both arguments must be integer: <")
-            | Le, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Le, _, _ -> failwith ("Both arguments must be integer: <=")
-            | Gt, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Gt, _, _ -> failwith ("Both arguments must be integer: >")
-            | Ge, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Ge, _, _ -> failwith ("Both arguments must be integer: >=")
-            | Eq, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Eq, TyBool, TyBool -> ([(t1,TyBool);(t2,TyBool)],TyBool)
-            | Eq, _, _ -> failwith ("Both arguments must be integer: =")
-            | Ne, TyInt, TyInt -> ([(t1,TyInt);(t2,TyInt)],TyBool)
-            | Ne, TyBool, TyBool -> ([(t1,TyBool);(t2,TyBool)],TyBool)
-            | Ne, _, _ -> failwith ("Both arguments must be integer: <>")
-            | Cons, t1, TyList t2 -> ([(t1,t2)],TyList t2)
-            | Cons, _, _ -> failwith ("right arguments must be list: ::")
+            | Plus, Ty.TyInt, Ty.TyInt-> ([],Ty.TyInt)
+            | Plus, Ty.TyInt, ty 
+            | Plus, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyInt)
+            | Plus, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyInt)
 
-        let rec ty_try_match ty pat env = 
-            failwith "not impl"
-            //match pat with 
-            //| VarP id -> (ty, ((id, ty) :: env))
-            //| AnyP -> (ty, env)
-            //| ILitP v when ty = TyInt -> (TyInt, env)
-            //| BLitP v when ty = TyBool -> (TyBool, env)
-            //| LLitP pats -> 
-            //    let rec loop p v env =
-            //        match p, v with 
-            //        | [], ty -> (TyList ty, env)
-            //        | (p::ps), ty -> 
-            //            let (t, e) = ty_try_match v p env 
-            //            in  if ty = TyAny || ty = t then loop ps t e else failwith "list item missmatch"
-            //    in  loop pats value env
-            //| NilP -> (TyList TyAny, env)
-            //| ConsP (x,y) ->
-            //    let (t1, e1) = ty_try_match value x env 
-            //    let (t2, e2) = ty_try_match value t e1 
-            //    in  if value = TyAny || ty = t then loop ps t e else failwith "list item missmatch"
+            | Minus, Ty.TyInt, Ty.TyInt-> ([],Ty.TyInt)
+            | Minus, Ty.TyInt, ty 
+            | Minus, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyInt)
+            | Minus, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyInt)
+
+            | Mult, Ty.TyInt, Ty.TyInt-> ([],Ty.TyInt)
+            | Mult, Ty.TyInt, ty 
+            | Mult, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyInt)
+            | Mult, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyInt)
+
+            | Divi, Ty.TyInt, Ty.TyInt-> ([],Ty.TyInt)
+            | Divi, Ty.TyInt, ty 
+            | Divi, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyInt)
+            | Divi, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyInt)
+
+            | Lt, Ty.TyInt, Ty.TyInt-> ([],Ty.TyBool)
+            | Lt, Ty.TyInt, ty 
+            | Lt, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Lt, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyBool)
+
+            | Le, Ty.TyInt, Ty.TyInt-> ([],Ty.TyBool)
+            | Le, Ty.TyInt, ty 
+            | Le, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Le, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyBool)
+
+            | Gt, Ty.TyInt, Ty.TyInt-> ([],Ty.TyBool)
+            | Gt, Ty.TyInt, ty 
+            | Gt, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Gt, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyBool)
+
+            | Ge, Ty.TyInt, Ty.TyInt-> ([],Ty.TyBool)
+            | Ge, Ty.TyInt, ty 
+            | Ge, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Ge, _, _ -> ([(t1,Ty.TyInt);(t2,Ty.TyInt)],Ty.TyBool)
+
+            | Eq, Ty.TyInt, Ty.TyInt -> ([],Ty.TyBool)
+            | Eq, Ty.TyInt, ty 
+            | Eq, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Eq, Ty.TyBool, Ty.TyBool -> ([],Ty.TyBool)
+            | Eq, Ty.TyBool, ty 
+            | Eq, ty, Ty.TyBool -> ([(ty,Ty.TyBool)],Ty.TyBool)
+            | Eq, _, _ -> let t = Ty.TyVar (Ty.fresh_tyvar()) in ([(t1,t);(t2,t)],Ty.TyBool)
+
+            | Ne, Ty.TyInt, Ty.TyInt -> ([],Ty.TyBool)
+            | Ne, Ty.TyInt, ty 
+            | Ne, ty, Ty.TyInt -> ([(ty,Ty.TyInt)],Ty.TyBool)
+            | Ne, Ty.TyBool, Ty.TyBool -> ([],Ty.TyBool)
+            | Ne, Ty.TyBool, ty 
+            | Ne, ty, Ty.TyBool -> ([(ty,Ty.TyBool)],Ty.TyBool)
+            | Ne, _, _ -> let t = Ty.TyVar (Ty.fresh_tyvar()) in ([(t1,t);(t2,t)],Ty.TyBool)
+
+            | Cons, t1, Ty.TyList t2 -> let t = Ty.TyVar (Ty.fresh_tyvar()) in ([(t1,t);(t2,t)],Ty.TyList t)
+            | Cons, _, _ -> let t = Ty.TyVar (Ty.fresh_tyvar()) in ([(t1,t);(t2,Ty.TyList t)],Ty.TyList t)
+
+        let rec ty_try_match ty pat tyenv = 
+            match pat with 
+            | VarP id -> (List.empty, [(id, ty)])
+            | AnyP -> (List.empty, List.empty)
+            | ILitP v -> ([(ty,Ty.TyInt)], List.empty)
+            | BLitP v -> ([(ty,Ty.TyBool)], List.empty)
+            | LLitP pats -> 
+                let tyitem = Ty.TyVar (Ty.fresh_tyvar())
+                let tylist = Ty.TyList tyitem
+                let rec loop p substs tyenvs =
+                    match p with 
+                    | [] -> ((ty,tylist)::(List.fold (fun s x -> x @ s) List.empty substs), List.fold (fun s x -> x @ s) List.empty tyenvs)
+                    | (p::ps) -> 
+                        let (subst, e) = ty_try_match tyitem p tyenv 
+                        in  loop ps (subst::substs) (e::tyenvs)
+                in  loop pats List.empty List.empty
+            | NilP -> ([(ty,Ty.TyVar (Ty.fresh_tyvar()))], List.empty)
+            | ConsP (x,y) ->
+                let tyitem = Ty.TyVar (Ty.fresh_tyvar())
+                let tylist = Ty.TyList tyitem
+                let (t1, e1) = ty_try_match tyitem x tyenv 
+                let (t2, e2) = ty_try_match tylist y tyenv 
+                in  ((ty,tylist)::(t1@t2), e1@e2)
 
 
         let rec ty_exp tyenv = function
             | Var x -> 
                 try ([], Environment.lookup x tyenv) with 
                     | Environment.Not_bound -> failwithf "Variable not bound: %A" x
-            | ILit i -> ([], TyInt)
-            | BLit b -> ([], TyBool)
+            | ILit i -> ([], Ty.TyInt)
+            | BLit b -> ([], Ty.TyBool)
             | BinOp (op, exp1, exp2) ->
                 let (s1, arg1) = ty_exp tyenv exp1
                 let (s2, arg2) = ty_exp tyenv exp2
@@ -794,7 +896,7 @@ module Interpreter =
                 let (s1,c) = ty_exp tyenv exp1
                 let (s2,t) = ty_exp tyenv exp2
                 let (s3,e) = ty_exp tyenv exp3 
-                let eqs = [(c,TyBool);(t,e)]@(eqs_of_subst s1)@(eqs_of_subst s2)@(eqs_of_subst s3)
+                let eqs = [(c,Ty.TyBool);(t,e)]@(eqs_of_subst s1)@(eqs_of_subst s2)@(eqs_of_subst s3)
                 let s3 = unify eqs
                 in  (s3, subst_type s3 t)
             | LetExp (ss,b) ->
@@ -813,62 +915,75 @@ module Interpreter =
                         ) 
                         (tyenv, List.empty) 
                         ss
-                //let newenv = List.fold (fun tyenv (id,e) -> let v = eval_exp tyenv e in  (id, v)::tyenv ) tyenv ss
+
                 let (subst,ty) = ty_exp newtyenv b
                 let eqs = eqs_of_subst (newsubst @ subst)
                 let s3 = unify eqs
                 in (s3, (subst_type s3 ty))
 
             | LetRecExp (ss,b) ->
-                let dummytyenv = ref Environment.empty
-                let (newtyenv,newsubst) = 
+                let (dummyenv,newsubst,neweqs,ret) = 
                     List.fold 
-                        (fun (newtyenv,newsubst) s -> 
-                            List.fold 
-                                (fun (newtyenv',newsubst') (id,e) -> 
-                                    let (subst,ty) = ty_exp newtyenv e 
-                                    let newtyenv' = (id, ty)::newtyenv' 
-                                    let newsubst' = subst@newsubst' 
-                                    in (newtyenv', newsubst') )
-                                (newtyenv,newsubst)
-                                s 
+                        (fun (dummyenv,newsubst,neweqs,ret) s -> 
+                            let items = List.fold (fun s (id,_) -> (id, Ty.fresh_tyvar())::s) List.empty s 
+                            let dummyenv = (List.map (fun (id,v) -> (id, Ty.TyVar v)) items) @ dummyenv
+                            let (newsubst,neweqs,ret) = List.fold2
+                                                            (fun (newsubst',neweqs',ret') (id,e) (_,v) -> 
+                                                                let (subst,ty) = ty_exp dummyenv e 
+                                                                let newsubst' = subst@newsubst' 
+                                                                let neweqs' = (Ty.TyVar v,ty)::neweqs' 
+                                                                let newret' = (id,ty)::ret' 
+                                                                in (newsubst',neweqs',newret') )
+                                                            (newsubst,neweqs,ret)
+                                                            s 
+                                                            items 
+                            in  (dummyenv, newsubst,neweqs, ret)
                         ) 
-                        (tyenv, List.empty) 
+                        (tyenv, List.empty, List.empty, List.empty) 
                         ss
-                //let dummytyenv = ref Environment.empty
-                //let newtyenv = List.fold (fun tyenv s -> List.fold (fun tyenv' (id,e) -> (id, e)::tyenv') tyenv s ) tyenv ss
-                //in  dummytyenv := newtyenv;
-                //    ty_exp newtyenv b
+
+                let eqs = eqs_of_subst (newsubst)
+                let s3 = unify eqs
+                let newtyenv = tyenv
+
+                let (ret, newtyenv) = List.fold (fun (ret,newtyenv) (id,ty) -> let ty = subst_type s3 ty in ((id, ty)::ret),(id, ty)::newtyenv) ([],newtyenv) ret
+
+                let (newsubst,ty) = ty_exp newtyenv b
+                let eqs = eqs_of_subst (newsubst)@eqs
+                let s3 = unify eqs
+
+                in  (s3, (subst_type s3 ty))
 
             | FunExp (id, exp) -> 
-                failwith "not impl"
-                //let ret = ty_exp tyenv exp 
-                //in  TyFunc (TyNil, ret)
+                let tyarg = Ty.TyVar (Ty.fresh_tyvar ())
+                let (subst,tyret) = ty_exp ((id,tyarg)::tyenv) exp
+                let ty = Ty.TyFunc (tyarg, tyret)
+                let eqs = eqs_of_subst subst
+                let s3 = unify eqs
+                in (s3, (subst_type s3 ty))
             | MatchExp (expr, cases) ->
-                failwith "not impl"
-                //let value = ty_exp tyenv expr
-                //let rec loop cases retty =
-                //    match cases with
-                //    | [] -> retty;
-                //    | (pat,body)::xs -> 
-                //        let (ty, tyenv) = ty_try_match value pat tyenv 
-                //        in  let ty = ty_exp tyenv body 
-                //            in  if retty.IsNone || ty = retty.Value then loop xs (Some ty) else failwith "body type missmatch"
-                //in 
-                //    match loop cases None with
-                //    | None -> TyNil
-                //    | Some ty -> ty
+                let domv = Ty.fresh_tyvar()
+                let domty = Ty.TyVar domv
+                let (st,ty) = ty_exp tyenv expr
+                let eqs = eqs_of_subst st
+                let eqs = List.fold (fun s (pt,ex) -> let (eqs1,binds1) = ty_try_match ty pt tyenv in let env1 = binds1 @ tyenv in let (se, tye) = ty_exp env1 ex in (domty,tye)::eqs1@(eqs_of_subst se)@s) eqs cases
+                let s3 = unify(eqs)
+                in  (s3, (subst_type s3 domty))
+
             | AppExp (exp1, exp2) ->
-                failwith "not impl"
-                //let funval = ty_exp env exp1 in
-                //let arg = ty_exp env exp2 in
-                //    match funval with
-                //    | TyFunc (arg,ret) when arg = ret -> ret
-                //    | _ -> failwith ("Non-function value is applied")
+                let (subst1,tyexp1) = ty_exp tyenv exp1
+                let (subst2,tyexp2) = ty_exp tyenv exp2
+
+                let tyvret = Ty.fresh_tyvar ()
+
+                let eqs = (tyexp1, Ty.TyFunc (tyexp2, Ty.TyVar tyvret))::eqs_of_subst(subst1)@eqs_of_subst(subst2)
+                let s3 = unify eqs
+                in (s3, (subst_type s3 (Ty.TyVar tyvret)))
+
             | LLit v -> 
                 //failwith "not impl"
-                let ety = TyVar (fresh_tyvar())
-                let ty = TyList ety
+                let ety = Ty.TyVar (Ty.fresh_tyvar())
+                let ty = Ty.TyList ety
                 let (s,t) = List.foldBack (fun x (s,t) -> let (s',t') = ty_exp tyenv x in ((t',ety)::t,(eqs_of_subst s')@s)) v ([],[])
                 let eqs = s@t
                 let s3 = unify eqs
@@ -877,9 +992,6 @@ module Interpreter =
             | ExpStmt e -> 
                 let (s, t) = ty_exp tyenv e in ([("-", t)], tyenv) 
             | LetStmt ss -> 
-                //failwith "not impl"
-                //List.fold (fun (ret,env) (id,e) -> let v = eval_exp env e in  ((id, v)::ret,(id, v)::env)) ([],env) s
-                //List.fold (fun s x -> List.fold (fun (ret,env') (id,e) -> let v = ty_exp env e in  (id, v)::ret,(id, v)::env') s x ) ([],env) ss
                 let (newtyenv,newsubst,ret) = 
                     List.fold 
                         (fun (newtyenv,newsubst,ret) s -> 
@@ -895,43 +1007,72 @@ module Interpreter =
                         ) 
                         (tyenv, List.empty, List.empty) 
                         ss
-                //let newenv = List.fold (fun tyenv (id,e) -> let v = eval_exp tyenv e in  (id, v)::tyenv ) tyenv ss
-                //let (subst,ty) = ty_exp newtyenv b
                 let eqs = eqs_of_subst (newsubst)
                 let s3 = unify eqs
                 let ret = List.map (fun (id,ty) -> (id, subst_type s3 ty)) ret
                 in  (ret, newtyenv)
  
             | LetRecStmt ss -> 
-                failwith "not impl"
-                //let dummyenv = ref Environment.empty
-                //let ret = List.fold (fun env s -> List.fold (fun (ret,env') (id,e) -> (id, e)::ret,(id, e)::env') env s ) ([],env) ss
-                //in  dummyenv := snd ret;
-                //    ret
+                let (dummyenv,newsubst,neweqs,ret) = 
+                    List.fold 
+                        (fun (dummyenv,newsubst,neweqs,ret) s -> 
+                            let items = List.fold (fun s (id,_) -> (id, Ty.fresh_tyvar())::s) List.empty s 
+                            let dummyenv = (List.map (fun (id,v) -> (id, Ty.TyVar v)) items) @ dummyenv
+                            let (newsubst,neweqs,ret) = List.fold2
+                                                            (fun (newsubst',neweqs',ret') (id,e) (_,v) -> 
+                                                                let (subst,ty) = ty_exp dummyenv e 
+                                                                let newsubst' = subst@newsubst' 
+                                                                let neweqs' = (Ty.TyVar v,ty)::neweqs' 
+                                                                let newret' = (id,ty)::ret' 
+                                                                in (newsubst',neweqs',newret') )
+                                                            (newsubst,neweqs,ret)
+                                                            s 
+                                                            items 
+                            in  (dummyenv, newsubst,neweqs, ret)
+                        ) 
+                        (tyenv, List.empty, List.empty, List.empty) 
+                        ss
+
+                let eqs = eqs_of_subst (newsubst)
+                let s3 = unify eqs
+                let newtyenv = tyenv
+
+                let (ret, newtyenv) = List.fold (fun (ret,newtyenv) (id,ty) -> let ty = subst_type s3 ty in ((id, ty)::ret),(id, ty)::newtyenv) ([],newtyenv) ret
+                in  (List.rev ret, newtyenv)
+
 
     module Repl =
         open Syntax
         open Typing
         open Eval
 
-        let rec read_eval_print env tyenv =
+        let rec read_eval_print env tyenv reader position =
             printf "# ";
-            match Parser.toplevel (ParserCombinator.ParserReader System.Console.In) 0 (0, "") with
+            match Parser.toplevel reader position (position, "")  with
                 | ParserCombinator.Success (p,decl,_) -> 
                     try 
+                        let (i,l,c) = p
                         let _ = printfn "%A" decl
+                        //let (tyrets, newtyenv) = Typing.ty_decl tyenv decl
+                        //let _ = List.iter (fun (id,v) -> printfn "type %s = %s" id (Ty.ToString v)) tyrets;
+                        //let (rets, newenv) = eval_decl env decl
+                        //let _ = List.iter (fun (id,v) -> printfn "val %s = %s" id (pp_val v)) rets
                         let (tyrets, newtyenv) = Typing.ty_decl tyenv decl
-                        let _ = List.iter (fun (id,v) -> printfn "type %s = %s" id (pp_ty v)) tyrets;
-                        let (rets, newenv) = eval_decl env decl in
-                            List.iter (fun (id,v) -> printfn "val %s = %s" id (pp_val v)) rets;
-                            read_eval_print newenv newtyenv
+                        //let _ = List.iter (fun (id,v) -> printfn "type %s = %s" id ()) tyrets;
+                        let (rets, newenv) = eval_decl env decl
+                        let ziped = List.zip rets tyrets 
+                        let _ = List.iter (fun ((id,v),(id,t)) -> printfn "val %s : %s = %s" id (Ty.ToString t) (pp_val v)) ziped
+                        let (reader,p) = Reader.trunc reader p
+                        in
+                            read_eval_print newenv newtyenv reader p
                     with
                         | v -> printfn "%s" v.Message;
-                               read_eval_print env tyenv
+                               read_eval_print env tyenv reader p
 
-                | ParserCombinator.Fail(p,(i,msg)) ->
-                    printfn "Syntax error[%d]: %s" i msg;
-                    read_eval_print env tyenv
+                | ParserCombinator.Fail(p,((i,l,c),msg)) ->
+                    let (reader, p) = Parser.errorRecover reader p
+                    in  printfn "SyntaxError (%d, %d) : %s" l c msg;
+                        read_eval_print env tyenv reader p
 
         let initial_env =
             Environment.empty |>
@@ -941,23 +1082,23 @@ module Interpreter =
 
         let initial_tyenv =
             Environment.empty |>
-            (Environment.extend "x" TyInt) |> 
-            (Environment.extend "v" TyInt) |>
-            (Environment.extend "i" TyInt)
+            (Environment.extend "x" Ty.TyInt) |> 
+            (Environment.extend "v" Ty.TyInt) |>
+            (Environment.extend "i" Ty.TyInt)
 
-        let run () = read_eval_print initial_env initial_tyenv
+        let run () = read_eval_print initial_env initial_tyenv (Reader.create System.Console.In) Position.start
 
 [<EntryPoint>]
 let main argv = 
-    let alpha = Interpreter.Syntax.fresh_tyvar () 
-    let beta = Interpreter.Syntax.fresh_tyvar () 
-    let ans1 = Interpreter.Typing.subst_type [(alpha, Interpreter.Syntax.TyInt)] (Interpreter.Syntax.TyFunc (Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyBool))
+    let alpha = Interpreter.Ty.fresh_tyvar () 
+    let beta = Interpreter.Ty.fresh_tyvar () 
+    let ans1 = Interpreter.Typing.subst_type [(alpha, Interpreter.Ty.TyInt)] (Interpreter.Ty.TyFunc (Interpreter.Ty.TyVar alpha, Interpreter.Ty.TyBool))
     let _ = printfn "%A" ans1
-    let ans2 = Interpreter.Typing.subst_type [(beta, (Interpreter.Syntax.TyFunc (Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyInt))); (alpha, Interpreter.Syntax.TyBool)] (Interpreter.Syntax.TyVar beta)
+    let ans2 = Interpreter.Typing.subst_type [(beta, (Interpreter.Ty.TyFunc (Interpreter.Ty.TyVar alpha, Interpreter.Ty.TyInt))); (alpha, Interpreter.Ty.TyBool)] (Interpreter.Ty.TyVar beta)
     let _ = printfn "%A" ans2
-    let subst1 = Interpreter.Typing.unify [(Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyInt)]
+    let subst1 = Interpreter.Typing.unify [(Interpreter.Ty.TyVar alpha, Interpreter.Ty.TyInt)]
     let _ = printfn "%A" subst1
-    let subst2 = Interpreter.Typing.unify [(Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyVar alpha, Interpreter.Syntax.TyBool), Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyFunc(Interpreter.Syntax.TyInt, Interpreter.Syntax.TyVar beta), Interpreter.Syntax.TyVar beta))]
+    let subst2 = Interpreter.Typing.unify [(Interpreter.Ty.TyFunc(Interpreter.Ty.TyVar alpha, Interpreter.Ty.TyBool), Interpreter.Ty.TyFunc(Interpreter.Ty.TyFunc(Interpreter.Ty.TyInt, Interpreter.Ty.TyVar beta), Interpreter.Ty.TyVar beta))]
     let _ = printfn "%A" subst2
     in  Interpreter.Repl.run (); 0 // 整数の終了コードを返します
 
