@@ -16,8 +16,6 @@
 module Reader = 
     type t = { reader: System.IO.TextReader; buffer: System.Text.StringBuilder; }
 
-    let EoS = '\u0000'
-
     let create reader = 
         { reader = reader; buffer = System.Text.StringBuilder(); }
 
@@ -31,10 +29,10 @@ module Reader =
                     then () 
                     else reader.buffer.Append(char ch) |> ignore; loop ()
         let _ = loop ()
-        in  if i < reader.buffer.Length then reader.buffer.[i] else EoS
+        in  if i < reader.buffer.Length then Some reader.buffer.[i] else None
     
     let submatch (reader:t) (start:int) (str:string) =
-        if (start < 0) || (Item reader (str.Length + start - 1) = EoS) 
+        if (start < 0) || (Item reader (str.Length + start - 1) = None) 
         then false
         else
             let rec loop (i1:int) (i2:int) = 
@@ -77,18 +75,18 @@ module ParserCombinator =
     let char (pred : char -> bool) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            let ch = Reader.Item reader i in
-            if (ch <> Reader.EoS) && (pred ch) 
-            then succ (Position.inc_ch pos ch) ch failInfo 
-            else fail pos ("char: not match character "+(if (ch <> Reader.EoS) then ch.ToString() else "EOS")) failInfo
-
+            match Reader.Item reader i with
+            | Some ch -> if pred ch then succ (Position.inc_ch pos ch) ch failInfo 
+                                    else fail pos (sprintf "char: not match character %s." (ch.ToString())) failInfo
+            | None -> fail pos "char: Reached end of file while parsing." failInfo
     let anychar (chs:string) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            let ch = Reader.Item reader i in
-            if (ch <> Reader.EoS) && (chs.IndexOf(ch) <> -1 )
-            then succ (Position.inc_ch pos ch) ch failInfo
-            else fail pos ("anychar: not match character  "+(if (ch <> Reader.EoS) then ch.ToString() else "EOS")) failInfo
+            match Reader.Item reader i with
+            | Some ch -> if chs.IndexOf(ch) <> -1 then succ (Position.inc_ch pos ch) ch failInfo 
+                                                  else fail pos (sprintf "anychar: not match character %s." (ch.ToString())) failInfo
+            | None -> fail pos "anychar: Reached end of file while parsing." failInfo
+
 
     let str (s:string) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
@@ -96,15 +94,14 @@ module ParserCombinator =
             let ch = Reader.Item reader i in
             if Reader.submatch reader i s 
             then succ (Position.inc_str pos s) s failInfo
-            else fail pos ("str: require is '"+s+"' but get"+(if (ch <> Reader.EoS) then ch.ToString() else "EOS")+".") failInfo
+            else fail pos (sprintf "str: require is '%s' but not exists." s) failInfo
 
     let any () = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            let ch = Reader.Item reader i in
-            if ch <> Reader.EoS 
-            then succ (Position.inc_ch pos ch) ch  failInfo
-            else fail pos "any: require any but get EOF." failInfo
+            match Reader.Item reader i with
+            | Some ch -> succ (Position.inc_ch pos ch) ch failInfo 
+            | None -> fail pos "any: Reached end of file while parsing." failInfo
 
     let not (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
@@ -210,11 +207,9 @@ module ParserCombinator =
     type Memoizer = { add: (unit -> unit) -> unit; reset : unit -> unit }
     let memoizer () = 
         let handlers = ref List.empty
-        in
-            {
-                add = fun (handler:unit -> unit) -> handlers := handler :: !handlers;
-                reset = fun () -> List.iter (fun h -> h()) !handlers
-            }
+        let add (handler:unit -> unit) = handlers := handler :: !handlers
+        let reset () = List.iter (fun h -> h()) !handlers
+        in  { add = add; reset = reset }
         
     let memoize (memoizer: Memoizer) (f : Parser<'a>) = 
         let dic = System.Collections.Generic.Dictionary<(Reader.t * int * FailInformation), ParserState<'a>> ()
@@ -262,6 +257,7 @@ module Interpreter =
         type t = 
               TyInt  
             | TyBool 
+            | TyStr
             | TyFunc of t * t
             | TyList of t
             | TyVar of tyvar
@@ -272,6 +268,7 @@ module Interpreter =
             match ty with
             | TyInt -> "int"
             | TyBool -> "bool"
+            | TyStr -> "string"
             | TyFunc (arg, ret)-> sprintf "%s -> %s" (ToString arg) (ToString ret)
             | TyList ty -> sprintf "%s list" (ToString ty)
             | TyVar n -> sprintf "'%c" (char n + 'a')
@@ -288,6 +285,7 @@ module Interpreter =
                 match ty with
                 | t.TyInt  -> ret
                 | t.TyBool -> ret
+                | t.TyStr -> ret
                 | t.TyFunc (tyarg,tyret) -> loop tyarg ret |> loop tyret
                 | t.TyList ty -> loop ty ret
                 | t.TyVar id -> Set.add id ret     
@@ -296,6 +294,18 @@ module Interpreter =
             in loop ty Set.empty
 
     module Syntax =
+        type texp =
+              TVar of string
+            | TString
+            | TInt
+            | TBool
+            | TFun of texp * texp
+            | TList of texp
+            | TTuple of texp list
+            | TUnit
+            | TNamed of string
+            | TConstruct of (texp list) * texp
+
         type id = string
 
         type binOp = Plus | Minus | Mult | Divi | Lt | Gt | Le | Ge | Eq | Ne | Cons
@@ -305,6 +315,7 @@ module Interpreter =
             | AnyP
             | ILitP of int
             | BLitP of bool
+            | SLitP of string
             | LLitP of pattern list
             | TLitP of pattern list
             | NilP
@@ -315,6 +326,7 @@ module Interpreter =
               Var of id
             | ILit of int
             | BLit of bool
+            | SLit of string
             | Unit
             | LLit of exp list
             | TLit of exp list
@@ -343,9 +355,62 @@ module Interpreter =
         let isIdHead ch = isLower(ch)
         let isIdBody ch = isLower(ch) || isDigit(ch) || (ch = '_') || (ch = '\'') 
 
+        let escapeString str =
+            let rec loop chars ret =
+                match chars with
+                | [] -> ret |> List.rev |> String.concat ""
+                | x::xs -> 
+                    let s =
+                        match x with
+                        | '\a' -> "\\a"
+                        | '\b' -> "\\b"
+                        | '\f' -> "\\f"
+                        | '\n' -> "\\n"
+                        | '\r' -> "\\r"
+                        | '\t' -> "\\t"
+                        | '\v' -> "\\v"
+                        | '\\' -> "\\\\"
+                        | '"'  -> "\\\""
+                        | _ -> x.ToString()
+                    in  loop xs (s::ret)
+            in  loop (Seq.toList str) List.empty
+            
+        let unescapeString str =
+            let rec loop chars (ret:char list) =
+                match chars with
+                | [] -> ret |> List.rev |> System.String.Concat
+                | _ -> 
+                    let (x,xs) =
+                        match chars with
+                        | '\\'::'a'::xs -> '\a',xs
+                        | '\\'::'b'::xs -> '\b',xs
+                        | '\\'::'f'::xs -> '\f',xs
+                        | '\\'::'n'::xs -> '\n',xs
+                        | '\\'::'r'::xs -> '\r',xs
+                        | '\\'::'t'::xs -> '\t',xs
+                        | '\\'::'v'::xs -> '\v',xs
+                        | '\\'::'\\'::xs -> '\\',xs
+                        | '\\'::'"'::xs  -> '"',xs
+                        | x::xs -> x,xs
+                        | [] -> failwith "not reach"
+                    in  loop xs (x::ret)
+            in  loop (Seq.toList str) List.empty
+
         let memo = memoizer()
 
-        let WS = (anychar " \t\r\n").Many()
+        let COMMENT_ = hole()
+        let COMMENT = quote (fun () -> !COMMENT_)
+        let _ = COMMENT_ := (seq [
+                                str "(*"; 
+                                (choice [
+                                    (str "(*").Not().Not().AndR(COMMENT).Select(fun _ -> ());
+                                    (str "*)").Not().AndR(any ()).Select(fun _ -> ())
+                                ]).Many().Select(fun _ -> "");
+                                str "*)"
+                            ]).Select(fun _ -> ())
+
+        let SPACE = (anychar " \t\r\n").Select(fun _ -> ())
+        let WS = (SPACE.Or(COMMENT)).Many()
         let ws x = WS.AndR(x)  |> memoize memo
 
         let Ident = ws( (char isIdHead).And((char isIdBody).Many().AsString()).Select(fun (h,b) -> h.ToString() + b) )
@@ -362,8 +427,17 @@ module Interpreter =
         let REC = res "rec"
         let MATCH = res "match"
         let WITH = res "with"
+        let INT = res "int"
+        let STRING = res "string"
+        let BOOL = res "bool"
         let ID = Ident.Where(fun x -> (List.contains x ["true";"false";"if";"then";"else";"let";"in";"and";"fun";"rec";"match";"with"]) = false);
         let INTV = ws( (char (fun x -> x = '-')).Option().And((char isDigit).Many1().AsString().Select(System.Int32.Parse)).Select(fun (s,v) -> if s.IsSome then (-v) else v))
+        let STRV = 
+            let DQuote = char (fun x -> x = '"' )
+            let Escaped = (char (fun x -> x = '\\' )).And(anychar("abfnrtv\\\"")).Select(fun (x,y) -> sprintf "%c%c" x y)
+            let Char = any().Select(fun x -> x.ToString())
+            let StrChr = DQuote.Not().AndR(Escaped.Or(Char))
+            in  ws( DQuote.AndR(StrChr.Many()).AndL(DQuote).Select( fun x -> String.concat "" x |> unescapeString ) )
         let LPAREN = ws(char (fun x -> x = '(' ))
         let RPAREN = ws(char (fun x -> x = ')' ))
         let MULT = ws(str "*")
@@ -387,10 +461,45 @@ module Interpreter =
         let SEMI = ws(str ";")
         let US = ws(str "_")
         let COMMA = ws(str ",")
+        let QUOTE = ws(str "'")
+        let COL = ws(str ":")
+
+        let TypeExpr_ = hole()
+        let TypeExpr = quote (fun () -> !TypeExpr_)
+
+        let SimpleType = 
+            let tcon x id =
+                match id,x with
+                | "list", x::[] -> TList x
+                | "list", _ -> failwith "list must 1 arg"
+                | _,[] -> failwith "need 1 arg"
+                | _ -> TConstruct(x,TNamed id)
+            in
+                (choice [
+                    QUOTE.AndR(ID).Select(fun x -> TVar x);
+                    INT.Select(fun x -> TInt);
+                    BOOL.Select(fun x -> TBool);
+                    STRING.Select(fun x -> TString);
+                    (seq [LPAREN; RPAREN]).Select(fun x -> TUnit);
+                    ID.Select(fun x -> TConstruct ([], TNamed x));
+                    LPAREN.AndR(TypeExpr).And(COMMA.AndR(TypeExpr).Many()).AndL(RPAREN).And(ID).Select(fun ((x,xs),id) -> tcon (x::xs) id );
+                    LPAREN.AndR(TypeExpr).AndR(TypeExpr).AndL(RPAREN);
+                ]).And(ID.Many()).Select(fun (x,ys) -> List.fold (fun s x -> tcon [s] x) x ys)
+
+        let TupleType =
+            SimpleType.And(MULT.AndR(SimpleType).Many()).Select( fun (x,xs) -> if xs = [] then x else TTuple (x::xs))
+
+        let FuncType =
+            TupleType.And(RARROW.AndR(TupleType).Many()).Select( fun (x,xs) -> if xs = [] then x else List.reduceBack (fun x s -> TFun (x,s)) (x::xs))
+
+        let _ = TypeExpr_ := FuncType 
 
         let Expr_ = hole ()
         let Expr = quote(fun () -> !Expr_)|> memoize memo
 
+        let ItemExpr_ = hole ()
+        let ItemExpr = quote(fun () -> !ItemExpr_)|> memoize memo
+        
         let BinOpExpr = 
             let make (tok,op) = tok.Select(fun _ -> FunExp("@lhs", FunExp("@rhs", BinOp (op,Var "@lhs",Var "@rhs"))))
             in
@@ -408,7 +517,8 @@ module Interpreter =
                                     ])
 
         let FunExpr =
-            FUN.AndR(ID.Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun x s -> FunExp (x, s)) args e)
+            //FUN.AndR(ID.Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun x s -> FunExp (x, s)) args e)
+            FUN.AndR(LPAREN.AndR(ID).And(COL.AndR(TypeExpr).AndL(RPAREN).Option()).Or(ID.Select(fun x -> (x,None))).Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun (x,t) s -> FunExp (x, s)) args e)
 
         let PatternExpr_ = hole ()
         let PatternExpr = quote(fun () -> !PatternExpr_)|> memoize memo
@@ -441,6 +551,7 @@ module Interpreter =
                         | AnyP -> ret
                         | ILitP _ -> ret
                         | BLitP _ -> ret 
+                        | SLitP _ -> ret 
                         | LLitP items -> List.fold (fun s x -> scan x s) ret items
                         | TLitP items -> List.fold (fun s x -> scan x s) ret items
                         | NilP -> ret
@@ -488,13 +599,14 @@ module Interpreter =
             choice [ 
                 FunExpr; 
                 INTV.Select(fun x -> ILit x);
+                STRV.Select(fun x -> SLit x);
                 TRUE.Select(fun _ -> BLit true);
                 FALSE.Select(fun _ -> BLit false);
                 ID.Select(fun x -> Var x);
                 IfExpr; 
                 MatchExpr;
                 LetExpr; 
-                LBRACKET.AndR(Expr.And((SEMI.AndR(Expr)).Many()).Option().Select( function | Some (x,xs) -> (x::xs) | None -> [] )).AndL(RBRACKET).Select(LLit);
+                LBRACKET.AndR(ItemExpr.And((SEMI.AndR(ItemExpr)).Many()).Option().Select( function | Some (x,xs) -> (x::xs) | None -> [] )).AndL(RBRACKET).Select(LLit);
                 LPAREN.And(RPAREN).Select(fun _ -> Unit);
                 LPAREN.AndR(BinOpExpr).AndL(RPAREN);
                 LPAREN.AndR(Expr).AndL(RPAREN)
@@ -564,6 +676,7 @@ module Interpreter =
                 TupleExpr.And(SEMI.AndR(TupleExpr).Many()).Select(fun (x,xs) -> List.reduceBack (fun x s -> SeqExp(x,s)) (x::xs));
 
         let _ = Expr_ := SeqExpr
+        let _ = ItemExpr_ := TupleExpr
 
         let LetStmt =
             LetAndExprs.AndL(IN.Not()).Select( fun s -> LetStmt s)
@@ -638,16 +751,18 @@ module Interpreter =
             type t =
                   IntV of int
                 | BoolV of bool
+                | StringV of string
                 | ProcV of id * exp * t Environment.t ref
                 | ConsV of t * t
                 | NilV
                 | UnitV
                 | TupleV of t list
-            
+
             let rec ToString v =
                 match v with
                 | IntV v -> v.ToString()
                 | BoolV v -> if v then "true" else "false"
+                | StringV v -> Parser.escapeString v |> sprintf "\"%s\"" 
                 | ProcV (id,exp,env) -> "<fun>"
                 | NilV -> "[]"
                 | ConsV _ -> 
@@ -693,6 +808,7 @@ module Interpreter =
             | AnyP -> Some env
             | ILitP v -> if value = Value.IntV v then Some env else None
             | BLitP v -> if value = Value.BoolV v then Some env else None
+            | SLitP v -> if value = Value.StringV v then Some env else None
             | LLitP pats -> 
                 let rec loop p v env =
                     match p, v with 
@@ -737,6 +853,7 @@ module Interpreter =
                     | Environment.Not_bound -> failwithf "Variable not bound: %A" x
             | ILit i -> Value.IntV i
             | BLit b -> Value.BoolV b
+            | SLit s -> Value.StringV s
             | Unit -> Value.UnitV
             | BinOp (op, exp1, exp2) ->
                 let arg1 = eval_exp env exp1 in
@@ -752,7 +869,7 @@ module Interpreter =
                 let _ = eval_exp env exp1
                 in  eval_exp env exp2
             | LetExp (ss,b) ->
-                let newenv = List.fold (fun env s -> List.fold (fun env' (id,e) -> let v = eval_exp env e in  (id, v)::env') env s ) env ss
+                let newenv = List.fold (fun env s -> List.fold (fun env' (id,e) -> let v = eval_exp env e in (id, v)::env') env s ) env ss
                 //let newenv = List.fold (fun env (id,e) -> let v = eval_exp env e in  (id, v)::env ) env ss
                 in  eval_exp newenv b
 
@@ -795,7 +912,8 @@ module Interpreter =
                 let v = eval_exp env e in (["-",v ], env) 
             | LetStmt ss -> 
                 //List.fold (fun (ret,env) (id,e) -> let v = eval_exp env e in  ((id, v)::ret,(id, v)::env)) ([],env) s
-                List.fold (fun s x -> List.fold (fun (ret,env') (id,e) -> let v = eval_exp env e in  (id, v)::ret,(id, v)::env') s x ) ([],env) ss
+                let (ret,env) = List.fold (fun (ret,env) x -> List.fold (fun (ret,env') (id,e) -> let v = eval_exp env e in  (id, v)::ret,(id, v)::env') (ret,env) x ) ([],env) ss
+                in  (List.rev ret, env)
             | LetRecStmt ss -> 
                 let dummyenv = ref Environment.empty
                 let ret = List.fold (fun env s -> List.fold (fun (ret,env') (id,e) -> let v = match e with FunExp(id,exp) -> Value.ProcV (id,exp,dummyenv) | _ -> failwithf "variable cannot " in  (id, v)::ret,(id, v)::env') env s ) ([],env) ss
@@ -815,6 +933,7 @@ module Interpreter =
                 in  match ty with
                     | Type.TyInt -> Type.TyInt
                     | Type.TyBool -> Type.TyBool
+                    | Type.TyStr -> Type.TyStr
                     | Type.TyFunc (arg, ret)-> Type.TyFunc (subst_type' s arg, subst_type' s ret)
                     | Type.TyList ty -> Type.TyList (subst_type' s ty)
                     | Type.TyVar n -> if v = n then t else ty
@@ -837,7 +956,7 @@ module Interpreter =
                 | (Type.TyVar id, ty) :: eqs 
                 | (ty, Type.TyVar id) :: eqs ->
                     if Set.contains id (Type.freevar_ty ty) 
-                    then failwith "unification error"
+                    then failwithf "unification error: type %s is include in %s" (Type.ToString (Type.TyVar id)) (Type.ToString ty)
                     else 
                         let ret = (id,ty) :: ret
                         let eqs = subst_eqs ret eqs
@@ -845,7 +964,7 @@ module Interpreter =
                 | (Type.TyFunc (tyarg1, tyret1), Type.TyFunc (tyarg2, tyret2)) :: eqs  -> loop ((tyarg1, tyarg2)::(tyret1, tyret2)::eqs) ret
                 | (Type.TyList ty1, Type.TyList ty2) :: eqs  -> loop ((ty1, ty2)::eqs) ret
                 | (Type.TyTuple ty1, Type.TyTuple ty2) :: eqs  when List.length ty1 = List.length ty2 -> loop ((List.zip ty1 ty2) @ eqs) ret
-                | _ -> failwith "unification error"
+                | (ty1, ty2)::eqs -> failwithf "unification error: type %s and type %s cannot unification" (Type.ToString ty1) (Type.ToString ty2)
             in  loop eqs List.empty
             
         let ty_prim op t1 t2 =
@@ -915,6 +1034,7 @@ module Interpreter =
             | AnyP -> (List.empty, List.empty)
             | ILitP v -> ([(ty,Type.TyInt)], List.empty)
             | BLitP v -> ([(ty,Type.TyBool)], List.empty)
+            | SLitP v -> ([(ty,Type.TyStr)], List.empty)
             | LLitP pats -> 
                 let tyitem = Type.TyVar (Type.fresh_tyvar())
                 let tylist = Type.TyList tyitem
@@ -952,6 +1072,7 @@ module Interpreter =
                     | Environment.Not_bound -> failwithf "Variable not bound: %A" x
             | ILit i -> ([], Type.TyInt)
             | BLit b -> ([], Type.TyBool)
+            | SLit b -> ([], Type.TyStr)
             | Unit -> ([], Type.TyUnit)
             | BinOp (op, exp1, exp2) ->
                 let (s1, arg1) = ty_exp tyenv exp1
@@ -1029,6 +1150,7 @@ module Interpreter =
                 let eqs = eqs_of_subst subst
                 let s3 = unify eqs
                 in  (s3, (subst_type s3 ty))
+
             | MatchExp (expr, cases) ->
                 let domv = Type.fresh_tyvar()
                 let domty = Type.TyVar domv
@@ -1047,12 +1169,14 @@ module Interpreter =
                 let eqs = (tyexp1, Type.TyFunc (tyexp2, Type.TyVar tyvret))::eqs_of_subst(subst1)@eqs_of_subst(subst2)
                 let s3 = unify eqs
                 in  (s3, (subst_type s3 (Type.TyVar tyvret)))
+
             | SeqExp (exp1,exp2) ->
                 let (s1,c) = ty_exp tyenv exp1
                 let (s2,t) = ty_exp tyenv exp2
                 let eqs = [(c,Type.TyUnit)]@(eqs_of_subst s1)@(eqs_of_subst s2)
                 let s3 = unify eqs
                 in  (s3, subst_type s3 t)
+
             | LLit v -> 
                 let ety = Type.TyVar (Type.fresh_tyvar())
                 let ty = Type.TyList ety
@@ -1060,6 +1184,7 @@ module Interpreter =
                 let eqs = s@t
                 let s3 = unify eqs
                 in  (s3, subst_type s3 ty)
+
             | TLit v -> 
                 let (s,t,m) = List.foldBack (fun x (s,t,m) -> let (s',t') = ty_exp tyenv x in let ety = Type.TyVar (Type.fresh_tyvar()) in ((t',ety)::t,(eqs_of_subst s')@s,ety::m)) v ([],[],[])
                 let ty = Type.TyTuple m
@@ -1124,7 +1249,7 @@ module Interpreter =
         open Syntax
         open Typing
         open Eval
-
+        
         let rec read_eval_print env tyenv reader position =
             printf "# ";
             match Parser.toplevel reader position (position, "")  with
@@ -1135,7 +1260,7 @@ module Interpreter =
                         let (tyrets, newtyenv) = Typing.ty_decl tyenv decl
                         let (rets, newenv) = eval_decl env decl
                         let ziped = List.zip rets tyrets 
-                        let _ = List.iter (fun ((id,v),(id,t)) -> printfn "val %s : %s = %s" id (Type.ToString t) (Value.ToString v)) ziped
+                        let _ = let rec loop xs = match xs with | [] -> [] | ((id,v),(_,t))::xs -> (printfn "val %s : %s = %s" id (Type.ToString t) (Value.ToString v)); loop xs in loop ziped
                         let (reader,p) = Reader.trunc reader p
                         in
                             read_eval_print newenv newtyenv reader p
@@ -1167,15 +1292,7 @@ module Interpreter =
 
 [<EntryPoint>]
 let main argv = 
-    let alpha = Interpreter.Type.fresh_tyvar () 
-    let beta = Interpreter.Type.fresh_tyvar () 
-    let ans1 = Interpreter.Typing.subst_type [(alpha, Interpreter.Type.TyInt)] (Interpreter.Type.TyFunc (Interpreter.Type.TyVar alpha, Interpreter.Type.TyBool))
-    let _ = printfn "%A" ans1
-    let ans2 = Interpreter.Typing.subst_type [(beta, (Interpreter.Type.TyFunc (Interpreter.Type.TyVar alpha, Interpreter.Type.TyInt))); (alpha, Interpreter.Type.TyBool)] (Interpreter.Type.TyVar beta)
-    let _ = printfn "%A" ans2
-    let subst1 = Interpreter.Typing.unify [(Interpreter.Type.TyVar alpha, Interpreter.Type.TyInt)]
-    let _ = printfn "%A" subst1
-    let subst2 = Interpreter.Typing.unify [(Interpreter.Type.TyFunc(Interpreter.Type.TyVar alpha, Interpreter.Type.TyBool), Interpreter.Type.TyFunc(Interpreter.Type.TyFunc(Interpreter.Type.TyInt, Interpreter.Type.TyVar beta), Interpreter.Type.TyVar beta))]
-    let _ = printfn "%A" subst2
+    let ret = Interpreter.Parser.TypeExpr (Reader.create System.Console.In) Position.head (Position.head,"")
+    let _ = printfn "%A" ret
     in  Interpreter.Repl.run (); 0 // 整数の終了コードを返します
 
