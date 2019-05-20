@@ -66,92 +66,107 @@ module ParserCombinator =
         in  if i > fi 
             then Fail (pos, (pos, msg)) 
             else Fail (pos, failInfo) 
-            
+
     let action (act: ((Reader.t * Position.t * FailInformation) -> 'a)) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let v = act (reader,pos,failInfo)
             in  succ pos v failInfo 
 
-    let char (pred : char -> bool) = 
+    // 文字 ch を受理するパーサを作る
+    let char ch = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            match Reader.Item reader i with
-            | Some ch -> if pred ch then succ (Position.inc_ch pos ch) ch failInfo 
-                                    else fail pos (sprintf "char: not match character %s." (ch.ToString())) failInfo
-            | None -> fail pos "char: Reached end of file while parsing." failInfo
-    let anychar (chs:string) = 
+            in
+                match Reader.Item reader i with
+                | Some c -> if c = ch then succ (Position.inc_ch pos c) ch failInfo 
+                                        else fail pos (sprintf "char: not match character %c." c) failInfo
+                | None -> fail pos "char: Reached end of file while parsing." failInfo
+
+    // 述語 pred が真を返す文字を受理するパーサを作る
+    let charOf (pred : char -> bool) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            match Reader.Item reader i with
-            | Some ch -> if chs.IndexOf(ch) <> -1 then succ (Position.inc_ch pos ch) ch failInfo 
-                                                  else fail pos (sprintf "anychar: not match character %s." (ch.ToString())) failInfo
-            | None -> fail pos "anychar: Reached end of file while parsing." failInfo
+            in
+                match Reader.Item reader i with
+                | Some ch -> if pred ch then succ (Position.inc_ch pos ch) ch failInfo 
+                                        else fail pos (sprintf "char: not match character %c." ch) failInfo
+                | None -> fail pos "char: Reached end of file while parsing." failInfo
 
-
-    let str (s:string) =
+    // 文字列 str に含まれる文字を受理するパーサを作る
+    let oneOf (str:string) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            let ch = Reader.Item reader i in
-            if Reader.submatch reader i s 
-            then succ (Position.inc_str pos s) s failInfo
-            else fail pos (sprintf "str: require is '%s' but not exists." s) failInfo
+            in
+                match Reader.Item reader i with
+                | Some ch -> if str.IndexOf(ch) <> -1 then succ (Position.inc_ch pos ch) ch failInfo 
+                                                      else fail pos (sprintf "oneOf: not match character %c." ch) failInfo
+                | None -> fail pos "oneOf: Reached end of file while parsing." failInfo
 
-    let any () = 
+    // 文字列 str を受理するパーサを作る
+    let str (str:string) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let (i,l,c) = pos
-            match Reader.Item reader i with
-            | Some ch -> succ (Position.inc_ch pos ch) ch failInfo 
-            | None -> fail pos "any: Reached end of file while parsing." failInfo
+            let ch = Reader.Item reader i 
+            in
+                if Reader.submatch reader i str 
+                then succ (Position.inc_str pos str) str failInfo
+                else fail pos (sprintf "str: require is '%s' but not exists." str) failInfo
 
+    // EOF以外の任意の位置文字を受理するパーサを作る
+    let anyChar () = 
+        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
+            let (i,l,c) = pos
+            in
+                match Reader.Item reader i with
+                | Some ch -> succ (Position.inc_ch pos ch) ch failInfo 
+                | None -> fail pos "anyChar: Reached end of file while parsing." failInfo
+
+    // パーサ parser が失敗することを期待するパーサを作る
+    // 入力は消費しない
     let not (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             match parser reader pos failInfo with
             | Fail    _ -> succ pos () failInfo
             | Success _ -> fail pos "not: require rule was fail but success." failInfo
 
+    // パーサ parser が成功するか先読みを行うパーサを作る
+    // 入力は消費しない
+    let look (parser:Parser<'a>) = not (not (parser))
+
+    // パーサ parser の結果に述語 pred を適用して結果を射影するパーサを作る
     let select (pred:'a->'b) (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             match parser reader pos failInfo with
             | Fail    (pos, max2) -> Fail (pos, max2)
             | Success (pos, value, max2) -> succ pos (pred value) max2
 
-    let asString (parser:Parser<'a list>) = 
-        select (fun x -> List.fold (fun s x -> s + x.ToString()) "" x) parser
-
+    // パーサ parser の結果に述語 pred を適用して真ならば継続するパーサを作る
     let where (pred:'a->bool) (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             match parser reader pos failInfo with
             | Fail    (pos, max2) -> Fail (pos, max2)
             | Success (_, value, max2) as f -> if pred value then f else fail pos "where: require rule was fail but success." max2
 
-    let opt (parser:Parser<'a>) = 
+    // パーサ parser を省略可能なパーサを作る
+    let option (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->       
             match parser reader pos failInfo with
             | Fail (pos, max2)  -> succ pos None max2
             | Success (pos, value, max2) -> succ pos (Some value) max2
 
-    let seq (parsers:Parser<'a> list) =
-        fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
-            let rec loop (parsers:Parser<'a> list) (pos:Position.t) (failInfo:FailInformation) (values: 'a list) =
-                match parsers with
-                | []   -> succ pos (List.rev values) failInfo
-                | x::xs -> 
-                    match x reader pos failInfo with
-                    | Fail    (pos, max2) -> Fail (pos, max2)
-                    | Success (pos, value, max2) -> loop xs pos max2 (value :: values)
-            in loop parsers pos failInfo [];
-
+    // パーサ列 parsers を順に試し、最初に成功したパーサの結果か、すべて成功しなかった場合は失敗となるパーサを作る
     let choice(parsers:Parser<'a> list) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             let rec loop (parsers:Parser<'a> list) (pos:Position.t) (failInfo:FailInformation) =
                 match parsers with
-                | []   -> fail pos "choice: not match any rules." failInfo
+                | []   -> fail pos "choice: not match anyChar rules." failInfo
                 | x::xs -> 
                     match x reader pos failInfo with
                     | Fail (_, max2) -> loop xs pos max2
                     | Success _ as ret -> ret;
             in loop parsers pos failInfo;
 
+    // パーサ parser の 0 回以上の繰り返しに合致するパーサを作る
     let repeat (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
             let rec loop pos values failInfo = 
@@ -160,6 +175,7 @@ module ParserCombinator =
                 | Success (pos, value, max2) -> loop pos (value :: values) max2
             in loop pos [] failInfo
 
+    // パーサ parser の 1 回以上の繰り返しに合致するパーサを作る
     let repeat1 (parser:Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
             let rec loop pos values failInfo = 
@@ -171,6 +187,7 @@ module ParserCombinator =
                 | Fail    (pos, max2) -> fail pos "repeat1: not match rule" max2
                 | Success (pos, value, max2) -> loop pos [value] max2
 
+    // パーサ lhs と パーサ rhs を連結したパーサを作る
     let andBoth (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
             match lhs reader pos failInfo with
@@ -180,6 +197,7 @@ module ParserCombinator =
                 | Fail    (pos2, max3) -> fail pos "andBoth: not match right rule" max3
                 | Success (pos2, value2, max3) -> succ pos2 (value1, value2) max3 
 
+    // パーサ lhs と パーサ rhs を連結したパーサを作る
     let andRight (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation) -> 
             match lhs reader pos failInfo with
@@ -189,6 +207,7 @@ module ParserCombinator =
                 | Fail    (pos2, max3) -> fail pos "andRight: not match right rule" max3
                 | Success (pos2, value2, max3) ->  succ pos2 value2 max3
 
+    // パーサ lhs と パーサ rhs を連結したパーサを作る
     let andLeft (rhs : Parser<'b>) (lhs : Parser<'a>) =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)-> 
             match lhs reader pos failInfo with
@@ -198,30 +217,84 @@ module ParserCombinator =
                 | Fail    (pos2, max3) -> fail pos "andLeft: not match left rule" max3
                 | Success (pos2, value2, max3) -> succ pos2 value1 max3 
 
+    // パーサ sep が区切りとして出現するパーサ parser の1回以上の繰り返しに合致するパーサを作る
+    let repeatSep1 (sep:Parser<'b>) (parser:Parser<'a>) = 
+        (andBoth (repeat (andRight parser sep)) parser) |> select (fun (x,xs) -> x::xs) 
+
+    // パーサ sep が区切りとして出現するパーサ parser の0回以上の繰り返しに合致するパーサを作る
+    let repeatSep (sep:Parser<'b>) (parser:Parser<'a>) = 
+        (repeatSep1 sep parser) |> option |> select (function | None -> [] | Some xs -> xs) 
+    
+    // 遅延評価が必要となるパーサを作る
     let quote (parser:unit -> Parser<'a>) = 
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->  (parser ()) reader pos failInfo
 
+    // 書き換え可能なパーサを作る
     let hole () = 
         ref (fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  ->  failwith "hole syntax")
 
-    type Memoizer = { add: (unit -> unit) -> unit; reset : unit -> unit }
+    // パーサのメモ化制御オブジェクト型
+    type Memoizer = { 
+        add: (unit -> unit) -> unit;    // メモ化のリセット時に呼び出される関数を登録する
+        reset : unit -> unit            // メモ化をリセットする
+    }
+
+    // パーサのメモ化制御オブジェクトを作る
     let memoizer () = 
         let handlers = ref List.empty
         let add (handler:unit -> unit) = handlers := handler :: !handlers
         let reset () = List.iter (fun h -> h()) !handlers
         in  { add = add; reset = reset }
-        
-    let memoize (memoizer: Memoizer) (f : Parser<'a>) = 
+
+    // パーサ parser をメモ化したパーサを作る
+    let memoize (memoizer: Memoizer) (parser : Parser<'a>) = 
         let dic = System.Collections.Generic.Dictionary<(Reader.t * int * FailInformation), ParserState<'a>> ()
         let _ = memoizer.add (fun () -> dic.Clear() )
-        in  fun x y z -> 
-                let (i,l,c) = y 
-                let key = (x,i,z) 
-                in
-                    match dic.TryGetValue(key) with 
+        in  fun reader pos failInfo -> 
+                let (i,l,c) = pos 
+                let key = (reader,i,failInfo) 
+                in  match dic.TryGetValue(key) with 
                     | true, r -> r
-                    | _       -> dic.[key] <- f x y z;
+                    | _       -> dic.[key] <- parser reader pos failInfo;
                                  dic.[key]
+
+    module ComputationExpressions =
+        exception ParseFail of (string)
+
+        // Parser (ﾟ∀ﾟ) Monad!
+        type ParserBuilder() =
+            member __.Bind(m, f) = 
+                fun (reader:Reader.t) (pos:Position.t) (fail:FailInformation) -> 
+                    match m reader pos fail with 
+                    | Fail    (pos',       fail') -> Fail (pos, fail) 
+                    | Success (pos',value',fail') -> f value' reader pos' fail'
+            member __.Return(x)  = 
+                fun (reader:Reader.t) (pos:Position.t) (fail':FailInformation) -> 
+                    try succ pos x fail' with 
+                    | ParseFail msg -> fail pos msg fail'
+
+        let parser = ParserBuilder()
+
+        // Repeat (ﾟ∀ﾟ) Monad!
+        type RepeatBuilder() = 
+            inherit ParserBuilder() 
+            member __.Run(m) = repeat m
+            
+        let rep = RepeatBuilder()
+
+        // Option (ﾟ∀ﾟ) Monad!
+        type OptionBuilder() = 
+            inherit ParserBuilder() 
+            member __.Run(m) = option m
+            
+        let opt = OptionBuilder()
+
+        type DelayBuilder() =
+            inherit ParserBuilder() 
+            member __.Run(m) = quote(fun () -> m)
+
+        let delay = DelayBuilder()
+        
 
     module OperatorExtension =
         open System.Runtime.CompilerServices;
@@ -240,15 +313,17 @@ module ParserCombinator =
             [<Extension>]
             static member inline Many(self: Parser<'T>) = repeat self 
             [<Extension>]
+            static member inline Many(self: Parser<'T>, sep:Parser<'U>) = repeatSep sep self 
+            [<Extension>]
             static member inline Many1(self: Parser<'T>) = repeat1 self 
             [<Extension>]
-            static member inline Option(self: Parser<'T>) = opt self 
+            static member inline Many1(self: Parser<'T>, sep:Parser<'U>) = repeatSep1 sep self 
+            [<Extension>]
+            static member inline Option(self: Parser<'T>) = option self 
             [<Extension>]
             static member inline Select(self: Parser<'T1>, selector:'T1 -> 'T2) = select selector self 
             [<Extension>]
             static member inline Where(self: Parser<'T1>, selector:'T1 -> bool) = where selector self 
-            [<Extension>]
-            static member inline AsString(self: Parser<'T list>) = asString self 
 
 module Interpreter =
     module Type = 
@@ -322,6 +397,23 @@ module Interpreter =
             | ConsP of pattern * pattern
             | UnitP
  
+        let rec scanPatV pattern ret  =
+            match pattern with
+            | VarP name -> name :: ret 
+            | AnyP -> ret
+            | ILitP _ -> ret
+            | BLitP _ -> ret 
+            | SLitP _ -> ret 
+            | LLitP items -> List.fold (fun s x -> scanPatV x s) ret items
+            | TLitP items -> List.fold (fun s x -> scanPatV x s) ret items
+            | NilP -> ret
+            | UnitP -> ret
+            | ConsP (car, cdr) -> scanPatV car ret |> scanPatV cdr
+
+        type lettype =
+            | LVar of pattern
+            | LFun of id
+
         type exp =
               Var of id
             | ILit of int
@@ -333,20 +425,26 @@ module Interpreter =
             | BinOp of binOp * exp * exp
             | IfExp of exp * exp * exp
             | SeqExp of (exp * exp)
-            | LetExp of (id * exp) list list * exp
-            | LetRecExp of (id * exp) list list * exp
-            | FunExp of (id * exp) 
+            //| LetExp of (id * exp) list list * exp
+            | LetExp of (lettype * exp) list list * exp
+            //| LetRecExp of (id * exp) list list * exp
+            | LetRecExp of (lettype * exp) list list * exp
+            //| FunExp of (id * exp) 
+            | FunExp of (pattern * exp) 
             | MatchExp of (exp * (pattern * exp) list)
             | AppExp  of (exp * exp)
 
         type program =
             | ExpStmt of exp
-            | LetStmt of (id * exp) list list
-            | LetRecStmt of (id * exp) list list
+            //| LetStmt of (id * exp) list list
+            | LetStmt of (lettype * exp) list list
+            //| LetRecStmt of (id * exp) list list
+            | LetRecStmt of (lettype * exp) list list
 
     module Parser =
         open ParserCombinator
         open ParserCombinator.OperatorExtension
+        open ParserCombinator.ComputationExpressions
         open Syntax;
 
         let isLower ch = 'a' <= ch && ch <= 'z'
@@ -396,24 +494,31 @@ module Interpreter =
                     in  loop xs (x::ret)
             in  loop (Seq.toList str) List.empty
 
-        let memo = memoizer()
+        let m = memoizer()
 
         let COMMENT_ = hole()
         let COMMENT = quote (fun () -> !COMMENT_)
-        let _ = COMMENT_ := (seq [
-                                str "(*"; 
-                                (choice [
-                                    (str "(*").Not().Not().AndR(COMMENT).Select(fun _ -> ());
-                                    (str "*)").Not().AndR(any ()).Select(fun _ -> ())
-                                ]).Many().Select(fun _ -> "");
-                                str "*)"
-                            ]).Select(fun _ -> ())
+        let _ = COMMENT_ := parser {
+                                let! _ = str "(*" 
+                                let! _ = (choice [
+                                            parser { let! _ = look (str "(*") in let! _ = COMMENT in return () };
+                                            parser { let! _ = not (str "*)") in let! _ = anyChar () in return () }
+                                        ]).Many()
+                                let! _ = str "*)"
+                                return () 
+                            }
 
-        let SPACE = (anychar " \t\r\n").Select(fun _ -> ())
-        let WS = (SPACE.Or(COMMENT)).Many()
-        let ws x = WS.AndR(x)  |> memoize memo
+        let SPACE = (oneOf " \t\r\n").Select(fun _ -> ())
+        let WS = (choice [SPACE;COMMENT]).Many()
+        let ws x = WS.AndR(x)  |> memoize m
 
-        let Ident = ws( (char isIdHead).And((char isIdBody).Many().AsString()).Select(fun (h,b) -> h.ToString() + b) )
+        //let Ident = ws( (char isIdHead).And((char isIdBody).Many().AsString()).Select(fun (h,b) -> h.ToString() + b) )
+        let Ident = ws (parser {
+            let! x = charOf isIdHead
+            let! xs = (charOf isIdBody).Many()
+            return (x::xs) |> System.String.Concat
+        })
+
         let res word = Ident.Where(fun x -> x = word)
         let TRUE = res "true"
         let FALSE = res "false"
@@ -431,15 +536,27 @@ module Interpreter =
         let STRING = res "string"
         let BOOL = res "bool"
         let ID = Ident.Where(fun x -> (List.contains x ["true";"false";"if";"then";"else";"let";"in";"and";"fun";"rec";"match";"with"]) = false);
-        let INTV = ws( (char (fun x -> x = '-')).Option().And((char isDigit).Many1().AsString().Select(System.Int32.Parse)).Select(fun (s,v) -> if s.IsSome then (-v) else v))
+        //let INTV = ws( (char (fun x -> x = '-')).Option().And((char isDigit).Many1().AsString().Select(System.Int32.Parse)).Select(fun (s,v) -> if s.IsSome then (-v) else v))
+        let INTV = ws( parser {
+            let! sign = (char '-').Option()
+            let! digits = (charOf isDigit).Many1().Select(System.String.Concat)
+            let v = System.Int32.Parse digits
+            return (if sign.IsSome then -v else v) 
+        })
         let STRV = 
-            let DQuote = char (fun x -> x = '"' )
-            let Escaped = (char (fun x -> x = '\\' )).And(anychar("abfnrtv\\\"")).Select(fun (x,y) -> sprintf "%c%c" x y)
-            let Char = any().Select(fun x -> x.ToString())
+            let DQuote = char '"'
+            let Escaped = (char '\\' ).And(oneOf("abfnrtv\\\"")).Select(fun (x,y) -> sprintf "%c%c" x y)
+            let Char = anyChar().Select(fun x -> x.ToString())
             let StrChr = DQuote.Not().AndR(Escaped.Or(Char))
-            in  ws( DQuote.AndR(StrChr.Many()).AndL(DQuote).Select( fun x -> String.concat "" x |> unescapeString ) )
-        let LPAREN = ws(char (fun x -> x = '(' ))
-        let RPAREN = ws(char (fun x -> x = ')' ))
+            //in  ws( DQuote.AndR(StrChr.Many()).AndL(DQuote).Select( fun x -> String.concat "" x |> unescapeString ) )
+            in  ws( parser { 
+                let! _ = DQuote
+                let! s = StrChr.Many()
+                let! _ = DQuote
+                return String.concat "" s |> unescapeString
+            })
+        let LPAREN = ws(char '(')
+        let RPAREN = ws(char ')')
         let MULT = ws(str "*")
         let DIV = ws(str "/")
         let PLUS = ws(str "+")
@@ -454,8 +571,8 @@ module Interpreter =
         let SEMISEMI = ws(str ";;")
         let ANDAND = ws(str "&&")
         let OROR = ws(str "||")
-        let LBRACKET = ws(char (fun x -> x = '[' ))
-        let RBRACKET = ws(char (fun x -> x = ']' ))
+        let LBRACKET = ws(char '[')
+        let RBRACKET = ws(char ']')
         let COLCOL = ws(str "::")
         let BAR = ws(str "|")
         let SEMI = ws(str ";")
@@ -471,7 +588,7 @@ module Interpreter =
             let tcon x id =
                 match id,x with
                 | "list", x::[] -> TList x
-                | "list", _ -> failwith "list must 1 arg"
+                | "list", _ -> raise (ParseFail "list type need 1 argument")
                 | _,[] -> failwith "need 1 arg"
                 | _ -> TConstruct(x,TNamed id)
             in
@@ -480,28 +597,26 @@ module Interpreter =
                     INT.Select(fun x -> TInt);
                     BOOL.Select(fun x -> TBool);
                     STRING.Select(fun x -> TString);
-                    (seq [LPAREN; RPAREN]).Select(fun x -> TUnit);
+                    LPAREN.And(RPAREN).Select(fun _ -> TUnit);
                     ID.Select(fun x -> TConstruct ([], TNamed x));
-                    LPAREN.AndR(TypeExpr).And(COMMA.AndR(TypeExpr).Many()).AndL(RPAREN).And(ID).Select(fun ((x,xs),id) -> tcon (x::xs) id );
+                    LPAREN.AndR(TypeExpr.Many1(COMMA)).AndL(RPAREN).And(ID).Select(fun (xs,id) -> tcon xs id );
                     LPAREN.AndR(TypeExpr).AndR(TypeExpr).AndL(RPAREN);
                 ]).And(ID.Many()).Select(fun (x,ys) -> List.fold (fun s x -> tcon [s] x) x ys)
 
-        let TupleType =
-            SimpleType.And(MULT.AndR(SimpleType).Many()).Select( fun (x,xs) -> if xs = [] then x else TTuple (x::xs))
+        let TupleType = SimpleType.Many1(MULT).Select(function | x::[] -> x | xs -> TTuple xs)
 
-        let FuncType =
-            TupleType.And(RARROW.AndR(TupleType).Many()).Select( fun (x,xs) -> if xs = [] then x else List.reduceBack (fun x s -> TFun (x,s)) (x::xs))
+        let FuncType = TupleType.Many1(RARROW).Select(List.reduceBack (fun x s -> TFun (x,s)))
 
         let _ = TypeExpr_ := FuncType 
 
         let Expr_ = hole ()
-        let Expr = quote(fun () -> !Expr_)|> memoize memo
+        let Expr = quote(fun () -> !Expr_)|> memoize m
 
         let ItemExpr_ = hole ()
-        let ItemExpr = quote(fun () -> !ItemExpr_)|> memoize memo
+        let ItemExpr = quote(fun () -> !ItemExpr_)|> memoize m
         
         let BinOpExpr = 
-            let make (tok,op) = tok.Select(fun _ -> FunExp("@lhs", FunExp("@rhs", BinOp (op,Var "@lhs",Var "@rhs"))))
+            let make (tok,op) = tok.Select(fun _ -> FunExp(VarP "@lhs", FunExp(VarP "@rhs", BinOp (op,Var "@lhs",Var "@rhs"))))
             in
                 choice (List.map make [ PLUS,Plus;
                                         MINUS,Minus;
@@ -516,49 +631,62 @@ module Interpreter =
                                         COLCOL,Cons
                                     ])
 
-        let FunExpr =
-            //FUN.AndR(ID.Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun x s -> FunExp (x, s)) args e)
-            FUN.AndR(LPAREN.AndR(ID).And(COL.AndR(TypeExpr).AndL(RPAREN).Option()).Or(ID.Select(fun x -> (x,None))).Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun (x,t) s -> FunExp (x, s)) args e)
+        let Args =
+            repeat1(
+                choice[
+                    parser {
+                        let! _ = LPAREN
+                        let! id = ID
+                        let! ty = opt { let! _ = COL in let! expr = TypeExpr in return expr }
+                        let! _ = RPAREN
+                        return (id,ty)
+                    };
+                    parser {
+                        let! id = ID
+                        let! ty = opt { let! _ = COL in let! expr = TypeExpr in return expr }
+                        return (id,ty)
+                    };
+                ]
+            )
 
         let PatternExpr_ = hole ()
-        let PatternExpr = quote(fun () -> !PatternExpr_)|> memoize memo
+        let PatternExpr = quote(fun () -> !PatternExpr_)|> memoize m
 
         let PatternAExpr = 
             choice [ 
                 INTV.Select(fun x -> ILitP x);
+                STRV.Select(fun x -> SLitP x);
                 TRUE.Select(fun x -> BLitP true);
                 FALSE.Select(fun x -> BLitP false);
                 ID.Select(fun x -> VarP x);
                 US.Select(fun x -> AnyP );
-                LBRACKET.AndR(PatternExpr.And((SEMI.AndR(PatternExpr)).Many()).Option().Select( function | Some (x,xs) -> (x::xs) | None -> [] )).AndL(RBRACKET).Select(LLitP);
+                LBRACKET.AndR(PatternExpr.Many1(SEMI)).AndL(RBRACKET).Select(LLitP);
                 LPAREN.AndR(PatternExpr).AndL(RPAREN);
             ]
 
         let PatternConsExpr = 
-            PatternAExpr.And(COLCOL.AndR(PatternAExpr).Many()).Select(fun (head, tail) -> List.reduceBack (fun x s -> ConsP(x, s)) (head::tail) );
+            PatternAExpr.Many1(COLCOL).Select(List.reduceBack (fun x s -> ConsP(x, s)))
 
         let PatternTupleExpr = 
-            PatternConsExpr.And(COMMA.AndR(PatternConsExpr).Many()).Select(fun (head, tail) -> match tail with [] -> head | _ -> TLitP (head::tail) );
+            PatternConsExpr.Many1(COMMA).Select(function | x::[] -> x | xs -> TLitP xs)
 
         let _ = PatternExpr_ := PatternTupleExpr
 
+        let FunExpr =
+            ////FUN.AndR(ID.Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun x s -> FunExp (x, s)) args e)
+            //FUN.AndR(LPAREN.AndR(ID).And(COL.AndR(TypeExpr).AndL(RPAREN).Option()).Or(ID.Select(fun x -> (x,None))).Many1()).AndL(RARROW).And(Expr).Select(fun (args, e) -> List.foldBack (fun (x,t) s -> FunExp (x, s)) args e)
+            parser {
+                let! _ = FUN
+                let! args = PatternExpr.Many1()
+                let! _ = RARROW
+                let! expr = Expr
+
+                return List.foldBack (fun x s -> FunExp (x, s)) args expr
+            }
+
         let Matching =
             let checkPattern pattern =
-                let vars = 
-                    let rec scan pattern ret  =
-                        match pattern with
-                        | VarP name -> name :: ret 
-                        | AnyP -> ret
-                        | ILitP _ -> ret
-                        | BLitP _ -> ret 
-                        | SLitP _ -> ret 
-                        | LLitP items -> List.fold (fun s x -> scan x s) ret items
-                        | TLitP items -> List.fold (fun s x -> scan x s) ret items
-                        | NilP -> ret
-                        | UnitP -> ret
-                        | ConsP (car, cdr) -> scan car ret |> scan cdr
-                    in
-                        scan pattern []
+                let vars = scanPatV pattern []
                 let dup = List.countBy (fun x -> x) vars |> List.where (fun (_,cnt) -> cnt > 1) |> List.map (fun (name,cnt) -> name)
                 in
                     if List.isEmpty dup 
@@ -568,7 +696,7 @@ module Interpreter =
                 PatternExpr.Where(checkPattern).AndL(RARROW).And(Expr)
 
         let Matchings =
-            BAR.Option().AndR(Matching).And(BAR.AndR(Matching).Many()).Select(fun (x,xs) -> x::xs)
+            BAR.Option().AndR(Matching.Many1(BAR))
 
         let MatchExpr =
             MATCH.AndR(Expr).AndL(WITH).And(Matchings).Select(fun (e,b) -> MatchExp (e,b))
@@ -576,23 +704,78 @@ module Interpreter =
         let IfExpr =
             IF.AndR(Expr).AndL(THEN).And(Expr).AndL(ELSE).And(Expr).Select( fun ((c,t),e) -> IfExp (c, t, e) )
 
-        let LetPrim =
-            (ID.Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | id::[] -> (id,e) | id::args -> (id,List.foldBack (fun x s -> FunExp (x, s)) args e))) |> memoize memo
-            
-        let LetAndExpr =
-            LET.AndR(LetPrim).And(AND.AndR(LetPrim).Many()).Select(fun (x,xs) -> (x::xs))
+        let LetFun =
+            ////(ID.Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | id::[] -> (id,e) | id::args -> (id,List.foldBack (fun x s -> FunExp (x, s)) args e))) |> memoize m
+            //(ID.And(COL.AndR(TypeExpr).Option()).Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | (id,ty)::[] -> (id,e) | (id,ty)::args -> (id,List.foldBack (fun (x,t) s -> FunExp (x, s)) args e))) |> memoize m
+            parser {
+                let! id = ID
+                let! args = PatternExpr.Many1()
+                let! _ = EQ
+                let! e = Expr
+                let ret =
+                    match args with 
+                    | [] -> failwith "no arg" 
+                    | args -> (LFun id,List.foldBack (fun x s -> FunExp (x, s)) args e)
+                return ret
+            }
 
-        let LetAndExprs = (LetAndExpr).Many1() |> memoize memo
+        let LetVar =
+            ////(ID.Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | id::[] -> (id,e) | id::args -> (id,List.foldBack (fun x s -> FunExp (x, s)) args e))) |> memoize m
+            //(ID.And(COL.AndR(TypeExpr).Option()).Many1().AndL(EQ).And(Expr).Select(fun (ids,e) -> match ids with | [] -> failwith "no entry" | (id,ty)::[] -> (id,e) | (id,ty)::args -> (id,List.foldBack (fun (x,t) s -> FunExp (x, s)) args e))) |> memoize m
+            parser {
+                //let! (id,ty) = 
+                //        choice [
+                //            parser {
+                //                let! _ = LPAREN
+                //                let! id = ID
+                //                let! ty = option ( COL.AndR(TypeExpr) )
+                //                let! _ = RPAREN
+                //                return (id,ty)
+                //            };
+                //            parser {
+                //                let! id = ID
+                //                let! ty = option ( COL.AndR(TypeExpr) )
+                //                return (id,ty)
+                //            };
+                //        ]
+                //let! _ = EQ
+                //let! e = Expr
 
-        let LetRecAndExpr =
-            LET.AndR(REC).AndR(LetPrim).And(AND.AndR(LetPrim).Many()).Select(fun (x,xs) -> (x::xs))
+                //return (id,e)
+                let! pat = PatternExpr
+                let! _ = EQ
+                let! e = Expr
 
-        let LetRecAndExprs = (LetRecAndExpr).Many1() |> memoize memo
+                return (LVar pat,e)
+            }
+
+        let LetPrim = (choice [LetFun;LetVar]) |> memoize m
+
+        let LetAndExpr = parser {
+            let! _  = LET
+            let! xs = LetPrim.Many1(AND)
+            return xs
+        }
+
+        let LetRecAndExpr = parser {
+            let! _  = LET
+            let! _  = REC
+            let! xs = LetPrim.Many1(AND)
+            return xs
+        }
+
+        let LetAndExprs = LetAndExpr.Many1() |> memoize m
+        let LetRecAndExprs = LetRecAndExpr.Many1() |> memoize m
 
         let LetExpr = 
             choice [
                 LetRecAndExprs.AndL(IN).And(Expr).Select(LetRecExp);
-                LetAndExprs.AndL(IN).And(Expr).Select(LetExp)
+                parser {
+                    let! bindings = LetAndExprs
+                    let! _ = IN
+                    let! expr = Expr
+                    return (LetExp (bindings,expr))
+                }
             ]
 
         let AExpr = 
@@ -606,13 +789,17 @@ module Interpreter =
                 IfExpr; 
                 MatchExpr;
                 LetExpr; 
-                LBRACKET.AndR(ItemExpr.And((SEMI.AndR(ItemExpr)).Many()).Option().Select( function | Some (x,xs) -> (x::xs) | None -> [] )).AndL(RBRACKET).Select(LLit);
+                LBRACKET.AndR(ItemExpr.Many(SEMI)).AndL(RBRACKET).Select(LLit);
                 LPAREN.And(RPAREN).Select(fun _ -> Unit);
                 LPAREN.AndR(BinOpExpr).AndL(RPAREN);
                 LPAREN.AndR(Expr).AndL(RPAREN)
             ]
 
-        let AppExpr = AExpr.Many1().Select( fun x -> List.reduce (fun s x -> AppExp (s, x) ) x )
+        let AppExpr = parser {
+            let! fn = AExpr
+            let! args = rep { let! _ = not(LET) in let! arg = AExpr in return arg }
+            return (List.fold (fun s x -> AppExp (s, x) ) fn args)
+        }
 
         let MExpr = 
             let op = choice[
@@ -631,7 +818,7 @@ module Interpreter =
                 MExpr.And(op.And(MExpr).Many()).Select(fun (l,r) -> List.fold (fun l (op,r) -> BinOp (op, l, r)) l r)
 
         let ConsExpr = 
-            PExpr.And(COLCOL.AndR(PExpr).Many()).Select(fun (head, tail) -> List.reduceBack (fun x s -> BinOp(Cons, x, s)) (head::tail) )
+            PExpr.Many1(COLCOL).Select(List.reduceBack (fun x s -> BinOp(Cons, x, s)) )
 
         let EqExpr = 
             let op = choice[
@@ -670,24 +857,24 @@ module Interpreter =
             ]
 
         let TupleExpr = 
-                LOrExpr.And(COMMA.AndR(LOrExpr).Many()).Select(fun (x,xs) -> match xs with | [] -> x | xs -> TLit (x::xs));
+                LOrExpr.Many1(COMMA).Select(function | x::[] -> x | xs -> TLit (xs))
 
         let SeqExpr =
-                TupleExpr.And(SEMI.AndR(TupleExpr).Many()).Select(fun (x,xs) -> List.reduceBack (fun x s -> SeqExp(x,s)) (x::xs));
+                TupleExpr.Many1(SEMI).Select(List.reduceBack (fun x s -> SeqExp(x,s)))
 
         let _ = Expr_ := SeqExpr
         let _ = ItemExpr_ := TupleExpr
 
-        let LetStmt =
-            LetAndExprs.AndL(IN.Not()).Select( fun s -> LetStmt s)
+        let LetStmt = 
+            LetAndExprs.AndL(not IN).Select( LetStmt )
 
         let LetRecStmt =
-            LetRecAndExprs.AndL(IN.Not()).Select( fun s -> LetRecStmt s)
+            LetRecAndExprs.AndL(not IN).Select( LetRecStmt )
 
         let ExprStmt =
             Expr.Select( fun x -> ExpStmt x)
 
-        let toplevel = (action (fun _ -> memo.reset() )).AndR(choice[ LetRecStmt; LetStmt; ExprStmt ].AndL(SEMISEMI))
+        let toplevel = (action (fun _ -> m.reset() )).AndR(choice[ LetRecStmt; LetStmt; ExprStmt ].AndL(SEMISEMI))
         
         let errorRecover reader p = 
             let token = ws(choice [
@@ -706,7 +893,7 @@ module Interpreter =
                             LPAREN.Select(fun x -> x.ToString());
                             RPAREN.Select(fun x -> x.ToString());
                             MULT;DIV;PLUS;MINUS;EQ;NE;LE;GE;LT;GT;
-                            any().Select(fun x -> x.ToString())
+                            anyChar().Select(fun x -> x.ToString())
                         ])
             let rec loop p lp =
                 match token reader p (p,"") with
@@ -752,7 +939,7 @@ module Interpreter =
                   IntV of int
                 | BoolV of bool
                 | StringV of string
-                | ProcV of id * exp * t Environment.t ref
+                | ProcV of pattern * exp * t Environment.t ref
                 | ConsV of t * t
                 | NilV
                 | UnitV
@@ -868,19 +1055,33 @@ module Interpreter =
             | SeqExp (exp1, exp2) ->
                 let _ = eval_exp env exp1
                 in  eval_exp env exp2
-            | LetExp (ss,b) ->
-                let newenv = List.fold (fun env s -> List.fold (fun env' (id,e) -> let v = eval_exp env e in (id, v)::env') env s ) env ss
+
+            | LetExp (lettype,body) ->
+                let proc_binding env binding = 
+                    List.fold (fun env' (lt,e) -> 
+                        match lt with
+                        | LVar pat -> 
+                            //let v = eval_exp env e in (id, v)::env'
+                            let v = eval_exp env e 
+                            let vs = try_match v pat env
+                            in  match vs with
+                                | None -> failwith "not match"
+                                | Some env -> env
+                        | LFun id -> let v = eval_exp env e in (id, v)::env'
+                    ) env binding
+                let newenv = List.fold proc_binding env lettype
                 //let newenv = List.fold (fun env (id,e) -> let v = eval_exp env e in  (id, v)::env ) env ss
-                in  eval_exp newenv b
+                in  eval_exp newenv body
 
-            | LetRecExp (ss,b) ->
+            | LetRecExp (pats,body) ->
                 let dummyenv = ref Environment.empty
-                let newenv = List.fold (fun env s -> List.fold (fun env' (id,e) -> let v = match e with FunExp(id,exp) -> Value.ProcV (id,exp,dummyenv) | _ -> failwithf "variable cannot " in  (id, v)::env') env s ) env ss
+                //let newenv = List.fold (fun env s -> List.fold (fun env' (id,e) -> let v = match e with FunExp(id,exp) -> Value.ProcV (id,exp,dummyenv) | _ -> failwithf "variable cannot " in  (id, v)::env') env s ) env binds
+                let newenv = List.fold (fun env s -> List.fold (fun env' (pat,e) -> let v = match e with FunExp(id,exp) -> Value.ProcV (id,exp,dummyenv) in  (id, v)::env' | _ -> failwithf "variable cannot " ) env s ) env pats
                 in  dummyenv := newenv;
-                    eval_exp newenv b
+                    eval_exp newenv body
 
-            | FunExp (id, exp) -> 
-                Value.ProcV (id, exp, ref env) 
+            | FunExp (pat, exp) -> 
+                Value.ProcV (pat, exp, ref env) 
             
             | MatchExp (expr, matchings) ->
                 let value = eval_exp env expr
@@ -897,9 +1098,13 @@ module Interpreter =
                 let funval = eval_exp env exp1 in
                 let arg = eval_exp env exp2 in
                     match funval with
-                    | Value.ProcV (id, body, env') ->
-                        let newenv = Environment.extend id arg !env' in
-                        eval_exp newenv body
+                    | Value.ProcV (pat, body, env') ->
+                        //let newenv = Environment.extend id arg !env' in
+                        let newenv = try_match arg pat !env'
+                        in
+                            match newenv with
+                            | None -> failwith "not match"
+                            | Some newenv -> eval_exp newenv body
                     | _ -> failwith ("Non-function value is applied")
 
             | LLit v -> 
@@ -1111,6 +1316,7 @@ module Interpreter =
                 in (s3, (subst_type s3 ty))
 
             | LetRecExp (ss,b) ->
+                
                 let (dummyenv,newsubst,neweqs,ret) = 
                     List.fold 
                         (fun (dummyenv,newsubst,neweqs,ret) s -> 
@@ -1273,6 +1479,7 @@ module Interpreter =
 
                 | ParserCombinator.Fail(p,((i,l,c),msg)) ->
                     let (reader, p) = Parser.errorRecover reader p
+                    let (reader, p) = Reader.trunc reader p
                     in  printfn "SyntaxError (%d, %d) : %s" l c msg;
                         read_eval_print env tyenv reader p
 
@@ -1290,9 +1497,11 @@ module Interpreter =
 
         let run () = read_eval_print initial_env initial_tyenv (Reader.create System.Console.In) Position.head
 
+
+
 [<EntryPoint>]
 let main argv = 
-    let ret = Interpreter.Parser.TypeExpr (Reader.create System.Console.In) Position.head (Position.head,"")
-    let _ = printfn "%A" ret
-    in  Interpreter.Repl.run (); 0 // 整数の終了コードを返します
+//    let ret = Interpreter.Parser.LetAndExpr (Reader.create System.Console.In) Position.head (Position.head,"")
+//    let _ = printfn "%A" ret in  
+    Interpreter.Repl.run (); 0 // 整数の終了コードを返します
 
