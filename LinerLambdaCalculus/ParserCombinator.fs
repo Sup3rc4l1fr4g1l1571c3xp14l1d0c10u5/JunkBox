@@ -154,9 +154,10 @@ module ParserCombinator =
         fun (reader:Reader.t) (pos:Position.t) (failInfo:FailInformation)  -> 
             match parser reader pos failInfo with
             | Fail    (pos, max2) -> Fail (pos, max2)
-            | Success (pos', value, max2) as f -> match pred value with
-                                               | None   -> fail pos "where_select: require rule was fail but success." max2
-                                               | Some v -> succ pos' v max2 
+            | Success (pos', value, max2) as f -> 
+                match pred value with
+                | None   -> fail pos "where_select: require rule was fail but success." max2
+                | Some v -> succ pos' v max2 
 
     // パーサ parser を省略可能なパーサを作る
     let option (parser:Parser<'a>) = 

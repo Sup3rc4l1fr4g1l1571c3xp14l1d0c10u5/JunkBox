@@ -69,20 +69,34 @@ let Eof = ParserCombinator.anyChar() |> ParserCombinator.not |> ParserCombinator
 let LPAREN = ReserveWord Bracket "("
 let RPAREN= ReserveWord Bracket ")"
 
-let simpleterm = choice [
-        | ID { Ast.Var $1 }
-        | QUAL BOOL { Ast.Boolean ($1,$2) }
-        | IF term THEN term ELSE term { Ast.If ($2,$4,$6) }
-        | QUAL LEFT term COMMA term RIGHT { Ast.Pair ($1,$3,$5) }
-        | SPLIT term AS ID COMMA ID IN term { Ast.Split ($2,$4,$6,$8) }
-        | QUAL LAMBDA ID COLON qualtype DOT term { Ast.Abs ($1,$3,$5,$7) }
-        | LPAREN term RPAREN { $2 }
-    ]
+let rec qualtype     = 
+    let qualtype' = ParserCombinator.quote (fun () -> qualtype) 
+    in
+        ParserCombinator.choice [
+            parser {let! q = QUAL in let! _ = BoolT in return Type.Bool q };
+            parser {let! q = QUAL in let! _ = LPAREN in let! qt1 = qualtype' in let! _ = MULTI in let! qt2 = qualtype' in let! _ = RPAREN in return Type.Pair (q,qt1,qt2) };
+            parser {let! q = QUAL in let! _ = LPAREN in let! qt1 = qualtype' in let! _ = ARROW in let! qt2 = qualtype' in let! _ = RPAREN in return Type.Fn (q,qt1,qt2) };
+            parser {let! q = LPAREN in let! qt = qualtype' in let! _ = RPAREN in return qt };
+        ]
 
-let term = simpleterm.Many1().Select(fun ts -> List.reduceBack (fun y x ->  Ast.App (y,x)) ts)
+and simpleterm = 
+    let term' = ParserCombinator.quote (fun () -> term) 
+    in
+        ParserCombinator.choice [
+            parser { let! id = ID in return Ast.Var id  };
+            parser { let! q = QUAL in let! v = BOOL in return Ast.Boolean (q,v) };
+            parser { let! _ = IF in let! cond = term' in let! _ = THEN in let! tt = term' in let! _ = ELSE in let! et = term' in return Ast.If (cond,tt,et) };
+            parser { let! q = QUAL  in let! _ = LEFT  in let! lt = term'  in let! _ = COMMA  in let! rt = term'  in let! _ = RIGHT in return Ast.Pair (q,lt,rt) };
+            parser { let! _ = SPLIT  in let! t = term'  in let! _ = AS  in let! lt = ID  in let! _ = COMMA  in let! rt = ID  in let! _ = IN  in let! b = term in return Ast.Split (t,lt,rt,b) };
+            parser { let! q1 = QUAL  in let! _ = LAMBDA  in let! id = ID  in let! _ = COLON  in let! q2 = qualtype  in let! _ = DOT  in let! b = term in return Ast.Abs (q1,id,q2,b) };
+            parser { let! _ = LPAREN  in let! t = term'  in let! _ = RPAREN in return t };
+        ]
 
-let toplevel = 
-    rep {
+and term = 
+    simpleterm.Many1().Select(fun ts -> List.reduceBack (fun y x ->  Ast.App (y,x)) ts)
+
+and toplevel = 
+    parser {
         let! _ = LET 
         let! id = ID
         let! _ = EQ 
@@ -90,22 +104,27 @@ let toplevel =
         let! _ = SEMICOLON 
         return (id,t)
     }
-  //  | { [] }
-  //  | Eof { [] }
-  //  | error
-  //  { failwith
-  //(Printf.sprintf "parse error near characters %d-%d"
-  //   (Parsing.symbol_start ())
-  //   (Parsing.symbol_end ()))
-  //  }
-  //  ;
+and toplevels = 
+    toplevel.Many1()
 
+and error reader p = 
+    let rec loop p stack =
+        let anytok = ParserCombinator.choice [Ident; Symbol; Bracket]
+        in  match anytok reader p (p,"") with
+            | ParserCombinator.ParserCombinator.Success (p,v,_) ->
+                match (v,stack) with
+                | "(", xs 
+                | "[", xs  
+                | "<", xs -> loop p (v::xs)
+                | ")", ("("::xs) 
+                | "]", ("["::xs) 
+                | ">", ("<"::xs) -> loop p xs
+                | ")", xs
+                | "]", xs 
+                | ">", xs -> loop p xs
+                | ";", xs when List.length xs = 0 -> p 
+                | _  , xs -> loop p xs
+            | ParserCombinator.ParserCombinator.Fail (p,(p',f)) ->
+                failwith "syntax miss"
+    in  loop p []
 
-
-
-qualtype:
-QUAL BoolT { Type.Bool $1 }
-    | QUAL LPAREN qualtype MULTI qualtype RPAREN { Type.Pair ($1,$3,$5) }
-    | QUAL LPAREN qualtype ARROW qualtype RPAREN { Type.Fn ($1,$3,$5) }
-    | LPAREN qualtype RPAREN { $2 }
-;
