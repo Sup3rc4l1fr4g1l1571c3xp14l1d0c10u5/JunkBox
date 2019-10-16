@@ -1,0 +1,105 @@
+﻿<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <title>TypeScript HTML App</title>
+    <link rel="stylesheet" href="app.css" />
+    <style>
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow:hidden;
+        }
+        #sections {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: 50% 50%;
+            grid-template-rows: 50% 50%;
+        }
+        #section-ast {
+            grid-column: 1;
+            grid-row: 1;
+        }
+        #sections-code {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        #section-input {
+            grid-column: 2;
+            grid-row: 1;
+        }
+        #sections-output {
+            grid-column: 2;
+            grid-row: 2;
+        }
+        .section-box {
+            display: grid;
+            grid-template-columns: 100%;
+            grid-template-rows: 1rem 1fr;
+        }
+        .section-box > .section-box-caption {
+            grid-column: 1;
+            grid-row: 1;
+        }
+        .section-box > .section-box-body {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        #ast {
+            width: 100%;
+            height: 100%;
+        }
+        #code {
+            width: 100%;
+            height: 100%;
+        }
+        #input {
+            width: 100%;
+            height: 100%;
+        }
+        #output {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+    <script src="app.js"></script>
+</head>
+<body>
+    <section id="sections">
+        <section id="section-ast`" class="section-box">
+            <section id="section-ast`" class="section-box-caption">
+                <div>AST</div>
+            </section>
+            <section id="section-ast`" class="section-box-body">
+                <textarea id="ast"></textarea>
+            </section>
+        </section>
+        <section id="section-code`"  class="section-box">
+            <section id="section-ast`" class="section-box-caption">
+                <div>Generated Code</div>
+            </section>
+            <section id="section-ast`" class="section-box-body">
+                <textarea id="code"></textarea>
+            </section>
+        </section>
+        <section id="section-input`"  class="section-box">
+            <section id="section-ast`" class="section-box-caption">
+                <div>Test Input</div>
+            </section>
+            <section id="section-ast`" class="section-box-body">
+                <textarea id="input"></textarea>
+            </section>
+        </section>
+        <section id="section-output`"  class="section-box">
+            <section id="section-ast`" class="section-box-caption">
+                <div>Parser Output</div>
+            </section>
+            <section id="section-ast`" class="section-box-body">
+                <textarea id="output"></textarea>
+            </section>
+        </section>
+    </section>
+</body>
+</html>
