@@ -15,88 +15,152 @@
             width: 100%;
             height: 100%;
             display: grid;
-            grid-template-columns: 50% 50%;
-            grid-template-rows: 50% 50%;
-        }
-        #section-ast {
-            grid-column: 1;
-            grid-row: 1;
-        }
-        #sections-code {
-            grid-column: 1;
-            grid-row: 2;
-        }
-        #section-input {
-            grid-column: 2;
-            grid-row: 1;
-        }
-        #sections-output {
-            grid-column: 2;
-            grid-row: 2;
-        }
-        .section-box {
-            display: grid;
             grid-template-columns: 100%;
-            grid-template-rows: 1rem 1fr;
+            grid-template-rows: 2rem 1fr;
         }
-        .section-box > .section-box-caption {
-            grid-column: 1;
-            grid-row: 1;
-        }
-        .section-box > .section-box-body {
-            grid-column: 1;
-            grid-row: 2;
+        #grammar {
+            width: 100%;
+            height: 100%;
+            white-space: pre;
+            resize: none;
         }
         #ast {
             width: 100%;
             height: 100%;
+            white-space: pre;
+            resize: none;
         }
         #code {
             width: 100%;
             height: 100%;
+            white-space: pre;
+            resize: none;
         }
         #input {
             width: 100%;
             height: 100%;
+            white-space: pre;
+            resize: none;
         }
         #output {
             width: 100%;
             height: 100%;
+            white-space: pre;
+            resize: none;
+        }
+
+        #sections > .section-radio {
+            display: none;
+        }
+        #sections > section > .section-box {
+            display: none;
+        }
+        #sections > section {
+            width: 100%;
+            height: 100%;
+            display: block;
+            grid-column: 1;
+            grid-row: 2;
+        }
+        #sections > ul {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        #section-grammar-radio:checked ~ section #section-grammar {
+            display: initial;
+        }
+        #section-grammar-radio:checked ~ ul #section-label-grammar {
+            background: #eee;
+            color:#000;
+        }
+        #section-ast-radio:checked ~ section #section-ast {
+            display: initial;
+        }
+        #section-ast-radio:checked ~ ul #section-label-ast {
+            background: #eee;
+            color:#000;
+        }
+        #section-code-radio:checked ~ section #section-code {
+            display: initial;
+        }
+        #section-code-radio:checked ~ ul #section-label-code {
+            background: #eee;
+            color:#000;
+        }
+        #section-input-radio:checked ~ section #section-input {
+            display: initial;
+        }
+        #section-input-radio:checked ~ ul #section-label-input {
+            background: #eee;
+            color:#000;
+        }
+        #section-output-radio:checked ~ section #section-output {
+            display: initial;
+        }
+        #section-output-radio:checked ~ ul #section-label-output {
+            background: #eee;
+            color:#000;
+        }
+
+        ul.tab-lists {
+            background: #888;
+            color:#eee;
+            text-align: center;
+            width: 100%;
+            height: 2rem;
+            line-height: 2rem;
+            display: table;
+            table-layout: fixed;
+        }
+        ul.tab-lists li {
+            border-right: 1px solid #ccc;
+            display: table-cell;
+        }
+        ul.tab-lists li:last-child {
+            border-right: none;
+        }
+        ul.tab-lists li label {
+            display: block;
         }
     </style>
     <script src="app.js"></script>
 </head>
 <body>
     <section id="sections">
-        <section id="section-ast`" class="section-box">
-            <section id="section-ast`" class="section-box-caption">
-                <div>AST</div>
+
+        <input type="radio" id="section-grammar-radio" name="section-radios" class="section-radio" checked />
+        <input type="radio" id="section-ast-radio" name="section-radios" class="section-radio" />
+        <input type="radio" id="section-code-radio" name="section-radios" class="section-radio" />
+        <input type="radio" id="section-input-radio" name="section-radios" class="section-radio" />
+        <input type="radio" id="section-output-radio" name="section-radios" class="section-radio" />
+
+        <ul class="tab-lists">
+            <li><label id="section-label-grammar" for="section-grammar-radio" class="section-label">Grammar</label></li>
+            <li><label id="section-label-ast" for="section-ast-radio" class="section-label">AST</label></li>
+            <li><label id="section-label-code" for="section-code-radio" class="section-label">Generated Code</label></li>
+            <li><label id="section-label-input" for="section-input-radio" class="section-label">Input</label></li>
+            <li><label id="section-label-output" for="section-output-radio" class="section-label">Output</label></li>
+        </ul>
+
+        <section>
+            <section id="section-grammar" class="section-box">
+                <textarea id="grammar"></textarea>
             </section>
-            <section id="section-ast`" class="section-box-body">
+
+            <section id="section-ast" class="section-box">
                 <textarea id="ast"></textarea>
             </section>
-        </section>
-        <section id="section-code`"  class="section-box">
-            <section id="section-ast`" class="section-box-caption">
-                <div>Generated Code</div>
-            </section>
-            <section id="section-ast`" class="section-box-body">
+
+            <section id="section-code" class="section-box">
                 <textarea id="code"></textarea>
             </section>
-        </section>
-        <section id="section-input`"  class="section-box">
-            <section id="section-ast`" class="section-box-caption">
-                <div>Test Input</div>
-            </section>
-            <section id="section-ast`" class="section-box-body">
+
+            <section id="section-input" class="section-box">
                 <textarea id="input"></textarea>
             </section>
-        </section>
-        <section id="section-output`"  class="section-box">
-            <section id="section-ast`" class="section-box-caption">
-                <div>Parser Output</div>
-            </section>
-            <section id="section-ast`" class="section-box-body">
+
+            <section id="section-output" class="section-box">
                 <textarea id="output"></textarea>
             </section>
         </section>
