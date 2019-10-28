@@ -212,6 +212,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onChar(ruleName: string, ast: { type: "Char", char: string }, successLabel: number, failLabel: number) {
+            // Char ast.char 
             this.ruleCode.writeLine(`if (str[ctx.sp] != "${this.escapeString(ast.char)}") {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -225,6 +226,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onCharClass(ruleName: string, ast: { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean }, successLabel: number, failLabel: number) {
+            // CharClass ast,inverted ast.parts ast.ignoreCase
             this.ruleCode.writeLine(`if (IsCharClass(str[ctx.sp],${ast.inverted},${JSON.stringify(ast.parts)},${ast.ignoreCase}) == false) {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -238,6 +240,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onAnyChar(ruleName: string, ast: { type: "AnyChar" }, successLabel: number, failLabel: number) {
+            // AnyChar
             this.ruleCode.writeLine(`if (str.length <= ctx.sp) {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -251,6 +254,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onStr(ruleName: string, ast: { type: "Str", str: string }, successLabel: number, failLabel: number) {
+            // Str
             this.ruleCode.writeLine(`if (str.substr(ctx.sp, ${ast.str.length}) != "${this.escapeString(ast.str)}") {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -268,18 +272,24 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
 
-            this.ruleCode.writeLine(`var temp${tempVar1} = { type: "EmptyValueList" };`);
+            // PushContext: push(context);
             this.ruleCode.writeLine(`var temp${tempVar2} = ctx;`);
+            // PushArray: push([])
+            this.ruleCode.writeLine(`var temp${tempVar1} = { type: "EmptyValueList" };`);
+
             for (const child of ast.childs) {
                 const nextLabel = this.allocLabel();
                 this.visit(ruleName, child, nextLabel, junctionLabel);
                 this.labelDef(nextLabel);
+                // Append: value = pop(); array = pop(); array.push(value); push(array)
                 this.ruleCode.writeLine(`temp${tempVar1} = { type: "ValueList", value:ctx.value, next:temp${tempVar1}};`);
-                this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
+                this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);// need this?
             }
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:temp${tempVar1}};`);
             this.jumpTo(successLabel);
             this.labelDef(junctionLabel);
+            // Pop: pop();
+            // PopContext: context = pop();
             this.ruleCode.writeLine(`ctx = temp${tempVar2};`);
             this.jumpTo(failLabel);
         }
@@ -296,10 +306,16 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onOptional(ruleName: string, ast: { type: "Optional"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
+            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, successLabel, junctionLabel);
+            // Nip
+            // Jump successLabel
             this.labelDef(junctionLabel);
             this.ruleCode.writeLine(`ctx = { sp:temp${tempVar}.sp, value: { type: "Nil" } };`);
+            // PopContext
+            // PushNil
+            // Jump successLabel
             this.jumpTo(successLabel);
         }
 
@@ -310,17 +326,27 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
             const tempVar3 = this.allocVar();
+            // PushContext / [Context]
             this.ruleCode.writeLine(`var temp${tempVar1} = ctx;`);
+            // PushArray / [[]; Context]
             this.ruleCode.writeLine(`var temp${tempVar2} = { type: "EmptyValueList" };`);
             this.labelDef(loopLabel);
+            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`var temp${tempVar3} = ctx;`);
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.visit(ruleName, ast.child, succLabel, junctionLabel);
             this.labelDef(succLabel);
+            // Call ruleName  / [ret1; Context ;[...]; Context]
+            // NIP / [ret1; [...]; Context]
+            // Append / [[ret1...]; Context]
             this.ruleCode.writeLine(`temp${tempVar2} = {type: "ValueList", value: ctx.value, next: temp${tempVar2}};`);
+            // PushContext / [context;[ret1;...]; Context]
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.jumpTo(loopLabel);
             this.labelDef(junctionLabel);
+            // [Context; [...]; Context]
+            // PopContext / [[...]; Context]
+            // NIP / [[...]]
             this.ruleCode.writeLine(`ctx = { sp:temp${tempVar3}.sp, value: { type: "Value", start: temp${tempVar1}.sp, end:temp${tempVar3}.sp, value:temp${tempVar2} }};`);
             this.jumpTo(successLabel);
         }
@@ -332,20 +358,33 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
             const tempVar3 = this.allocVar();
+            // PushContext / [Context]
             this.ruleCode.writeLine(`var temp${tempVar1} = ctx;`);
+            // PushArray / [[]; Context]
             this.ruleCode.writeLine(`var temp${tempVar2} = { type: "EmptyValueList" };`);
-            this.ruleCode.writeLine(`var temp${tempVar3} = ctx;`);
+            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`ctx = { sp: ctx.sp, value: null };`);
             this.visit(ruleName, ast.child, loopLabel, rollbackLabel);
             this.labelDef(rollbackLabel);
+            // [Context; [...]; Context]
+            // Pop; Pop; PopContext
             this.ruleCode.writeLine(`ctx = temp${tempVar1};`);
             this.jumpTo(failLabel);
             this.labelDef(loopLabel);
+
+            // Call ruleName  / [ret1; Context ;[...]; Context]
+            // NIP / [ret1; [...]; Context]
+            // Append / [[ret1...]; Context]
             this.ruleCode.writeLine(`temp${tempVar2} = {type: "ValueList", value: ctx.value, next: temp${tempVar2}};`);
-            this.ruleCode.writeLine(`temp${tempVar3} = {sp:ctx.sp, value: temp${tempVar2}};`);
+            this.ruleCode.writeLine(`var temp${tempVar3} = {sp:ctx.sp, value: temp${tempVar2}};`);
+            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.visit(ruleName, ast.child, loopLabel, junctionLabel);
+            // Call ruleName  / [ret1; Context ;[...]; Context]
             this.labelDef(junctionLabel);
+            // [Context; [...]; Context]
+            // PopContext
+            // NIP 
             this.ruleCode.writeLine(`ctx = { sp: temp${tempVar3}.sp, value: { type: "Value", start: temp${tempVar1}.sp, end:temp${tempVar3}.sp, value:temp${tempVar2} }};`);
             this.jumpTo(successLabel);
         }
@@ -353,9 +392,12 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onAndPredicate(ruleName: string, ast: { type: "AndPredicate"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
+            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
             this.labelDef(junctionLabel);
+            // Pop
+            // PopContext
             this.ruleCode.writeLine(`ctx = temp${tempVar};`);
             this.jumpTo(successLabel);
         }
@@ -363,6 +405,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onNotPredicate(ruleName: string, ast: { type: "NotPredicate"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
+            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, failLabel, junctionLabel);
             this.labelDef(junctionLabel);
@@ -414,6 +457,421 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.labelDef(junctionLabel);
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value: { type:"Value", start: ctx.value.start, end:ctx.value.end, value: str.substring(ctx.value.start, ctx.value.end) }};`);
             this.jumpTo(successLabel);
+        }
+    }
+
+    type IR 
+        = { type: "Char", char: string, successLabel: number, failLabel: number}
+        | { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number }
+        | { type: "AnyChar", successLabel: number, failLabel: number }
+        | { type: "Str", str: string, successLabel: number, failLabel: number }
+        | { type: "PushContext" }
+        | { type: "PushArray" }
+        | { type: "Label", id:number }
+        | { type: "Jump", id:number }
+        | { type: "Nip" }
+        | { type: "Append" }
+        | { type: "Pop" }
+        | { type: "PopContext" }
+        | { type: "PushNil" }
+        | { type: "Call", name:string }
+        | { type: "Test", successLabel: number, failLabel: number  }
+        | { type: "Capture", name:string }
+        | { type: "Action", code:string }
+        | { type: "Text" }
+        | { type: "Return" }
+        | { type: "Text" }
+
+    class JavascriptGenerator2 implements ICodeGenerator {
+        private irCodes: IR[];
+//        private code: CodeWriter;
+//        private ruleCode: CodeWriter;
+//        private actionCode: CodeWriter;
+        private labelId: number;
+        private varId: number;
+        private actionId: number;
+        private captures: { [key: string]: number }[];
+
+        private escapeString(str: string) {
+            const s = JSON.stringify(str);
+            return s.substr(1, s.length - 2);
+        }
+
+        private allocLabel(): number {
+            return this.labelId++;
+        }
+
+        private allocAction(): number {
+            return this.actionId++;
+        }
+
+        private allocVar(): number {
+            return this.varId++;
+        }
+
+        constructor() {
+//            this.ruleCode = null;
+//            this.actionCode = null;
+//            this.code = new CodeWriter();
+            this.irCodes = [];
+
+            this.labelId = 1;
+            this.varId = 1;
+            this.actionId = 1;
+            this.captures = [];
+        }
+
+        public toString(): string {
+            return JSON.stringify(this.irCodes,null,4);
+        }
+
+        public generate(g: Grammar): void {
+//            this.code.writeLine(`(function (){`);
+//            this.code.up();
+//            this.code.writeLine(...
+//                `function decodeValue(x) {
+//    if (x == null) { return x; }
+//    switch (x.type) {
+//        case "Value": {
+//            if ((typeof x.value === "object") && (x.value["type"] == "Value" || x.value["type"] == "EmptyValueList" || x.value["type"] == "ValueList")) {
+//                return decodeValue(x.value);
+//            } else {
+//                return x.value;
+//            }
+//        }
+//        case "EmptyValueList": {
+//            return [];
+//        }
+//        case "Nil": {
+//            return null;
+//        }
+//        case "ValueList": {
+//            const ret = [];
+//            while (x.type != "EmptyValueList") {
+//                ret.push(decodeValue(x.value));
+//                x = x.next;
+//            }
+//            return ret.reverse();
+//        }
+//        default: {
+//            return x;
+//        }
+//    }
+//}
+
+//function IsCharClass(char, inverted, parts, ignoreCase) {
+//    if (char == undefined) { return false; }
+//    let ret = false;
+//    if (ignoreCase) {
+//        const charCode = char.toLowerCase().charCodeAt(0);
+//        ret = parts.some(x => x.begin.toLowerCase().charCodeAt(0) <= charCode && charCode <= x.end.toLowerCase().charCodeAt(0));
+//    } else {
+//        const charCode = char.charCodeAt(0);
+//        ret = parts.some(x => x.begin.charCodeAt(0) <= charCode && charCode <= x.end.charCodeAt(0));
+//    }
+//    if (inverted) { ret = !ret; }
+//    return ret;
+//}
+//`.split(/\n/));
+
+            const keys = Object.keys(g);
+            for (const key of keys) {
+                //this.actionCode = new CodeWriter();
+                //this.actionCode.up();
+                //this.ruleCode = new CodeWriter();
+                //this.ruleCode.up();
+                this.generateOne(key, g[key]);
+                //this.code.append(this.actionCode).append(this.ruleCode);
+                //this.actionCode = null;
+                //this.ruleCode = null;
+            }
+
+            //this.code.writeLine(`return {`);
+            //this.code.up();
+            //Object.keys(g).map(x => `${x}: $${x}`).join(",\n").split("\n").forEach(x => this.code.writeLine(x));
+            //this.code.down();
+            //this.code.writeLine(`};`);
+
+            //this.code.down();
+            //this.code.writeLine(`})();`);
+        }
+
+        private generateOne(ruleName: string, ast: Ast): void {
+            const successLabel = this.allocLabel();
+            const failLabel = this.allocLabel();
+            //this.ruleCode.writeLine(`/* rule: ${ruleName} */`);
+            //this.ruleCode.writeLine(`function $${ruleName}(str, ctx) {`);
+            //this.ruleCode.up();
+            //this.ruleCode.writeLine(`let label = null;`);
+            //this.ruleCode.writeLine(`let i = 0;`);
+            //this.ruleCode.down().writeLine(`goto:`).up();
+            //this.ruleCode.writeLine(`for (;;) {`);
+            //this.ruleCode.up();
+            //this.ruleCode.writeLine(`i++; if (i > 1000) { throw new Error(); } `);
+            //this.ruleCode.writeLine(`switch (label) {`);
+            //this.ruleCode.up();
+            //this.ruleCode.up();
+            //this.ruleCode.down().writeLine(`case null:`).up();
+            this.captures.push({});
+            this.visit(ruleName, ast, successLabel, failLabel);
+            this.captures.pop();
+            this.irCodes.push({ type: "Label", id: successLabel});
+            this.irCodes.push({ type: "Return"});
+            this.irCodes.push({ type: "Label", id: failLabel});
+            this.irCodes.push({ type: "Return"});
+        }
+
+        private visit(ruleName: string, ast: Ast, successLabel: number, failLabel: number): void {
+            switch (ast.type) {
+                case "Char": this.onChar(ruleName, ast, successLabel, failLabel); break;
+                case "CharClass": this.onCharClass(ruleName, ast, successLabel, failLabel); break;
+                case "AnyChar": this.onAnyChar(ruleName, ast, successLabel, failLabel); break;
+                case "Str": this.onStr(ruleName, ast, successLabel, failLabel); break;
+                case "Sequence": this.onSequence(ruleName, ast, successLabel, failLabel); break;
+                case "Choice": this.onChoice(ruleName, ast, successLabel, failLabel); break;
+                case "Optional": this.onOptional(ruleName, ast, successLabel, failLabel); break;
+                case "ZeroOrMore": this.onZeroOrMore(ruleName, ast, successLabel, failLabel); break;
+                case "OneOrMore": this.onOneOrMore(ruleName, ast, successLabel, failLabel); break;
+                case "AndPredicate": this.onAndPredicate(ruleName, ast, successLabel, failLabel); break;
+                case "NotPredicate": this.onNotPredicate(ruleName, ast, successLabel, failLabel); break;
+                case "RuleRef": this.onRuleRef(ruleName, ast, successLabel, failLabel); break;
+                case "Labeled": this.onLabeled(ruleName, ast, successLabel, failLabel); break;
+                case "Action": this.onAction(ruleName, ast, successLabel, failLabel); break;
+                case "Text": this.onText(ruleName, ast, successLabel, failLabel); break;
+                default: throw new Error(`Ast "${ast}" is not supported in Rule ${ruleName}`);
+            }
+        }
+
+        //private labelDef(label: number) {
+        //    this.ruleCode.down().writeLine(`case "L${label}":`).up();
+        //}
+
+        //private jumpTo(label: number) {
+        //    this.ruleCode.writeLine(`label = "L${label}"; continue goto;`);
+        //}
+
+        private onChar(ruleName: string, ast: { type: "Char", char: string }, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "Char", char: ast.char, successLabel: successLabel, failLabel: failLabel });
+            // if (str[ctx.sp] != char) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
+        }
+
+        private onCharClass(ruleName: string, ast: { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean }, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "CharClass", inverted: ast.inverted, parts: ast.parts, ignoreCase: ast.ignoreCase, successLabel: successLabel, failLabel: failLabel });
+            // if (IsCharClass(str[ctx.sp],ast.inverted,ast.parts,ast.ignoreCase) != true) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
+        }
+
+        private onAnyChar(ruleName: string, ast: { type: "AnyChar" }, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "AnyChar", successLabel: successLabel, failLabel: failLabel });
+            // if (str.length <= ctx.sp) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
+        }
+
+        private onStr(ruleName: string, ast: { type: "Str", str: string }, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "Str", str: ast.str, successLabel: successLabel, failLabel: failLabel });
+            // if (str.substr(ctx.sp,ast.str.length) != ast.str) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+ast.str.length, value:{ type:"Value", start: ctx.sp, end:ctx.sp+ast.str.length, value:str.substr(ctx.sp, ast.str.length)}};`);
+        }
+
+        private onSequence(ruleName: string, ast: { type: "Sequence"; childs: Ast[] }, successLabel: number, failLabel: number) {
+            const junctionLabel = this.allocLabel();
+            const tempVar1 = this.allocVar();
+            const tempVar2 = this.allocVar();
+
+            this.irCodes.push({ type: "PushContext" });
+            // PushContext: push(context);
+            this.irCodes.push({ type: "PushArray" });
+            // PushArray: push([])
+
+            for (const child of ast.childs) {
+                const nextLabel = this.allocLabel();
+                this.visit(ruleName, child, nextLabel, junctionLabel);
+                this.irCodes.push({ type: "Label", id: nextLabel });
+                this.irCodes.push({ type: "Append" });
+                // Append: value = pop(); array = pop(); array.push(value); push(array)
+                //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);// need this?
+            }
+            this.irCodes.push({ type: "Nip" });
+            //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:temp${tempVar1}};`);
+            this.irCodes.push({ type: "Jump", id: successLabel });
+            this.irCodes.push({ type: "Label", id: junctionLabel });
+
+            this.irCodes.push({ type: "Pop" });
+            // Pop: pop();
+            this.irCodes.push({ type: "PopContext" });
+            // PopContext: context = pop();
+            //this.ruleCode.writeLine(`ctx = temp${tempVar2};`);
+            this.irCodes.push({ type: "Jump", id: failLabel });
+            //this.jumpTo(failLabel);
+        }
+
+        private onChoice(ruleName: string, ast: { type: "Choice"; childs: Ast[] }, successLabel: number, failLabel: number) {
+            for (const child of ast.childs) {
+                const nextLabel = this.allocLabel();
+                this.visit(ruleName, child, successLabel, nextLabel);
+                this.irCodes.push({ type: "Label", id: nextLabel});
+            }
+            this.irCodes.push({ type: "Jump", id: failLabel });
+            //this.jumpTo(failLabel);
+        }
+
+        private onOptional(ruleName: string, ast: { type: "Optional"; child: Ast }, successLabel: number, failLabel: number) {
+            //const tempVar = this.allocVar();
+            const succLabel = this.allocLabel();
+            const junctionLabel = this.allocLabel();
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, succLabel, junctionLabel);
+            this.irCodes.push({ type: "Label", id: succLabel});
+            this.irCodes.push({ type: "Nip" });
+            this.irCodes.push({ type: "Jump", id: successLabel });
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "PushNil" });
+            this.irCodes.push({ type: "Jump", id: successLabel });
+        }
+
+        private onZeroOrMore(ruleName: string, ast: { type: "ZeroOrMore"; child: Ast }, successLabel: number, failLabel: number) {
+            const loopLabel = this.allocLabel();
+            const succLabel = this.allocLabel();
+            const junctionLabel = this.allocLabel();
+            const tempVar1 = this.allocVar();
+            const tempVar2 = this.allocVar();
+            const tempVar3 = this.allocVar();
+            // PushContext / [Context]
+            this.irCodes.push({ type: "PushContext" });
+            // PushArray / [[]; Context]
+            this.irCodes.push({ type: "PushArray" });
+            this.irCodes.push({ type: "Label", id: loopLabel});
+            // PushContext / [Context ;[...]; Context]
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, succLabel, junctionLabel);
+            this.irCodes.push({ type: "Label", id: succLabel});
+            // Call ruleName  / [ret1; Context ;[...]; Context]
+            // NIP / [ret1; [...]; Context]
+            this.irCodes.push({ type: "Nip" });
+            // Append / [[ret1...]; Context]
+            this.irCodes.push({ type: "Append" });
+            // PushContext / [context;[ret1;...]; Context]
+            this.irCodes.push({ type: "PushContext" });
+            this.irCodes.push({ type: "Jump", id: loopLabel});
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            // [Context; [...]; Context]
+            // PopContext / [[...]; Context]
+            this.irCodes.push({ type: "PushContext" });
+            // NIP / [[...]]
+            this.irCodes.push({ type: "Nip" });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+        }
+
+        private onOneOrMore(ruleName: string, ast: { type: "OneOrMore"; child: Ast }, successLabel: number, failLabel: number) {
+            const rollbackLabel = this.allocLabel();
+            const loopLabel = this.allocLabel();
+            const junctionLabel = this.allocLabel();
+            const tempVar1 = this.allocVar();
+            const tempVar2 = this.allocVar();
+            const tempVar3 = this.allocVar();
+            // PushContext / [Context]
+            this.irCodes.push({ type: "PushContext" });
+            // PushArray / [[]; Context]
+            this.irCodes.push({ type: "PushArray" });
+            // PushContext / [Context ;[...]; Context]
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, loopLabel, rollbackLabel);
+            this.irCodes.push({ type: "Label", id: rollbackLabel});
+            // [Context; [...]; Context]
+            this.irCodes.push({ type: "Pop" });
+            this.irCodes.push({ type: "Pop" });
+            this.irCodes.push({ type: "PopContext" });
+            // Pop; Pop; PopContext
+            this.irCodes.push({ type: "Jump", id: failLabel});
+            this.irCodes.push({ type: "Label", id: loopLabel});
+            // Call ruleName  / [ret1; Context ;[...]; Context]
+            // NIP / [ret1; [...]; Context]
+            this.irCodes.push({ type: "Nip" });
+            // Append / [[ret1...]; Context]
+            this.irCodes.push({ type: "Append" });
+            // PushContext / [Context ;[...]; Context]
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, loopLabel, junctionLabel);
+            // Call ruleName  / [ret1; Context ;[...]; Context]
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            // [Context; [...]; Context]
+            // PopContext
+            this.irCodes.push({ type: "PopContext" });
+            // NIP 
+            this.irCodes.push({ type: "Nip" });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+        }
+
+        private onAndPredicate(ruleName: string, ast: { type: "AndPredicate"; child: Ast }, successLabel: number, failLabel: number) {
+            const tempVar = this.allocVar();
+            const junctionLabel = this.allocLabel();
+            // PushContext
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, junctionLabel, failLabel);
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            // Pop
+            this.irCodes.push({ type: "Pop" });
+            // PopContext
+            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+        }
+
+        private onNotPredicate(ruleName: string, ast: { type: "NotPredicate"; child: Ast }, successLabel: number, failLabel: number) {
+            const tempVar = this.allocVar();
+            const junctionLabel = this.allocLabel();
+            const junctionLabel2 = this.allocLabel();
+            // PushContext
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, junctionLabel2, junctionLabel);
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "Pop" });
+            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "Jump", id: failLabel});
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+        }
+
+        private onRuleRef(ruleName: string, ast: { type: "RuleRef"; rule: string }, successLabel: number, failLabel: number) {
+            const tempVar = this.allocVar();
+            const junctionLabel = this.allocLabel();
+            const junctionLabel2 = this.allocLabel();
+            this.irCodes.push({ type: "PushContext" });
+            this.irCodes.push({ type: "Call", name: ast.rule});
+            this.irCodes.push({ type: "Test", successLabel:junctionLabel,failLabel:junctionLabel2});
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "Nip" });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.irCodes.push({ type: "Label", id: junctionLabel2});
+            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "Jump", id: failLabel});
+        }
+
+        private onLabeled(ruleName: string, ast: { type: "Labeled"; name: string; child: Ast }, successLabel: number, failLabel: number) {
+            const junctionLabel = this.allocLabel();
+            this.visit(ruleName, ast.child, junctionLabel, failLabel);
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "Capture", name: ast.name });
+            this.irCodes.push({ type: "Jump", id: successLabel});
+            //this.captures[this.captures.length - 1][ast.name] = this.captures[this.captures.length - 1].Count;
+        }
+
+        private onAction(ruleName: string, ast: { type: "Action"; child: Ast, code: string }, successLabel: number, failLabel: number) {
+            const actionId = this.allocAction();
+            const junctionLabel = this.allocLabel();
+            this.visit(ruleName, ast.child, junctionLabel, failLabel);
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "Action", code: ast.code});
+            this.irCodes.push({ type: "Jump", id: successLabel});
+        }
+
+        private onText(ruleName: string, ast: { type: "Text"; child: Ast }, successLabel: number, failLabel: number) {
+            const junctionLabel = this.allocLabel();
+            this.irCodes.push({ type: "PushContext" });
+            this.visit(ruleName, ast.child, junctionLabel, failLabel);
+            this.irCodes.push({ type: "Label", id: junctionLabel});
+            this.irCodes.push({ type: "Pop" });
+            this.irCodes.push({ type: "Text" });
+            //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value: { type:"Value", start: ctx.value.start, end:ctx.value.end, value: str.substring(ctx.value.start, ctx.value.end) }};`);
+            this.irCodes.push({ type: "Jump", id: successLabel});
         }
     }
 
@@ -476,6 +934,11 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         generator.generate(g);
         return generator.toString();
     }
+    export function compileGrammar2(g: Grammar): string {
+        let generator = new JavascriptGenerator2();
+        generator.generate(g);
+        return generator.toString();
+    }
 }
 
 window.onload = () => {
@@ -488,6 +951,7 @@ window.onload = () => {
     const domGrammar = <HTMLTextAreaElement>document.getElementById('grammar');
     const domAst = <HTMLTextAreaElement>document.getElementById('ast');
     const domCode = <HTMLTextAreaElement>document.getElementById('code');
+    const domIr = <HTMLTextAreaElement>document.getElementById('ir');
     const domInput = <HTMLTextAreaElement>document.getElementById('input');
     const domOutput = <HTMLTextAreaElement>document.getElementById('output');
 
@@ -517,7 +981,7 @@ window.onload = () => {
     function parse() {
         oldGrammarValue = domGrammar.value;
         const ret = builtinParser["default"](oldGrammarValue, { sp: 0, value: null });
-        if (ret != null && ret.value.type == "Value") {
+        if (ret != null && ret.value.type === "Value") {
             domAst.value = JSON.stringify(ret.value.value, null, 4);
         } else {
             domAst.value = "Parse Error";
@@ -529,6 +993,7 @@ window.onload = () => {
     function compile() {
         oldAstValue = domAst.value;
         domCode.value = PegKit.compileGrammar(JSON.parse(oldAstValue));
+        domIr.value = PegKit.compileGrammar2(JSON.parse(oldAstValue));
         compileTimer = null;
         return true;
     }
@@ -543,8 +1008,8 @@ window.onload = () => {
     function decodeValue(x: IValue): any {
         switch (x.type) {
             case "Value": {
-                if ((typeof x.value === "object") && (x.value["type"] == "Value" || x.value["type"] == "EmptyValueList" || x.value["type"] == "ValueList")) {
-                    return decodeValue(x.value);
+                if ((typeof x.value === "object") && (x.value.type === "Value" || x.value.type === "EmptyValueList" || x.value.type === "ValueList")) {
+                    return decodeValue(<IValue>x.value);
                 } else {
                     return x.value;
                 }
