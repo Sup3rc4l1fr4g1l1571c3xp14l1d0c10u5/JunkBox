@@ -468,6 +468,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         | { type: "PushContext" }
         | { type: "PushArray" }
         | { type: "Label", id:number }
+        | { type: "Rule", name:string }
         | { type: "Jump", id:number }
         | { type: "Nip" }
         | { type: "Append" }
@@ -477,9 +478,9 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         | { type: "Call", name:string }
         | { type: "Test", successLabel: number, failLabel: number  }
         | { type: "Capture", name:string }
-        | { type: "Action", code:string }
+        | { type: "Action", code:string, captures:string[] }
         | { type: "Text" }
-        | { type: "Return" }
+        | { type: "Return", success: boolean }
         | { type: "Text" }
 
     class JavascriptGenerator2 implements ICodeGenerator {
@@ -510,9 +511,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         constructor() {
-//            this.ruleCode = null;
-//            this.actionCode = null;
-//            this.code = new CodeWriter();
             this.irCodes = [];
 
             this.labelId = 1;
@@ -526,99 +524,23 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         public generate(g: Grammar): void {
-//            this.code.writeLine(`(function (){`);
-//            this.code.up();
-//            this.code.writeLine(...
-//                `function decodeValue(x) {
-//    if (x == null) { return x; }
-//    switch (x.type) {
-//        case "Value": {
-//            if ((typeof x.value === "object") && (x.value["type"] == "Value" || x.value["type"] == "EmptyValueList" || x.value["type"] == "ValueList")) {
-//                return decodeValue(x.value);
-//            } else {
-//                return x.value;
-//            }
-//        }
-//        case "EmptyValueList": {
-//            return [];
-//        }
-//        case "Nil": {
-//            return null;
-//        }
-//        case "ValueList": {
-//            const ret = [];
-//            while (x.type != "EmptyValueList") {
-//                ret.push(decodeValue(x.value));
-//                x = x.next;
-//            }
-//            return ret.reverse();
-//        }
-//        default: {
-//            return x;
-//        }
-//    }
-//}
-
-//function IsCharClass(char, inverted, parts, ignoreCase) {
-//    if (char == undefined) { return false; }
-//    let ret = false;
-//    if (ignoreCase) {
-//        const charCode = char.toLowerCase().charCodeAt(0);
-//        ret = parts.some(x => x.begin.toLowerCase().charCodeAt(0) <= charCode && charCode <= x.end.toLowerCase().charCodeAt(0));
-//    } else {
-//        const charCode = char.charCodeAt(0);
-//        ret = parts.some(x => x.begin.charCodeAt(0) <= charCode && charCode <= x.end.charCodeAt(0));
-//    }
-//    if (inverted) { ret = !ret; }
-//    return ret;
-//}
-//`.split(/\n/));
-
             const keys = Object.keys(g);
             for (const key of keys) {
-                //this.actionCode = new CodeWriter();
-                //this.actionCode.up();
-                //this.ruleCode = new CodeWriter();
-                //this.ruleCode.up();
                 this.generateOne(key, g[key]);
-                //this.code.append(this.actionCode).append(this.ruleCode);
-                //this.actionCode = null;
-                //this.ruleCode = null;
             }
-
-            //this.code.writeLine(`return {`);
-            //this.code.up();
-            //Object.keys(g).map(x => `${x}: $${x}`).join(",\n").split("\n").forEach(x => this.code.writeLine(x));
-            //this.code.down();
-            //this.code.writeLine(`};`);
-
-            //this.code.down();
-            //this.code.writeLine(`})();`);
         }
 
         private generateOne(ruleName: string, ast: Ast): void {
             const successLabel = this.allocLabel();
             const failLabel = this.allocLabel();
-            //this.ruleCode.writeLine(`/* rule: ${ruleName} */`);
-            //this.ruleCode.writeLine(`function $${ruleName}(str, ctx) {`);
-            //this.ruleCode.up();
-            //this.ruleCode.writeLine(`let label = null;`);
-            //this.ruleCode.writeLine(`let i = 0;`);
-            //this.ruleCode.down().writeLine(`goto:`).up();
-            //this.ruleCode.writeLine(`for (;;) {`);
-            //this.ruleCode.up();
-            //this.ruleCode.writeLine(`i++; if (i > 1000) { throw new Error(); } `);
-            //this.ruleCode.writeLine(`switch (label) {`);
-            //this.ruleCode.up();
-            //this.ruleCode.up();
-            //this.ruleCode.down().writeLine(`case null:`).up();
             this.captures.push({});
+            this.irCodes.push({ type: "Rule", name: ruleName });
             this.visit(ruleName, ast, successLabel, failLabel);
             this.captures.pop();
             this.irCodes.push({ type: "Label", id: successLabel});
-            this.irCodes.push({ type: "Return"});
+            this.irCodes.push({ type: "Return", success:true});
             this.irCodes.push({ type: "Label", id: failLabel});
-            this.irCodes.push({ type: "Return"});
+            this.irCodes.push({ type: "Return", success:false});
         }
 
         private visit(ruleName: string, ast: Ast, successLabel: number, failLabel: number): void {
@@ -642,22 +564,12 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             }
         }
 
-        //private labelDef(label: number) {
-        //    this.ruleCode.down().writeLine(`case "L${label}":`).up();
-        //}
-
-        //private jumpTo(label: number) {
-        //    this.ruleCode.writeLine(`label = "L${label}"; continue goto;`);
-        //}
-
         private onChar(ruleName: string, ast: { type: "Char", char: string }, successLabel: number, failLabel: number) {
             this.irCodes.push({ type: "Char", char: ast.char, successLabel: successLabel, failLabel: failLabel });
-            // if (str[ctx.sp] != char) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
         }
 
         private onCharClass(ruleName: string, ast: { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean }, successLabel: number, failLabel: number) {
             this.irCodes.push({ type: "CharClass", inverted: ast.inverted, parts: ast.parts, ignoreCase: ast.ignoreCase, successLabel: successLabel, failLabel: failLabel });
-            // if (IsCharClass(str[ctx.sp],ast.inverted,ast.parts,ast.ignoreCase) != true) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
         }
 
         private onAnyChar(ruleName: string, ast: { type: "AnyChar" }, successLabel: number, failLabel: number) {
@@ -754,7 +666,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.irCodes.push({ type: "Label", id: junctionLabel});
             // [Context; [...]; Context]
             // PopContext / [[...]; Context]
-            this.irCodes.push({ type: "PushContext" });
+            this.irCodes.push({ type: "PopContext" });
             // NIP / [[...]]
             this.irCodes.push({ type: "Nip" });
             this.irCodes.push({ type: "Jump", id: successLabel});
@@ -851,7 +763,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.irCodes.push({ type: "Label", id: junctionLabel});
             this.irCodes.push({ type: "Capture", name: ast.name });
             this.irCodes.push({ type: "Jump", id: successLabel});
-            //this.captures[this.captures.length - 1][ast.name] = this.captures[this.captures.length - 1].Count;
+            this.captures[this.captures.length - 1][ast.name] = this.captures[this.captures.length - 1].Count;
         }
 
         private onAction(ruleName: string, ast: { type: "Action"; child: Ast, code: string }, successLabel: number, failLabel: number) {
@@ -859,7 +771,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const junctionLabel = this.allocLabel();
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
             this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Action", code: ast.code});
+            this.irCodes.push({ type: "Action", code: ast.code, captures: Object.keys(this.captures[this.captures.length - 1])});
             this.irCodes.push({ type: "Jump", id: successLabel});
         }
 
@@ -1241,3 +1153,1663 @@ _
   = (" "/"\t"/"\n"/"\r")*
 
 */
+/*
+
+(function () { 
+  const ir = [
+    {
+        "type": "Rule",
+        "name": "Expression"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Term"
+    },
+    {
+        "type": "Test",
+        "successLabel": 8,
+        "failLabel": 9
+    },
+    {
+        "type": "Label",
+        "id": 8
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 7
+    },
+    {
+        "type": "Label",
+        "id": 9
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 5
+    },
+    {
+        "type": "Label",
+        "id": 7
+    },
+    {
+        "type": "Capture",
+        "name": "head"
+    },
+    {
+        "type": "Jump",
+        "id": 6
+    },
+    {
+        "type": "Label",
+        "id": 6
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "Label",
+        "id": 12
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 18,
+        "failLabel": 19
+    },
+    {
+        "type": "Label",
+        "id": 18
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 17
+    },
+    {
+        "type": "Label",
+        "id": 19
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 16
+    },
+    {
+        "type": "Label",
+        "id": 17
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Str",
+        "str": "+",
+        "successLabel": 20,
+        "failLabel": 21
+    },
+    {
+        "type": "Label",
+        "id": 21
+    },
+    {
+        "type": "Str",
+        "str": "-",
+        "successLabel": 20,
+        "failLabel": 22
+    },
+    {
+        "type": "Label",
+        "id": 22
+    },
+    {
+        "type": "Jump",
+        "id": 16
+    },
+    {
+        "type": "Label",
+        "id": 20
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 24,
+        "failLabel": 25
+    },
+    {
+        "type": "Label",
+        "id": 24
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 23
+    },
+    {
+        "type": "Label",
+        "id": 25
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 16
+    },
+    {
+        "type": "Label",
+        "id": 23
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Term"
+    },
+    {
+        "type": "Test",
+        "successLabel": 27,
+        "failLabel": 28
+    },
+    {
+        "type": "Label",
+        "id": 27
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 26
+    },
+    {
+        "type": "Label",
+        "id": 28
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 16
+    },
+    {
+        "type": "Label",
+        "id": 26
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 13
+    },
+    {
+        "type": "Label",
+        "id": 16
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 15
+    },
+    {
+        "type": "Label",
+        "id": 15
+    },
+    {
+        "type": "Jump",
+        "id": 14
+    },
+    {
+        "type": "Label",
+        "id": 13
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Jump",
+        "id": 12
+    },
+    {
+        "type": "Label",
+        "id": 14
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 11
+    },
+    {
+        "type": "Label",
+        "id": 11
+    },
+    {
+        "type": "Capture",
+        "name": "tail"
+    },
+    {
+        "type": "Jump",
+        "id": 10
+    },
+    {
+        "type": "Label",
+        "id": 10
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 4
+    },
+    {
+        "type": "Label",
+        "id": 5
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 3
+    },
+    {
+        "type": "Label",
+        "id": 4
+    },
+    {
+        "type": "Action",
+        "code": " console.log(tail);\n      return tail.reduce(function(result, element) {\n        if (element[1] === \"+\") { return result + element[3]; }\n        if (element[1] === \"-\") { return result - element[3]; }\n      }, head);\n    ",
+        "captures": [
+            "head",
+            "tail"
+        ]
+    },
+    {
+        "type": "Jump",
+        "id": 1
+    },
+    {
+        "type": "Label",
+        "id": 3
+    },
+    {
+        "type": "Jump",
+        "id": 2
+    },
+    {
+        "type": "Label",
+        "id": 1
+    },
+    {
+        "type": "Return",
+        "success": true
+    },
+    {
+        "type": "Label",
+        "id": 2
+    },
+    {
+        "type": "Return",
+        "success": false
+    },
+    {
+        "type": "Rule",
+        "name": "Term"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Factor"
+    },
+    {
+        "type": "Test",
+        "successLabel": 36,
+        "failLabel": 37
+    },
+    {
+        "type": "Label",
+        "id": 36
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 35
+    },
+    {
+        "type": "Label",
+        "id": 37
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 33
+    },
+    {
+        "type": "Label",
+        "id": 35
+    },
+    {
+        "type": "Capture",
+        "name": "head"
+    },
+    {
+        "type": "Jump",
+        "id": 34
+    },
+    {
+        "type": "Label",
+        "id": 34
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "Label",
+        "id": 40
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 46,
+        "failLabel": 47
+    },
+    {
+        "type": "Label",
+        "id": 46
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 45
+    },
+    {
+        "type": "Label",
+        "id": 47
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 44
+    },
+    {
+        "type": "Label",
+        "id": 45
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Str",
+        "str": "*",
+        "successLabel": 48,
+        "failLabel": 49
+    },
+    {
+        "type": "Label",
+        "id": 49
+    },
+    {
+        "type": "Str",
+        "str": "/",
+        "successLabel": 48,
+        "failLabel": 50
+    },
+    {
+        "type": "Label",
+        "id": 50
+    },
+    {
+        "type": "Jump",
+        "id": 44
+    },
+    {
+        "type": "Label",
+        "id": 48
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 52,
+        "failLabel": 53
+    },
+    {
+        "type": "Label",
+        "id": 52
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 51
+    },
+    {
+        "type": "Label",
+        "id": 53
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 44
+    },
+    {
+        "type": "Label",
+        "id": 51
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Factor"
+    },
+    {
+        "type": "Test",
+        "successLabel": 55,
+        "failLabel": 56
+    },
+    {
+        "type": "Label",
+        "id": 55
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 54
+    },
+    {
+        "type": "Label",
+        "id": 56
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 44
+    },
+    {
+        "type": "Label",
+        "id": 54
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 41
+    },
+    {
+        "type": "Label",
+        "id": 44
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 43
+    },
+    {
+        "type": "Label",
+        "id": 43
+    },
+    {
+        "type": "Jump",
+        "id": 42
+    },
+    {
+        "type": "Label",
+        "id": 41
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Jump",
+        "id": 40
+    },
+    {
+        "type": "Label",
+        "id": 42
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 39
+    },
+    {
+        "type": "Label",
+        "id": 39
+    },
+    {
+        "type": "Capture",
+        "name": "tail"
+    },
+    {
+        "type": "Jump",
+        "id": 38
+    },
+    {
+        "type": "Label",
+        "id": 38
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 32
+    },
+    {
+        "type": "Label",
+        "id": 33
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 31
+    },
+    {
+        "type": "Label",
+        "id": 32
+    },
+    {
+        "type": "Action",
+        "code": "\n      return tail.reduce(function(result, element) {\n        if (element[1] === \"*\") { return result * element[3]; }\n        if (element[1] === \"/\") { return result / element[3]; }\n      }, head);\n    ",
+        "captures": [
+            "head",
+            "tail"
+        ]
+    },
+    {
+        "type": "Jump",
+        "id": 29
+    },
+    {
+        "type": "Label",
+        "id": 31
+    },
+    {
+        "type": "Jump",
+        "id": 30
+    },
+    {
+        "type": "Label",
+        "id": 29
+    },
+    {
+        "type": "Return",
+        "success": true
+    },
+    {
+        "type": "Label",
+        "id": 30
+    },
+    {
+        "type": "Return",
+        "success": false
+    },
+    {
+        "type": "Rule",
+        "name": "Factor"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "Str",
+        "str": "(",
+        "successLabel": 62,
+        "failLabel": 61
+    },
+    {
+        "type": "Label",
+        "id": 62
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 64,
+        "failLabel": 65
+    },
+    {
+        "type": "Label",
+        "id": 64
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 63
+    },
+    {
+        "type": "Label",
+        "id": 65
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 61
+    },
+    {
+        "type": "Label",
+        "id": 63
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Expression"
+    },
+    {
+        "type": "Test",
+        "successLabel": 68,
+        "failLabel": 69
+    },
+    {
+        "type": "Label",
+        "id": 68
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 67
+    },
+    {
+        "type": "Label",
+        "id": 69
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 61
+    },
+    {
+        "type": "Label",
+        "id": 67
+    },
+    {
+        "type": "Capture",
+        "name": "expr"
+    },
+    {
+        "type": "Jump",
+        "id": 66
+    },
+    {
+        "type": "Label",
+        "id": 66
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 71,
+        "failLabel": 72
+    },
+    {
+        "type": "Label",
+        "id": 71
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 70
+    },
+    {
+        "type": "Label",
+        "id": 72
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 61
+    },
+    {
+        "type": "Label",
+        "id": 70
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Str",
+        "str": ")",
+        "successLabel": 73,
+        "failLabel": 61
+    },
+    {
+        "type": "Label",
+        "id": 73
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 60
+    },
+    {
+        "type": "Label",
+        "id": 61
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 59
+    },
+    {
+        "type": "Label",
+        "id": 60
+    },
+    {
+        "type": "Action",
+        "code": " return expr; ",
+        "captures": [
+            "expr"
+        ]
+    },
+    {
+        "type": "Jump",
+        "id": 57
+    },
+    {
+        "type": "Label",
+        "id": 59
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "Integer"
+    },
+    {
+        "type": "Test",
+        "successLabel": 75,
+        "failLabel": 76
+    },
+    {
+        "type": "Label",
+        "id": 75
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 57
+    },
+    {
+        "type": "Label",
+        "id": 76
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 74
+    },
+    {
+        "type": "Label",
+        "id": 74
+    },
+    {
+        "type": "Jump",
+        "id": 58
+    },
+    {
+        "type": "Label",
+        "id": 57
+    },
+    {
+        "type": "Return",
+        "success": true
+    },
+    {
+        "type": "Label",
+        "id": 58
+    },
+    {
+        "type": "Return",
+        "success": false
+    },
+    {
+        "type": "Rule",
+        "name": "Integer"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Call",
+        "name": "_"
+    },
+    {
+        "type": "Test",
+        "successLabel": 83,
+        "failLabel": 84
+    },
+    {
+        "type": "Label",
+        "id": 83
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 82
+    },
+    {
+        "type": "Label",
+        "id": 84
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 81
+    },
+    {
+        "type": "Label",
+        "id": 82
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Str",
+        "str": "0",
+        "successLabel": 88,
+        "failLabel": 90
+    },
+    {
+        "type": "Label",
+        "id": 90
+    },
+    {
+        "type": "Str",
+        "str": "1",
+        "successLabel": 88,
+        "failLabel": 91
+    },
+    {
+        "type": "Label",
+        "id": 91
+    },
+    {
+        "type": "Str",
+        "str": "2",
+        "successLabel": 88,
+        "failLabel": 92
+    },
+    {
+        "type": "Label",
+        "id": 92
+    },
+    {
+        "type": "Str",
+        "str": "3",
+        "successLabel": 88,
+        "failLabel": 93
+    },
+    {
+        "type": "Label",
+        "id": 93
+    },
+    {
+        "type": "Str",
+        "str": "4",
+        "successLabel": 88,
+        "failLabel": 94
+    },
+    {
+        "type": "Label",
+        "id": 94
+    },
+    {
+        "type": "Str",
+        "str": "5",
+        "successLabel": 88,
+        "failLabel": 95
+    },
+    {
+        "type": "Label",
+        "id": 95
+    },
+    {
+        "type": "Str",
+        "str": "6",
+        "successLabel": 88,
+        "failLabel": 96
+    },
+    {
+        "type": "Label",
+        "id": 96
+    },
+    {
+        "type": "Str",
+        "str": "7",
+        "successLabel": 88,
+        "failLabel": 97
+    },
+    {
+        "type": "Label",
+        "id": 97
+    },
+    {
+        "type": "Str",
+        "str": "8",
+        "successLabel": 88,
+        "failLabel": 98
+    },
+    {
+        "type": "Label",
+        "id": 98
+    },
+    {
+        "type": "Str",
+        "str": "9",
+        "successLabel": 88,
+        "failLabel": 99
+    },
+    {
+        "type": "Label",
+        "id": 99
+    },
+    {
+        "type": "Jump",
+        "id": 87
+    },
+    {
+        "type": "Label",
+        "id": 87
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 81
+    },
+    {
+        "type": "Label",
+        "id": 88
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Str",
+        "str": "0",
+        "successLabel": 88,
+        "failLabel": 100
+    },
+    {
+        "type": "Label",
+        "id": 100
+    },
+    {
+        "type": "Str",
+        "str": "1",
+        "successLabel": 88,
+        "failLabel": 101
+    },
+    {
+        "type": "Label",
+        "id": 101
+    },
+    {
+        "type": "Str",
+        "str": "2",
+        "successLabel": 88,
+        "failLabel": 102
+    },
+    {
+        "type": "Label",
+        "id": 102
+    },
+    {
+        "type": "Str",
+        "str": "3",
+        "successLabel": 88,
+        "failLabel": 103
+    },
+    {
+        "type": "Label",
+        "id": 103
+    },
+    {
+        "type": "Str",
+        "str": "4",
+        "successLabel": 88,
+        "failLabel": 104
+    },
+    {
+        "type": "Label",
+        "id": 104
+    },
+    {
+        "type": "Str",
+        "str": "5",
+        "successLabel": 88,
+        "failLabel": 105
+    },
+    {
+        "type": "Label",
+        "id": 105
+    },
+    {
+        "type": "Str",
+        "str": "6",
+        "successLabel": 88,
+        "failLabel": 106
+    },
+    {
+        "type": "Label",
+        "id": 106
+    },
+    {
+        "type": "Str",
+        "str": "7",
+        "successLabel": 88,
+        "failLabel": 107
+    },
+    {
+        "type": "Label",
+        "id": 107
+    },
+    {
+        "type": "Str",
+        "str": "8",
+        "successLabel": 88,
+        "failLabel": 108
+    },
+    {
+        "type": "Label",
+        "id": 108
+    },
+    {
+        "type": "Str",
+        "str": "9",
+        "successLabel": 88,
+        "failLabel": 109
+    },
+    {
+        "type": "Label",
+        "id": 109
+    },
+    {
+        "type": "Jump",
+        "id": 89
+    },
+    {
+        "type": "Label",
+        "id": 89
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 86
+    },
+    {
+        "type": "Label",
+        "id": 86
+    },
+    {
+        "type": "Capture",
+        "name": "x"
+    },
+    {
+        "type": "Jump",
+        "id": 85
+    },
+    {
+        "type": "Label",
+        "id": 85
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 80
+    },
+    {
+        "type": "Label",
+        "id": 81
+    },
+    {
+        "type": "Pop"
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Jump",
+        "id": 79
+    },
+    {
+        "type": "Label",
+        "id": 80
+    },
+    {
+        "type": "Action",
+        "code": " return parseInt(x.concat(\"\"), 10); ",
+        "captures": [
+            "x"
+        ]
+    },
+    {
+        "type": "Jump",
+        "id": 77
+    },
+    {
+        "type": "Label",
+        "id": 79
+    },
+    {
+        "type": "Jump",
+        "id": 78
+    },
+    {
+        "type": "Label",
+        "id": 77
+    },
+    {
+        "type": "Return",
+        "success": true
+    },
+    {
+        "type": "Label",
+        "id": 78
+    },
+    {
+        "type": "Return",
+        "success": false
+    },
+    {
+        "type": "Rule",
+        "name": "_"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "PushArray"
+    },
+    {
+        "type": "Label",
+        "id": 113
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Str",
+        "str": " ",
+        "successLabel": 114,
+        "failLabel": 116
+    },
+    {
+        "type": "Label",
+        "id": 116
+    },
+    {
+        "type": "Str",
+        "str": "\t",
+        "successLabel": 114,
+        "failLabel": 117
+    },
+    {
+        "type": "Label",
+        "id": 117
+    },
+    {
+        "type": "Str",
+        "str": "\n",
+        "successLabel": 114,
+        "failLabel": 118
+    },
+    {
+        "type": "Label",
+        "id": 118
+    },
+    {
+        "type": "Str",
+        "str": "\r",
+        "successLabel": 114,
+        "failLabel": 119
+    },
+    {
+        "type": "Label",
+        "id": 119
+    },
+    {
+        "type": "Jump",
+        "id": 115
+    },
+    {
+        "type": "Label",
+        "id": 114
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Append"
+    },
+    {
+        "type": "PushContext"
+    },
+    {
+        "type": "Jump",
+        "id": 113
+    },
+    {
+        "type": "Label",
+        "id": 115
+    },
+    {
+        "type": "PopContext"
+    },
+    {
+        "type": "Nip"
+    },
+    {
+        "type": "Jump",
+        "id": 110
+    },
+    {
+        "type": "Label",
+        "id": 112
+    },
+    {
+        "type": "Jump",
+        "id": 111
+    },
+    {
+        "type": "Label",
+        "id": 110
+    },
+    {
+        "type": "Return",
+        "success": true
+    },
+    {
+        "type": "Label",
+        "id": 111
+    },
+    {
+        "type": "Return",
+        "success": false
+    }
+];
+  
+  const ruleTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Rule").reduce((s,[x,i]) => (s[x.name] = i, s), {});
+  const labelTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Label").reduce((s,[x,i]) => (s[x.id] = i, s), {});
+
+  function cons(car,cdr) {
+    if (cdr == null || cdr.type != "cons") { throw new Error("not cons"); }
+    return { type:"cons", car:car, cdr:cdr};
+  }
+  const Nil = Object.freeze({ type:"cons", car:null, cdr: null });
+  function atom(v) {
+    return { type:"atom", value:v };
+  }
+  function assoc(key,list)  {
+     while (list != Nil) {
+       const [k,v] = list.car;
+       if (k == key) { return v; }
+       list = list.cdr;
+     }
+  }
+  function decode(v) {
+    if (v.type == "atom") { return v.v; }
+    if (v.type == "cons") {
+     const ret = [];
+     while (v != Nil) {
+       ret.push(decode(v.car));
+       v = v.cdr;
+     }
+     return ret.reverse();
+    }
+    throw new Error();
+  }
+  
+  function step(insts, str, context) {
+    let [pc, index, capture, stack] = context;
+    
+    const ir = insts[pc];
+    console.log(ir,context);
+    switch (ir.type) {
+      case "Str": {
+        const v = str.substr(index, ir.str.length);
+        if (v == ir.str) { 
+          stack = cons(atom(v),stack);
+          index += ir.str.length; 
+          pc = labelTable[ir.successLabel]; 
+        } else { 
+          pc = labelTable[ir.failLabel]; 
+        }
+        return [pc, index, capture, stack];
+      }
+      case "Label": {
+        return [pc+1, index, capture, stack];
+      }
+      case "Rule": {
+        return [pc+1, index, capture, stack];
+      }
+      case "Nip": {
+        return [pc+1, index, capture, cons(stack.car, stack.cdr.cdr)];
+      }
+      case "Jump": {
+        return [labelTable[ir.id], index, capture, stack];
+      }
+      case "Call": {
+        return [ruleTable[ir.name], index, Nil, cons([pc+1,capture],stack)];
+      }
+      case "PushContext": {
+        return [pc+1, index, capture, cons(context, stack)];
+      }
+      case "PopContext": {
+        let [pc2, index2, capture2, stack2] = stack.car;
+        return [pc+1, index2, capture2, stack2];
+      }
+      case "Pop": {
+        return [pc+1, index, capture, stack.cdr];
+      }
+      case "Append": {
+        return [pc+1, index, capture, cons(cons(stack.car, stack.cdr.car), stack.cdr.cdr)];
+      }
+      case "Capture": {
+        return [pc+1, index, cons([ir.name, stack.car],capture), stack];
+      }
+      case "Action": {
+        const pred = eval(`(function() { return function (${ir.captures.join(", ")}) { ${ir.code} }; })()`);
+        const args = ir.captures.map(x => decode(assoc(x, capture)));
+        console.log("!", args);
+        const ret = pred(...args);
+        return [pc+1, index, capture, cons(atom(ret), stack)];
+      }
+      case "PushArray": {
+        return [pc+1, index, capture, cons(Nil,stack)];
+      }
+      case "Test": {
+        const [flag,v] = stack.car;
+        if (flag) {
+          pc = labelTable[ir.successLabel]; 
+          return [pc+1, index, capture, cons(v,stack.cdr)];
+        } else {
+          pc = labelTable[ir.failLabel]; 
+          return [pc+1, index, capture, stack.cdr];
+        }
+      }
+      case "Return": {
+        if (ir.success) {
+          const ret = stack.car;
+          const [retpc, retcap] = stack.cdr.car;
+          const rootstack = stack.cdr.cdr;
+          return [retpc, index, retcap, cons([true,ret],rootstack)];
+        } else {
+          const [retpc, retcap] = stack.car;
+          const rootstack = stack.cdr;
+          return [retpc, index, retcap, cons([false,null],rootstack)];
+        }
+      }
+      default:{
+        throw new Error(ir.type);
+      }
+    }
+  }
+  
+  let context = [0, 0, Nil, cons([-1,Nil], Nil)];
+  for (let i=0; i<10000 && context[0] >= 0; i++) {
+    context = step(ir, "123+456", context)
+  }
+  return context;
+  
+})();
+
+ */
