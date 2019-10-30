@@ -212,7 +212,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onChar(ruleName: string, ast: { type: "Char", char: string }, successLabel: number, failLabel: number) {
-            // Char ast.char 
             this.ruleCode.writeLine(`if (str[ctx.sp] != "${this.escapeString(ast.char)}") {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -226,7 +225,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onCharClass(ruleName: string, ast: { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean }, successLabel: number, failLabel: number) {
-            // CharClass ast,inverted ast.parts ast.ignoreCase
             this.ruleCode.writeLine(`if (IsCharClass(str[ctx.sp],${ast.inverted},${JSON.stringify(ast.parts)},${ast.ignoreCase}) == false) {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -240,7 +238,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onAnyChar(ruleName: string, ast: { type: "AnyChar" }, successLabel: number, failLabel: number) {
-            // AnyChar
             this.ruleCode.writeLine(`if (str.length <= ctx.sp) {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -254,7 +251,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onStr(ruleName: string, ast: { type: "Str", str: string }, successLabel: number, failLabel: number) {
-            // Str
             this.ruleCode.writeLine(`if (str.substr(ctx.sp, ${ast.str.length}) != "${this.escapeString(ast.str)}") {`);
             this.ruleCode.up();
             this.jumpTo(failLabel);
@@ -272,24 +268,19 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
 
-            // PushContext: push(context);
             this.ruleCode.writeLine(`var temp${tempVar2} = ctx;`);
-            // PushArray: push([])
             this.ruleCode.writeLine(`var temp${tempVar1} = { type: "EmptyValueList" };`);
 
             for (const child of ast.childs) {
                 const nextLabel = this.allocLabel();
                 this.visit(ruleName, child, nextLabel, junctionLabel);
                 this.labelDef(nextLabel);
-                // Append: value = pop(); array = pop(); array.push(value); push(array)
                 this.ruleCode.writeLine(`temp${tempVar1} = { type: "ValueList", value:ctx.value, next:temp${tempVar1}};`);
                 this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);// need this?
             }
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:temp${tempVar1}};`);
             this.jumpTo(successLabel);
             this.labelDef(junctionLabel);
-            // Pop: pop();
-            // PopContext: context = pop();
             this.ruleCode.writeLine(`ctx = temp${tempVar2};`);
             this.jumpTo(failLabel);
         }
@@ -306,16 +297,10 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onOptional(ruleName: string, ast: { type: "Optional"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
-            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, successLabel, junctionLabel);
-            // Nip
-            // Jump successLabel
             this.labelDef(junctionLabel);
             this.ruleCode.writeLine(`ctx = { sp:temp${tempVar}.sp, value: { type: "Nil" } };`);
-            // PopContext
-            // PushNil
-            // Jump successLabel
             this.jumpTo(successLabel);
         }
 
@@ -326,27 +311,17 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
             const tempVar3 = this.allocVar();
-            // PushContext / [Context]
             this.ruleCode.writeLine(`var temp${tempVar1} = ctx;`);
-            // PushArray / [[]; Context]
             this.ruleCode.writeLine(`var temp${tempVar2} = { type: "EmptyValueList" };`);
             this.labelDef(loopLabel);
-            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`var temp${tempVar3} = ctx;`);
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.visit(ruleName, ast.child, succLabel, junctionLabel);
             this.labelDef(succLabel);
-            // Call ruleName  / [ret1; Context ;[...]; Context]
-            // NIP / [ret1; [...]; Context]
-            // Append / [[ret1...]; Context]
             this.ruleCode.writeLine(`temp${tempVar2} = {type: "ValueList", value: ctx.value, next: temp${tempVar2}};`);
-            // PushContext / [context;[ret1;...]; Context]
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.jumpTo(loopLabel);
             this.labelDef(junctionLabel);
-            // [Context; [...]; Context]
-            // PopContext / [[...]; Context]
-            // NIP / [[...]]
             this.ruleCode.writeLine(`ctx = { sp:temp${tempVar3}.sp, value: { type: "Value", start: temp${tempVar1}.sp, end:temp${tempVar3}.sp, value:temp${tempVar2} }};`);
             this.jumpTo(successLabel);
         }
@@ -358,33 +333,20 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const tempVar1 = this.allocVar();
             const tempVar2 = this.allocVar();
             const tempVar3 = this.allocVar();
-            // PushContext / [Context]
             this.ruleCode.writeLine(`var temp${tempVar1} = ctx;`);
-            // PushArray / [[]; Context]
             this.ruleCode.writeLine(`var temp${tempVar2} = { type: "EmptyValueList" };`);
-            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`ctx = { sp: ctx.sp, value: null };`);
             this.visit(ruleName, ast.child, loopLabel, rollbackLabel);
             this.labelDef(rollbackLabel);
-            // [Context; [...]; Context]
-            // Pop; Pop; PopContext
             this.ruleCode.writeLine(`ctx = temp${tempVar1};`);
             this.jumpTo(failLabel);
             this.labelDef(loopLabel);
 
-            // Call ruleName  / [ret1; Context ;[...]; Context]
-            // NIP / [ret1; [...]; Context]
-            // Append / [[ret1...]; Context]
             this.ruleCode.writeLine(`temp${tempVar2} = {type: "ValueList", value: ctx.value, next: temp${tempVar2}};`);
             this.ruleCode.writeLine(`var temp${tempVar3} = {sp:ctx.sp, value: temp${tempVar2}};`);
-            // PushContext / [Context ;[...]; Context]
             this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);
             this.visit(ruleName, ast.child, loopLabel, junctionLabel);
-            // Call ruleName  / [ret1; Context ;[...]; Context]
             this.labelDef(junctionLabel);
-            // [Context; [...]; Context]
-            // PopContext
-            // NIP 
             this.ruleCode.writeLine(`ctx = { sp: temp${tempVar3}.sp, value: { type: "Value", start: temp${tempVar1}.sp, end:temp${tempVar3}.sp, value:temp${tempVar2} }};`);
             this.jumpTo(successLabel);
         }
@@ -392,12 +354,9 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onAndPredicate(ruleName: string, ast: { type: "AndPredicate"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
-            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
             this.labelDef(junctionLabel);
-            // Pop
-            // PopContext
             this.ruleCode.writeLine(`ctx = temp${tempVar};`);
             this.jumpTo(successLabel);
         }
@@ -405,7 +364,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private onNotPredicate(ruleName: string, ast: { type: "NotPredicate"; child: Ast }, successLabel: number, failLabel: number) {
             const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
-            // PushContext
             this.ruleCode.writeLine(`var temp${tempVar} = ctx;`);
             this.visit(ruleName, ast.child, failLabel, junctionLabel);
             this.labelDef(junctionLabel);
@@ -460,67 +418,131 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
     }
 
-    type IR 
-        = { type: "Char", char: string, successLabel: number, failLabel: number}
+    type IR
+        = { type: "Char", char: string, successLabel: number, failLabel: number }
         | { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number }
         | { type: "AnyChar", successLabel: number, failLabel: number }
         | { type: "Str", str: string, successLabel: number, failLabel: number }
         | { type: "PushContext" }
         | { type: "PushArray" }
-        | { type: "Label", id:number }
-        | { type: "Rule", name:string }
-        | { type: "Jump", id:number }
+        | { type: "Label", id: number }
+        | { type: "Rule", name: string }
+        | { type: "Jump", id: number }
         | { type: "Nip" }
         | { type: "Append" }
         | { type: "Pop" }
         | { type: "PopContext" }
         | { type: "PushNil" }
-        | { type: "Call", name:string }
-        | { type: "Test", successLabel: number, failLabel: number  }
-        | { type: "Capture", name:string }
-        | { type: "Action", code:string, captures:string[] }
+        | { type: "Call", name: string }
+        | { type: "Test", successLabel: number, failLabel: number }
+        | { type: "Capture", name: string }
+        | { type: "Action", code: string, captures: string[] }
         | { type: "Text" }
         | { type: "Return", success: boolean }
-        | { type: "Text" }
+        | { type: "Break", comment: string }
 
-    class JavascriptGenerator2 implements ICodeGenerator {
+    class IRGenerator implements ICodeGenerator {
         private irCodes: IR[];
-//        private code: CodeWriter;
-//        private ruleCode: CodeWriter;
-//        private actionCode: CodeWriter;
-        private labelId: number;
-        private varId: number;
-        private actionId: number;
-        private captures: { [key: string]: number }[];
 
-        private escapeString(str: string) {
-            const s = JSON.stringify(str);
-            return s.substr(1, s.length - 2);
-        }
+        private labelId: number;
+        private captures: { [key: string]: number }[];
 
         private allocLabel(): number {
             return this.labelId++;
         }
 
-        private allocAction(): number {
-            return this.actionId++;
+        private Char(char: string, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "Char", char: char, successLabel: successLabel, failLabel: failLabel });
         }
 
-        private allocVar(): number {
-            return this.varId++;
+        private CharClass(inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "CharClass", inverted: inverted, parts: parts, ignoreCase: ignoreCase, successLabel: successLabel, failLabel: failLabel });
+        }
+
+        private AnyChar(successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "AnyChar", successLabel: successLabel, failLabel: failLabel });
+        }
+
+        private Str(str: string, successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "Str", str: str, successLabel: successLabel, failLabel: failLabel });
+        }
+
+        // push();
+        private PushContext(): void {
+            this.irCodes.push({ type: "PushContext" });
+        }
+
+        // push([]);
+        private PushArray(): void {
+            this.irCodes.push({ type: "PushArray" });
+        }
+
+        // v = pop(); pop(); push(v);
+        private Nip(): void {
+            this.irCodes.push({ type: "Nip" });
+        }
+
+        private Pop(): void {
+            this.irCodes.push({ type: "Pop" });
+        }
+
+        private PopContext(): void {
+            this.irCodes.push({ type: "PopContext" });
+        }
+
+        private Append(): void {
+            this.irCodes.push({ type: "Append" });
+        }
+
+        private PushNil(): void {
+            this.irCodes.push({ type: "PushNil" });
+        }
+
+        private Text(): void {
+            this.irCodes.push({ type: "Text" });
+        }
+
+        private Label(id: number): void {
+            this.irCodes.push({ type: "Label", id: id });
+        }
+
+        private Jump(id: number): void {
+            this.irCodes.push({ type: "Jump", id: id });
+        }
+
+        private Call(name: string): void {
+            this.irCodes.push({ type: "Call", name: name });
+        }
+
+        private Test(successLabel: number, failLabel: number) {
+            this.irCodes.push({ type: "Test", successLabel: successLabel, failLabel: failLabel });
+        }
+
+        private Capture(name: string) {
+            this.irCodes.push({ type: "Capture", name: name });
+        }
+
+        private Action(code: string, captures: string[]) {
+            this.irCodes.push({ type: "Action", code: code, captures: captures });
+        }
+
+        private Rule(name:string) {
+            this.irCodes.push({ type: "Rule", name: name });
+        }
+
+        private Return(success: boolean) {
+            this.irCodes.push({ type: "Return", success: success });
         }
 
         constructor() {
             this.irCodes = [];
 
             this.labelId = 1;
-            this.varId = 1;
-            this.actionId = 1;
             this.captures = [];
         }
 
         public toString(): string {
-            return JSON.stringify(this.irCodes,null,4);
+            return JSON.stringify(this.irCodes, null, 4);
         }
 
         public generate(g: Grammar): void {
@@ -534,13 +556,13 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const successLabel = this.allocLabel();
             const failLabel = this.allocLabel();
             this.captures.push({});
-            this.irCodes.push({ type: "Rule", name: ruleName });
+            this.Rule(ruleName);
             this.visit(ruleName, ast, successLabel, failLabel);
             this.captures.pop();
-            this.irCodes.push({ type: "Label", id: successLabel});
-            this.irCodes.push({ type: "Return", success:true});
-            this.irCodes.push({ type: "Label", id: failLabel});
-            this.irCodes.push({ type: "Return", success:false});
+            this.Label(successLabel);
+            this.Return(true);
+            this.Label(failLabel);
+            this.Return(false);
         }
 
         private visit(ruleName: string, ast: Ast, successLabel: number, failLabel: number): void {
@@ -565,230 +587,180 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         }
 
         private onChar(ruleName: string, ast: { type: "Char", char: string }, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "Char", char: ast.char, successLabel: successLabel, failLabel: failLabel });
+            this.Char(ast.char, successLabel, failLabel);
         }
 
         private onCharClass(ruleName: string, ast: { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean }, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "CharClass", inverted: ast.inverted, parts: ast.parts, ignoreCase: ast.ignoreCase, successLabel: successLabel, failLabel: failLabel });
+            this.CharClass(ast.inverted, ast.parts, ast.ignoreCase, successLabel, failLabel);
         }
 
         private onAnyChar(ruleName: string, ast: { type: "AnyChar" }, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "AnyChar", successLabel: successLabel, failLabel: failLabel });
-            // if (str.length <= ctx.sp) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+1, value:{ type:"Value", start: ctx.sp, end:ctx.sp+1, value:str[ctx.sp]}};`);
+            this.AnyChar(successLabel, failLabel);
         }
 
         private onStr(ruleName: string, ast: { type: "Str", str: string }, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "Str", str: ast.str, successLabel: successLabel, failLabel: failLabel });
-            // if (str.substr(ctx.sp,ast.str.length) != ast.str) { ctx = {pc:label[faillabel], sp:ctx.sp, value:ctx.value}; } else { ctx = { pc: label[successlabel], sp:ctx.sp+ast.str.length, value:{ type:"Value", start: ctx.sp, end:ctx.sp+ast.str.length, value:str.substr(ctx.sp, ast.str.length)}};`);
+            this.Str(ast.str, successLabel, failLabel);
         }
 
         private onSequence(ruleName: string, ast: { type: "Sequence"; childs: Ast[] }, successLabel: number, failLabel: number) {
             const junctionLabel = this.allocLabel();
-            const tempVar1 = this.allocVar();
-            const tempVar2 = this.allocVar();
 
-            this.irCodes.push({ type: "PushContext" });
-            // PushContext: push(context);
-            this.irCodes.push({ type: "PushArray" });
-            // PushArray: push([])
+            this.PushContext();
+            this.PushArray();
 
             for (const child of ast.childs) {
                 const nextLabel = this.allocLabel();
                 this.visit(ruleName, child, nextLabel, junctionLabel);
-                this.irCodes.push({ type: "Label", id: nextLabel });
-                this.irCodes.push({ type: "Append" });
-                // Append: value = pop(); array = pop(); array.push(value); push(array)
-                //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:null};`);// need this?
+                this.Label(nextLabel);
+                this.Append();
             }
-            this.irCodes.push({ type: "Nip" });
-            //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value:temp${tempVar1}};`);
-            this.irCodes.push({ type: "Jump", id: successLabel });
-            this.irCodes.push({ type: "Label", id: junctionLabel });
+            this.Nip();
+            this.Jump(successLabel);
+            this.Label(junctionLabel);
 
-            this.irCodes.push({ type: "Pop" });
-            // Pop: pop();
-            this.irCodes.push({ type: "PopContext" });
-            // PopContext: context = pop();
-            //this.ruleCode.writeLine(`ctx = temp${tempVar2};`);
-            this.irCodes.push({ type: "Jump", id: failLabel });
-            //this.jumpTo(failLabel);
+            this.Pop();
+            this.PopContext();
+            this.Jump(failLabel);
         }
 
         private onChoice(ruleName: string, ast: { type: "Choice"; childs: Ast[] }, successLabel: number, failLabel: number) {
             for (const child of ast.childs) {
                 const nextLabel = this.allocLabel();
                 this.visit(ruleName, child, successLabel, nextLabel);
-                this.irCodes.push({ type: "Label", id: nextLabel});
+                this.Label(nextLabel);
             }
-            this.irCodes.push({ type: "Jump", id: failLabel });
-            //this.jumpTo(failLabel);
+            this.Jump(failLabel);
         }
 
         private onOptional(ruleName: string, ast: { type: "Optional"; child: Ast }, successLabel: number, failLabel: number) {
-            //const tempVar = this.allocVar();
             const succLabel = this.allocLabel();
             const junctionLabel = this.allocLabel();
-            this.irCodes.push({ type: "PushContext" });
+            this.PushContext();
             this.visit(ruleName, ast.child, succLabel, junctionLabel);
-            this.irCodes.push({ type: "Label", id: succLabel});
-            this.irCodes.push({ type: "Nip" });
-            this.irCodes.push({ type: "Jump", id: successLabel });
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "PopContext" });
-            this.irCodes.push({ type: "PushNil" });
-            this.irCodes.push({ type: "Jump", id: successLabel });
+            this.Label(succLabel);
+            this.Nip();
+            this.Jump(successLabel);
+            this.Label(junctionLabel);
+            this.PopContext();
+            this.PushNil();
+            this.Jump(successLabel);
         }
 
         private onZeroOrMore(ruleName: string, ast: { type: "ZeroOrMore"; child: Ast }, successLabel: number, failLabel: number) {
             const loopLabel = this.allocLabel();
             const succLabel = this.allocLabel();
             const junctionLabel = this.allocLabel();
-            const tempVar1 = this.allocVar();
-            const tempVar2 = this.allocVar();
-            const tempVar3 = this.allocVar();
-            // PushContext / [Context]
-            this.irCodes.push({ type: "PushContext" });
-            // PushArray / [[]; Context]
-            this.irCodes.push({ type: "PushArray" });
-            this.irCodes.push({ type: "Label", id: loopLabel});
-            // PushContext / [Context ;[...]; Context]
-            this.irCodes.push({ type: "PushContext" });
+            this.PushContext();
+            this.PushArray();
+            this.Label(loopLabel);
+            this.PushContext();
             this.visit(ruleName, ast.child, succLabel, junctionLabel);
-            this.irCodes.push({ type: "Label", id: succLabel});
-            // Call ruleName  / [ret1; Context ;[...]; Context]
-            // NIP / [ret1; [...]; Context]
-            this.irCodes.push({ type: "Nip" });
-            // Append / [[ret1...]; Context]
-            this.irCodes.push({ type: "Append" });
-            // PushContext / [context;[ret1;...]; Context]
-            this.irCodes.push({ type: "PushContext" });
-            this.irCodes.push({ type: "Jump", id: loopLabel});
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            // [Context; [...]; Context]
-            // PopContext / [[...]; Context]
-            this.irCodes.push({ type: "PopContext" });
-            // NIP / [[...]]
-            this.irCodes.push({ type: "Nip" });
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(succLabel);
+            this.Nip();
+            this.Append();
+            this.Jump(loopLabel);
+            this.Label(junctionLabel);
+            this.PopContext();
+            this.Nip();
+            this.Jump(successLabel);
         }
 
         private onOneOrMore(ruleName: string, ast: { type: "OneOrMore"; child: Ast }, successLabel: number, failLabel: number) {
             const rollbackLabel = this.allocLabel();
             const loopLabel = this.allocLabel();
             const junctionLabel = this.allocLabel();
-            const tempVar1 = this.allocVar();
-            const tempVar2 = this.allocVar();
-            const tempVar3 = this.allocVar();
-            // PushContext / [Context]
-            this.irCodes.push({ type: "PushContext" });
-            // PushArray / [[]; Context]
-            this.irCodes.push({ type: "PushArray" });
-            // PushContext / [Context ;[...]; Context]
-            this.irCodes.push({ type: "PushContext" });
+            this.PushContext();
+            this.PushArray();
+            this.PushContext();
             this.visit(ruleName, ast.child, loopLabel, rollbackLabel);
-            this.irCodes.push({ type: "Label", id: rollbackLabel});
-            // [Context; [...]; Context]
-            this.irCodes.push({ type: "Pop" });
-            this.irCodes.push({ type: "Pop" });
-            this.irCodes.push({ type: "PopContext" });
-            // Pop; Pop; PopContext
-            this.irCodes.push({ type: "Jump", id: failLabel});
-            this.irCodes.push({ type: "Label", id: loopLabel});
-            // Call ruleName  / [ret1; Context ;[...]; Context]
-            // NIP / [ret1; [...]; Context]
-            this.irCodes.push({ type: "Nip" });
-            // Append / [[ret1...]; Context]
-            this.irCodes.push({ type: "Append" });
-            // PushContext / [Context ;[...]; Context]
-            this.irCodes.push({ type: "PushContext" });
+            this.Label(rollbackLabel);
+            this.Pop();
+            this.Pop();
+            this.PopContext();
+            this.Jump(failLabel);
+            this.Label(loopLabel);
+            this.Nip();
+            this.Append();
+            this.PushContext();
             this.visit(ruleName, ast.child, loopLabel, junctionLabel);
-            // Call ruleName  / [ret1; Context ;[...]; Context]
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            // [Context; [...]; Context]
-            // PopContext
-            this.irCodes.push({ type: "PopContext" });
-            // NIP 
-            this.irCodes.push({ type: "Nip" });
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(junctionLabel);
+            this.PopContext();
+            this.Nip();
+            this.Jump(successLabel);
         }
 
         private onAndPredicate(ruleName: string, ast: { type: "AndPredicate"; child: Ast }, successLabel: number, failLabel: number) {
-            const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
-            // PushContext
-            this.irCodes.push({ type: "PushContext" });
+            this.PushContext();
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            // Pop
-            this.irCodes.push({ type: "Pop" });
-            // PopContext
-            this.irCodes.push({ type: "PopContext" });
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(junctionLabel);
+            this.Pop();
+            this.PopContext();
+            this.Jump(successLabel);
         }
 
         private onNotPredicate(ruleName: string, ast: { type: "NotPredicate"; child: Ast }, successLabel: number, failLabel: number) {
-            const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
             const junctionLabel2 = this.allocLabel();
-            // PushContext
-            this.irCodes.push({ type: "PushContext" });
+            this.PushContext();
             this.visit(ruleName, ast.child, junctionLabel2, junctionLabel);
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Pop" });
-            this.irCodes.push({ type: "PopContext" });
-            this.irCodes.push({ type: "Jump", id: failLabel});
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "PopContext" });
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(junctionLabel);
+            this.Pop();
+            this.PopContext();
+            this.Jump(failLabel);
+            this.Label(junctionLabel);
+            this.PopContext();
+            this.Jump(successLabel);
         }
 
         private onRuleRef(ruleName: string, ast: { type: "RuleRef"; rule: string }, successLabel: number, failLabel: number) {
-            const tempVar = this.allocVar();
             const junctionLabel = this.allocLabel();
             const junctionLabel2 = this.allocLabel();
-            this.irCodes.push({ type: "PushContext" });
-            this.irCodes.push({ type: "Call", name: ast.rule});
-            this.irCodes.push({ type: "Test", successLabel:junctionLabel,failLabel:junctionLabel2});
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Nip" });
-            this.irCodes.push({ type: "Jump", id: successLabel});
-            this.irCodes.push({ type: "Label", id: junctionLabel2});
-            this.irCodes.push({ type: "PopContext" });
-            this.irCodes.push({ type: "Jump", id: failLabel});
+            this.PushContext();
+            this.Call(ast.rule);
+            this.Test(junctionLabel, junctionLabel2);
+            this.Label(junctionLabel);
+            this.Nip();
+            this.Jump(successLabel);
+            this.Label(junctionLabel2);
+            this.PopContext();
+            this.Jump(failLabel);
         }
 
         private onLabeled(ruleName: string, ast: { type: "Labeled"; name: string; child: Ast }, successLabel: number, failLabel: number) {
             const junctionLabel = this.allocLabel();
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Capture", name: ast.name });
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(junctionLabel);
+            this.Capture(ast.name);
+            this.Jump(successLabel);
             this.captures[this.captures.length - 1][ast.name] = this.captures[this.captures.length - 1].Count;
         }
 
         private onAction(ruleName: string, ast: { type: "Action"; child: Ast, code: string }, successLabel: number, failLabel: number) {
-            const actionId = this.allocAction();
             const junctionLabel = this.allocLabel();
             this.visit(ruleName, ast.child, junctionLabel, failLabel);
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Action", code: ast.code, captures: Object.keys(this.captures[this.captures.length - 1])});
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            this.Label(junctionLabel);
+            this.Action(ast.code, Object.keys(this.captures[this.captures.length - 1]));
+            this.Jump(successLabel);
         }
 
         private onText(ruleName: string, ast: { type: "Text"; child: Ast }, successLabel: number, failLabel: number) {
             const junctionLabel = this.allocLabel();
-            this.irCodes.push({ type: "PushContext" });
-            this.visit(ruleName, ast.child, junctionLabel, failLabel);
-            this.irCodes.push({ type: "Label", id: junctionLabel});
-            this.irCodes.push({ type: "Pop" });
-            this.irCodes.push({ type: "Text" });
-            //this.ruleCode.writeLine(`ctx = { sp:ctx.sp, value: { type:"Value", start: ctx.value.start, end:ctx.value.end, value: str.substring(ctx.value.start, ctx.value.end) }};`);
-            this.irCodes.push({ type: "Jump", id: successLabel});
+            const junctionLabel2 = this.allocLabel();
+            this.PushContext();
+            this.visit(ruleName, ast.child, junctionLabel, junctionLabel2);
+            this.Label(junctionLabel);
+            this.Pop();
+            this.Text();
+            this.Jump(successLabel);
+            this.Label(junctionLabel2);
+            this.Pop();
+            this.Jump(failLabel);
         }
     }
 
-    export type Ast =
-          Char
+    export type Ast
+        = Char
         | CharClass
         | AnyChar
         | Str
@@ -821,24 +793,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
     export type Action = { type: "Action", child: Ast, code: string };
     export type Text = { type: "Text", child: Ast };
 
-    export module G {
-        export function Char(char: string): Char { return { type: "Char", char: char }; }
-        export function CharClass(inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean): CharClass { return { type: "CharClass", inverted: inverted, parts: parts, ignoreCase: ignoreCase }; }
-        export function AnyChar(): AnyChar { return { type: "AnyChar" }; }
-        export function Str(str: string): Str { return { type: "Str", str: str }; }
-        export function Sequence(...childs: Ast[]): Sequence { return { type: "Sequence", childs: childs }; }
-        export function Choice(...childs: Ast[]): Choice { return { type: "Choice", childs: childs }; }
-        export function Optional(child: Ast): Optional { return { type: "Optional", child: child }; }
-        export function ZeroOrMore(child: Ast): ZeroOrMore { return { type: "ZeroOrMore", child: child }; }
-        export function OneOrMore(child: Ast): OneOrMore { return { type: "OneOrMore", child: child }; }
-        export function AndPredicate(child: Ast): AndPredicate { return { type: "AndPredicate", child: child }; }
-        export function NotPredicate(child: Ast): NotPredicate { return { type: "NotPredicate", child: child }; }
-        export function RuleRef(rule: string): RuleRef { return { type: "RuleRef", rule: rule }; }
-        export function Labeled(name: string, child: Ast): Labeled { return { type: "Labeled", name: name, child: child }; }
-        export function Action(child: Ast, code: string): Ast { return { type: "Action", child: child, code: code }; }
-        export function Text(child: Ast): Text { return { type: "Text", child: child }; }
-    }
-
     export type Grammar = { [key: string]: Ast };
 
     export function compileGrammar(g: Grammar): string {
@@ -846,8 +800,9 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         generator.generate(g);
         return generator.toString();
     }
+
     export function compileGrammar2(g: Grammar): string {
-        let generator = new JavascriptGenerator2();
+        let generator = new IRGenerator();
         generator.generate(g);
         return generator.toString();
     }
@@ -1147,1669 +1102,209 @@ Factor
   / Integer
 
 Integer
-  = _ x:("0"/"1"/"2"/"3"/"4"/"5"/"6"/"7"/"8"/"9")+ { return parseInt(x.concat(""), 10); }
+  = _ x:("0"/"1"/"2"/"3"/"4"/"5"/"6"/"7"/"8"/"9")+ { return parseInt(x.join(""), 10); }
 
 _
   = (" "/"\t"/"\n"/"\r")*
 
 */
+
 /*
-
-(function () { 
-  const ir = [
-    {
-        "type": "Rule",
-        "name": "Expression"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Term"
-    },
-    {
-        "type": "Test",
-        "successLabel": 8,
-        "failLabel": 9
-    },
-    {
-        "type": "Label",
-        "id": 8
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 7
-    },
-    {
-        "type": "Label",
-        "id": 9
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 5
-    },
-    {
-        "type": "Label",
-        "id": 7
-    },
-    {
-        "type": "Capture",
-        "name": "head"
-    },
-    {
-        "type": "Jump",
-        "id": 6
-    },
-    {
-        "type": "Label",
-        "id": 6
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "Label",
-        "id": 12
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 18,
-        "failLabel": 19
-    },
-    {
-        "type": "Label",
-        "id": 18
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 17
-    },
-    {
-        "type": "Label",
-        "id": 19
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 16
-    },
-    {
-        "type": "Label",
-        "id": 17
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Str",
-        "str": "+",
-        "successLabel": 20,
-        "failLabel": 21
-    },
-    {
-        "type": "Label",
-        "id": 21
-    },
-    {
-        "type": "Str",
-        "str": "-",
-        "successLabel": 20,
-        "failLabel": 22
-    },
-    {
-        "type": "Label",
-        "id": 22
-    },
-    {
-        "type": "Jump",
-        "id": 16
-    },
-    {
-        "type": "Label",
-        "id": 20
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 24,
-        "failLabel": 25
-    },
-    {
-        "type": "Label",
-        "id": 24
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 23
-    },
-    {
-        "type": "Label",
-        "id": 25
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 16
-    },
-    {
-        "type": "Label",
-        "id": 23
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Term"
-    },
-    {
-        "type": "Test",
-        "successLabel": 27,
-        "failLabel": 28
-    },
-    {
-        "type": "Label",
-        "id": 27
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 26
-    },
-    {
-        "type": "Label",
-        "id": 28
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 16
-    },
-    {
-        "type": "Label",
-        "id": 26
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 13
-    },
-    {
-        "type": "Label",
-        "id": 16
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 15
-    },
-    {
-        "type": "Label",
-        "id": 15
-    },
-    {
-        "type": "Jump",
-        "id": 14
-    },
-    {
-        "type": "Label",
-        "id": 13
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Jump",
-        "id": 12
-    },
-    {
-        "type": "Label",
-        "id": 14
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 11
-    },
-    {
-        "type": "Label",
-        "id": 11
-    },
-    {
-        "type": "Capture",
-        "name": "tail"
-    },
-    {
-        "type": "Jump",
-        "id": 10
-    },
-    {
-        "type": "Label",
-        "id": 10
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 4
-    },
-    {
-        "type": "Label",
-        "id": 5
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 3
-    },
-    {
-        "type": "Label",
-        "id": 4
-    },
-    {
-        "type": "Action",
-        "code": " console.log(tail);\n      return tail.reduce(function(result, element) {\n        if (element[1] === \"+\") { return result + element[3]; }\n        if (element[1] === \"-\") { return result - element[3]; }\n      }, head);\n    ",
-        "captures": [
-            "head",
-            "tail"
-        ]
-    },
-    {
-        "type": "Jump",
-        "id": 1
-    },
-    {
-        "type": "Label",
-        "id": 3
-    },
-    {
-        "type": "Jump",
-        "id": 2
-    },
-    {
-        "type": "Label",
-        "id": 1
-    },
-    {
-        "type": "Return",
-        "success": true
-    },
-    {
-        "type": "Label",
-        "id": 2
-    },
-    {
-        "type": "Return",
-        "success": false
-    },
-    {
-        "type": "Rule",
-        "name": "Term"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Factor"
-    },
-    {
-        "type": "Test",
-        "successLabel": 36,
-        "failLabel": 37
-    },
-    {
-        "type": "Label",
-        "id": 36
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 35
-    },
-    {
-        "type": "Label",
-        "id": 37
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 33
-    },
-    {
-        "type": "Label",
-        "id": 35
-    },
-    {
-        "type": "Capture",
-        "name": "head"
-    },
-    {
-        "type": "Jump",
-        "id": 34
-    },
-    {
-        "type": "Label",
-        "id": 34
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "Label",
-        "id": 40
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 46,
-        "failLabel": 47
-    },
-    {
-        "type": "Label",
-        "id": 46
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 45
-    },
-    {
-        "type": "Label",
-        "id": 47
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 44
-    },
-    {
-        "type": "Label",
-        "id": 45
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Str",
-        "str": "*",
-        "successLabel": 48,
-        "failLabel": 49
-    },
-    {
-        "type": "Label",
-        "id": 49
-    },
-    {
-        "type": "Str",
-        "str": "/",
-        "successLabel": 48,
-        "failLabel": 50
-    },
-    {
-        "type": "Label",
-        "id": 50
-    },
-    {
-        "type": "Jump",
-        "id": 44
-    },
-    {
-        "type": "Label",
-        "id": 48
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 52,
-        "failLabel": 53
-    },
-    {
-        "type": "Label",
-        "id": 52
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 51
-    },
-    {
-        "type": "Label",
-        "id": 53
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 44
-    },
-    {
-        "type": "Label",
-        "id": 51
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Factor"
-    },
-    {
-        "type": "Test",
-        "successLabel": 55,
-        "failLabel": 56
-    },
-    {
-        "type": "Label",
-        "id": 55
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 54
-    },
-    {
-        "type": "Label",
-        "id": 56
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 44
-    },
-    {
-        "type": "Label",
-        "id": 54
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 41
-    },
-    {
-        "type": "Label",
-        "id": 44
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 43
-    },
-    {
-        "type": "Label",
-        "id": 43
-    },
-    {
-        "type": "Jump",
-        "id": 42
-    },
-    {
-        "type": "Label",
-        "id": 41
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Jump",
-        "id": 40
-    },
-    {
-        "type": "Label",
-        "id": 42
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 39
-    },
-    {
-        "type": "Label",
-        "id": 39
-    },
-    {
-        "type": "Capture",
-        "name": "tail"
-    },
-    {
-        "type": "Jump",
-        "id": 38
-    },
-    {
-        "type": "Label",
-        "id": 38
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 32
-    },
-    {
-        "type": "Label",
-        "id": 33
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 31
-    },
-    {
-        "type": "Label",
-        "id": 32
-    },
-    {
-        "type": "Action",
-        "code": "\n      return tail.reduce(function(result, element) {\n        if (element[1] === \"*\") { return result * element[3]; }\n        if (element[1] === \"/\") { return result / element[3]; }\n      }, head);\n    ",
-        "captures": [
-            "head",
-            "tail"
-        ]
-    },
-    {
-        "type": "Jump",
-        "id": 29
-    },
-    {
-        "type": "Label",
-        "id": 31
-    },
-    {
-        "type": "Jump",
-        "id": 30
-    },
-    {
-        "type": "Label",
-        "id": 29
-    },
-    {
-        "type": "Return",
-        "success": true
-    },
-    {
-        "type": "Label",
-        "id": 30
-    },
-    {
-        "type": "Return",
-        "success": false
-    },
-    {
-        "type": "Rule",
-        "name": "Factor"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "Str",
-        "str": "(",
-        "successLabel": 62,
-        "failLabel": 61
-    },
-    {
-        "type": "Label",
-        "id": 62
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 64,
-        "failLabel": 65
-    },
-    {
-        "type": "Label",
-        "id": 64
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 63
-    },
-    {
-        "type": "Label",
-        "id": 65
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 61
-    },
-    {
-        "type": "Label",
-        "id": 63
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Expression"
-    },
-    {
-        "type": "Test",
-        "successLabel": 68,
-        "failLabel": 69
-    },
-    {
-        "type": "Label",
-        "id": 68
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 67
-    },
-    {
-        "type": "Label",
-        "id": 69
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 61
-    },
-    {
-        "type": "Label",
-        "id": 67
-    },
-    {
-        "type": "Capture",
-        "name": "expr"
-    },
-    {
-        "type": "Jump",
-        "id": 66
-    },
-    {
-        "type": "Label",
-        "id": 66
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 71,
-        "failLabel": 72
-    },
-    {
-        "type": "Label",
-        "id": 71
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 70
-    },
-    {
-        "type": "Label",
-        "id": 72
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 61
-    },
-    {
-        "type": "Label",
-        "id": 70
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Str",
-        "str": ")",
-        "successLabel": 73,
-        "failLabel": 61
-    },
-    {
-        "type": "Label",
-        "id": 73
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 60
-    },
-    {
-        "type": "Label",
-        "id": 61
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 59
-    },
-    {
-        "type": "Label",
-        "id": 60
-    },
-    {
-        "type": "Action",
-        "code": " return expr; ",
-        "captures": [
-            "expr"
-        ]
-    },
-    {
-        "type": "Jump",
-        "id": 57
-    },
-    {
-        "type": "Label",
-        "id": 59
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "Integer"
-    },
-    {
-        "type": "Test",
-        "successLabel": 75,
-        "failLabel": 76
-    },
-    {
-        "type": "Label",
-        "id": 75
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 57
-    },
-    {
-        "type": "Label",
-        "id": 76
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 74
-    },
-    {
-        "type": "Label",
-        "id": 74
-    },
-    {
-        "type": "Jump",
-        "id": 58
-    },
-    {
-        "type": "Label",
-        "id": 57
-    },
-    {
-        "type": "Return",
-        "success": true
-    },
-    {
-        "type": "Label",
-        "id": 58
-    },
-    {
-        "type": "Return",
-        "success": false
-    },
-    {
-        "type": "Rule",
-        "name": "Integer"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Call",
-        "name": "_"
-    },
-    {
-        "type": "Test",
-        "successLabel": 83,
-        "failLabel": 84
-    },
-    {
-        "type": "Label",
-        "id": 83
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 82
-    },
-    {
-        "type": "Label",
-        "id": 84
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 81
-    },
-    {
-        "type": "Label",
-        "id": 82
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Str",
-        "str": "0",
-        "successLabel": 88,
-        "failLabel": 90
-    },
-    {
-        "type": "Label",
-        "id": 90
-    },
-    {
-        "type": "Str",
-        "str": "1",
-        "successLabel": 88,
-        "failLabel": 91
-    },
-    {
-        "type": "Label",
-        "id": 91
-    },
-    {
-        "type": "Str",
-        "str": "2",
-        "successLabel": 88,
-        "failLabel": 92
-    },
-    {
-        "type": "Label",
-        "id": 92
-    },
-    {
-        "type": "Str",
-        "str": "3",
-        "successLabel": 88,
-        "failLabel": 93
-    },
-    {
-        "type": "Label",
-        "id": 93
-    },
-    {
-        "type": "Str",
-        "str": "4",
-        "successLabel": 88,
-        "failLabel": 94
-    },
-    {
-        "type": "Label",
-        "id": 94
-    },
-    {
-        "type": "Str",
-        "str": "5",
-        "successLabel": 88,
-        "failLabel": 95
-    },
-    {
-        "type": "Label",
-        "id": 95
-    },
-    {
-        "type": "Str",
-        "str": "6",
-        "successLabel": 88,
-        "failLabel": 96
-    },
-    {
-        "type": "Label",
-        "id": 96
-    },
-    {
-        "type": "Str",
-        "str": "7",
-        "successLabel": 88,
-        "failLabel": 97
-    },
-    {
-        "type": "Label",
-        "id": 97
-    },
-    {
-        "type": "Str",
-        "str": "8",
-        "successLabel": 88,
-        "failLabel": 98
-    },
-    {
-        "type": "Label",
-        "id": 98
-    },
-    {
-        "type": "Str",
-        "str": "9",
-        "successLabel": 88,
-        "failLabel": 99
-    },
-    {
-        "type": "Label",
-        "id": 99
-    },
-    {
-        "type": "Jump",
-        "id": 87
-    },
-    {
-        "type": "Label",
-        "id": 87
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 81
-    },
-    {
-        "type": "Label",
-        "id": 88
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Str",
-        "str": "0",
-        "successLabel": 88,
-        "failLabel": 100
-    },
-    {
-        "type": "Label",
-        "id": 100
-    },
-    {
-        "type": "Str",
-        "str": "1",
-        "successLabel": 88,
-        "failLabel": 101
-    },
-    {
-        "type": "Label",
-        "id": 101
-    },
-    {
-        "type": "Str",
-        "str": "2",
-        "successLabel": 88,
-        "failLabel": 102
-    },
-    {
-        "type": "Label",
-        "id": 102
-    },
-    {
-        "type": "Str",
-        "str": "3",
-        "successLabel": 88,
-        "failLabel": 103
-    },
-    {
-        "type": "Label",
-        "id": 103
-    },
-    {
-        "type": "Str",
-        "str": "4",
-        "successLabel": 88,
-        "failLabel": 104
-    },
-    {
-        "type": "Label",
-        "id": 104
-    },
-    {
-        "type": "Str",
-        "str": "5",
-        "successLabel": 88,
-        "failLabel": 105
-    },
-    {
-        "type": "Label",
-        "id": 105
-    },
-    {
-        "type": "Str",
-        "str": "6",
-        "successLabel": 88,
-        "failLabel": 106
-    },
-    {
-        "type": "Label",
-        "id": 106
-    },
-    {
-        "type": "Str",
-        "str": "7",
-        "successLabel": 88,
-        "failLabel": 107
-    },
-    {
-        "type": "Label",
-        "id": 107
-    },
-    {
-        "type": "Str",
-        "str": "8",
-        "successLabel": 88,
-        "failLabel": 108
-    },
-    {
-        "type": "Label",
-        "id": 108
-    },
-    {
-        "type": "Str",
-        "str": "9",
-        "successLabel": 88,
-        "failLabel": 109
-    },
-    {
-        "type": "Label",
-        "id": 109
-    },
-    {
-        "type": "Jump",
-        "id": 89
-    },
-    {
-        "type": "Label",
-        "id": 89
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 86
-    },
-    {
-        "type": "Label",
-        "id": 86
-    },
-    {
-        "type": "Capture",
-        "name": "x"
-    },
-    {
-        "type": "Jump",
-        "id": 85
-    },
-    {
-        "type": "Label",
-        "id": 85
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 80
-    },
-    {
-        "type": "Label",
-        "id": 81
-    },
-    {
-        "type": "Pop"
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Jump",
-        "id": 79
-    },
-    {
-        "type": "Label",
-        "id": 80
-    },
-    {
-        "type": "Action",
-        "code": " return parseInt(x.concat(\"\"), 10); ",
-        "captures": [
-            "x"
-        ]
-    },
-    {
-        "type": "Jump",
-        "id": 77
-    },
-    {
-        "type": "Label",
-        "id": 79
-    },
-    {
-        "type": "Jump",
-        "id": 78
-    },
-    {
-        "type": "Label",
-        "id": 77
-    },
-    {
-        "type": "Return",
-        "success": true
-    },
-    {
-        "type": "Label",
-        "id": 78
-    },
-    {
-        "type": "Return",
-        "success": false
-    },
-    {
-        "type": "Rule",
-        "name": "_"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "PushArray"
-    },
-    {
-        "type": "Label",
-        "id": 113
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Str",
-        "str": " ",
-        "successLabel": 114,
-        "failLabel": 116
-    },
-    {
-        "type": "Label",
-        "id": 116
-    },
-    {
-        "type": "Str",
-        "str": "\t",
-        "successLabel": 114,
-        "failLabel": 117
-    },
-    {
-        "type": "Label",
-        "id": 117
-    },
-    {
-        "type": "Str",
-        "str": "\n",
-        "successLabel": 114,
-        "failLabel": 118
-    },
-    {
-        "type": "Label",
-        "id": 118
-    },
-    {
-        "type": "Str",
-        "str": "\r",
-        "successLabel": 114,
-        "failLabel": 119
-    },
-    {
-        "type": "Label",
-        "id": 119
-    },
-    {
-        "type": "Jump",
-        "id": 115
-    },
-    {
-        "type": "Label",
-        "id": 114
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Append"
-    },
-    {
-        "type": "PushContext"
-    },
-    {
-        "type": "Jump",
-        "id": 113
-    },
-    {
-        "type": "Label",
-        "id": 115
-    },
-    {
-        "type": "PopContext"
-    },
-    {
-        "type": "Nip"
-    },
-    {
-        "type": "Jump",
-        "id": 110
-    },
-    {
-        "type": "Label",
-        "id": 112
-    },
-    {
-        "type": "Jump",
-        "id": 111
-    },
-    {
-        "type": "Label",
-        "id": 110
-    },
-    {
-        "type": "Return",
-        "success": true
-    },
-    {
-        "type": "Label",
-        "id": 111
-    },
-    {
-        "type": "Return",
-        "success": false
+    const ruleTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Rule").reduce((s,[x,i]) => (s[x.name] = i, s), {});
+    const labelTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Label").reduce((s,[x,i]) => (s[x.id] = i, s), {});
+    function cons(car,cdr) {
+        if (cdr == null || cdr.type != "cons") { throw new Error("not cons"); }
+        return { type:"cons", car:car, cdr:cdr};
     }
-];
-  
-  const ruleTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Rule").reduce((s,[x,i]) => (s[x.name] = i, s), {});
-  const labelTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Label").reduce((s,[x,i]) => (s[x.id] = i, s), {});
-
-  function cons(car,cdr) {
-    if (cdr == null || cdr.type != "cons") { throw new Error("not cons"); }
-    return { type:"cons", car:car, cdr:cdr};
-  }
-  const Nil = Object.freeze({ type:"cons", car:null, cdr: null });
-  function atom(v) {
-    return { type:"atom", value:v };
-  }
-  function assoc(key,list)  {
-     while (list != Nil) {
-       const [k,v] = list.car;
-       if (k == key) { return v; }
-       list = list.cdr;
-     }
-  }
-  function decode(v) {
-    if (v.type == "atom") { return v.v; }
-    if (v.type == "cons") {
-     const ret = [];
-     while (v != Nil) {
-       ret.push(decode(v.car));
-       v = v.cdr;
-     }
-     return ret.reverse();
+    const Nil = Object.freeze({ type:"cons", car:null, cdr: null });
+    function atom(v) {
+        return { type:"atom", value:v };
     }
-    throw new Error();
-  }
-  
-  function step(insts, str, context) {
-    let [pc, index, capture, stack] = context;
-    
-    const ir = insts[pc];
-    console.log(ir,context);
-    switch (ir.type) {
-      case "Str": {
-        const v = str.substr(index, ir.str.length);
-        if (v == ir.str) { 
-          stack = cons(atom(v),stack);
-          index += ir.str.length; 
-          pc = labelTable[ir.successLabel]; 
-        } else { 
-          pc = labelTable[ir.failLabel]; 
+    function assoc(key,list)  {
+        while (list != Nil) {
+            const [k,v] = list.car;
+            if (k == key) { return v; }
+            list = list.cdr;
         }
-        return [pc, index, capture, stack];
-      }
-      case "Label": {
-        return [pc+1, index, capture, stack];
-      }
-      case "Rule": {
-        return [pc+1, index, capture, stack];
-      }
-      case "Nip": {
-        return [pc+1, index, capture, cons(stack.car, stack.cdr.cdr)];
-      }
-      case "Jump": {
-        return [labelTable[ir.id], index, capture, stack];
-      }
-      case "Call": {
-        return [ruleTable[ir.name], index, Nil, cons([pc+1,capture],stack)];
-      }
-      case "PushContext": {
-        return [pc+1, index, capture, cons(context, stack)];
-      }
-      case "PopContext": {
-        let [pc2, index2, capture2, stack2] = stack.car;
-        return [pc+1, index2, capture2, stack2];
-      }
-      case "Pop": {
-        return [pc+1, index, capture, stack.cdr];
-      }
-      case "Append": {
-        return [pc+1, index, capture, cons(cons(stack.car, stack.cdr.car), stack.cdr.cdr)];
-      }
-      case "Capture": {
-        return [pc+1, index, cons([ir.name, stack.car],capture), stack];
-      }
-      case "Action": {
-        const pred = eval(`(function() { return function (${ir.captures.join(", ")}) { ${ir.code} }; })()`);
-        const args = ir.captures.map(x => decode(assoc(x, capture)));
-        console.log("!", args);
-        const ret = pred(...args);
-        return [pc+1, index, capture, cons(atom(ret), stack)];
-      }
-      case "PushArray": {
-        return [pc+1, index, capture, cons(Nil,stack)];
-      }
-      case "Test": {
+    }
+    function decode(v) {
+        if (v.type == "atom") { return v.value; }
+        if (v.type == "cons") {
+            const ret = [];
+            while (v != Nil) {
+                ret.push(decode(v.car));
+                v = v.cdr;
+            }
+            return ret.reverse();
+        }
+        throw new Error();
+    }
+
+    function IsCharClass(char, inverted, parts, ignoreCase) {
+        if (char == undefined) { return false; }
+        let ret = false;
+        if (ignoreCase) {
+            const charCode = char.toLowerCase().charCodeAt(0);
+            ret = parts.some(x => x.begin.toLowerCase().charCodeAt(0) <= charCode && charCode <= x.end.toLowerCase().charCodeAt(0));
+        } else {
+            const charCode = char.charCodeAt(0);
+            ret = parts.some(x => x.begin.charCodeAt(0) <= charCode && charCode <= x.end.charCodeAt(0));
+        }
+        if (inverted) { ret = !ret; }
+        return ret;
+    }
+
+    function step(insts, str, context) {
+        let [pc, index, capture, stack, env] = context;
+
+        const ir = insts[pc];
+        console.log(ir,context);
+        switch (ir.type) {
+            case "Char": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str[index]
+                if (v == ir.char) {
+                    stack = cons(atom(v),stack);
+                    index += 1;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "AnyChar": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                stack = cons(atom(v),stack);
+                index += 1;
+                pc = labelTable[ir.successLabel];
+                return [pc, index, capture, stack, env];
+            }
+            case "CharClass": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str[index]
+                if (isCharClass(v, ir.inverted, ir.parts, ir.ignoreCase)) {
+                    stack = cons(atom(v),stack);
+                    index += 1;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "Str": {
+                if (index < 0 || str.length <= index + ir.str.length) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str.substr(index, ir.str.length);
+                if (v == ir.str) {
+                    stack = cons(atom(v),stack);
+                    index += ir.str.length;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "Label": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Break": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Rule": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Nip": {
+                return [pc+1, index, capture, cons(stack.car, stack.cdr.cdr), env];
+            }
+            case "Jump": {
+                return [labelTable[ir.id], index, capture, stack, env];
+            }
+            case "Call": {
+                return [ruleTable[ir.name], index, Nil, stack, cons([pc+1,capture,stack], env)];
+            }
+            case "PushContext": {
+                return [pc+1, index, capture, cons(context, stack), env];
+            }
+            case "PopContext": {
+                let [pc2, index2, capture2, stack2] = stack.car;
+                return [pc+1, index2, capture2, stack2, env];
+            }
+            case "Pop": {
+                return [pc+1, index, capture, stack.cdr, env];
+            }
+            case "Append": {
+                return [pc+1, index, capture, cons(cons(stack.car, stack.cdr.car), stack.cdr.cdr), env];
+            }
+            case "Capture": {
+                return [pc+1, index, cons([ir.name, stack.car],capture), stack, env];
+            }
+            case "Text": {
+                const [pc2, index2, capture2, stack2] = stack.car;
+                const sub = str.substr(index2, index-index2);
+                console.log(str,index2,index,sub);
+                return [pc+1, index, capture, cons(atom(sub),stack.cdr), env];
+            }
+            case "Action": {
+                const pred = eval(`(function() { return function (${ir.captures.join(", ")}) { ${ir.code} }; })()`);
+                const args = ir.captures.map(x => decode(assoc(x, capture)));
+                console.log("!", ir.captures.map(x => assoc(x, capture)), ir.captures.map(x => decode(assoc(x, capture))));
+                const ret = pred(...args);
+                return [pc+1, index, capture, cons(atom(ret), stack), env];
+            }
+            case "PushArray": {
+                return [pc+1, index, capture, cons(Nil,stack), env];
+            }
+            case "Test": {
+                const [flag,v] = stack.car;
+                if (flag) {
+                    pc = labelTable[ir.successLabel];
+                    return [pc+1, index, capture, cons(v,stack.cdr), env];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                    return [pc+1, index, capture, stack.cdr, env];
+                }
+            }
+            case "Return": {
+                if (ir.success) {
+                    const [retpc, retcap, retstack] = env.car;
+                    const ret = stack.car;
+                    return [retpc, index, retcap, cons([true,ret],retstack), env.cdr];
+                } else {
+                    const [retpc, retcap, retstack] = env.car;
+                    return [retpc, index, retcap, cons([false,null],retstack), env.cdr];
+                }
+            }
+            default:{
+                throw new Error(ir.type);
+            }
+        }
+    }
+
+    let context = [0, 0, Nil, Nil, cons([-1,Nil, Nil], Nil)];
+    for (let i=0; i<10000 && context[0] >= 0; i++) {
+        context = step(ir, "123+456", context)
+    }
+    {
+        const [pc, index, capture, stack, env] = context;
         const [flag,v] = stack.car;
         if (flag) {
-          pc = labelTable[ir.successLabel]; 
-          return [pc+1, index, capture, cons(v,stack.cdr)];
+            console.log(decode(v))
+            return decode(v);
         } else {
-          pc = labelTable[ir.failLabel]; 
-          return [pc+1, index, capture, stack.cdr];
+            return undefined;
         }
-      }
-      case "Return": {
-        if (ir.success) {
-          const ret = stack.car;
-          const [retpc, retcap] = stack.cdr.car;
-          const rootstack = stack.cdr.cdr;
-          return [retpc, index, retcap, cons([true,ret],rootstack)];
-        } else {
-          const [retpc, retcap] = stack.car;
-          const rootstack = stack.cdr;
-          return [retpc, index, retcap, cons([false,null],rootstack)];
-        }
-      }
-      default:{
-        throw new Error(ir.type);
-      }
     }
-  }
-  
-  let context = [0, 0, Nil, cons([-1,Nil], Nil)];
-  for (let i=0; i<10000 && context[0] >= 0; i++) {
-    context = step(ir, "123+456", context)
-  }
-  return context;
-  
-})();
 
- */
+
+*/

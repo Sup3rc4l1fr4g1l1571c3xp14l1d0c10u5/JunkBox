@@ -18,31 +18,8 @@
             grid-template-columns: 100%;
             grid-template-rows: 2rem 1fr;
         }
-        #grammar {
-            width: 100%;
-            height: 100%;
-            white-space: pre;
-            resize: none;
-        }
-        #ast {
-            width: 100%;
-            height: 100%;
-            white-space: pre;
-            resize: none;
-        }
-        #code {
-            width: 100%;
-            height: 100%;
-            white-space: pre;
-            resize: none;
-        }
-        #input {
-            width: 100%;
-            height: 100%;
-            white-space: pre;
-            resize: none;
-        }
-        #output {
+
+        textarea.code {
             width: 100%;
             height: 100%;
             white-space: pre;
@@ -85,6 +62,13 @@
             display: initial;
         }
         #section-code-radio:checked ~ ul #section-label-code {
+            background: #eee;
+            color:#000;
+        }
+        #section-ir-radio:checked ~ section #section-ir {
+            display: initial;
+        }
+        #section-ir-radio:checked ~ ul #section-label-ir {
             background: #eee;
             color:#000;
         }
@@ -132,6 +116,7 @@
         <input type="radio" id="section-grammar-radio" name="section-radios" class="section-radio" checked />
         <input type="radio" id="section-ast-radio" name="section-radios" class="section-radio" />
         <input type="radio" id="section-code-radio" name="section-radios" class="section-radio" />
+        <input type="radio" id="section-ir-radio" name="section-radios" class="section-radio" />
         <input type="radio" id="section-input-radio" name="section-radios" class="section-radio" />
         <input type="radio" id="section-output-radio" name="section-radios" class="section-radio" />
 
@@ -139,29 +124,34 @@
             <li><label id="section-label-grammar" for="section-grammar-radio" class="section-label">Grammar</label></li>
             <li><label id="section-label-ast" for="section-ast-radio" class="section-label">AST</label></li>
             <li><label id="section-label-code" for="section-code-radio" class="section-label">Generated Code</label></li>
+            <li><label id="section-label-ir" for="section-ir-radio" class="section-label">IR</label></li>
             <li><label id="section-label-input" for="section-input-radio" class="section-label">Input</label></li>
             <li><label id="section-label-output" for="section-output-radio" class="section-label">Output</label></li>
         </ul>
 
         <section>
             <section id="section-grammar" class="section-box">
-                <textarea id="grammar"></textarea>
+                <textarea id="grammar" class="code"></textarea>
             </section>
 
             <section id="section-ast" class="section-box">
-                <textarea id="ast"></textarea>
+                <textarea id="ast" class="code"></textarea>
             </section>
 
             <section id="section-code" class="section-box">
-                <textarea id="code"></textarea>
+                <textarea id="code" class="code"></textarea>
+            </section>
+
+            <section id="section-ir" class="section-box">
+                <textarea id="ir" class="code"></textarea>
             </section>
 
             <section id="section-input" class="section-box">
-                <textarea id="input"></textarea>
+                <textarea id="input" class="code"></textarea>
             </section>
 
             <section id="section-output" class="section-box">
-                <textarea id="output"></textarea>
+                <textarea id="output" class="code"></textarea>
             </section>
         </section>
     </section>
