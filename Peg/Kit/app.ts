@@ -191,6 +191,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
                 case "Sequence": this.onSequence(ruleName, ast, successLabel, failLabel); break;
                 case "Choice": this.onChoice(ruleName, ast, successLabel, failLabel); break;
                 case "Optional": this.onOptional(ruleName, ast, successLabel, failLabel); break;
+                case "Group": this.onGroup(ruleName, ast, successLabel, failLabel); break;
                 case "ZeroOrMore": this.onZeroOrMore(ruleName, ast, successLabel, failLabel); break;
                 case "OneOrMore": this.onOneOrMore(ruleName, ast, successLabel, failLabel); break;
                 case "AndPredicate": this.onAndPredicate(ruleName, ast, successLabel, failLabel); break;
@@ -302,6 +303,12 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.labelDef(junctionLabel);
             this.ruleCode.writeLine(`ctx = { sp:temp${tempVar}.sp, value: { type: "Nil" } };`);
             this.jumpTo(successLabel);
+        }
+
+        private onGroup(ruleName: string, ast: { type: "Group"; child: Ast }, successLabel: number, failLabel: number) {
+            this.captures.push({});
+            this.visit(ruleName, ast.child, successLabel, failLabel);
+            this.captures.pop();
         }
 
         private onZeroOrMore(ruleName: string, ast: { type: "ZeroOrMore"; child: Ast }, successLabel: number, failLabel: number) {
@@ -419,27 +426,27 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
     }
 
     type IR
-        = { type: "Char", char: string, successLabel: number, failLabel: number }
-        | { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number }
-        | { type: "AnyChar", successLabel: number, failLabel: number }
-        | { type: "Str", str: string, successLabel: number, failLabel: number }
-        | { type: "PushContext" }
-        | { type: "PushArray" }
-        | { type: "Label", id: number }
-        | { type: "Rule", name: string }
-        | { type: "Jump", id: number }
-        | { type: "Nip" }
-        | { type: "Append" }
-        | { type: "Pop" }
-        | { type: "PopContext" }
-        | { type: "PushNil" }
-        | { type: "Call", name: string }
-        | { type: "Test", successLabel: number, failLabel: number }
-        | { type: "Capture", name: string }
-        | { type: "Action", code: string, captures: string[] }
-        | { type: "Text" }
-        | { type: "Return", success: boolean }
-        | { type: "Break", comment: string }
+        = { type: "Char", char: string, successLabel: number, failLabel: number, loc: string}
+        | { type: "CharClass", inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number, loc: string}
+        | { type: "AnyChar", successLabel: number, failLabel: number, loc: string }
+        | { type: "Str", str: string, successLabel: number, failLabel: number, loc: string}
+        | { type: "PushContext", loc: string}
+        | { type: "PushArray", loc: string}
+        | { type: "Label", id: number, loc: string}
+        | { type: "Rule", name: string, loc: string}
+        | { type: "Jump", id: number, loc: string}
+        | { type: "Nip", loc: string}
+        | { type: "Append", loc: string}
+        | { type: "Pop", loc: string}
+        | { type: "PopContext", loc: string}
+        | { type: "PushNull", loc: string}
+        | { type: "Call", name: string, loc: string}
+        | { type: "Test", successLabel: number, failLabel: number, loc: string}
+        | { type: "Capture", name: string, loc: string}
+        | { type: "Action", code: string, captures: string[], loc: string}
+        | { type: "Text", loc: string}
+        | { type: "Return", success: boolean, loc: string}
+        | { type: "Break", comment: string, loc: string}
 
     class IRGenerator implements ICodeGenerator {
         private irCodes: IR[];
@@ -448,90 +455,97 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         private captures: { [key: string]: number }[];
 
         private allocLabel(): number {
+            if (this.labelId == 496) {
+                console.log(new Error().stack.split(/\n/));
+            }
             return this.labelId++;
         }
 
         private Char(char: string, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "Char", char: char, successLabel: successLabel, failLabel: failLabel });
+            this.irCodes.push({ type: "Char", char: char, successLabel: successLabel, failLabel: failLabel, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private CharClass(inverted: boolean, parts: { begin: string, end: string }[], ignoreCase: boolean, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "CharClass", inverted: inverted, parts: parts, ignoreCase: ignoreCase, successLabel: successLabel, failLabel: failLabel });
+            this.irCodes.push({ type: "CharClass", inverted: inverted, parts: parts, ignoreCase: ignoreCase, successLabel: successLabel, failLabel: failLabel, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private AnyChar(successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "AnyChar", successLabel: successLabel, failLabel: failLabel });
+            this.irCodes.push({ type: "AnyChar", successLabel: successLabel, failLabel: failLabel, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Str(str: string, successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "Str", str: str, successLabel: successLabel, failLabel: failLabel });
+            this.irCodes.push({ type: "Str", str: str, successLabel: successLabel, failLabel: failLabel, loc: new Error().stack.split(/\n/)[1]});
         }
 
         // push();
         private PushContext(): void {
-            this.irCodes.push({ type: "PushContext" });
+            this.irCodes.push({ type: "PushContext",loc: new Error().stack.split(/\n/)[1] });
         }
 
         // push([]);
         private PushArray(): void {
-            this.irCodes.push({ type: "PushArray" });
+            this.irCodes.push({ type: "PushArray",loc: new Error().stack.split(/\n/)[1] });
         }
 
         // v = pop(); pop(); push(v);
         private Nip(): void {
-            this.irCodes.push({ type: "Nip" });
+            this.irCodes.push({ type: "Nip",loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Pop(): void {
-            this.irCodes.push({ type: "Pop" });
+            this.irCodes.push({ type: "Pop",loc: new Error().stack.split(/\n/)[1] });
         }
 
         private PopContext(): void {
-            this.irCodes.push({ type: "PopContext" });
+            this.irCodes.push({ type: "PopContext",loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Append(): void {
-            this.irCodes.push({ type: "Append" });
+            this.irCodes.push({ type: "Append",loc: new Error().stack.split(/\n/)[1] });
         }
 
-        private PushNil(): void {
-            this.irCodes.push({ type: "PushNil" });
+        private PushNull(): void {
+            this.irCodes.push({ type: "PushNull",loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Text(): void {
-            this.irCodes.push({ type: "Text" });
+            this.irCodes.push({ type: "Text" ,loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Label(id: number): void {
-            this.irCodes.push({ type: "Label", id: id });
+            this.irCodes.push({ type: "Label", id: id, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Jump(id: number): void {
-            this.irCodes.push({ type: "Jump", id: id });
+            this.irCodes.push({ type: "Jump", id: id, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Call(name: string): void {
-            this.irCodes.push({ type: "Call", name: name });
+            this.irCodes.push({ type: "Call", name: name, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Test(successLabel: number, failLabel: number) {
-            this.irCodes.push({ type: "Test", successLabel: successLabel, failLabel: failLabel });
+            this.irCodes.push({ type: "Test", successLabel: successLabel, failLabel: failLabel, loc: new Error().stack.split(/\n/)[1]});
         }
 
         private Capture(name: string) {
-            this.irCodes.push({ type: "Capture", name: name });
+            this.irCodes.push({ type: "Capture", name: name, loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Action(code: string, captures: string[]) {
-            this.irCodes.push({ type: "Action", code: code, captures: captures });
+            this.irCodes.push({ type: "Action", code: code, captures: captures, loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Rule(name:string) {
-            this.irCodes.push({ type: "Rule", name: name });
+            this.irCodes.push({ type: "Rule", name: name, loc: new Error().stack.split(/\n/)[1] });
         }
 
         private Return(success: boolean) {
-            this.irCodes.push({ type: "Return", success: success });
+            this.irCodes.push({ type: "Return", success: success, loc: new Error().stack.split(/\n/)[1] });
+        }
+
+        private Break(comment: string) {
+            this.irCodes.push({ type: "Break", comment: comment, loc: new Error().stack.split(/\n/)[1] });
         }
 
         constructor() {
@@ -574,6 +588,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
                 case "Sequence": this.onSequence(ruleName, ast, successLabel, failLabel); break;
                 case "Choice": this.onChoice(ruleName, ast, successLabel, failLabel); break;
                 case "Optional": this.onOptional(ruleName, ast, successLabel, failLabel); break;
+                case "Group": this.onGroup(ruleName, ast, successLabel, failLabel); break;
                 case "ZeroOrMore": this.onZeroOrMore(ruleName, ast, successLabel, failLabel); break;
                 case "OneOrMore": this.onOneOrMore(ruleName, ast, successLabel, failLabel); break;
                 case "AndPredicate": this.onAndPredicate(ruleName, ast, successLabel, failLabel); break;
@@ -642,15 +657,20 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.Jump(successLabel);
             this.Label(junctionLabel);
             this.PopContext();
-            this.PushNil();
+            this.PushNull();
             this.Jump(successLabel);
+        }
+
+        private onGroup(ruleName: string, ast: { type: "Group"; child: Ast }, successLabel: number, failLabel: number) {
+            this.captures.push({});
+            this.visit(ruleName, ast.child, successLabel, failLabel);
+            this.captures.pop();
         }
 
         private onZeroOrMore(ruleName: string, ast: { type: "ZeroOrMore"; child: Ast }, successLabel: number, failLabel: number) {
             const loopLabel = this.allocLabel();
             const succLabel = this.allocLabel();
             const junctionLabel = this.allocLabel();
-            this.PushContext();
             this.PushArray();
             this.Label(loopLabel);
             this.PushContext();
@@ -661,7 +681,6 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             this.Jump(loopLabel);
             this.Label(junctionLabel);
             this.PopContext();
-            this.Nip();
             this.Jump(successLabel);
         }
 
@@ -669,34 +688,38 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const rollbackLabel = this.allocLabel();
             const loopLabel = this.allocLabel();
             const junctionLabel = this.allocLabel();
-            this.PushContext();
             this.PushArray();
             this.PushContext();
+            this.Break("first");
             this.visit(ruleName, ast.child, loopLabel, rollbackLabel);
             this.Label(rollbackLabel);
-            this.Pop();
-            this.Pop();
             this.PopContext();
+            this.Pop();
             this.Jump(failLabel);
             this.Label(loopLabel);
             this.Nip();
             this.Append();
             this.PushContext();
+            this.Break("!");
             this.visit(ruleName, ast.child, loopLabel, junctionLabel);
             this.Label(junctionLabel);
             this.PopContext();
-            this.Nip();
             this.Jump(successLabel);
         }
 
         private onAndPredicate(ruleName: string, ast: { type: "AndPredicate"; child: Ast }, successLabel: number, failLabel: number) {
             const junctionLabel = this.allocLabel();
+            const junctionLabel2 = this.allocLabel();
             this.PushContext();
-            this.visit(ruleName, ast.child, junctionLabel, failLabel);
+            this.visit(ruleName, ast.child, junctionLabel, junctionLabel2);
             this.Label(junctionLabel);
             this.Pop();
             this.PopContext();
+            this.PushNull();
             this.Jump(successLabel);
+            this.Label(junctionLabel2);
+            this.PopContext();
+            this.Jump(failLabel);
         }
 
         private onNotPredicate(ruleName: string, ast: { type: "NotPredicate"; child: Ast }, successLabel: number, failLabel: number) {
@@ -704,12 +727,13 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             const junctionLabel2 = this.allocLabel();
             this.PushContext();
             this.visit(ruleName, ast.child, junctionLabel2, junctionLabel);
-            this.Label(junctionLabel);
+            this.Label(junctionLabel2);
             this.Pop();
             this.PopContext();
             this.Jump(failLabel);
             this.Label(junctionLabel);
             this.PopContext();
+            this.PushNull();
             this.Jump(successLabel);
         }
 
@@ -767,6 +791,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
         | Sequence
         | Choice
         | Optional
+        | Group
         | ZeroOrMore
         | OneOrMore
         | AndPredicate
@@ -784,6 +809,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
     export type Sequence = { type: "Sequence", childs: Ast[] };
     export type Choice = { type: "Choice", childs: Ast[] };
     export type Optional = { type: "Optional", child: Ast };
+    export type Group = { type: "Group", child: Ast };
     export type ZeroOrMore = { type: "ZeroOrMore", child: Ast };
     export type OneOrMore = { type: "OneOrMore", child: Ast };
     export type AndPredicate = { type: "AndPredicate", child: Ast };
@@ -811,8 +837,9 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
 window.onload = () => {
 
     const builtinGrammar: PegKit.Grammar =
-        { "default": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "g", "child": { "type": "RuleRef", "rule": "Grammer" } }, "code": " console.log(JSON.stringify(g)); return g; " }] }, "Grammer": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "xs", "child": { "type": "OneOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "r", "child": { "type": "RuleRef", "rule": "Rule" } }, { "type": "RuleRef", "rule": "__" }] }, "code": " return r; " }] } } }] }, "code": " return xs.reduce((s,[name,body]) => { s[name] = body; return s; }, {}); " }] }, "Rule": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "ruleName", "child": { "type": "RuleRef", "rule": "Identifier" } }, { "type": "RuleRef", "rule": "__" }, { "type": "Str", "str": "=" }, { "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "ruleBody", "child": { "type": "RuleRef", "rule": "Expression" } }, { "type": "RuleRef", "rule": "EOS" }] }, "code": " return [ruleName, ruleBody]; " }] }, "Expression": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "ChoiceExpression" }] }, "ChoiceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "ActionExpression" } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "__" }, { "type": "Str", "str": "/" }, { "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "ActionExpression" } }] }, "code": " return e; " }] } } }] }, "code": " return { type: \"Choice\", childs: xs.reduce((s,x) => { s.push(x); return s; },[x]) }; " }] }, "ActionExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "expr", "child": { "type": "RuleRef", "rule": "SequenceExpression" } }, { "type": "Labeled", "name": "code", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "CodeBlock" } }] }, "code": " return x; " }] } } }] }, "code": " return (code == null) ? expr : { type: \"Action\", child: expr, code: code }; " }] }, "SequenceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "LabeledExpression" } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "LabeledExpression" } }] }, "code": " return e; " }] } } }] }, "code": " return (xs.length == 0) ? x : { type: \"Sequence\", childs: xs.reduce((s,x) => { s.push(x); return s; },[x]) }; " }] }, "LabeledExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "label", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "name", "child": { "type": "RuleRef", "rule": "Identifier" } }, { "type": "RuleRef", "rule": "_" }, { "type": "Str", "str": ":" }, { "type": "RuleRef", "rule": "_" }] }, "code": " return name; " }] } } }, { "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "PrefixedExpression" } }] }, "code": " return (label == null) ? expression : { type: \"Labeled\", name: label, child: expression }; " }] }, "PrefixedExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "operator", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "PrefixedOperator" } }, { "type": "RuleRef", "rule": "_" }] }, "code": " return x; " }] } } }, { "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "SuffixedExpression" } }] }, "code": " return (operator == null) ? expression : { type: operator, child: expression }; " }] }, "PrefixedOperator": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "&" }, "code": " return \"AndPredicate\"; " }, { "type": "Action", "child": { "type": "Str", "str": "!" }, "code": " return \"NotPredicate\"; " }, { "type": "Action", "child": { "type": "Str", "str": "$" }, "code": " return \"Text\"; " }] }, "SuffixedExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "PrimaryExpression" } }, { "type": "Labeled", "name": "operator", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SuffixedOperator" } }] }, "code": " return x; " }] } } }] }, "code": " return (operator == null) ? expression : { type: operator, child: expression }; " }] }, "SuffixedOperator": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "?" }, "code": " return \"Optional\"; " }, { "type": "Action", "child": { "type": "Str", "str": "*" }, "code": " return \"ZeroOrMore\"; " }, { "type": "Action", "child": { "type": "Str", "str": "+" }, "code": " return \"OneOrMore\"; " }] }, "PrimaryExpression": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "LiteralMatcher" }, { "type": "RuleRef", "rule": "CharacterClassMatcher" }, { "type": "RuleRef", "rule": "AnyMatcher" }, { "type": "RuleRef", "rule": "RuleReferenceExpression" }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "(" }, { "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "Expression" } }, { "type": "RuleRef", "rule": "_" }, { "type": "Str", "str": ")" }] }, "code": " return e; " }] }, "LiteralMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "StringLiteral" } }, "code": " return { type: \"Str\", str: x }; " }] }, "StringLiteral": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\"" }, { "type": "Labeled", "name": "chars", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "DoubleStringCharacter" } } }, { "type": "Str", "str": "\"" }] }, "code": " return chars.join(\"\"); " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "'" }, { "type": "Labeled", "name": "chars", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "SingleStringCharacter" } } }, { "type": "Str", "str": "'" }] }, "code": " return chars.join(\"\"); " }] }, "DoubleStringCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "\"" }, { "type": "Str", "str": "\\" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": "return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "EscapeSequence" } }] }, "code": "return x; " }] }, "SingleStringCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "'" }, { "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminator" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "RuleRef", "rule": "LineContinuation" }] }, "EscapeSequence": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "'" }, "code": " return \"'\";  " }, { "type": "Action", "child": { "type": "Str", "str": "\"" }, "code": " return \"\\\"\"; " }, { "type": "Action", "child": { "type": "Str", "str": "\\" }, "code": " return \"\\\\\"; " }, { "type": "Action", "child": { "type": "Str", "str": "b" }, "code": " return \"\\b\"; " }, { "type": "Action", "child": { "type": "Str", "str": "f" }, "code": " return \"\\f\"; " }, { "type": "Action", "child": { "type": "Str", "str": "n" }, "code": " return \"\\n\"; " }, { "type": "Action", "child": { "type": "Str", "str": "r" }, "code": " return \"\\r\"; " }, { "type": "Action", "child": { "type": "Str", "str": "t" }, "code": " return \"\\t\"; " }, { "type": "Action", "child": { "type": "Str", "str": "v" }, "code": " return \"\\v\"; " }] }, "CharacterClassMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "[" }, { "type": "Labeled", "name": "inverted", "child": { "type": "Optional", "child": { "type": "Str", "str": "^" } } }, { "type": "Labeled", "name": "parts", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "CharacterPart" } } }, { "type": "Str", "str": "]" }, { "type": "Labeled", "name": "ignoreCase", "child": { "type": "Optional", "child": { "type": "Str", "str": "i" } } }] }, "code": " return { type:\"CharClass\", inverted: inverted, parts:parts, ignoreCase:ignoreCase }; " }] }, "CharacterPart": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "ClassCharacterRange" }, { "type": "Action", "child": { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }, "code": " return { begin:x, end:x}; " }] }, "ClassCharacterRange": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "begin", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }, { "type": "Str", "str": "-" }, { "type": "Labeled", "name": "end", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }] }, "code": " return { begin:begin, end:end }; " }] }, "ClassCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "]" }, { "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminator" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "EscapeSequence" } }] }, "code": " return x; " }, { "type": "RuleRef", "rule": "LineContinuation" }] }, "LineContinuation": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminatorSequence" }] }, "code": " return \"\"; " }] }, "AnyMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "." }, "code": " return { type: \"AnyChar\" }; " }] }, "RuleReferenceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "name", "child": { "type": "RuleRef", "rule": "Identifier" } }, "code": " return { type: \"RuleRef\", rule: name }; " }] }, "CodeBlock": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "{" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "Code" } }, { "type": "Str", "str": "}" }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Str", "str": "{" }, "code": " error(\"Unbalanced brace.\"); " }] }, "Code": { "type": "Choice", "childs": [{ "type": "Text", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "OneOrMore", "child": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "{", "end": "{" }, { "begin": "}", "end": "}" }], "ignoreCase": null } }, { "type": "RuleRef", "rule": "SourceCharacter" }] }] } }, { "type": "Sequence", "childs": [{ "type": "Str", "str": "{" }, { "type": "RuleRef", "rule": "Code" }, { "type": "Str", "str": "}" }] }] } } }] }, "SourceCharacter": { "type": "Choice", "childs": [{ "type": "AnyChar" }] }, "LineTerminator": { "type": "Choice", "childs": [{ "type": "CharClass", "inverted": null, "parts": [{ "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }], "ignoreCase": null }] }, "LineTerminatorSequence": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "Optional", "child": { "type": "Str", "str": "\r" } }, { "type": "Str", "str": "\n" }] }] }, "Identifier": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "A", "end": "Z" }, { "begin": "a", "end": "z" }, { "begin": "_", "end": "_" }], "ignoreCase": null } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "A", "end": "Z" }, { "begin": "a", "end": "z" }, { "begin": "0", "end": "9" }, { "begin": "_", "end": "_" }], "ignoreCase": null } } }] }, "code": " return String.prototype.concat(x,...xs); " }] }, "__": { "type": "Choice", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }] }, "_": { "type": "Choice", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }] }, "EOS": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }, { "type": "CharClass", "inverted": null, "parts": [{ "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }], "ignoreCase": null }] }] } }
+        { "default": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "g", "child": { "type": "RuleRef", "rule": "Grammer" } }, "code": " console.log(JSON.stringify(g)); return g; " }] }, "Grammer": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "xs", "child": { "type": "OneOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "r", "child": { "type": "RuleRef", "rule": "Rule" } }, { "type": "RuleRef", "rule": "__" }] }, "code": " return r; " }] } } }] }, "code": " return xs.reduce((s,[name,body]) => { s[name] = body; return s; }, {}); " }] }, "Rule": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "ruleName", "child": { "type": "RuleRef", "rule": "Identifier" } }, { "type": "RuleRef", "rule": "__" }, { "type": "Str", "str": "=" }, { "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "ruleBody", "child": { "type": "RuleRef", "rule": "Expression" } }, { "type": "RuleRef", "rule": "EOS" }] }, "code": " return [ruleName, ruleBody]; " }] }, "Expression": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "ChoiceExpression" }] }, "ChoiceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "ActionExpression" } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "__" }, { "type": "Str", "str": "/" }, { "type": "RuleRef", "rule": "__" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "ActionExpression" } }] }, "code": " return e; " }] } } }] }, "code": " return { type: \"Choice\", childs: xs.reduce((s,x) => { s.push(x); return s; },[x]) }; " }] }, "ActionExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "expr", "child": { "type": "RuleRef", "rule": "SequenceExpression" } }, { "type": "Labeled", "name": "code", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "CodeBlock" } }] }, "code": " return x; " }] } } }] }, "code": " return (code == null) ? expr : { type: \"Action\", child: expr, code: code }; " }] }, "SequenceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "LabeledExpression" } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "LabeledExpression" } }] }, "code": " return e; " }] } } }] }, "code": " return (xs.length == 0) ? x : { type: \"Sequence\", childs: xs.reduce((s,x) => { s.push(x); return s; },[x]) }; " }] }, "LabeledExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "label", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "name", "child": { "type": "RuleRef", "rule": "Identifier" } }, { "type": "RuleRef", "rule": "_" }, { "type": "Str", "str": ":" }, { "type": "RuleRef", "rule": "_" }] }, "code": " return name; " }] } } }, { "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "PrefixedExpression" } }] }, "code": " return (label == null) ? expression : { type: \"Labeled\", name: label, child: expression }; " }] }, "PrefixedExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "operator", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "PrefixedOperator" } }, { "type": "RuleRef", "rule": "_" }] }, "code": " return x; " }] } } }, { "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "SuffixedExpression" } }] }, "code": " return (operator == null) ? expression : { type: operator, child: expression }; " }] }, "PrefixedOperator": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "&" }, "code": " return \"AndPredicate\"; " }, { "type": "Action", "child": { "type": "Str", "str": "!" }, "code": " return \"NotPredicate\"; " }, { "type": "Action", "child": { "type": "Str", "str": "$" }, "code": " return \"Text\"; " }] }, "SuffixedExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "expression", "child": { "type": "RuleRef", "rule": "PrimaryExpression" } }, { "type": "Labeled", "name": "operator", "child": { "type": "Optional", "child": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SuffixedOperator" } }] }, "code": " return x; " }] } } }] }, "code": " return (operator == null) ? expression : { type: operator, child: expression }; " }] }, "SuffixedOperator": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "?" }, "code": " return \"Optional\"; " }, { "type": "Action", "child": { "type": "Str", "str": "*" }, "code": " return \"ZeroOrMore\"; " }, { "type": "Action", "child": { "type": "Str", "str": "+" }, "code": " return \"OneOrMore\"; " }] }, "PrimaryExpression": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "LiteralMatcher" }, { "type": "RuleRef", "rule": "CharacterClassMatcher" }, { "type": "RuleRef", "rule": "AnyMatcher" }, { "type": "RuleRef", "rule": "RuleReferenceExpression" }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "(" }, { "type": "RuleRef", "rule": "_" }, { "type": "Labeled", "name": "e", "child": { "type": "RuleRef", "rule": "Expression" } }, { "type": "RuleRef", "rule": "_" }, { "type": "Str", "str": ")" }] }, "code": " return { type: \"Group\", child:e }; " }] }, "LiteralMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "StringLiteral" } }, "code": " return { type: \"Str\", str: x }; " }] }, "StringLiteral": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\"" }, { "type": "Labeled", "name": "chars", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "DoubleStringCharacter" } } }, { "type": "Str", "str": "\"" }] }, "code": " return chars.join(\"\"); " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "'" }, { "type": "Labeled", "name": "chars", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "SingleStringCharacter" } } }, { "type": "Str", "str": "'" }] }, "code": " return chars.join(\"\"); " }] }, "DoubleStringCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "\"" }, { "type": "Str", "str": "\\" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "EscapeSequence" } }] }, "code": " return x; " }] }, "SingleStringCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "'" }, { "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminator" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "RuleRef", "rule": "LineContinuation" }] }, "EscapeSequence": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "'" }, "code": " return \"'\";  " }, { "type": "Action", "child": { "type": "Str", "str": "\"" }, "code": " return \"\\\"\"; " }, { "type": "Action", "child": { "type": "Str", "str": "\\" }, "code": " return \"\\\\\"; " }, { "type": "Action", "child": { "type": "Str", "str": "b" }, "code": " return \"\\b\"; " }, { "type": "Action", "child": { "type": "Str", "str": "f" }, "code": " return \"\\f\"; " }, { "type": "Action", "child": { "type": "Str", "str": "n" }, "code": " return \"\\n\"; " }, { "type": "Action", "child": { "type": "Str", "str": "r" }, "code": " return \"\\r\"; " }, { "type": "Action", "child": { "type": "Str", "str": "t" }, "code": " return \"\\t\"; " }, { "type": "Action", "child": { "type": "Str", "str": "v" }, "code": " return \"\\v\"; " }] }, "CharacterClassMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "[" }, { "type": "Labeled", "name": "inverted", "child": { "type": "Optional", "child": { "type": "Str", "str": "^" } } }, { "type": "Labeled", "name": "parts", "child": { "type": "ZeroOrMore", "child": { "type": "RuleRef", "rule": "CharacterPart" } } }, { "type": "Str", "str": "]" }, { "type": "Labeled", "name": "ignoreCase", "child": { "type": "Optional", "child": { "type": "Str", "str": "i" } } }] }, "code": " return { type:\"CharClass\", inverted: inverted, parts:parts, ignoreCase:ignoreCase }; " }] }, "CharacterPart": { "type": "Choice", "childs": [{ "type": "RuleRef", "rule": "ClassCharacterRange" }, { "type": "Action", "child": { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }, "code": " return { begin:x, end:x}; " }] }, "ClassCharacterRange": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "begin", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }, { "type": "Str", "str": "-" }, { "type": "Labeled", "name": "end", "child": { "type": "RuleRef", "rule": "ClassCharacter" } }] }, "code": " return { begin:begin, end:end }; " }] }, "ClassCharacter": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "Choice", "childs": [{ "type": "Str", "str": "]" }, { "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminator" }] } }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "SourceCharacter" } }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "EscapeSequence" } }] }, "code": " return x; " }, { "type": "RuleRef", "rule": "LineContinuation" }] }, "LineContinuation": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "\\" }, { "type": "RuleRef", "rule": "LineTerminatorSequence" }] }, "code": " return \"\"; " }] }, "AnyMatcher": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Str", "str": "." }, "code": " return { type: \"AnyChar\" }; " }] }, "RuleReferenceExpression": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Labeled", "name": "name", "child": { "type": "RuleRef", "rule": "Identifier" } }, "code": " return { type: \"RuleRef\", rule: name }; " }] }, "CodeBlock": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Str", "str": "{" }, { "type": "Labeled", "name": "x", "child": { "type": "RuleRef", "rule": "Code" } }, { "type": "Str", "str": "}" }] }, "code": " return x; " }, { "type": "Action", "child": { "type": "Str", "str": "{" }, "code": " error(\"Unbalanced brace.\"); " }] }, "Code": { "type": "Choice", "childs": [{ "type": "Text", "child": { "type": "ZeroOrMore", "child": { "type": "Choice", "childs": [{ "type": "OneOrMore", "child": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "NotPredicate", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "{", "end": "{" }, { "begin": "}", "end": "}" }], "ignoreCase": null } }, { "type": "RuleRef", "rule": "SourceCharacter" }] }] } }, { "type": "Sequence", "childs": [{ "type": "Str", "str": "{" }, { "type": "RuleRef", "rule": "Code" }, { "type": "Str", "str": "}" }] }] } } }] }, "SourceCharacter": { "type": "Choice", "childs": [{ "type": "AnyChar" }] }, "LineTerminator": { "type": "Choice", "childs": [{ "type": "CharClass", "inverted": null, "parts": [{ "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }], "ignoreCase": null }] }, "LineTerminatorSequence": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "Optional", "child": { "type": "Str", "str": "\r" } }, { "type": "Str", "str": "\n" }] }] }, "Identifier": { "type": "Choice", "childs": [{ "type": "Action", "child": { "type": "Sequence", "childs": [{ "type": "Labeled", "name": "x", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "A", "end": "Z" }, { "begin": "a", "end": "z" }, { "begin": "_", "end": "_" }], "ignoreCase": null } }, { "type": "Labeled", "name": "xs", "child": { "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": "A", "end": "Z" }, { "begin": "a", "end": "z" }, { "begin": "0", "end": "9" }, { "begin": "_", "end": "_" }], "ignoreCase": null } } }] }, "code": " return String.prototype.concat(x,...xs); " }] }, "__": { "type": "Choice", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }] }, "_": { "type": "Choice", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }] }, "EOS": { "type": "Choice", "childs": [{ "type": "Sequence", "childs": [{ "type": "ZeroOrMore", "child": { "type": "CharClass", "inverted": null, "parts": [{ "begin": " ", "end": " " }, { "begin": "\t", "end": "\t" }], "ignoreCase": null } }, { "type": "CharClass", "inverted": null, "parts": [{ "begin": "\r", "end": "\r" }, { "begin": "\n", "end": "\n" }], "ignoreCase": null }] }] } }
         ;
+
     const builtinParser: { [key: string]: (str: string, ctx: IContext) => IContext | null } = eval(PegKit.compileGrammar(builtinGrammar));
 
     const domGrammar = <HTMLTextAreaElement>document.getElementById('grammar');
@@ -843,7 +870,8 @@ window.onload = () => {
     let compileTimer: number | null = null;
     let buildTimer: number | null = null;
     let runTimer: number | null = null;
-    let parser: { [key: string]: (str: string, ctx: IContext) => IContext | null } = null;
+    //let parser: { [key: string]: (str: string, ctx: IContext) => IContext | null } = null;
+    let parser: (ruleName: string, input: string) => any;
 
     function parse() {
         oldGrammarValue = domGrammar.value;
@@ -859,8 +887,214 @@ window.onload = () => {
 
     function compile() {
         oldAstValue = domAst.value;
-        domCode.value = PegKit.compileGrammar(JSON.parse(oldAstValue));
+        //domCode.value = PegKit.compileGrammar(JSON.parse(oldAstValue));
         domIr.value = PegKit.compileGrammar2(JSON.parse(oldAstValue));
+        domCode.value = `
+(function () {
+    const ir = ${domIr.value};
+    const ruleTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Rule").reduce((s,[x,i]) => (s[x.name] = i, s), {});
+    const labelTable = ir.map((x,i) => [x,i]).filter(([x,i])=> x.type == "Label").reduce((s,[x,i]) => (s[x.id] = i, s), {});
+    function cons(car,cdr) {
+        if (cdr == null || cdr.type != "cons") { throw new Error("not cons"); }
+        return { type:"cons", car:car, cdr:cdr};
+    }
+    const Nil = Object.freeze({ type:"cons", car:null, cdr: null });
+    function atom(v) {
+        return { type:"atom", value:v };
+    }
+    function assoc(key,list)  {
+        while (list != Nil) {
+            const [k,v] = list.car;
+            if (k == key) { return v; }
+            list = list.cdr;
+        }
+    }
+    function decode(v) {
+        if (v.type == "atom") { return v.value; }
+        if (v.type == "cons") {
+            const ret = [];
+            while (v != Nil) {
+                ret.push(decode(v.car));
+                v = v.cdr;
+            }
+            return ret.reverse();
+        }
+        throw new Error();
+    }
+
+    function isCharClass(char, inverted, parts, ignoreCase) {
+        if (char == undefined) { return false; }
+        let ret = false;
+        if (ignoreCase) {
+            const charCode = char.toLowerCase().charCodeAt(0);
+            ret = parts.some(x => x.begin.toLowerCase().charCodeAt(0) <= charCode && charCode <= x.end.toLowerCase().charCodeAt(0));
+        } else {
+            const charCode = char.charCodeAt(0);
+            ret = parts.some(x => x.begin.charCodeAt(0) <= charCode && charCode <= x.end.charCodeAt(0));
+        }
+        if (inverted) { ret = !ret; }
+        return ret;
+    }
+
+    function step(insts, str, context) {
+        let [pc, index, capture, stack, env] = context;
+
+        const ir = insts[pc];
+        switch (ir.type) {
+            case "Char": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str[index]
+                if (v == ir.char) {
+                    stack = cons(atom(v),stack);
+                    index += 1;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "AnyChar": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str[index]
+                stack = cons(atom(v),stack);
+                index += 1;
+                pc = labelTable[ir.successLabel];
+                return [pc, index, capture, stack, env];
+            }
+            case "CharClass": {
+                if (index < 0 || str.length <= index) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str[index]
+                if (isCharClass(v, ir.inverted, ir.parts, ir.ignoreCase)) {
+                    stack = cons(atom(v),stack);
+                    index += 1;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "Str": {
+                if (index < 0 || str.length <= index + ir.str.length) {
+                    pc = labelTable[ir.failLabel];
+                    return [pc, index, capture, stack, env];
+                }
+                const v = str.substr(index, ir.str.length);
+                if (v == ir.str) {
+                    stack = cons(atom(v),stack);
+                    index += ir.str.length;
+                    pc = labelTable[ir.successLabel];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                }
+                return [pc, index, capture, stack, env];
+            }
+            case "Label": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Break": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Rule": {
+                return [pc+1, index, capture, stack, env];
+            }
+            case "Nip": {
+                return [pc+1, index, capture, cons(stack.car, stack.cdr.cdr), env];
+            }
+            case "Jump": {
+                return [labelTable[ir.id], index, capture, stack, env];
+            }
+            case "Call": {
+                return [ruleTable[ir.name], index, Nil, stack, cons([pc+1,capture,stack], env)];
+            }
+            case "PushContext": {
+                return [pc+1, index, capture, cons(context, stack), env];
+            }
+            case "PushNull": {
+                return [pc+1, index, capture, cons(atom(null), stack), env];
+            }
+            case "PopContext": {
+                let [pc2, index2, capture2, stack2] = stack.car;
+                return [pc+1, index2, capture2, stack2, env];
+            }
+            case "Pop": {
+                return [pc+1, index, capture, stack.cdr, env];
+            }
+            case "Append": {
+                return [pc+1, index, capture, cons(cons(stack.car, stack.cdr.car), stack.cdr.cdr), env];
+            }
+            case "Capture": {
+                return [pc+1, index, cons([ir.name, stack.car],capture), stack, env];
+            }
+            case "Text": {
+                const [pc2, index2, capture2, stack2] = stack.car;
+                const sub = str.substr(index2, index-index2);
+                return [pc+1, index, capture, cons(atom(sub),stack.cdr), env];
+            }
+            case "Action": {
+                const pred = eval(\`(function() { return function (\${ir.captures.join(", ")}) { \${ir.code} }; })()\`);
+                const args = ir.captures.map(x => decode(assoc(x, capture)));
+                const ret = pred(...args);
+                return [pc+1, index, capture, cons(atom(ret), stack.cdr), env];
+            }
+            case "PushArray": {
+                return [pc+1, index, capture, cons(Nil,stack), env];
+            }
+            case "Test": {
+                const [flag,v] = stack.car;
+                if (flag) {
+                    pc = labelTable[ir.successLabel];
+                    return [pc+1, index, capture, cons(v,stack.cdr), env];
+                } else {
+                    pc = labelTable[ir.failLabel];
+                    return [pc+1, index, capture, stack.cdr, env];
+                }
+            }
+            case "Return": {
+                if (ir.success) {
+                    const [retpc, retcap, retstack] = env.car;
+                    const ret = stack.car;
+                    return [retpc, index, retcap, cons([true,ret],retstack), env.cdr];
+                } else {
+                    const [retpc, retcap, retstack] = env.car;
+                    return [retpc, index, retcap, cons([false,null],retstack), env.cdr];
+                }
+            }
+            default:{
+                throw new Error(ir.type);
+            }
+        }
+    }
+
+    return function (ruleName, str) {
+        let context = [ruleTable[ruleName], 0, Nil, Nil, cons([-1,Nil, Nil], Nil)];
+        for (let i=0; context[0] >= 0; i++) {
+            context = step(ir, str, context)
+            if (i >= 500000) {
+                throw new Error("loop limit.")
+            }
+        }
+        {
+            const [pc, index, capture, stack, env] = context;
+            const [flag,v] = stack.car;
+            if (flag) {
+                console.log(decode(v))
+                return decode(v);
+            } else {
+                return undefined;
+            }
+        }
+    };
+})();
+`
         compileTimer = null;
         return true;
     }
@@ -901,9 +1135,11 @@ window.onload = () => {
     function run() {
         if (parser == null) { return; }
         oldInputValue = domInput.value;
-        const ret = parser["default"](oldInputValue, { sp: 0, value: null });
+        //const ret = parser["default"](oldInputValue, { sp: 0, value: null });
+        //domOutput.value = JSON.stringify(ret, null, 4);
+        //console.log(decodeValue(ret.value));
+        const ret = parser("default", oldInputValue);
         domOutput.value = JSON.stringify(ret, null, 4);
-        console.log(decodeValue(ret.value));
         runTimer = null;
         return true;
     }
@@ -960,6 +1196,7 @@ window.onload = () => {
 };
 
 /*
+
 default
   = g:Grammer { console.log(JSON.stringify(g)); return g; }
 
@@ -1005,7 +1242,7 @@ PrimaryExpression
   / CharacterClassMatcher
   / AnyMatcher
   / RuleReferenceExpression
-  / "(" _ e:Expression _ ")" { return e; }
+  / "(" _ e:Expression _ ")" { return { type: "Group", child:e }; }
 
 LiteralMatcher
   = x:StringLiteral { return { type: "Str", str: x }; }
@@ -1076,6 +1313,7 @@ __ = [ \r\n\t]*
 _ = [ \t]*
 
 EOS = [ \t]* [\r\n]
+
 
 
 */
