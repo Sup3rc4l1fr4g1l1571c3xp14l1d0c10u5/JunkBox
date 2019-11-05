@@ -491,6 +491,7 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
             | { type: "Str", str: string, successLabel: number, failLabel: number, loc: string }
             | { type: "PushContext", loc: string }
             | { type: "PushArray", loc: string }
+            | { type: "PushPosition", loc: string }
             | { type: "Label", id: number, loc: string }
             | { type: "Rule", name: string, loc: string }
             | { type: "Jump", id: number, loc: string }
@@ -555,6 +556,10 @@ function IsCharClass(char, inverted, parts, ignoreCase) {
 
             private PushArray(): void {
                 this.irCodes.push({ type: "PushArray", loc: new Error().stack.split(/\n/)[1] });
+            }
+
+            private PushPosition(): void {
+                this.irCodes.push({ type: "PushPosition", loc: new Error().stack.split(/\n/)[1] });
             }
 
             private Nip(): void {
@@ -927,8 +932,6 @@ window.onload = () => {
         events.forEach(x => dom.addEventListener(x, listener));
     }
 
-
-
     let oldGrammarValue: string = "";
     let oldAstValue: string = "";
     let oldCodeValue: string = "";
@@ -955,7 +958,7 @@ window.onload = () => {
 
     type Cell = Cont | Ret | Cons | Atom;
     interface Cont { type: "cont", context: Context };
-    interface Ret { type: "ret", flag: boolean, value: Cell };
+    interface Ret  { type: "ret", flag: boolean, value: Cell };
     interface Cons { type: "cons", car: Cell, cdr: Cons };
     interface Atom { type: "atom", value: any };
 
@@ -963,9 +966,11 @@ window.onload = () => {
 
     type Env = { pc: number, capture: Dic, sp: number, next: Env | null }
     type CharRangePart = { begin: string, end: string };
+    type Position = { index: number, line: number, column: number };
+
     interface Context {
         pc: number;
-        index: number;
+        pos: Position;
         capture: Dic;
         sp: number;
         env: Env
@@ -987,7 +992,7 @@ window.onload = () => {
         }
 
         function cont(c: Context): Cont {
-            return { type: "cont", context: { pc: c.pc, index: c.index, capture: c.capture, sp: c.sp, env: c.env } };
+            return { type: "cont", context: { pc: c.pc, pos: c.pos, capture: c.capture, sp: c.sp, env: c.env } };
         }
 
         function ret(flag: boolean, value: Cell): Ret {
@@ -1033,134 +1038,166 @@ window.onload = () => {
             return ret;
         }
 
+        function incPos(pos: Position, v: string) {
+            let { index: index, line: line, column: column } = pos;
+            let n = 0;
+            while (v.length > n) {
+                switch (v[n]) {
+                    case "\r": {
+                        if (v.length > n + 1 && v[n + 1] == "\n") {
+                            n += 2; line += 1; column = 1;
+                            continue;
+                        } else {
+                            n += 1; line += 1; column = 1;
+                            continue;
+                        }
+                    }
+                    case "\n": {
+                        n += 1; line += 1; column = 1;
+                        continue;
+                    }
+                    default: {
+                        n += 1;
+                        column += 1;
+                        continue;
+                    }
+                }
+            }
+            return { index: index + n, line: line, column: column };
+        }
+
         function step(insts: PegKit.IRGenerator.IR[], stack: Cell[], str: string, context: Context): Context {
-            let { pc: pc, index: index, capture: capture, sp: sp, env: env } = context;
+            let { pc: pc, pos: pos, capture: capture, sp: sp, env: env } = context;
 
             const ir = insts[pc];
             switch (ir.type) {
                 case "Char": {
-                    if (index < 0 || str.length <= index) {
+                    if (pos.index < 0 || str.length <= pos.index) {
                         pc = labelTable[ir.failLabel];
-                        return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                        return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                     }
-                    const v = str[index]
+                    const v = str[pos.index]
                     if (v == ir.char) {
                         stack[sp] = atom(v);
                         sp = sp + 1;
-                        index += 1;
+                        pos = incPos(pos, v);
                         pc = labelTable[ir.successLabel];
                     } else {
                         pc = labelTable[ir.failLabel];
                     }
-                    return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "AnyChar": {
-                    if (index < 0 || str.length <= index) {
+                    if (pos.index < 0 || str.length <= pos.index) {
                         pc = labelTable[ir.failLabel];
-                        return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                        return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                     }
-                    const v = str[index];
+                    const v = str[pos.index];
                     stack[sp] = atom(v);
                     sp += 1;
-                    index += 1;
+                    pos = incPos(pos,v);
                     pc = labelTable[ir.successLabel];
-                    return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "CharClass": {
-                    if (index < 0 || str.length <= index) {
+                    if (pos.index < 0 || str.length <= pos.index) {
                         pc = labelTable[ir.failLabel];
-                        return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                        return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                     }
-                    const v = str[index]
+                    const v = str[pos.index]
                     if (isCharClass(v, ir.inverted, ir.parts, ir.ignoreCase)) {
                         stack[sp] = atom(v);
                         sp += 1;
-                        index += 1;
+                        pos = incPos(pos,v);
                         pc = labelTable[ir.successLabel];
                     } else {
                         pc = labelTable[ir.failLabel];
                     }
-                    return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "Str": {
-                    if (index < 0 || str.length <= index + ir.str.length) {
+                    if (pos.index < 0 || str.length <= pos.index + ir.str.length) {
                         pc = labelTable[ir.failLabel];
-                        return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                        return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                     }
-                    const v = str.substr(index, ir.str.length);
+                    const v = str.substr(pos.index, ir.str.length);
                     if (v == ir.str) {
                         stack[sp] = atom(v);
                         sp += 1;
-                        index += ir.str.length;
+                        pos = incPos(pos,v);
                         pc = labelTable[ir.successLabel];
                     } else {
                         pc = labelTable[ir.failLabel];
                     }
-                    return { pc: pc, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "Label":
                 case "Comment":
                 case "Rule": {
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "Nip": {
                     stack[sp - 2] = stack[sp - 1];
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp - 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp - 1, env: env };
                 }
                 case "Jump": {
-                    return { pc: labelTable[ir.id], index: index, capture: capture, sp: sp, env: env };
+                    return { pc: labelTable[ir.id], pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "Call": {
-                    return { pc: ruleTable[ir.name], index: index, capture: null, sp: sp, env: { pc: pc + 1, capture: capture, sp: sp, next: env } };
+                    return { pc: ruleTable[ir.name], pos: pos, capture: null, sp: sp, env: { pc: pc + 1, capture: capture, sp: sp, next: env } };
                 }
                 case "PushContext": {
                     stack[sp] = cont(context);
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp + 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp + 1, env: env };
                 }
                 case "PushNull": {
                     stack[sp] = atom(null);
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp + 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp + 1, env: env };
                 }
                 case "PopContext": {
                     const ctx = stack[sp - 1];
                     if (ctx.type != "cont") {
                         throw new Error("stack value is not context.");
                     }
-                    let { pc: pc2, index: index2, capture: capture2, sp: sp2, env: env2 } = ctx.context;
-                    return { pc: pc + 1, index: index2, capture: capture2, sp: sp2, env: env };
+                    let { pc: pc2, pos: pos2, capture: capture2, sp: sp2, env: env2 } = ctx.context;
+                    return { pc: pc + 1, pos: pos2, capture: capture2, sp: sp2, env: env };
                 }
                 case "Pop": {
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp - 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp - 1, env: env };
                 }
                 case "Append": {
                     const list = stack[sp - 2];
                     if (list.type != "cons") { throw new Error(); }
                     stack[sp - 2] = cons(stack[sp - 1], list);
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp - 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp - 1, env: env };
                 }
                 case "Capture": {
-                    return { pc: pc + 1, index: index, capture: add(ir.name, stack[sp - 1], capture), sp: sp, env: env };
+                    return { pc: pc + 1, pos: pos, capture: add(ir.name, stack[sp - 1], capture), sp: sp, env: env };
                 }
                 case "Text": {
                     const ctx = stack[sp - 1];
                     if (ctx.type != "cont") {
                         throw new Error();
                     }
-                    const { pc: pc2, index: index2, capture: capture2, sp: sp2, env: env } = ctx.context;
-                    const sub = str.substr(index2, index - index2);
+                    const { pc: pc2, pos: pos2, capture: capture2, sp: sp2, env: env } = ctx.context;
+                    const sub = str.substr(pos2.index, pos.index - pos2.index);
                     stack[sp - 1] = atom(sub);
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "Action": {
                     const pred = eval(`(function() { return function (${ir.captures.join(", ")}) { ${ir.code} }; })()`);
                     const args = ir.captures.map(x => decode(assoc(x, capture)));
                     const ret = pred(...args);
                     stack[sp - 1] = atom(ret);
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp, env: env };
                 }
                 case "PushArray": {
                     stack[sp] = Nil;
-                    return { pc: pc + 1, index: index, capture: capture, sp: sp + 1, env: env };
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp + 1, env: env };
+                }
+                case "PushPosition": {
+                    stack[sp] = atom({ index: pos.index, line: pos.line, column: pos.column });
+                    return { pc: pc + 1, pos: pos, capture: capture, sp: sp + 1, env: env };
                 }
                 case "Test": {
                     const ret = stack[sp - 1];
@@ -1170,10 +1207,10 @@ window.onload = () => {
                     if (ret.flag) {
                         pc = labelTable[ir.successLabel];
                         stack[sp - 1] = ret.value;
-                        return { pc: pc + 1, index: index, capture: capture, sp: sp, env: env };
+                        return { pc: pc + 1, pos: pos, capture: capture, sp: sp, env: env };
                     } else {
                         pc = labelTable[ir.failLabel];
-                        return { pc: pc + 1, index: index, capture: capture, sp: sp - 1, env: env };
+                        return { pc: pc + 1, pos: pos, capture: capture, sp: sp - 1, env: env };
                     }
                 }
                 case "Return": {
@@ -1181,10 +1218,10 @@ window.onload = () => {
                     if (ir.success) {
                         const result = stack[sp - 1];
                         stack[retstack] = ret(true, result);
-                        return { pc: retpc, index: index, capture: retcap, sp: retstack + 1, env: next };
+                        return { pc: retpc, pos: pos, capture: retcap, sp: retstack + 1, env: next };
                     } else {
                         stack[retstack] = ret(false, null);
-                        return { pc: retpc, index: index, capture: retcap, sp: retstack + 1, env: next };
+                        return { pc: retpc, pos: pos, capture: retcap, sp: retstack + 1, env: next };
                     }
                 }
                 default: {
@@ -1194,7 +1231,7 @@ window.onload = () => {
         }
 
         return function (ruleName, str) {
-            let context: Context = { pc: ruleTable[ruleName], index: 0, capture: null, sp: 0, env: { pc: -1, capture: null, sp: 0, next: null } };
+            let context: Context = { pc: ruleTable[ruleName], pos: { index: 0, line: 1, column: 1 }, capture: null, sp: 0, env: { pc: -1, capture: null, sp: 0, next: null } };
             const stack: Cell[] = [];
             for (let i = 0; context.pc >= 0; i++) {
                 context = step(ir, stack, str, context)
@@ -1203,7 +1240,7 @@ window.onload = () => {
                 }
             }
             {
-                const { pc: pc, index: index, capture: capture, sp: sp, env: env } = context;
+                const { pc: pc, pos: pos, capture: capture, sp: sp, env: env } = context;
                 const v = stack[sp - 1];
                 if (v.type != "ret") {
                     throw new Error();
