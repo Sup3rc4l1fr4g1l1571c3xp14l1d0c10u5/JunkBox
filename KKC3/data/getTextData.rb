@@ -1,6 +1,7 @@
+#getTextData
 require 'nokogiri'
 require 'open-uri'
-
+require 'json'
 
 def filter(c)
   case c.ord
@@ -47,24 +48,32 @@ end
 
 def get(url)
   charset = nil
-  html = open(url) do |f|
+  html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
     charset = f.charset
     f.read
   end
 
   doc = Nokogiri::HTML.parse(html, nil, charset)
-  lines = doc.css('.module--content > #news_textbody, .module--content > #news_textmore, .module--content > .news_add > div, .content--detail-body > .content--summary').map{|x| x.text.strip.split(//).map{|x| filter(x)}.join('') }.join('').gsub(/。/,"。\n")
+  contents = doc.css('.module--content > #news_textbody, .module--content > #news_textmore, .module--content > .news_add > div, .content--detail-body > .content--summary').map{|x| x.text.strip.split(//).map{|x| filter(x)}.join('') }.join('').gsub(/。/,"。\n").split("\n")
   for i in 1 .. 1000000 do
     path = sprintf("./TextData/%08d.txt", i)
     if File.exist?(path) then
       next
     end
-    IO.write(path, lines)
+    File.open(path, "w") do |f|
+      f.puts("# #{DateTime.now.strftime("%Y/%m/%d %H:%M:%S")}")
+      f.puts("# #{url}")
+      contents.each do |content|
+        f.puts(content)
+      end
+    end
     puts "#{url} save to #{path}."
     return true
   end
   return false
 end
 
-ARGV.each { |arg| get(arg) }
+STDIN.each.each do |line|
+  get(line.chomp)
+end
 

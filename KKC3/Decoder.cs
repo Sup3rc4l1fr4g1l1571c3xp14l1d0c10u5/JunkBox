@@ -1,8 +1,4 @@
-﻿﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace KKC3 {
     /// <summary>
@@ -45,7 +41,8 @@ namespace KKC3 {
         /// <summary>
         /// ノード node のスコアを求める
         /// </summary>
-        /// <param name="node">スコアを求める対象のノード</param>
+        /// <param name="nodes">スコアを求める対象のノード列</param>
+        /// <param name="index">ノード列の現在ノードを示す添え字</param>
         /// <param name="gold">正解を示すノード列</param>
         /// <param name="w">特徴の重み表</param>
         /// <returns></returns>
@@ -100,7 +97,7 @@ namespace KKC3 {
         /// <param name="w">特徴量の重み</param>
         /// <param name="gold">教師データ列</param>
         /// <returns></returns>
-        public List<Dict.Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<string, double> w, IReadOnlyList<Node> gold = null) {
+        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<string, double> w, IReadOnlyList<Node> gold = null) {
 
             //前向き
             foreach (var nodes in graph.Nodes) {
@@ -122,10 +119,10 @@ namespace KKC3 {
 
             //後ろ向き
             {
-                var result = new List<Dict.Entry>();
+                var result = new List<Entry>();
                 var node = graph.Eos.Prev;
                 while (!node.IsBos) {
-                    result.Add(new Dict.Entry(node.Read, node.Word, node.Features));
+                    result.Add(new Entry(node.Read, node.Word, node.Features));
                     node = node.Prev;
                 }
                 result.Reverse();

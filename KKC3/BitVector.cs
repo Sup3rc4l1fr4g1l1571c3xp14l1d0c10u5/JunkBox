@@ -1,21 +1,23 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace KKC3 {
-    public class BitVector : IEnumerable<byte>, IEnumerable {
+    public class BitVector : IEnumerable<byte> {
         public int Length { get; private set; }
-        private int Capacity { get; set; }
-        private List<byte> vector { get; } = new List<byte>();
+        private List<byte> Vector { get; }
 
-        public int ByteLength { get { return vector.Count; } }
-        public IEnumerable<byte> Bytes { get { return vector; } }
+        public int ByteLength { get { return Vector.Count; } }
+        public IEnumerable<byte> Bytes { get { return Vector; } }
 
-        public BitVector() { }
+        public BitVector() {
+            Length = 0;
+            Vector = new List<byte>();
+        }
         public BitVector(IEnumerable<byte> collection) {
+            Length = 0;
+            Vector = new List<byte>();
             var i = 0;
             foreach (var item in collection) {
                 this[i++] = item;
@@ -26,7 +28,7 @@ namespace KKC3 {
                 if (n < 0 || Length <= n) { throw new IndexOutOfRangeException(); }
                 var index = n / 8;
                 var bitPos = n % 8;
-                return (byte)((vector[index] >> bitPos) & 0x01U);
+                return (byte)((Vector[index] >> bitPos) & 0x01U);
             }
             set {
                 if (n < 0) { throw new IndexOutOfRangeException(); }
@@ -36,49 +38,36 @@ namespace KKC3 {
                 var index = n / 8;
                 var bitPos = n % 8;
 
-                if (vector.Count <= index) {
-                    vector.Capacity = index + 1;
-                    for (var i = vector.Count; i <= index; i++) {
-                        vector.Add(0);
+                if (Vector.Count <= index) {
+                    for (var i = Vector.Count; i <= index; i++) {
+                        Vector.Add(0);
                     }
                 }
                 if (value == 0) {
-                    vector[index] &= (byte)~(1 << bitPos);
+                    Vector[index] &= (byte)~(1 << bitPos);
                 } else {
-                    vector[index] |= (byte)(1 << bitPos);
+                    Vector[index] |= (byte)(1 << bitPos);
                 }
             }
         }
 
-        private static readonly byte[] BitCountTable = Enumerable.Range(0, 256).Select(x => CountBit((byte)x)).ToArray();
-
-        private static byte CountBit(byte n) {
-            byte cnt = 0;
-            for (var i = 0; i < 8 && n != 0; i++) {
-                if ((n & 0x01) != 0) {
-                    cnt += 1;
-                }
-                n >>= 1;
-            }
-            return cnt;
-        }
 
         /// <summary>
-        /// ビット列の先頭から見て n 回目に target_bit が出現する位置を求める
+        /// ビット列の先頭から見て n 回目に targetBit が出現する位置を求める
         /// </summary>
         /// <param name="n"></param>
-        /// <param name="target_bit"></param>
+        /// <param name="targetBit"></param>
         /// <returns></returns>
-        public int? select(int n, byte target_bit) {
+        public int? Select(int n, byte targetBit) {
             if (n <= 0) {
                 return null;
             }
 #if true
-            if (target_bit != 0) {
-                for (var i = 0; i < this.vector.Count; i++) {
-                    var v = this.vector[i];
-                    if (n > BitCountTable[v]) {
-                        n -= BitCountTable[v];
+            if (targetBit != 0) {
+                for (var i = 0; i < Vector.Count; i++) {
+                    var v = Vector[i];
+                    if (n > BitCountTable.Count(v)) {
+                        n -= BitCountTable.Count(v);
                     } else {
                         var ret = i * 8;
                         for (;;) {
@@ -94,10 +83,10 @@ namespace KKC3 {
                     }
                 }
             } else {
-                for (var i = 0; i < this.vector.Count; i++) {
-                    var v = this.vector[i];
-                    if (n > 8 - BitCountTable[v]) {
-                        n -= (8 - BitCountTable[v]);
+                for (var i = 0; i < Vector.Count; i++) {
+                    var v = Vector[i];
+                    if (n > 8 - BitCountTable.Count(v)) {
+                        n -= (8 - BitCountTable.Count(v));
                     } else {
                         var ret = i * 8;
                         for (;;) {
@@ -116,7 +105,7 @@ namespace KKC3 {
             return null;
 #else
             for (var i = 0; i < this.Length; i++) {
-                if (this[i] == target_bit) {
+                if (this[i] == targetBit) {
                     n -= 1;
                 }
                 if (n == 0) {
@@ -128,39 +117,39 @@ namespace KKC3 {
         }
 
         /// <summary>
-        /// ビット列の[0..position]の範囲で target_bit が出現する回数を求める
+        /// ビット列の[0..position]の範囲で targetBit が出現する回数を求める
         /// </summary>
-        /// <param name="n"></param>
-        /// <param name="target_bit"></param>
+        /// <param name="position"></param>
+        /// <param name="targetBit"></param>
         /// <returns></returns>
-        public int rank(int position, byte target_bit) {
+        public int Rank(int position, byte targetBit) {
             if (position < 0) {
                 return 0;
             }
-            target_bit = (byte)((target_bit != 0) ? 1 : 0);
+            targetBit = (byte)((targetBit != 0) ? 1 : 0);
 #if true
             position += 1;
             var index = position / 8;
-            var bitpos = position % 8;
+            var bitPos = position % 8;
             var n = 0;
             for (var i = 0; i < index; i++) {
-                n += BitCountTable[this.vector[i]];
+                n += BitCountTable.Count(Vector[i]);
             }
-            if (bitpos > 0) {
-                var v = this.vector[index];
-                while (bitpos > 0) {
+            if (bitPos > 0) {
+                var v = Vector[index];
+                while (bitPos > 0) {
                     if ((v & 0x01) != 0) {
                         n++;
                     }
-                    bitpos--;
+                    bitPos--;
                     v >>= 1;
                 }
             }
-            return target_bit != 0 ? n : (position - n);
+            return targetBit != 0 ? n : (position - n);
 #else
             var n = 0;
             for (var i = 0; i <= position; i++) {
-                if (this[i] == target_bit) {
+                if (this[i] == targetBit) {
                     n += 1;
                 }
             }

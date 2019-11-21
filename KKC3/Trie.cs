@@ -1,106 +1,96 @@
 ﻿﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+ using System.Linq;
 
-namespace KKC3 {
+ namespace KKC3 {
     public class Trie<TKey, TValue> {
         public class Constructor {
             internal class Node {
                 // The node of the tree.
                 // Each node has one character as its member.
-                public TKey key;
-                public TValue value;
+                public TKey Key { get; }
+                public TValue Value { get; set; }
 
-                public List<Node> children;
-                public bool accept;
+                public List<Node> Children{ get; }
+                public bool Accept{ get; set; }
 
                 public Node(TKey key, TValue value) {
-                    this.key = key;
-                    this.value = value;
-                    this.children = new List<Node>();
-                    this.accept = false;
+                    Key = key;
+                    Value = value;
+                    Children = new List<Node>();
+                    Accept = false;
                 }
                 public override string ToString() {
-                    return this.key.ToString();
+                    return Key.ToString();
                 }
 
                 public void add_child(Node child) {
-                    this.children.Add(child);
+                    Children.Add(child);
                 }
             }
 
-            private Node tree;
-
-            //This class has:
-            //    a function which constructs a tree by words
-            //    a function which dumps the tree as a LOUDS bit-string
+            private Node Root { get; }
 
             public Constructor() {
-                this.tree = new Node(default(TKey), default(TValue));  //The root node
+                Root = new Node(default(TKey), default(TValue));
             }
 
-            //Add a word to the tree
-            public Constructor add(IEnumerable<TKey> keys, TValue value) {
-                Node prev = null;
-                Node node = this.tree;
+            public Constructor Add(IEnumerable<TKey> keys, TValue value) {
+                Node node = Root;
                 foreach (var key in keys) {
-                    var child = node.children.Find(x => x.key.Equals(key));
+                    var child = node.Children.Find(x => x.Key.Equals(key));
                     if (child == null) {
                         child = new Node(key, default(TValue));
                         node.add_child(child);
                     }
-                    prev = node;
                     node = child;
                 }
-                node.accept = true;
-                node.value = value;
+                node.Accept = true;
+                node.Value = value;
                 return this;
             }
 
-            public void show() {
-                this.show_(this.tree);
+            public void Show() {
+                show_(Root);
             }
 
             private void show_(Node node, int depth = 0) {
                 Console.WriteLine($"{String.Concat(Enumerable.Repeat(' ', depth))}{node}");
-                foreach (var child in node.children) {
-                    this.show_(child, depth + 1);
+                foreach (var child in node.Children) {
+                    show_(child, depth + 1);
                 }
             }
 
-            // Dump a LOUDS bit-string
             public Trie<TKey, TValue> Create() {
                 // from collections import deque
 
-                var bit_array = new BitVector() { 1, 0 };  // [1, 0] indicates the 0th node
+                var bitArray = new BitVector() { 1, 0 };  // [1, 0] indicates the 0th node
                 var labels = new List<TKey>() { default(TKey) };
                 var values = new Dictionary<int, TValue>();
 
                 // dumps by Breadth-first search
                 var queue = new Queue<Node>();
-                queue.Enqueue(this.tree);
+                queue.Enqueue(Root);
 
                 var acceptBitVector = new BitVector();
 
                 int index = 1;
                 while (queue.Count != 0) {
                     var node = queue.Dequeue();
-                    labels.Add(node.key);
+                    labels.Add(node.Key);
 
-                    if (node.accept) {
+                    if (node.Accept) {
                         acceptBitVector[index] = 1;
-                        values[index] = node.value;
+                        values[index] = node.Value;
                     }
-                    foreach (var child in node.children) {
+                    foreach (var child in node.Children) {
                         queue.Enqueue(child);
-                        bit_array.Add(1);
+                        bitArray.Add(1);
                     }
-                    bit_array.Add(0);
+                    bitArray.Add(0);
                     index++;
                 }
-                return new Trie<TKey, TValue>(bit_array, labels, acceptBitVector, values);
+                return new Trie<TKey, TValue>(bitArray, labels, acceptBitVector, values);
             }
         }
 
@@ -121,11 +111,11 @@ namespace KKC3 {
             }
         }
 
-        public int? trace_children(int current_node, TKey character) {
-            var index = this.bitVector.select(current_node, 0) + 1;
-            while (index.HasValue && this.bitVector[index.Value] == 1) {
-                var node = this.bitVector.rank(index.Value, 1);
-                if (this.labels[node].Equals(character)) {
+        private int? TraceChildren(int currentNode, TKey character) {
+            var index = bitVector.Select(currentNode, 0) + 1;
+            while (index.HasValue && bitVector[index.Value] == 1) {
+                var node = bitVector.Rank(index.Value, 1);
+                if (labels[node].Equals(character)) {
                     return node;
                 }
                 index += 1;
@@ -133,10 +123,10 @@ namespace KKC3 {
             return null;
         }
 
-        public int? search(IEnumerable<TKey> query) {
+        public int? Search(IEnumerable<TKey> query) {
             int? node = 1;
             foreach (var c in query) {
-                node = this.trace_children(node.Value, c);
+                node = TraceChildren(node.Value, c);
                 if (node.HasValue == false) {
                     // the query is not in the tree
                     return null;
@@ -145,34 +135,101 @@ namespace KKC3 {
             return node;
         }
 
-        public int? parent(int? node) {
+        public int? Parent(int? node) {
             if (node.HasValue == false) {
                 return null;
             }
-            var idx = this.bitVector.select(node.Value, 1);
-            return this.bitVector.rank(idx.Value - 1, 0);
+            var idx = bitVector.Select(node.Value, 1);
+            if (idx == null) {
+                return null;
+            }
+            return bitVector.Rank(idx.Value - 1, 0);
         }
 
-        public bool isAccept(int? node) {
+        public bool IsAccept(int? node) {
             if (node.HasValue == false) {
                 return false;
             }
-            return this.acceptBitVector[node.Value] != 0;
+            return acceptBitVector[node.Value] != 0;
         }
 
-        public IEnumerable<TValue> CommonPrefixSearch(IEnumerable<TKey> query) {
+        public IEnumerable<Tuple<IEnumerable<TKey>, TValue>> CommonPrefixSearch(IEnumerable<TKey> query) {
             int? node = 1;
+            var keys = new List<TKey>();
             foreach (var c in query) {
-                node = this.trace_children(node.Value, c);
+                node = TraceChildren(node.Value, c);
                 if (node.HasValue == false) {
                     yield break;
                 }
-                if (isAccept(node)) {
-                    yield return values[node.Value];
+                keys.Add(c);
+                if (IsAccept(node)) {
+                    yield return Tuple.Create((IEnumerable<TKey>)keys, values[node.Value]);
                 }
             }
         }
 
-    }
+        public void ToStaticTrie(System.IO.Stream s, Func<TKey, byte[]> keySerializer, Func<TValue, byte[]> valueSerializer) {
+            // header
 
+            // FourCC
+            s.Write("TRIE".ToCharArray().Select(x => (byte)x).ToArray());
+
+            s.Write("HEAD".ToCharArray().Select(x => (byte)x).ToArray());
+            // sizeof header
+            s.Write(6 * 4);
+            // BitVector: int32*int32
+            s.Write(bitVector.ByteLength);
+            s.Write(bitVector.Length);
+            // acceptBitVector: int32*int32
+            s.Write(acceptBitVector.ByteLength);
+            s.Write(acceptBitVector.Length);
+            // labels: int32
+            s.Write(labels.Count);
+            // values: int32
+            s.Write(values.Count);
+
+            // BitVectorData:
+            s.Write("BITV".ToCharArray().Select(x => (byte)x).ToArray());
+            s.Write(bitVector.Bytes.ToArray());
+
+            // acceptBitVector:
+            s.Write("ABTV".ToCharArray().Select(x => (byte)x).ToArray());
+            s.Write(acceptBitVector.Bytes.ToArray());
+
+            s.Write("LBLS".ToCharArray().Select(x => (byte)x).ToArray());
+            // labels:(chunkoffset*length)*data[]
+            int size = 0;
+            foreach (var label in labels) {
+                var len = keySerializer(label).Length;
+                s.Write(size);
+                s.Write(len);
+                size += len;
+            }
+            s.Write(size);
+            foreach (var label in labels) {
+                s.Write(keySerializer(label));
+            }
+
+            s.Write("VALS".ToCharArray().Select(x => (byte)x).ToArray());
+            // values:(chunkoffset*length)*data[]
+            size = 0;
+            foreach (var value in values) {
+                var len = value == null ? 0 : valueSerializer(value).Length;
+                s.Write(size);
+                s.Write(len);
+                size += len;
+            }
+            s.Write(size);
+            foreach (var value in values) {
+                if (value != null) {
+                    s.Write(valueSerializer(value));
+                }
+            }
+
+            s.Write("EIRT".ToCharArray().Select(x => (byte)x).ToArray());
+
+
+        }
+
+    }
 }
