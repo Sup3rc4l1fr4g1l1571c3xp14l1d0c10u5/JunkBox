@@ -89,11 +89,13 @@ namespace KKC3 {
         private void UpdateNodeScore(IReadOnlyList<Node> nodes, int index, double learningRate) {
             foreach (var func in FeatureFuncs.NodeFeatures) {
                 var feature = func(nodes, index);
-                if (Weight.ContainsKey(feature)) {
-                    Weight[feature] += learningRate;
+                double value;
+                if (Weight.TryGetValue(feature, out value)) {
+                    value += learningRate;
                 } else {
-                    Weight[feature] = learningRate;
+                    value = learningRate;
                 }
+                Weight[feature] = value;
             }
         }
 
@@ -107,11 +109,13 @@ namespace KKC3 {
             if (prevNode == null) { return; }
             foreach (var func in FeatureFuncs.EdgeFeatures) {
                 var feature = func(prevNode, node);
-                if (Weight.ContainsKey(feature)) {
-                    Weight[feature] += learningRate;
+                double value;
+                if (Weight.TryGetValue(feature, out value)) {
+                    value += learningRate;
                 } else {
-                    Weight[feature] = learningRate;
+                    value = learningRate;
                 }
+                Weight[feature] = value;
             }
         }
 
@@ -126,7 +130,7 @@ namespace KKC3 {
             Node prevNode = null;
             for (var i = 0; i < nodes.Count; i++) {
                 var node = nodes[i];
-                addDict(node);  //Dic.Add(node.Read, node.Word, node.Features);
+                addDict(node); 
                 UpdateNodeScore(nodes, i, learningRate);
                 UpdateEdgeScore(prevNode, node, learningRate);
                 prevNode = node;
@@ -265,8 +269,13 @@ namespace KKC3 {
         /// <param name="addDict"></param>
         public void Learn(IList<Entry> sentence, Func<string, int, IEnumerable<Entry>> commonPrefixSearch, Action<Node> addDict) {
             // 読みを連結した文字列を作る
-            var str = String.Concat(sentence.Select(x => x.Read));
-            // 
+            //var str = new StringBilderString.Concat(sentence.Select(x => x.Read)); 相当
+            var sb = new System.Text.StringBuilder();
+            foreach (var x in sentence) {
+                sb.Append(x.Read);
+            }
+            var str = sb.ToString();
+
             var graph = new WordLattice(str, commonPrefixSearch);
             Regularize(graph);  // L1正則化
 

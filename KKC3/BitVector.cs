@@ -66,8 +66,8 @@ namespace KKC3 {
             if (targetBit != 0) {
                 for (var i = 0; i < Vector.Count; i++) {
                     var v = Vector[i];
-                    if (n > BitCountTable.Count(v)) {
-                        n -= BitCountTable.Count(v);
+                    if (n > BitCounter.Count(v)) {
+                        n -= BitCounter.Count(v);
                     } else {
                         var ret = i * 8;
                         for (;;) {
@@ -85,8 +85,8 @@ namespace KKC3 {
             } else {
                 for (var i = 0; i < Vector.Count; i++) {
                     var v = Vector[i];
-                    if (n > 8 - BitCountTable.Count(v)) {
-                        n -= (8 - BitCountTable.Count(v));
+                    if (n > 8 - BitCounter.Count(v)) {
+                        n -= (8 - BitCounter.Count(v));
                     } else {
                         var ret = i * 8;
                         for (;;) {
@@ -133,7 +133,7 @@ namespace KKC3 {
             var bitPos = position % 8;
             var n = 0;
             for (var i = 0; i < index; i++) {
-                n += BitCountTable.Count(Vector[i]);
+                n += BitCounter.Count(Vector[i]);
             }
             if (bitPos > 0) {
                 var v = Vector[index];

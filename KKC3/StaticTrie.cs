@@ -12,6 +12,7 @@ namespace KKC3 {
     public class StaticTrie<TKey, TValue> {
         private readonly Stream _stream;
 
+        
         private readonly int _acceptBitVectorByteLength;
         private readonly int _acceptBitVectorHead;
         private readonly int _acceptBitVectorLength;
@@ -69,8 +70,8 @@ namespace KKC3 {
             s.Seek(startPos, SeekOrigin.Begin);
             for (var i = 0; i < byteLength; i++) {
                 var v = s.ReadByte();
-                if (n > 8 - BitCountTable.Count((byte)v)) {
-                    n -= (8 - BitCountTable.Count((byte)v));
+                if (n > 8 - BitCounter.Count((byte)v)) {
+                    n -= (8 - BitCounter.Count((byte)v));
                 } else {
                     var ret = i * 8;
                     for (;;) {
@@ -99,7 +100,7 @@ namespace KKC3 {
 
             s.Seek(startPos, SeekOrigin.Begin);
             for (var i = 0; i < index; i++) {
-                n += BitCountTable.Count((byte)s.ReadByte());
+                n += BitCounter.Count((byte)s.ReadByte());
             }
             if (bitPos > 0) {
                 var v = s.ReadByte();

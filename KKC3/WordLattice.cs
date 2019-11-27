@@ -24,7 +24,11 @@ namespace KKC3 {
         /// <param name="str">単語ラティスを作る文字列</param>
         /// <param name="commonPrefixSearch"></param>
         public WordLattice(string str, Func<string,int,IEnumerable<Entry>> commonPrefixSearch ) {
-            var nodes = Enumerable.Range(0, str.Length + 2).Select(_ => new List<Node>()).ToArray();
+            // var nodes = Enumerable.Range(0, str.Length + 2).Select(_ => new List<Node>()).ToArray(); 相当
+            var nodes = new List<Node>[str.Length + 2];
+            for (var i = 0; i < nodes.Length; i++) {
+                nodes[i] = new List<Node>();
+            }
 
             // BOSを単語ラティスの先頭に設定
             var bos = new Node(0, "", "", "BOS");

@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{EF53063B-8623-43C3-8592-74DE93AB43C7}</ProjectGuid>
+    <ProjectGuid>{6F68A680-711D-451B-B737-F1A575520399}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>KKC3</RootNamespace>
     <AssemblyName>KKC3</AssemblyName>
@@ -43,7 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BitCountTable.cs" />
+    <Compile Include="BitCounter.cs" />
     <Compile Include="BitVector.cs" />
     <Compile Include="Decoder.cs" />
     <Compile Include="FeatureFuncs.cs" />

@@ -46,34 +46,41 @@ def filter(c)
   end
 end
 
-def get(url)
+def get(json)
   charset = nil
-  html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
+  url = json['link']
+  id  = json['id'].to_i
+  path = sprintf("./TextData/%08d.txt", id)
+
+  if File.exist?(path) then
+    return 
+  end
+
+  #html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
+  html = open(url) do |f|
     charset = f.charset
     f.read
   end
 
   doc = Nokogiri::HTML.parse(html, nil, charset)
   contents = doc.css('.module--content > #news_textbody, .module--content > #news_textmore, .module--content > .news_add > div, .content--detail-body > .content--summary').map{|x| x.text.strip.split(//).map{|x| filter(x)}.join('') }.join('').gsub(/。/,"。\n").split("\n")
-  for i in 1 .. 1000000 do
-    path = sprintf("./TextData/%08d.txt", i)
-    if File.exist?(path) then
-      next
+  File.open(path, "w") do |f|
+    f.puts("# Date: #{DateTime.now.strftime("%Y/%m/%d %H:%M:%S")}")
+    f.puts("# URL: #{url}")
+    f.puts("# ID: #{id}")
+    contents.each do |content|
+      f.puts(content)
     end
-    File.open(path, "w") do |f|
-      f.puts("# #{DateTime.now.strftime("%Y/%m/%d %H:%M:%S")}")
-      f.puts("# #{url}")
-      contents.each do |content|
-        f.puts(content)
-      end
-    end
-    puts "#{url} save to #{path}."
-    return true
   end
-  return false
+  return
 end
 
-STDIN.each.each do |line|
-  get(line.chomp)
+Dir.foreach('./NewsList') do |item|
+  next if (item == '.') or (item == '..') or (File.extname(item).downcase != ".json") 
+  json = File.open("./NewsList/#{item}", "r") do |f|
+    JSON.load(f.read)
+  end
+  get(json)
 end
+
 
