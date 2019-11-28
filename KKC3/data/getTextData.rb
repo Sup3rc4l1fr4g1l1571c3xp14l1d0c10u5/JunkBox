@@ -2,6 +2,7 @@
 require 'nokogiri'
 require 'open-uri'
 require 'json'
+require 'fileutils'
 
 def filter(c)
   case c.ord
@@ -56,8 +57,8 @@ def get(json)
     return 
   end
 
-  #html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
-  html = open(url) do |f|
+  html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
+  #html = open(url) do |f|
     charset = f.charset
     f.read
   end
@@ -75,6 +76,7 @@ def get(json)
   return
 end
 
+FileUtils.mkdir_p("TextData")
 Dir.foreach('./NewsList') do |item|
   next if (item == '.') or (item == '..') or (File.extname(item).downcase != ".json") 
   json = File.open("./NewsList/#{item}", "r") do |f|

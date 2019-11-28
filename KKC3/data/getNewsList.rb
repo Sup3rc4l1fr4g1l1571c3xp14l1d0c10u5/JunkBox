@@ -8,7 +8,7 @@ def get_list()
   FileUtils.mkdir_p("NewsList")
   loop do
     url = sprintf('https://www3.nhk.or.jp/news/json16/new_%03d.json', i)
-    json = open(url) do |f|
+    json = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
       charset = f.charset
       JSON.load(f.read)
     end

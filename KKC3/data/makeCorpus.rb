@@ -1,8 +1,10 @@
 # makeCorpus
 require "tempfile"
+require 'fileutils'
 
 allUpdate = ARGV.include?("-all")
 
+FileUtils.mkdir_p("Corpus")
 Dir.foreach('./TextData') do |item|
   next if (item == '.') or (item == '..') or (File.extname(item).downcase != ".txt") 
   input = File.expand_path(File.dirname(__FILE__), "./TextData/#{item}") 

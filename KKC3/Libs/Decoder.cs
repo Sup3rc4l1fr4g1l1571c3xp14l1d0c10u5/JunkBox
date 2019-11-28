@@ -94,21 +94,22 @@ namespace KKC3 {
         /// ビタビアルゴリズム
         /// </summary>
         /// <param name="graph">グラフ</param>
-        /// <param name="w">特徴量の重み</param>
+        /// <param name="nodeWeight">特徴量の重み</param>
+        /// <param name="edgeWeight">特徴量の重み</param>
         /// <param name="gold">教師データ列</param>
         /// <returns></returns>
-        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<string, double> w, IReadOnlyList<Node> gold = null) {
+        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<string, double> nodeWeight, IReadOnlyDictionary<string, double> edgeWeight, IReadOnlyList<Node> gold = null) {
 
             //前向き
             foreach (var nodes in graph.Nodes) {
                 for (var i = 0; i < nodes.Count; i++) {
                     var node = nodes[i];
                     if (node.IsBos) { continue; }
-                    node.Score = -1000000.0;
-                    var nodeScoreCache = GetNodeScore(nodes, i, gold, w);
+                    node.Score = double.MinValue;
+                    var nodeScoreCache = GetNodeScore(nodes, i, gold, nodeWeight);
 
                     foreach (var prevNode in graph.GetPrevs(node)) {
-                        var tmpScore = prevNode.Score + GetEdgeScore(prevNode, node, gold, w) + nodeScoreCache;
+                        var tmpScore = prevNode.Score + GetEdgeScore(prevNode, node, gold, edgeWeight) + nodeScoreCache;
                         if (tmpScore >= node.Score) {
                             node.Score = tmpScore;
                             node.Prev = prevNode;

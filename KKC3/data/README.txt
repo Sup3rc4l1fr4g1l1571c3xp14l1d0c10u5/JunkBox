@@ -1,0 +1,13 @@
+NHKニュースから言語資源を獲得するツール
+
+getNewsList.rb
+ニュースリストを取得して記事情報が格納されたJSONファイルをNewsListディレクトリに生成する。
+
+getTextData.rb
+NewsListディレクトリ内の記事情報が格納されたJSONファイルを元に、記事データのスクレイピングを行い、結果をTextDataディレクトリに生成する。
+
+makeCorpus.rb
+TextDataディレクトリの記事データをmecabを用いて形態素解析を行い、結果をCorpusディレクトリに生成する。
+
+correctionCorpus.rb
+Corpusディレクトリ内のコーパスデータの数値の読みを可能な限り補正する。
