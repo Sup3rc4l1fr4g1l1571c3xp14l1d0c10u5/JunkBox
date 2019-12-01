@@ -48,6 +48,7 @@
     <Compile Include="Libs\BitVector.cs" />
     <Compile Include="Libs\CharConv.cs" />
     <Compile Include="Libs\Decoder.cs" />
+    <Compile Include="Libs\Dict.cs" />
     <Compile Include="Libs\FeatureFuncs.cs" />
     <Compile Include="Libs\Gradews.cs" />
     <Compile Include="Libs\Node.cs" />
@@ -70,4 +71,4 @@
     <None Include="App.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-</Project>
+</Project>

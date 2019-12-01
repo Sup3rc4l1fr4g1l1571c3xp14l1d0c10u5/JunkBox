@@ -57,8 +57,8 @@ def get(json)
     return 
   end
 
-  html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
-  #html = open(url) do |f|
+  #html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
+  html = open(url) do |f|
     charset = f.charset
     f.read
   end
