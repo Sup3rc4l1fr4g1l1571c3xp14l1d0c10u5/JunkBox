@@ -10,12 +10,12 @@ namespace KKC3 {
         /// <summary>
         /// ノード重み（特徴⇒重みの疎行列）
         /// </summary>
-        protected Dictionary<string, double> NodeWeights { get; }
+        protected Dictionary<NodeFeature, double>[] NodeWeights { get; }
 
         /// <summary>
         /// エッジ重み（特徴⇒重みの疎行列）
         /// </summary>
-        protected Dictionary<string, double> EdgeWeights { get; }
+        protected Dictionary<EdgeFeature, double>[] EdgeWeights { get; }
 
         /// <summary>
         /// 特徴量抽出
@@ -45,12 +45,12 @@ namespace KKC3 {
         /// <summary>
         /// ノードの遅延L1正則化用の更新時間と重みの記録
         /// </summary>
-        private Dictionary<string, int> NodeLastUpdated { get; }
+        private Dictionary<NodeFeature, int>[] NodeLastUpdated { get; }
 
         /// <summary>
         /// エッジの遅延L1正則化用の更新時間と重みの記録
         /// </summary>
-        private Dictionary<string, int> EdgeLastUpdated { get; }
+        private Dictionary<EdgeFeature, int>[] EdgeLastUpdated { get; }
 
         /// <summary>
         /// 更新時間カウンタ
@@ -96,15 +96,17 @@ namespace KKC3 {
         /// <param name="index">ノード列の現在ノードを示す添え字</param>
         /// <param name="learningRate">学習率（正例の場合は正の値、負例の場合は負の値）</param>
         private void UpdateNodeScore(IReadOnlyList<Node> nodes, int index, double learningRate) {
-            foreach (var func in FeatureFuncs.NodeFeatures) {
+            for (var i = 0; i < FeatureFuncs.NodeFeatures.Count; i++) {
+                var func = FeatureFuncs.NodeFeatures[i];
+
                 var feature = func(nodes, index);
                 double value;
-                if (NodeWeights.TryGetValue(feature, out value)) {
+                if (NodeWeights[i].TryGetValue(feature, out value)) {
                     value += learningRate;
                 } else {
                     value = learningRate;
                 }
-                NodeWeights[feature] = value;
+                NodeWeights[i][feature] = value;
             }
         }
 
@@ -116,15 +118,16 @@ namespace KKC3 {
         /// <param name="learningRate">学習率（正例の場合は正の値、負例の場合は負の値）</param>
         private void UpdateEdgeScore(Node prevNode, Node node, double learningRate) {
             if (prevNode == null) { return; }
-            foreach (var func in FeatureFuncs.EdgeFeatures) {
+            for (var i=0; i< FeatureFuncs.EdgeFeatures.Count; i++) {
+                var func = FeatureFuncs.EdgeFeatures[i];
                 var feature = func(prevNode, node);
                 double value;
-                if (EdgeWeights.TryGetValue(feature, out value)) {
+                if (EdgeWeights[i].TryGetValue(feature, out value)) {
                     value += learningRate;
                 } else {
                     value = learningRate;
                 }
-                EdgeWeights[feature] = value;
+                EdgeWeights[i][feature] = value;
             }
         }
 
@@ -167,8 +170,8 @@ namespace KKC3 {
             FeatureFuncs = featureFuncs;
             //EdgeWeights = featureFuncs.EdgeFeatures.Select(x => new Dictionary<string, double>()).ToList();
             //NodeWeights = featureFuncs.NodeFeatures.Select(x => new Dictionary<string, double>()).ToList();
-            EdgeWeights = new Dictionary<string, double>();
-            NodeWeights = new Dictionary<string, double>();
+            EdgeWeights = featureFuncs.EdgeFeatures.Select(x => new Dictionary<EdgeFeature, double>()).ToArray();
+            NodeWeights = featureFuncs.NodeFeatures.Select(x => new Dictionary<NodeFeature, double>()).ToArray();
             VerboseMode = verboseMode;
             LearningRate = 0.1;
 
@@ -177,8 +180,8 @@ namespace KKC3 {
 
             //EdgeLastUpdated = featureFuncs.EdgeFeatures.Select(x => new Dictionary<string, int>()).ToList();
             //NodeLastUpdated = featureFuncs.EdgeFeatures.Select(x => new Dictionary<string, int>()).ToList();
-            EdgeLastUpdated = new Dictionary<string, int>();
-            NodeLastUpdated = new Dictionary<string, int>();
+            EdgeLastUpdated = featureFuncs.EdgeFeatures.Select(x => new Dictionary<EdgeFeature, int>()).ToArray();
+            NodeLastUpdated = featureFuncs.NodeFeatures.Select(x => new Dictionary<NodeFeature, int>()).ToArray();
             UpdatedCount = 0;
             Lambda = 1.0e-22;
         }
@@ -211,7 +214,21 @@ namespace KKC3 {
         /// 特徴 feature に対応する重みのL1正則化
         /// </summary>
         /// <param name="feature">特徴</param>
-        private void RegularizeFeature(string feature, Dictionary<string, double> Weights, Dictionary<string, int> LastUpdated) {
+        private void RegularizeNodeFeature(NodeFeature feature, Dictionary<NodeFeature, double> Weights, Dictionary<NodeFeature, int> LastUpdated) {
+            double value;
+            if (Weights.TryGetValue(feature, out value)) {
+                int lastUpdated;
+                if (LastUpdated.TryGetValue(feature, out lastUpdated) == false) { lastUpdated = 0; }
+                var newVal = Clip(value, Lambda * (UpdatedCount - lastUpdated));
+                if (Math.Abs(newVal) < 1.0e-10) {
+                    Weights.Remove(feature);
+                } else {
+                    Weights[feature] = newVal;
+                }
+                LastUpdated[feature] = UpdatedCount;
+            }
+        }
+        private void RegularizeEdgeFeature(EdgeFeature feature, Dictionary<EdgeFeature, double> Weights, Dictionary<EdgeFeature, int> LastUpdated) {
             double value;
             if (Weights.TryGetValue(feature, out value)) {
                 int lastUpdated;
@@ -232,9 +249,10 @@ namespace KKC3 {
         /// <param name="nodes">スコアを求める対象のノード列</param>
         /// <param name="index">ノード列の現在ノードを示す添え字</param>
         private void RegularizeNode(IReadOnlyList<Node> nodes, int index) {
-            foreach (var func in FeatureFuncs.NodeFeatures) {
+            for(var i=0;i< FeatureFuncs.NodeFeatures.Count;i++) {
+                var func = FeatureFuncs.NodeFeatures[i];
                 var feature = func(nodes, index);
-                RegularizeFeature(feature,NodeWeights, NodeLastUpdated);
+                RegularizeNodeFeature(feature,NodeWeights[i], NodeLastUpdated[i]);
             }
         }
 
@@ -244,9 +262,10 @@ namespace KKC3 {
         /// <param name="prevNode"></param>
         /// <param name="node">ノード</param>
         private void RegularizeEdge(Node prevNode, Node node) {
-            foreach (var func in FeatureFuncs.EdgeFeatures) {
+            for (var i = 0; i < FeatureFuncs.EdgeFeatures.Count; i++) {
+                var func = FeatureFuncs.EdgeFeatures[i];
                 var feature = func(prevNode, node);
-                RegularizeFeature(feature,EdgeWeights, EdgeLastUpdated);
+                RegularizeEdgeFeature(feature,EdgeWeights[i], EdgeLastUpdated[i]);
             }
         }
 
@@ -271,11 +290,15 @@ namespace KKC3 {
         /// 全特徴にL1正則化を適用
         /// </summary>
         private void RegularizeAll() {
-            foreach (var feature in NodeWeights.Keys.ToList()) {
-                RegularizeFeature(feature,NodeWeights, NodeLastUpdated);
+            for (var i = 0; i < NodeWeights.Length; i++) {
+                foreach (var feature in NodeWeights[i].Keys.ToList()) {
+                    RegularizeNodeFeature(feature, NodeWeights[i], NodeLastUpdated[i]);
+                }
             }
-            foreach (var feature in EdgeWeights.Keys.ToList()) {
-                RegularizeFeature(feature,EdgeWeights,EdgeLastUpdated);
+            for (var i = 0; i < EdgeWeights.Length; i++) {
+                foreach (var feature in EdgeWeights[i].Keys.ToList()) {
+                    RegularizeEdgeFeature(feature, EdgeWeights[i], EdgeLastUpdated[i]);
+                }
             }
         }
 
@@ -323,6 +346,21 @@ namespace KKC3 {
             return ret;
         }
 
+        private static string SerializeNodeKey(NodeFeature key) {
+            return key.Serialize();
+        }
+        private static string SerializeEdgeKey(EdgeFeature key) {
+            return key.Serialize();
+        }
+        private static NodeFeature DeserializeNodeKey(string key) {
+            var items = key.Split("/".ToCharArray(), 3);
+            return new NodeFeature(items[0], items[1], items[2]);
+        }
+        private static EdgeFeature DeserializeEdgeKey(string key) {
+            var items = key.Split("/".ToCharArray(), 2);
+            return new EdgeFeature(items[0], items[1]);
+        }
+
         /// <summary>
         /// モデルの保存
         /// </summary>
@@ -331,9 +369,19 @@ namespace KKC3 {
             RegularizeAll();
             using (var writer = new System.IO.StreamWriter(filename)) {
                 writer.WriteLine(NodeWeights.Count().ToString());
-                writer.WriteLine(NodeWeights.Select(fv => fv.Key + "\t\t" + fv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                foreach (var weights in NodeWeights) {
+                    writer.WriteLine(weights.Count().ToString());
+                    foreach (var fv in weights) {
+                        writer.WriteLine(SerializeNodeKey(fv.Key) + "\t\t" + fv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                }
                 writer.WriteLine(EdgeWeights.Count().ToString());
-                writer.WriteLine(EdgeWeights.Select(fv => fv.Key + "\t\t" + fv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                foreach (var weights in EdgeWeights) {
+                    writer.WriteLine(weights.Count().ToString());
+                    foreach (var fv in weights) {
+                        writer.WriteLine(SerializeEdgeKey(fv.Key) + "\t\t" + fv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                }
             }
         }
 
@@ -348,19 +396,25 @@ namespace KKC3 {
             var self = new StructuredSupportVectorMachine(featureFuncs, verboseMode);
             using (var reader = new System.IO.StreamReader(filename)) {
                 {
-                    var nodeWeightCount = int.Parse(reader.ReadLine());
-                    for (var i = 0; i < nodeWeightCount; i++) {
-                        var line = reader.ReadLine();
-                        var kv = line.Split(new[] { "\t\t" }, 2, StringSplitOptions.None);
-                        self.NodeWeights[kv[0]] = double.Parse(kv[1]);
+                    var nodeWeightsCount = int.Parse(reader.ReadLine());
+                    for (var j = 0; j < nodeWeightsCount; j++) {
+                        var nodeWeightCount = int.Parse(reader.ReadLine());
+                        for (var i = 0; i < nodeWeightCount; i++) {
+                            var line = reader.ReadLine();
+                            var kv = line.Split(new[] { "\t\t" }, 2, StringSplitOptions.None);
+                            self.NodeWeights[j][DeserializeNodeKey(kv[0])] = double.Parse(kv[1]);
+                        }
                     }
                 }
                 {
-                    var edgeWeightCount = int.Parse(reader.ReadLine());
-                    for (var i = 0; i < edgeWeightCount; i++) {
-                        var line = reader.ReadLine();
-                        var kv = line.Split(new[] { "\t\t" }, 2, StringSplitOptions.None);
-                        self.EdgeWeights[kv[0]] = double.Parse(kv[1]);
+                    var edgeWeightsCount = int.Parse(reader.ReadLine());
+                    for (var j = 0; j < edgeWeightsCount; j++) {
+                        var edgeWeightCount = int.Parse(reader.ReadLine());
+                        for (var i = 0; i < edgeWeightCount; i++) {
+                            var line = reader.ReadLine();
+                            var kv = line.Split(new[] { "\t\t" }, 2, StringSplitOptions.None);
+                            self.EdgeWeights[j][DeserializeEdgeKey(kv[0])] = double.Parse(kv[1]);
+                        }
                     }
                 }
             }

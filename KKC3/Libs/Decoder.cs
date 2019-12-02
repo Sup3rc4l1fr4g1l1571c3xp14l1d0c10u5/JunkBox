@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace KKC3 {
     /// <summary>
@@ -46,7 +47,7 @@ namespace KKC3 {
         /// <param name="gold">正解を示すノード列</param>
         /// <param name="w">特徴の重み表</param>
         /// <returns></returns>
-        public double GetNodeScore(IReadOnlyList<Node> nodes, int index, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
+        public double GetNodeScore(IReadOnlyList<Node> nodes, int index, IReadOnlyList<Node> gold, IReadOnlyDictionary<NodeFeature, double>[] w) {
             var score = 0.0;
             if (gold != null && IsCorrectNode(nodes[index], gold)) {
                 // 構造化SVMのメインアイディアは
@@ -54,10 +55,11 @@ namespace KKC3 {
                 // なので、正解のパスにペナルティ（もしくは、不正解のパスにボーナス）を課す
                 score -= Penalty;
             }
-            foreach (var func in FeatureFuncs.NodeFeatures) {
+            for(var i=0; i< FeatureFuncs.NodeFeatures.Count; i++) {
+                var func = FeatureFuncs.NodeFeatures[i];
                 var feature = func(nodes, index);
                 double v;
-                if (w.TryGetValue(feature, out v)) {
+                if (w[i].TryGetValue(feature, out v)) {
                     score += v;
                 }
             }
@@ -72,7 +74,7 @@ namespace KKC3 {
         /// <param name="gold">正解を示すノード列</param>
         /// <param name="w">特徴の重み表</param>
         /// <returns></returns>
-        public double GetEdgeScore(Node prevNode, Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<string, double> w) {
+        public double GetEdgeScore(Node prevNode, Node node, IReadOnlyList<Node> gold, IReadOnlyDictionary<EdgeFeature, double>[] w) {
             var score = 0.0;
             if (gold != null && IsCorrectEdge(prevNode, node, gold)) {
                 // 構造化SVMのメインアイディアは
@@ -80,10 +82,11 @@ namespace KKC3 {
                 // なので、正解のパスにペナルティを課す
                 score -= Penalty;
             }
-            foreach (var func in FeatureFuncs.EdgeFeatures) {
+            for (var i = 0; i < FeatureFuncs.EdgeFeatures.Count; i++) {
+                var func = FeatureFuncs.EdgeFeatures[i];
                 var feature = func(prevNode, node);
                 double v;
-                if (w.TryGetValue(feature, out v)) {
+                if (w[i].TryGetValue(feature, out v)) {
                     score += v;
                 }
             }
@@ -98,7 +101,7 @@ namespace KKC3 {
         /// <param name="edgeWeight">特徴量の重み</param>
         /// <param name="gold">教師データ列</param>
         /// <returns></returns>
-        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<string, double> nodeWeight, IReadOnlyDictionary<string, double> edgeWeight, IReadOnlyList<Node> gold = null) {
+        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<NodeFeature, double>[] nodeWeight, IReadOnlyDictionary<EdgeFeature, double>[] edgeWeight, IReadOnlyList<Node> gold = null) {
 
             //前向き
             foreach (var nodes in graph.Nodes) {

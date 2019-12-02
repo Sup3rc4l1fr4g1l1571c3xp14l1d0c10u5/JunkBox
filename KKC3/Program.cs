@@ -10,7 +10,7 @@ namespace KKC3 {
             //CreateDictionary.Run(args);
 
             // 学習を実行
-            Train.Run(args);
+            //Train.Run(args);
 
             // 検査を実行
             Validation.Run(args);

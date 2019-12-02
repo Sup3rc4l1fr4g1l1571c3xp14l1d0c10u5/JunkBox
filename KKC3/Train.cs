@@ -25,7 +25,7 @@ namespace KKC3 {
             var featureFuncs = KKCFeatureFunc.Create();
             var svm = new StructuredSupportVectorMachine(featureFuncs, false);
 
-            for (var i = 0; i < 5; i++) {
+            for (var i = 0; i < 1; i++) {
                 var words = new List<Entry>();
                 Console.WriteLine($"Train Epoc={i+1}");
                 var n = 0;

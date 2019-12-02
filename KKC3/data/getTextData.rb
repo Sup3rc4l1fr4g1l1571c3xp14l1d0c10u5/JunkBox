@@ -1,4 +1,4 @@
-#getTextData
+﻿#getTextData
 require 'nokogiri'
 require 'open-uri'
 require 'json'
@@ -6,6 +6,7 @@ require 'fileutils'
 
 def filter(c)
   case c.ord
+    when " ".ord         then return '　'
     when "\r".ord         then return ''
     when "\n".ord         then return ''
     when '!'.ord          then return '！'
