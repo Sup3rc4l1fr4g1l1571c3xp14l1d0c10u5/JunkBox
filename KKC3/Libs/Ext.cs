@@ -1,5 +1,6 @@
 ﻿﻿using System;
 using System.IO;
+using System.Collections.Generic;
 
  namespace KKC3 {
     public static class Ext {
@@ -19,5 +20,18 @@ using System.IO;
             return BitConverter.ToInt32(Read(self, 4),0);
         }
 
+
+        public static IEnumerable<T[]> EachCons<T>(this IEnumerable<T> self, int n) {
+            Queue<T> queue = new Queue<T>();
+            foreach (var item in self) {
+                queue.Enqueue(item);
+                if (queue.Count > n) {
+                    queue.Dequeue();
+                }
+                if (queue.Count == n) {
+                    yield return queue.ToArray();
+                }
+            }
+        }
     }
 }

@@ -6,7 +6,7 @@ require 'fileutils'
 
 def filter(c)
   case c.ord
-    when " ".ord         then return '　'
+    when " ".ord          then return '　'
     when "\r".ord         then return ''
     when "\n".ord         then return ''
     when '!'.ord          then return '！'
@@ -58,12 +58,29 @@ def get(json)
     return 
   end
 
-  #html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
-  html = open(url) do |f|
-    charset = f.charset
-    f.read
-  end
+  puts "Download: #{url}"
 
+  retry_num = 5
+  html = ""
+  loop do
+    begin
+      #html = open(url, { :proxy => 'http://160.203.98.12:8080/' }) do |f|
+      html = open(url) do |f|
+        charset = f.charset
+        f.read
+      end
+      break
+    rescue Net::ReadTimeout
+      puts "-> time out"
+      if retry_num == 0
+        raise
+      else
+        puts "  -> retry"
+        retry_num -= 1
+      end
+    end
+  end
+  
   doc = Nokogiri::HTML.parse(html, nil, charset)
   contents = doc.css('.module--content > #news_textbody, .module--content > #news_textmore, .module--content > .news_add > div, .content--detail-body > .content--summary').map{|x| x.text.strip.split(//).map{|x| filter(x)}.join('') }.join('').gsub(/。/,"。\n").split("\n")
   File.open(path, "w") do |f|

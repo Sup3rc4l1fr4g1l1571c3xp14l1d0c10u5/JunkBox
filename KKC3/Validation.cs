@@ -12,9 +12,10 @@ namespace KKC3 {
                 dict = Dict.Load(sw);
             }
             var featureFuncs = KKCFeatureFunc.Create();
-            Func<string, int, IEnumerable<Entry>> commonPrefixSearch = (str, i) => {
+            Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch = (str, i, len) => {
                 var ret = new List<Entry>();
-                var n = Math.Min(str.Length, i + 16);
+                if (len == -1) { len = 16; }
+                var n = Math.Min(str.Length, i + len);
                 for (var j = i + 1; j <= n; j++) {
                     var read = str.Substring(i, j - i);
                     ret.AddRange(dict.Find(read));
@@ -32,7 +33,7 @@ namespace KKC3 {
                     var items = line.Split('\t');
                     if (String.IsNullOrWhiteSpace(line)) {
                         var ret = svm.Convert(String.Concat(words.Select(x => x.Read)), commonPrefixSearch);
-                        gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Word)));
+                        gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Item2.Word)));
                         words.Clear();
                     } else {
                         words.Add(new Entry(CharConv.toHiragana(items[1] == "" ? items[0] : items[1]), items[0], items[2]));
@@ -41,7 +42,7 @@ namespace KKC3 {
 
                 if (words.Count != 0) {
                     var ret = svm.Convert(String.Concat(words.Select(x => x.Read)), commonPrefixSearch);
-                    gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Word)));
+                    gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Item2.Word)));
                     words.Clear();
                 }
             }

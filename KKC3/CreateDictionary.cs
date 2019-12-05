@@ -23,7 +23,7 @@ namespace KKC3 {
             }
 
             // unidicの辞書を読み取り
-            foreach (var file in System.IO.Directory.EnumerateFiles(@"d:\work", "*.csv")) {
+            foreach (var file in System.IO.Directory.EnumerateFiles(@"C:\mecab\lib\mecab\dic\unidic", "*.csv")) {
                 Console.WriteLine($"  Read File {file}");
                 foreach (var line in System.IO.File.ReadLines(file)) {
                     var items = line.Split(',');

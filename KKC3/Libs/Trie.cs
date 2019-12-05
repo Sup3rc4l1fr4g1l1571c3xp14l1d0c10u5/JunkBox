@@ -6,12 +6,12 @@ using System.Collections.Generic;
     public class Trie<TKey, TValue> {
         public class Constructor {
             internal class Node {
-                // The node of the tree.
-                // Each node has one character as its member.
                 public TKey Key { get; }
+
                 public TValue Value { get; set; }
 
                 public List<Node> Children{ get; }
+
                 public bool Accept{ get; set; }
 
                 public Node(TKey key, TValue value) {

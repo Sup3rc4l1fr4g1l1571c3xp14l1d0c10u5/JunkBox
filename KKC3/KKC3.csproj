@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SearchDictionary.cs" />
     <Compile Include="CreateDictionary.cs" />
     <Compile Include="Libs\BitCounter.cs" />
     <Compile Include="Libs\BitVector.cs" />

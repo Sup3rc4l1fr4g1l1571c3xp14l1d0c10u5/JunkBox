@@ -11,9 +11,10 @@ namespace KKC3 {
             using (var sw = new System.IO.StreamReader("dict.tsv")) {
                 dict = Dict.Load(sw);
             }
-            Func<string, int, IEnumerable<Entry>> commonPrefixSearch = (str, i) => {
+            Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch = (str, i, len) => {
                 var ret = new List<Entry>();
-                var n = Math.Min(str.Length, i + 16);
+                if (len == -1) { len = 16; }
+                var n = Math.Min(str.Length, i + len);
                 for (var j = i + 1; j <= n; j++) {
                     // 本来はCommonPrefixSearchを使う
                     var read = str.Substring(i, j - i);
@@ -36,7 +37,7 @@ namespace KKC3 {
                 var testData = files.Skip(start).Take(end - start).ToList();
                 var trainData = files.Take(start).Concat(files.Skip(end)).ToList();
 
-                for (var e = 0; e < 5; e++) {
+                for (var e = 0; e < 1; e++) {
                     var words = new List<Entry>();
                     var j = 0;
                     Console.WriteLine($"  Training: epoc={e}");
@@ -58,7 +59,9 @@ namespace KKC3 {
                         }
 
                     }
+                    svm.RegularizeAll();
                 }
+
                 Console.WriteLine("");
                 // 開始
                 {
@@ -71,7 +74,7 @@ namespace KKC3 {
                             var items = line.Split('\t');
                             if (String.IsNullOrWhiteSpace(line)) {
                                 var ret = svm.Convert(String.Concat(words.Select(x => x.Read)), commonPrefixSearch);
-                                gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Word)));
+                                gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Item2.Word)));
                                 Console.Write($"    Data={j++}\r");
                                 words.Clear();
                             } else {
@@ -81,7 +84,7 @@ namespace KKC3 {
 
                         if (words.Count != 0) {
                             var ret = svm.Convert(String.Concat(words.Select(x => x.Read)), commonPrefixSearch);
-                            gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Word)));
+                            gradews.Comparer(String.Join(" ", words.Select(x => x.Word)), String.Join(" ", ret.Select(x => x.Item2.Word)));
                             Console.Write($"    Data={j++}\r");
                             words.Clear();
                         }

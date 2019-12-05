@@ -11,9 +11,10 @@ namespace KKC3 {
             using (var sw = new System.IO.StreamReader("dict.tsv")) {
                 dict = Dict.Load(sw);
             }
-            Func<string, int, IEnumerable<Entry>> commonPrefixSearch = (str, i) => {
+            Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch = (str, i, len) => {
                 var ret = new List<Entry>();
-                var n = Math.Min(str.Length, i + 16);
+                if (len == -1) { len = 16; }
+                var n = Math.Min(str.Length, i + len);
                 for (var j = i + 1; j <= n; j++) {
                     // 本来はCommonPrefixSearchを使う
                     var read = str.Substring(i, j - i);
@@ -46,6 +47,7 @@ namespace KKC3 {
                     }
 
                 }
+                svm.RegularizeAll();
             }
 
             svm.Save("learn.model");

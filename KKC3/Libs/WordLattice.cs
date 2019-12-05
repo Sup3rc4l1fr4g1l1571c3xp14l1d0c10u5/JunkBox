@@ -23,7 +23,7 @@ namespace KKC3 {
         /// </summary>
         /// <param name="str">単語ラティスを作る文字列</param>
         /// <param name="commonPrefixSearch"></param>
-        public WordLattice(string str, Func<string,int,IEnumerable<Entry>> commonPrefixSearch ) {
+        public WordLattice(string str, Func<string,int,int,IEnumerable<Entry>> commonPrefixSearch ) {
             // var nodes = Enumerable.Range(0, str.Length + 2).Select(_ => new List<Node>()).ToArray(); 相当
             var nodes = new List<Node>[str.Length + 2];
             for (var i = 0; i < nodes.Length; i++) {
@@ -39,7 +39,7 @@ namespace KKC3 {
             nodes[str.Length + 1].Add(Eos);
 
             for (var i = 0; i < str.Length; i++) {
-                foreach (var word in commonPrefixSearch(str,i)) {
+                foreach (var word in commonPrefixSearch(str,i,-1)) {
                     var j = i + word.Read.Length;
                     var node = new Node(j, word.Word, word.Read, word.Features);
                     nodes[j].Add(node);
@@ -50,6 +50,54 @@ namespace KKC3 {
                     if (read != "") {
                         var node = new Node(i + 1, read, read, "");
                         nodes[i + 1].Add(node);
+                    }
+                }
+            }
+            Nodes = nodes.Cast<IReadOnlyList<Node>>().ToArray();
+        }
+
+        // 部分変換向け
+        public WordLattice(string str, IList<Tuple<int,Entry>> sentence, Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch) {
+            // var nodes = Enumerable.Range(0, str.Length + 2).Select(_ => new List<Node>()).ToArray(); 相当
+            var nodes = new List<Node>[str.Length + 2];
+            for (var i = 0; i < nodes.Length; i++) {
+                nodes[i] = new List<Node>();
+            }
+
+            // BOSを単語ラティスの先頭に設定
+            var bos = new Node(0, "", "", "BOS");
+            nodes[0].Add(bos);
+
+            // EOSを単語ラティスの末尾に設定
+            Eos = new Node(str.Length + 1, "", "", "EOS");
+            nodes[str.Length + 1].Add(Eos);
+
+            // かれがくるまでいえでまつ。
+            // (0,かれ) (2,が) (3,くるま) (6,で) (7,いえ) (9,で) (10,まつ) (12,。)
+            // (0,かれ) (2,が) (3,null)          (7,いえ) (9,で) (10,まつ) (12,。)
+            var index = 0;
+            for (var s = 0; s < sentence.Count; s++) {
+                if (sentence[s].Item2 != null) {
+                    var j = sentence[s].Item1 + sentence[s].Item2.Read.Length;
+                    nodes[j].Add(new Node(j, sentence[s].Item2.Word, sentence[s].Item2.Read, sentence[s].Item2.Features));
+                    index = j;
+                } else {
+                    var start = sentence[s].Item1;
+                    var end = (sentence.Count > s + 1) ? sentence[s + 1].Item1 : str.Length;
+                    for (var i = start; i < end; i++) {
+                        foreach (var word in commonPrefixSearch(str, i,end-start)) {
+                            var j = i + word.Read.Length;
+                            var node = new Node(j, word.Word, word.Read, word.Features);
+                            nodes[j].Add(node);
+                        }
+                        {
+                            // 無変換に対応する候補を入れる
+                            var read = str.Substring(i, 1);
+                            if (read != "") {
+                                var node = new Node(i + 1, read, read, "");
+                                nodes[i + 1].Add(node);
+                            }
+                        }
                     }
                 }
             }
@@ -125,4 +173,4 @@ namespace KKC3 {
         }
 
     }
-}
+}

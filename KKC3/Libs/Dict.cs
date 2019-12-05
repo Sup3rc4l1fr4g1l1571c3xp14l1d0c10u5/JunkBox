@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,8 +7,7 @@ namespace KKC3 {
     /// <summary>
     /// 辞書
     /// </summary>
-    public class Dict : IEnumerable<KeyValuePair<string, List<Entry>>>
-    {
+    public class Dict : IEnumerable<KeyValuePair<string, List<Entry>>> {
         private Dictionary<string, List<Entry>> Items { get; } = new Dictionary<string, List<Entry>>();
 
         public Dict Add(string read, string word, params string[] features) {
@@ -52,6 +51,14 @@ namespace KKC3 {
                 }
             }
         }
+        public IEnumerable<Entry> CommonPrefixSearch(string query) {
+            for (var i = 1; i <= query.Length; i++) {
+                var subkey = query.Substring(0, i);
+                foreach (var entry in Find(subkey)) {
+                    yield return entry;
+                }
+            }
+        }
 
         public IEnumerator<KeyValuePair<string, List<Entry>>> GetEnumerator() {
             foreach (var kv in Items) {
@@ -65,3 +72,4 @@ namespace KKC3 {
     }
 
 }
+

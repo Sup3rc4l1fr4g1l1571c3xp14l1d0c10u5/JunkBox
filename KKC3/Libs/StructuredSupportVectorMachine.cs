@@ -289,7 +289,7 @@ namespace KKC3 {
         /// <summary>
         /// 全特徴にL1正則化を適用
         /// </summary>
-        private void RegularizeAll() {
+        public void RegularizeAll() {
             for (var i = 0; i < NodeWeights.Length; i++) {
                 foreach (var feature in NodeWeights[i].Keys.ToList()) {
                     RegularizeNodeFeature(feature, NodeWeights[i], NodeLastUpdated[i]);
@@ -308,7 +308,7 @@ namespace KKC3 {
         /// <param name="sentence">教師データ</param>
         /// <param name="commonPrefixSearch"></param>
         /// <param name="addDict"></param>
-        public void Learn(IList<Entry> sentence, Func<string, int, IEnumerable<Entry>> commonPrefixSearch, Action<Node> addDict) {
+        public void Learn(IList<Entry> sentence, Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch, Action<Node> addDict) {
             // 読みを連結した文字列を作る
             //var str = new StringBilderString.Concat(sentence.Select(x => x.Read)); 相当
             var sb = new System.Text.StringBuilder();
@@ -318,10 +318,10 @@ namespace KKC3 {
             var str = sb.ToString();
 
             var graph = new WordLattice(str, commonPrefixSearch);
-            Regularize(graph);  // L1正則化
+            //Regularize(graph);  // L1正則化
 
             var goldStandard = ConvertToGoldStandard(sentence);
-            var result = LearningDecoder.Viterbi(graph, NodeWeights, EdgeWeights, goldStandard);
+            var result = LearningDecoder.Viterbi(graph, NodeWeights, EdgeWeights, goldStandard).Select(x => x.Item2).ToList();
 
             if (!sentence.SequenceEqual(result)) {
                 UpdateParameters(sentence, result, addDict);
@@ -339,8 +339,14 @@ namespace KKC3 {
         /// <param name="str"></param>
         /// <param name="commonPrefixSearch"></param>
         /// <returns></returns>
-        public List<Entry> Convert(string str, Func<string, int, IEnumerable<Entry>> commonPrefixSearch) {
+        public List<Tuple<int, Entry>> Convert(string str, Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch) {
             var graph = new WordLattice(str, commonPrefixSearch);
+            var ret = PredictDecoder.Viterbi(graph, NodeWeights, EdgeWeights);
+            //Console.Error.WriteLine(graph.ToDot());
+            return ret;
+        }
+        public List<Tuple<int, Entry>> PartialConvert(string str, IList<Tuple<int, Entry>> sentence, Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch) {
+            var graph = new WordLattice(str, sentence, commonPrefixSearch);
             var ret = PredictDecoder.Viterbi(graph, NodeWeights, EdgeWeights);
             //Console.Error.WriteLine(graph.ToDot());
             return ret;
@@ -422,4 +428,4 @@ namespace KKC3 {
         }
 
     }
-}
+}

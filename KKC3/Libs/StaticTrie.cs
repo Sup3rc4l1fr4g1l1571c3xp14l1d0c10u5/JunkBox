@@ -142,7 +142,7 @@ namespace KKC3 {
             return null;
         }
 
-        public int? Search(IEnumerable<TKey> query) {
+        public int? SearchNode(IEnumerable<TKey> query) {
             int? node = 1;
             foreach (var c in query) {
                 node = TraceChildren(node.Value, c);
@@ -151,6 +151,20 @@ namespace KKC3 {
                 }
             }
             return node;
+        }
+        public TValue Search(IEnumerable<TKey> query) {
+            int? node = 1;
+            foreach (var c in query) {
+                node = TraceChildren(node.Value, c);
+                if (node.HasValue == false) {
+                    return default(TValue);
+                }
+            }
+            if (IsAccept(node)==false) {
+                return default(TValue);
+            }
+            var valueValue = GetValue(_stream, node.Value, _valuesIndexTableHead, _valuesValueTableHead, _valueDeserializer);
+            return valueValue;
         }
 
         private bool IsAccept(int? node) {

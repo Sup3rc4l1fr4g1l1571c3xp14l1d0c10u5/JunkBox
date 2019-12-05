@@ -9,8 +9,11 @@ namespace KKC3 {
             // 辞書を作成
             //CreateDictionary.Run(args);
 
+            // 辞書検索の実行
+            //SearchDictionary.Run(args);
+
             // 学習を実行
-            //Train.Run(args);
+            Train.Run(args);
 
             // 検査を実行
             Validation.Run(args);

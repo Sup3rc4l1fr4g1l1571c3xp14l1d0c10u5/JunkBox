@@ -101,7 +101,7 @@ namespace KKC3 {
         /// <param name="edgeWeight">特徴量の重み</param>
         /// <param name="gold">教師データ列</param>
         /// <returns></returns>
-        public List<Entry> Viterbi(WordLattice graph, IReadOnlyDictionary<NodeFeature, double>[] nodeWeight, IReadOnlyDictionary<EdgeFeature, double>[] edgeWeight, IReadOnlyList<Node> gold = null) {
+        public List<Tuple<int, Entry>> Viterbi(WordLattice graph, IReadOnlyDictionary<NodeFeature, double>[] nodeWeight, IReadOnlyDictionary<EdgeFeature, double>[] edgeWeight, IReadOnlyList<Node> gold = null) {
 
             //前向き
             foreach (var nodes in graph.Nodes) {
@@ -123,10 +123,10 @@ namespace KKC3 {
 
             //後ろ向き
             {
-                var result = new List<Entry>();
+                var result = new List<Tuple<int, Entry>>();
                 var node = graph.Eos.Prev;
                 while (!node.IsBos) {
-                    result.Add(new Entry(node.Read, node.Word, node.Features));
+                    result.Add( Tuple.Create(node.EndPos - node.Read.Length, new Entry(node.Read, node.Word, node.Features)));
                     node = node.Prev;
                 }
                 result.Reverse();
