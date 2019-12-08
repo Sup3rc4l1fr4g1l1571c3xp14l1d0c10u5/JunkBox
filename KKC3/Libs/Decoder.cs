@@ -7,7 +7,14 @@ namespace KKC3 {
     /// </summary>
     public class Decoder
     {
+        /// <summary>
+        /// 素性関数群
+        /// </summary>
         private FeatureFuncs FeatureFuncs { get; }
+
+        /// <summary>
+        /// 学習時の正解時スコアに与えるペナルティ
+        /// </summary>
         private double Penalty { get; }
 
         public Decoder(FeatureFuncs featureFuncs, double penalty = 0.0) {

@@ -161,7 +161,7 @@ namespace KKC3 {
             Action<Node> addDict
         ) {
             UpdateParametersBody(sentence, LearningRate, addDict);       // 正例相当
-            UpdateParametersBody(result, -1 * LearningRate, addDict);    // 負例相当
+            UpdateParametersBody(result, -1 * LearningRate, (_) => { });    // 負例相当
         }
 
 

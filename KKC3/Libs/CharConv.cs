@@ -6,6 +6,11 @@ using System.Threading.Tasks;
 
 namespace KKC3 {
     public static class CharConv {
+        /// <summary>
+        /// 文字列中の全角カタカナを全角ひらがなに変換
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         public static string toHiragana(string str) {
             // String.Concat(str.Select(x => (0x30A1 <= x && x <= 0x30F3) ? (char)(x - (0x30A1 - 0x3041)) : (char)x)) よりやや高速
             var s = str.ToCharArray();
