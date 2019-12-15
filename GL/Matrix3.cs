@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GLPainter {
-    public class Matrix3 {
+namespace GLPainter
+{
+    public class Matrix3
+    {
         private float[] Value;
 
         public float[] ToArray() {
@@ -52,8 +55,8 @@ namespace GLPainter {
         }
 
         public static Matrix3 rotation(float angleInRadians) {
-            var c = (float) Math.Cos(angleInRadians);
-            var s = (float) Math.Sin(angleInRadians);
+            var c = (float)Math.Cos(angleInRadians);
+            var s = (float)Math.Sin(angleInRadians);
             return new Matrix3(
                 c, -s, 0,
                 s, c, 0,
@@ -67,6 +70,47 @@ namespace GLPainter {
                 0, sy, 0,
                 0, 0, 1
             );
+        }
+
+        public static PointF transform(Matrix3 m, PointF p) {
+            var a00 = m[0 * 3 + 0];
+            var a01 = m[0 * 3 + 1];
+            var a02 = m[0 * 3 + 2];
+            var a10 = m[1 * 3 + 0];
+            var a11 = m[1 * 3 + 1];
+            var a12 = m[1 * 3 + 2];
+            var a20 = m[2 * 3 + 0];
+            var a21 = m[2 * 3 + 1];
+            var a22 = m[2 * 3 + 2];
+
+            var x = a00 * p.X + a10 * p.Y + a20 * 1;
+            var y = a01 * p.X + a11 * p.Y + a21 * 1;
+            var w = a02 * p.X + a12 * p.Y + a22 * 1;
+
+            return new PointF(x, y);
+        }
+
+        public static Matrix3 inverse(Matrix3 m) {
+            var a00 = m[0 * 3 + 0];
+            var a01 = m[0 * 3 + 1];
+            var a02 = m[0 * 3 + 2];
+            var a10 = m[1 * 3 + 0];
+            var a11 = m[1 * 3 + 1];
+            var a12 = m[1 * 3 + 2];
+            var a20 = m[2 * 3 + 0];
+            var a21 = m[2 * 3 + 1];
+            var a22 = m[2 * 3 + 2];
+
+            float b01 = a22 * a11 - a12 * a21;
+            float b11 = -a22 * a10 + a12 * a20;
+            float b21 = a21 * a10 - a11 * a20;
+
+            float det = a00 * b01 + a01 * b11 + a02 * b21;
+
+            return new Matrix3(new[] {b01, (-a22 * a01 + a02 * a21), (a12 * a01 - a02 * a11),
+                        b11, (a22 * a00 - a02 * a20), (-a12 * a00 + a02 * a10),
+                        b21, (-a21 * a00 + a01 * a20), (a11 * a00 - a01 * a10)}.Select(x => x / det).ToArray());
+
         }
 
         public static Matrix3 multiply(Matrix3 a, Matrix3 b) {
