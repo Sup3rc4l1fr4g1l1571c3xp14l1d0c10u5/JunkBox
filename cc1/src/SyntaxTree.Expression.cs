@@ -1245,10 +1245,12 @@ namespace AnsiCParser.SyntaxTree {
                             lhs = lhsPtr;
                             // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                             ResultType = lhs.Type;
+                            rhs = TypeConversionExpression.Apply(locationRange, CType.CreatePtrDiffT(), rhs);//*
                         } else if (rhsPtr != null && lhs.Type.IsIntegerType() && rhsPtr.Type.IsPointerType() && rhsPtr.Type.GetBasePointerType().IsObjectType()) {
                             rhs = rhsPtr;
                             // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                             ResultType = rhs.Type;
+                            lhs = TypeConversionExpression.Apply(locationRange, CType.CreatePtrDiffT(), lhs);//*
                         } else {
                             throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "加算の場合，両オペランドが算術型をもつか，又は一方のオペランドがオブジェクト型へのポインタで，もう一方のオペランドの型が整数型でなければならない。");
                         }
@@ -1282,6 +1284,7 @@ namespace AnsiCParser.SyntaxTree {
                             // 意味規則 整数型をもつ式をポインタに加算又はポインタから減算する場合，結果は，ポインタオペランドの型をもつ。
                             lhs = lhsPtr;
                             ResultType = lhs.Type;
+                            rhs = TypeConversionExpression.Apply(locationRange, CType.CreatePtrDiffT(), rhs);   //*
                         } else {
                             throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "両オペランドがどちらも算術型もしくは適合するオブジェクト型の修飾版又は非修飾版へのポインタ、または、左オペランドがオブジェクト型へのポインタで，右オペランドの型が整数型、でなければならない。");
                         }
@@ -1971,6 +1974,17 @@ namespace AnsiCParser.SyntaxTree {
                     // 左オペランドに格納されている値を更新する副作用は，直前の副作用完了点から次の副作用完了点までの間に起こらなければならない。
                     // オペランドの評価順序は，未規定とする。
                     // 代入演算子の結果を変更するか，又は次の副作用完了点の後，それにアクセスしようとした場合，その動作は未定義とする。
+
+
+                    if (lhs.Type.IsPointerType() && lhs.Type.GetBasePointerType().IsObjectType() && rhs.Type.IsIntegerType()) {
+                        // 左オペランドがオブジェクト型へのポインタであり，かつ右オペランドの型が整数型である。
+                        rhs = TypeConversionExpression.Apply(rhs.LocationRange, CType.CreatePtrDiffT(), rhs);//*
+                    } else if (lhs.Type.IsArithmeticType() && rhs.Type.IsArithmeticType()) {
+                        // 左オペランドの型が算術型の修飾版又は非修飾版であり，かつ右オペランドの型が算術型である。
+                        rhs = TypeConversionExpression.Apply(rhs.LocationRange, lhs.Type, rhs);//*これでいいのだろうか？
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(LocationRange, "右辺値を左辺値型にキャストできない。");
+                    }
 
                     Op = op;
                     Lhs = lhs;

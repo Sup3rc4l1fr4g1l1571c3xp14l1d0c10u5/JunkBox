@@ -130,7 +130,8 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
-            var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\Documents\Visual Studio 2017\Projects\AnsiCParser\AnsiCParser\lacc-test\bitfield-load.c"), " <Debug>").Parse();
+             var ret = new Parser(System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\tmp\array-param.i"), " <Debug>").Parse();
+            //var ret = new Parser(System.IO.File.ReadAllText(@"..\..\tcctest2\tmp\00_assignment.i"), " <Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);

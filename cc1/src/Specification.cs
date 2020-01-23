@@ -664,9 +664,14 @@ namespace AnsiCParser {
                     case BasicType.TypeKind._Bool:
                         // 処理系依存：sizeof(_Bool) == 1 としているため、無条件でint型に変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                    case BasicType.TypeKind.Char:  // 処理系定義だが無条件でint型に変換できる
+                    case BasicType.TypeKind.SignedChar:  // 無条件でint型に変換できる
+                    case BasicType.TypeKind.SignedShortInt:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.SignedInt:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.SignedLongInt:  // sizeof(int) == sizeof(long)に限り変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                    case BasicType.TypeKind.UnsignedChar:  // 無条件でint型に変換できる
+                    case BasicType.TypeKind.UnsignedShortInt:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.UnsignedInt:
                     case BasicType.TypeKind.UnsignedLongInt: // sizeof(uint) == sizeof(ulong)に限り変換できる
                         // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
@@ -678,7 +683,7 @@ namespace AnsiCParser {
                             return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                         }
                     default:
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                 }
             }
         }
@@ -1493,6 +1498,19 @@ namespace AnsiCParser {
                 if ((t2 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
                     t2 = (t2 as TypeQualifierType).Type;
                     continue;
+                }
+
+                {
+#warning  "C言語の奇妙なルール「int (*)(...)型と int(...)型は同一型」を調べるために、int(...)型をint(*)(...)型にする。"
+                    CType rt;
+                    if (t1.IsPointerType(out rt) && rt.IsFunctionType() && t2.IsFunctionType()) {
+                        t2 = CType.CreatePointer(t2);
+                        continue;
+                    }
+                    if (t2.IsPointerType(out rt) && rt.IsFunctionType() && t1.IsFunctionType()) {
+                        t1 = CType.CreatePointer(t1);
+                        continue;
+                    }
                 }
                 if (t1.GetType() != t2.GetType()) {
                     return false;

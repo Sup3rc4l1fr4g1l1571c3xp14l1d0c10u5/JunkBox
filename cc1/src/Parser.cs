@@ -24,7 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode _mode = LanguageMode.C89;
+        private LanguageMode _mode = LanguageMode.C99;
 
         /// <summary>
         /// 名前空間(ステートメント ラベル)
@@ -130,7 +130,7 @@ namespace AnsiCParser {
         /// <param name="storageClass"></param>
         /// <param name="scope"></param>
         /// <returns></returns>
-        private LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, bool hasInitializer) {
+        private static LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, Scope<Declaration> identScope, bool hasInitializer) {
             // 記憶域クラス指定からリンケージを求める
             switch (storageClass) {
                 case AnsiCParser.StorageClassSpecifier.Auto:
@@ -192,7 +192,7 @@ namespace AnsiCParser {
                 case AnsiCParser.StorageClassSpecifier.Extern: {
                         // 識別子が，その識別子の以前の宣言が可視である有効範囲において，記憶域クラス指定子 extern を伴って宣言される場合，次のとおりとする。
                         Declaration iv;
-                        if (_identScope.TryGetValue(ident.Raw, out iv)) {
+                        if (identScope.TryGetValue(ident.Raw, out iv)) {
                             switch (iv.LinkageObject.Linkage) {
                                 case LinkageKind.ExternalLinkage:
                                 case LinkageKind.InternalLinkage:
@@ -597,8 +597,10 @@ namespace AnsiCParser {
                         var definition = entry.TentativeDefinitions.FirstOrDefault(x => x.StorageClass != AnsiCParser.StorageClassSpecifier.Extern);
                         if (definition != null) {
                             //if (entry.TentativeDefinitions.First().StorageClass != AnsiCParser.StorageClassSpecifier.Extern) {
-                            entry.Definition = entry.TentativeDefinitions[0];
-                            entry.TentativeDefinitions.RemoveAt(0);
+                            //entry.Definition = entry.TentativeDefinitions[0];
+                            //entry.TentativeDefinitions.RemoveAt(0);
+                            entry.Definition = definition;
+                            entry.TentativeDefinitions.Remove(definition);
                         }
                     }
                 }
@@ -3414,7 +3416,7 @@ namespace AnsiCParser {
             }
 
             // 記憶域クラス指定からリンケージを求める(関数の場合は、外部結合もしくは内部結合のどれかとなり、無結合はない)
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, false);
+            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, false);
             Debug.Assert(linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage);
 
             // その識別子の以前の宣言が可視であるか？
@@ -3509,7 +3511,7 @@ namespace AnsiCParser {
         private Declaration.VariableDeclaration VariableDeclaration(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, bool hasInitializer) {
 
             // 記憶域クラス指定からリンケージを求める
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, hasInitializer);
+            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, hasInitializer);
 
 
 

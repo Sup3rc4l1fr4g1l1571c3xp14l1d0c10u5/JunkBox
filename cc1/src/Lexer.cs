@@ -17,7 +17,7 @@ namespace AnsiCParser {
         /// <summary>
         /// pragma pack 指令に一致する正規表現。
         /// </summary>
-        private static Regex RegexPackDirective { get; } = new Regex(@"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[1|2|4])?\s*\)|\s*\s*(?<packsize>[1|2|4])?\s*)?\s*)$");
+        private static Regex RegexPackDirective { get; } = new Regex(@"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[0124])?\s*\)|\s*\s*(?<packsize>[0124])?\s*)?\s*)$");
 
         /// <summary>
         /// 10進数文字に一致する正規表現。
@@ -1310,7 +1310,7 @@ namespace AnsiCParser {
                             if (match.Groups["packsize"].Success) {
                                 Settings.PackSize = int.Parse(match.Groups["packsize"].Value);
                             } else {
-                                Settings.PackSize = Settings.DefaultPackSize;
+                                Settings.PackSize = 0;
                             }
                         }
                     }

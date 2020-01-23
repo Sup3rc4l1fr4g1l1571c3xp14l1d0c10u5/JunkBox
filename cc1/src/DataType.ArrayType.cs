@@ -1,7 +1,7 @@
 namespace AnsiCParser {
     namespace DataType {
         /// <summary>
-        ///     配列型
+        /// 配列型
         /// </summary>
         public class ArrayType : CType {
 

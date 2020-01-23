@@ -92,12 +92,16 @@ namespace AnsiCParser {
                     }
 
                     private int PaddingOf(int value, int align) {
+                        if (align == 0) {
+                            return 0;
+                        }
                         return (align - (value % align)) % align;
                     }
 
                     private bool IsEqualBitField(CType t1, CType t2) {
                         if (t1.IsBasicType() && t2.IsBasicType()) {
-                            return (t1.Unwrap() as BasicType).Kind == (t1.Unwrap() as BasicType).Kind;
+                            return (t1.Unwrap() as BasicType).Sizeof() == (t2.Unwrap() as BasicType).Sizeof();  // 同じサイズなら同一視できる？
+                            //return (t1.Unwrap() as BasicType).Kind == (t2.Unwrap() as BasicType).Kind;
                         }
                         return false;
                     }
@@ -247,7 +251,7 @@ namespace AnsiCParser {
 
                         // 構造体のサイズをアライメントにそろえる
                         var structureAlignment = Settings.PackSize;
-                        if ((currentBytePosition % structureAlignment) > 0) {
+                        if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                             currentBytePosition += pad;
@@ -274,7 +278,15 @@ namespace AnsiCParser {
                         }
                     } else {
                         // 共用体型の場合は登録時のままでいい
-                        _size = Members.Max(x => x.Type.Sizeof());
+                        _size = Members.Max(x => {
+                            BitFieldType bft;
+                            if (x.Type.IsBitField(out bft)) {
+                                return (bft.BitOffset + bft.BitWidth + 7) / 8;
+                            } else {
+                                return x.Type.Sizeof();
+                            }
+                        }
+                        );
 
                     }
 

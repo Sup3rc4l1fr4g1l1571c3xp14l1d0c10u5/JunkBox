@@ -627,6 +627,16 @@ namespace AnsiCParser {
                     return null;
                 }
 
+                {
+#warning  "C言語の奇妙なルール「int (*)(...)型と int(...)型は同一型」を満たすためのチェック。"
+                    CType rt;
+                    if (t1.IsPointerType(out rt) && rt.IsFunctionType() && t2.IsFunctionType()) {
+                        return CompositeType(t1, CType.CreatePointer(t2));
+                    } else if (t2.IsPointerType(out rt) && rt.IsFunctionType() && t1.IsFunctionType()) {
+                        return CompositeType(CType.CreatePointer(t1), t2);
+                    }
+                }
+
                 if (t1.IsFunctionType() && t2.IsFunctionType()) {
                     var ta1 = t1.Unwrap() as FunctionType;
                     var ta2 = t2.Unwrap() as FunctionType;
