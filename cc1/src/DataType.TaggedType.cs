@@ -49,6 +49,8 @@ namespace AnsiCParser {
                 }
 
                 private int _size;
+                
+                private int _align;
 
                 /// <summary>
                 /// フレキシブル配列メンバを持つ構造体を含むか判定
@@ -63,6 +65,7 @@ namespace AnsiCParser {
                     return new StructUnionType(Kind, TagName, IsAnonymous) {
                         Members = Members.Select(x => x.Duplicate()).ToList(),
                         _size = _size,
+                        _align = _align,
                         HasFlexibleArrayMember = HasFlexibleArrayMember
                     };
                 }
@@ -78,25 +81,15 @@ namespace AnsiCParser {
                     }
                 }
 
+                private static int PaddingOf(int value, int align) {
+                    if (align == 0) {
+                        return 0;
+                    }
+                    return (align - (value % align)) % align;
+                }
 
                 private class StructLayouter {
-                    private int AlignOf(CType type) {
-                        switch (type.Sizeof()) {
-                            case 1:
-                                return 1;
-                            case 2:
-                                return 2;
-                            default:
-                                return 4;
-                        }
-                    }
 
-                    private int PaddingOf(int value, int align) {
-                        if (align == 0) {
-                            return 0;
-                        }
-                        return (align - (value % align)) % align;
-                    }
 
                     private bool IsEqualBitField(CType t1, CType t2) {
                         if (t1.IsBasicType() && t2.IsBasicType()) {
@@ -149,7 +142,23 @@ namespace AnsiCParser {
                             return result;
                         }
                     }
-                    public Tuple<int, List<MemberInfo>> Run(List<MemberInfo> members) {
+
+                    /// <summary>
+                    /// 構造体のレイアウト計算を実行
+                    /// </summary>
+                    /// <param name="members">メンバー情報</param>
+                    /// <returns>(構造体のサイズ、構造体のアラインメント、メンバー情報（レイアウト情報が書き込まれた結果)</returns>
+                    public Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members) {
+                        return Run_LikeGCC(members);
+                        //return Run_LikeMSVC(members);
+                    }
+
+                    /// <summary>
+                    /// gccっぽい構造体のレイアウト計算アルゴリズム
+                    /// </summary>
+                    /// <param name="members"></param>
+                    /// <returns></returns>
+                    private Tuple<int, int, List<MemberInfo>> Run_LikeGCC(List<MemberInfo> members) {
                         var result = new List<MemberInfo>();
 
                         CType currentBitfieldType = null;
@@ -165,57 +174,87 @@ namespace AnsiCParser {
                             var bit = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
                             var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
 
-                            // 今のバイト領域を終了するか？
-                            if ((currentBitfieldType != null) && (bit == 0)) {
-                                if ((currentBitfieldSize % 8) > 0) {
-                                    var pad = PaddingOf(currentBitfieldSize, 8);
-                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
-                                    System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)pad);
-                                    currentBitfieldSize += pad;
-                                    if (currentBitfieldCapacity != currentBitfieldSize) {
-                                        currentBytePosition += currentBitfieldCapacity / 8;
+                            // 幅0のビットフィールドの挿入
+                            if ((bit == 0)) {
+                                if (currentBitfieldType != null) {
+                                    // ビットフィールドを指定した型の境界に向けて切り上げ
+                                    var pad = PaddingOf(currentBitfieldSize, type.Alignof()*8);
+                                    if (pad > 0) {
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)pad);
+                                        currentBytePosition += (currentBitfieldSize+pad) / 8;
                                         currentBitfieldType = null;
                                         currentBitfieldCapacity = 0;
                                         currentBitfieldSize = 0;
+                                        continue;
+                                    } else if (pad == 0) {
+                                        // ちょうど境界上なのでパディングは挿入しない
+                                        currentBitfieldType = null;
+                                        currentBitfieldCapacity = 0;
+                                        currentBitfieldSize = 0;
+                                        continue;
+                                    } else {
+                                        // 負数はないわー
+                                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "ビットフィールドのレイアウト計算中に負のビットサイズが出現しました。（本実装の誤りだと思います。）");
                                     }
+                                } else {
+                                    // バイト境界も同様に指定した型の境界に向けて切り上げ
+                                    var pad = PaddingOf(currentBytePosition, type.Alignof());
+                                    if (pad > 0) {
+                                        result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
+                                    }
+                                    currentBytePosition += pad;
+                                    currentBitfieldType = null;
+                                    currentBitfieldCapacity = 0;
+                                    currentBitfieldSize = 0;
                                     continue;
                                 }
                             }
 
                             // 今のビットフィールド領域を終了するか？
-                            if (((currentBitfieldType != null) && (!IsEqualBitField(type, currentBitfieldType))) || // 型が違う
-                                ((currentBitfieldType != null) && (bit == -1))) { // ビットフィールドではない
-                                                                                  // ビットフィールドの終了
-                                if (currentBitfieldCapacity - currentBitfieldSize > 0) {
-                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
-                                    System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
+                            if (currentBitfieldType != null) {
+                                if ((bit == -1) // そもそも次のメンバはビットフィールドではない
+                                    // || (IsEqualBitField(type, currentBitfieldType) == false)  // 「今のビットフィールドと次のビットフィールドの型が違う」をGCCは見ていないっぽい
+                                ) {
+                                    var pad = PaddingOf(currentBitfieldSize, 8);
+                                    if (pad > 0) {
+                                        // 余り領域がある場合はパディングにする
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(pad));
+                                    }
+                                    // ビットフィールドを終了させる
+                                    currentBytePosition += (currentBitfieldSize + pad) / 8;
+                                    currentBitfieldType = null;
+                                    currentBitfieldCapacity = 0;
+                                    currentBitfieldSize = 0;
+                                } else if ((bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) {    // 今のビットフィールド領域の余りに次のビットフィールドが入らない
+                                    var pad = PaddingOf(currentBitfieldSize, 8);
+                                    if (pad > 0) {
+                                        // 余り領域がある場合はパディングにする
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(pad));
+                                    }
+                                    // ビットフィールドを終了させる
+                                    currentBytePosition += (currentBitfieldSize + pad) / 8;
+                                    currentBitfieldType = null;
+                                    currentBitfieldCapacity = 0;
+                                    currentBitfieldSize = 0;
                                 }
-                                currentBytePosition += currentBitfieldCapacity / 8;
-                                currentBitfieldType = null;
-                                currentBitfieldCapacity = 0;
-                                currentBitfieldSize = 0;
-                            } else if ((currentBitfieldType != null) && (bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) { // 今の領域があふれる
-                                if (currentBitfieldCapacity - currentBitfieldSize > 0) {
-                                    System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
-                                    System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
-                                    result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
-                                    // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
-                                    currentBytePosition += currentBitfieldCapacity / 8;
-                                }
-                                currentBitfieldSize = 0;
                             }
 
-                            // アライメント挿入が必要？
+                            // ビットフィールドが終了している場合、境界調整が必要か調べて境界調整を行う
                             if (currentBitfieldType == null) {
-                                var pad = PaddingOf(currentBytePosition, Math.Min(Settings.PackSize, AlignOf(type)));
+                                var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof()));
                                 if (pad > 0) {
                                     result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                 }
                                 currentBytePosition += pad;
                             }
 
+                            // メンバーのフィールドを挿入する
                             if (bit == -1) {
                                 // 普通のフィールド
                                 result = CreateMemberInfo(result, type, name, currentBytePosition, 0, -1);
@@ -232,9 +271,194 @@ namespace AnsiCParser {
                                 result = CreateMemberInfo(result, type, name, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)bit);
                                 currentBitfieldSize += bit;
                             } else {
-                                // 境界の処理には到達しないはず
+                                // ここには来ないはず
+
                             }
                         }
+
+                        // ビットフィールドが終端していないなら終端させる
+                        if (currentBitfieldType != null) {
+                            var pad = PaddingOf(currentBitfieldSize, 8);
+                            if (pad > 0) {
+                                System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                System.Diagnostics.Debug.Assert((currentBitfieldCapacity - currentBitfieldSize) <= sbyte.MaxValue);
+                                result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
+                            }
+                            currentBytePosition += (currentBitfieldSize + pad) / 8;
+                            currentBitfieldType = null;
+                            currentBitfieldCapacity = 0;
+                            currentBitfieldSize = 0;
+                        }
+
+                        // 前提として規格書の以下の項目の知識が必要
+                        // 
+                        // 3.2  境界調整（alignment） 
+                        // 特定の型のオブジェクトを特定のバイトアドレスの倍数のアドレスをもつ記憶域境界に割り付ける要求。
+                        //
+                        // 本題。
+                        // 規格書には以下のような記載があるので、C言語における構造体メンバの境界調整（アラインメント）は処理系が規定することになっている。
+                        //
+                        // 6.7.2.1 構造体指定子及び共用体指定子 
+                        // アドレス付け可能な記憶域単位の境界調整は，未規定とする。
+                        //
+                        // しかし、6.3.2.3 ポインタの部分の補足には以下のような指針が存在する
+                        //
+                        // 6.3.2.3 ポインタ
+                        // (16) 一般には， 境界を正しく調整する という概念は推移的である。
+                        //      すなわち，型 A のポインタが型 Bのポインタとして境界を正しく調整され，それが型 C のポインタとしても境界を正しく調整されているならば，型 A のポインタは型 C のポインタとして境界を正しく調整されている。
+                        // 
+                        // このことより、型Aを使う場合、以下のすべてで境界が正しく調整されているなければいけない。
+                        // - 単体の変数として使う
+                        // - 複合型中の要素として使う
+                        // - ポインタで使われている
+                        //
+                        // また、6.5.3.4 sizeof演算子では以下のような言及がある
+                        //
+                        // 6.5.3.4 sizeof演算子
+                        // (83) &*E は E と等価であり（E が空ポインタであっても）， &(E1[E2]) は ((E1) + (E2)) と等価である。
+                        // 構造体型又は共用体型をもつオペランドに適用した場合の結果は，内部及び末尾の詰め物部分を含めたオブジェクトの総バイト数とする。
+                        // 例2.  sizeof 演算子のもう一つの用途は，次のようにして配列の要素の個数を求めることである。
+                        //       sizeof array / sizeof array[0]
+                        //
+                        // この指針より、境界調整についいて以下のことが導出できる
+                        // - 境界を正しく調整された型の中にある要素は、境界を正しく調整されていなければならない。
+                        // - 境界を正しく調整された結果はsizeof演算子の例2を満たさなければならない。
+                        //
+                        // このことより、構造体については以下の指針を満たす必要がある
+                        // - 構造体の各メンバはそれぞれの境界調整に従う
+                        // - 構造体全体の境界調整は構造体メンバの最大の境界調整となる
+                        // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
+                        // 
+                        // これは規格書には直接書いていないが、細かく読み取ると導出される。
+                        var structureAlignment = members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.Alignof()).Max();
+                        if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
+                            var pad = PaddingOf(currentBytePosition, structureAlignment);
+                            result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
+                            currentBytePosition += pad;
+                        }
+
+                        return Tuple.Create(currentBytePosition, structureAlignment, result);
+
+                    }
+                    /// <summary>
+                    /// VCっぽい構造体のレイアウト計算アルゴリズム
+                    /// </summary>
+                    /// <param name="members"></param>
+                    /// <returns></returns>
+                    private Tuple<int, int, List<MemberInfo>> Run_LikeMSVC(List<MemberInfo> members) {
+                        var result = new List<MemberInfo>();
+
+                        CType currentBitfieldType = null;
+                        var currentBitfieldCapacity = 0;
+                        var currentBitfieldSize = 0;
+                        var currentBytePosition = 0;
+
+                        foreach (var member in members) {
+                            BitFieldType bft;
+
+                            var size = member.Type.Sizeof();
+                            var name = member.Ident;
+                            var bit = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
+                            var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
+
+                            // 幅0のビットフィールドの挿入
+                            if ((bit == 0)) {
+                                if (currentBitfieldType != null) {
+                                    // 残りのビットフィールドを放棄するか？
+                                    var pad = PaddingOf(currentBitfieldSize, (type.Sizeof() * 8));
+                                    if (pad > 0) {
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)pad);
+                                        currentBytePosition += (currentBitfieldSize+pad) / 8;
+                                        currentBitfieldType = null;
+                                        currentBitfieldCapacity = 0;
+                                        currentBitfieldSize = 0;
+                                        continue;
+                                    } else if (pad == 0) {
+                                        // ちょうど境界上なのでパディングは挿入しない
+                                        currentBitfieldType = null;
+                                        currentBitfieldCapacity = 0;
+                                        currentBitfieldSize = 0;
+                                        continue;
+                                    } else {
+                                        // 負数はないわー
+                                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "ビットフィールドのレイアウト計算中に負のビットサイズが出現しました。（本実装の誤りだと思います。）");
+                                    }
+                                } else {
+                                    // 境界調整を強制する
+                                    var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof()));
+                                    if (pad > 0) {
+                                        result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
+                                    }
+                                    currentBytePosition += pad;
+                                    currentBitfieldType = null;
+                                    currentBitfieldCapacity = 0;
+                                    currentBitfieldSize = 0;
+                                    continue;
+                                }
+                            }
+
+                            // 今のビットフィールド領域を終了するか？
+                            if (currentBitfieldType != null) {
+                                if ((bit == -1) || // そもそも次のメンバはビットフィールドではない
+                                    (IsEqualBitField(type, currentBitfieldType) == false)  // 今のビットフィールドと次のビットフィールドの型が違う
+                                ) {
+                                    if (currentBitfieldCapacity - currentBitfieldSize > 0) {
+                                        // 余り領域がある場合はパディングにする
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
+                                    }
+                                    // ビットフィールドを終了させる
+                                    currentBytePosition += currentBitfieldCapacity / 8;
+                                    currentBitfieldType = null;
+                                    currentBitfieldCapacity = 0;
+                                    currentBitfieldSize = 0;
+                                } else if ((bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) {    // 今のビットフィールド領域の余りに次のビットフィールドが入らない
+                                    if (currentBitfieldCapacity - currentBitfieldSize > 0) {
+                                        // 余り領域がある場合はパディングにする
+                                        System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                        System.Diagnostics.Debug.Assert(currentBitfieldCapacity - currentBitfieldSize <= sbyte.MaxValue);
+                                        result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(currentBitfieldCapacity - currentBitfieldSize));
+                                        // ビットフィールドの終了ではなく、次のビットフィールド領域への移動なので先頭バイト位置を更新し、ビット位置をリセットするのみ
+                                        currentBytePosition += currentBitfieldCapacity / 8;
+                                    }
+                                    currentBitfieldSize = 0;
+                                }
+                            }
+
+                            // ビットフィールドが終了している場合、境界調整が必要か調べて境界調整を行う
+                            if (currentBitfieldType == null) {
+                                var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof()));
+                                if (pad > 0) {
+                                    result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
+                                }
+                                currentBytePosition += pad;
+                            }
+
+                            // メンバーのフィールドを挿入する
+                            if (bit == -1) {
+                                // 普通のフィールド
+                                result = CreateMemberInfo(result, type, name, currentBytePosition, 0, -1);
+                                currentBytePosition += size;
+                            } else if (bit > 0) {
+                                // ビットフィールド
+                                if (currentBitfieldType == null) {
+                                    currentBitfieldType = type;
+                                    currentBitfieldCapacity = size * 8;
+                                    currentBitfieldSize = 0; // 念のため
+                                }
+                                System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                System.Diagnostics.Debug.Assert(bit <= sbyte.MaxValue);
+                                result = CreateMemberInfo(result, type, name, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)bit);
+                                currentBitfieldSize += bit;
+                            } else {
+                                // ここには来ないはず
+
+                            }
+                        }
+
                         // ビットフィールドが終端していないなら終端させる
                         if (currentBitfieldType != null) {
                             var pad = currentBitfieldCapacity - currentBitfieldSize;
@@ -249,16 +473,103 @@ namespace AnsiCParser {
                             currentBitfieldSize = 0;
                         }
 
-                        // 構造体のサイズをアライメントにそろえる
-                        var structureAlignment = Settings.PackSize;
+                        // 前提として規格書の以下の項目の知識が必要
+                        // 
+                        // 3.2  境界調整（alignment） 
+                        // 特定の型のオブジェクトを特定のバイトアドレスの倍数のアドレスをもつ記憶域境界に割り付ける要求。
+                        //
+                        // 本題。
+                        // 規格書には以下のような記載があるので、C言語における構造体メンバの境界調整（アラインメント）は処理系が規定することになっている。
+                        //
+                        // 6.7.2.1 構造体指定子及び共用体指定子 
+                        // アドレス付け可能な記憶域単位の境界調整は，未規定とする。
+                        //
+                        // しかし、6.3.2.3 ポインタの部分の補足には以下のような指針が存在する
+                        //
+                        // 6.3.2.3 ポインタ
+                        // (16) 一般には， 境界を正しく調整する という概念は推移的である。
+                        //      すなわち，型 A のポインタが型 Bのポインタとして境界を正しく調整され，それが型 C のポインタとしても境界を正しく調整されているならば，型 A のポインタは型 C のポインタとして境界を正しく調整されている。
+                        // 
+                        // このことより、型Aを使う場合、以下のすべてで境界が正しく調整されているなければいけない。
+                        // - 単体の変数として使う
+                        // - 複合型中の要素として使う
+                        // - ポインタで使われている
+                        //
+                        // また、6.5.3.4 sizeof演算子では以下のような言及がある
+                        //
+                        // 6.5.3.4 sizeof演算子
+                        // (83) &*E は E と等価であり（E が空ポインタであっても）， &(E1[E2]) は ((E1) + (E2)) と等価である。
+                        // 構造体型又は共用体型をもつオペランドに適用した場合の結果は，内部及び末尾の詰め物部分を含めたオブジェクトの総バイト数とする。
+                        // 例2.  sizeof 演算子のもう一つの用途は，次のようにして配列の要素の個数を求めることである。
+                        //       sizeof array / sizeof array[0]
+                        //
+                        // この指針より、境界調整についいて以下のことが導出できる
+                        // - 境界を正しく調整された型の中にある要素は、境界を正しく調整されていなければならない。
+                        // - 境界を正しく調整された結果はsizeof演算子の例2を満たさなければならない。
+                        //
+                        // このことより、構造体については以下の指針を満たす必要がある
+                        // - 構造体の各メンバはそれぞれの境界調整に従う
+                        // - 構造体全体の境界調整は構造体メンバの最大の境界調整となる
+                        // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
+                        // 
+                        // これは規格書には直接書いていないが、細かく読み取ると導出される。
+                        var structureAlignment = members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.Alignof()).Max();
                         if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                             currentBytePosition += pad;
                         }
 
-                        return Tuple.Create(currentBytePosition, result);
+                        return Tuple.Create(currentBytePosition, structureAlignment, result);
 
+                    }
+                }
+
+                private class UnionLayouter
+                {
+                    public Tuple<int, int> Run(List<MemberInfo> members) {
+                        return Run_LikeGCC(members);
+                        //return Run_LikeMSVC(members);
+                    }
+                    public Tuple<int, int> Run_LikeGCC(List<MemberInfo> members) {
+                        var size = members.Max(x => {
+                            BitFieldType bft;
+                            if (x.Type.IsBitField(out bft)) {
+                                return (bft.BitOffset + bft.BitWidth + 7) / 8;
+                            } else {
+                                return x.Type.Sizeof();
+                            }
+                        });
+                        var align = members.Max(x => {
+                            BitFieldType bft;
+                            if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
+                                return 0;
+                            } else {
+                                return x.Type.Alignof();
+                            }
+                        });
+                        return Tuple.Create(size, align);
+                    }
+                    public Tuple<int,int> Run_LikeMSVC(List<MemberInfo> members) {
+                        var size = members.Max(x => {
+                            BitFieldType bft;
+                            if (x.Type.IsBitField(out bft)) {
+                                return (bft.BitOffset + bft.BitWidth + 7) / 8;
+                            } else {
+                                return x.Type.Sizeof();
+                            }
+                        });
+                        var align = members.Max(x => {
+                            BitFieldType bft;
+                            if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
+                                return 0;
+                            } else {
+                                return x.Type.Alignof();
+                            }
+                        });
+                        var pad = PaddingOf(size, align);
+                        size += pad;
+                        return Tuple.Create(size, align);
                     }
                 }
 
@@ -266,34 +577,41 @@ namespace AnsiCParser {
 
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
-                        // ビットフィールド部分のレイアウトを決定
                         var layouter = new StructLayouter();
                         var ret = layouter.Run(Members);
                         if (this.HasFlexibleArrayMember) {
                             _size = ret.Item1 - Members.Last().Type.Sizeof();   // フレキシブル配列メンバは最後の要素の型を無視する
-                            Members = ret.Item2;
+                            _align = ret.Item2;
+                            Members = ret.Item3;
                         } else {
                             _size = ret.Item1;
-                            Members = ret.Item2;
+                            _align = ret.Item2;
+                            Members = ret.Item3;
                         }
                     } else {
-                        // 共用体型の場合は登録時のままでいい
-                        _size = Members.Max(x => {
-                            BitFieldType bft;
-                            if (x.Type.IsBitField(out bft)) {
-                                return (bft.BitOffset + bft.BitWidth + 7) / 8;
-                            } else {
-                                return x.Type.Sizeof();
-                            }
-                        }
-                        );
-
+                        // 共用体型のの場合
+                        var layouter = new UnionLayouter();
+                        var ret = layouter.Run(Members);
+                        _size = ret.Item1;
+                        _align = ret.Item2;
                     }
 
                 }
 
+                /// <summary>
+                /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
+                /// </summary>
+                /// <returns></returns>
                 public override int Sizeof() {
                     return _size;
+                }
+
+                /// <summary>
+                /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+                /// </summary>
+                /// <returns></returns>
+                public override int Alignof() {
+                    return _align;
                 }
 
                 public class MemberInfo {
@@ -347,8 +665,20 @@ namespace AnsiCParser {
                 public override void Fixup(CType type) {
                 }
 
+                /// <summary>
+                /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
+                /// </summary>
+                /// <returns></returns>
                 public override int Sizeof() {
                     return Sizeof(BasicType.TypeKind.SignedInt);
+                }
+
+                /// <summary>
+                /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+                /// </summary>
+                /// <returns></returns>
+                public override int Alignof() {
+                    return Alignof(BasicType.TypeKind.SignedInt);
                 }
 
                 /// <summary>

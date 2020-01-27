@@ -49,10 +49,16 @@ namespace AnsiCParser {
             public abstract CType Duplicate();
 
             /// <summary>
-            ///     型のサイズを取得
+            ///     型のサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
             public abstract int Sizeof();
+
+            /// <summary>
+            ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+            /// </summary>
+            /// <returns></returns>
+            public abstract int Alignof();
 
             /// <summary>
             ///     型が同一であるかどうかを比較する(適合ではない。)
@@ -473,6 +479,58 @@ namespace AnsiCParser {
                         return 12;
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のサイズを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
+                }
+            }
+            public static int Alignof(BasicType.TypeKind kind) {
+                switch (kind) {
+                    case BasicType.TypeKind.KAndRImplicitInt:
+                        return 4;
+                    case BasicType.TypeKind.Void:
+                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
+                    case BasicType.TypeKind.Char:
+                        return 1;
+                    case BasicType.TypeKind.SignedChar:
+                        return 1;
+                    case BasicType.TypeKind.UnsignedChar:
+                        return 1;
+                    case BasicType.TypeKind.SignedShortInt:
+                        return 2;
+                    case BasicType.TypeKind.UnsignedShortInt:
+                        return 2;
+                    case BasicType.TypeKind.SignedInt:
+                        return 4;
+                    case BasicType.TypeKind.UnsignedInt:
+                        return 4;
+                    case BasicType.TypeKind.SignedLongInt:
+                        return 4;
+                    case BasicType.TypeKind.UnsignedLongInt:
+                        return 4;
+                    case BasicType.TypeKind.SignedLongLongInt:
+                        return 4;
+                    case BasicType.TypeKind.UnsignedLongLongInt:
+                        return 4;
+                    case BasicType.TypeKind.Float:
+                        return 4;
+                    case BasicType.TypeKind.Double:
+                        return 4;
+                    case BasicType.TypeKind.LongDouble:
+                        return 4;
+                    case BasicType.TypeKind._Bool:
+                        return 1;
+                    case BasicType.TypeKind.Float_Complex:
+                        return 4;
+                    case BasicType.TypeKind.Double_Complex:
+                        return 4;
+                    case BasicType.TypeKind.LongDouble_Complex:
+                        return 4;
+                    case BasicType.TypeKind.Float_Imaginary:
+                        return 4;
+                    case BasicType.TypeKind.Double_Imaginary:
+                        return 4;
+                    case BasicType.TypeKind.LongDouble_Imaginary:
+                        return 4;
+                    default:
+                        throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のアラインメントを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
                 }
             }
 

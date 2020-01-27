@@ -65,6 +65,15 @@ namespace AnsiCParser {
                 return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : ElementType.Sizeof() * Length;
             }
 
+            /// <summary>
+            ///     型の境界調整（アラインメント）を取得
+            /// </summary>
+            /// <returns></returns>
+            public override int Alignof() {
+                return ElementType.Alignof();
+            }
+
+
         }
     }
 

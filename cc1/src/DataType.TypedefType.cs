@@ -22,11 +22,25 @@ namespace DataType {
             get;
         }
 
-        public override int Sizeof() {
+            /// <summary>
+            /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
+            /// </summary>
+            /// <returns></returns>
+            public override int Sizeof() {
             return Type.Sizeof();
         }
 
+
+            /// <summary>
+            /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+            /// </summary>
+            /// <returns></returns>
+            public override int Alignof() {
+                return Type.Alignof();
+            }
+
+
+        }
     }
-}
 
 }

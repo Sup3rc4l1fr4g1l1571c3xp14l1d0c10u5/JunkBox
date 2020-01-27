@@ -1969,7 +1969,7 @@ namespace AnsiCParser {
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                             var byteReg = ToByteReg(register);
-                                            Emit($"movb (%eax), {byteReg}");
+                                            Emit($"movb {src}, {byteReg}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -1988,7 +1988,7 @@ namespace AnsiCParser {
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                             var wordReg = ToWordReg(register);
-                                            Emit($"movw (%eax), {wordReg}");
+                                            Emit($"movw {src}, {wordReg}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -2008,7 +2008,7 @@ namespace AnsiCParser {
                                             UInt32 dstMask = ~(srcMask << (offsetBit));
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            Emit($"movl (%eax), {register}");
+                                            Emit($"movl {src}, {register}");
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
