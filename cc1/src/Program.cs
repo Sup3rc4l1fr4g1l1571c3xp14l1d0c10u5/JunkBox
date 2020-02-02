@@ -131,14 +131,8 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\tmp\bitfield-types-init.i") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\bitfield-pack-next.c") /*
                 @"
-struct S1 {
-    char c;
-    int : 0;
-    int : 0;
-    int : 0;
-};
 "//*/
                 , "<Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {

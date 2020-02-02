@@ -397,7 +397,10 @@ namespace AnsiCParser.SyntaxTree {
                 var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
                 foreach (var member in type.Members) {
                     if (it.Current == null) {
-                        break;
+                        // 初期化要素の無いパディングも一応ゼロクリア
+                        var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+                        assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                        continue;
                     }
                     if (member == flexibleArrayMember) {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");
@@ -428,7 +431,10 @@ namespace AnsiCParser.SyntaxTree {
                     var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
                     foreach (var member in type.Members) {
                         if (it.Current == null) {
-                            break;
+                            // 初期化要素の無いパディングも一応ゼロクリア
+                            var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            continue;
                         }
                         if (member == flexibleArrayMember) {
                             throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");

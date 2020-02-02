@@ -925,12 +925,16 @@ namespace AnsiCParser {
                 BitFieldType bft;
                 if (type.IsBitField(out bft)) {
                     // ビットフィールドへの代入の場合
-                    LoadVariableAddress("%eax"); // lhs
+                    LoadVariableAddress("%edi"); // ビットフィールドの起点アドレス
                     switch (bft.Type.Sizeof()) {
                         case 1: {
-                                int offsetBit = bft.BitOffset;
+
+                                int offsetBit = bft.BitOffset % 8;
+                                int offsetByte = bft.BitOffset / 8;
                                 UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
-                                UInt32 dstMask = ~(srcMask << (offsetBit));
+                                UInt32 dstMask = ~(srcMask << ((int)offsetBit));
+                                int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+
                                 LoadI32("%ecx");    // 右辺式の値を取り出す
 
                                 if (!bft.IsUnsignedIntegerType()) {
@@ -944,23 +948,43 @@ namespace AnsiCParser {
                                 }
                                 Emit("pushl %ecx");
 
+#if true
+                                // ビットマスク処理と位置合わせ
+                                Emit($"andl ${srcMask}, %ecx");
+                                Emit($"shll ${offsetBit}, %ecx");
+                                for (var i=0; i< byteLen; i++ ) {
+                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                    Emit($"movb {offsetByte+i}(%edi), %dl");
+                                    Emit($"andb ${(byte)(dstMask>>(i*8))}, %dl");
+                                    // ビットを結合させてから書き込む
+                                    Emit($"orb  %dl, %cl");
+                                    Emit($"movb %cl, {offsetByte+i}(%edi)");
+                                    // 書き込んだ分だけシフト
+                                    Emit($"shrl $8, %ecx");
+                                }
+                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#else
                                 // ビットマスク処理と位置合わせをする
                                 Emit($"andl ${srcMask}, %ecx");
                                 Emit($"shll ${offsetBit}, %ecx");
 
                                 // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
-                                Emit($"movb (%eax), %dl");
+                                Emit($"movb {offsetByte}(%edi), %dl");
                                 Emit($"andb ${(byte)dstMask}, %dl");
                                 // ビットを結合させてから書き込む
                                 Emit($"orb  %dl, %cl");
-                                Emit($"movb %cl, (%eax)");
+                                Emit($"movb %cl, {offsetByte}(%edi)");
                                 Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#endif
                                 break;
                             }
                         case 2: {
-                                int offsetBit = bft.BitOffset;
+                                int offsetBit = bft.BitOffset % 8;
+                                int offsetByte = bft.BitOffset / 8;
                                 UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
-                                UInt32 dstMask = ~(srcMask << (offsetBit));
+                                UInt32 dstMask = ~(srcMask << ((int)offsetBit));
+                                int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+
                                 LoadI32("%ecx");    // 右辺式の値を取り出す
 
                                 if (!bft.IsUnsignedIntegerType()) {
@@ -973,47 +997,137 @@ namespace AnsiCParser {
                                 }
                                 Emit("pushl %ecx");
 
+#if true
+                                // ビットマスク処理と位置合わせ
+                                Emit($"andl ${srcMask}, %ecx");
+                                Emit($"shll ${offsetBit}, %ecx");
+                                for (var i = 0; i < byteLen; i++) {
+                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                    Emit($"movb {offsetByte + i}(%edi), %dl");
+                                    Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
+                                    // ビットを結合させてから書き込む
+                                    Emit($"orb  %dl, %cl");
+                                    Emit($"movb %cl, {offsetByte + i}(%edi)");
+                                    // 書き込んだ分だけシフト
+                                    Emit($"shrl $8, %ecx");
+                                }
+                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#else
                                 // ビットマスク処理と位置合わせをする
                                 Emit($"andl ${srcMask}, %ecx");
                                 Emit($"shll ${offsetBit}, %ecx");
 
                                 // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
-                                Emit($"movw (%eax), %dx");
+                                Emit($"movw {offsetByte}(%edi), %dx");
                                 Emit($"andw ${(UInt16)dstMask}, %dx");
                                 // ビットを結合させてから書き込む
                                 Emit($"orw  %dx, %cx");
-                                Emit($"movw %cx, (%eax)");
+                                Emit($"movw %cx, {offsetByte}(%edi)");
                                 Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#endif
                                 break;
                             }
                         case 3:
                         case 4: {
-                                int offsetBit = bft.BitOffset;
-                                UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
-                                UInt32 dstMask = ~(srcMask << (offsetBit));
-                                LoadI32("%ecx");    // 右辺式の値を取り出す
+                                int offsetBit = bft.BitOffset % 8;
+                                int offsetByte = bft.BitOffset / 8;
+                                int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
-                                if (!bft.IsUnsignedIntegerType()) {
-                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
-                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
-                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
-                                } else {
-                                    // ビットフィールドの最上位ビットより上をを消す
+                                if (byteLen <= 4) { // 書き込み先が4byte幅を超えない場合
+                                    UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                    UInt32 dstMask = ~(srcMask << ((int)offsetBit));
+
+                                    LoadI32("%ecx");    // 右辺式の値を取り出す
+
+                                    if (!bft.IsUnsignedIntegerType()) {
+                                        // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                        Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                        Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                    } else {
+                                        // ビットフィールドの最上位ビットより上をを消す
+                                        Emit($"andl ${srcMask}, %ecx");
+                                    }
+                                    Emit("pushl %ecx");
+
+#if true
+                                    // ビットマスク処理と位置合わせ
                                     Emit($"andl ${srcMask}, %ecx");
+                                    Emit($"shll ${offsetBit}, %ecx");
+                                    for (var i = 0; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %dl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %dl, %cl");
+                                        Emit($"movb %cl, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %ecx");
+                                    }
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#else
+                                    // ビットマスク処理と位置合わせをする
+                                    Emit($"andl ${srcMask}, %ecx");
+                                    Emit($"shll ${offsetBit}, %ecx");
+                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                    Emit($"movl {offsetByte}(%edi), %edx");
+                                    Emit($"andl ${(UInt32)dstMask}, %edx");
+                                    // ビットを結合させてから書き込む
+                                    Emit($"orl  %edx, %ecx");
+                                    Emit($"movl %ecx, {offsetByte}(%edi)");
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#endif
+                                } else {    // 書き込み先が4byte幅を超える場合
+                                    UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                    UInt32 dstMask = ~(srcMask << ((int)offsetBit));
+
+                                    // 右辺式の値を %eax:%ecx にロード
+                                    LoadI32("%ecx");    // 右辺式の値を取り出す
+                                    if (!bft.IsUnsignedIntegerType()) {
+                                        // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                        Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                        Emit($"sarl ${32 - bft.BitWidth}, %ecx");
+                                    } else {
+                                        // ビットフィールドの最上位ビットより上をを消す
+                                        Emit($"andl ${srcMask}, %ecx");
+                                    }
+                                    Emit("pushl %ecx");
+
+#if true
+                                    // ビットマスク処理と位置合わせ
+                                    Emit($"andl ${srcMask}, %ecx");
+                                    Emit($"movl %ecx, %ecx");
+                                    Emit($"shrl ${32 - offsetBit}, %eax");
+                                    Emit($"shll ${offsetBit}, %ecx");
+                                    
+                                    // スタック上に書き込みデータを作って合成させる
+                                    Emit($"pushl %eax");
+                                    Emit($"pushl %ecx");
+                                    Emit($"movl  %esp, %esi");
+                                    for (var i = 0; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %dl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"movb {i}(%esi), %cl");
+                                        Emit($"orb  %dl, %cl");
+                                        Emit($"movb %cl, {offsetByte + i}(%edi)");
+                                    }
+                                    Emit($"addl $8, %esp");
+
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#else
+                                    // ビットマスク処理と位置合わせをする
+                                    Emit($"andl ${srcMask}, %ecx");
+                                    Emit($"shll ${offsetBit}, %ecx");
+                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                    Emit($"movl {offsetByte}(%edi), %edx");
+                                    Emit($"andl ${(UInt32)dstMask}, %edx");
+                                    // ビットを結合させてから書き込む
+                                    Emit($"orl  %edx, %ecx");
+                                    Emit($"movl %ecx, {offsetByte}(%edi)");
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+#endif
                                 }
-                                Emit("pushl %ecx");
-
-                                // ビットマスク処理と位置合わせをする
-                                Emit($"andl ${srcMask}, %ecx");
-                                Emit($"shll ${offsetBit}, %ecx");
-
-                                // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
-                                Emit($"movl (%eax), %edx");
-                                Emit($"andl ${(UInt32)dstMask}, %edx");
-                                // ビットを結合させてから書き込む
-                                Emit($"orl  %edx, %ecx");
-                                Emit($"movl %ecx, (%eax)");
-                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
                                 break;
                             }
                         default:
@@ -1947,11 +2061,13 @@ namespace AnsiCParser {
                                 case Value.ValueKind.Var:
                                     // 変数参照はアドレス式を生成
                                     src = VarRefToAddrExpr(value);
+                                    Emit($"leal {src}, %esi ");
+                                    src = $"(%esi)";
                                     break;
                                 case Value.ValueKind.Address:
                                     // アドレス参照のアドレスはスタックトップの値
-                                    Emit($"popl {register}");
-                                    src = $"({register})";
+                                    Emit($"popl %esi");
+                                    src = $"(%esi)";
                                     break;
                                 default:
                                     throw new NotImplementedException("こないはず");
@@ -1963,14 +2079,28 @@ namespace AnsiCParser {
                             if (valueType.IsBitField(out bft)) {
                                 switch (bft.Type.Sizeof()) {
                                     case 1: {
-                                            int offsetBit = bft.BitOffset;
+                                            int offsetBit = bft.BitOffset % 8;
+                                            int offsetByte = bft.BitOffset / 8;
                                             UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
                                             UInt32 dstMask = ~(srcMask << (offsetBit));
+                                            int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            var byteReg = ToByteReg(register);
-                                            Emit($"movb {src}, {byteReg}");
-                                            Emit($"shrl ${offsetBit}, {register}");
+                                            switch (byteLen) {
+                                                case 2: {
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+                                                        break;
+                                                    }
+                                                case 1: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte}{src}, {byteReg}");
+                                                        break;
+                                                    }
+                                                default:
+                                                    throw new Exception();
+                                            }
+                                                Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
                                             if (!bft.IsUnsignedIntegerType()) {
@@ -1982,13 +2112,35 @@ namespace AnsiCParser {
                                             return;
                                         }
                                     case 2: {
-                                            int offsetBit = bft.BitOffset;
+                                            int offsetBit = bft.BitOffset % 8;
+                                            int offsetByte = bft.BitOffset / 8;
                                             UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
                                             UInt32 dstMask = ~(srcMask << (offsetBit));
+                                            int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            var wordReg = ToWordReg(register);
-                                            Emit($"movw {src}, {wordReg}");
+                                            switch (byteLen) {
+                                                case 1: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte}{src}, {byteReg}");
+                                                        break;
+                                                    }
+                                                case 2: {
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+                                                        break;
+                                                    }
+                                                case 3: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte + 2}{src}, {byteReg}");
+                                                        Emit($"shll $16, {register}");
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+                                                        break;
+                                                    }
+                                                default:
+                                                    throw new Exception();
+                                            }
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
 
@@ -2001,16 +2153,121 @@ namespace AnsiCParser {
                                             return;
 
                                         }
-                                    case 3:
-                                    case 4: {
-                                            int offsetBit = bft.BitOffset;
+                                    case 3: {
+                                            int offsetBit = bft.BitOffset % 8;
+                                            int offsetByte = bft.BitOffset / 8;
                                             UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
                                             UInt32 dstMask = ~(srcMask << (offsetBit));
+                                            int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            Emit($"movl {src}, {register}");
+                                            switch (byteLen) {
+                                                case 1: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte}{src}, {byteReg}");
+                                                        break;
+                                                    }
+                                                case 2: {
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+                                                        break;
+                                                    }
+                                                case 3: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte + 2}{src}, {byteReg}");
+                                                        Emit($"shll $16, {register}");
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+                                                        break;
+                                                    }
+                                                case 4: {
+                                                        Emit($"movl {offsetByte}{src}, {register}");
+                                                        break;
+                                                    }
+                                                default:
+                                                    throw new Exception();
+                                            }
+
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                             Emit($"shrl ${offsetBit}, {register}");
                                             Emit($"andl ${srcMask}, {register}");
+
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                                Emit($"shll ${32 - bft.BitWidth}, {register}");
+                                                Emit($"sarl ${32 - bft.BitWidth}, {register}");
+                                            }
+
+                                            return;
+                                        }
+                                    case 4: {
+                                            int offsetBit = bft.BitOffset % 8;
+                                            int offsetByte = bft.BitOffset / 8;
+                                            UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
+                                            UInt32 dstMask = ~(srcMask << (offsetBit));
+                                            int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                            switch (byteLen) {
+                                                case 1: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte}{src}, {byteReg}");
+
+                                                        Emit($"shrl ${offsetBit}, {register}");
+                                                        Emit($"andl ${srcMask}, {register}");
+                                                        break;
+                                                    }
+                                                case 2: {
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+
+                                                        Emit($"shrl ${offsetBit}, {register}");
+                                                        Emit($"andl ${srcMask}, {register}");
+                                                        break;
+                                                    }
+                                                case 3: {
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte + 2}{src}, {byteReg}");
+                                                        Emit($"shll $16, {register}");
+                                                        var wordReg = ToWordReg(register);
+                                                        Emit($"movw {offsetByte}{src}, {wordReg}");
+
+                                                        Emit($"shrl ${offsetBit}, {register}");
+                                                        Emit($"andl ${srcMask}, {register}");
+                                                        break;
+                                                    }
+                                                case 4: {
+                                                        Emit($"movl {offsetByte}{src}, {register}");
+                                                        // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                                        Emit($"shrl ${offsetBit}, {register}");
+                                                        Emit($"andl ${srcMask}, {register}");
+                                                        break;
+                                                    }
+                                                case 5: {
+                                                        // -----yyy xxxxxxxx xxxxxxxx xxxxxxxx zzzzz---を読み込む
+                                                        // -----yyyを読み込み、yyy00000 00000000 00000000 00000000 にしてスタックに積む
+                                                        // xxxxxxxx xxxxxxxx xxxxxxxx zzzzz---を読み込み、000xxxxx xxxxxxxx xxxxxxxx xxxzzzzz にする
+                                                        // スタック上のyyy00000 00000000 00000000 00000000とレジスタ上の000xxxxx xxxxxxxx xxxxxxxx xxxzzzzzのorを取る
+                                                        // スタック上のyyy00000 00000000 00000000 00000000を放棄
+
+                                                        var byteReg = ToByteReg(register);
+                                                        Emit($"movb {offsetByte + 4}{src}, {byteReg}");
+                                                        Emit($"shll ${32-offsetBit}, {register}");
+                                                        Emit($"pushl {register}");
+
+                                                        Emit($"movl {offsetByte}{src}, {register}");
+
+                                                        Emit($"shrl ${offsetBit}, {register}");
+                                                        Emit($"orl (%esp), {register}");
+                                                        Emit($"addl $4, %esp");
+
+                                                        Emit($"andl ${srcMask}, {register}");
+                                                        break;
+                                                    }
+                                                default:
+                                                    throw new Exception();
+                                            }
+
 
                                             if (!bft.IsUnsignedIntegerType()) {
                                                 // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
@@ -4381,11 +4638,11 @@ namespace AnsiCParser {
             /// </summary>
             private struct ValueEntry {
                 public int ByteOffset { get; }
-                public sbyte BitOffset { get; }
-                public sbyte BitSize { get; }
+                public int BitOffset { get; }
+                public int BitSize { get; }
                 public Expression Expr { get; }
 
-                public ValueEntry(int byteOffset, sbyte bitOffset, sbyte bitSize, Expression expr) {
+                public ValueEntry(int byteOffset, int bitOffset, int bitSize, Expression expr) {
                     this.ByteOffset = byteOffset;
                     this.BitOffset = bitOffset;
                     this.BitSize = bitSize;
@@ -4714,26 +4971,27 @@ namespace AnsiCParser {
                     var bft = self.Type as BitFieldType;
                     if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
                         _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, ret));
-                        if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
-                            _currentOffsetByte += bft.Sizeof();
-                        }
+                        //if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
+                        //    _currentOffsetByte += bft.Sizeof();
+                        //}
                     } else {
                         throw new Exception("ビットフィールドに代入できない値が使われている。");
                     }
                 } else {
                     _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, ret));
-                    _currentOffsetByte += self.Type.Sizeof();
+                    //_currentOffsetByte += self.Type.Sizeof();
                 }
                 return value;
             }
 
             public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
+                var arrayType = self.Type.Unwrap() as ArrayType;
 
                 foreach (var s in self.Inits) {
                     s.Accept(this, value);
+                    _currentOffsetByte += arrayType.ElementType.Sizeof();
                 }
 
-                var arrayType = self.Type.Unwrap() as ArrayType;
                 var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.Sizeof();
                 while (filledSize > 0) {
                     if (filledSize >= 4) {
@@ -4756,36 +5014,38 @@ namespace AnsiCParser {
 
             public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
                 var start = _initValues.Count;
+                var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
 
-                foreach (var s in self.Inits) {
-                    s.Accept(this, value);
+                var baseCurrentOffsetByte = _currentOffsetByte;
+                foreach (var s in self.Inits.Zip(suType.Members,Tuple.Create)) {
+                    _currentOffsetByte = baseCurrentOffsetByte + s.Item2.Offset;
+                    s.Item1.Accept(this, value);
                 }
 
-                var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
                 if (suType.IsStructureType()) {
                     foreach (var x in suType.Members.Skip(self.Inits.Count)) {
                         if (x.Type.IsBitField()) {
                             var bft = x.Type as BitFieldType;
                             var bt = bft.Type as BasicType;
-                            _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
-                            if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
-                                _currentOffsetByte += bft.Sizeof();
-                            }
+                            var off = baseCurrentOffsetByte + x.Offset + bft.BitOffset / 8;
+                            _initValues.Add(new ValueEntry(off, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+                            _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth ) / 8;
                         } else {
                             var fillSize = x.Type.Sizeof();
                             while (fillSize > 0) {
+                                var off = baseCurrentOffsetByte + x.Offset;
                                 if (fillSize >= 4) {
                                     fillSize -= 4;
-                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                                    _currentOffsetByte += 4;
+                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
+                                    _currentOffsetByte = off+4;
                                 } else if (fillSize >= 2) {
                                     fillSize -= 2;
-                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
-                                    _currentOffsetByte += 4;
+                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
+                                    _currentOffsetByte = off + 4;
                                 } else if (fillSize >= 1) {
                                     fillSize -= 1;
-                                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
-                                    _currentOffsetByte += 4;
+                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
+                                    _currentOffsetByte = off + 4;
                                 }
                             }
                         }
@@ -4805,8 +5065,8 @@ namespace AnsiCParser {
                         i++;
                         continue;
                     }
-                    ulong v = 0;
 
+                    List<byte> v = new List<byte>();
                     while (i < _initValues.Count && _initValues[i].ByteOffset == byteOffset) {
                         var cvalue = _initValues[i].Expr.Accept(this, value);
                         var bOffset = _initValues[i].BitOffset;
@@ -4841,10 +5101,20 @@ namespace AnsiCParser {
                             default:
                                 throw new ArgumentOutOfRangeException();
                         }
-                        v |= bits << bOffset;
+
+                        var vstart = bOffset / 8;
+                        var vend = (bOffset + bSize + 7) / 8;
+                        while(v.Count < vend) {
+                            v.Add(0);
+                        }
+                        for (var j=vstart; j< vend; j++) {
+                            v[j] = (byte)(bits >> (j * 8));
+                        }
                         _initValues.RemoveAt(i);
                     }
-                    _initValues.Insert(i, new ValueEntry(byteOffset, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v, (expr.Type as BasicType).Kind)));
+                    for (var j = 0; j < v.Count; j++) {
+                        _initValues.Insert(i, new ValueEntry(byteOffset+j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar  )));
+                    }
 
                     i++;
 
