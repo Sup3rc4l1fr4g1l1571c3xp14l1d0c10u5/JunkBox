@@ -5113,10 +5113,10 @@ namespace AnsiCParser {
                         _initValues.RemoveAt(i);
                     }
                     for (var j = 0; j < v.Count; j++) {
-                        _initValues.Insert(i, new ValueEntry(byteOffset+j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar  )));
+                        _initValues.Insert(i+j, new ValueEntry(byteOffset+j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar  )));
                     }
 
-                    i++;
+                    i+=v.Count;
 
                 }
                 return value;
