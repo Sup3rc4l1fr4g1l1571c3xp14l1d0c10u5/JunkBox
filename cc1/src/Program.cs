@@ -131,7 +131,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\bitfield-pack-next.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\lacc-test\bitfield-types.c") /*
                 @"
 "//*/
                 , "<Debug>").Parse();
