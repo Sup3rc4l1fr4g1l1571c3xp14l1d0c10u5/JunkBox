@@ -167,12 +167,13 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnAndExpression(Expression.BitExpression.AndExpression self, Expression value) {
-                var lhs = self.Lhs.Accept(this, value).LongValue();
-                long ret = 0;
-                if (lhs != 0) {
-                    ret = self.Rhs.Accept(this, value).LongValue() == 0 ? 0 : 1;
+                var lhs = self.Lhs.Accept(this, value);
+                var rhs = self.Rhs.Accept(this, value);
+                if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
+                    var ret = lhs.LongValue() & rhs.LongValue();
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
                 }
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                throw new Exception();
             }
 
             public Expression OnArgumentDeclaration(Declaration.ArgumentDeclaration self, Expression value) {

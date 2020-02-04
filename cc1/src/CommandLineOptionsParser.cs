@@ -26,7 +26,7 @@ namespace AnsiCParser {
             /// <param name="name">引数の名前</param>
             /// <param name="argc">引数の数</param>
             /// <param name="handler">引数処理ハンドラ</param>
-            public OptionDefinition(string name, int argc, OptionHandler handler) {
+            public OptionDefinition(string name,int argc, OptionHandler handler) {
                 Name = name;
                 Argc = argc;
                 Handler = handler;

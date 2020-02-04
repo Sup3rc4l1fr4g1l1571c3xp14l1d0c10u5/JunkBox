@@ -917,6 +917,382 @@ namespace AnsiCParser {
                 CheckStackDepth(sdp - 1);
             }
 
+            private void LogicalRightShift64(string regLo, string regHi, int cnt) {
+                if (64 <= cnt) {
+                    Emit($"xorl    {regHi}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    return;
+                } else if (32 < cnt && cnt < 64) {
+                    Emit($"movl    {regHi}, {regLo}");
+                    Emit($"xorl    {regHi}, {regHi}");
+                    cnt -= 32;
+                } else if (cnt == 32) {
+                    Emit($"movl    {regHi}, {regLo}");
+                    Emit($"xorl    {regHi}, {regHi}");
+                    return;
+                } else if (0 < cnt && cnt < 32) {
+                    // nothing
+                } else if (0 == cnt) {
+                    return;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                System.Diagnostics.Debug.Assert(0 < cnt && cnt < 32);
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi}, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo}, %eax"); }
+
+                Emit($"shrdl   ${cnt}, %edx, %eax");
+                Emit($"shrl    ${cnt}, %edx");
+
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+
+            }
+
+            private void LogicalRightShift64(string regLo, string regHi, string regCnt) {
+                var l1 = LabelAlloc();
+                var l2 = LabelAlloc();
+                var l3 = LabelAlloc();
+                var l4 = LabelAlloc();
+                var ljunction = LabelAlloc();
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi }, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo }, %eax"); }
+                if (regCnt != "%ecx") { Emit($"pushl   %ecx"); Emit($"movl    {regCnt}, %ecx"); }
+
+                Emit($"cmpb    $64, %cl");
+                Emit($"jge     {l1}");
+                Emit($"cmpb    $32, %cl");
+                Emit($"jg     {l2}");
+                Emit($"je     {l3}");
+                Emit($"cmpb    $0, %cl");
+                Emit($"je     {ljunction}");
+                Emit($"jmp    {l4}");
+
+                Emit($"{l1}:"); // 64 <= cl
+                Emit($"xorl    %edx, %edx");
+                Emit($"xorl    %eax, %eax");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l2}:"); // 32 < cl && cl < 64
+                Emit($"movl    %edx, %eax");
+                Emit($"xorl    %edx, %edx");
+                Emit($"subb    $32, %cl");
+                Emit($"jmp     {l1}");
+
+                Emit($"{l3}:"); // 32 == cl
+                Emit($"movl    %edx, %eax");
+                Emit($"xorl    %edx, %edx");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l1}:"); // 0 < cl < 32
+                Emit($"shrdl   %cl, %edx, %eax");
+                Emit($"shrl    %cl, %edx");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{ljunction}:");
+
+                if (regCnt != "%ecx") { Emit($"popl   %ecx"); }
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+
+            }
+            private void LogicalLeftShift64(string regLo, string regHi, int cnt) {
+
+                if (64 <= cnt) {
+                    Emit($"xorl    {regHi}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    return;
+                } else if (32 < cnt && cnt < 64) {
+                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    cnt -= 32;
+                } else if (cnt == 32) {
+                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    return;
+                } else if (0 < cnt && cnt < 32) {
+                    // nothing
+                } else if (0 == cnt) {
+                    return;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                System.Diagnostics.Debug.Assert(0 < cnt && cnt < 32);
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi}, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo}, %eax"); }
+
+                Emit($"shldl   ${cnt}, %eax, %edx");
+                Emit($"shll    ${cnt}, %eax");
+
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+            }
+
+            private void LogicalLeftShift64(string regLo, string regHi, string regCnt) {
+                var l1 = LabelAlloc();
+                var l2 = LabelAlloc();
+                var l3 = LabelAlloc();
+                var l4 = LabelAlloc();
+                var ljunction = LabelAlloc();
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi }, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo }, %eax"); }
+                if (regCnt != "%ecx") { Emit($"pushl   %ecx"); Emit($"movl    {regCnt}, %ecx"); }
+
+                Emit($"cmpb    $64, %cl");
+                Emit($"jge     {l1}");
+                Emit($"cmpb    $32, %cl");
+                Emit($"jg     {l2}");
+                Emit($"je     {l3}");
+                Emit($"cmpb    $0, %cl");
+                Emit($"je     {ljunction}");
+                Emit($"jmp    {l4}");
+
+                Emit($"{l1}:"); // 64 <= cl
+                Emit($"xorl    {regHi}, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l2}:"); // 32 < cl && cl < 64
+                Emit($"movl    {regLo}, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"subb    $32, %cl");
+                Emit($"jmp     {l1}");
+
+                Emit($"{l3}:"); // 32 == cl
+                Emit($"movl    {regLo}, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l1}:"); // 0 < cl < 32
+                Emit($"shldl   %cl, %eax, %edx");
+                Emit($"shll    %cl, %eax");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{ljunction}:");
+
+                if (regCnt != "%ecx") { Emit($"popl   %ecx"); }
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+
+            }
+
+            /// <summary>
+            /// 64bit整数向けの算術右シフトコードを生成
+            /// </summary>
+            /// <param name="regLo"></param>
+            /// <param name="regHi"></param>
+            /// <param name="cnt"></param>
+            private void ArithmeticRightShift64(string regLo, string regHi, int cnt) {
+
+                if (64 <= cnt) {
+                    Emit($"sarl    $31, {regHi}");
+                    Emit($"movl    {regHi}, {regLo}");
+                    return;
+                } else if (32 < cnt && cnt < 64) {
+                    Emit($"movl    {regHi}, {regLo}");
+                    Emit($"sarl    $31, {regHi}");
+                    cnt -= 32;
+                } else if (cnt == 32) {
+                    Emit($"movl    {regHi}, {regLo}");
+                    Emit($"sarl    $31, {regHi}");
+                    return;
+                } else if (0 < cnt && cnt < 32) {
+                    // nothing
+                } else if (0 == cnt) {
+                    return;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                System.Diagnostics.Debug.Assert(0 < cnt && cnt < 32);
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi}, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo}, %eax"); }
+
+                Emit($"shrdl   ${cnt}, %edx, %eax");
+                Emit($"sarl    ${cnt}, %edx");
+
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+            }
+
+            /// <summary>
+            /// 64bit整数向けの算術右シフトコードを生成
+            /// </summary>
+            /// <param name="regLo"></param>
+            /// <param name="regHi"></param>
+            /// <param name="cnt"></param>
+            private void ArithmeticRightShift64(string regLo, string regHi, string regCnt) {
+                var l1 = LabelAlloc();
+                var l2 = LabelAlloc();
+                var l3 = LabelAlloc();
+                var l4 = LabelAlloc();
+                var ljunction = LabelAlloc();
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi }, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo }, %eax"); }
+                if (regCnt != "%ecx") { Emit($"pushl   %ecx"); Emit($"movl    {regCnt}, %ecx"); }
+
+                Emit($"movl    %edx, %esi");
+                Emit($"andl    $0x80000000, %esi");
+
+                Emit($"cmpb    $64, %cl");
+                Emit($"jge     {l1}");
+                Emit($"cmpb    $32, %cl");
+                Emit($"jg     {l2}");
+                Emit($"je     {l3}");
+                Emit($"cmpb    $0, %cl");
+                Emit($"je     {ljunction}");
+                Emit($"jmp    {l4}");
+
+                Emit($"{l1}:"); // 64 <= cl
+                Emit($"sarl    $31, %edx");
+                Emit($"movl    %edx, %eax");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l2}:"); // 32 < cl && cl < 64
+                Emit($"movl    %edx, %eax");
+                Emit($"sarl    $31, %edx");
+                Emit($"subb    $32, %cl");
+                Emit($"jmp     {l1}");
+
+                Emit($"{l3}:"); // 32 == cl
+                Emit($"movl    %edx, %eax");
+                Emit($"sarl    $31, %edx");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l1}:"); // 0 < cl < 32
+                Emit($"shrdl   %cl, %edx, %eax");
+                Emit($"sarl    %cl, %edx");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{ljunction}:");
+
+                if (regCnt != "%ecx") { Emit($"popl   %ecx"); }
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+
+            }
+
+            /// <summary>
+            /// 64bit整数向けの算術左シフトコードを生成
+            /// </summary>
+            /// <param name="regLo"></param>
+            /// <param name="regHi"></param>
+            /// <param name="cnt"></param>
+            private void ArithmeticLeftShift64(string regLo, string regHi, int cnt) {
+
+                if (64 <= cnt) {
+                    Emit($"sall    $31, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    return;
+                } else if (32 < cnt && cnt < 64) {
+                    Emit($"andl    $0x80000000, {regHi}");
+                    Emit($"andl    $0x7FFFFFFF, {regLo}");
+                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    cnt -= 32;
+                } else if (cnt == 32) {
+                    Emit($"andl    $0x80000000, {regHi}");
+                    Emit($"andl    $0x7FFFFFFF, {regLo}");
+                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"xorl    {regLo}, {regLo}");
+                    return;
+                } else if (0 < cnt && cnt < 32) {
+                    // nothing
+                } else if (0 == cnt) {
+                    return;
+                } else {
+                    throw new NotImplementedException();
+                }
+
+                System.Diagnostics.Debug.Assert(0 < cnt && cnt < 32);
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi}, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo}, %eax"); }
+
+                Emit($"movl    %edx, %esi");
+                Emit($"andl    $0x80000000, %esi");
+
+                Emit($"shldl   ${cnt}, %eax, %edx");
+                Emit($"shll    ${cnt}, %eax");
+
+                Emit($"andl    $0x7FFFFFFF, %edx");
+                Emit($"orl     %esi, %edx");
+
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+            }
+
+            /// <summary>
+            /// 64bit整数向けの算術左シフトコードを生成
+            /// </summary>
+            /// <param name="regLo"></param>
+            /// <param name="regHi"></param>
+            /// <param name="cnt"></param>
+            private void ArithmeticLeftShift64(string regLo, string regHi, string regCnt) {
+                var l1 = LabelAlloc();
+                var l2 = LabelAlloc();
+                var l3 = LabelAlloc();
+                var l4 = LabelAlloc();
+                var ljunction = LabelAlloc();
+
+                if (regHi != "%edx") { Emit($"pushl   %edx"); Emit($"movl    {regHi }, %edx"); }
+                if (regLo != "%eax") { Emit($"pushl   %eax"); Emit($"movl    {regLo }, %eax"); }
+                if (regCnt != "%ecx") { Emit($"pushl   %ecx"); Emit($"movl    {regCnt}, %ecx"); }
+
+                Emit($"cmpb    $64, %cl");
+                Emit($"jge     {l1}");
+                Emit($"cmpb    $32, %cl");
+                Emit($"jg     {l2}");
+                Emit($"je     {l3}");
+                Emit($"cmpb    $0, %cl");
+                Emit($"je     {ljunction}");
+                Emit($"jmp    {l4}");
+
+                Emit($"{l1}:"); // 64 <= cl
+                Emit($"sall    $31, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l2}:"); // 32 < cl && cl < 64
+                Emit($"andl    $0x80000000, {regHi}");
+                Emit($"andl    $0x7FFFFFFF, {regLo}");
+                Emit($"orl     {regLo}, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"subb    $32, %cl");
+                Emit($"jmp     {l1}");
+
+                Emit($"{l3}:"); // 32 == cl
+                Emit($"andl    $0x80000000, {regHi}");
+                Emit($"andl    $0x7FFFFFFF, {regLo}");
+                Emit($"orl     {regLo}, {regHi}");
+                Emit($"xorl    {regLo}, {regLo}");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{l1}:"); // 0 < cl < 32
+                Emit($"movl    %edx, %esi");
+                Emit($"andl    $0x80000000, %esi");
+                Emit($"shldl   %cl, %eax, %edx");
+                Emit($"shll    %cl, %eax");
+                Emit($"andl    $0x7FFFFFFF, %edx");
+                Emit($"orl     %esi, %edx");
+                Emit($"jmp     {ljunction}");
+
+                Emit($"{ljunction}:");
+
+                if (regCnt != "%ecx") { Emit($"popl   %ecx"); }
+                if (regLo != "%eax") { Emit($"movl    %eax, {regLo}"); Emit($"popl   %eax"); }
+                if (regHi != "%edx") { Emit($"movl    %edx, {regHi}"); Emit($"popl   %edx"); }
+
+            }
+
             public void Assign(CType type) {
                 var sdp = GetStackDepth();
                 var lhs = Peek(0);
@@ -927,8 +1303,6 @@ namespace AnsiCParser {
 
                     int offsetBit = bft.BitOffset % 8;
                     int offsetByte = bft.BitOffset / 8;
-                    UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
-                    UInt32 dstMask = ~(srcMask << ((int)offsetBit));
                     int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
                     // ビットフィールドへの代入の場合
@@ -936,72 +1310,13 @@ namespace AnsiCParser {
 
 
                     switch (bft.Type.Sizeof()) {
-                        case 1: {
-
-
-                                LoadI32("%ecx");    // 右辺式の値を取り出す
-
-                                if (!bft.IsUnsignedIntegerType()) {
-                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
-                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
-                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
-                                } else {
-                                    // ビットフィールドの最上位ビットより上をを消す
-                                    Emit($"andl ${srcMask}, %ecx");
-
-                                }
-                                Emit("pushl %ecx");
-
-                                // ビットマスク処理と位置合わせ
-                                Emit($"andl ${srcMask}, %ecx");
-                                Emit($"shll ${offsetBit}, %ecx");
-                                for (var i=0; i< byteLen; i++ ) {
-                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
-                                    Emit($"movb {offsetByte+i}(%edi), %dl");
-                                    Emit($"andb ${(byte)(dstMask>>(i*8))}, %dl");
-                                    // ビットを結合させてから書き込む
-                                    Emit($"orb  %dl, %cl");
-                                    Emit($"movb %cl, {offsetByte+i}(%edi)");
-                                    // 書き込んだ分だけシフト
-                                    Emit($"shrl $8, %ecx");
-                                }
-                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
-                                break;
-                            }
-                        case 2: {
-
-                                LoadI32("%ecx");    // 右辺式の値を取り出す
-
-                                if (!bft.IsUnsignedIntegerType()) {
-                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
-                                    Emit($"sall ${32 - bft.BitWidth}, %ecx");
-                                    Emit($"sarl ${32 - bft.BitWidth}, %ecx");
-                                } else {
-                                    // ビットフィールドの最上位ビットより上をを消す
-                                    Emit($"andl ${srcMask}, %ecx");
-                                }
-                                Emit("pushl %ecx");
-
-                                // ビットマスク処理と位置合わせ
-                                Emit($"andl ${srcMask}, %ecx");
-                                Emit($"shll ${offsetBit}, %ecx");
-                                for (var i = 0; i < byteLen; i++) {
-                                    // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
-                                    Emit($"movb {offsetByte + i}(%edi), %dl");
-                                    Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
-                                    // ビットを結合させてから書き込む
-                                    Emit($"orb  %dl, %cl");
-                                    Emit($"movb %cl, {offsetByte + i}(%edi)");
-                                    // 書き込んだ分だけシフト
-                                    Emit($"shrl $8, %ecx");
-                                }
-                                Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
-                                break;
-                            }
-                        case 3:
+                        case 1: 
+                        case 2:
                         case 4: {
+                                UInt32 srcMask = bft.BitWidth == 32 ? 0xFFFFFFFFU : (UInt32)((1U << bft.BitWidth) - 1);
 
                                 if (byteLen <= 4) { // 書き込み先が4byte幅を超えない場合
+                                    UInt32 dstMask = ~(srcMask << ((int)offsetBit));
 
                                     LoadI32("%ecx");    // 右辺式の値を取り出す
 
@@ -1030,6 +1345,7 @@ namespace AnsiCParser {
                                     }
                                     Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
                                 } else {    // 書き込み先が4byte幅を超える場合
+                                    UInt64 dstMask = ~((UInt64)srcMask << ((int)offsetBit));
 
                                     // 右辺式の値を %eax:%ecx にロード
                                     LoadI32("%ecx");    // 右辺式の値を取り出す
@@ -1045,7 +1361,7 @@ namespace AnsiCParser {
 
                                     // ビットマスク処理と位置合わせ
                                     Emit($"andl ${srcMask}, %ecx");
-                                    Emit($"movl %ecx, %ecx");
+                                    Emit($"movl %ecx, %eax");
                                     Emit($"shrl ${32 - offsetBit}, %eax");
                                     Emit($"shll ${offsetBit}, %ecx");
                                     
@@ -1065,6 +1381,188 @@ namespace AnsiCParser {
                                     Emit($"addl $8, %esp");
 
                                     Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                }
+                                break;
+                            }
+                        case 8: {
+                                UInt64 srcMask = bft.BitWidth == 64 ? 0xFFFFFFFFFFFFFFFFUL : (UInt64)((1UL << bft.BitWidth) - 1);
+
+                                if (byteLen <= 4) { // 書き込み先が4byte幅を超えない場合
+                                    UInt64 dstMask = ~(srcMask << ((int)offsetBit));
+
+                                    LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
+
+                                    if (!bft.IsUnsignedIntegerType()) {
+                                        // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+
+                                        // value << (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+                                        // value >> (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+                                    } else {
+                                        // ビットフィールドの最上位ビットより上を消す
+                                        Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                        Emit($"andl ${srcMask >> 32}, %edx");
+                                    }
+                                    Emit("pushl %edx");
+                                    Emit("pushl %eax");
+
+                                    // ビットマスク処理
+                                    Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                    Emit($"andl ${srcMask >> 32}, %edx");
+
+                                    // 位置合わせ
+                                    Emit($"shldl ${offsetBit}, %eax, %edx");
+                                    Emit($"shll  ${offsetBit}, %eax");
+
+                                    // 書き込み(下位ビット)
+                                    for (var i = 0; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %dl");
+                                        Emit($"movb %dl, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %edx");
+                                    }
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                } else if (byteLen > 4 && byteLen <= 8) {    // 書き込み先が4byteより大きく、8byte以下の場合
+                                    UInt64 dstMask = ~(srcMask << ((int)offsetBit));
+
+                                    LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
+
+                                    if (!bft.IsUnsignedIntegerType()) {
+                                        // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+
+                                        // value << (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+                                        // value >> (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+                                    } else {
+                                        // ビットフィールドの最上位ビットより上を消す
+                                        Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                        Emit($"andl ${srcMask >> 32}, %edx");
+                                    }
+                                    Emit("pushl %edx");
+                                    Emit("pushl %eax");
+
+                                    // ビットマスク処理
+                                    Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                    Emit($"andl ${srcMask >> 32}, %edx");
+
+                                    // 位置合わせ
+                                    Emit($"shldl ${offsetBit}, %eax, %edx");
+                                    Emit($"shll  ${offsetBit}, %eax");
+
+                                    // 書き込み(下位ビット)
+                                    for (var i = 0; i < 4; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %al");
+                                        Emit($"movb %al, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %eax");
+                                    }
+                                    // 書き込み(上位ビット)
+                                    for (var i = 4; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %dl");
+                                        Emit($"movb %dl, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %edx");
+                                    }
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+                                } else if (byteLen == 9) {
+                                    // 9bitは特別対応
+                                    UInt64 dstMaskLo = ~(srcMask << ((int)offsetBit));
+                                    UInt64 dstMaskHi = ~(srcMask >> ((int)64-offsetBit));
+
+                                    LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
+
+                                    if (!bft.IsUnsignedIntegerType()) {
+                                        // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+
+                                        // value << (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+                                        // value >> (64 - bft.BitWidth) 相当のコード
+                                        ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
+
+
+                                    } else {
+                                        // ビットフィールドの最上位ビットより上を消す
+                                        Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                        Emit($"andl ${srcMask >> 32}, %edx");
+                                    }
+                                    Emit("pushl %edx");
+                                    Emit("pushl %eax");
+
+                                    // ビットマスク処理
+                                    Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
+                                    Emit($"andl ${srcMask >> 32}, %edx");
+
+                                    // 位置合わせをする。
+                                    Emit($"pushl %edx");
+                                    Emit($"pushl %eax");
+                                    Emit($"xorl  %eax,%eax");
+                                    Emit($"shrdl ${64-offsetBit}, %edx, %eax"); // はみ出しビットが%eaxに入る
+                                    Emit($"movl %eax, %esi");   // はみ出し分を%esiに入れる
+                                    Emit($"popl %eax");
+                                    Emit($"popl %edx");
+
+                                    Emit($"shldl ${offsetBit}, %eax, %edx");
+                                    Emit($"shll  ${offsetBit}, %eax");
+
+                                    // %esi:%edx:%eax という表現になっている
+
+                                    // 書き込み(下位ビット)
+                                    for (var i = 0; i < 4; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMaskLo >> (i * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %al");
+                                        Emit($"movb %al, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %eax");
+                                    }
+                                    // 書き込み(上位ビット)
+                                    for (var i = 4; i <8; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMaskLo >> (i * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %dl");
+                                        Emit($"movb %dl, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %edx");
+                                    }
+                                    // 書き込み(はみ出しビット)
+                                    Emit($"movi %esi, %eax");
+                                    for (var i = 8; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}(%edi), %cl");
+                                        Emit($"andb ${(byte)(dstMaskHi >> ((i-8) * 8))}, %cl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %cl, %al");
+                                        Emit($"movb %al, {offsetByte + i}(%edi)");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, %eax");
+                                    }
+                                    Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
+
+                                } else {
+                                    throw new NotSupportedException();
                                 }
                                 break;
                             }
@@ -2057,6 +2555,7 @@ namespace AnsiCParser {
                                                         break;
                                                     }
                                                 case 4: {
+                                                        Emit($"# ビットフィールド読み出し");
                                                         Emit($"movl {offsetByte}{src}, {register}");
                                                         // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
                                                         Emit($"shrl ${offsetBit}, {register}");
@@ -2250,8 +2749,8 @@ namespace AnsiCParser {
                                     break;
                                 case Value.ValueKind.Address:
                                     // アドレス参照のアドレスはスタックトップの値
-                                    Emit($"popl {regHi}");
-                                    src = offset => $"{offset}({regHi})";
+                                    Emit($"popl %esi");
+                                    src = offset => $"{offset}(%esi)";
                                     break;
                                 default:
                                     throw new NotImplementedException();
@@ -2263,49 +2762,76 @@ namespace AnsiCParser {
                                 int offsetBit = bft.BitOffset % 8;
                                 int offsetByte = bft.BitOffset / 8;
                                 UInt64 srcMask = (UInt64)((1UL << bft.BitWidth) - 1);
-                                UInt64 dstMask = ~(srcMask << (offsetBit));
                                 UInt32 srcMaskLo = (UInt32)(srcMask & 0xFFFFFFFFUL);
                                 UInt32 srcMaskHi = (UInt32)(srcMask >> 32);
-                                UInt32 dstMaskLo = (UInt32)(dstMask & 0xFFFFFFFFUL);
-                                UInt32 dstMaskHi = (UInt32)(dstMask >> 32);
                                 int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
                                 switch (byteLen) {
                                     case 1: {
                                             var byteReg = ToByteReg(regLo);
-                                            Emit($"movb {offsetByte}{src}, {byteReg}");
-
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-                                            Emit($"andl ${srcMaskLo}, {regLo}");
-                                            Emit($"movl $0, {regHi}");
+                                            Emit($"movb {src(offsetByte)}, {byteReg}");
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
+                                                Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                Emit($"movsbl {byteReg}, {regLo}");
+                                                Emit($"movl {regLo}, {regHi}");
+                                                Emit($"sall $31, {regHi}");
+                                            } else {
+                                                Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
+                                                Emit($"shrb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                Emit($"movzbl {byteReg}, {regLo}");
+                                                Emit($"movl $0, {regHi}");
+                                            }
                                             break;
                                         }
                                     case 2: {
                                             var wordReg = ToWordReg(regLo);
-                                            Emit($"movw {offsetByte}{src}, {wordReg}");
-
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-                                            Emit($"andl ${srcMaskLo}, {regLo}");
-                                            Emit($"movl $0, {regHi}");
+                                            Emit($"movw {src(offsetByte)}, {wordReg}");
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                Emit($"movswl {wordReg}, {regLo}");
+                                                Emit($"movl {regLo}, {regHi}");
+                                                Emit($"sall $31, {regHi}");
+                                            } else {
+                                                Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                Emit($"shrw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                Emit($"movzwl {wordReg}, {regLo}");
+                                                Emit($"movl $0, {regHi}");
+                                            }
                                             break;
                                         }
                                     case 3: {
                                             var byteReg = ToByteReg(regLo);
-                                            Emit($"movb {offsetByte + 2}{src}, {byteReg}");
+                                            Emit($"movb {src(offsetByte + 2)}, {byteReg}");
                                             Emit($"shll $16, {regLo}");
                                             var wordReg = ToWordReg(regLo);
-                                            Emit($"movw {offsetByte}{src}, {wordReg}");
+                                            Emit($"movw {src(offsetByte)}, {wordReg}");
 
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-                                            Emit($"andl ${srcMaskLo}, {regLo}");
-                                            Emit($"movl $0, {regHi}");
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                Emit($"movl {regLo}, {regHi}");
+                                                Emit($"sall $31, {regLo}");
+                                            } else {
+                                                Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                Emit($"movl $0, {regHi}");
+                                            }
                                             break;
                                         }
                                     case 4: {
-                                            Emit($"movl {offsetByte}{src}, {regLo}");
+                                            Emit($"movl {src(offsetByte)}, {regLo}");
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-                                            Emit($"andl ${srcMaskLo}, {regLo}");
-                                            Emit($"movl $0, {regHi}");
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                Emit($"movl {regLo}, {regHi}");
+                                                Emit($"sall $31, {regLo}");
+                                            } else {
+                                                Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                Emit($"movl $0, {regHi}");
+                                            }
                                             break;
                                         }
                                     case 5:
@@ -2319,59 +2845,69 @@ namespace AnsiCParser {
                                             switch (byteLen) {
                                                 case 5: {
                                                         var byteRegHi = ToByteReg(regHi);
-                                                        Emit($"movb {offsetByte + 4}{src}, {byteRegHi}");
+                                                        Emit($"movb {src(offsetByte + 4)}, {byteRegHi}");
                                                         break;
                                                     }
                                                 case 6: {
                                                         var wordRegHi = ToWordReg(regHi);
-                                                        Emit($"movw {offsetByte + 4}{src}, {wordRegHi}");
+                                                        Emit($"movw {src(offsetByte + 4)}, {wordRegHi}");
                                                         break;
                                                     }
                                                 case 7: {
                                                         var byteRegHi = ToByteReg(regHi);
-                                                        Emit($"movb {offsetByte + 6}{src}, {byteRegHi}");
-                                                        Emit($"shll 16, {regHi}");
+                                                        Emit($"movb {src(offsetByte + 6)}, {byteRegHi}");
+                                                        Emit($"shll $16, {regHi}");
                                                         var wordRegHi = ToWordReg(regHi);
-                                                        Emit($"movw {offsetByte + 4}{src}, {wordRegHi}");
+                                                        Emit($"movw {src(offsetByte + 4)}, {wordRegHi}");
                                                         break;
                                                     }
                                                 case 8: {
-                                                        Emit($"movl {offsetByte + 4}{src}, {regHi}");
+                                                        Emit($"movl {src(offsetByte + 4)}, {regHi}");
                                                         break;
                                                     }
                                                 default:
                                                     throw new Exception();
                                             }
-                                            Emit($"shll ${32 - offsetBit}, {regHi}");
+                                            Emit($"movl {src(offsetByte)}, {regLo}");
 
-                                            Emit($"movl {offsetByte}{src}, {regLo}");
+                                            LogicalLeftShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth));
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                ArithmeticRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
+                                            } else {
+                                                LogicalRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
+                                            }
 
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-                                            Emit($"orl {regHi}, {regLo}");
-
-                                            Emit($"andl ${srcMaskLo}, {regLo}");
-                                            Emit($"movl ${srcMaskHi}, {regHi}");
                                             break;
                                         }
                                     case 9: {
                                             var byteRegHi = ToByteReg(regHi);
-                                            Emit($"movb {offsetByte + 8}{src}, {byteRegHi}");
-                                            Emit($"shll ${32-offsetBit}, {regHi}");
-
-                                            Emit($"movl {offsetByte + 4}{src}, {regLo}");
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-
-                                            Emit($"orl {regHi}, {regLo}");
-                                            Emit($"push {regLo}");
-
-                                            Emit($"movl {offsetByte + 4}{src}, {regHi}");
-                                            Emit($"shll ${32 - offsetBit}, {regHi}");
-
-                                            Emit($"movl {offsetByte}{src}, {regLo}");
-                                            Emit($"shrl ${offsetBit}, {regLo}");
-
-                                            Emit($"orl {regHi}, {regLo}");
+                                            Emit($"movb {src(offsetByte + 8)}, {byteRegHi}");
+                                            Emit($"movl {src(offsetByte + 4)}, {regLo}");
+                                            if (offsetBit != 0) {
+                                                Emit($"pushl {regHi}");
+                                                Emit($"shll ${32 - offsetBit}, {regHi}");
+                                                Emit($"shrl ${offsetBit}, {regLo}");
+                                                Emit($"orl {regHi}, {regLo}");
+                                                Emit($"popl {regHi}");
+                                            }
+                                            Emit($"pushl {regLo}");
+                                            Emit($"movl {src(offsetByte + 4)}, {regHi}");
+                                            Emit($"movl {src(offsetByte)}, {regLo}");
+                                            if (offsetBit != 0) {
+                                                Emit($"pushl {regHi}");
+                                                Emit($"shll ${32 - offsetBit}, {regHi}");
+                                                Emit($"shrl ${offsetBit}, {regLo}");
+                                                Emit($"orl {regHi}, {regLo}");
+                                                Emit($"popl {regHi}");
+                                            }
                                             Emit($"popl {regHi}");
+
+                                            LogicalLeftShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                            if (!bft.IsUnsignedIntegerType()) {
+                                                ArithmeticRightShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                            } else {
+                                                LogicalRightShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                            }
 
                                             break;
                                         }
@@ -2708,6 +3244,8 @@ namespace AnsiCParser {
 
                             BitFieldType bft;
                             if (value.Type.IsBitField(out bft)) {
+#warning "ビットフィールドからの読み出しを修正(符号拡張など)"
+
 #if false
                                 // ビットフィールドなので
                                 switch (bft.Sizeof()) {
@@ -2761,8 +3299,6 @@ namespace AnsiCParser {
                                     case 4: {
                                             int offsetBit = bft.BitOffset % 8;
                                             int offsetByte = bft.BitOffset / 8;
-                                            UInt32 srcMask = (UInt32)((1U << bft.BitWidth) - 1);
-                                            UInt32 dstMask = ~(srcMask << (offsetBit));
                                             int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
                                             var register = "%eax";
                                             var src = "(%esi)";
@@ -2772,17 +3308,29 @@ namespace AnsiCParser {
                                                 case 1: {
                                                         var byteReg = ToByteReg(register);
                                                         Emit($"movb {offsetByte}{src}, {byteReg}");
-
-                                                        Emit($"shrl ${offsetBit}, {register}");
-                                                        Emit($"andl ${srcMask}, {register}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shlb ${8-(offsetBit+bft.BitWidth)}, {byteReg}");
+                                                            Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                            Emit($"movsbl {byteReg}, {register}");
+                                                        } else {
+                                                            Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
+                                                            Emit($"shrb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                            Emit($"movzbl {byteReg}, {register}");
+                                                        }
                                                         break;
                                                     }
                                                 case 2: {
                                                         var wordReg = ToWordReg(register);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
-
-                                                        Emit($"shrl ${offsetBit}, {register}");
-                                                        Emit($"andl ${srcMask}, {register}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                            Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                            Emit($"movswl {wordReg}, {register}");
+                                                        } else {
+                                                            Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                            Emit($"shrw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                            Emit($"movzwl {wordReg}, {register}");
+                                                        }
                                                         break;
                                                     }
                                                 case 3: {
@@ -2792,15 +3340,24 @@ namespace AnsiCParser {
                                                         var wordReg = ToWordReg(register);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
 
-                                                        Emit($"shrl ${offsetBit}, {register}");
-                                                        Emit($"andl ${srcMask}, {register}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
+                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
+                                                        } else {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
+                                                            Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
+                                                        }
                                                         break;
                                                     }
                                                 case 4: {
                                                         Emit($"movl {offsetByte}{src}, {register}");
-                                                        // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                                        Emit($"shrl ${offsetBit}, {register}");
-                                                        Emit($"andl ${srcMask}, {register}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
+                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth))+ offsetBit}, {register}");
+                                                        } else {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
+                                                            Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
+                                                        }
                                                         break;
                                                     }
                                                 case 5: {
@@ -2809,7 +3366,6 @@ namespace AnsiCParser {
                                                         // xxxxxxxx xxxxxxxx xxxxxxxx zzzzz---を読み込み、000xxxxx xxxxxxxx xxxxxxxx xxxzzzzz にする
                                                         // スタック上のyyy00000 00000000 00000000 00000000とレジスタ上の000xxxxx xxxxxxxx xxxxxxxx xxxzzzzzのorを取る
                                                         // スタック上のyyy00000 00000000 00000000 00000000を放棄
-
                                                         var byteReg = ToByteReg(register);
                                                         Emit($"movb {offsetByte + 4}{src}, {byteReg}");
                                                         Emit($"shll ${32 - offsetBit}, {register}");
@@ -2821,7 +3377,13 @@ namespace AnsiCParser {
                                                         Emit($"orl (%esp), {register}");
                                                         Emit($"addl $4, %esp");
 
-                                                        Emit($"andl ${srcMask}, {register}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shll ${32 - (bft.BitWidth)}, {register}");
+                                                            Emit($"sarl ${(32 - (bft.BitWidth)) }, {register}");
+                                                        } else {
+                                                            Emit($"shll ${32 - (bft.BitWidth)}, {register}");
+                                                            Emit($"shrl ${(32 - (bft.BitWidth)) }, {register}");
+                                                        }
                                                         break;
                                                     }
                                                 default:
@@ -2842,36 +3404,49 @@ namespace AnsiCParser {
 
                                         }
                                     case 8: {
+
                                             int offsetBit = bft.BitOffset % 8;
                                             int offsetByte = bft.BitOffset / 8;
                                             UInt64 srcMask = (UInt64)((1UL << bft.BitWidth) - 1);
-                                            UInt64 dstMask = ~(srcMask << (offsetBit));
                                             UInt32 srcMaskLo = (UInt32)(srcMask & 0xFFFFFFFFUL);
                                             UInt32 srcMaskHi = (UInt32)(srcMask >> 32);
-                                            UInt32 dstMaskLo = (UInt32)(dstMask & 0xFFFFFFFFUL);
-                                            UInt32 dstMaskHi = (UInt32)(dstMask >> 32);
                                             int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
-                                            Emit($"movl %ecx, %edi");
-                                            var regHi = "%ecx";
+                                            var regHi = "%edx";
                                             var regLo = "%eax";
                                             var src = "(%esi)";
                                             switch (byteLen) {
                                                 case 1: {
                                                         var byteReg = ToByteReg(regLo);
                                                         Emit($"movb {offsetByte}{src}, {byteReg}");
-
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-                                                        Emit($"andl ${srcMaskLo}, {regLo}");
-                                                        Emit($"movl $0, {regHi}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
+                                                            Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                            Emit($"movsbl {byteReg}, {regLo}");
+                                                            Emit($"movl {regLo}, {regHi}");
+                                                            Emit($"sall $31, {regHi}");
+                                                        } else {
+                                                            Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
+                                                            Emit($"shrb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
+                                                            Emit($"movzbl {byteReg}, {regLo}");
+                                                            Emit($"movl $0, {regHi}");
+                                                        }
                                                         break;
                                                     }
                                                 case 2: {
                                                         var wordReg = ToWordReg(regLo);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
-
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-                                                        Emit($"andl ${srcMaskLo}, {regLo}");
-                                                        Emit($"movl $0, {regHi}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                            Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                            Emit($"movswl {wordReg}, {regLo}");
+                                                            Emit($"movl {regLo}, {regHi}");
+                                                            Emit($"sall $31, {regHi}");
+                                                        } else {
+                                                            Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
+                                                            Emit($"shrw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
+                                                            Emit($"movzwl {wordReg}, {regLo}");
+                                                            Emit($"movl $0, {regHi}");
+                                                        }
                                                         break;
                                                     }
                                                 case 3: {
@@ -2881,17 +3456,31 @@ namespace AnsiCParser {
                                                         var wordReg = ToWordReg(regLo);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
 
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-                                                        Emit($"andl ${srcMaskLo}, {regLo}");
-                                                        Emit($"movl $0, {regHi}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                            Emit($"movl {regLo}, {regHi}");
+                                                            Emit($"sall $31, {regLo}");
+                                                        } else {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                            Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                            Emit($"movl $0, {regHi}");
+                                                        }
                                                         break;
                                                     }
                                                 case 4: {
                                                         Emit($"movl {offsetByte}{src}, {regLo}");
                                                         // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-                                                        Emit($"andl ${srcMaskLo}, {regLo}");
-                                                        Emit($"movl $0, {regHi}");
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                            Emit($"movl {regLo}, {regHi}");
+                                                            Emit($"sall $31, {regLo}");
+                                                        } else {
+                                                            Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
+                                                            Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
+                                                            Emit($"movl $0, {regHi}");
+                                                        }
                                                         break;
                                                     }
                                                 case 5:
@@ -2916,7 +3505,7 @@ namespace AnsiCParser {
                                                             case 7: {
                                                                     var byteRegHi = ToByteReg(regHi);
                                                                     Emit($"movb {offsetByte + 6}{src}, {byteRegHi}");
-                                                                    Emit($"shll 16, {regHi}");
+                                                                    Emit($"shll $16, {regHi}");
                                                                     var wordRegHi = ToWordReg(regHi);
                                                                     Emit($"movw {offsetByte + 4}{src}, {wordRegHi}");
                                                                     break;
@@ -2928,45 +3517,54 @@ namespace AnsiCParser {
                                                             default:
                                                                 throw new Exception();
                                                         }
-                                                        Emit($"shll ${32 - offsetBit}, {regHi}");
-
                                                         Emit($"movl {offsetByte}{src}, {regLo}");
 
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-                                                        Emit($"orl {regHi}, {regLo}");
+                                                        LogicalLeftShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth));
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            ArithmeticRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
+                                                        } else {
+                                                            LogicalRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
+                                                        }
 
-                                                        Emit($"andl ${srcMaskLo}, {regLo}");
-                                                        Emit($"movl ${srcMaskHi}, {regHi}");
                                                         break;
                                                     }
                                                 case 9: {
                                                         var byteRegHi = ToByteReg(regHi);
                                                         Emit($"movb {offsetByte + 8}{src}, {byteRegHi}");
-                                                        Emit($"shll ${32 - offsetBit}, {regHi}");
-
                                                         Emit($"movl {offsetByte + 4}{src}, {regLo}");
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-
-                                                        Emit($"orl {regHi}, {regLo}");
-                                                        Emit($"push {regLo}");
-
+                                                        if (offsetBit != 0) {
+                                                            Emit($"pushl {regHi}");
+                                                            Emit($"shll ${32 - offsetBit}, {regHi}");
+                                                            Emit($"shrl ${offsetBit}, {regLo}");
+                                                            Emit($"orl {regHi}, {regLo}");
+                                                            Emit($"popl {regHi}");
+                                                        }
+                                                        Emit($"pushl {regLo}");
                                                         Emit($"movl {offsetByte + 4}{src}, {regHi}");
-                                                        Emit($"shll ${32 - offsetBit}, {regHi}");
-
                                                         Emit($"movl {offsetByte}{src}, {regLo}");
-                                                        Emit($"shrl ${offsetBit}, {regLo}");
-
-                                                        Emit($"orl {regHi}, {regLo}");
+                                                        if (offsetBit != 0) {
+                                                            Emit($"pushl {regHi}");
+                                                            Emit($"shll ${32 - offsetBit}, {regHi}");
+                                                            Emit($"shrl ${offsetBit}, {regLo}");
+                                                            Emit($"orl {regHi}, {regLo}");
+                                                            Emit($"popl {regHi}");
+                                                        }
                                                         Emit($"popl {regHi}");
+
+                                                        LogicalLeftShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                            ArithmeticRightShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                                        } else {
+                                                            LogicalRightShift64(regLo, regHi, 64 - (bft.BitWidth));
+                                                        }
 
                                                         break;
                                                     }
                                                 default:
                                                     throw new Exception();
                                             }
-                                            Emit($"pushl ${regHi}");
-                                            Emit($"pushl ${regLo}");
-                                            Emit($"movl %edi, %ecx");
+                                            Emit($"pushl {regHi}");
+                                            Emit($"pushl {regLo}");
                                             break;
                                         }
                                     default:

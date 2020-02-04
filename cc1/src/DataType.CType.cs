@@ -506,15 +506,15 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.UnsignedLongInt:
                         return 4;
                     case BasicType.TypeKind.SignedLongLongInt:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.UnsignedLongLongInt:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.Float:
                         return 4;
                     case BasicType.TypeKind.Double:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.LongDouble:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind._Bool:
                         return 1;
                     case BasicType.TypeKind.Float_Complex:

@@ -118,6 +118,26 @@ namespace AnsiCParser {
                                 ty = CreateUnsignedLongInt();
                                 result.Add(new MemberInfo(null, ty, bytepos));
                                 break;
+                            case 5:
+                                ty = CreateUnsignedChar();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                ty = CreateUnsignedLongInt();
+                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                break;
+                            case 6:
+                                ty = CreateUnsignedShortInt();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                ty = CreateUnsignedLongInt();
+                                result.Add(new MemberInfo(null, ty, bytepos+2));
+                                break;
+                            case 7:
+                                ty = CreateUnsignedChar();
+                                result.Add(new MemberInfo(null, ty, bytepos));
+                                ty = CreateUnsignedShortInt();
+                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                ty = CreateUnsignedLongInt();
+                                result.Add(new MemberInfo(null, ty, bytepos + 3));
+                                break;
                             default:
                                 throw new Exception("");
                         }
