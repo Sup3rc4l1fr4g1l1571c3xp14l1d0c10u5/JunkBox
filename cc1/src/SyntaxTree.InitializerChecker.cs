@@ -398,8 +398,21 @@ namespace AnsiCParser.SyntaxTree {
                 foreach (var member in type.Members) {
                     if (it.Current == null) {
                         // 初期化要素の無いパディングも一応ゼロクリア
-                        var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
-                        assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                        BitFieldType bft;
+                        if (member.Type.IsBitField(out bft)) {
+                            var kind = (bft.Type as BasicType).Kind;
+                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                        } else if (member.Type.IsBasicType()) {
+                            var kind = (member.Type as BasicType).Kind;
+                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                        } else if (member.Type.IsStructureType() || member.Type.IsUnionType()) {
+                            assigns.Add(CheckInitializerStruct(depth + 1, member.Type as TaggedType.StructUnionType, new InitializerIterator(new Initializer.ComplexInitializer(loc, new List<Initializer>()) ), isLocalVariableInit));
+                        } else if (member.Type.IsPointerType() || member.Type.IsEnumeratedType()) {
+                            var kind = BasicType.TypeKind.UnsignedLongInt; // fake pointer type
+                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                        } else {
+                            throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化ができない型です。");
+                        }
                         continue;
                     }
                     if (member == flexibleArrayMember) {
@@ -432,8 +445,21 @@ namespace AnsiCParser.SyntaxTree {
                     foreach (var member in type.Members) {
                         if (it.Current == null) {
                             // 初期化要素の無いパディングも一応ゼロクリア
-                            var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
-                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            BitFieldType bft;
+                            if (member.Type.IsBitField(out bft)) {
+                                var kind = (bft.Type as BasicType).Kind;
+                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            } else if (member.Type.IsBasicType()) {
+                                var kind = (member.Type as BasicType).Kind;
+                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            } else if (member.Type.IsStructureType() || member.Type.IsUnionType()) {
+                                assigns.Add(CheckInitializerStruct(depth + 1, member.Type as TaggedType.StructUnionType, new InitializerIterator(new Initializer.ComplexInitializer(loc, new List<Initializer>())), isLocalVariableInit));
+                            } else if (member.Type.IsPointerType() || member.Type.IsEnumeratedType()) {
+                                var kind = BasicType.TypeKind.UnsignedLongInt; // fake pointer type
+                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            } else {
+                                throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化ができない型です。");
+                            }
                             continue;
                         }
                         if (member == flexibleArrayMember) {

@@ -839,14 +839,41 @@ namespace AnsiCParser {
                         CastTo(CType.CreateChar()); // rhsを signed char にキャスト
                         Emit("pop %ecx"); Pop(); // rhs
 #endif
+#if false
+                        /* 32bitシフト：0～31ビットまでのシフトに対応 */
                         LoadI32("%eax"); // lhs
                         if (lhs.Type.IsUnsignedIntegerType()) {
                             Emit("shll %cl, %eax");
                         } else {
                             Emit("sall %cl, %eax");
                         }
-
                         Emit("pushl %eax");
+#else
+                        /* 64bitシフト：0～31ビットまでのシフトに対応 */
+                        LoadI32("%eax"); // lhs lo
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            // lhs hi
+                            Emit("xor %edx, %edx"); 
+                            Emit("shldl %cl, %eax, %edx");
+                            Emit("shll %cl, %eax");
+                        } else {
+                            // lhs hi
+                            Emit("movl  %eax, %edx");
+                            Emit("sarl  $31, %edx");
+                            Emit("shldl %cl, %eax, %edx");
+                            Emit("sall %cl, %eax");
+                        }
+
+                        Emit("testb $32, %cl");
+                        var l = LabelAlloc();
+                        Emit($"je {l}");
+                        Emit("movl %eax, %edx");
+                        Emit("xorl %eax, %eax");
+                        Label(l);
+                        //Emit("pushl %edx");   // 上位は使わない
+                        Emit("pushl %eax");
+
+#endif
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
                 } else {
@@ -901,14 +928,52 @@ namespace AnsiCParser {
                         CastTo(CType.CreateChar()); // rhsを signed char にキャスト
                         Emit("pop %ecx"); Pop(); // rhs
 #endif
+#if false
+                        /* 32bitシフト：0～31ビットまでのシフトに対応 */
                         LoadI32("%eax"); // lhs
                         if (lhs.Type.IsUnsignedIntegerType()) {
                             Emit("shrl %cl, %eax");
                         } else {
                             Emit("sarl %cl, %eax");
                         }
-
                         Emit("pushl %eax");
+#else
+                        /* 64bitシフト：0～31ビットまでのシフトに対応 */
+                        LoadI32("%eax"); // lhs lo
+                        if (lhs.Type.IsUnsignedIntegerType()) {
+                            // lhs hi
+                            Emit("xor %edx, %edx"); 
+
+                            Emit("shrdl %cl, %edx, %eax");
+
+                            Emit("shrl %cl, %edx");
+                            Emit("testb $32, %cl");
+                            var l = LabelAlloc();
+                            Emit($"je {l}");
+                            Emit("movl %edx, %eax");
+                            Emit("xorl %edx, %edx");
+                            Label(l);
+                            Emit("pushl %edx");
+                            Emit("pushl %eax");
+                        } else {
+                            // lhs hi
+                            Emit("movl  %eax, %edx");
+                            Emit("sarl  $31, %edx");
+
+                            Emit("shrdl %cl, %edx, %eax");
+
+                            Emit("sarl %cl, %edx");
+                            Emit("testb $32, %cl");
+                            var l = LabelAlloc();
+                            Emit($"je {l}");
+                            Emit("movl %edx, %eax");
+                            Emit("sarl $31, %edx");
+                            Label(l);
+                            Emit("pushl %edx");
+                            Emit("pushl %eax");
+                        }
+
+#endif
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                     }
                 } else {
@@ -1649,10 +1714,12 @@ namespace AnsiCParser {
                     FpuPush();
                     FpuPush();
 
-                    Emit("fcomip");
-                    Emit("fstp %st(0)");
+                    Emit("fucomip %st(1), %st");
+                    Emit("fstp    %st(0)");
 
-                    Emit("sete %al");
+                    Emit("setnp %ah");
+                    Emit("sete  %al");
+                    Emit("andb  %ah, %al");
                     Emit("movzbl %al, %eax");
                     Emit("pushl %eax");
 
@@ -1706,12 +1773,14 @@ namespace AnsiCParser {
                     FpuPush();
                     FpuPush();
 
-                    Emit("fcomip");
-                    Emit("fstp %st(0)");
+                    Emit("fucomip %st(1), %st");
+                    Emit("fstp    %st(0)");
 
-                    Emit("setne %al");
+                    Emit("setp   %ah");
+                    Emit("setne  %al");
+                    Emit("orb    %ah, %al");
                     Emit("movzbl %al, %eax");
-                    Emit("pushl %eax");
+                    Emit("pushl  %eax");
 
                     Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
                 } else {
@@ -1943,6 +2012,17 @@ namespace AnsiCParser {
                 FpuPop(type);
             }
 
+            private void SaveAndSetFPUCW() {
+                Emit("fnstcw 0(%esp)");
+                Emit("movzwl 0(%esp), %eax");
+                Emit("movb $12, %ah");
+                Emit("movw %ax, 2(%esp)");
+                Emit("fldcw 2(%esp)");
+            }
+            private void RestoreFPUCW() {
+                Emit("fldcw 0(%esp)");
+            }
+
             private void CastFloatingValueToInt(CType type) {
                 Value ret = Peek(0);
                 Debug.Assert(ret.Type.IsRealFloatingType() && type.IsIntegerType());
@@ -1956,56 +2036,41 @@ namespace AnsiCParser {
                     // sp+[2..3] -> [(精度=単精度, 丸め=ゼロ方向への丸め)を設定したfpucw]
                     // sp+[4..7] -> [浮動小数点数の整数への変換結果、その後は、int幅での変換結果]
                     switch (type.Sizeof()) {
-                        case 1:
+                        case 1: // FloatingType -> sint_8
                             Emit("sub $8, %esp");
-                            Emit("fnstcw 0(%esp)");
-                            Emit("movzwl 0(%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
-                            Emit("fistps 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            SaveAndSetFPUCW();
+                            Emit("fistps 4(%esp)"); // float -> sint16_t
+                            RestoreFPUCW();
                             Emit("movzwl 4(%esp), %eax");
                             Emit("movsbl %al, %eax");
                             Emit("movl %eax, 4(%esp)");
+
                             Emit("add $4, %esp");
                             break;
-                        case 2:
+                        case 2: // FloatingType -> sint_16
                             Emit("sub $8, %esp");
-                            Emit("fnstcw 0(%esp)");
-                            Emit("movzwl 0(%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
-                            Emit("fistps 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            SaveAndSetFPUCW();
+                            Emit("fistps 4(%esp)"); // float -> sint16_t
+                            RestoreFPUCW();
                             Emit("movzwl 4(%esp), %eax");
                             Emit("cwtl");
                             Emit("movl %eax, 4(%esp)");
                             Emit("add $4, %esp");
                             break;
-                        case 4:
+                        case 4: // FloatingType -> sint_32
                             Emit("sub $8, %esp");
-                            Emit("fnstcw 0(%esp)");
-                            Emit("movzwl 0(%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
+                            SaveAndSetFPUCW();
                             Emit("fistpl 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            RestoreFPUCW();
                             //Emit($"movl 4(%esp), %eax");
                             //Emit($"movl %eax, 4(%esp)");
                             Emit("add $4, %esp");
                             break;
                         case 8:
                             Emit("sub $12, %esp");
-                            Emit("fnstcw 0(%esp)");
-                            Emit("movzwl 0(%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
+                            SaveAndSetFPUCW();
                             Emit("fistpq 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            RestoreFPUCW();
                             Emit("add $4, %esp");
                             break;
                         default:
@@ -2013,44 +2078,33 @@ namespace AnsiCParser {
                     }
                 } else {
                     switch (type.Sizeof()) {
-                        case 1:
+                        case 1: // FloatingType -> uint_8
                             Emit("sub $8, %esp");
-                            Emit("fnstcw 0(%esp)");
-                            Emit("movzwl 0(%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
+                            SaveAndSetFPUCW();
                             Emit("fistps 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            RestoreFPUCW();
                             Emit("movzwl 4(%esp), %eax");
                             Emit("movzbl %al, %eax");
                             Emit("movl %eax, 4(%esp)");
                             Emit("add $4, %esp");
                             break;
-                        case 2:
+                        case 2:// FloatingType -> uint_16
                             Emit("sub $8, %esp");
-                            Emit("fnstcw (%esp)");
-                            Emit("movzwl (%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
-                            Emit("fistps 4(%esp)");
-                            Emit("fldcw 0(%esp)");
-                            Emit("movzwl 4(%esp), %eax");
-                            Emit("cwtl");
+                            SaveAndSetFPUCW();
+                            Emit("fistpl 4(%esp)");
+                            RestoreFPUCW();
+                            Emit("movl 4(%esp), %eax");
+                            Emit("movzwl  %ax, %eax");
                             Emit("movl %eax, 4(%esp)");
                             Emit("add $4, %esp");
                             break;
-                        case 4:
+                        case 4:// FloatingType -> uint_32
                             Emit("sub $12, %esp");
-                            Emit("fnstcw (%esp)");
-                            Emit("movzwl (%esp), %eax");
-                            Emit("movb $12, %ah");
-                            Emit("movw %ax, 2(%esp)");
-                            Emit("fldcw 2(%esp)");
+                            SaveAndSetFPUCW();
                             Emit("fistpq 4(%esp)");
-                            Emit("fldcw 0(%esp)");
+                            RestoreFPUCW();
                             Emit("movl 4(%esp), %eax");
+                            Emit("movl 8(%esp), %edx");
                             Emit("movl %eax, 8(%esp)");
                             Emit("add $8, %esp");
                             break;
@@ -3244,8 +3298,6 @@ namespace AnsiCParser {
 
                             BitFieldType bft;
                             if (value.Type.IsBitField(out bft)) {
-#warning "ビットフィールドからの読み出しを修正(符号拡張など)"
-
 #if false
                                 // ビットフィールドなので
                                 switch (bft.Sizeof()) {
@@ -3927,9 +3979,9 @@ namespace AnsiCParser {
                     GenCompare32("setbe");
                 } else if ((lhs.Type.IsRealFloatingType() || lhs.Type.IsIntegerType()) &&
                            (rhs.Type.IsRealFloatingType() || rhs.Type.IsIntegerType())) {
-                    FpuPush();
-                    FpuPush();
-                    Emit("fcomip");
+                    FpuPush(); // %st(1)= lhs
+                    FpuPush(); // %st(0)= rhs
+                    Emit("fucomip");
                     Emit("fstp %st(0)");
                     Emit("setbe %al");
                     Emit("movzbl %al, %eax");

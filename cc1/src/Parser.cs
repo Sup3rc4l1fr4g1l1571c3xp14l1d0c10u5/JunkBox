@@ -24,7 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode _mode = LanguageMode.C99;
+        private LanguageMode _mode = LanguageMode.C89;
 
         /// <summary>
         /// 名前空間(ステートメント ラベル)
@@ -380,7 +380,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.SignedLongInt: {
                             //try {
                             //var v = Lexer.ToInt32(token.Range, body, radix);
-                            var v = unchecked((Int32)originalSigned);
+                            var v = (Int64)unchecked((Int32)originalSigned);
                             if (v == originalSigned) {
                                 value = v;
                                 break;
@@ -393,9 +393,9 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.UnsignedLongInt: {
                             //try {
                             //var v = Lexer.ToUInt32(token.Range, body, radix);
-                            var v = unchecked((UInt32)originalUnsigned);
+                            var v = (UInt64)unchecked((UInt32)originalUnsigned);
                             if (v == originalUnsigned) {
-                                value = v;
+                                value = unchecked((Int64)v);
                                 break;
                             }
                             //} catch (OverflowException) {

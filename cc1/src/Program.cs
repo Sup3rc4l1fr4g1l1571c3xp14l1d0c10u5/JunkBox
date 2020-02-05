@@ -131,7 +131,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\bitwise-constant.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\declarator-abstract.c") /*
                 @"
 "//*/
                 , "<Debug>").Parse();

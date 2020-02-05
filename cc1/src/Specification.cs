@@ -1125,6 +1125,7 @@ namespace AnsiCParser {
                         return TypeConvert(targetType, Expression.TypeConversionExpression.Apply(expr.LocationRange, CType.CreatePointer(elementType), expr));
                     }
                 }
+
             } else {
                 CType elementType;
                 if (expr.Type.IsFunctionType()) {
