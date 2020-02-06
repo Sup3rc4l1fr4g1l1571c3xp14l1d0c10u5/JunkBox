@@ -345,10 +345,12 @@ namespace AnsiCParser {
 
             var originalSigned = Lexer.ToInt64(token.Range, body, radix);
             var originalUnsigned = Lexer.ToUInt64(token.Range, body, radix);
+
             Int64 value = 0;
 
             BasicType.TypeKind selectedType = 0;
             Debug.Assert(candidates.Length > 0);
+#if false
             foreach (var candidate in candidates) {
                 switch (candidate) {
                     case BasicType.TypeKind.SignedInt: {
@@ -427,7 +429,94 @@ namespace AnsiCParser {
                 selectedType = candidate;
                 break;
             }
-
+#else
+            foreach (var candidate in candidates) {
+                switch (candidate) {
+                    case BasicType.TypeKind.SignedInt: {
+                            //try {
+                            //var v = Lexer.ToInt32(token.Range, body, radix);
+                            var v = unchecked((Int32)originalSigned);
+                            if (v >= 0) {
+                                value = v;
+                                break;
+                            } else {
+                                // オーバーフローした
+                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
+                            continue;
+                        }
+                    case BasicType.TypeKind.UnsignedInt: {
+                            //try {
+                            //var v = Lexer.ToUInt32(token.Range, body, radix);
+                            var v = unchecked((UInt32)originalUnsigned);
+                            if (v == originalUnsigned) {
+                                value = v;
+                                break;
+                            } else {
+                                // オーバーフローした
+                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
+                            continue;
+                        }
+                    case BasicType.TypeKind.SignedLongInt: {
+                            //try {
+                            //var v = Lexer.ToInt32(token.Range, body, radix);
+                            var v = unchecked((Int32)originalSigned);
+                            if (v >= 0) {
+                                value = v;
+                                break;
+                            } else {
+                                // オーバーフローした
+                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
+                            continue;
+                        }
+                    case BasicType.TypeKind.UnsignedLongInt: {
+                            //try {
+                            //var v = Lexer.ToUInt32(token.Range, body, radix);
+                            var v = unchecked((UInt32)originalUnsigned);
+                            if (v == originalUnsigned) {
+                                value = v;
+                                break;
+                            } else {
+                                // オーバーフローした
+                            }
+                            //} catch (OverflowException) {
+                            //    // 大きすぎる。
+                            //}
+                            continue;
+                        }
+                    case BasicType.TypeKind.SignedLongLongInt: {
+                            //var v = Lexer.ToInt64(token.Range, body, radix);
+                            var v = unchecked((Int64)originalSigned);
+                            if (v >= 0) {
+                                value = v;
+                                break;
+                            }
+                            continue;
+                        }
+                    case BasicType.TypeKind.UnsignedLongLongInt: {
+                            //var v = Lexer.ToUInt64(token.Range, body, radix);
+                            var v = unchecked((UInt64)originalUnsigned);
+                            if (v == originalUnsigned) {
+                                value = unchecked((Int64)v);
+                                break;
+                            }
+                            continue;
+                        }
+                    default:
+                        throw new CompilerException.InternalErrorException(token.Start, token.End, "整数定数の型変換候補が不正です。");
+                }
+                selectedType = candidate;
+                break;
+            }
+#endif
             _lexer.NextToken();
 
             return new SyntaxTree.Expression.PrimaryExpression.Constant.IntegerConstant(token.Range, token.Raw, value, selectedType);
@@ -542,7 +631,7 @@ namespace AnsiCParser {
             return ret;
         }
 
-        #endregion
+#endregion
 
 
         /// <summary>
@@ -1387,9 +1476,9 @@ namespace AnsiCParser {
 
             return (sbyte)size.Value;
         }
-
         /// <summary>
         /// 6.7.2.1 型指定子型修飾子並び（メンバ宣言子）
+
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
@@ -1752,7 +1841,6 @@ namespace AnsiCParser {
             StorageClassSpecifier storageClass;
             CType baseType = DeclarationSpecifiers(out storageClass);
 
-
             // 6.7.5.3 関数宣言子（関数原型を含む)
             // 制約 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
             if (storageClass != AnsiCParser.StorageClassSpecifier.None && storageClass != AnsiCParser.StorageClassSpecifier.Register) {
@@ -1769,6 +1857,11 @@ namespace AnsiCParser {
                 throw new CompilerException.SpecificationErrorException(_lexer.CurrentToken().Range, "関数型中に型の無い仮引数名があります");
             }
             var end = _lexer.CurrentToken().Start;
+
+            // 関数型を関数ポインタ型に変える
+            if (baseType.IsFunctionType()) {
+                baseType = CType.CreatePointer(baseType);
+            }
             return new FunctionType.ArgumentInfo(new LocationRange(start, end), ident, storageClass, baseType);
 
         }
@@ -3195,7 +3288,7 @@ namespace AnsiCParser {
         //
 
 
-        #region 各宣言で登場する記憶クラス指定子/型指定子/型修飾子/関数修飾子の読み取り処理を共通化
+#region 各宣言で登場する記憶クラス指定子/型指定子/型修飾子/関数修飾子の読み取り処理を共通化
 
         [Flags]
         private enum ReadDeclarationSpecifierPartFlag {
@@ -3393,10 +3486,10 @@ namespace AnsiCParser {
             }
         }
 
-        #endregion
+#endregion
 
 
-        #region 関数宣言部（関数定義時も含む）の解析と名前表への登録を共通化
+#region 関数宣言部（関数定義時も含む）の解析と名前表への登録を共通化
 
         private Declaration.FunctionDeclaration FunctionDeclaration(Token ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier, ScopeKind scope, bool isDefine) {
             if (scope == ScopeKind.BlockScope && isDefine) {
@@ -3474,7 +3567,7 @@ namespace AnsiCParser {
             return funcDelc;
 
         }
-        #endregion
+#endregion
 
         private Declaration.TypeDeclaration TypedefDeclaration(Token ident, CType type) {
             // 型宣言名

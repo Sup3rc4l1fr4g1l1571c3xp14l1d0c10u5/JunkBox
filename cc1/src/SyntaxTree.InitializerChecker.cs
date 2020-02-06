@@ -168,6 +168,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
             }
 
+#if false
             // 要素数分回す
             var assigns = new List<Initializer>();
             var loc = it.Current.LocationRange;
@@ -187,6 +188,65 @@ namespace AnsiCParser.SyntaxTree {
             it.Leave();
             it.Next();
             return new Initializer.ArrayAssignInitializer(loc, type, assigns);
+#else
+            it.Enter();
+            it.Next();
+            var si = it.Current as Initializer.SimpleInitializer;
+            if (si != null && si.AssignmentExpression is Expression.PrimaryExpression.StringExpression && type.ElementType.IsCharacterType()) {
+                // char x[] = { "hello" }; のような雑なケース
+                var sexpr = si.AssignmentExpression as Expression.PrimaryExpression.StringExpression;
+                if (type.Length == -1) {
+                    if (depth != 1) {
+                        throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "ネストした可変配列を初期化しています。");
+                    }
+                    // 要素数分回す
+                    List<Initializer> assigns = new List<Initializer>();
+                    var loc = it.Current.LocationRange;
+                    var len = sexpr.Value.Count;
+                    foreach (var b in sexpr.Value) {
+                        assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.ElementType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
+                    }
+                    // 型の長さを確定させる
+                    type.Length = len;
+                    it.Leave();
+                    it.Next();
+                    return new Initializer.ArrayAssignInitializer(loc, type, assigns);
+                } else {
+                    var len = sexpr.Value.Count;
+                    if (len > type.Length) {
+                        Logger.Warning(sexpr.LocationRange, $"配列変数の要素数よりも長い文字列が初期化子として与えられているため、文字列末尾の {len - type.Length}バイトは無視され、終端文字なし文字列 (つまり、終端を示す 0 値のない文字列) が作成されます。");
+                        len = type.Length;
+                    }
+                    // 要素数分回す
+                    List<Initializer> assigns = new List<Initializer>();
+                    var loc = it.Current.LocationRange;
+                    foreach (var b in sexpr.Value.Take(len)) {
+                        assigns.Add(new Initializer.SimpleAssignInitializer(loc, type.ElementType, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, $"0x{b,0:X2}", b, BasicType.TypeKind.UnsignedChar)));
+                    }
+                    it.Leave();
+                    it.Next();
+                    return new Initializer.ArrayAssignInitializer(loc, type, assigns);
+                }
+            } else {
+                // 要素数分回す
+                var assigns = new List<Initializer>();
+                var loc = it.Current.LocationRange;
+                int i;
+                for (i = 0; type.Length == -1 || i < type.Length; i++) {
+                    if (it.Current == null) {
+                        break;
+                    }
+                    assigns.Add(CheckInitializerBase(depth, type.ElementType, it, isLocalVariableInit));
+                }
+                if (type.Length == -1) {
+                    // 型の長さを確定させる
+                    type.Length = i;
+                }
+                it.Leave();
+                it.Next();
+                return new Initializer.ArrayAssignInitializer(loc, type, assigns);
+            }
+#endif
         }
 
         /// <summary>
@@ -404,7 +464,40 @@ namespace AnsiCParser.SyntaxTree {
                             assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
                         } else if (member.Type.IsBasicType()) {
                             var kind = (member.Type as BasicType).Kind;
-                            assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                            switch (kind) {
+                                case BasicType.TypeKind.Void:
+                                    throw new CompilerException.InternalErrorException(it.Current.LocationRange, "void型フィールドを初期化しようとしています。（本処理系の不具合です。）");
+                                case BasicType.TypeKind.KAndRImplicitInt:
+                                case BasicType.TypeKind.Char:
+                                case BasicType.TypeKind.SignedChar:
+                                case BasicType.TypeKind.UnsignedChar:
+                                case BasicType.TypeKind.SignedShortInt:
+                                case BasicType.TypeKind.UnsignedShortInt:
+                                case BasicType.TypeKind.SignedInt:
+                                case BasicType.TypeKind.UnsignedInt:
+                                case BasicType.TypeKind.SignedLongInt:
+                                case BasicType.TypeKind.UnsignedLongInt:
+                                case BasicType.TypeKind.SignedLongLongInt:
+                                case BasicType.TypeKind.UnsignedLongLongInt:
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                                    break;
+                                case BasicType.TypeKind.Float:
+                                case BasicType.TypeKind.Double:
+                                case BasicType.TypeKind.LongDouble:
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.FloatingConstant(loc, "0", 0, kind)));
+                                    break;
+                                case BasicType.TypeKind._Bool:
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                                    break;
+                                case BasicType.TypeKind.Float_Complex:
+                                case BasicType.TypeKind.Double_Complex:
+                                case BasicType.TypeKind.LongDouble_Complex:
+                                case BasicType.TypeKind.Float_Imaginary:
+                                case BasicType.TypeKind.Double_Imaginary:
+                                case BasicType.TypeKind.LongDouble_Imaginary:
+                                default:
+                                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化ができない型です。");
+                            }
                         } else if (member.Type.IsStructureType() || member.Type.IsUnionType()) {
                             assigns.Add(CheckInitializerStruct(depth + 1, member.Type as TaggedType.StructUnionType, new InitializerIterator(new Initializer.ComplexInitializer(loc, new List<Initializer>()) ), isLocalVariableInit));
                         } else if (member.Type.IsPointerType() || member.Type.IsEnumeratedType()) {

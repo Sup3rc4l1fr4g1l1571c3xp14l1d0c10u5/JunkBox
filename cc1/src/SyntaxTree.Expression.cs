@@ -341,9 +341,8 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public override bool IsLValue() {
-                    // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
-                    // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
-                    return false;
+                    // 文字列リテラルは，一次式とする。それは，6.4.5 の規則で決まる型をもつ左辺値とする。
+                    return true;
                 }
 
                 public StringExpression(LocationRange locationRange, List<string> strings) : base(locationRange) {

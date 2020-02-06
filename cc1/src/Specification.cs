@@ -1265,13 +1265,13 @@ namespace AnsiCParser {
             if (targetType != null) {
                 TaggedType.StructUnionType st1;
                 TaggedType.StructUnionType st2;
-                if (targetType.IsStructureType(out st1) && expr.Type.IsStructureType(out st2)) {
+                if ((targetType.IsStructureType(out st1) && expr.Type.IsStructureType(out st2)) || (targetType.IsUnionType(out st1) && expr.Type.IsUnionType(out st2))) {
                     if (Object.ReferenceEquals(st1,st2) == true) {
                         return expr;
                     }
                 }
             } else {
-                if (expr.Type.IsStructureType()) {
+                if (expr.Type.IsStructureType() || expr.Type.IsUnionType()) {
                     return expr;
                 }
             }

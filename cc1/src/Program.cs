@@ -131,8 +131,11 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\declarator-abstract.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\tmp\pointer-immediate.i") /*
                 @"
+int g(int x, int (a)(int (a)(int))) {
+    return x;
+}
 "//*/
                 , "<Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {

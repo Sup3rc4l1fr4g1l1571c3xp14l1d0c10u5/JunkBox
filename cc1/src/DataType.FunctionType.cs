@@ -118,7 +118,8 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int Sizeof() {
-                throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のサイズは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
+                return 4;
+                //throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のサイズは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
             }
 
             /// <summary>

@@ -839,7 +839,7 @@ namespace AnsiCParser {
                         CastTo(CType.CreateChar()); // rhsを signed char にキャスト
                         Emit("pop %ecx"); Pop(); // rhs
 #endif
-#if false
+#if true
                         /* 32bitシフト：0～31ビットまでのシフトに対応 */
                         LoadI32("%eax"); // lhs
                         if (lhs.Type.IsUnsignedIntegerType()) {
@@ -928,7 +928,7 @@ namespace AnsiCParser {
                         CastTo(CType.CreateChar()); // rhsを signed char にキャスト
                         Emit("pop %ecx"); Pop(); // rhs
 #endif
-#if false
+#if true
                         /* 32bitシフト：0～31ビットまでのシフトに対応 */
                         LoadI32("%eax"); // lhs
                         if (lhs.Type.IsUnsignedIntegerType()) {
@@ -5568,17 +5568,35 @@ namespace AnsiCParser {
             public Value OnAdditiveExpression(Expression.AdditiveExpression self, Value value) {
                 var lv = self.Lhs.Accept(this, value);
                 var rv = self.Rhs.Accept(this, value);
-                if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.IntConst) {
-                    lv.IntConst += rv.IntConst;
-                    return lv;
-                }
-                if (lv.Kind == Value.ValueKind.Ref && rv.Kind == Value.ValueKind.IntConst) {
-                    lv.Offset += (int)rv.IntConst;
-                    return lv;
-                }
-                if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.Ref) {
-                    lv.Offset += (int)rv.IntConst;
-                    return lv;
+                switch (self.Op) {
+                    case Expression.AdditiveExpression.OperatorKind.Add:
+                        if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.IntConst) {
+                            lv.IntConst += rv.IntConst;
+                            return lv;
+                        }
+                        if (lv.Kind == Value.ValueKind.Ref && rv.Kind == Value.ValueKind.IntConst) {
+                            lv.Offset += (int)rv.IntConst;
+                            return lv;
+                        }
+                        if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.Ref) {
+                            lv.Offset += (int)rv.IntConst;
+                            return lv;
+                        }
+                        break;
+                    case Expression.AdditiveExpression.OperatorKind.Sub:
+                        if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.IntConst) {
+                            lv.IntConst -= rv.IntConst;
+                            return lv;
+                        }
+                        if (lv.Kind == Value.ValueKind.Ref && rv.Kind == Value.ValueKind.IntConst) {
+                            lv.Offset -= (int)rv.IntConst;
+                            return lv;
+                        }
+                        if (lv.Kind == Value.ValueKind.IntConst && rv.Kind == Value.ValueKind.Ref) {
+                            lv.Offset -= (int)rv.IntConst;
+                            return lv;
+                        }
+                        break;
                 }
                 throw new NotImplementedException();
             }

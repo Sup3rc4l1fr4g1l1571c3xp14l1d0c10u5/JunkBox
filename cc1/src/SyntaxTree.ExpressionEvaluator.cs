@@ -157,8 +157,15 @@ namespace AnsiCParser.SyntaxTree {
 
                         return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, adc.Type, off);
                     }
+                    switch (self.Op) {
 
-                    return new Expression.AdditiveExpression(self.LocationRange, Expression.AdditiveExpression.OperatorKind.Add, lhs, rhs);
+                        case Expression.AdditiveExpression.OperatorKind.Add:
+                            return new Expression.AdditiveExpression(self.LocationRange, Expression.AdditiveExpression.OperatorKind.Add, lhs, rhs);
+                        case Expression.AdditiveExpression.OperatorKind.Sub:
+                            return new Expression.AdditiveExpression(self.LocationRange, Expression.AdditiveExpression.OperatorKind.Sub, lhs, rhs);
+                        default:
+                            throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
+                    }
                 }
             }
 
