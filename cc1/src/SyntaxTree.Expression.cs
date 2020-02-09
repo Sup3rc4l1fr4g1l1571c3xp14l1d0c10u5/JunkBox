@@ -190,10 +190,22 @@ namespace AnsiCParser.SyntaxTree {
                         Info = info;
                     }
                 }
+
+                /// <summary>
+                /// @@@オブジェクト定数（C文法上には出現しない。コンパイラ作成の都合で導入）
+                /// </summary>
+                public class ObjectConstant : IdentifierExpression
+                {
+                    public override CType Type { get; }
+
+                    public ObjectConstant(LocationRange locationRange, CType type, string label) : base(locationRange, label) {
+                        Type = type;
+                    }
+                }
             }
 
             /// <summary>
-            /// 定数
+            /// 定数&
             /// </summary>
             /// <remarks>
             /// 定数は，一次式とする。その型は，その形式と値によって決まる（6.4.4 で規定する。）
@@ -329,6 +341,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public List<byte> Value { get; }
+                public string Label { get; }
 
                 private CType ConstantType {
                     get;
@@ -345,11 +358,11 @@ namespace AnsiCParser.SyntaxTree {
                     return true;
                 }
 
-                public StringExpression(LocationRange locationRange, List<string> strings) : base(locationRange) {
+                public StringExpression(LocationRange locationRange, string label, List<string> strings) : base(locationRange) {
                     // Todo: WideChar未対応
 
                     // ascii 
-
+                    Label = label;
                     Value = new List<byte>();
                     var strParts = new List<string>();
                     foreach (var str in strings) {

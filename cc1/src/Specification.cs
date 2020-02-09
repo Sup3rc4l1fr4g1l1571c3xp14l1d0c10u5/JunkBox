@@ -668,7 +668,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.SignedChar:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.SignedShortInt:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.SignedInt:  // 無条件でint型に変換できる
-                    case BasicType.TypeKind.SignedLongInt:  // sizeof(int) == sizeof(long)に限り変換できる
+                    case BasicType.TypeKind.SignedLongInt:  // 処理系依存：sizeof(int) == sizeof(long)に限り変換できる
                         return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                     case BasicType.TypeKind.UnsignedChar:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.UnsignedShortInt:  // 無条件でint型に変換できる
@@ -682,6 +682,10 @@ namespace AnsiCParser {
                             // signed int で表現できる
                             return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                         }
+                    case BasicType.TypeKind.SignedLongLongInt:
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedLongLongInt(), expr);
+                    case BasicType.TypeKind.UnsignedLongLongInt:
+                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedLongLongInt(), expr);
                     default:
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                 }
@@ -1312,6 +1316,15 @@ namespace AnsiCParser {
             }
         }
 
+        public static CType GetBaseArrayType(this CType self) {
+            CType baseType;
+            if (!self.IsArrayType(out baseType)) {
+                throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "配列型以外から派生元型を得ようとしました。（本実装の誤りが原因だと思われます。）");
+            } else {
+                return baseType;
+            }
+        }
+
         /// <summary>
         /// 6.3.2.3 ポインタ(空ポインタ定数)
         /// </summary>
@@ -1736,7 +1749,5 @@ namespace AnsiCParser {
         public static bool IsModifiableLvalue(CType type, bool inInitialize = false) {
             return (!type.IsIncompleteType()) && (!type.IsArrayType()) && (inInitialize || (type.GetTypeQualifier() != TypeQualifier.Const));
         }
-
-
     }
 }

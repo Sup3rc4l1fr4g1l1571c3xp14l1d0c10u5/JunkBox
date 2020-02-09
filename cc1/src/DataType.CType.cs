@@ -240,6 +240,13 @@ namespace AnsiCParser {
             public static BasicType CreateSignedLongInt() {
                 return BasicType.Create(BasicType.TypeKind.SignedLongInt);
             }
+            public static BasicType CreateUnsignedLongLongInt() {
+                return BasicType.Create(BasicType.TypeKind.UnsignedLongLongInt);
+            }
+
+            public static BasicType CreateSignedLongLongInt() {
+                return BasicType.Create(BasicType.TypeKind.SignedLongLongInt);
+            }
 
             public static BasicType CreateFloat() {
                 return BasicType.Create(BasicType.TypeKind.Float);

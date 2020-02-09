@@ -1375,7 +1375,7 @@ namespace AnsiCParser {
 
 
                     switch (bft.Type.Sizeof()) {
-                        case 1: 
+                        case 1:
                         case 2:
                         case 4: {
                                 UInt32 srcMask = bft.BitWidth == 32 ? 0xFFFFFFFFU : (UInt32)((1U << bft.BitWidth) - 1);
@@ -1429,7 +1429,7 @@ namespace AnsiCParser {
                                     Emit($"movl %ecx, %eax");
                                     Emit($"shrl ${32 - offsetBit}, %eax");
                                     Emit($"shll ${offsetBit}, %ecx");
-                                    
+
                                     // スタック上に書き込みデータを作って合成させる
                                     Emit($"pushl %eax");
                                     Emit($"pushl %ecx");
@@ -1550,7 +1550,7 @@ namespace AnsiCParser {
                                 } else if (byteLen == 9) {
                                     // 9bitは特別対応
                                     UInt64 dstMaskLo = ~(srcMask << ((int)offsetBit));
-                                    UInt64 dstMaskHi = ~(srcMask >> ((int)64-offsetBit));
+                                    UInt64 dstMaskHi = ~(srcMask >> ((int)64 - offsetBit));
 
                                     LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
 
@@ -1580,7 +1580,7 @@ namespace AnsiCParser {
                                     Emit($"pushl %edx");
                                     Emit($"pushl %eax");
                                     Emit($"xorl  %eax,%eax");
-                                    Emit($"shrdl ${64-offsetBit}, %edx, %eax"); // はみ出しビットが%eaxに入る
+                                    Emit($"shrdl ${64 - offsetBit}, %edx, %eax"); // はみ出しビットが%eaxに入る
                                     Emit($"movl %eax, %esi");   // はみ出し分を%esiに入れる
                                     Emit($"popl %eax");
                                     Emit($"popl %edx");
@@ -1602,7 +1602,7 @@ namespace AnsiCParser {
                                         Emit($"shrl $8, %eax");
                                     }
                                     // 書き込み(上位ビット)
-                                    for (var i = 4; i <8; i++) {
+                                    for (var i = 4; i < 8; i++) {
                                         // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
                                         Emit($"movb {offsetByte + i}(%edi), %cl");
                                         Emit($"andb ${(byte)(dstMaskLo >> (i * 8))}, %cl");
@@ -1617,7 +1617,7 @@ namespace AnsiCParser {
                                     for (var i = 8; i < byteLen; i++) {
                                         // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
                                         Emit($"movb {offsetByte + i}(%edi), %cl");
-                                        Emit($"andb ${(byte)(dstMaskHi >> ((i-8) * 8))}, %cl");
+                                        Emit($"andb ${(byte)(dstMaskHi >> ((i - 8) * 8))}, %cl");
                                         // ビットを結合させてから書き込む
                                         Emit($"orb  %cl, %al");
                                         Emit($"movb %al, {offsetByte + i}(%edi)");
@@ -2066,7 +2066,7 @@ namespace AnsiCParser {
                             //Emit($"movl %eax, 4(%esp)");
                             Emit("add $4, %esp");
                             break;
-                        case 8:
+                        case 8: // FloatingType -> sint_64
                             Emit("sub $12, %esp");
                             SaveAndSetFPUCW();
                             Emit("fistpq 4(%esp)");
@@ -2108,13 +2108,56 @@ namespace AnsiCParser {
                             Emit("movl %eax, 8(%esp)");
                             Emit("add $8, %esp");
                             break;
-                        case 8:
+                        case 8: // FloatingType -> sint_64
+#if false
                             Emit("sub $8, %esp");
                             Emit("fstpl (%esp)");
                             Emit("call\t___fixunsdfdi");
                             Emit("add $8, %esp");
                             Emit("pushl %edx");
                             Emit("pushl %eax");
+#else
+                            Emit("subl  $12, %esp");
+                            // %st= [SRC]
+                            /* fldl (double)S64_MAX 相当*/
+                            Emit("pushl $1138753536");
+                            Emit("pushl $0");
+                            Emit("fldl  0(%esp)");              // %st= [S64_MAX, SRC]
+                            Emit("addl  $8, %esp");
+
+                            /* SRCをスタックに積む */
+                            Emit("fld %st(1)");                 // %st= [SRC, S64_MAX, SRC]
+
+                            Emit("fucomip %st(1), %st");        // %st= [S64_MAX, SRC]
+                            var l1 = LabelAlloc();
+                            var l2 = LabelAlloc();
+                            Emit($"jnb {l1}");
+                            Emit("fstp    %st(0)"); ;           // %st= [SRC]
+                            SaveAndSetFPUCW();
+                            Emit("fistpq  4(%esp)");            // %st= []
+                            RestoreFPUCW();
+                            Emit($"jmp {l2}");
+
+                            Emit($"{l1}:");
+                            // %st= [S64_MAX,SRC]
+                            Emit("fsubrp  %st, %st(1)");        // %st= [SRC]
+                            SaveAndSetFPUCW();
+                            Emit("fistpq  4(%esp)");            // %st= []
+                            RestoreFPUCW();
+                            Emit("movl    4(%esp), %ecx");
+                            Emit("xorb    $0, %ch");
+                            Emit("movl    %ecx, %eax");
+                            Emit("movl    8(%esp), %ecx");
+                            Emit("xorl    $0x80000000, %ecx");
+                            Emit("movl    %ecx, %edx");
+                            Emit("movl    %eax, 4(%esp)");
+                            Emit("movl    %edx, 8(%esp)");
+
+                            Emit($"{l2}:");
+                            Emit("addl  $4, %esp");
+
+
+#endif
                             break;
                         default:
                             throw new NotImplementedException();
@@ -2574,8 +2617,8 @@ namespace AnsiCParser {
                                 int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
                                 switch (bft.Type.Sizeof()) {
-                                    case 1: 
-                                    case 2: 
+                                    case 1:
+                                    case 2:
                                     case 3:
                                     case 4: {
 
@@ -2625,7 +2668,7 @@ namespace AnsiCParser {
 
                                                         var byteReg = ToByteReg(register);
                                                         Emit($"movb {offsetByte + 4}{src}, {byteReg}");
-                                                        Emit($"shll ${32-offsetBit}, {register}");
+                                                        Emit($"shll ${32 - offsetBit}, {register}");
                                                         Emit($"pushl {register}");
 
                                                         Emit($"movl {offsetByte}{src}, {register}");
@@ -2686,7 +2729,7 @@ namespace AnsiCParser {
                                     op = "movl";
                                 } else if (valueType.IsPointerType() || valueType.IsArrayType()) {
                                     op = "movl";
-                                } else if (valueType.IsStructureType()) {
+                                } else if (valueType.IsStructureType() || valueType.IsUnionType()) {
                                     op = "movl";    // ここmovlでOK?
                                 } else {
                                     throw new NotImplementedException();
@@ -3361,7 +3404,7 @@ namespace AnsiCParser {
                                                         var byteReg = ToByteReg(register);
                                                         Emit($"movb {offsetByte}{src}, {byteReg}");
                                                         if (!bft.IsUnsignedIntegerType()) {
-                                                            Emit($"shlb ${8-(offsetBit+bft.BitWidth)}, {byteReg}");
+                                                            Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                             Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
                                                             Emit($"movsbl {byteReg}, {register}");
                                                         } else {
@@ -3405,7 +3448,7 @@ namespace AnsiCParser {
                                                         Emit($"movl {offsetByte}{src}, {register}");
                                                         if (!bft.IsUnsignedIntegerType()) {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
-                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth))+ offsetBit}, {register}");
+                                                            Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
                                                         } else {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
                                                             Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
@@ -4869,10 +4912,10 @@ namespace AnsiCParser {
             }
 
             public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
-                int no = _context.DataBlock.Count;
-                var label = $"D{no}";
-                _context.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
-                _context.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = label });
+                //int no = _context.DataBlock.Count;
+                //var label = $"D{no}";
+                _context.DataBlock.Add(Tuple.Create(self.Label, self.Value.ToArray()));
+                _context.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = self.Label });
                 return value;
             }
 
@@ -5436,6 +5479,7 @@ namespace AnsiCParser {
             public void WriteCode(StreamWriter writer) {
                 _context.Codes.ForEach(x => writer.WriteLine(x.ToString()));
             }
+
         }
 
         protected class FileScopeInitializerVisitor : SyntaxTree.IVisitor<Value, Value> {
@@ -5731,10 +5775,10 @@ namespace AnsiCParser {
             }
 
             public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
-                int no = _context.DataBlock.Count;
-                var label = $"D{no}";
-                _context.DataBlock.Add(Tuple.Create(label, self.Value.ToArray()));
-                return new Value { Kind = Value.ValueKind.Ref, Label = label, Offset = 0, Type = self.Type };
+                //int no = _context.DataBlock.Count;
+                //var label = $"D{no}";
+                _context.DataBlock.Add(Tuple.Create(self.Label, self.Value.ToArray()));
+                return new Value { Kind = Value.ValueKind.Ref, Label = self.Label, Offset = 0, Type = self.Type };
             }
 
             public Value OnRelationalExpression(Expression.RelationalExpression self, Value value) {
@@ -5847,7 +5891,7 @@ namespace AnsiCParser {
                 var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
 
                 var baseCurrentOffsetByte = _currentOffsetByte;
-                foreach (var s in self.Inits.Zip(suType.Members,Tuple.Create)) {
+                foreach (var s in self.Inits.Zip(suType.Members, Tuple.Create)) {
                     _currentOffsetByte = baseCurrentOffsetByte + s.Item2.Offset;
                     s.Item1.Accept(this, value);
                 }
@@ -5859,7 +5903,7 @@ namespace AnsiCParser {
                             var bt = bft.Type as BasicType;
                             var off = baseCurrentOffsetByte + x.Offset + bft.BitOffset / 8;
                             _initValues.Add(new ValueEntry(off, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
-                            _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth ) / 8;
+                            _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth) / 8;
                         } else {
                             var fillSize = x.Type.Sizeof();
                             while (fillSize > 0) {
@@ -5867,7 +5911,7 @@ namespace AnsiCParser {
                                 if (fillSize >= 4) {
                                     fillSize -= 4;
                                     _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                                    _currentOffsetByte = off+4;
+                                    _currentOffsetByte = off + 4;
                                 } else if (fillSize >= 2) {
                                     fillSize -= 2;
                                     _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
@@ -5942,13 +5986,13 @@ namespace AnsiCParser {
 
                         var vstart = bOffset / 8;
                         var vend = (bOffset + bSize + 7) / 8;
-                        while(v.Count < vend) {
+                        while (v.Count < vend) {
                             v.Add(0);
                         }
-                        for (var j=vstart; j< vend; j++) {
+                        for (var j = vstart; j < vend; j++) {
                             if (bOffset > (j * 8)) {
                                 v[j] |= (byte)(bits << (bOffset - (j * 8)));
-                            } else if (bOffset < (j * 8) ) {
+                            } else if (bOffset < (j * 8)) {
                                 v[j] |= (byte)(bits >> ((j * 8) - bOffset));
                             } else {
                                 v[j] |= (byte)(bits);
@@ -5957,10 +6001,10 @@ namespace AnsiCParser {
                         _initValues.RemoveAt(i);
                     }
                     for (var j = 0; j < v.Count; j++) {
-                        _initValues.Insert(i+j, new ValueEntry(byteOffset+j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar  )));
+                        _initValues.Insert(i + j, new ValueEntry(byteOffset + j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar)));
                     }
 
-                    i+=v.Count;
+                    i += v.Count;
 
                 }
                 return value;
@@ -6032,6 +6076,7 @@ namespace AnsiCParser {
             public Value OnTranslationUnit(TranslationUnit self, Value value) {
                 throw new NotImplementedException();
             }
+
         }
 
         public void Compile(Ast ret, StreamWriter o) {

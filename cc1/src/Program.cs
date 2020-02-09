@@ -131,11 +131,13 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\tmp\pointer-immediate.i") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\source\repos\cc1\tests\lacc\string-conversion.c") /*
                 @"
-int g(int x, int (a)(int (a)(int))) {
-    return x;
-}
+struct S1 {
+	unsigned long  a : 15;
+	unsigned short b : 4;
+	unsigned short c : 4;
+};
 "//*/
                 , "<Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {

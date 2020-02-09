@@ -78,6 +78,8 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public WhileStatement(LocationRange locationRange, Expression cond) : base(locationRange) {
+                CType elemType;
+                if (cond.Type.IsArrayType(out elemType)) { cond= Expression.TypeConversionExpression.Apply(locationRange, CType.CreatePointer(elemType), cond); }
                 Cond = Specification.TypeConvert(CType.CreateBool(), cond);
                 ;
             }
@@ -117,7 +119,14 @@ namespace AnsiCParser.SyntaxTree {
 
             public ForStatement(LocationRange locationRange, Expression init, Expression cond, Expression update) : base(locationRange) {
                 Init = init;
-                Cond = cond == null ? null : Specification.TypeConvert(CType.CreateBool(), cond);
+                if (cond != null) {
+                    CType elemType;
+                    if (cond.Type.IsArrayType(out elemType)) { cond = Expression.TypeConversionExpression.Apply(locationRange, CType.CreatePointer(elemType), cond); }
+                    Cond = Specification.TypeConvert(CType.CreateBool(), cond);
+
+                } else {
+                    Cond = null;
+                }
                 Update = update;
             }
         }
@@ -137,6 +146,8 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public IfStatement(LocationRange locationRange, Expression cond, Statement thenStmt, Statement elseStmt) : base(locationRange) {
+                CType elemType;
+                if (cond.Type.IsArrayType(out elemType)) { cond = Expression.TypeConversionExpression.Apply(locationRange, CType.CreatePointer(elemType), cond); }
                 Cond = Specification.TypeConvert(CType.CreateBool(), cond);
                 ThenStmt = thenStmt;
                 ElseStmt = elseStmt;
@@ -161,6 +172,8 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public SwitchStatement(LocationRange locationRange, Expression cond) : base(locationRange) {
+                CType elemType;
+                if (cond.Type.IsArrayType(out elemType)) { cond = Expression.TypeConversionExpression.Apply(locationRange, CType.CreatePointer(elemType), cond); }
                 Cond = cond;
                 CaseLabels = new List<CaseStatement>();
                 DefaultLabel = null;

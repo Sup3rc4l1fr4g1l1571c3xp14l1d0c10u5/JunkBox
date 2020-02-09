@@ -24,8 +24,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 言語レベルの選択
         /// </summary>
-        private LanguageMode _mode = LanguageMode.C89;
-
+        public static LanguageMode _mode { get; } = LanguageMode.C89;
         /// <summary>
         /// 名前空間(ステートメント ラベル)
         /// </summary>
@@ -71,6 +70,12 @@ namespace AnsiCParser {
         /// 暗黙的宣言の挿入対象となる宣言部
         /// </summary>
         private readonly Stack<List</*Declaration*/Ast>> _insertImplicitDeclarationOperatorStack = new Stack<List</*Declaration*/Ast>>();
+
+        private int stringLiteralLabelCnt = 0;
+
+        private string allocStringLabel() {
+            return $"str@${stringLiteralLabelCnt++}";
+        }
 
         /// <summary>
         ///  暗黙的関数宣言を挿入
@@ -436,7 +441,7 @@ namespace AnsiCParser {
                             //try {
                             //var v = Lexer.ToInt32(token.Range, body, radix);
                             var v = unchecked((Int32)originalSigned);
-                            if (v >= 0) {
+                            if (v == originalSigned && v >= 0) {
                                 value = v;
                                 break;
                             } else {
@@ -466,7 +471,7 @@ namespace AnsiCParser {
                             //try {
                             //var v = Lexer.ToInt32(token.Range, body, radix);
                             var v = unchecked((Int32)originalSigned);
-                            if (v >= 0) {
+                            if (v == originalSigned && v >= 0) {
                                 value = v;
                                 break;
                             } else {
@@ -495,7 +500,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.SignedLongLongInt: {
                             //var v = Lexer.ToInt64(token.Range, body, radix);
                             var v = unchecked((Int64)originalSigned);
-                            if (v >= 0) {
+                            if (v == originalSigned && v >= 0) {
                                 value = v;
                                 break;
                             }
@@ -2342,7 +2347,7 @@ namespace AnsiCParser {
                     var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
                     var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
                     var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
-                    varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, new List<string> { "\"" + funcName + "\"" }));
+                    varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, allocStringLabel(), new List<string> { "\"" + funcName + "\"" }));
                     _identScope.Add("__func__", varDecl);
                     declsOrStmts.Add(varDecl);
                     varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
@@ -2681,7 +2686,7 @@ namespace AnsiCParser {
                     strings.Add(StringLiteral());
                 }
                 var end = _lexer.CurrentToken().End;
-                return new SyntaxTree.Expression.PrimaryExpression.StringExpression(new LocationRange(start, end), strings);
+                return new SyntaxTree.Expression.PrimaryExpression.StringExpression(new LocationRange(start, end), allocStringLabel(), strings);
             }
             if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken('{')) {

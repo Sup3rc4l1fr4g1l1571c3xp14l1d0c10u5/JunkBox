@@ -265,6 +265,7 @@ namespace AnsiCParser {
                                     // ビットフィールドが連続している
                                     if (Settings.PackSize == 0) {
                                         // #pragma pack が未指定
+#if false
                                         if ((bit > 0) && (currentBitfieldCapacity < currentBitfieldSize + bit)) {    // 今のビットフィールド領域の余りに次のビットフィールドが入らない
                                             var pad = PaddingOf(currentBitfieldSize, 8);
                                             if (pad > 0) {
@@ -279,6 +280,32 @@ namespace AnsiCParser {
                                             currentBitfieldCapacity = 0;
                                             currentBitfieldSize = 0;
                                         }
+#else
+                                        if ((currentBytePosition % currentBitfieldType.Alignof()) == 0 && (currentBytePosition % typeAlign) == 0) {
+                                            // アラインメントが揃っている。
+                                            var maxSize = Math.Max(currentBitfieldType.Sizeof(), type.Sizeof());
+                                            if (currentBitfieldSize + bit <= maxSize*8) {
+                                                // 未使用領域に押し込めるのでそう仕向けるように現在のビットフィールド情報を書き換える。
+                                                currentBitfieldType = currentBitfieldType.Sizeof() > type.Sizeof() ? currentBitfieldType : type;
+                                                currentBitfieldCapacity = maxSize * 8;
+                                                goto okay;
+                                            }
+                                        }
+
+                                        var pad = PaddingOf(currentBitfieldSize, 8);
+                                        if (pad > 0) {
+                                            // 余り領域がある場合はパディングにする
+                                            System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
+                                            System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
+                                            result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)(pad));
+                                        }
+                                        // ビットフィールドを終了させる
+                                        currentBytePosition += (currentBitfieldSize + pad) / 8;
+                                        currentBitfieldType = null;
+                                        currentBitfieldCapacity = 0;
+                                        currentBitfieldSize = 0;
+                                    okay:;
+#endif
                                     } else {
                                         // #pragma pack(n) が指定済み
                                         // gcc は隙間なく全ビットを詰めるのでパディングも入れないしビットフィールドを終了させたりもしない

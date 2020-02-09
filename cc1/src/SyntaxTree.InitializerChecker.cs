@@ -142,8 +142,10 @@ namespace AnsiCParser.SyntaxTree {
                         throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
                     }
                 }
-                // 単純代入の規則を適用して検証
-
+                // C89ではグローバル変数に対する初期化はコンパイル時定数式のみ許される。
+                if (isLocalVariableInit == false && Parser._mode == Parser.LanguageMode.C89) {
+                    ExpressionEvaluator.Eval(expr);
+                }
                 var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(it.Current.LocationRange, type, expr);
                 var ret = new Initializer.SimpleAssignInitializer(it.Current.LocationRange, type, assign);
                 it.Next();
@@ -529,47 +531,61 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             if (it.IsInComplexInitializer()) {
-                // 初期化リスト内を舐めてる場合
-                // 要素数分回す
-                List<Initializer> assigns = new List<Initializer>();
-                if (it.Current != null) {
-                    var loc = it.Current.LocationRange;
-                    var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
-                    foreach (var member in type.Members) {
-                        if (it.Current == null) {
-                            // 初期化要素の無いパディングも一応ゼロクリア
-                            BitFieldType bft;
-                            if (member.Type.IsBitField(out bft)) {
-                                var kind = (bft.Type as BasicType).Kind;
-                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
-                            } else if (member.Type.IsBasicType()) {
-                                var kind = (member.Type as BasicType).Kind;
-                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
-                            } else if (member.Type.IsStructureType() || member.Type.IsUnionType()) {
-                                assigns.Add(CheckInitializerStruct(depth + 1, member.Type as TaggedType.StructUnionType, new InitializerIterator(new Initializer.ComplexInitializer(loc, new List<Initializer>())), isLocalVariableInit));
-                            } else if (member.Type.IsPointerType() || member.Type.IsEnumeratedType()) {
-                                var kind = BasicType.TypeKind.UnsignedLongInt; // fake pointer type
-                                assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
-                            } else {
-                                throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化ができない型です。");
-                            }
-                            continue;
-                        }
-                        if (member == flexibleArrayMember) {
-                            throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");
-                        }
-                        if (member.Ident == null) {
-                            // padding
-                            var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
-                            assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, kind)));
-                            continue;
-                        }
-                        assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));
-                    }
-                    return new Initializer.StructUnionAssignInitializer(loc, type, assigns);
-                }
 
-                return new Initializer.StructUnionAssignInitializer(LocationRange.Empty, type, assigns);
+#if true
+                if (it.IsSimpleInitializer() && CType.IsEqual(it.AsSimpleInitializer().AssignmentExpression.Type,type)) {
+                    if (isLocalVariableInit) {
+                        return CheckInitializer2Simple(depth, type, it, true);   // 単純初期化に丸投げ
+                    }
+
+                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, " 初期化子の要素が定数ではありません。");
+                } else { 
+#endif
+
+                    // 初期化リスト内を舐めてる場合
+                    // 要素数分回す
+                    List<Initializer> assigns = new List<Initializer>();
+                    if (it.Current != null) {
+                        var loc = it.Current.LocationRange;
+                        var flexibleArrayMember = type.HasFlexibleArrayMember ? type.Members.Last() : null;
+                        foreach (var member in type.Members) {
+                            if (it.Current == null) {
+                                // 初期化要素の無いパディングも一応ゼロクリア
+                                BitFieldType bft;
+                                if (member.Type.IsBitField(out bft)) {
+                                    var kind = (bft.Type as BasicType).Kind;
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                                } else if (member.Type.IsBasicType()) {
+                                    var kind = (member.Type as BasicType).Kind;
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                                } else if (member.Type.IsStructureType() || member.Type.IsUnionType()) {
+                                    assigns.Add(CheckInitializerStruct(depth + 1, member.Type as TaggedType.StructUnionType, new InitializerIterator(new Initializer.ComplexInitializer(loc, new List<Initializer>())), isLocalVariableInit));
+                                } else if (member.Type.IsPointerType() || member.Type.IsEnumeratedType()) {
+                                    var kind = BasicType.TypeKind.UnsignedLongInt; // fake pointer type
+                                    assigns.Add(new Initializer.SimpleAssignInitializer(loc, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(loc, "0", 0, kind)));
+                                } else {
+                                    throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "初期化ができない型です。");
+                                }
+                                continue;
+                            }
+                            if (member == flexibleArrayMember) {
+                                throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "フレキシブルメンバ要素を初期化することはできません。");
+                            }
+                            if (member.Ident == null) {
+                                // padding
+                                var kind = (member.Type.IsBitField()) ? ((member.Type as BitFieldType).Type as BasicType).Kind : (member.Type as BasicType).Kind;
+                                assigns.Add(new Initializer.SimpleAssignInitializer(it.Current.LocationRange, member.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(it.Current.LocationRange, "0", 0, kind)));
+                                continue;
+                            }
+                            assigns.Add(CheckInitializerBase(depth, member.Type, it, isLocalVariableInit));
+                        }
+                        return new Initializer.StructUnionAssignInitializer(loc, type, assigns);
+                    }
+
+                    return new Initializer.StructUnionAssignInitializer(LocationRange.Empty, type, assigns);
+#if true
+                }
+#endif
             }
 
             if (it.IsSimpleInitializer()) {

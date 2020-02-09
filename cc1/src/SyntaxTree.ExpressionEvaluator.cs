@@ -33,11 +33,11 @@ namespace AnsiCParser.SyntaxTree {
         /// </summary>
         /// <param name="self"></param>
         /// <returns></returns>
-        private static long LongValue(this Expression self) {
+        private static Tuple<Expression.PrimaryExpression.IdentifierExpression, long> LongValue(this Expression self) {
             var ret = AsLongValue(self);
             // 初期化子の要素が定数ではありません等
-            if (ret.HasValue) {
-                return ret.Value;
+            if (ret!=null) {
+                return ret;
             } else {
                 throw new NotSupportedException(self.GetType().Name);
             }
@@ -48,18 +48,23 @@ namespace AnsiCParser.SyntaxTree {
         /// </summary>
         /// <param name="self"></param>
         /// <returns></returns>
-        private static long? AsLongValue(this Expression self) {
+        private static Tuple<Expression.PrimaryExpression.IdentifierExpression, long> AsLongValue(this Expression self) {
             if (self is Expression.PrimaryExpression.Constant.IntegerConstant) {
-                return (long)(((Expression.PrimaryExpression.Constant.IntegerConstant)self).Value);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(null, ((Expression.PrimaryExpression.Constant.IntegerConstant)self).Value);
             }
             if (self is Expression.PrimaryExpression.Constant.CharacterConstant) {
-                return (long)(((Expression.PrimaryExpression.Constant.CharacterConstant)self).Value);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(null, ((Expression.PrimaryExpression.Constant.CharacterConstant)self).Value);
             }
             if (self is Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
-                return (long)(((Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant)self).Info.Value);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(null, ((Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant)self).Info.Value);
             }
             if (self is Expression.PrimaryExpression.Constant.FloatingConstant) {
-                return (long)(((Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(null, (long)((Expression.PrimaryExpression.Constant.FloatingConstant)self).Value);
+            }
+            if (self is Expression.PrimaryExpression.StringExpression) {
+                var se = ((Expression.PrimaryExpression.StringExpression)self);
+                var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(se.LocationRange, se.Type, se.Label);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(id, (long)0);
             }
             return null;
         }
@@ -116,10 +121,29 @@ namespace AnsiCParser.SyntaxTree {
                     }
                 } else if (self.Type.IsIntegerType()) {
                     switch (self.Op) {
-                        case Expression.AdditiveExpression.OperatorKind.Add:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() + rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
-                        case Expression.AdditiveExpression.OperatorKind.Sub:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() - rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                        case Expression.AdditiveExpression.OperatorKind.Add: {
+                                var lhv = lhs.LongValue();
+                                var rhv = rhs.LongValue();
+                                if (lhv.Item1 == null && rhv.Item1 == null) {
+                                    // どちらも定数
+                                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 + rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                                } else {
+                                    // どちらか一方、もしくは両方がラベル定数
+                                    throw new NotImplementedException();
+                                }
+                            }
+                        case Expression.AdditiveExpression.OperatorKind.Sub: {
+                                var lhv = lhs.LongValue();
+                                var rhv = rhs.LongValue();
+                                if (lhv.Item1 == null && rhv.Item1 == null) {
+                                    // どちらも定数
+                                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 - rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                                } else {
+                                    // どちらか一方、もしくは両方がラベル定数
+                                    throw new NotImplementedException();
+                                }
+                            }
+
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -127,35 +151,87 @@ namespace AnsiCParser.SyntaxTree {
                     if (lhs is Expression.PrimaryExpression.AddressConstantExpression && rhs is Expression.PrimaryExpression.Constant && rhs.Type.IsIntegerType()) {
                         var adc = lhs as Expression.PrimaryExpression.AddressConstantExpression;
                         Expression.PrimaryExpression.Constant.IntegerConstant off;
-                        var stride = adc.Type.GetBasePointerType().Sizeof();
+                        CType elementType;
+                        if (adc.Type.IsArrayType(out elementType) == false) {
+                            elementType = adc.Type.GetBasePointerType();
+                        }
+                        //var stride = adc.Type.GetBasePointerType().Sizeof();
+                        var stride = elementType.Sizeof();
                         switch (self.Op) {
-                            case Expression.AdditiveExpression.OperatorKind.Add:
-                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() + rhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                            case Expression.AdditiveExpression.OperatorKind.Add: {
+                                var adv = adc.Offset.LongValue();
+                                var rhv = rhs.LongValue();
+                                    if (adv.Item1 == null && rhv.Item1 == null) {
+                                        // どちらも定数
+                                        off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adv.Item2 + rhv.Item2 * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                    } else {
+                                        // どちらか一方、もしくは両方がラベル定数
+                                        throw new NotImplementedException();
+                                    }
+                                    break;
+                                }
+                            case Expression.AdditiveExpression.OperatorKind.Sub: {
+                                    var adv = adc.Offset.LongValue();
+                                    var rhv = rhs.LongValue();
+                                    if (adv.Item1 == null && rhv.Item1 == null) {
+                                        // どちらも定数
+                                        off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adv.Item2 - rhv.Item2 * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                    } else {
+                                        // どちらか一方、もしくは両方がラベル定数
+                                        throw new NotImplementedException();
+                                    }
                                 break;
-                            case Expression.AdditiveExpression.OperatorKind.Sub:
-                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() - rhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
-                                break;
+                                }
                             default:
                                 throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                         }
 
-                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, adc.Type, off);
+                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, /* adc.Type */ CType.CreatePointer(elementType), off);
                     } else if (rhs is Expression.PrimaryExpression.AddressConstantExpression && lhs is Expression.PrimaryExpression.Constant && lhs.Type.IsIntegerType()) {
                         var adc = rhs as Expression.PrimaryExpression.AddressConstantExpression;
                         Expression.PrimaryExpression.Constant.IntegerConstant off;
-                        var stride = adc.Type.GetBasePointerType().Sizeof();
+                        CType elementType;
+                        if (adc.Type.IsArrayType(out elementType) == false) {
+                            elementType = adc.Type.GetBasePointerType();
+                        }
+                        //var stride = adc.Type.GetBasePointerType().Sizeof();
+                        var stride = elementType.Sizeof();
                         switch (self.Op) {
-                            case Expression.AdditiveExpression.OperatorKind.Add:
-                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() + lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
-                                break;
-                            case Expression.AdditiveExpression.OperatorKind.Sub:
-                                off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() - lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
-                                break;
+                            case Expression.AdditiveExpression.OperatorKind.Add: {
+                                    var adv = adc.Offset.LongValue();
+                                    var lhv = lhs.LongValue();
+                                    if (adv.Item1 == null && lhv.Item1 == null) {
+                                        // どちらも定数
+                                        off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adv.Item2 + lhv.Item2 * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                    } else {
+                                        // どちらか一方、もしくは両方がラベル定数
+                                        throw new NotImplementedException();
+                                    }
+                                    break;
+                                }
+                            case Expression.AdditiveExpression.OperatorKind.Sub: {
+                                    var adv = adc.Offset.LongValue();
+                                    var lhv = lhs.LongValue();
+                                    if (adv.Item1 == null && lhv.Item1 == null) {
+                                        // どちらも定数
+                                        off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adv.Item2 - lhv.Item2 * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                                    } else {
+                                        // どちらか一方、もしくは両方がラベル定数
+                                        throw new NotImplementedException();
+                                    }
+                                    break;
+                                }
+                            //case Expression.AdditiveExpression.OperatorKind.Add:
+                            //    off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() + lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                            //    break;
+                            //case Expression.AdditiveExpression.OperatorKind.Sub:
+                            //    off = new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", adc.Offset.LongValue() - lhs.LongValue() * stride, ((BasicType)adc.Offset.Type.Unwrap()).Kind);
+                            //    break;
                             default:
                                 throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の加算式部分で加算でも減算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                         }
 
-                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, adc.Type, off);
+                        return new Expression.PrimaryExpression.AddressConstantExpression(adc.LocationRange, adc.Identifier, /* adc.Type */ CType.CreatePointer(elementType), off);
                     }
                     switch (self.Op) {
 
@@ -177,8 +253,12 @@ namespace AnsiCParser.SyntaxTree {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    var ret = lhs.LongValue() & rhs.LongValue();
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    var lhv = lhs.LongValue();
+                    var rhv = rhs.LongValue();
+                    if (lhv.Item1 == null && rhv.Item1 == null) {
+                        var ret = lhv.Item2 & rhv.Item2;
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    }
                 }
                 throw new Exception();
             }
@@ -246,7 +326,8 @@ namespace AnsiCParser.SyntaxTree {
                                 throw new NotSupportedException();
                         }
                     } else if (self.Type.Unwrap().IsPointerType()) {
-                        return new Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, null, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", ret.LongValue(), BasicType.TypeKind.SignedInt));
+                        var rev = ret.LongValue();
+                        return new Expression.PrimaryExpression.AddressConstantExpression(ret.LocationRange, rev.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", rev.Item2, BasicType.TypeKind.SignedInt));
                     } else {
                         throw new NotSupportedException();
                     }
@@ -289,7 +370,13 @@ namespace AnsiCParser.SyntaxTree {
                         throw new NotSupportedException();
                     }
                 } else if (ret is Expression.PrimaryExpression.AddressConstantExpression) {
-                    return ret;
+                    var ace = ret as Expression.PrimaryExpression.AddressConstantExpression;
+                    return new Expression.PrimaryExpression.AddressConstantExpression(ace.LocationRange, ace.Identifier, self.Type, ace.Offset);
+                } else if (ret is Expression.PrimaryExpression.StringExpression) {
+                    // @@@
+                    var ace = ret as Expression.PrimaryExpression.StringExpression;
+                    var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(ace.LocationRange, ace.Type, ace.Label);
+                    return new Expression.PrimaryExpression.AddressConstantExpression(ace.LocationRange, id, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(ace.LocationRange,"0",0,BasicType.TypeKind.SignedInt));
                 } else {
                     throw new NotSupportedException();
                 }
@@ -322,10 +409,11 @@ namespace AnsiCParser.SyntaxTree {
 
             public Expression OnConditionalExpression(Expression.ConditionalExpression self, Expression value) {
                 var cond = self.CondExpr.Accept(this, value);
-                if (cond.LongValue() != 0) {
-                    return self.ThenExpr.Accept(this, value);
-                } else {
+                var condv = cond.LongValue();
+                if (condv.Item1 == null && condv.Item2 == 0) {
                     return self.ElseExpr.Accept(this, value);
+                } else {
+                    return self.ThenExpr.Accept(this, value);
                 }
             }
 
@@ -377,8 +465,12 @@ namespace AnsiCParser.SyntaxTree {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    var ret = lhs.LongValue() ^ rhs.LongValue();
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    var lhv = lhs.LongValue();
+                    var rhv = rhs.LongValue();
+                    if (lhv.Item1 == null && rhv.Item1 == null) {
+                        var ret = lhv.Item2 ^ rhv.Item2;
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    }
                 }
                 throw new Exception();
             }
@@ -427,8 +519,12 @@ namespace AnsiCParser.SyntaxTree {
                 var lhs = self.Lhs.Accept(this, value);
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
-                    var ret = lhs.LongValue() | rhs.LongValue();
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    var lhv = lhs.LongValue();
+                    var rhv = rhs.LongValue();
+                    if (lhv.Item1 == null && rhv.Item1 == null) {
+                        var ret = lhv.Item2 | rhv.Item2;
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, ((BasicType)self.Type.Unwrap()).Kind);
+                    }
                 }
                 throw new Exception();
             }
@@ -439,25 +535,46 @@ namespace AnsiCParser.SyntaxTree {
 
             public Expression OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, Expression value) {
                 var ret = self.Expr.Accept(this, value);
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                var rev = ret.LongValue();
+                if (rev.Item1 == null) {
+                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", rev.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                } else {
+                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, rev.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", rev.Item2, ((BasicType)self.Type.Unwrap()).Kind));
+                }
             }
 
             public Expression OnLogicalAndExpression(Expression.LogicalAndExpression self, Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
+                var lhv = lhs.LongValue();
                 var ret = false;
-                if (lhs.LongValue() != 0) {
-                    var rhs = self.Rhs.Accept(this, value);
-                    ret = rhs.LongValue() != 0;
+                if (lhv.Item1 == null && lhv.Item2 == 0) {
+                    ret = false;
+                } else {
+                    var rhs = self.Lhs.Accept(this, value);
+                    var rhv = rhs.LongValue();
+                    if (rhv.Item1 == null && rhv.Item2 == 0) {
+                        ret = false;
+                    } else {
+                        ret = true;
+                    }
                 }
                 return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnLogicalOrExpression(Expression.LogicalOrExpression self, Expression value) {
                 var lhs = self.Lhs.Accept(this, value);
+                var lhv = lhs.LongValue();
                 var ret = true;
-                if (lhs.LongValue() == 0) {
-                    var rhs = self.Rhs.Accept(this, value);
-                    ret = rhs.LongValue() != 0;
+                if (lhv.Item1 == null && lhv.Item2 == 0) {
+                    var rhs = self.Lhs.Accept(this, value);
+                    var rhv = rhs.LongValue();
+                    if (rhv.Item1 == null && rhv.Item2 == 0) {
+                        ret = false;
+                    } else {
+                        ret = true;
+                    }
+                } else {
+                    ret = true;
                 }
                 return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret ? 1 : 0, ((BasicType)self.Type.Unwrap()).Kind);
             }
@@ -502,13 +619,18 @@ namespace AnsiCParser.SyntaxTree {
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
                 } else if (self.Type.IsIntegerType()) {
+                    var lhv = lhs.LongValue();
+                    var rhv = rhs.LongValue();
+                    if (lhv.Item1 != null || rhv.Item1 != null) {
+                        throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式への乗算・除算・剰余算が行われています。");
+                    }
                     switch (self.Op) {
                         case Expression.MultiplicativeExpression.OperatorKind.Mul:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() * rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 * rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
                         case Expression.MultiplicativeExpression.OperatorKind.Div:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() / rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 / rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
                         case Expression.MultiplicativeExpression.OperatorKind.Mod:
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhs.LongValue() % rhs.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 % rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
                         default:
                             throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中の乗除算式部分で乗算でも除算でも剰余算でもない演算子が登場しています。（本処理系の誤りが原因です。）");
                     }
@@ -530,8 +652,11 @@ namespace AnsiCParser.SyntaxTree {
                 } else {
                     var vl = lhs.LongValue();
                     var vr = rhs.LongValue();
-                    le = vl <= vr;
-                    ge = vl >= vr;
+                    if (vl.Item2 != vr.Item2) {
+                        throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式への乗算・除算・剰余算が行われています。");
+                    }
+                    le = vl.Item2 <= vr.Item2;
+                    ge = vl.Item2 >= vr.Item2;
                 }
                 switch (self.Op) {
                     case Expression.RelationalExpression.OperatorKind.LessThan:
@@ -556,12 +681,18 @@ namespace AnsiCParser.SyntaxTree {
                 var rhs = self.Rhs.Accept(this, value);
                 if (lhs.Type.IsIntegerType() && rhs.Type.IsIntegerType()) {
                     long v;
+                    var lhv = lhs.LongValue();
+                    var rhv = rhs.LongValue();
+                    if (lhv.Item1 != null || rhv.Item1 != null) {
+                        throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式へのシフト演算が行われています。");
+                    }
+
                     switch (self.Op) {
                         case Expression.ShiftExpression.OperatorKind.Left:
-                            v = lhs.LongValue() << (int)rhs.LongValue();
+                            v = lhv.Item2 << (int)rhv.Item2;
                             break;
                         case Expression.ShiftExpression.OperatorKind.Right:
-                            v = lhs.LongValue() >> (int)rhs.LongValue();
+                            v = lhv.Item2 >> (int)rhv.Item2;
                             break;
                         default:
                             throw new Exception();
@@ -612,7 +743,8 @@ namespace AnsiCParser.SyntaxTree {
                 // 任意のスカラ値を_Bool 型に変換する場合，その値が 0 に等しい場合は結果は 0 とし，それ以外の場合は 1 とする。
                 if (self.Type.IsBoolType()) {
                     if (self.Expr.Type.IsScalarType()) {
-                        var ret = self.Expr.Accept(this, value).LongValue() == 0 ? 0 : 1;
+                        var rv = self.Expr.Accept(this, value).LongValue();
+                        var ret = (rv.Item1 != null && rv.Item2 == 0) ? 0 : 1;
                         return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret, BasicType.TypeKind._Bool);
                     } else {
                         throw new CompilerException.SpecificationErrorException(self.LocationRange, "スカラ値以外を _Bool 型に変換しようとした。");
@@ -777,6 +909,7 @@ namespace AnsiCParser.SyntaxTree {
             public Expression OnWhileStatement(Statement.WhileStatement self, Expression value) {
                 throw new NotImplementedException();
             }
+
         }
 
         /// <summary>
