@@ -79,6 +79,7 @@ namespace AnsiCParser {
             var unwrappedSelf = self.Unwrap();
             return unwrappedSelf is FunctionType;
         }
+
         public static bool IsFunctionType(this CType self, out FunctionType funcSelf) {
             var unwrappedSelf = self.Unwrap();
             if (unwrappedSelf is FunctionType) {
@@ -331,7 +332,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         public static bool IsIntegerType(this CType self) {
-            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(BasicType.TypeKind.Char);
+            return self.IsSignedIntegerType() || self.IsUnsignedIntegerType() || self.IsEnumeratedType() || self.IsBasicType(BasicType.TypeKind.Char) || self.IsBasicType(BasicType.TypeKind._Bool);
         }
 
         /// <summary>
@@ -1007,6 +1008,30 @@ namespace AnsiCParser {
         /// 適合する型へのオペランドの値の型変換は，値又は表現の変更を引き起こさない
         /// </remarks>
         public static Expression TypeConvert(CType targetType, Expression expr) {
+
+            {
+                CType elementType;
+                if (/*targetType.IsIntegerType() && */expr.Type.IsArrayType(out elementType)) {
+                    // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
+                    // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
+                    // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
+                    // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
+
+                    // アドレス付け可能な記憶域が実際に使われるかどうかにかかわらず，記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも，
+                    // （6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない。
+                    if (expr.HasStorageClassRegister()) {
+                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも（6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない");
+                    }
+                    expr = TypeConvert(targetType, Expression.TypeConversionExpression.Apply(expr.LocationRange, CType.CreatePointer(elementType), expr));
+
+                    //// 任意のポインタ型は整数型に型変換できる。
+                    //// これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
+                    //// 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
+                    //return Expression.TypeConversionExpression.Apply(expr.LocationRange, targetType, expr);
+                    // 次のチェックに投げる。
+                }
+            }
+
             // 6.3.1 算術オペランド
 
             // 6.3.1.1 論理型，文字型及び整数型
@@ -1200,26 +1225,6 @@ namespace AnsiCParser {
                     // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
                     // 結果は何らかの整数型の値の範囲に含まれているとは限らない。
                     Logger.Warning(expr.LocationRange, $"キャストなしでポインタ型を整数型に変換しています。");
-                    return Expression.TypeConversionExpression.Apply(expr.LocationRange, targetType, expr);
-                }
-
-                CType elementType;
-                if (targetType.IsIntegerType() && expr.Type.IsArrayType(out elementType)) {
-                    // 左辺値が sizeof 演算子のオペランド，単項&演算子のオペランド，又は文字配列を初期化するのに使われる文字列リテラルである場合を除いて，
-                    // 型“～型の配列”をもつ式は，型“～型へのポインタ”の式に型変換する。
-                    // それは配列オブジェクトの先頭の要素を指し，左辺値ではない。
-                    // 配列オブジェクトがレジスタ記憶域クラスをもつ場合，その動作は未定義とする。
-
-                    // アドレス付け可能な記憶域が実際に使われるかどうかにかかわらず，記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも，
-                    // （6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない。
-                    if (expr.HasStorageClassRegister()) {
-                        throw new CompilerException.SpecificationErrorException(expr.LocationRange, "記憶域クラス指定子 register を伴って宣言されたオブジェクトのどの部分のアドレスも（6.5.3.2 で述べる単項 & 演算子によって）明示的にも又は（6.3.2.1 で述べる配列名のポインタへの変換によって）暗黙にも，計算することはできない");
-                    }
-                    expr = TypeConvert(targetType, Expression.TypeConversionExpression.Apply(expr.LocationRange, CType.CreatePointer(elementType), expr));
-                    
-                    // 任意のポインタ型は整数型に型変換できる。
-                    // これまでに規定されている場合を除き，結果は処理系定義とする。結果が整数型で表現できなければ，その動作は未定義とする。
-                    // 結果は何らかの整数型の値の範囲に含まれているとは限らない。                    
                     return Expression.TypeConversionExpression.Apply(expr.LocationRange, targetType, expr);
                 }
 

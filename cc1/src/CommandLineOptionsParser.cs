@@ -106,7 +106,7 @@ namespace AnsiCParser {
                 get;
             }
             public TooFewArgumentException(string name, int argc, int paramc) :
-                base($"コマンドライン引数 {name} には {argc}個の引数が必要ですが、指定されているのは{paramc}個です。") {
+                base($"コマンドライン引数 {name} には{argc}個の引数が必要ですが、実際に指定されているのは{paramc}個です。") {
                 Name = name;
                 ArgCount = argc;
                 ParamCount = paramc;

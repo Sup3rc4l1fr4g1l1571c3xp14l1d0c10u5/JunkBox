@@ -63,8 +63,12 @@ namespace AnsiCParser.SyntaxTree {
             }
             if (self is Expression.PrimaryExpression.StringExpression) {
                 var se = ((Expression.PrimaryExpression.StringExpression)self);
-                var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(se.LocationRange, se.Type, se.Label);
+                var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(se.LocationRange, se.Type, se.Label, se);
                 return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(id, (long)0);
+            }
+            if (self is Expression.PrimaryExpression.AddressConstantExpression) {
+                var ae = ((Expression.PrimaryExpression.AddressConstantExpression)self);
+                return new Tuple<Expression.PrimaryExpression.IdentifierExpression, long>(ae.Identifier, ae.Offset.Value);
             }
             return null;
         }
@@ -127,8 +131,16 @@ namespace AnsiCParser.SyntaxTree {
                                 if (lhv.Item1 == null && rhv.Item1 == null) {
                                     // どちらも定数
                                     return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 + rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                                } else if (lhv.Item1 != null && rhv.Item1 == null) {
+                                    // 左辺がラベル定数で右辺が定数
+                                    var off = lhv.Item2 + rhv.Item2;
+                                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, lhv.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, off.ToString(), off, BasicType.TypeKind.SignedInt));
+                                } else if (lhv.Item1 == null && rhv.Item1 != null) {
+                                    // 左辺が定数で右辺がラベル定数
+                                    var off = lhv.Item2 + rhv.Item2;
+                                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, rhv.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, off.ToString(), off, BasicType.TypeKind.SignedInt));
                                 } else {
-                                    // どちらか一方、もしくは両方がラベル定数
+                                    // 両方がラベル定数
                                     throw new NotImplementedException();
                                 }
                             }
@@ -138,8 +150,19 @@ namespace AnsiCParser.SyntaxTree {
                                 if (lhv.Item1 == null && rhv.Item1 == null) {
                                     // どちらも定数
                                     return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 - rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                                } else if (lhv.Item1 != null && rhv.Item1 == null) {
+                                    // 左辺がラベル定数で右辺が定数
+                                    var off = lhv.Item2 - rhv.Item2;
+                                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, lhv.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, off.ToString(), off, BasicType.TypeKind.SignedInt));
+                                } else if (lhv.Item1 == null && rhv.Item1 != null) {
+                                    // 左辺が定数で右辺がラベル定数
+                                    var off = lhv.Item2 - rhv.Item2;
+                                    return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, rhv.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, off.ToString(), off, BasicType.TypeKind.SignedInt));
+                                } else if (lhv.Item1 == rhv.Item1) {
+                                    // 両方が同一のラベル定数
+                                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", lhv.Item2 - rhv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
                                 } else {
-                                    // どちらか一方、もしくは両方がラベル定数
+                                    // 両方がラベル定数
                                     throw new NotImplementedException();
                                 }
                             }
@@ -375,7 +398,7 @@ namespace AnsiCParser.SyntaxTree {
                 } else if (ret is Expression.PrimaryExpression.StringExpression) {
                     // @@@
                     var ace = ret as Expression.PrimaryExpression.StringExpression;
-                    var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(ace.LocationRange, ace.Type, ace.Label);
+                    var id = new Expression.PrimaryExpression.IdentifierExpression.ObjectConstant(ace.LocationRange, ace.Type, ace.Label, ace);
                     return new Expression.PrimaryExpression.AddressConstantExpression(ace.LocationRange, id, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(ace.LocationRange,"0",0,BasicType.TypeKind.SignedInt));
                 } else {
                     throw new NotSupportedException();
@@ -652,7 +675,7 @@ namespace AnsiCParser.SyntaxTree {
                 } else {
                     var vl = lhs.LongValue();
                     var vr = rhs.LongValue();
-                    if (vl.Item2 != vr.Item2) {
+                    if (vl.Item1 != vr.Item1) {
                         throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式への乗算・除算・剰余算が行われています。");
                     }
                     le = vl.Item2 <= vr.Item2;
@@ -759,7 +782,11 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                        if (v.Item1 != null) {
+                            return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, v.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, ((BasicType)self.Type.Unwrap()).Kind));
+                        } else {
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                        }
                     } else {
                         return e;
                     }
@@ -768,7 +795,11 @@ namespace AnsiCParser.SyntaxTree {
                     var e = self.Expr.Accept(this, value);
                     var v = e.AsLongValue();
                     if (v != null) {
-                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Value, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                        if (v.Item1 != null) {
+                            throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない浮動小数点式から整数型への変換が行われています。");
+                        } else {
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                        }
                     } else {
                         return e;
                     }
@@ -847,7 +878,12 @@ namespace AnsiCParser.SyntaxTree {
                 if (ret.Type.IsRealFloatingType()) {
                     return new Expression.PrimaryExpression.Constant.FloatingConstant(self.LocationRange, "", -ret.DoubleValue(), ((BasicType)self.Type.Unwrap()).Kind);
                 } else if (ret.Type.IsIntegerType()) {
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", -ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                    var rv = ret.LongValue();
+                    if (rv.Item1 != null) {
+                        throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式に対する単項マイナス演算が行われています。");
+                    } else {
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", -rv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                    }
                 } else {
                     throw new Exception();
                 }
@@ -856,7 +892,12 @@ namespace AnsiCParser.SyntaxTree {
             public Expression OnUnaryNegateExpression(Expression.UnaryNegateExpression self, Expression value) {
                 var ret = self.Expr.Accept(this, value);
                 if (ret.Type.IsIntegerType()) {
-                    return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ~ret.LongValue(), ((BasicType)self.Type.Unwrap()).Kind);
+                    var rv = ret.LongValue();
+                    if (rv.Item1 != null) {
+                        throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない式に対するビット反転演算が行われています。");
+                    } else {
+                        return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ~rv.Item2, ((BasicType)self.Type.Unwrap()).Kind);
+                    }
                 } else {
                     throw new Exception();
                 }
@@ -865,7 +906,8 @@ namespace AnsiCParser.SyntaxTree {
 
             public Expression OnUnaryNotExpression(Expression.UnaryNotExpression self, Expression value) {
                 var ret = self.Expr.Accept(this, value);
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", ret.LongValue() == 0 ? 1 : 0, BasicType.TypeKind.SignedInt);
+                var rv = ret.LongValue();
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", (rv.Item1 == null || rv.Item2 == 0) ? 1 : 0, BasicType.TypeKind.SignedInt);
             }
 
             public Expression OnUnaryPlusExpression(Expression.UnaryPlusExpression self, Expression value) {

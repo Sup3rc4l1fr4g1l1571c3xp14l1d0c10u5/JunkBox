@@ -9,6 +9,10 @@ namespace AnsiCParser {
         /// 論理ソースファイルパス
         /// </summary>
         private static List<string> FilePathTable { get; } = new List<string>();
+
+        /// <summary>
+        /// 
+        /// </summary>
         private static Dictionary<string,int> FilePathMap { get; } = new Dictionary<string, int>();
 
         /// <summary>

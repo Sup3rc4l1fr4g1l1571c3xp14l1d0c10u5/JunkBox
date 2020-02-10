@@ -60,6 +60,7 @@ namespace AnsiCParser.SyntaxTree {
             return false;
         }
 
+
         /// <summary>
         /// 6.5.1 一次式
         /// </summary>
@@ -197,15 +198,17 @@ namespace AnsiCParser.SyntaxTree {
                 public class ObjectConstant : IdentifierExpression
                 {
                     public override CType Type { get; }
-
-                    public ObjectConstant(LocationRange locationRange, CType type, string label) : base(locationRange, label) {
+                    public Expression Obj { get; }
+                     
+                    public ObjectConstant(LocationRange locationRange, CType type, string label, Expression obj) : base(locationRange, label) {
                         Type = type;
+                        Obj = obj;
                     }
                 }
             }
 
             /// <summary>
-            /// 定数&
+            /// 定数
             /// </summary>
             /// <remarks>
             /// 定数は，一次式とする。その型は，その形式と値によって決まる（6.4.4 で規定する。）
@@ -617,7 +620,8 @@ namespace AnsiCParser.SyntaxTree {
                 }
 
                 public override bool IsLValue() {
-                    return true;// /* !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) &&*/ Expr.IsLValue();
+                    return true;// /* !Expr.Type.GetTypeQualifier().HasFlag(TypeQualifier.Const) &&*/
+            Expr.IsLValue();
                 }
                 public override bool HasStorageClassRegister() {
                     // 集成体又は共用体のオブジェクトが typedef 以外の記憶域クラス指定子を用いて宣言されたとき，結合に関するものを除いて，記憶域クラス指定子による性質をオブジェクトのメンバにも適用する。
@@ -1578,6 +1582,10 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public LogicalAndExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                // 通常の単項変換
+                lhs = Specification.TypeConvert(null, lhs);
+                rhs = Specification.TypeConvert(null, rhs);
+
                 // 制約
                 // 各オペランドの型は，スカラ型でなければならない。
                 if (!lhs.Type.IsScalarType()) {
@@ -1615,6 +1623,10 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public LogicalOrExpression(LocationRange locationRange, Expression lhs, Expression rhs) : base(locationRange) {
+                // 通常の単項変換
+                lhs = Specification.TypeConvert(null, lhs);
+                rhs = Specification.TypeConvert(null, rhs);
+
                 // 制約
                 // 各オペランドの型は，スカラ型でなければならない。
                 if (!lhs.Type.IsScalarType()) {

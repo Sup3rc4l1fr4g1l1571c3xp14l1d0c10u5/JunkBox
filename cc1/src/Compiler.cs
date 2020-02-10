@@ -5747,6 +5747,18 @@ namespace AnsiCParser {
                     var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.VariableExpression;
                     return new Value { Kind = Value.ValueKind.Ref, Label = f.Decl.LinkageObject.LinkageId, Offset = (int)self.Offset.Value, Type = self.Type };
                 }
+                if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.ObjectConstant) {
+                    var f = self.Identifier as Expression.PrimaryExpression.IdentifierExpression.ObjectConstant;
+                    if (_context.DataBlock.Any(x => x.Item1 == f.Ident) == false) {
+                        if (f.Obj is Expression.PrimaryExpression.StringExpression) {
+                            var se = f.Obj as Expression.PrimaryExpression.StringExpression;
+                            _context.DataBlock.Add(Tuple.Create(se.Label, se.Value.ToArray()));
+                        } else {
+                            throw new Exception("");
+                        }
+                    }
+                    return new Value { Kind = Value.ValueKind.Ref, Label = f.Ident, Offset = (int)self.Offset.Value, Type = self.Type };
+                }
                 if (self.Identifier == null) {
                     return new Value { Kind = Value.ValueKind.IntConst, IntConst = (int)self.Offset.Value, Type = self.Type };
                 }
