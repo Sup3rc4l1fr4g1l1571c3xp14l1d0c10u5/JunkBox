@@ -1,6 +1,7 @@
 using System;
 
 namespace AnsiCParser {
+    [Serializable]
     public abstract class CompilerException : Exception {
         public Location Start {
             get;

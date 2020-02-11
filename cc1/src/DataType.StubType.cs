@@ -9,7 +9,7 @@ namespace AnsiCParser {
             /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
-            public override int Sizeof() {
+            public override int SizeOf() {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型のサイズを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
             }
 
@@ -17,7 +17,7 @@ namespace AnsiCParser {
             /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
-            public override int Alignof() {
+            public override int AlignOf() {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型のアラインメントを取得しようとしました。（想定では発生しないはずですが、本実装の型解決処理にどうやら誤りがあるようです。）。");
             }
 

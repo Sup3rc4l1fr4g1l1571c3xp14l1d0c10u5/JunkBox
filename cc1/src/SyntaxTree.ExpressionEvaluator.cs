@@ -178,8 +178,8 @@ namespace AnsiCParser.SyntaxTree {
                         if (adc.Type.IsArrayType(out elementType) == false) {
                             elementType = adc.Type.GetBasePointerType();
                         }
-                        //var stride = adc.Type.GetBasePointerType().Sizeof();
-                        var stride = elementType.Sizeof();
+                        //var stride = adc.Type.GetBasePointerType().SizeOf();
+                        var stride = elementType.SizeOf();
                         switch (self.Op) {
                             case Expression.AdditiveExpression.OperatorKind.Add: {
                                 var adv = adc.Offset.LongValue();
@@ -217,8 +217,8 @@ namespace AnsiCParser.SyntaxTree {
                         if (adc.Type.IsArrayType(out elementType) == false) {
                             elementType = adc.Type.GetBasePointerType();
                         }
-                        //var stride = adc.Type.GetBasePointerType().Sizeof();
-                        var stride = elementType.Sizeof();
+                        //var stride = adc.Type.GetBasePointerType().SizeOf();
+                        var stride = elementType.SizeOf();
                         switch (self.Op) {
                             case Expression.AdditiveExpression.OperatorKind.Add: {
                                     var adv = adc.Offset.LongValue();
@@ -738,11 +738,11 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnSizeofExpression(Expression.SizeofExpression self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.Sizeof(), ((BasicType)self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.SizeOf(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.Sizeof(), ((BasicType)self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.SizeOf(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnStringExpression(Expression.PrimaryExpression.StringExpression self, Expression value) {

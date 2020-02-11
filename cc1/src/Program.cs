@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Diagnostics;
 using AnsiCParser.SyntaxTree;
+using Codeplex.Data;
 
 namespace AnsiCParser {
     class Program {
@@ -90,7 +91,7 @@ namespace AnsiCParser {
                     var ret = new Parser(System.IO.File.ReadAllText(opts.Args[0]), opts.Args[0]).Parse();
                     if (opts.AstFile != null) {
                         using (var o = new System.IO.StreamWriter(opts.AstFile)) {
-                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
+                            o.WriteLine(DynamicJson.Serialize(ret.Accept(new ToJsonVisitor(), null)));
                         }
                     }
 
@@ -102,11 +103,11 @@ namespace AnsiCParser {
                     }
                 } else {
                     foreach (var arg in opts.Args) {
-                        var astFile = System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(arg), "scm");
+                        var astFile = System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(arg), "json");
                         var asmFile = System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(arg), "s");
                         var ret = new Parser(System.IO.File.ReadAllText(arg), arg).Parse();
                         using (var o = new System.IO.StreamWriter(astFile)) {
-                            o.WriteLine(ret.Accept(new ToSExprVisitor(), null).ToString());
+                            o.WriteLine(DynamicJson.Serialize(ret.Accept(new ToJsonVisitor(), null)));
                         }
 
                         if (opts.FlagSyntaxOnly == false) {
@@ -131,7 +132,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\lacc-test\tmp\string-conversion.i") /*
+                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\ShivyC\feature_tests\error_array.c") /*
                 @"
 struct S1 {
 	unsigned long  a : 15;
@@ -145,48 +146,6 @@ struct S1 {
                 compiler.Compile(ret, o);
             }
             return;
-            var sexpr = ret.Accept(new ToSExprVisitor(), null);
-            //*
-            var interpreter = new Schene.SchemeInterpreter();
-            interpreter.InterpreterWantsToPrint += (s, e) => Console.Write(e.WhatToPrint);
-            interpreter.Evaluate($"(define ast '{new Schene.Writer(false).Write(sexpr)})");
-            interpreter.Evaluate(@"(define repl (lambda () (let ((expr (begin (display ""cc1> "") (read (standard-input-port))))) (begin (write (eval expr)) (newline) (repl)))))");
-            interpreter.Evaluate(@"
-(define pp (lambda (s)
-  (define do-indent (lambda (level)
-    (dotimes (_ level) (write-char #\space))))
-  (define pp-parenl (lambda ()
-    (write-char #\()))
-  (define pp-parenr (lambda ()
-    (write-char #\))))
-  (define pp-atom (lambda (e prefix)
-    (when prefix (write-char #\space))
-    (write e)))
-  (define pp-list (lambda (s level prefix)
-    (and prefix (do-indent level))
-    (pp-parenl)
-    (let loop ((s s)
-               (prefix #f))
-      (if (null? s)
-          (pp-parenr)
-          (let ((e (car s)))
-            (if (list? e)
-                (begin (and prefix (newline))
-                       (pp-list e (+ level 1) prefix))
-                (pp-atom e prefix))
-            (loop (cdr s) #t))))))
-  (if (list? s)
-      (pp-list s 0 #f)
-      (write s))
-  (newline)))
-");
-            interpreter.Evaluate(@"(repl)");
-            //*/
-            using (var o = new System.IO.StreamWriter(@"test.s")) {
-                var compiler = new Compiler();
-                compiler.Compile(ret, o);
-            }
-
         }
     }
 }
@@ -206,4 +165,6 @@ struct S1 {
  * - Complex numbers : Complete
  * - Imaginary numbers : Complete.
  * - Bool type : Complete.
+ * - Long double type: Incomplete
+ * 
  */

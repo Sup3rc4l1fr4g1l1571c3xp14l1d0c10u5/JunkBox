@@ -79,15 +79,11 @@ namespace AnsiCParser {
             isCurrent = true;
             while (it != Empty) {
                 TValue val;
-                if (it._entries.TryGetValue(ident,out val))
-                {
-                    if (val is T)
-                    {
+                if (it._entries.TryGetValue(ident,out val)) {
+                    if (val is T) {
                         value = (T)(val);
                         return true;
-                    }
-                    else
-                    {
+                    } else {
                         value = default(T);
                         return false;
                     }

@@ -32,6 +32,7 @@ namespace AnsiCParser {
                         // 外部もしくは内部結合なので再定義チェック
                         LinkageObject value;
                         if (_linkageTable.TryGetValue(decl.Ident, out value)) {
+                            // 以前のオブジェクトが存在する
                             if (value.Linkage != linkage) {
                                 throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクトのリンケージが以前のオブジェクトと一致しない");
                             }
@@ -45,6 +46,7 @@ namespace AnsiCParser {
                             }
                         }
                         else {
+                            // 以前のオブジェクトが存在しない
                             value = new LinkageObject(decl.Ident, decl.Type, linkage);
                             _linkageTable[decl.Ident] = value;
                             LinkageObjects.Add(value);

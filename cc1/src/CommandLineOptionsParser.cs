@@ -95,6 +95,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数の数が少なかった場合に発生させる例外
         /// </summary>
+        [Serializable]
         public class TooFewArgumentException : ArgumentException {
             public string Name {
                 get;
@@ -116,6 +117,7 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数の解析失敗時に発生させる例外
         /// </summary>
+        [Serializable]
         public class ArgumentFormatException : ArgumentException {
             public string Name {
                 get;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static AnsiCParser.DataType.CType.UnwrapFlag;
 
 namespace AnsiCParser {
     namespace DataType {
@@ -52,13 +53,13 @@ namespace AnsiCParser {
             ///     型のサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
-            public abstract int Sizeof();
+            public abstract int SizeOf();
 
             /// <summary>
             ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
-            public abstract int Alignof();
+            public abstract int AlignOf();
 
             /// <summary>
             ///     型が同一であるかどうかを比較する(適合ではない。)
@@ -68,139 +69,166 @@ namespace AnsiCParser {
             /// <returns></returns>
             public static bool IsEqual(CType t1, CType t2) {
                 for (;;) {
-                    if (ReferenceEquals(t1, t2)) {
-                        return true;
+                    
+                    /* 同一なので真 */
+                    if (ReferenceEquals(t1, t2)) { return true; }
+
+                    /* typedef型の場合は実際の型を取りだして再チェック */
+                    if (t1 is TypedefType) {
+                        t1 = ((TypedefType)t1).Type;
+                        continue;
                     }
-
-                    if (t1 is TypedefType || t2 is TypedefType) {
-                        if (t1 is TypedefType) {
-                            t1 = ((TypedefType)t1).Type;
-                        }
-
-                        if (t2 is TypedefType) {
-                            t2 = ((TypedefType)t2).Type;
-                        }
-
+                    if (t2 is TypedefType) {
+                        t2 = ((TypedefType)t2).Type;
                         continue;
                     }
 
+                    /* 空の型修飾子の場合、修飾子を外して再チェック */
                     if ((t1 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
                         t1 = ((TypeQualifierType)t1).Type;
                         continue;
                     }
-
                     if ((t2 as TypeQualifierType)?.Qualifier == TypeQualifier.None) {
                         t2 = ((TypeQualifierType)t2).Type;
                         continue;
                     }
 
+                    /* 型の種別が違うので偽 */
                     if (t1.GetType() != t2.GetType()) {
                         return false;
                     }
 
+                    /* 互いが型修飾子の場合 */
                     if (t1 is TypeQualifierType && t2 is TypeQualifierType) {
-                        var _t1 = (TypeQualifierType)t1;
-                        var _t2 = (TypeQualifierType)t2;
-                        if (_t1.Qualifier != _t2.Qualifier) {
+                        var tqt1 = (TypeQualifierType)t1;
+                        var tqt2 = (TypeQualifierType)t2;
+                        /* 型修飾が違うので疑 */
+                        if (tqt1.Qualifier != tqt2.Qualifier) {
                             return false;
                         }
 
-                        t1 = _t1.Type;
-                        t2 = _t2.Type;
+                        /* 修飾子を外して再チェック */
+                        t1 = tqt1.Type;
+                        t2 = tqt2.Type;
                         continue;
                     }
 
+                    /* 互いがポインタ型の場合 */
                     if (t1 is PointerType && t2 is PointerType) {
+                        /* ポインタを外して再チェック */
                         t1 = ((PointerType)t1).ReferencedType;
                         t2 = ((PointerType)t2).ReferencedType;
                         continue;
                     }
+
+                    /* 互いがビットフィールド型の場合 */
                     if (t1 is BitFieldType && t2 is BitFieldType) {
-                        var _t1 = (BitFieldType)t1;
-                        var _t2 = (BitFieldType)t2;
-                        if (_t1.BitOffset != _t2.BitOffset) {
+                        var bft1 = (BitFieldType)t1;
+                        var bft2 = (BitFieldType)t2;
+                        /* ビットフィールドの先頭位置とビット幅が一致しないなら疑 */
+                        if (bft1.BitOffset != bft2.BitOffset) {
                             return false;
                         }
-                        if (_t1.BitWidth != _t2.BitWidth) {
+                        if (bft1.BitWidth != bft2.BitWidth) {
                             return false;
                         }
-                        t1 = _t1.Type;
-                        t2 = _t2.Type;
+                        /* ビットフィールドを外して再チェック */
+                        t1 = bft1.Type;
+                        t2 = bft2.Type;
                         continue;
                     }
 
+                    /* 互いが配列型の場合 */
                     if (t1 is ArrayType && t2 is ArrayType) {
-                        var _t1 = (ArrayType)t1;
-                        var _t2 = (ArrayType)t2;
-                        if (_t1.Length != _t2.Length) {
+                        var at1 = (ArrayType)t1;
+                        var at2 = (ArrayType)t2;
+                        /* 配列の要素数が一致しないなら疑 */
+                        if (at1.Length != at2.Length) {
                             return false;
                         }
-
-                        t1 = _t1.ElementType;
-                        t2 = _t2.ElementType;
+                        /* 配列要素型が一致するか再チェック */
+                        t1 = at1.ElementType;
+                        t2 = at2.ElementType;
                         continue;
                     }
 
+                    /* 互いが関数型の場合 */
                     if (t1 is FunctionType && t2 is FunctionType) {
-                        var _t1 = (FunctionType)t1;
-                        var _t2 = (FunctionType)t2;
-                        if (_t1.Arguments?.Length != _t2.Arguments?.Length) {
+                        var ft1 = (FunctionType)t1;
+                        var ft2 = (FunctionType)t2;
+
+                        /* 引数の存在及び数が一致しないなら疑 */
+                        if (ft1.Arguments?.Length != ft2.Arguments?.Length) {
                             return false;
                         }
 
-                        if (_t1.HasVariadic != _t2.HasVariadic) {
+                        /* 可変長引数の有無が一致しないなら疑 */
+                        if (ft1.HasVariadic != ft2.HasVariadic) {
                             return false;
                         }
 
-                        if (_t1.Arguments != null && _t2.Arguments != null) {
-                            if (_t1.Arguments.Zip(_t2.Arguments, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
+                        /* 引数それぞれの型が一致しないなら疑 */
+                        if (ft1.Arguments != null && ft2.Arguments != null) {
+                            if (ft1.Arguments.Zip(ft2.Arguments, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                                 return false;
                             }
                         }
 
-                        t1 = _t1.ResultType;
-                        t2 = _t2.ResultType;
+                        /* 戻り値型が一致するか再チェック */
+                        t1 = ft1.ResultType;
+                        t2 = ft2.ResultType;
                         continue;
                     }
 
+                    /* 互いがスタブ型の場合は偽 */
                     if (t1 is StubType && t2 is StubType) {
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "スタブ型同士の比較はできません。（本処理系の実装の誤りが原因です。）");
                     }
 
+                    /* 互いが構造化型の場合 */
                     if (t1 is TaggedType.StructUnionType && t2 is TaggedType.StructUnionType) {
-                        var _t1 = (TaggedType.StructUnionType)t1;
-                        var _t2 = (TaggedType.StructUnionType)t2;
-                        if (_t1.Kind != _t2.Kind) {
+                        var sut1 = (TaggedType.StructUnionType)t1;
+                        var sut2 = (TaggedType.StructUnionType)t2;
+
+                        /* 種別が一致しないなら疑 */
+                        if (sut1.Kind != sut2.Kind) {
                             return false;
                         }
 
-                        if (_t1.IsAnonymous != _t2.IsAnonymous) {
+                        /* 匿名型かどうかが一致しないなら疑 */
+                        if (sut1.IsAnonymous != sut2.IsAnonymous) {
                             return false;
                         }
 
-                        if (_t1.TagName != _t2.TagName) {
+                        /* タグ名が一致しないなら疑 */
+                        if (sut1.TagName != sut2.TagName) {
                             return false;
                         }
 
-                        if (_t1.Members.Count != _t2.Members.Count) {
+                        /* メンバの要素数が一致しないなら疑 */
+                        if (sut1.Members.Count != sut2.Members.Count) {
                             return false;
                         }
 
-                        if (_t1.Members.Zip(_t2.Members, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
+                        /* メンバそれぞれの型が一致しないなら疑 */
+                        if (sut1.Members.Zip(sut2.Members, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                             return false;
                         }
 
                         return true;
                     }
 
+                    /* 互いが基本型の場合 */
                     if (t1 is BasicType && t2 is BasicType) {
+                        /* 種別が一致しないなら疑 */
                         if (((BasicType)t1).Kind != ((BasicType)t2).Kind) {
                             return false;
+                        } else {
+                            return true;
                         }
-
-                        return true;
                     }
 
+                    /* 互いにそれら以外の型の場合 */
                     throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型の比較方法が定義されていません。（本処理系の実装の誤りが原因です。）");
                 }
             }
@@ -405,14 +433,14 @@ namespace AnsiCParser {
                 TypedefType = 0x01,
                 TypeQualifierType = 0x02,
                 BitFieldType = 0x04,
-                All = UnwrapFlag.TypedefType | UnwrapFlag.TypeQualifierType | UnwrapFlag.BitFieldType 
+                All = TypedefType | TypeQualifierType | BitFieldType 
             }
 
             /// <summary>
             ///     型別名と型修飾（とビットフィールド修飾）を無視した型を得る。
             /// </summary>
             /// <returns></returns>
-            public CType Unwrap(UnwrapFlag unwrapFlag = UnwrapFlag.All) {
+            public CType Unwrap(UnwrapFlag unwrapFlag = All) {
                 var self = this;
                 for (;;) {
                     if (unwrapFlag.HasFlag(UnwrapFlag.TypedefType) && self is TypedefType) {
@@ -436,7 +464,12 @@ namespace AnsiCParser {
                 return self;
             }
 
-            public static int Sizeof(BasicType.TypeKind kind) {
+            /// <summary>
+            /// 基本型のサイズ取得
+            /// </summary>
+            /// <param name="kind"></param>
+            /// <returns></returns>
+            public static int SizeOf(BasicType.TypeKind kind) {
                 switch (kind) {
                     case BasicType.TypeKind.KAndRImplicitInt:
                         return 4;
@@ -488,12 +521,18 @@ namespace AnsiCParser {
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のサイズを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
                 }
             }
-            public static int Alignof(BasicType.TypeKind kind) {
+
+            /// <summary>
+            /// 基本型のアライメント取得
+            /// </summary>
+            /// <param name="kind"></param>
+            /// <returns></returns>
+            public static int AlignOf(BasicType.TypeKind kind) {
                 switch (kind) {
                     case BasicType.TypeKind.KAndRImplicitInt:
                         return 4;
                     case BasicType.TypeKind.Void:
-                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
+                        throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型のアラインメントは取得できません。");
                     case BasicType.TypeKind.Char:
                         return 1;
                     case BasicType.TypeKind.SignedChar:
@@ -542,7 +581,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            /// 6.2.7適合型及び合成型
+            /// 6.2.7 適合型及び合成型
             /// 合成型（composite type）は，適合する二つの型から構成することができる。
             /// 合成型は，二つの型の両方に適合し，かつ次の条件を満たす型とする。
             /// - 一方の型が既知の固定長をもつ配列の場合，合成型は，その大きさの配列とする。そうでなく，一方の型が可変長の配列の場合，合成型はその型とする。
@@ -652,12 +691,12 @@ namespace AnsiCParser {
                             }
                         }
 
-                        var composited = CompositeType(ta1.Members[i].Type, ta2.Members[i].Type);
-                        if (composited == null) {
+                        var compositeType = CompositeType(ta1.Members[i].Type, ta2.Members[i].Type);
+                        if (compositeType == null) {
                             return null;
                         }
 
-                        newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, composited, ta1.Members[i].Offset));
+                        newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, compositeType, ta1.Members[i].Offset));
                     }
 
                     newType.Members = newMembers;
@@ -696,9 +735,9 @@ namespace AnsiCParser {
 #warning  "C言語の奇妙なルール「int (*)(...)型と int(...)型は同一型」を満たすためのチェック。"
                     CType rt;
                     if (t1.IsPointerType(out rt) && rt.IsFunctionType() && t2.IsFunctionType()) {
-                        return CompositeType(t1, CType.CreatePointer(t2));
+                        return CompositeType(t1, CreatePointer(t2));
                     } else if (t2.IsPointerType(out rt) && rt.IsFunctionType() && t1.IsFunctionType()) {
-                        return CompositeType(CType.CreatePointer(t1), t2);
+                        return CompositeType(CreatePointer(t1), t2);
                     }
                 }
 

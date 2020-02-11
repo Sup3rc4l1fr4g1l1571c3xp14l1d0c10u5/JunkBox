@@ -238,7 +238,7 @@ namespace AnsiCParser.SyntaxTree {
                     public IntegerConstant(LocationRange locationRange, string str, long value, BasicType.TypeKind kind) : base(locationRange) {
                         var ctype = BasicType.Create(kind);
 
-                        int lowerBits = 8 * ctype.Sizeof();
+                        int lowerBits = 8 * ctype.SizeOf();
                         Debug.Assert(lowerBits > 0);
 
                         int upperBits = (8 * sizeof(long)) - lowerBits;
@@ -1121,25 +1121,26 @@ namespace AnsiCParser.SyntaxTree {
         /// 6.5.4 キャスト演算子(キャスト式)
         /// </summary>
         public class CastExpression : TypeConversionExpression {
-            // 制約 
-            // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
             public CastExpression(LocationRange locationRange, CType type, Expression expr) : base(locationRange, type, expr) {
                 // 制約 
                 // 型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならず，オペランドは，スカラ型をもたなければならない。
+
                 if (type.IsVoidType()) {
-                    // void型を指定しているのでOK
+                    // 型名が void 型を指定する場合なのでOK
                     return;
                 }
 
                 if (!type.IsScalarType()) {
-                    if (type.IsBoolType()) {
-                        // _Bool型にはキャスト可能である。
-                    } else {
-                        throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
-                    }
+                    //if (type.IsBoolType()) {
+                    //    // _Bool型にはキャスト可能である。
+                    //} else {
+                    // 型名がスカラ型の修飾版又は非修飾版を指定していない。
+                    throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                    //}
                 }
 
                 if (!expr.Type.IsScalarType()) {
+                    // オペランドが，スカラ型をもっていない。
                     throw new CompilerException.SpecificationErrorException(expr.LocationRange.Start, expr.LocationRange.End, "型名が void 型を指定する場合を除いて，オペランドは，スカラ型をもたなければならない。");
                 }
 

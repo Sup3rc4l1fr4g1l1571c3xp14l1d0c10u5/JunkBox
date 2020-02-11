@@ -143,7 +143,7 @@ namespace AnsiCParser.SyntaxTree {
                     }
                 }
                 // C89ではグローバル変数に対する初期化はコンパイル時定数式のみ許される。
-                if (isLocalVariableInit == false && Parser._mode == Parser.LanguageMode.C89) {
+                if (isLocalVariableInit == false && Settings.LanguageStandard == Settings.CLanguageStandard.C89) {
                     ExpressionEvaluator.Eval(expr);
                 }
                 var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(it.Current.LocationRange, type, expr);
@@ -418,7 +418,7 @@ namespace AnsiCParser.SyntaxTree {
             if (it.IsInComplexInitializer()) {
                 return CheckInitializerArrayBySimpleInitializerInComplexInitializer(depth, type, it, isLocalVariableInit);
             }
-            throw new Exception();
+            throw new CompilerException.SpecificationErrorException(it.Current.LocationRange, "配列型変数を単純初期化式で初期化することはできません。");
         }
 
         /// <summary>

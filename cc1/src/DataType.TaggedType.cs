@@ -13,10 +13,16 @@ namespace AnsiCParser {
                 IsAnonymous = isAnonymous;
             }
 
+            /// <summary>
+            /// タグ名
+            /// </summary>
             public string TagName {
                 get;
             }
 
+            /// <summary>
+            /// 匿名型ならば真 
+            /// </summary>
             public bool IsAnonymous {
                 get;
             }
@@ -88,67 +94,96 @@ namespace AnsiCParser {
                     return (align - (value % align)) % align;
                 }
 
-                protected abstract class StructLayouter {
+                /// <summary>
+                /// 構造体のレイアウト算出
+                /// </summary>
+                protected abstract class StructLayout {
+
+                    /// <summary>
+                    /// 同じビットフィールドに入れることが出来る型と見なせるか？
+                    /// </summary>
+                    /// <param name="t1"></param>
+                    /// <param name="t2"></param>
+                    /// <returns></returns>
                     protected bool IsEqualBitField(CType t1, CType t2) {
                         if (t1.IsBasicType() && t2.IsBasicType()) {
-                            return (t1.Unwrap() as BasicType).Sizeof() == (t2.Unwrap() as BasicType).Sizeof();  // 同じサイズなら同一視できる？
+                            // 同じサイズなら同一視
+                            return ((BasicType) t1.Unwrap()).SizeOf() == ((BasicType) t2.Unwrap()).SizeOf();
                             //return (t1.Unwrap() as BasicType).Kind == (t2.Unwrap() as BasicType).Kind;
                         }
                         return false;
                     }
 
-                    protected List<MemberInfo> CreateBytePaddingMemberInfo(List<MemberInfo> result, int size, int bytepos) {
+                    /// <summary>
+                    /// バイト単位のパディングをメンバリストに追加
+                    /// </summary>
+                    /// <param name="result">メンバリスト</param>
+                    /// <param name="size"></param>
+                    /// <param name="bytePos"></param>
+                    /// <returns></returns>
+                    protected List<MemberInfo> CreateBytePaddingMemberInfo(List<MemberInfo> result, int size, int bytePos) {
                         CType ty;
                         switch (size) {
                             case 1:
                                 ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 break;
                             case 2:
                                 ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 break;
                             case 3:
                                 ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                result.Add(new MemberInfo(null, ty, bytePos + 1));
                                 break;
                             case 4:
                                 ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 break;
                             case 5:
                                 ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                result.Add(new MemberInfo(null, ty, bytePos + 1));
                                 break;
                             case 6:
                                 ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytepos+2));
+                                result.Add(new MemberInfo(null, ty, bytePos+2));
                                 break;
                             case 7:
                                 ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytepos));
+                                result.Add(new MemberInfo(null, ty, bytePos));
                                 ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytepos + 1));
+                                result.Add(new MemberInfo(null, ty, bytePos + 1));
                                 ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytepos + 3));
+                                result.Add(new MemberInfo(null, ty, bytePos + 3));
                                 break;
                             default:
                                 throw new Exception("");
                         }
                         return result;
                     }
-                    protected List<MemberInfo> CreateMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytepos, sbyte bitpos, sbyte bitsize) {
-                        if (bitsize == -1) {
-                            result.Add(new MemberInfo(ident, ty, bytepos));
+
+                    /// <summary>
+                    /// メンバ情報を追加
+                    /// </summary>
+                    /// <param name="result"></param>
+                    /// <param name="ty"></param>
+                    /// <param name="ident"></param>
+                    /// <param name="bytePos"></param>
+                    /// <param name="bitPos"></param>
+                    /// <param name="bitSize"></param>
+                    /// <returns></returns>
+                    protected List<MemberInfo> CreateMemberInfo(List<MemberInfo> result, CType ty, Token ident, int bytePos, sbyte bitPos, sbyte bitSize) {
+                        if (bitSize == -1) {
+                            result.Add(new MemberInfo(ident, ty, bytePos));
                             return result;
                         } else {
-                            result.Add(new MemberInfo(ident, new BitFieldType(ident, ty, bitpos, bitsize), bytepos));
+                            result.Add(new MemberInfo(ident, new BitFieldType(ident, ty, bitPos, bitSize), bytePos));
                             return result;
                         }
                     }
@@ -160,19 +195,22 @@ namespace AnsiCParser {
                     /// <returns>(構造体のサイズ、構造体のアラインメント、メンバー情報（レイアウト情報が書き込まれた結果)</returns>
                     public abstract Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members);
                 }
-                protected class StructLayouterGCC : StructLayouter
-                {
-                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, sbyte bitpos, sbyte bitsize) {
-                        if (bytepos < 0 || bitsize <= 0 /*|| ty.Sizeof() * 8 < bitpos + bitsize*/) {
+
+                /// <summary>
+                /// GCCっぽい構造体レイアウト計算アルゴリズム
+                /// </summary>
+                protected class StructLayoutGcc : StructLayout {
+                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytePos, sbyte bitPos, sbyte bitSize) {
+                        if (bytePos < 0 || bitSize <= 0 /*|| ty.SizeOf() * 8 < bitPos + bitSize*/) {
                             throw new Exception("");
                         } else {
-                            result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitpos, bitsize), bytepos));
+                            result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitPos, bitSize), bytePos));
                             return result;
                         }
                     }
 
                     /// <summary>
-                    /// gccっぽい構造体のレイアウト計算アルゴリズム
+                    /// 構造体のレイアウト計算を実行
                     /// </summary>
                     /// <param name="members"></param>
                     /// <returns></returns>
@@ -187,11 +225,11 @@ namespace AnsiCParser {
                         foreach (var member in members) {
                             BitFieldType bft;
 
-                            var size = member.Type.Sizeof();
+                            var size = member.Type.SizeOf();
                             var name = member.Ident;
                             var bit = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
                             var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
-                            var typeAlign = Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof());
+                            var typeAlign = Settings.PackSize == 0 ? type.AlignOf() : Math.Min(Settings.PackSize, type.AlignOf());
                             // 幅0のビットフィールドの挿入
                             if ((bit == 0)) {
                                 if (currentBitfieldType != null) {
@@ -200,8 +238,8 @@ namespace AnsiCParser {
                                     if (pad > 0) {
                                         System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
                                         System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
-                                        if (currentBitfieldType.Sizeof() * 8 < currentBitfieldSize + pad) {
-                                            var pad1 = (currentBitfieldSize + pad) - currentBitfieldType.Sizeof() * 8;
+                                        if (currentBitfieldType.SizeOf() * 8 < currentBitfieldSize + pad) {
+                                            var pad1 = (currentBitfieldSize + pad) - currentBitfieldType.SizeOf() * 8;
                                             var pad2 = pad - pad1;
                                             result = CreateBitPaddingMemberInfo(result, currentBitfieldType, currentBytePosition, (sbyte)currentBitfieldSize, (sbyte)pad2);
                                             var bytePosition = currentBytePosition + (currentBitfieldSize + pad2) / 8;
@@ -281,12 +319,12 @@ namespace AnsiCParser {
                                             currentBitfieldSize = 0;
                                         }
 #else
-                                        if ((currentBytePosition % currentBitfieldType.Alignof()) == 0 && (currentBytePosition % typeAlign) == 0) {
+                                        if ((currentBytePosition % currentBitfieldType.AlignOf()) == 0 && (currentBytePosition % typeAlign) == 0) {
                                             // アラインメントが揃っている。
-                                            var maxSize = Math.Max(currentBitfieldType.Sizeof(), type.Sizeof());
+                                            var maxSize = Math.Max(currentBitfieldType.SizeOf(), type.SizeOf());
                                             if (currentBitfieldSize + bit <= maxSize*8) {
                                                 // 未使用領域に押し込めるのでそう仕向けるように現在のビットフィールド情報を書き換える。
-                                                currentBitfieldType = currentBitfieldType.Sizeof() > type.Sizeof() ? currentBitfieldType : type;
+                                                currentBitfieldType = currentBitfieldType.SizeOf() > type.SizeOf() ? currentBitfieldType : type;
                                                 currentBitfieldCapacity = maxSize * 8;
                                                 goto okay;
                                             }
@@ -423,7 +461,7 @@ namespace AnsiCParser {
                         // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
                         // 
                         // これは規格書には直接書いていないが、細かく読み取ると導出される。
-                        var structureAlignment = Settings.PackSize != 0 ? Settings.PackSize : members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.Alignof()).Max();
+                        var structureAlignment = Settings.PackSize != 0 ? Settings.PackSize : members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
                         if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
@@ -434,10 +472,10 @@ namespace AnsiCParser {
 
                     }
                 }
-                protected class StructLayouterMSVC : StructLayouter
+                protected class StructLayoutMsvc : StructLayout
                 {
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, sbyte bitpos, sbyte bitsize) {
-                        if (bytepos < 0 || bitsize <= 0 || ty.Sizeof() * 8 < bitpos + bitsize) {
+                        if (bytepos < 0 || bitsize <= 0 || ty.SizeOf() * 8 < bitpos + bitsize) {
                             throw new Exception("");
                         } else {
                             result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitpos, bitsize), bytepos));
@@ -461,7 +499,7 @@ namespace AnsiCParser {
                         foreach (var member in members) {
                             BitFieldType bft;
 
-                            var size = member.Type.Sizeof();
+                            var size = member.Type.SizeOf();
                             var name = member.Ident;
                             var bit = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
                             var type = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
@@ -470,7 +508,7 @@ namespace AnsiCParser {
                             if ((bit == 0)) {
                                 if (currentBitfieldType != null) {
                                     // 残りのビットフィールドを放棄するか？
-                                    var pad = PaddingOf(currentBitfieldSize, (type.Sizeof() * 8));
+                                    var pad = PaddingOf(currentBitfieldSize, (type.SizeOf() * 8));
                                     if (pad > 0) {
                                         System.Diagnostics.Debug.Assert(currentBitfieldSize <= sbyte.MaxValue);
                                         System.Diagnostics.Debug.Assert(pad <= sbyte.MaxValue);
@@ -492,7 +530,7 @@ namespace AnsiCParser {
                                     }
                                 } else {
                                     // 境界調整を強制する
-                                    var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof()));
+                                    var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.AlignOf() : Math.Min(Settings.PackSize, type.AlignOf()));
                                     if (pad > 0) {
                                         result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                     }
@@ -535,7 +573,7 @@ namespace AnsiCParser {
 
                             // ビットフィールドが終了している場合、境界調整が必要か調べて境界調整を行う
                             if (currentBitfieldType == null) {
-                                var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.Alignof() : Math.Min(Settings.PackSize, type.Alignof()));
+                                var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.AlignOf() : Math.Min(Settings.PackSize, type.AlignOf()));
                                 if (pad > 0) {
                                     result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                 }
@@ -618,7 +656,7 @@ namespace AnsiCParser {
                         // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
                         // 
                         // これは規格書には直接書いていないが、細かく読み取ると導出される。
-                        var structureAlignment = members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.Alignof()).Max();
+                        var structureAlignment = members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
                         if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
@@ -642,7 +680,7 @@ namespace AnsiCParser {
                             if (x.Type.IsBitField(out bft)) {
                                 return (bft.BitOffset + bft.BitWidth + 7) / 8;
                             } else {
-                                return x.Type.Sizeof();
+                                return x.Type.SizeOf();
                             }
                         });
                         var align = members.Max(x => {
@@ -650,7 +688,7 @@ namespace AnsiCParser {
                             if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
                                 return 0;
                             } else {
-                                return x.Type.Alignof();
+                                return x.Type.AlignOf();
                             }
                         });
                         return Tuple.Create(size, align);
@@ -661,7 +699,7 @@ namespace AnsiCParser {
                             if (x.Type.IsBitField(out bft)) {
                                 return (bft.BitOffset + bft.BitWidth + 7) / 8;
                             } else {
-                                return x.Type.Sizeof();
+                                return x.Type.SizeOf();
                             }
                         });
                         var align = members.Max(x => {
@@ -669,7 +707,7 @@ namespace AnsiCParser {
                             if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
                                 return 0;
                             } else {
-                                return x.Type.Alignof();
+                                return x.Type.AlignOf();
                             }
                         });
                         var pad = PaddingOf(size, align);
@@ -682,10 +720,10 @@ namespace AnsiCParser {
 
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
-                        var layouter = new StructLayouterGCC();
+                        var layouter = new StructLayoutGcc();
                         var ret = layouter.Run(Members);
                         if (this.HasFlexibleArrayMember) {
-                            _size = ret.Item1 - Members.Last().Type.Sizeof();   // フレキシブル配列メンバは最後の要素の型を無視する
+                            _size = ret.Item1 - Members.Last().Type.SizeOf();   // フレキシブル配列メンバは最後の要素の型を無視する
                             _align = ret.Item2;
                             Members = ret.Item3;
                         } else {
@@ -707,7 +745,7 @@ namespace AnsiCParser {
                 /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
                 /// </summary>
                 /// <returns></returns>
-                public override int Sizeof() {
+                public override int SizeOf() {
                     return _size;
                 }
 
@@ -715,7 +753,7 @@ namespace AnsiCParser {
                 /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
                 /// </summary>
                 /// <returns></returns>
-                public override int Alignof() {
+                public override int AlignOf() {
                     return _align;
                 }
 
@@ -774,16 +812,16 @@ namespace AnsiCParser {
                 /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
                 /// </summary>
                 /// <returns></returns>
-                public override int Sizeof() {
-                    return Sizeof(BasicType.TypeKind.SignedInt);
+                public override int SizeOf() {
+                    return SizeOf(BasicType.TypeKind.SignedInt);
                 }
 
                 /// <summary>
                 /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
                 /// </summary>
                 /// <returns></returns>
-                public override int Alignof() {
-                    return Alignof(BasicType.TypeKind.SignedInt);
+                public override int AlignOf() {
+                    return AlignOf(BasicType.TypeKind.SignedInt);
                 }
 
                 /// <summary>

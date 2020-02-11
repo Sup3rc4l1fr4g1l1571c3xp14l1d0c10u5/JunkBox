@@ -180,16 +180,16 @@ namespace AnsiCParser {
             /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
-            public override int Sizeof() {
-                return CType.Sizeof(Kind);
+            public override int SizeOf() {
+                return CType.SizeOf(Kind);
             }
 
             /// <summary>
             ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
-            public override int Alignof() {
-                return CType.Alignof(Kind);
+            public override int AlignOf() {
+                return CType.AlignOf(Kind);
             }
 
         }

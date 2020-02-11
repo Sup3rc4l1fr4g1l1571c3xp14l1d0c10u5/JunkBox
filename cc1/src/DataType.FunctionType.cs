@@ -117,7 +117,7 @@ namespace AnsiCParser {
             /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
-            public override int Sizeof() {
+            public override int SizeOf() {
                 return 4;
                 //throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のサイズは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
             }
@@ -126,7 +126,7 @@ namespace AnsiCParser {
             /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
-            public override int Alignof() {
+            public override int AlignOf() {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のアラインメントは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
             }
 

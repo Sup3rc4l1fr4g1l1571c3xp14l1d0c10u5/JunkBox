@@ -61,16 +61,16 @@ namespace AnsiCParser {
             /// 型のバイトサイズを取得
             /// </summary>
             /// <returns></returns>
-            public override int Sizeof() {
-                return Length < 0 ? Sizeof(BasicType.TypeKind.SignedInt) : ElementType.Sizeof() * Length;
+            public override int SizeOf() {
+                return Length < 0 ? SizeOf(BasicType.TypeKind.SignedInt) : ElementType.SizeOf() * Length;
             }
 
             /// <summary>
             ///     型の境界調整（アラインメント）を取得
             /// </summary>
             /// <returns></returns>
-            public override int Alignof() {
-                return ElementType.Alignof();
+            public override int AlignOf() {
+                return ElementType.AlignOf();
             }
 
 

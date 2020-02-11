@@ -166,7 +166,7 @@ namespace AnsiCParser {
             public void Discard() {
                 Value v = Pop();
                 if (v.Kind == Value.ValueKind.Temp) {
-                    Emit($"addl ${StackAlign(v.Type.Sizeof())}, %esp"); // discard temp value
+                    Emit($"addl ${StackAlign(v.Type.SizeOf())}, %esp"); // discard temp value
                 } else if (v.Kind == Value.ValueKind.Address) {
                     Emit("addl $4, %esp"); // discard pointer
                 }
@@ -180,12 +180,12 @@ namespace AnsiCParser {
                     for (int i = 0; i < index; i++) {
                         var v2 = Peek(i);
                         if (v2.Kind == Value.ValueKind.Temp || v2.Kind == Value.ValueKind.Address) {
-                            skipsize += StackAlign(v2.Type.Sizeof());
+                            skipsize += StackAlign(v2.Type.SizeOf());
                         }
                     }
 
                     if (v.Kind == Value.ValueKind.Temp) {
-                        int size = StackAlign(v.Type.Sizeof());
+                        int size = StackAlign(v.Type.SizeOf());
                         if (size <= 4) {
                             Emit($"leal {skipsize}(%esp), %esi");
                             Emit("push (%esi)");
@@ -246,7 +246,7 @@ namespace AnsiCParser {
                     if (rhs.Kind == Value.ValueKind.IntConst && lhs.Kind == Value.ValueKind.Ref) {
                         Pop();
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset + rhs.IntConst * elemType.Sizeof()) });
+                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset + rhs.IntConst * elemType.SizeOf()) });
                     } else {
                         if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%ecx", "%edx"); // rhs(loのみ使う)
@@ -255,7 +255,7 @@ namespace AnsiCParser {
                         }
 
                         LoadPointer("%eax"); // lhs = base
-                        Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
+                        Emit($"imull ${elemType.SizeOf()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("addl %ecx, %eax"); // base += index
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -266,7 +266,7 @@ namespace AnsiCParser {
                     if (lhs.Kind == Value.ValueKind.IntConst && rhs.Kind == Value.ValueKind.Ref) {
                         Pop();
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset + lhs.IntConst * elemType.Sizeof()) });
+                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset + lhs.IntConst * elemType.SizeOf()) });
                     } else {
                         LoadPointer("%ecx"); // rhs = base
                         if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
@@ -275,7 +275,7 @@ namespace AnsiCParser {
                             LoadI32("%eax"); // lhs = index
                         }
 
-                        Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
+                        Emit($"imull ${elemType.SizeOf()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("addl %ecx, %eax"); // base += index
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -345,7 +345,7 @@ namespace AnsiCParser {
                     if (rhs.Kind == Value.ValueKind.IntConst && lhs.Kind == Value.ValueKind.Ref) {
                         Pop();
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset - rhs.IntConst * elemType.Sizeof()) });
+                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = lhs.Label, Offset = (int)(lhs.Offset - rhs.IntConst * elemType.SizeOf()) });
                     } else {
                         if (rhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
                             LoadI64("%ecx", "%edx"); // rhs(loのみ使う)
@@ -354,7 +354,7 @@ namespace AnsiCParser {
                         }
 
                         LoadPointer("%eax"); // lhs = base
-                        Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
+                        Emit($"imull ${elemType.SizeOf()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("subl %ecx, %eax"); // base += index
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -365,7 +365,7 @@ namespace AnsiCParser {
                     if (lhs.Kind == Value.ValueKind.IntConst && rhs.Kind == Value.ValueKind.Ref) {
                         Pop();
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset - lhs.IntConst * elemType.Sizeof()) });
+                        Push(new Value { Kind = Value.ValueKind.Ref, Type = type, Label = rhs.Label, Offset = (int)(rhs.Offset - lhs.IntConst * elemType.SizeOf()) });
                     } else {
                         LoadPointer("%ecx"); // rhs = base
                         if (lhs.Type.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
@@ -374,7 +374,7 @@ namespace AnsiCParser {
                             LoadI32("%eax"); // lhs = index
                         }
 
-                        Emit($"imull ${elemType.Sizeof()}, %ecx, %ecx"); // index *= sizeof(base[0])
+                        Emit($"imull ${elemType.SizeOf()}, %ecx, %ecx"); // index *= sizeof(base[0])
                         Emit("subl %ecx, %eax"); // base += index
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -385,14 +385,14 @@ namespace AnsiCParser {
                     if (lhs.Kind == Value.ValueKind.Ref && rhs.Kind == Value.ValueKind.Ref && lhs.Label == rhs.Label) {
                         Pop();
                         Pop();
-                        Push(new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreatePtrDiffT(), IntConst = ((lhs.Offset - rhs.Offset) / elemType.Sizeof()) });
+                        Push(new Value { Kind = Value.ValueKind.IntConst, Type = CType.CreatePtrDiffT(), IntConst = ((lhs.Offset - rhs.Offset) / elemType.SizeOf()) });
                     } else {
                         // (rhs - lhs) / sizeof(elemType)
                         LoadPointer("%ecx"); // rhs = ptr
                         LoadPointer("%eax"); // lhs = ptr
                         Emit("subl %ecx, %eax");
                         Emit("cltd");
-                        Emit($"movl ${elemType.Sizeof()}, %ecx");
+                        Emit($"movl ${elemType.SizeOf()}, %ecx");
                         Emit("idivl %ecx");
                         Emit("pushl %eax");
                         Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
@@ -1374,7 +1374,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%edi"); // ビットフィールドの起点アドレス
 
 
-                    switch (bft.Type.Sizeof()) {
+                    switch (bft.Type.SizeOf()) {
                         case 1:
                         case 2:
                         case 4: {
@@ -1636,7 +1636,7 @@ namespace AnsiCParser {
                     }
                 } else {
                     LoadVariableAddress("%eax"); // lhs
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 1:
                             LoadI32("%ecx");
                             Emit("movb %cl, (%eax)");
@@ -1659,7 +1659,7 @@ namespace AnsiCParser {
                         default:
                             LoadValueToStack(rhs.Type);
                             Emit("movl %esp, %esi");
-                            Emit($"movl ${type.Sizeof()}, %ecx");
+                            Emit($"movl ${type.SizeOf()}, %ecx");
                             Emit("movl %eax, %edi");
                             Emit("cld");
                             Emit("rep movsb");
@@ -2035,7 +2035,7 @@ namespace AnsiCParser {
                     // sp+[0..1] -> [fpucwの退避値]
                     // sp+[2..3] -> [(精度=単精度, 丸め=ゼロ方向への丸め)を設定したfpucw]
                     // sp+[4..7] -> [浮動小数点数の整数への変換結果、その後は、int幅での変換結果]
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 1: // FloatingType -> sint_8
                             Emit("sub $8, %esp");
                             SaveAndSetFPUCW();
@@ -2077,7 +2077,7 @@ namespace AnsiCParser {
                             throw new NotImplementedException();
                     }
                 } else {
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 1: // FloatingType -> uint_8
                             Emit("sub $8, %esp");
                             SaveAndSetFPUCW();
@@ -2270,7 +2270,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%eax");
                 }
 
-                Emit($"imull ${type.Sizeof()}, %ecx, %ecx");
+                Emit($"imull ${type.SizeOf()}, %ecx, %ecx");
                 Emit("leal (%eax, %ecx), %eax");
                 Emit("pushl %eax");
 
@@ -2291,7 +2291,7 @@ namespace AnsiCParser {
                 if (funcType.ResultType.IsVoidType()) {
                     resultSize = 0;
                 } else {
-                    resultSize = StackAlign(funcType.ResultType.Sizeof());
+                    resultSize = StackAlign(funcType.ResultType.SizeOf());
                     Emit($"subl ${resultSize}, %esp"); // 関数呼び出しの結果の格納先をスタックトップに確保
                 }
 
@@ -2308,7 +2308,7 @@ namespace AnsiCParser {
                     args(this, i);
                     var argval = Peek(0);
                     LoadValueToStack(argval.Type);
-                    argSize += StackAlign(argval.Type.Sizeof());
+                    argSize += StackAlign(argval.Type.SizeOf());
                 }
 
                 // 戻り値が浮動小数点数型でもlong long型ではなく、eaxに入らないサイズならスタック上に格納先アドレスを積む
@@ -2374,7 +2374,7 @@ namespace AnsiCParser {
                     }
 
                     if (st.Kind == CType.TaggedType.StructUnionType.StructOrUnion.Struct) {
-                        offset += m.Type.Sizeof();
+                        offset += m.Type.SizeOf();
                     }
                 }
                 return offset;
@@ -2516,7 +2516,7 @@ namespace AnsiCParser {
                             return;
                         }
                     case Value.ValueKind.Temp: {
-                            //if (valueType.Sizeof() <= 4) {
+                            //if (valueType.SizeOf() <= 4) {
                             //    // スタックトップの値をレジスタにロード
                             //    Emit($"popl {register}");
                             //    return;
@@ -2565,7 +2565,7 @@ namespace AnsiCParser {
                                 case BasicType.TypeKind.SignedLongLongInt:
                                 case BasicType.TypeKind.UnsignedLongLongInt:
                                 default:
-                                    if (valueType.Sizeof() <= 4) {
+                                    if (valueType.SizeOf() <= 4) {
                                         Emit($"popl {register}");
                                         break;
                                     }
@@ -2616,7 +2616,7 @@ namespace AnsiCParser {
                                 UInt32 dstMask = ~(srcMask << (offsetBit));
                                 int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
 
-                                switch (bft.Type.Sizeof()) {
+                                switch (bft.Type.SizeOf()) {
                                     case 1:
                                     case 2:
                                     case 3:
@@ -2698,7 +2698,7 @@ namespace AnsiCParser {
                                 }
                             } else {
                                 if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
-                                    switch (valueType.Sizeof()) {
+                                    switch (valueType.SizeOf()) {
                                         case 1:
                                             op = "movsbl";
                                             break;
@@ -2712,7 +2712,7 @@ namespace AnsiCParser {
                                             throw new NotImplementedException();
                                     }
                                 } else if (valueType.IsUnsignedIntegerType()) {
-                                    switch (valueType.Sizeof()) {
+                                    switch (valueType.SizeOf()) {
                                         case 1:
                                             op = "movzbl";
                                             break;
@@ -2761,7 +2761,7 @@ namespace AnsiCParser {
                     case Value.ValueKind.IntConst: {
                             // 定数値をレジスタにロードする。
                             if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char)) {
-                                switch (valueType.Sizeof()) {
+                                switch (valueType.SizeOf()) {
                                     //case 1:
                                     //    //Emit($"movb ${value.IntConst}, {ToByteReg(regLo)}");
                                     //    //Emit($"movsbl {ToByteReg(regLo)}, {regLo}");
@@ -2788,7 +2788,7 @@ namespace AnsiCParser {
                                         throw new NotImplementedException();
                                 }
                             } else {
-                                switch (valueType.Sizeof()) {
+                                switch (valueType.SizeOf()) {
                                     //case 1:
                                     //    Emit($"movb ${value.IntConst}, {ToByteReg(regLo)}");
                                     //    Emit($"movzbl {ToByteReg(regLo)}, {regLo}");
@@ -2819,13 +2819,13 @@ namespace AnsiCParser {
                             return;
                         }
                     case Value.ValueKind.Temp:
-                        //if (valueType.Sizeof() <= 4) {
+                        //if (valueType.SizeOf() <= 4) {
                         //    // スタックトップの値をレジスタにロード
                         //    Emit($"popl {regLo}");
                         //    Emit($"movl $0, {regHi}");
                         //    return;
                         //} else 
-                        if (valueType.Sizeof() == 8) {
+                        if (valueType.SizeOf() == 8) {
                             // スタックトップの値をレジスタにロード
                             Emit($"popl {regLo}");
                             Emit($"popl {regHi}");
@@ -3017,7 +3017,7 @@ namespace AnsiCParser {
                             } else {
                                 //string op;
                                 //if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
-                                //    switch (valueType.Sizeof()) {
+                                //    switch (valueType.SizeOf()) {
                                 //        case 1:
                                 //            op = "movsbl";
                                 //            break;
@@ -3031,7 +3031,7 @@ namespace AnsiCParser {
                                 //            throw new NotImplementedException();
                                 //    }
                                 //} else if (valueType.IsUnsignedIntegerType()) {
-                                //    switch (valueType.Sizeof()) {
+                                //    switch (valueType.SizeOf()) {
                                 //        case 1:
                                 //            op = "movzbl";
                                 //            break;
@@ -3252,7 +3252,7 @@ namespace AnsiCParser {
                     case Value.ValueKind.IntConst: {
                             // 定数値をスタックに積む
                             if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char)) {
-                                switch (valueType.Sizeof()) {
+                                switch (valueType.SizeOf()) {
                                     case 1:
                                         Emit($"pushl ${unchecked((int)(sbyte)value.IntConst)}");
                                         break;
@@ -3274,7 +3274,7 @@ namespace AnsiCParser {
                                         throw new NotImplementedException();
                                 }
                             } else {
-                                switch (valueType.Sizeof()) {
+                                switch (valueType.SizeOf()) {
                                     case 1:
                                         Emit($"pushl ${unchecked((int)(byte)value.IntConst)}");
                                         break;
@@ -3343,7 +3343,7 @@ namespace AnsiCParser {
                             if (value.Type.IsBitField(out bft)) {
 #if false
                                 // ビットフィールドなので
-                                switch (bft.Sizeof()) {
+                                switch (bft.SizeOf()) {
                                     case 1:
                                         Emit($"movb (%esi), %al");
                                         Emit($"shlb ${7 - (bft.BitOffset + bft.BitWidth)}, %al");
@@ -3387,7 +3387,7 @@ namespace AnsiCParser {
                                 }
                                 Emit($"push %eax");
 #else
-                                switch (bft.Type.Sizeof()) {
+                                switch (bft.Type.SizeOf()) {
                                     case 1:
                                     case 2:
                                     case 3:
@@ -3669,12 +3669,12 @@ namespace AnsiCParser {
                             } else {
 
                                 // コピー先を確保
-                                Emit($"subl ${StackAlign(valueType.Sizeof())}, %esp");
+                                Emit($"subl ${StackAlign(valueType.SizeOf())}, %esp");
                                 Emit("movl %esp, %edi");
 
                                 // 転送
                                 Emit("pushl %ecx");
-                                Emit($"movl ${valueType.Sizeof()}, %ecx");
+                                Emit($"movl ${valueType.SizeOf()}, %ecx");
                                 Emit("cld");
                                 Emit("rep movsb");
                                 Emit("popl %ecx");
@@ -3702,7 +3702,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%eax");
 
                     // load value
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 8:
                             var subop = (op == "add") ? "adc" : "sbb";
                             Emit("pushl 4(%eax)");
@@ -3754,7 +3754,7 @@ namespace AnsiCParser {
                     CType baseType;
                     int size;
                     if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
-                        size = baseType.Sizeof();
+                        size = baseType.SizeOf();
                     } else {
                         size = 1;
                     }
@@ -3762,7 +3762,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%eax");
 
                     // load value
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 8:
                             var subop = (op == "add") ? "adc" : "sbb";
                             Emit("pushl 4(%eax)");
@@ -4142,7 +4142,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%eax");
 
                     // load value
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 8:
                             var subop = (op == "add") ? "adc" : "sbb";
                             if (op == "add") {
@@ -4193,7 +4193,7 @@ namespace AnsiCParser {
                     CType baseType;
                     int size;
                     if (type.IsPointerType(out baseType) && !baseType.IsVoidType()) {
-                        size = baseType.Sizeof();
+                        size = baseType.SizeOf();
                     } else {
                         size = 1;
                     }
@@ -4202,7 +4202,7 @@ namespace AnsiCParser {
                     LoadVariableAddress("%eax");
 
                     // load value
-                    switch (type.Sizeof()) {
+                    switch (type.SizeOf()) {
                         case 8:
                             var subop = (op == "add") ? "adc" : "sbb";
                             Emit($"{op}l ${size}, 0(%eax)");
@@ -4287,7 +4287,7 @@ namespace AnsiCParser {
                 if (type != null) {
                     var value = Peek(0);
                     if (value.Type.IsSignedIntegerType()) {
-                        switch (value.Type.Sizeof()) {
+                        switch (value.Type.SizeOf()) {
                             case 1:
                                 LoadI32("%eax");
                                 Emit("movsbl %al, %eax");
@@ -4306,7 +4306,7 @@ namespace AnsiCParser {
                                 throw new NotImplementedException();
                         }
                     } else if (value.Type.IsUnsignedIntegerType()) {
-                        switch (value.Type.Sizeof()) {
+                        switch (value.Type.SizeOf()) {
                             case 1:
                                 LoadI32("%eax");
                                 Emit("movzbl %al, %eax");
@@ -4327,16 +4327,16 @@ namespace AnsiCParser {
                     } else if (value.Type.IsRealFloatingType()) {
                         FpuPush();
                     } else {
-                        if (value.Type.Sizeof() <= 4) {
+                        if (value.Type.SizeOf() <= 4) {
                             LoadI32("%eax");
                         } else {
                             LoadVariableAddress("%esi");
-                            Emit($"movl ${value.Type.Sizeof()}, %ecx");
+                            Emit($"movl ${value.Type.SizeOf()}, %ecx");
                             Emit("movl 8(%ebp), %edi");
                             Emit("cld");
                             Emit("rep movsb");
                             if (value.Kind == Value.ValueKind.Temp) {
-                                Emit($"addl {StackAlign(value.Type.Sizeof())}, %esp");
+                                Emit($"addl {StackAlign(value.Type.SizeOf())}, %esp");
                             }
                         }
                     }
@@ -4456,7 +4456,7 @@ namespace AnsiCParser {
                     int offset = 8; // prev return position
 
                     // 戻り値領域へのポインタ
-                    if (!ft.ResultType.IsVoidType() && ft.ResultType.Sizeof() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt))) {
+                    if (!ft.ResultType.IsVoidType() && ft.ResultType.SizeOf() > 4 && (!ft.ResultType.IsRealFloatingType() && !ft.ResultType.IsBasicType(BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt))) {
                         offset += 4;
                     }
 
@@ -4471,7 +4471,7 @@ namespace AnsiCParser {
                             foreach (var arg in ft.Arguments) {
                                 vars.Add($"#   name={arg.Ident.Raw}, type={arg.Type.ToString()}, address={offset}(%ebp)");
                                 _context.Arguments.Add(arg.Ident.Raw, offset);
-                                offset += CodeGenerator.StackAlign(arg.Type.Sizeof());
+                                offset += CodeGenerator.StackAlign(arg.Type.SizeOf());
                             }
                         }
                     }
@@ -4798,7 +4798,7 @@ namespace AnsiCParser {
                 // 戻り値が構造体型/共用体型の場合、スタック上に配置すると不味いのでテンポラリ変数を確保してコピーする
                 var obj = _context.Peek(0);
                 if (obj.Kind == Value.ValueKind.Temp && (obj.Type.IsStructureType() || obj.Type.IsUnionType())) {
-                    int size = CodeGenerator.StackAlign(obj.Type.Sizeof());
+                    int size = CodeGenerator.StackAlign(obj.Type.SizeOf());
                     _localScopeTotalSize += size;
                     var ident = $"<temp:{_localScope.Count()}>";
                     var tp = Tuple.Create((string)null, -_localScopeTotalSize);
@@ -4962,13 +4962,13 @@ namespace AnsiCParser {
 
             public Value OnSizeofExpression(Expression.SizeofExpression self, Value value) {
                 // todo: C99可変長配列型
-                _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.Sizeof() });
+                _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.ExprOperand.Type.SizeOf() });
                 return value;
             }
 
             public Value OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Value value) {
                 // todo: C99可変長配列型
-                _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.Sizeof() });
+                _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.SizeOf() });
                 return value;
             }
 
@@ -5053,7 +5053,7 @@ namespace AnsiCParser {
             }
 
             public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
-                var elementSize = self.Type.ElementType.Sizeof();
+                var elementSize = self.Type.ElementType.SizeOf();
                 var v = new Value(value) { Type = self.Type.ElementType };
                 var writed = 0;
                 foreach (var init in self.Inits) {
@@ -5073,8 +5073,8 @@ namespace AnsiCParser {
                     }
                 }
 
-                while (self.Type.Sizeof() > writed) {
-                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
+                while (self.Type.SizeOf() > writed) {
+                    var sz = Math.Min((self.Type.SizeOf() - writed), 4);
                     switch (sz) {
                         case 4:
                             _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
@@ -5116,12 +5116,12 @@ namespace AnsiCParser {
                     if (member.Item1.Type.IsBitField(out bft)) {
                         writed = member.Item1.Offset + (bft.BitOffset + bft.BitWidth + 7) / 8;
                     } else {
-                        writed = member.Item1.Offset + member.Item1.Type.Sizeof();
+                        writed = member.Item1.Offset + member.Item1.Type.SizeOf();
                     }
                 }
                 v.Offset = baseoffset + writed;
-                while (self.Type.Sizeof() > writed) {
-                    var sz = Math.Min((self.Type.Sizeof() - writed), 4);
+                while (self.Type.SizeOf() > writed) {
+                    var sz = Math.Min((self.Type.SizeOf() - writed), 4);
                     switch (sz) {
                         case 4:
                             _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
@@ -5182,7 +5182,7 @@ namespace AnsiCParser {
                             _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
                             _context.Emit($"# static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         } else {
-                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
+                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.SizeOf());
                             _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
                             _context.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                         }
@@ -5229,7 +5229,7 @@ namespace AnsiCParser {
                             _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
                             _context.Emit($"# static: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         } else {
-                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.Sizeof());
+                            _localScopeTotalSize += CodeGenerator.StackAlign(x.LinkageObject.Type.SizeOf());
                             _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
                             _context.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                         }
@@ -5549,7 +5549,7 @@ namespace AnsiCParser {
                         var cvalue = val.Expr.Accept(this, value);
                         switch (cvalue.Kind) {
                             case Value.ValueKind.IntConst:
-                                switch (cvalue.Type.Sizeof()) {
+                                switch (cvalue.Type.SizeOf()) {
                                     case 1:
                                         Emit($".byte {(byte)cvalue.IntConst}");
                                         break;
@@ -5568,7 +5568,7 @@ namespace AnsiCParser {
 
                                 break;
                             case Value.ValueKind.FloatConst:
-                                switch (cvalue.Type.Sizeof()) {
+                                switch (cvalue.Type.SizeOf()) {
                                     case 4: {
                                             var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)cvalue.FloatConst), 0);
                                             Emit($".long {dwords}");
@@ -5600,9 +5600,9 @@ namespace AnsiCParser {
                     }
                 } else {
                     if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                        Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}, 4");
+                        Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}, 4");
                     } else {
-                        Emit($".lcomm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.Sizeof()}, 4");
+                        Emit($".lcomm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}, 4");
                     }
                 }
 
@@ -5857,15 +5857,15 @@ namespace AnsiCParser {
                     var bft = self.Type as BitFieldType;
                     if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
                         _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, ret));
-                        //if (bft.BitOffset + bft.BitWidth == bft.Sizeof() * 8) {
-                        //    _currentOffsetByte += bft.Sizeof();
+                        //if (bft.BitOffset + bft.BitWidth == bft.SizeOf() * 8) {
+                        //    _currentOffsetByte += bft.SizeOf();
                         //}
                     } else {
                         throw new Exception("ビットフィールドに代入できない値が使われている。");
                     }
                 } else {
                     _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, ret));
-                    //_currentOffsetByte += self.Type.Sizeof();
+                    //_currentOffsetByte += self.Type.SizeOf();
                 }
                 return value;
             }
@@ -5875,10 +5875,10 @@ namespace AnsiCParser {
 
                 foreach (var s in self.Inits) {
                     s.Accept(this, value);
-                    _currentOffsetByte += arrayType.ElementType.Sizeof();
+                    _currentOffsetByte += arrayType.ElementType.SizeOf();
                 }
 
-                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.Sizeof();
+                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.SizeOf();
                 while (filledSize > 0) {
                     if (filledSize >= 4) {
                         _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
@@ -5917,7 +5917,7 @@ namespace AnsiCParser {
                             _initValues.Add(new ValueEntry(off, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
                             _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth) / 8;
                         } else {
-                            var fillSize = x.Type.Sizeof();
+                            var fillSize = x.Type.SizeOf();
                             while (fillSize > 0) {
                                 var off = baseCurrentOffsetByte + x.Offset;
                                 if (fillSize >= 4) {
@@ -5963,7 +5963,7 @@ namespace AnsiCParser {
                             throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
                         }
                         ulong bits = 0;
-                        switch (cvalue.Type.Sizeof()) {
+                        switch (cvalue.Type.SizeOf()) {
                             case 1:
                                 if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
                                     bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));

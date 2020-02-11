@@ -1245,25 +1245,29 @@ namespace AnsiCParser {
                 }
                 // 行コメントの処理
                 if (Peek("//")) {
-                    IncPos(2);
+                    if (Settings.LanguageStandard == Settings.CLanguageStandard.C89) {
+                        throw new CompilerException.SyntaxErrorException(this.GetCurrentLocation(), this.GetCurrentLocation(), $"行コメントは ISO/IEC 9899:1990 では許可されていません。");
+                    } else { 
+                        IncPos(2);
 
-                    bool terminated = false;
-                    while (_inputPos < _inputText.Length) {
-                        int ch = Peek();
-                        if (ch == '\\') {
-                            IncPos(2);
-                        } else if (ch == '\n') {
-                            terminated = true;
-                            break;
-                        } else {
-                            IncPos(1);
+                        bool terminated = false;
+                        while (_inputPos < _inputText.Length) {
+                            int ch = Peek();
+                            if (ch == '\\') {
+                                IncPos(2);
+                            } else if (ch == '\n') {
+                                terminated = true;
+                                break;
+                            } else {
+                                IncPos(1);
+                            }
                         }
+                        if (terminated == false) {
+                            _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
+                            return;
+                        }
+                        continue;
                     }
-                    if (terminated == false) {
-                        _tokens.Add(new Token(Token.TokenKind.EOF, GetCurrentLocation(), GetCurrentLocation(), ""));
-                        return;
-                    }
-                    continue;
                 }
                 break;
             }
@@ -1316,7 +1320,7 @@ namespace AnsiCParser {
                     }
                     goto rescan;
                 } else {
-                    throw new CompilerException.SyntaxErrorException(GetCurrentLocation(), GetCurrentLocation(), "stray '#' in program");
+                    throw new CompilerException.SyntaxErrorException(GetCurrentLocation(), GetCurrentLocation(), "前処理指令が出現できない位置に # が存在しています。");
                 }
             }
 

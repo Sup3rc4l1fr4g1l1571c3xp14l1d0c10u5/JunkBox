@@ -34,16 +34,16 @@ namespace AnsiCParser {
             /// 型のバイトサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
-            public override int Sizeof() {
-                return Type.Sizeof();
+            public override int SizeOf() {
+                return Type.SizeOf();
             }
 
             /// <summary>
             /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
-            public override int Alignof() {
-                return Type.Alignof();
+            public override int AlignOf() {
+                return Type.AlignOf();
             }
 
         }

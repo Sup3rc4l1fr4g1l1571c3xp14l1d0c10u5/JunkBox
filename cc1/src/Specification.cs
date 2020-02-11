@@ -962,10 +962,10 @@ namespace AnsiCParser {
 
             // そうでない場合，符号付き整数型をもつオペランドの型が，符号無し整数型をもつオペランドの型のすべての値を表現できるならば，
             // 符号無し整数型をもつオペランドを，符号付き整数型をもつオペランドの型に変換する。
-            if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.Sizeof() > btRhs.Sizeof()) {
+            if (btLhs.IsSignedIntegerType() && btRhs.IsUnsignedIntegerType() && btLhs.SizeOf() > btRhs.SizeOf()) {
                 rhs = Expression.TypeConversionExpression.Apply(rhs.LocationRange, btLhs, rhs);
                 return btLhs;
-            } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.Sizeof() > btLhs.Sizeof()) {
+            } else if (btRhs.IsSignedIntegerType() && btLhs.IsUnsignedIntegerType() && btRhs.SizeOf() > btLhs.SizeOf()) {
                 lhs = Expression.TypeConversionExpression.Apply(lhs.LocationRange, btRhs, lhs);
                 return btRhs;
             }
