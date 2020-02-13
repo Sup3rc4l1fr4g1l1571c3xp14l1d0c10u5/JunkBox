@@ -60,11 +60,11 @@ namespace AnsiCParser {
 
         private static int _idCnt;
 
-        public LinkageObject(string ident, CType type, LinkageKind linakge) {
+        public LinkageObject(string ident, CType type, LinkageKind linkage) {
             Id = _idCnt++;
             Ident = ident;
             Type = type;
-            Linkage = linakge;
+            Linkage = linkage;
             LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : $"{ident}";
         }
 
@@ -97,12 +97,12 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 仮宣言
+        /// 仮宣言（仮宣言は複数できる）
         /// </summary>
         public List<Declaration> TentativeDefinitions { get; } = new List<Declaration>();
 
         /// <summary>
-        /// 本宣言
+        /// 本宣言（本宣言はひとつだけ）
         /// </summary>
         public Declaration Definition { get; set; }
 

@@ -132,13 +132,15 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\ShivyC\feature_tests\error_array.c") /*
+                //System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\ShivyC\feature_tests\error_array.c") /*
                 @"
-struct S1 {
-	unsigned long  a : 15;
-	unsigned short b : 4;
-	unsigned short c : 4;
+enum {
+    zero = '\0'
 };
+
+int *p = zero;
+
+
 "//*/
                 , "<Debug>").Parse();
             using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {

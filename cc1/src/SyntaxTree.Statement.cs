@@ -221,7 +221,7 @@ namespace AnsiCParser.SyntaxTree {
         /// 複文(C99)
         /// </summary>
         public class CompoundStatementC99 : Statement {
-            public List<Ast/*Declaration|STatement*/> DeclsOrStmts {
+            public List<Ast/*Declaration|Statement*/> DeclsOrStmts {
                 get;
             }
             public Scope<TaggedType> TagScope {
@@ -231,8 +231,8 @@ namespace AnsiCParser.SyntaxTree {
                 get;
             }
 
-            public CompoundStatementC99(LocationRange locationRange, List<Ast> declsOrStmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
-                DeclsOrStmts = declsOrStmts;
+            public CompoundStatementC99(LocationRange locationRange, List<Declaration> decls, List<Ast> declsOrStmts, Scope<TaggedType> tagScope, Scope<Declaration> identScope) : base(locationRange) {
+                DeclsOrStmts = decls.Select(x => (Ast)x).Concat(declsOrStmts).ToList();
                 TagScope = tagScope;
                 IdentScope = identScope;
             }

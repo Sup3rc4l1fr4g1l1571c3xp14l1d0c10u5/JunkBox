@@ -963,5 +963,23 @@ namespace AnsiCParser.SyntaxTree {
             var evaluator = new SyntaxTreeConstantEvaluatorVisitor();
             return expr.Accept(evaluator, expr);
         }
+
+        /// <summary>
+        /// 定数式からlong値を得る
+        /// </summary>
+        /// <param name="ret"></param>
+        /// <returns></returns>
+        public static long? ToLong(Expression ret) {
+            if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
+                return (ret as Expression.PrimaryExpression.Constant.IntegerConstant).Value;
+            } else if (ret is Expression.PrimaryExpression.Constant.CharacterConstant) {
+                return (ret as Expression.PrimaryExpression.Constant.CharacterConstant).Value;
+            } else if (ret is Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant) {
+                return (ret as Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant).Info.Value;
+            }
+            else {
+                return null;
+            }
+        }
     }
 }

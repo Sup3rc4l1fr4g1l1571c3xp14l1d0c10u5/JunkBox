@@ -11,7 +11,7 @@ namespace AnsiCParser.SyntaxTree {
         /// </summary>
         public List<LinkageObject> LinkageTable;
 
-        public List</*Declaration*/Ast> Declarations { get; } = new List</*Declaration*/Ast>();
+        public List<Declaration> Declarations { get; } = new List<Declaration>();
 
         public TranslationUnit(LocationRange locationRange) : base(locationRange) {
         }

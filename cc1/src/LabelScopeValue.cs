@@ -20,7 +20,7 @@ namespace AnsiCParser {
         } = new List<Statement.GotoStatement>();
 
         /// <summary>
-        /// 宣言地点を設定
+        /// ラベルの宣言地点を設定
         /// </summary>
         /// <param name="labelStmt"></param>
         public void SetDeclaration(Statement.GenericLabeledStatement labelStmt) {
@@ -34,7 +34,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        /// 参照地点を追加
+        /// ラベルの参照地点を追加
         /// </summary>
         /// <param name="gotoStmt"></param>
         public void AddReference(Statement.GotoStatement gotoStmt) {

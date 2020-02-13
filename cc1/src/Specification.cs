@@ -1357,7 +1357,7 @@ namespace AnsiCParser {
             // 整数定数式又はその定数式とあるので定数演算を試みる
             try {
                 var ret = ExpressionEvaluator.Eval(expr);
-                var value = (int?)(ret as Expression.PrimaryExpression.Constant.IntegerConstant)?.Value;
+                var value = ExpressionEvaluator.ToLong(ret);
                 if (value.HasValue == false) {
                     return false;
                 }

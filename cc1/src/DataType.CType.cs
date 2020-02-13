@@ -665,6 +665,10 @@ namespace AnsiCParser {
                         return null;
                     }
 
+                    if (ta1.HasFlexibleArrayMember != ta2.HasFlexibleArrayMember) {
+                        return null;
+                    }
+
                     var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous);
                     var newMembers = new List<TaggedType.StructUnionType.MemberInfo>();
                     for (var i = 0; i < ta1.Members.Count; i++) {
@@ -699,7 +703,7 @@ namespace AnsiCParser {
                         newMembers.Add(new TaggedType.StructUnionType.MemberInfo(ta1.Members[i].Ident, compositeType, ta1.Members[i].Offset));
                     }
 
-                    newType.Members = newMembers;
+                    newType.Build(newMembers, ta1.HasFlexibleArrayMember);
                     return newType;
                 }
 

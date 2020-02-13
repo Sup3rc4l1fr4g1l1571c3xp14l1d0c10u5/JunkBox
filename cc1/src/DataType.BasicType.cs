@@ -74,30 +74,37 @@ namespace AnsiCParser {
                 return this;
             }
 
-            public static BasicType FromTypeSpecifier(TypeSpecifier typeSpecifier) {
-                return new BasicType(ToKind(typeSpecifier));
-            }
-
             /// <summary>
-            /// 基本型コンストラクタ
+            /// コンストラクタ
             /// </summary>
             /// <param name="kind"></param>
             private BasicType(TypeKind kind) {
                 Kind = kind;
             }
 
+            /// <summary>
+            /// 基本型のキャッシュ
+            /// </summary>
             private static Dictionary<TypeKind, BasicType> InstanceType { get; } = Enum.GetValues(typeof(TypeKind)).Cast<TypeKind>().ToDictionary(x => x, x => new BasicType(x));
 
             public static BasicType Create(TypeKind kind) {
                 return InstanceType[kind];
             }
 
-
             /// <summary>
             /// 基本型種別
             /// </summary>
             public TypeKind Kind {
                 get;
+            }
+
+            /// <summary>
+            /// 型指定子から基本型を生成
+            /// </summary>
+            /// <param name="typeSpecifier"></param>
+            /// <returns></returns>
+            public static BasicType FromTypeSpecifier(TypeSpecifier typeSpecifier) {
+                return new BasicType(ToKind(typeSpecifier));
             }
 
             private static TypeKind ToKind(TypeSpecifier typeSpecifier) {

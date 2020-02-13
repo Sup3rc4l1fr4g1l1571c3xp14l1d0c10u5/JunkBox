@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
-    public partial class Parser {
         /// <summary>
         /// リンケージオブジェクト表
         /// </summary>
@@ -73,7 +72,7 @@ namespace AnsiCParser {
                         // 無結合なので再定義チェックはしない。(名前表上で再定義のチェックは終わっているはず。)
                         var value = new LinkageObject(decl.Ident, decl.Type, linkage);
                         // static の場合は、staticなリンケージ名を生成して使う
-                        if (decl.StorageClass == AnsiCParser.StorageClassSpecifier.Static) {
+                        if (decl.StorageClass == StorageClassSpecifier.Static) {
                             value.Definition = decl;
                             value.LinkageId = $"{decl.Ident}.{LinkageObjects.Count}";
                             LinkageObjects.Add(value);
@@ -87,6 +86,5 @@ namespace AnsiCParser {
                 }
             }
 
-        }
     }
 }

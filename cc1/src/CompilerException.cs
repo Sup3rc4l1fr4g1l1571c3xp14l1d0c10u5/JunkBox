@@ -1,15 +1,28 @@
 using System;
 
 namespace AnsiCParser {
+    /// <summary>
+    /// コンパイラ例外
+    /// </summary>
     [Serializable]
     public abstract class CompilerException : Exception {
-        public Location Start {
-            get;
-        }
-        public Location End {
-            get;
-        }
 
+        /// <summary>
+        /// 例外発生要因となったソースコード範囲の先頭
+        /// </summary>
+        public Location Start { get; }
+
+        /// <summary>
+        /// 例外発生要因となったソースコード範囲の末尾
+        /// </summary>
+        public Location End { get; }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="start">例外発生要因となったソースコード範囲の先頭</param>
+        /// <param name="end">例外発生要因となったソースコード範囲の末尾</param>
+        /// <param name="message">例外メッセージ</param>
         protected CompilerException(Location start, Location end, string message) : base(message) {
             Start = start;
             End = end;

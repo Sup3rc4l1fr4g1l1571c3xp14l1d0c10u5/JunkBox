@@ -45,17 +45,23 @@ namespace AnsiCParser {
                 }
 
                 public List<MemberInfo> Members {
-                    get; internal set;
+                    get; private set;
                 }
                 /// <summary>
                 /// フレキシブル配列メンバを持つことを示す
                 /// </summary>
                 public bool HasFlexibleArrayMember {
-                    get; internal set;
+                    get; private set;
                 }
 
+                /// <summary>
+                /// 型サイズ
+                /// </summary>
                 private int _size;
                 
+                /// <summary>
+                /// 型アライメント
+                /// </summary>
                 private int _align;
 
                 /// <summary>
@@ -87,17 +93,17 @@ namespace AnsiCParser {
                     }
                 }
 
-                private static int PaddingOf(int value, int align) {
-                    if (align == 0) {
-                        return 0;
-                    }
-                    return (align - (value % align)) % align;
-                }
-
                 /// <summary>
                 /// 構造体のレイアウト算出
                 /// </summary>
-                protected abstract class StructLayout {
+                protected abstract class StructLayoutBase {
+                    public static int PaddingOf(int value, int align) {
+                        if (align == 0) {
+                            return 0;
+                        }
+                        return (align - (value % align)) % align;
+                    }
+
 
                     /// <summary>
                     /// 同じビットフィールドに入れることが出来る型と見なせるか？
@@ -199,7 +205,7 @@ namespace AnsiCParser {
                 /// <summary>
                 /// GCCっぽい構造体レイアウト計算アルゴリズム
                 /// </summary>
-                protected class StructLayoutGcc : StructLayout {
+                protected class StructLayoutGcc : StructLayoutBase {
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytePos, sbyte bitPos, sbyte bitSize) {
                         if (bytePos < 0 || bitSize <= 0 /*|| ty.SizeOf() * 8 < bitPos + bitSize*/) {
                             throw new Exception("");
@@ -472,7 +478,11 @@ namespace AnsiCParser {
 
                     }
                 }
-                protected class StructLayoutMsvc : StructLayout
+
+                /// <summary>
+                /// MSVCっぽい構造体レイアウト計算アルゴリズム
+                /// </summary>
+                protected class StructLayoutMsvc : StructLayoutBase
                 {
                     private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytepos, sbyte bitpos, sbyte bitsize) {
                         if (bytepos < 0 || bitsize <= 0 || ty.SizeOf() * 8 < bitpos + bitsize) {
@@ -668,18 +678,24 @@ namespace AnsiCParser {
                     }
                 }
 
-                private class UnionLayouter
-                {
-                    public Tuple<int, int> Run(List<MemberInfo> members) {
-                        return Run_LikeGCC(members);
-                        //return Run_LikeMSVC(members);
-                    }
-                    public Tuple<int, int> Run_LikeGCC(List<MemberInfo> members) {
+                /// <summary>
+                /// 共用体のレイアウト算出
+                /// </summary>
+                protected abstract class UnionLayoutBase {
+                    public abstract Tuple<int, int> Run(List<MemberInfo> members);
+                }
+
+                /// <summary>
+                /// GCCっぽい共用体レイアウト計算アルゴリズム
+                /// </summary>
+                protected class UnionLayoutGcc : UnionLayoutBase {
+                    public override Tuple<int, int> Run(List<MemberInfo> members) {
                         var size = members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft)) {
                                 return (bft.BitOffset + bft.BitWidth + 7) / 8;
-                            } else {
+                            }
+                            else {
                                 return x.Type.SizeOf();
                             }
                         });
@@ -687,13 +703,20 @@ namespace AnsiCParser {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
                                 return 0;
-                            } else {
+                            }
+                            else {
                                 return x.Type.AlignOf();
                             }
                         });
                         return Tuple.Create(size, align);
                     }
-                    public Tuple<int,int> Run_LikeMSVC(List<MemberInfo> members) {
+                }
+                
+                /// <summary>
+                /// MSVCっぽい共用体レイアウト計算アルゴリズム
+                /// </summary>
+                protected class UnionLayoutMscv: UnionLayoutBase {
+                    public override Tuple<int,int> Run(List<MemberInfo> members) {
                         var size = members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft)) {
@@ -710,18 +733,23 @@ namespace AnsiCParser {
                                 return x.Type.AlignOf();
                             }
                         });
-                        var pad = PaddingOf(size, align);
+                        var pad = StructLayoutBase.PaddingOf(size, align);
                         size += pad;
                         return Tuple.Create(size, align);
                     }
                 }
 
-                public void Build() {
+                /// <summary>
+                /// メンバレイアウトの計算を行い、構造体情報を設定する
+                /// </summary>
+                public void Build(List<MemberInfo> members, bool hasFlexibleArrayMember) {
+                    this.HasFlexibleArrayMember = hasFlexibleArrayMember;
+                    this.Members = members;
 
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
-                        var layouter = new StructLayoutGcc();
-                        var ret = layouter.Run(Members);
+                        var layout = new StructLayoutGcc();
+                        var ret = layout.Run(Members);
                         if (this.HasFlexibleArrayMember) {
                             _size = ret.Item1 - Members.Last().Type.SizeOf();   // フレキシブル配列メンバは最後の要素の型を無視する
                             _align = ret.Item2;
@@ -733,8 +761,8 @@ namespace AnsiCParser {
                         }
                     } else {
                         // 共用体型のの場合
-                        var layouter = new UnionLayouter();
-                        var ret = layouter.Run(Members);
+                        var layout = new UnionLayoutGcc();
+                        var ret = layout.Run(Members);
                         _size = ret.Item1;
                         _align = ret.Item2;
                     }
@@ -757,6 +785,9 @@ namespace AnsiCParser {
                     return _align;
                 }
 
+                /// <summary>
+                /// 構造体・共用体のメンバ情報
+                /// </summary>
                 public class MemberInfo {
                     public MemberInfo(Token ident, CType type, int offset/*, int bitOffset, int bitSize*/) {
                         Ident = ident;

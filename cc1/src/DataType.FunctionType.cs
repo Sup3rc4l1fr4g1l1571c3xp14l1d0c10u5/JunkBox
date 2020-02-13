@@ -11,9 +11,15 @@ namespace AnsiCParser {
         ///     関数型
         /// </summary>
         public class FunctionType : CType {
+            /// <summary>
+            /// 関数型に紐付くタグスコープ
+            /// </summary>
             public Scope<TaggedType> PrototypeTaggedScope {
                 get;
             }
+            /// <summary>
+            /// 関数型に紐付く識別子スコープ
+            /// </summary>
             public Scope<Declaration> PrototypeIdentScope {
                 get;
             }
@@ -130,13 +136,35 @@ namespace AnsiCParser {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "関数型のアラインメントは取得できません。（C言語規約上では、関数識別子はポインタ型に変換されているはずなので、これは本処理系に誤りがあることを示しています。）");
             }
 
+            /// <summary>
+            /// 関数の宣言形式
+            /// </summary>
             public enum FunctionStyle {
-                OldStyle,       // 古い形式の関数宣言型（引数部が識別子並び）
-                NewStyle,       // 新しい形式の関数宣言型（引数部が仮引数型並び）
-                AmbiguityStyle, // 引数が省略されており曖昧
-                InvalidStyle,   // 不正な形式
+                /// <summary>
+                /// 古い形式の関数宣言型（引数部が識別子並び）
+                /// </summary>
+                OldStyle,
+                
+                /// <summary>
+                /// 新しい形式の関数宣言型（引数部が仮引数型並び）
+                /// </summary>
+                NewStyle,
+                
+                /// <summary>
+                /// 引数が省略されており曖昧
+                /// </summary>
+                AmbiguityStyle,
+
+                /// <summary>
+                /// 不正な形式
+                /// </summary>
+                InvalidStyle
             }
 
+            /// <summary>
+            /// 関数の宣言形式を取得する
+            /// </summary>
+            /// <returns></returns>
             public FunctionStyle GetFunctionStyle() {
                 var candidate = FunctionStyle.AmbiguityStyle;
                 if (Arguments == null) {
