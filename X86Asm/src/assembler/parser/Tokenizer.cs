@@ -11,7 +11,7 @@ namespace X86Asm.parser
 		/// <summary>
 		/// Returns the next token from this tokenizer. This is never {@code null} because there is an end-of-file token type. </summary>
 		/// <returns> the next token from this tokenizer </returns>
-		public abstract Token next();
+		public abstract Token Next();
 
 	}
 

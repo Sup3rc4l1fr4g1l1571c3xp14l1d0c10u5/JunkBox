@@ -2,290 +2,247 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace X86Asm.parser
-{
+namespace X86Asm.parser {
+    using operand;
+
+    /// <summary>
+    /// アセンブリ言語のパーサ
+    /// </summary>
+    public sealed class Parser {
+        /// <summary>
+        /// ファイルから読み取り、解析を行う
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public static Program ParseFile(Stream file) {
+            if (file == null) {
+                throw new ArgumentNullException(nameof(file));
+            }
+            BufferedTokenizer tokenizer = new BufferedTokenizer(new StringTokenizer(file));
+            return (new Parser(tokenizer)).ParseFile();
+        }
+
+        private BufferedTokenizer Tokenizer { get; }
+
+        private Parser(BufferedTokenizer tokenizer) {
+            if (tokenizer == null) {
+                throw new ArgumentNullException();
+            }
+            Tokenizer = tokenizer;
+        }
+
+        /// <summary>
+        /// ファイルの構文解析
+        /// </summary>
+        /// <returns></returns>
+        private Program ParseFile() {
+            Program program = new Program();
+            //EOFに出会うまで行の解析を続ける
+            while (!Tokenizer.Check(TokenType.END_OF_FILE)) {
+                ParseLine(program);
+            }
+            return program;
+        }
+
+        /// <summary>
+        /// 行の構文解析
+        /// </summary>
+        /// <param name="program"></param>
+        private void ParseLine(Program program) {
+            // ラベルがある限り読み取る
+            while (Tokenizer.Check(TokenType.LABEL)) {
+                string name = Tokenizer.Next().text;
+                name = name.Substring(0, name.Length - 1);
+                program.addStatement(new LabelStatement(name));
+            }
+
+            // 命令があれば読み取る
+            if (Tokenizer.Check(TokenType.NAME)) {
+                ParseInstruction(program);
+            }
+
+            // 改行を読み取る
+            if (Tokenizer.Check(TokenType.NEWLINE)) {
+                Tokenizer.Next();
+            } else {
+                throw new Exception("改行がありません。");
+            }
+        }
+
+        /// <summary>
+        /// 命令の構文解析
+        /// </summary>
+        /// <param name="program"></param>
+        private void ParseInstruction(Program program) {
+            // ニーモニックを取得
+            string mnemonic = Tokenizer.Next().text;
+
+            // オペランドを取得
+            IList<Operand> operands = new List<Operand>();
+            bool expectComma = false;
+            while (!Tokenizer.Check(TokenType.NEWLINE)) {
+                // オペランド区切りのコンマをチェック
+                if (!expectComma) {
+                    if (Tokenizer.Check(TokenType.COMMA)) {
+                        throw new Exception("オペランドがあるべき場所にコンマがありました。");
+                    }
+                } else {
+                    if (!Tokenizer.Check(TokenType.COMMA)) {
+                        throw new Exception("コンマがありません。");
+                    }
+                    Tokenizer.Next();
+                }
+
+                if (Tokenizer.Check(TokenType.REGISTER)) {
+                    // トークンがレジスタ名の場合はレジスタを読み取る
+                    operands.Add(ParseRegister(Tokenizer.Next().text));
+                } else if (Tokenizer.Check(TokenType.DOLLAR)) {
+                    // トークンが '$' の場合は続く即値を解析する
+                    Tokenizer.Next();
+                    operands.Add(ParseImmediate());
+                } else if (CanParseImmediate() || Tokenizer.Check(TokenType.LEFT_PAREN)) {
+                    // トークンに即値要素が出現している場合はディスプレイメントアドレスとして即値を読み取る。
+                    // トークンに開き丸括弧が出現している場合は、ディスプレイメントアドレスは０とする             
+                    Immediate display = CanParseImmediate() ? ParseImmediate() : ImmediateValue.ZERO;
+                    // ディスプレイメントに続くメモリ式を解析する
+                    operands.Add(ParseMemory(display));
+                } else {
+                    throw new Exception("不明なオペランドです。");
+                }
+                // 一つでも要素を読み込んだらコンマの出現を求める
+                expectComma = true;
+            }
+
+            // ニーモニックとオペランドから命令文を作ってプログラムに追加
+            program.addStatement(new InstructionStatement(mnemonic, operands));
+        }
 
 
-	using InstructionStatement = X86Asm.InstructionStatement;
-	using LabelStatement = X86Asm.LabelStatement;
-	using Program = X86Asm.Program;
-	using Immediate = X86Asm.operand.Immediate;
-	using ImmediateValue = X86Asm.operand.ImmediateValue;
-	using Label = X86Asm.operand.Label;
-	using Memory = X86Asm.operand.Memory;
-	using Operand = X86Asm.operand.Operand;
-	using Register = X86Asm.operand.Register;
-	using Register16 = X86Asm.operand.Register16;
-	using Register32 = X86Asm.operand.Register32;
-	using Register8 = X86Asm.operand.Register8;
-	using SegmentRegister = X86Asm.operand.SegmentRegister;
+        /// <summary>
+        /// 次のトークンが即値要素（十進数、十六進数、ラベル名）か調べる。
+        /// </summary>
+        /// <returns></returns>
+        private bool CanParseImmediate() {
+            return Tokenizer.Check(TokenType.DECIMAL) || Tokenizer.Check(TokenType.HEXADECIMAL) || Tokenizer.Check(TokenType.NAME);
+        }
 
 
-	public sealed class Parser
-	{
+        /// <summary>
+        /// 即値を解析する
+        /// </summary>
+        /// <returns></returns>
+        private Immediate ParseImmediate() {
+            if (Tokenizer.Check(TokenType.DECIMAL)) {
+                // 十進数
+                return new ImmediateValue(Convert.ToInt32(Tokenizer.Next().text));
+            } else if (Tokenizer.Check(TokenType.HEXADECIMAL)) {
+                // 十六進数
+                string text = Tokenizer.Next().text;
+                text = text.Substring(2, text.Length - 2);
+                return new ImmediateValue((int)Convert.ToInt64(text, 16));
+            } else if (Tokenizer.Check(TokenType.NAME)) {
+                // ラベル名
+                return new Label(Tokenizer.Next().text);
+            } else {
+                throw new Exception("即値要素があるべきです。");
+            }
+        }
 
-//JAVA TO C# CONVERTER WARNING: Method 'throws' clauses are not available in .NET:
-//ORIGINAL LINE: public static X86Asm.Program parseFile(java.io.File file) throws java.io.IOException
-		public static Program parseFile(Stream file)
-		{
-			if (file == null)
-			{
-				throw new ArgumentNullException(nameof(file));
-			}
-			BufferedTokenizer tokenizer = new BufferedTokenizer(new StringTokenizer(file));
-			return (new Parser(tokenizer)).parseFile();
-		}
+        /// <summary>
+        /// メモリ式を解析する
+        /// </summary>
+        /// <param name="displacement"></param>
+        /// <returns></returns>
+        private Memory ParseMemory(Immediate displacement) {
+            Register32 @base = null;
+            Register32 index = null;
+            int scale = 1;
 
+            if (Tokenizer.Check(TokenType.LEFT_PAREN)) {
+                Tokenizer.Next();
 
+                if (Tokenizer.Check(TokenType.REGISTER)) {
+                    @base = (Register32)ParseRegister(Tokenizer.Next().text);
+                }
 
-		private BufferedTokenizer tokenizer;
+                if (Tokenizer.Check(TokenType.COMMA)) {
+                    Tokenizer.Next();
 
+                    if (Tokenizer.Check(TokenType.REGISTER)) {
+                        index = (Register32)ParseRegister(Tokenizer.Next().text);
+                    }
 
+                    if (Tokenizer.Check(TokenType.COMMA)) {
+                        Tokenizer.Next();
 
-		private Parser(BufferedTokenizer tokenizer)
-		{
-			if (tokenizer == null)
-			{
-				throw new ArgumentNullException();
-			}
-			this.tokenizer = tokenizer;
-		}
+                        if (Tokenizer.Check(TokenType.DECIMAL)) {
+                            scale = Convert.ToInt32(Tokenizer.Next().text);
+                        }
+                    }
 
+                }
 
+                if (Tokenizer.Check(TokenType.RIGHT_PAREN)) {
+                    Tokenizer.Next();
+                } else {
+                    throw new Exception("閉じ丸括弧がない");
+                }
+            }
 
-		private Program parseFile()
-		{
-			Program program = new Program();
-			while (!tokenizer.check(TokenType.END_OF_FILE))
-			{
-				parseLine(program);
-			}
-			return program;
-		}
+            return new Memory(@base, index, scale, displacement);
+        }
 
+        /// <summary>
+        /// レジスタ名とレジスタオブジェクトの対応表
+        /// </summary>
+        private static readonly IDictionary<string, Register> RegisterTable = new Dictionary<string, Register>() {
+            { "%eax", Register32.EAX},
+            { "%ebx", Register32.EBX},
+            { "%ecx", Register32.ECX},
+            { "%edx", Register32.EDX},
+            { "%esp", Register32.ESP},
+            { "%ebp", Register32.EBP},
+            { "%esi", Register32.ESI},
+            { "%edi", Register32.EDI},
+            { "%ax", Register16.AX},
+            { "%bx", Register16.BX},
+            { "%cx", Register16.CX},
+            { "%dx", Register16.DX},
+            { "%sp", Register16.SP},
+            { "%bp", Register16.BP},
+            { "%si", Register16.SI},
+            { "%di", Register16.DI},
+            { "%al", Register8.AL},
+            { "%bl", Register8.BL},
+            { "%cl", Register8.CL},
+            { "%dl", Register8.DL},
+            { "%ah", Register8.AH},
+            { "%bh", Register8.BH},
+            { "%ch", Register8.CH},
+            { "%dh", Register8.DH},
+            { "%cs", SegmentRegister.CS},
+            { "%ds", SegmentRegister.DS},
+            { "%es", SegmentRegister.ES},
+            { "%fs", SegmentRegister.FS},
+            { "%gs", SegmentRegister.GS},
+            { "%ss", SegmentRegister.SS},
+        };
 
-		private void parseLine(Program program)
-		{
-			// Parse label declarations
-			while (tokenizer.check(TokenType.LABEL))
-			{
-				string name = tokenizer.next().text;
-				name = name.Substring(0, name.Length - 1);
-				program.addStatement(new LabelStatement(name));
-			}
+        /// <summary>
+        /// レジスタ名からレジスタオブジェクトを得る。
+        /// 大文字小文字は区別されない。
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        private static Register ParseRegister(string name) {
+            Register register;
+            if (!RegisterTable.TryGetValue(name.ToLower(), out register)) {
+                throw new ArgumentException("不正なレジスタ名です");
+            }
 
-			// Parse instruction
-			if (tokenizer.check(TokenType.NAME))
-			{
-				parseInstruction(program);
-			}
+            return register;
+        }
 
-			if (tokenizer.check(TokenType.NEWLINE))
-			{
-				tokenizer.next();
-			}
-			else
-			{
-				throw new Exception("Expected newline");
-			}
-		}
-
-
-		private void parseInstruction(Program program)
-		{
-			// Parse mnemonic (easy)
-			string mnemonic = tokenizer.next().text;
-
-			// Parse operands (hard)
-			IList<Operand> operands = new List<Operand>();
-			bool expectcomma = false;
-			while (!tokenizer.check(TokenType.NEWLINE))
-			{
-				if (!expectcomma)
-				{
-					if (tokenizer.check(TokenType.COMMA))
-					{
-						throw new Exception("Expected operand, got comma");
-					}
-				}
-				else
-				{
-					if (!tokenizer.check(TokenType.COMMA))
-					{
-						throw new Exception("Expected comma");
-					}
-					tokenizer.next();
-				}
-
-				if (tokenizer.check(TokenType.REGISTER))
-				{
-					operands.Add(parseRegister(tokenizer.next().text));
-				}
-				else if (tokenizer.check(TokenType.DOLLAR))
-				{
-					tokenizer.next();
-					operands.Add(parseImmediate());
-				}
-				else if (canParseImmediate() || tokenizer.check(TokenType.LEFT_PAREN))
-				{
-					Immediate disp;
-					if (canParseImmediate())
-					{
-						disp = parseImmediate();
-					}
-					else
-					{
-						disp = ImmediateValue.ZERO;
-					}
-					operands.Add(parseMemory(disp));
-				}
-				else
-				{
-					throw new Exception("Expected operand");
-				}
-				expectcomma = true;
-			}
-
-			program.addStatement(new InstructionStatement(mnemonic, operands));
-		}
-
-
-		/// <summary>
-		/// Tests whether the next token is a decimal number, hexadecimal number, or a label. </summary>
-		/// <param name="tokenizer"> the tokenizer to test from </param>
-		/// <returns> {@code true} if the next token is an immediate operand, {@code false} otherwise </returns>
-		private bool canParseImmediate()
-		{
-			return tokenizer.check(TokenType.DECIMAL) || tokenizer.check(TokenType.HEXADECIMAL) || tokenizer.check(TokenType.NAME);
-		}
-
-
-		private Immediate parseImmediate()
-		{
-			if (tokenizer.check(TokenType.DECIMAL))
-			{
-				return new ImmediateValue(Convert.ToInt32(tokenizer.next().text));
-			}
-			else if (tokenizer.check(TokenType.HEXADECIMAL))
-			{
-				string text = tokenizer.next().text;
-				text = text.Substring(2, text.Length - 2);
-				return new ImmediateValue((int)Convert.ToInt64(text, 16));
-			}
-			else if (tokenizer.check(TokenType.NAME))
-			{
-				return new Label(tokenizer.next().text);
-			}
-			else
-			{
-				throw new Exception("Expected immediate");
-			}
-		}
-
-
-		private Memory parseMemory(Immediate displacement)
-		{
-			Register32 @base = null;
-			Register32 index = null;
-			int scale = 1;
-
-			if (tokenizer.check(TokenType.LEFT_PAREN))
-			{
-				tokenizer.next();
-
-				if (tokenizer.check(TokenType.REGISTER))
-				{
-					@base = (Register32)parseRegister(tokenizer.next().text);
-				}
-
-				if (tokenizer.check(TokenType.COMMA))
-				{
-					tokenizer.next();
-
-					if (tokenizer.check(TokenType.REGISTER))
-					{
-						index = (Register32)parseRegister(tokenizer.next().text);
-					}
-
-					if (tokenizer.check(TokenType.COMMA))
-					{
-						tokenizer.next();
-
-						if (tokenizer.check(TokenType.DECIMAL))
-						{
-							scale = Convert.ToInt32(tokenizer.next().text);
-						}
-					}
-
-				}
-
-				if (tokenizer.check(TokenType.RIGHT_PAREN))
-				{
-					tokenizer.next();
-				}
-				else
-				{
-					throw new Exception("Expected right parenthesis");
-				}
-			}
-
-			return new Memory(@base, index, scale, displacement);
-		}
-
-
-		private static IDictionary<string, Register> REGISTER_TABLE;
-
-		static Parser()
-		{
-			REGISTER_TABLE = new Dictionary<string, Register>();
-			REGISTER_TABLE["%eax"] = Register32.EAX;
-			REGISTER_TABLE["%ebx"] = Register32.EBX;
-			REGISTER_TABLE["%ecx"] = Register32.ECX;
-			REGISTER_TABLE["%edx"] = Register32.EDX;
-			REGISTER_TABLE["%esp"] = Register32.ESP;
-			REGISTER_TABLE["%ebp"] = Register32.EBP;
-			REGISTER_TABLE["%esi"] = Register32.ESI;
-			REGISTER_TABLE["%edi"] = Register32.EDI;
-			REGISTER_TABLE["%ax"] = Register16.AX;
-			REGISTER_TABLE["%bx"] = Register16.BX;
-			REGISTER_TABLE["%cx"] = Register16.CX;
-			REGISTER_TABLE["%dx"] = Register16.DX;
-			REGISTER_TABLE["%sp"] = Register16.SP;
-			REGISTER_TABLE["%bp"] = Register16.BP;
-			REGISTER_TABLE["%si"] = Register16.SI;
-			REGISTER_TABLE["%di"] = Register16.DI;
-			REGISTER_TABLE["%al"] = Register8.AL;
-			REGISTER_TABLE["%bl"] = Register8.BL;
-			REGISTER_TABLE["%cl"] = Register8.CL;
-			REGISTER_TABLE["%dl"] = Register8.DL;
-			REGISTER_TABLE["%ah"] = Register8.AH;
-			REGISTER_TABLE["%bh"] = Register8.BH;
-			REGISTER_TABLE["%ch"] = Register8.CH;
-			REGISTER_TABLE["%dh"] = Register8.DH;
-			REGISTER_TABLE["%cs"] = SegmentRegister.CS;
-			REGISTER_TABLE["%ds"] = SegmentRegister.DS;
-			REGISTER_TABLE["%es"] = SegmentRegister.ES;
-			REGISTER_TABLE["%fs"] = SegmentRegister.FS;
-			REGISTER_TABLE["%gs"] = SegmentRegister.GS;
-			REGISTER_TABLE["%ss"] = SegmentRegister.SS;
-		}
-
-
-		/// <summary>
-		/// Returns the register associated with the specified name. Examples of register names include {@code "%eax"}, {@code "%sp"}, and {@code "%cs"}. The name is case-insensitive. </summary>
-		/// <param name="name"> the name of the register </param>
-		/// <returns> the register associated with the name </returns>
-		/// <exception cref="IllegalArgumentException"> if no register is associated with the name </exception>
-		private static Register parseRegister(string name)
-		{
-			name = name.ToLower();
-			if (!REGISTER_TABLE.ContainsKey(name))
-			{
-				throw new System.ArgumentException("Invalid register name");
-			}
-			return REGISTER_TABLE[name];
-		}
-
-	}
+    }
 
 }

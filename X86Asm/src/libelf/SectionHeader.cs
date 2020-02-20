@@ -1,11 +1,12 @@
 using X86Asm.util;
+
 namespace X86Asm.libelf
 {
 
 	public sealed class SectionHeader
 	{
 
-		internal static int SECTION_HEADER_ENTRY_SIZE = 40;
+	    public const int SECTION_HEADER_ENTRY_SIZE = 40;
 
 
 		public int name;

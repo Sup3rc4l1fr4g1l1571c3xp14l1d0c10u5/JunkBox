@@ -111,7 +111,7 @@ namespace X86Asm.parser
 		/// <summary>
 		/// Returns the next token from this tokenizer. </summary>
 		/// <returns> the next token from this tokenizer </returns>
-		public override Token next()
+		public override Token Next()
 		{
 			foreach (TokenPattern pat in patterns)
 			{
@@ -125,7 +125,7 @@ namespace X86Asm.parser
 					}
 					else
 					{
-						return next();
+						return Next();
 					}
 				}
 			}
