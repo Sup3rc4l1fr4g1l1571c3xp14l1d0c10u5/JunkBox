@@ -1,79 +1,110 @@
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
 using X86Asm.util;
 
-namespace X86Asm.libelf
-{
+namespace X86Asm.libelf {
 
 
+    /// <summary>
+    /// ELFヘッダ
+    /// </summary>
+    public sealed class ElfHeader {
+        public const int Size = 52;
 
-	public sealed class ElfHeader
-	{
+        /// <summary>
+        /// 
+        /// </summary>
+        private static ElfIdent ident = new ElfIdent() {
+            EI_MAG0 = 0x7F, 
+            EI_MAG1 = (byte)'E', 
+            EI_MAG2 = (byte)'L', 
+            EI_MAG3 = (byte)'F', 
+            EI_CLASS = ElfClass.ELFCLASS32, 
+            EI_DATA = ElfData.ELFDATA2LSB, 
+            EI_VERSION = ElfVersion.EV_CURRENT, 
+            EI_OSABI = ElfOSABI.ELFOSABI_NONE, 
+            EI_ABIVERSION = 0, 
+        };
 
-		private const int ELFCLASS32 = 1;
+        /// <summary>
+        /// オブジェクトファイルの種類
+        /// </summary>
+        public ObjectType type { get; set; }
 
-		private const int ELFDATA2LSB = 1;
+        /// <summary>
+        /// アーキテクチャ
+        /// </summary>
+        public ElfMachine machine  { get; set; } = ElfMachine.EM_386;
 
-		private const int EV_CURRENT = 1;
+        /// <summary>
+        /// バージョン
+        /// </summary>
+        public ElfVersion version  { get; set; } = ElfVersion.EV_CURRENT;
 
-		private const int EM_386 = 3;
+        /// <summary>
+        /// エントリポイント（仮想アドレス）
+        /// </summary>
+        public uint entry { get; set; } 
 
-		internal const int ELF_HEADER_SIZE = 52;
+        /// <summary>
+        /// フラグ（x86やX64では使われていない）
+        /// </summary>
+        public uint flags { get; set; } = 0;
 
+        /// <summary>
+        /// ELFヘッダのサイズ
+        /// </summary>
+        public short ehsize { get; set; } = Size;
 
-		private static byte[] ident = {0x7F, (byte)'E', (byte)'L', (byte)'F', ELFCLASS32, ELFDATA2LSB, EV_CURRENT, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        /// <summary>
+        /// セクションヘッダの名前がある文字列テーブルのインデクス
+        /// </summary>
+        public short shstrndx { get; set; } 
 
-		public ObjectType type;
+        /// <summary>
+        /// バイナリストリームへの書き込み
+        /// </summary>
+        /// <param name="bw"></param>
+        /// <param name="phnum"></param>
+        /// <param name="shnum"></param>
+        public void WriteTo(BinaryWriter bw, ushort phnum, ushort shnum) {
+            uint phoff = Size;
+            uint shoff = phoff + phnum * (uint)ProgramHeader.TypeSize;
 
-		public readonly short machine = EM_386;
+            // e_ident の書き込み
+            ident.WriteTo(bw);
+            bw.Write((UInt16)type);
+            bw.Write((UInt16)machine);
+            bw.Write((UInt32)version);
+            bw.Write((UInt32)entry);
+            // プログラムヘッダテーブルへのオフセット
+            if (phnum != 0) {
+                bw.Write((UInt32)phoff);
+            } else {
+                bw.Write((UInt32)0);
+            }
+            // セクションヘッダテーブルへのオフセット
+            if (shnum != 0) {
+                bw.Write((UInt32)shoff);
+            } else {
+                bw.Write((UInt32)0);
+            }
+            // フラグ（プロセッサ定義）
+            bw.Write((UInt32)flags);
+            // ELFヘッダのサイズ
+            bw.Write((UInt16)ehsize);
+            // プログラムヘッダのサイズ
+            bw.Write((UInt16)ProgramHeader.TypeSize);
+            // プログラムヘッダの個数
+            bw.Write((UInt16)phnum);
+            // セクションヘッダのサイズ
+            bw.Write((UInt16)SectionHeader.TypeSize);
+            // セクションヘッダの個数
+            bw.Write((UInt16)shnum);
+            // セクションヘッダの名前がある文字列テーブルのインデクス
+            bw.Write((UInt16)shstrndx);
+        }
 
-		public readonly int version = EV_CURRENT;
-
-		public int entry;
-
-		public readonly int flags = 0; // Unused on x86
-
-		public readonly short ehsize = ELF_HEADER_SIZE;
-
-		public short shstrndx;
-
-
-
-		internal byte[] getBytes(short phnum, short shnum)
-		{
-			int phoff = ELF_HEADER_SIZE;
-			int shoff = phoff + phnum * ProgramHeader.PROGRAM_HEADER_ENTRY_SIZE;
-
-			ByteBuffer b = new ByteBuffer(ELF_HEADER_SIZE);
-			b.append(ident);
-			b.appendLittleEndian((ushort)type);
-			b.appendLittleEndian(machine);
-			b.appendLittleEndian(version);
-			b.appendLittleEndian(entry);
-			if (phnum != 0)
-			{
-				b.appendLittleEndian(phoff);
-			}
-			else
-			{
-				b.appendLittleEndian(0);
-			}
-			if (shnum != 0)
-			{
-				b.appendLittleEndian(shoff);
-			}
-			else
-			{
-				b.appendLittleEndian(0);
-			}
-			b.appendLittleEndian(flags);
-			b.appendLittleEndian((short)ELF_HEADER_SIZE);
-			b.appendLittleEndian((short)ProgramHeader.PROGRAM_HEADER_ENTRY_SIZE);
-			b.appendLittleEndian(phnum);
-			b.appendLittleEndian((short)SectionHeader.SECTION_HEADER_ENTRY_SIZE);
-			b.appendLittleEndian(shnum);
-			b.appendLittleEndian(shstrndx);
-			return b.toArray();
-		}
-
-	}
-
+    }
 }

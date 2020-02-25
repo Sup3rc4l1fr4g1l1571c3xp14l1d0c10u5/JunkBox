@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 
 namespace X86Asm.parser {
-    using operand;
+    using X86Asm.ast;
+    using X86Asm.ast.statement;
+    using X86Asm.ast.operand;
 
     /// <summary>
-    /// ƒAƒZƒ“ƒuƒŠŒ¾Œê‚Ìƒp[ƒT
+    /// ã‚¢ã‚»ãƒ³ãƒ–ãƒªè¨€èªã®ãƒ‘ãƒ¼ã‚µ
     /// </summary>
     public sealed class Parser {
         /// <summary>
-        /// ƒtƒ@ƒCƒ‹‚©‚ç“Ç‚İæ‚èA‰ğÍ‚ğs‚¤
+        /// ãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰èª­ã¿å–ã‚Šã€è§£æã‚’è¡Œã†
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
@@ -22,8 +24,15 @@ namespace X86Asm.parser {
             return (new Parser(tokenizer)).ParseFile();
         }
 
+        /// <summary>
+        /// èª­ã¿å–ã‚Šã«ä½¿ã†å­—å¥è§£æå™¨
+        /// </summary>
         private BufferedTokenizer Tokenizer { get; }
 
+        /// <summary>
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+        /// </summary>
+        /// <param name="tokenizer">èª­ã¿å–ã‚Šã«ä½¿ã†å­—å¥è§£æå™¨</param>
         private Parser(BufferedTokenizer tokenizer) {
             if (tokenizer == null) {
                 throw new ArgumentNullException();
@@ -32,12 +41,12 @@ namespace X86Asm.parser {
         }
 
         /// <summary>
-        /// ƒtƒ@ƒCƒ‹‚Ì\•¶‰ğÍ
+        /// ãƒ•ã‚¡ã‚¤ãƒ«ã®æ§‹æ–‡è§£æ
         /// </summary>
         /// <returns></returns>
         private Program ParseFile() {
             Program program = new Program();
-            //EOF‚Éo‰ï‚¤‚Ü‚Ås‚Ì‰ğÍ‚ğ‘±‚¯‚é
+            //EOFã«å‡ºä¼šã†ã¾ã§è¡Œã®è§£æã‚’ç¶šã‘ã‚‹
             while (!Tokenizer.Check(TokenType.END_OF_FILE)) {
                 ParseLine(program);
             }
@@ -45,81 +54,81 @@ namespace X86Asm.parser {
         }
 
         /// <summary>
-        /// s‚Ì\•¶‰ğÍ
+        /// è¡Œã®æ§‹æ–‡è§£æ
         /// </summary>
         /// <param name="program"></param>
         private void ParseLine(Program program) {
-            // ƒ‰ƒxƒ‹‚ª‚ ‚éŒÀ‚è“Ç‚İæ‚é
+            // ãƒ©ãƒ™ãƒ«ãŒã‚ã‚‹é™ã‚Šèª­ã¿å–ã‚‹
             while (Tokenizer.Check(TokenType.LABEL)) {
-                string name = Tokenizer.Next().text;
+                string name = Tokenizer.Next().Text;
                 name = name.Substring(0, name.Length - 1);
-                program.addStatement(new LabelStatement(name));
+                program.AddStatement(new LabelStatement(name));
             }
 
-            // –½—ß‚ª‚ ‚ê‚Î“Ç‚İæ‚é
+            // å‘½ä»¤ãŒã‚ã‚Œã°èª­ã¿å–ã‚‹
             if (Tokenizer.Check(TokenType.NAME)) {
                 ParseInstruction(program);
             }
 
-            // ‰üs‚ğ“Ç‚İæ‚é
+            // æ”¹è¡Œã‚’èª­ã¿å–ã‚‹
             if (Tokenizer.Check(TokenType.NEWLINE)) {
                 Tokenizer.Next();
             } else {
-                throw new Exception("‰üs‚ª‚ ‚è‚Ü‚¹‚ñB");
+                throw new Exception("æ”¹è¡ŒãŒã‚ã‚Šã¾ã›ã‚“ã€‚");
             }
         }
 
         /// <summary>
-        /// –½—ß‚Ì\•¶‰ğÍ
+        /// å‘½ä»¤ã®æ§‹æ–‡è§£æ
         /// </summary>
         /// <param name="program"></param>
         private void ParseInstruction(Program program) {
-            // ƒj[ƒ‚ƒjƒbƒN‚ğæ“¾
-            string mnemonic = Tokenizer.Next().text;
+            // ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã‚’å–å¾—
+            string mnemonic = Tokenizer.Next().Text;
 
-            // ƒIƒyƒ‰ƒ“ƒh‚ğæ“¾
-            IList<Operand> operands = new List<Operand>();
+            // ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚’å–å¾—
+            IList<IOperand> operands = new List<IOperand>();
             bool expectComma = false;
             while (!Tokenizer.Check(TokenType.NEWLINE)) {
-                // ƒIƒyƒ‰ƒ“ƒh‹æØ‚è‚ÌƒRƒ“ƒ}‚ğƒ`ƒFƒbƒN
+                // ã‚ªãƒšãƒ©ãƒ³ãƒ‰åŒºåˆ‡ã‚Šã®ã‚³ãƒ³ãƒã‚’ãƒã‚§ãƒƒã‚¯
                 if (!expectComma) {
                     if (Tokenizer.Check(TokenType.COMMA)) {
-                        throw new Exception("ƒIƒyƒ‰ƒ“ƒh‚ª‚ ‚é‚×‚«êŠ‚ÉƒRƒ“ƒ}‚ª‚ ‚è‚Ü‚µ‚½B");
+                        throw new Exception("ã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒã‚ã‚‹ã¹ãå ´æ‰€ã«ã‚³ãƒ³ãƒãŒã‚ã‚Šã¾ã—ãŸã€‚");
                     }
                 } else {
                     if (!Tokenizer.Check(TokenType.COMMA)) {
-                        throw new Exception("ƒRƒ“ƒ}‚ª‚ ‚è‚Ü‚¹‚ñB");
+                        throw new Exception("ã‚³ãƒ³ãƒãŒã‚ã‚Šã¾ã›ã‚“ã€‚");
                     }
                     Tokenizer.Next();
                 }
 
                 if (Tokenizer.Check(TokenType.REGISTER)) {
-                    // ƒg[ƒNƒ“‚ªƒŒƒWƒXƒ^–¼‚Ìê‡‚ÍƒŒƒWƒXƒ^‚ğ“Ç‚İæ‚é
-                    operands.Add(ParseRegister(Tokenizer.Next().text));
+                    // ãƒˆãƒ¼ã‚¯ãƒ³ãŒãƒ¬ã‚¸ã‚¹ã‚¿åã®å ´åˆã¯ãƒ¬ã‚¸ã‚¹ã‚¿ã‚’èª­ã¿å–ã‚‹
+                    operands.Add(ParseRegister(Tokenizer.Next().Text));
                 } else if (Tokenizer.Check(TokenType.DOLLAR)) {
-                    // ƒg[ƒNƒ“‚ª '$' ‚Ìê‡‚Í‘±‚­‘¦’l‚ğ‰ğÍ‚·‚é
+                    // ãƒˆãƒ¼ã‚¯ãƒ³ãŒ '$' ã®å ´åˆã¯ç¶šãå³å€¤ã‚’è§£æã™ã‚‹
                     Tokenizer.Next();
                     operands.Add(ParseImmediate());
                 } else if (CanParseImmediate() || Tokenizer.Check(TokenType.LEFT_PAREN)) {
-                    // ƒg[ƒNƒ“‚É‘¦’l—v‘f‚ªoŒ»‚µ‚Ä‚¢‚éê‡‚ÍƒfƒBƒXƒvƒŒƒCƒƒ“ƒgƒAƒhƒŒƒX‚Æ‚µ‚Ä‘¦’l‚ğ“Ç‚İæ‚éB
-                    // ƒg[ƒNƒ“‚ÉŠJ‚«ŠÛŠ‡ŒÊ‚ªoŒ»‚µ‚Ä‚¢‚éê‡‚ÍAƒfƒBƒXƒvƒŒƒCƒƒ“ƒgƒAƒhƒŒƒX‚Í‚O‚Æ‚·‚é             
-                    Immediate display = CanParseImmediate() ? ParseImmediate() : ImmediateValue.ZERO;
-                    // ƒfƒBƒXƒvƒŒƒCƒƒ“ƒg‚É‘±‚­ƒƒ‚ƒŠ®‚ğ‰ğÍ‚·‚é
+                    // ãƒˆãƒ¼ã‚¯ãƒ³ã«å³å€¤è¦ç´ ãŒå‡ºç¾ã—ã¦ã„ã‚‹å ´åˆã¯ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆã‚¢ãƒ‰ãƒ¬ã‚¹ã¨ã—ã¦å³å€¤ã‚’èª­ã¿å–ã‚‹ã€‚
+                    // ãƒˆãƒ¼ã‚¯ãƒ³ã«é–‹ãä¸¸æ‹¬å¼§ãŒå‡ºç¾ã—ã¦ã„ã‚‹å ´åˆã¯ã€ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆã‚¢ãƒ‰ãƒ¬ã‚¹ã¯ï¼ã¨ã™ã‚‹             
+                    IImmediate display = CanParseImmediate() ? ParseImmediate() : ImmediateValue.Zero;
+                    // ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆã«ç¶šããƒ¡ãƒ¢ãƒªå¼ã‚’è§£æã™ã‚‹
                     operands.Add(ParseMemory(display));
                 } else {
-                    throw new Exception("•s–¾‚ÈƒIƒyƒ‰ƒ“ƒh‚Å‚·B");
+                    throw new Exception("ä¸æ˜ãªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã§ã™ã€‚");
                 }
-                // ˆê‚Â‚Å‚à—v‘f‚ğ“Ç‚İ‚ñ‚¾‚çƒRƒ“ƒ}‚ÌoŒ»‚ğ‹‚ß‚é
+                // ä¸€ã¤ã§ã‚‚è¦ç´ ã‚’èª­ã¿è¾¼ã‚“ã ã‚‰ã‚³ãƒ³ãƒã®å‡ºç¾ã‚’æ±‚ã‚ã‚‹
                 expectComma = true;
             }
 
-            // ƒj[ƒ‚ƒjƒbƒN‚ÆƒIƒyƒ‰ƒ“ƒh‚©‚ç–½—ß•¶‚ğì‚Á‚ÄƒvƒƒOƒ‰ƒ€‚É’Ç‰Á
-            program.addStatement(new InstructionStatement(mnemonic, operands));
+            // ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã¨ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‹ã‚‰å‘½ä»¤æ–‡ã‚’ä½œã£ã¦ãƒ—ãƒ­ã‚°ãƒ©ãƒ ã«è¿½åŠ 
+            program.AddStatement(new InstructionStatement(mnemonic, operands));
         }
 
 
         /// <summary>
-        /// Ÿ‚Ìƒg[ƒNƒ“‚ª‘¦’l—v‘fi\i”A\˜Zi”Aƒ‰ƒxƒ‹–¼j‚©’²‚×‚éB
+        /// æ¬¡ã®ãƒˆãƒ¼ã‚¯ãƒ³ãŒå³å€¤è¦ç´ ï¼ˆåé€²æ•°ã€åå…­é€²æ•°ã€ãƒ©ãƒ™ãƒ«åï¼‰ã‹èª¿ã¹ã‚‹
         /// </summary>
         /// <returns></returns>
         private bool CanParseImmediate() {
@@ -128,55 +137,58 @@ namespace X86Asm.parser {
 
 
         /// <summary>
-        /// ‘¦’l‚ğ‰ğÍ‚·‚é
+        /// å³å€¤ã‚’è§£æã™ã‚‹
         /// </summary>
         /// <returns></returns>
-        private Immediate ParseImmediate() {
+        private IImmediate ParseImmediate() {
             if (Tokenizer.Check(TokenType.DECIMAL)) {
-                // \i”
-                return new ImmediateValue(Convert.ToInt32(Tokenizer.Next().text));
+                // åé€²æ•°
+                return new ImmediateValue(Convert.ToInt32(Tokenizer.Next().Text));
             } else if (Tokenizer.Check(TokenType.HEXADECIMAL)) {
-                // \˜Zi”
-                string text = Tokenizer.Next().text;
+                // åå…­é€²æ•°
+                string text = Tokenizer.Next().Text;
                 text = text.Substring(2, text.Length - 2);
                 return new ImmediateValue((int)Convert.ToInt64(text, 16));
             } else if (Tokenizer.Check(TokenType.NAME)) {
-                // ƒ‰ƒxƒ‹–¼
-                return new Label(Tokenizer.Next().text);
+                // ãƒ©ãƒ™ãƒ«å
+                return new Label(Tokenizer.Next().Text);
             } else {
-                throw new Exception("‘¦’l—v‘f‚ª‚ ‚é‚×‚«‚Å‚·B");
+                throw new Exception("å³å€¤è¦ç´ ãŒã‚ã‚‹ã¹ãã§ã™ã€‚");
             }
         }
 
         /// <summary>
-        /// ƒƒ‚ƒŠ®‚ğ‰ğÍ‚·‚é
+        /// ãƒ¡ãƒ¢ãƒªå¼ã‚’è§£æã™ã‚‹
         /// </summary>
         /// <param name="displacement"></param>
         /// <returns></returns>
-        private Memory ParseMemory(Immediate displacement) {
+        private Memory ParseMemory(IImmediate displacement) {
             Register32 @base = null;
             Register32 index = null;
             int scale = 1;
+
+            // æ¬¡ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’å—ç†
+            // ( '(' (?<@base>REGISTER)? ( ',' (?<index>REGISRET)? ( ',' (?<scale>DECIMAL)? )? )? ')' )?
 
             if (Tokenizer.Check(TokenType.LEFT_PAREN)) {
                 Tokenizer.Next();
 
                 if (Tokenizer.Check(TokenType.REGISTER)) {
-                    @base = (Register32)ParseRegister(Tokenizer.Next().text);
+                    @base = (Register32)ParseRegister(Tokenizer.Next().Text);
                 }
 
                 if (Tokenizer.Check(TokenType.COMMA)) {
                     Tokenizer.Next();
 
                     if (Tokenizer.Check(TokenType.REGISTER)) {
-                        index = (Register32)ParseRegister(Tokenizer.Next().text);
+                        index = (Register32)ParseRegister(Tokenizer.Next().Text);
                     }
 
                     if (Tokenizer.Check(TokenType.COMMA)) {
                         Tokenizer.Next();
 
                         if (Tokenizer.Check(TokenType.DECIMAL)) {
-                            scale = Convert.ToInt32(Tokenizer.Next().text);
+                            scale = Convert.ToInt32(Tokenizer.Next().Text);
                         }
                     }
 
@@ -185,7 +197,7 @@ namespace X86Asm.parser {
                 if (Tokenizer.Check(TokenType.RIGHT_PAREN)) {
                     Tokenizer.Next();
                 } else {
-                    throw new Exception("•Â‚¶ŠÛŠ‡ŒÊ‚ª‚È‚¢");
+                    throw new Exception("é–‰ã˜ä¸¸æ‹¬å¼§ãŒãªã„");
                 }
             }
 
@@ -193,7 +205,7 @@ namespace X86Asm.parser {
         }
 
         /// <summary>
-        /// ƒŒƒWƒXƒ^–¼‚ÆƒŒƒWƒXƒ^ƒIƒuƒWƒFƒNƒg‚Ì‘Î‰•\
+        /// ãƒ¬ã‚¸ã‚¹ã‚¿åã¨ãƒ¬ã‚¸ã‚¹ã‚¿ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®å¯¾å¿œè¡¨
         /// </summary>
         private static readonly IDictionary<string, Register> RegisterTable = new Dictionary<string, Register>() {
             { "%eax", Register32.EAX},
@@ -229,15 +241,15 @@ namespace X86Asm.parser {
         };
 
         /// <summary>
-        /// ƒŒƒWƒXƒ^–¼‚©‚çƒŒƒWƒXƒ^ƒIƒuƒWƒFƒNƒg‚ğ“¾‚éB
-        /// ‘å•¶š¬•¶š‚Í‹æ•Ê‚³‚ê‚È‚¢B
+        /// ãƒ¬ã‚¸ã‚¹ã‚¿åã‹ã‚‰ãƒ¬ã‚¸ã‚¹ã‚¿ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’å¾—ã‚‹ã€‚
+        /// å¤§æ–‡å­—å°æ–‡å­—ã¯åŒºåˆ¥ã•ã‚Œãªã„ã€‚
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
         private static Register ParseRegister(string name) {
             Register register;
             if (!RegisterTable.TryGetValue(name.ToLower(), out register)) {
-                throw new ArgumentException("•s³‚ÈƒŒƒWƒXƒ^–¼‚Å‚·");
+                throw new ArgumentException("ä¸æ­£ãªãƒ¬ã‚¸ã‚¹ã‚¿åã§ã™");
             }
 
             return register;

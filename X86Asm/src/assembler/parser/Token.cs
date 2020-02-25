@@ -1,77 +1,68 @@
 using System;
 
-namespace X86Asm.parser
-{
+namespace X86Asm.parser {
 
+    /// <summary>
+    /// 字句解析器が返すトークン
+    /// </summary>
+    public sealed class Token {
 
-	/// <summary>
-	/// A lexical token. A token has a type and a string of captured text. </summary>
-	/// <seealso cref= Tokenizer </seealso>
-	public sealed class Token
-	{
+        /// <summary>
+        /// トークンの種別
+        /// </summary>
+        public TokenType Type { get; }
 
-		/// <summary>
-		/// The type of this token. </summary>
-		public readonly TokenType type;
+        /// <summary>
+        /// トークンの文字列
+        /// </summary>
+        public string Text { get; }
 
-		/// <summary>
-		/// The text captured by this token. </summary>
-		public readonly string text;
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="type">トークンの種別</param>
+        /// <param name="text">トークンの文字列</param>
+        public Token(TokenType type, string text) {
+            if (text == null) {
+                throw new ArgumentNullException(nameof(text));
+            }
+            if (type == TokenType.WHITESPACE) {
+                throw new ArgumentException(nameof(type));
+            }
+            this.Type = type;
+            this.Text = text;
+        }
 
+        /// <summary>
+        /// 比較処理
+        /// </summary>
+        /// <param name="obj">比較対象</param>
+        /// <returns>トークン種別とトークン文字列が一致すれば真</returns>
+        public override bool Equals(object obj) {
+            if (!(obj is Token)) {
+                return false;
+            } else {
+                Token other = (Token)obj;
+                return Type.Equals(other.Type) && Text.Equals(other.Text);
+            }
+        }
 
+        /// <summary>
+        /// このオブジェクトのハッシュ値を返す
+        /// </summary>
+        /// <returns>ハッシュ値</returns>
+        public override int GetHashCode() {
+            return Type.GetHashCode() + Text.GetHashCode();
+        }
 
-		/// <summary>
-		/// Constructs a token with the specified type and text. </summary>
-		/// <param name="type"> the type </param>
-		/// <param name="text"> the captured text </param>
-		/// <exception cref="ArgumentNullException"> if the type or the text is {@code null} </exception>
-		public Token(TokenType type, string text)
-		{
-			if (type == TokenType.WHITESPACE || text == null)
-			{
-				throw new ArgumentNullException();
-			}
-			this.type = type;
-			this.text = text;
-		}
+        /// <summary>
+        /// このオブジェクトの文字列表現を返す
+        /// </summary>
+        /// <returns>文字列表現</returns>
+        public override string ToString() {
+            return string.Format("[{0} {1}]", Type, Text);
+        }
 
-
-
-		/// <summary>
-		/// Compares this token to the specified object for equality. Returns {@code true} if the specified object is a token with the same type and text. Otherwise returns {@code false}. </summary>
-		/// <param name="obj"> the object to compare this token against </param>
-		/// <returns> {@code true} if the object is a token with the same type and text, {@code false} otherwise </returns>
-		public override bool Equals(object obj)
-		{
-			if (!(obj is Token))
-			{
-				return false;
-			}
-			else
-			{
-				Token other = (Token)obj;
-				return type.Equals(other.type) && text.Equals(other.text);
-			}
-		}
-
-
-		/// <summary>
-		/// Returns the hash code for this token. </summary>
-		/// <returns> the hash code for this token. </returns>
-		public override int GetHashCode()
-		{
-			return type.GetHashCode() + text.GetHashCode();
-		}
-
-
-		/// <summary>
-		/// Returns a string representation of this token. The format is subjected to change. </summary>
-		/// <returns> a string representation of this token </returns>
-		public override string ToString()
-		{
-			return string.Format("[{0} {1}]", type, text);
-		}
-
-	}
+    }
 
 }

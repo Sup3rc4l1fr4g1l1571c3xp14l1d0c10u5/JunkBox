@@ -1,12 +1,8 @@
-namespace X86Asm.generator
-{
+namespace X86Asm.generator {
 
-
-	/// <summary>
-	/// An option for an instruction pattern. </summary>
-	/// <seealso cref= InstructionPattern </seealso>
-	public abstract class InstructionOption
-	{
-	}
+    /// <summary>
+    /// 命令パターンに付与するオプション情報を示すインタフェース 
+    /// </summary>
+    public interface InstructionOption { }
 
 }

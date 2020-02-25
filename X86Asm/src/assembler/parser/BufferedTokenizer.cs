@@ -2,23 +2,25 @@ using System;
 
 namespace X86Asm.parser {
     /// <summary>
-    /// Decorates a tokenizer with peeking capabilities.
+    /// 字句解析器にpeek(先読み)機能を追加するラッパ
     /// </summary>
-    public sealed class BufferedTokenizer : Tokenizer {
-        /// <summary>
-        /// The underlying tokenizer, which provides the tokens.
-        /// </summary>
-        private Tokenizer Tokenizer { get; }
+    public sealed class BufferedTokenizer : ITokenizer {
 
         /// <summary>
-        /// The next token. The peek() method saves the token here. It is cleared to {@code null} when next() is called.
+        /// ラッピング対象の字句解析器
+        /// </summary>
+        private ITokenizer Tokenizer { get; }
+
+        /// <summary>
+        /// 保持されている「次のトークン」
         /// </summary>
         private Token NextToken { get; set; }
 
         /// <summary>
-        /// Constructs a buffered tokenizer from the specified tokenizer. </summary>
-        /// <param name="tokenizer"> the underlying tokenizer providing the tokens </param>
-        public BufferedTokenizer(Tokenizer tokenizer) {
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="tokenizer">ラッピングしたい字句解析器</param>
+        public BufferedTokenizer(ITokenizer tokenizer) {
             if (tokenizer == null) {
                 throw new ArgumentNullException();
             }
@@ -26,24 +28,26 @@ namespace X86Asm.parser {
             NextToken = null;
         }
 
-
-
         /// <summary>
-        /// Returns the next token from this tokenizer. </summary>
-        /// <returns> the next token from this tokenizer </returns>
-        public override Token Next() {
+        /// 次のトークンを読み取り、結果を返す
+        /// </summary>
+        /// <returns>読み取り結果を表すトークン</returns>
+        public Token Next() {
             if (NextToken != null) {
+                // 先読み済みのトークンがあればそれを返す。
                 Token result = NextToken;
                 NextToken = null;
                 return result;
             } else {
+                // 先読み済みのトークンが無いなら読み取りを行う。
                 return Tokenizer.Next();
             }
         }
 
         /// <summary>
-        /// Returns the next token without consuming it. Consecutive calls to this method return the same value. </summary>
-        /// <returns> the next token </returns>
+        /// トークンの先読みを行い、結果を返す。
+        /// </summary>
+        /// <returns>先読みしたトークン</returns>
         public Token Peek() {
             if (NextToken == null) {
                 NextToken = Tokenizer.Next();
@@ -52,11 +56,12 @@ namespace X86Asm.parser {
         }
 
         /// <summary>
-        /// Peeks at the next token and tests whether it has the specified type. Returns {@code peek().type == type}. </summary>
-        /// <param name="type"> the type to test against </param>
-        /// <returns> {@code true} if the next token (without consuming it) has the specified type, {@code false} otherwise </returns>
+        /// 先読みしたトークンのTokenTypeがtypeと等しいか調べる
+        /// </summary>
+        /// <param name="type">一致してほしいTokenType</param>
+        /// <returns>比較結果</returns>
         public bool Check(TokenType type) {
-            return Peek().type == type;
+            return Peek().Type == type;
         }
 
     }

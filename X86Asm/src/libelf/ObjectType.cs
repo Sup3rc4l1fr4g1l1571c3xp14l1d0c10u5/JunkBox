@@ -1,29 +1,29 @@
-namespace X86Asm.libelf
-{
+namespace X86Asm.libelf {
 
-
-	public enum ObjectType
-	{
-
-		ET_NONE = 0,
-		ET_REL = 1,
-		ET_EXEC = 2,
-		ET_DYN = 3,
-		ET_CORE = 4
-
-
-//JAVA TO C# CONVERTER TODO TASK: Enums cannot contain fields in .NET:
-//		public final short value;
-
-
-//JAVA TO C# CONVERTER TODO TASK: Enums cannot contain methods in .NET:
-//		private ObjectType(int value)
-	//	{
-	//		if ((short)value != value)
-	//			throw new AssertionError();
-	//		this.value = (short)value;
-	//	}
-
-	}
+    /// <summary>
+    /// オブジェクトファイルタイプ
+    /// </summary>
+    public enum ObjectType : ushort {
+        /// <summary>
+        /// 未知のタイプ
+        /// </summary>
+        ET_NONE = 0,
+        /// <summary>
+        /// 再配置可能なファイル
+        /// </summary>
+        ET_REL = 1,
+        /// <summary>
+        /// 実行可能ファイル
+        /// </summary>
+        ET_EXEC = 2,
+        /// <summary>
+        /// 共有オブジェクト
+        /// </summary>
+        ET_DYN = 3,
+        /// <summary>
+        /// コアファイル
+        /// </summary>
+        ET_CORE = 4
+    }
 
 }

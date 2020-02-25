@@ -4,199 +4,173 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace X86Asm.generator
-{
+namespace X86Asm.generator {
 
 
-	/// <summary>
-	/// An instruction pattern.
-	/// </summary>
-	public sealed class InstructionPattern
-	{
+    /// <summary>
+    /// 命令パターンクラス
+    /// </summary>
+    public sealed class InstructionPattern {
 
-		/// <summary>
-		/// The regular expression pattern for mnemonics, which is one lowercase letter followed by zero or more lowercase or numeric characters.
-		/// </summary>
-		private static Regex MNEMONIC_PATTERN = new Regex("[a-z][a-z0-9]*");
+        /// <summary>
+        /// ニーモニックと合致する正規表現パターン。
+        /// </summary>
+        private static Regex MNEMONIC_PATTERN { get; } = new Regex("[a-z][a-z0-9]*");
+
+        /// <summary>
+        /// ニーモニック
+        /// </summary>
+        public string mnemonic { get; }
+
+        /// <summary>
+        /// オペランドのパターン
+        /// </summary>
+        public IReadOnlyList<OperandPattern> operands { get; }
+
+        /// <summary>
+        /// オペランドサイズモード
+        /// </summary>
+        public OperandSizeMode operandSizeMode { get; }
+
+        /// <summary>
+        /// 命令パターンに付与されたオプション情報
+        /// </summary>
+        public IReadOnlyList<InstructionOption> options { get; }
 
 
-
-		public readonly string mnemonic;
-
-		public readonly IReadOnlyList<OperandPattern> operands;
-
-		public readonly OperandSizeMode operandSizeMode;
-
-		public readonly IReadOnlyList<InstructionOption> options;
-
-
-		public readonly byte[] opcodes;
-
-
-
-		/// <summary>
-		/// Constructions an instruction pattern with the specified parameters. </summary>
-		/// <param name="mnemonic"> the mnemonic </param>
-		/// <param name="operands"> the operands </param>
-		/// <param name="operandSizeMode"> the operand size mode </param>
-		/// <param name="opcodes"> the opcodes </param>
-		/// <param name="options"> the options </param>
-		/// <exception cref="ArgumentNullException"> if any argument is {@code null} </exception>
-		public InstructionPattern(string mnemonic, OperandPattern[] operands, OperandSizeMode operandSizeMode, int[] opcodes, params InstructionOption[] options)
-		{
-			if (mnemonic == null || operands == null /*|| operandSizeMode == null */|| opcodes == null || options == null)
-			{
-				throw new ArgumentNullException();
-			}
-
-			if (!MNEMONIC_PATTERN.IsMatch(mnemonic))
-			{
-				throw new System.ArgumentException("Invalid mnemonic");
-			}
-
-			if (operands.Length > 10)
-			{
-				throw new System.ArgumentException("Invalid operands");
-			}
-
-			if (options.Length > 1)
-			{
-				throw new System.ArgumentException("Invalid options");
-			}
-			if (options.Length == 1)
-			{
-				InstructionOption option = options[0];
-				if (option is RegisterInOpcode)
-				{
-					checkOption((RegisterInOpcode)option, operands);
-				}
-				else if (option is ModRM)
-				{
-					checkOption((ModRM)option, operands);
-				}
-				else
-				{
-					throw new Exception("Unrecognized instruction option");
-				}
-			}
-
-			this.mnemonic = mnemonic;
-			this.operandSizeMode = operandSizeMode;
-			this.opcodes = toBytes(opcodes);
-
-			this.operands = operands.ToList();
-
-			this.options = options.ToList();
-		}
+        /// <summary>
+        /// 命令パターンに対応する命令コードのテンプレート（一部命令はこのバイト列をベースに少し手を入れたコードを生成する）
+        /// </summary>
+        public byte[] opcodes { get; }
 
 
 
-		/// <summary>
-		/// Returns a string representation of this instruction pattern. The format is subjected to change. </summary>
-		/// <returns> a string representation of this instruction pattern </returns>
-		public override string ToString()
-		{
-			StringBuilder sb = new StringBuilder();
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="mnemonic"> ニーモニック</param>
+        /// <param name="operands"> オペランドのパターン </param>
+        /// <param name="operandSizeMode"> オペランドサイズモード </param>
+        /// <param name="opcodes"> 命令コードテンプレート </param>
+        /// <param name="options"> 命令パターンに付与されたオプション情報 </param>
+        /// <exception cref="ArgumentNullException"> if any argument is {@code null} </exception>
+        public InstructionPattern(string mnemonic, OperandPattern[] operands, OperandSizeMode operandSizeMode, byte[] opcodes, params InstructionOption[] options) {
+            if (mnemonic == null || operands == null /*|| operandSizeMode == null */|| opcodes == null || options == null) {
+                throw new ArgumentNullException();
+            }
 
-			sb.Append(mnemonic);
+            if (!MNEMONIC_PATTERN.IsMatch(mnemonic)) {
+                throw new System.ArgumentException("未定義のニーモニックです");
+            }
 
-			if (operands.Count > 0)
-			{
-				sb.Append("  ");
-				bool initial = true;
-				foreach (OperandPattern op in operands)
-				{
-					if (initial)
-					{
-						initial = false;
-					}
-					else
-					{
-						sb.Append(", ");
-					}
-					sb.Append(op);
-				}
-			}
+            if (operands.Length > 10) {
+                throw new System.ArgumentException("オペランドの数が多すぎます");
+            }
 
-			return sb.ToString();
-		}
+            if (options.Length > 1) {
+                throw new System.ArgumentException("オプションは2個以上指定できません");
+            }
+            if (options.Length == 1) {
+                // オプションが指定されている場合は、オプションと引数の妥当性チェックを行う
+                InstructionOption option = options[0];
+                if (option is RegisterInOpcode) {
+                    checkOption((RegisterInOpcode)option, operands);
+                } else if (option is ModRM) {
+                    checkOption((ModRM)option, operands);
+                } else {
+                    throw new Exception("対応していない命令オプションです");
+                }
+            }
 
+            this.mnemonic = mnemonic;
+            this.operandSizeMode = operandSizeMode;
+            this.opcodes = opcodes.ToArray();
+            this.operands = operands.ToList();
+            this.options = options.ToList();
+        }
 
+        /// <summary>
+        /// このオブジェクトの文字列表現を返す
+        /// </summary>
+        /// <returns>文字列表現</returns>
+        public override string ToString() {
+            StringBuilder sb = new StringBuilder();
 
-		private static void checkOption(RegisterInOpcode option, OperandPattern[] operands)
-		{
-			if (option.operandIndex >= operands.Length)
-			{
-				throw new System.IndexOutOfRangeException("Parameter index out of bounds");
-			}
-			if (!isRegisterPattern(operands[option.operandIndex]))
-			{
-				throw new System.ArgumentException("Option does not match operand");
-			}
-		}
+            sb.Append(mnemonic);
 
+            if (operands.Count > 0) {
+                sb.Append("  ");
+                bool initial = true;
+                foreach (OperandPattern op in operands) {
+                    if (initial) {
+                        initial = false;
+                    } else {
+                        sb.Append(", ");
+                    }
+                    sb.Append(op);
+                }
+            }
 
-		private static void checkOption(ModRM option, OperandPattern[] operands)
-		{
-			if (option.rmOperandIndex >= operands.Length)
-			{
-				throw new System.IndexOutOfRangeException("Parameter index out of bounds");
-			}
-			if (!isRegisterMemoryPattern(operands[option.rmOperandIndex]))
-			{
-				throw new System.ArgumentException("Option does not match operand");
-			}
-
-			if (option.regOpcodeOperandIndex >= 10 && option.regOpcodeOperandIndex < 18) // No problem
-			{
-				;
-			}
-			else if (option.regOpcodeOperandIndex >= 18)
-			{
-				throw new System.ArgumentException("Invalid register/opcode constant value");
-			}
-			else if (option.regOpcodeOperandIndex >= operands.Length)
-			{
-				throw new System.IndexOutOfRangeException("Parameter index out of bounds");
-			}
-			else if (!isRegisterPattern(operands[option.regOpcodeOperandIndex]))
-			{
-				throw new System.ArgumentException("Option does not match operand");
-			}
-		}
+            return sb.ToString();
+        }
 
 
-		private static bool isRegisterMemoryPattern(OperandPattern pat)
-		{
-			return pat == OperandPattern.RM8 || pat == OperandPattern.RM16 || pat == OperandPattern.RM32 || pat == OperandPattern.MEM;
-		}
+        /// <summary>
+        /// RegisterInOpcodeオプションが指定されている場合の引数チェックを行う
+        /// </summary>
+        /// <param name="option"></param>
+        /// <param name="operands"></param>
+        private static void checkOption(RegisterInOpcode option, OperandPattern[] operands) {
+            if (option.operandIndex >= operands.Length) {
+                throw new System.IndexOutOfRangeException("オペランドの個数が、RegisterInOpcode.operandIndex以下です。");
+            }
+            if (!isRegisterPattern(operands[option.operandIndex])) {
+                throw new System.ArgumentException("RegisterInOpcode.operandIndexで指定されたオペランドがレジスタではありません。");
+            }
+        }
 
+        /// <summary>
+        /// ModRMオプションが指定されている場合の引数チェックを行う
+        /// </summary>
+        /// <param name="option"></param>
+        /// <param name="operands"></param>
+        private static void checkOption(ModRM option, OperandPattern[] operands) {
+            if (option.rmOperandIndex >= operands.Length) {
+                throw new System.IndexOutOfRangeException("オペランドの個数が、ModRM.rmOperandIndex以下です。");
+            }
+            if (!isRegisterMemoryPattern(operands[option.rmOperandIndex])) {
+                throw new System.ArgumentException("ModRM.rmOperandIndexで指定されたオペランドがレジスタもしくはメモリではありません。");
+            }
 
-		private static bool isRegisterPattern(OperandPattern pat)
-		{
-			return pat == OperandPattern.REG8 || pat == OperandPattern.REG16 || pat == OperandPattern.REG32 || pat == OperandPattern.SREG;
-		}
+            if (option.regOpcodeOperandIndex >= 10 && option.regOpcodeOperandIndex < 18) {
+                // 10～17は0～7のオペコード定数として解釈されるので問題なし。
+            } else if (option.regOpcodeOperandIndex >= 18) {
+                throw new System.ArgumentException("ModRM.regOpcodeOperandIndexに不正な値が指定されています");
+            } else if (option.regOpcodeOperandIndex >= operands.Length) {
+                throw new System.IndexOutOfRangeException("オペランドの個数が、ModRM.regOpcodeOperandIndex以下です。");
+            } else if (!isRegisterPattern(operands[option.regOpcodeOperandIndex])) {
+                throw new System.ArgumentException("ModRM.regOpcodeOperandIndexで指定されたオペランドがレジスタではありません。");
+            }
+        }
 
+        /// <summary>
+        /// オペランドのパターンがメモリオペランドもしくは8/16/32bitレジスタパターンならば真
+        /// </summary>
+        /// <param name="pat"></param>
+        /// <returns></returns>
+        private static bool isRegisterMemoryPattern(OperandPattern pat) {
+            return pat == OperandPattern.RM8 || pat == OperandPattern.RM16 || pat == OperandPattern.RM32 || pat == OperandPattern.MEM;
+        }
 
-		/// <summary>
-		/// Returns a new unsigned byte array containing the same sequence of values as the specified int32 array. Each integer value must be in the range [0x00, 0xFF]. </summary>
-		/// <param name="opcodes"> </param>
-		/// <returns> a new byte array containing the same sequence of values as the int32 array </returns>
-		/// <exception cref="IllegalArgumentException"> if any value of the int32 array is outside of the range [0x00, 0xFF] </exception>
-		private static byte[] toBytes(int[] opcodes)
-		{
-			byte[] result = new byte[opcodes.Length];
-			for (int i = 0; i < opcodes.Length; i++)
-			{
-				if ((opcodes[i] & 0xFF) != opcodes[i])
-				{
-					throw new System.ArgumentException("Byte value out of range");
-				}
-				result[i] = (byte)opcodes[i];
-			}
-			return result;
-		}
+        /// <summary>
+        /// オペランドのパターンが8/16/32bitレジスタパターンもしくはセグメントレジスタパターンならば真
+        /// </summary>
+        /// <param name="pat"></param>
+        /// <returns></returns>
+        private static bool isRegisterPattern(OperandPattern pat) {
+            return pat == OperandPattern.REG8 || pat == OperandPattern.REG16 || pat == OperandPattern.REG32 || pat == OperandPattern.SREG;
+        }
 
-	}
+    }
 
 }
