@@ -12,6 +12,7 @@ namespace X86Asm {
     public sealed class Assembler {
         public static void Main(string[] args) {
             if (System.Diagnostics.Debugger.IsAttached) {
+                args = new[] { @"C:\Users\whelp\Desktop\X86Asm\test\magic.s", @"C:\Users\whelp\Desktop\X86Asm\test\magic.obj" };
                 DebugMain(args);
             } else {
                 NormalMain(args);
@@ -32,16 +33,34 @@ namespace X86Asm {
                 {
                     uint ENTRY_POINT = 0x00100000 + 0x54;
                     var code = generator.Assembler.assemble(program, ENTRY_POINT);
+                    var data = new byte[0];
+                    var bssSIze = 0;
+                    var symbols = new List<_IMAGE_SYMBOL>() {
+                        new _IMAGE_SYMBOL() {
+                            N = new _SYMBOL_NAME() { ShortName = new byte[8] { (byte)'_', (byte)'m', (byte)'a', (byte)'g', (byte)'i', (byte)'c', 0,0 } },
+                            Value = 0,
+                            SectionNumber = 1,  // .textセクションの番号を１起点で
+                            Type = _IMAGE_SYMBOL._SYMBOL_TYPE.DT_FCN,   // 型は関数
+                            StorageClass = _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_EXT,   // 外部結合
+                            NumberOfAuxSymbols = 0
+                        }
+                    };
 
+                    var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length + (uint)data.Length + (uint)bssSIze;
+                    var relocationTablePos = symbolTablePos + (uint)(symbols.Count * _IMAGE_SYMBOL.Size);
+                    var longSymbolTable = new List<byte>();
+                    
                     /* pe-i386形式のオブジェクトファイルを生成 */
                     libcoff._IMAGE_FILE_HEADER fileHeader = new _IMAGE_FILE_HEADER() {
                         Machine = IMAGE_FILE_MACHINE.IMAGE_FILE_MACHINE_I386,
                         NumberOfSections = 3,   // .text, .bss, .data で決め打ちにしている
                         TimeDateStamp = 0,
-                        PointerToSymbolTable = 0xFFFFFFFF,  // 後で埋める
-                        NumberOfSymbols = 0xFFFFFFFF,  // 後で埋める
+                        PointerToSymbolTable = symbolTablePos,
+                        NumberOfSymbols = (uint)(symbols.Count),
                         SizeOfOptionalHeader = 0,   // オブジェクトファイルでは0固定
                         Characteristics = IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_32BIT_MACHINE
+                    };
+                    List<libcoff._IMAGE_RELOCATION> textSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
                     };
                     libcoff._IMAGE_SECTION_HEADER textSectionHeader = new _IMAGE_SECTION_HEADER() {
                         Name = new char[8] { '.', 't', 'e', 'x', 't', '\0', '\0', '\0' },
@@ -49,12 +68,64 @@ namespace X86Asm {
                         VirtualAddress = 0,
                         SizeOfRawData = (uint)code.Length,
                         PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3,
-                        PointerToRelocations = 0xFFFFFFFF,// 後で埋める
-                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので
-                        NumberOfRelocations = 0xFFFF,// 後で埋める
-                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので
-                        Characteristics = (DataSectionFlags)0x60300020  // 後で分析
+                        PointerToRelocations = relocationTablePos,
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        NumberOfRelocations = (UInt16)textSectionRelocations.Count,
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        Characteristics = DataSectionFlags.MemoryExecute | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentCode
                     };
+                    List<libcoff._IMAGE_RELOCATION> dataSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
+                    };
+                    libcoff._IMAGE_SECTION_HEADER dataSectionHeader = new _IMAGE_SECTION_HEADER() {
+                        Name = new char[8] { '.', 'd', 'a', 't', 'a', '\0', '\0', '\0' },
+                        VirtualSize = 0,
+                        VirtualAddress = 0,
+                        SizeOfRawData = (uint)data.Length,  // データセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length,
+                        PointerToRelocations = (uint)(relocationTablePos + textSectionRelocations.Count() * _IMAGE_RELOCATION.Size),
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        NumberOfRelocations = (UInt16)dataSectionRelocations.Count(),
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        Characteristics = DataSectionFlags.MemoryWrite | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentInitializedData
+                    };
+                    List<libcoff._IMAGE_RELOCATION> bssSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
+                    };
+                    libcoff._IMAGE_SECTION_HEADER bssSectionHeader = new _IMAGE_SECTION_HEADER() {
+                        Name = new char[8] { '.', 'b', 's', 's', '\0', '\0', '\0', '\0' },
+                        VirtualSize = 0,
+                        VirtualAddress = 0,
+                        SizeOfRawData = (uint)bssSIze,  // BSSセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length + (uint)data.Length,
+                        PointerToRelocations = (uint)(relocationTablePos + textSectionRelocations.Count() * _IMAGE_RELOCATION.Size + dataSectionRelocations.Count() * _IMAGE_RELOCATION.Size),
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        NumberOfRelocations = (UInt16)bssSectionRelocations.Count(),
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        Characteristics = DataSectionFlags.MemoryExecute | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentUninitializedData
+                    };
+
+                    using (var bw = new BinaryWriter(outputFile)) {
+                        fileHeader.WriteTo(bw);
+                        bw.WriteTo(textSectionHeader);
+                        bw.WriteTo(dataSectionHeader);
+                        bw.WriteTo(bssSectionHeader);
+                        bw.Write(code.ToArray());
+                        foreach (var symbol in symbols) {
+                            symbol.WriteTo(bw);
+                        }
+                        foreach (var rel in textSectionRelocations) {
+                            rel.WriteTo(bw);
+                        }
+                        foreach (var rel in dataSectionRelocations) {
+                            rel.WriteTo(bw);
+                        }
+                        foreach (var rel in bssSectionRelocations) {
+                            rel.WriteTo(bw);
+                        }
+                        bw.Write((UInt32)longSymbolTable.Count());
+                        bw.Write(longSymbolTable.ToArray());
+                        
+                    }
+                    return;
                 }
                 {
                     /* elf形式の実行ファイルを生成 */
@@ -104,7 +175,7 @@ namespace X86Asm {
 
         private static void DebugMain(string[] args) {
             CoffDump.Dump(@"C:\Users\whelp\Desktop\X86Asm\test\test.o");
-            NormalMain(new[] { @"C:\Users\whelp\Desktop\X86Asm\test\count.s", @"C:\Users\whelp\Desktop\X86Asm\test\count.elf" });
+            NormalMain(new[] { @"C:\Users\whelp\Desktop\X86Asm\test\magic.s", @"C:\Users\whelp\Desktop\X86Asm\test\magic.obj" });
             System.Diagnostics.Debug.Assert(FileDiff(@"C:\Users\whelp\Desktop\X86Asm\test\count.elf", @"C:\Users\whelp\Desktop\X86Asm\test\count.elf.org"));
         }
 

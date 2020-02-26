@@ -33,6 +33,8 @@ namespace X86Asm.libcoff {
         /// </summary>
         public UInt16 Type { get; set; }
 
+        public const int Size = 8;
+
         public static _IMAGE_RELOCATION ReadFrom(BinaryReader br) {
             return new _IMAGE_RELOCATION() {
                 VirtualAddress = br.ReadUInt32(),

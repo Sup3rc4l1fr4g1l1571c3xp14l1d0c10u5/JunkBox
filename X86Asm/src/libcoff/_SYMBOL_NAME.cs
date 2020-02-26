@@ -13,7 +13,7 @@ namespace X86Asm.libcoff {
         /// <summary>
         /// '\0'を含まないシンボル名の文字数が8以内の場合、このメンバにシンボル名が格納される
         /// </summary>
-        public byte[] ShortName { get; private set; } = new byte[8];
+        public byte[] ShortName { get; set; } = new byte[8];
 
         /// <summary>
         /// シンボル名が 8 文字を越える場合、ロングシンボル名が格納されているロングシンボル名テーブルの先頭からのオフセット
