@@ -1,3 +1,5 @@
+	.text
+	.globl	_magic
 _magic:
 	pushl	%ebp
 	movl	%ebp, %esp

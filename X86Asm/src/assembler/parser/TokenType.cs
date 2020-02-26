@@ -7,6 +7,7 @@ namespace X86Asm.parser {
         NEWLINE,
         COLON,
         NAME,
+        DIRECTIVE,
         LEFT_PAREN,
         RIGHT_PAREN,
         LABEL,

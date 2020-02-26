@@ -56,6 +56,7 @@ namespace X86Asm.parser {
             new TokenPattern("[ \t]+", TokenType.WHITESPACE), // Whitespace
             new TokenPattern("[A-Za-z_][A-Za-z0-9_]*:", TokenType.LABEL),
             new TokenPattern("[A-Za-z_][A-Za-z0-9_]*", TokenType.NAME),
+            new TokenPattern("\\.[A-Za-z_][A-Za-z0-9_]*", TokenType.DIRECTIVE),
             new TokenPattern("%[A-Za-z][A-Za-z0-9_]*", TokenType.REGISTER),
             new TokenPattern("0[xX][0-9a-fA-F]+", TokenType.HEXADECIMAL),
             new TokenPattern("-?[0-9]+", TokenType.DECIMAL),

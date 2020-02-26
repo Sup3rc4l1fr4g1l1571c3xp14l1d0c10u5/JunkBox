@@ -123,7 +123,7 @@ namespace X86Asm.generator {
         /// <param name="labelOffsets"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, uint> labelOffsets, uint offset) {
+        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Tuple<Section,uint>> labelOffsets, Section section, uint offset) {
             // 命令パターンを得る
             InstructionPattern pat = table.match(mnemonic, operands);
 
@@ -151,7 +151,7 @@ namespace X86Asm.generator {
             // ModR/MとSIBが指定されている場合はModR/Mバイトを生成して追加する
             // Append ModR/M and SIB bytes if necessary
             if (pat.options.Count == 1 && pat.options[0] is ModRM) {
-                var modRMBytes = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets);
+                var modRMBytes = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets, section, offset);
                 result.AddRange(modRMBytes);
             }
 

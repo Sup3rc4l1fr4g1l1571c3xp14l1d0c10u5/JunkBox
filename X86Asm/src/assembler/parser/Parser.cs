@@ -65,9 +65,12 @@ namespace X86Asm.parser {
                 program.AddStatement(new LabelStatement(name));
             }
 
-            // 命令があれば読み取る
             if (Tokenizer.Check(TokenType.NAME)) {
+                // 命令があれば読み取る
                 ParseInstruction(program);
+            } else if (Tokenizer.Check(TokenType.DIRECTIVE)) {
+                // ディレクティブがあれば読み取る
+                ParseDirective(program);
             }
 
             // 改行を読み取る
@@ -124,6 +127,60 @@ namespace X86Asm.parser {
 
             // ニーモニックとオペランドから命令文を作ってプログラムに追加
             program.AddStatement(new InstructionStatement(mnemonic, operands));
+        }
+
+        private IOperand DirectiveItem() {
+            if (Tokenizer.Check(TokenType.REGISTER)) {
+                throw new Exception("ディレクティブの引数にレジスタは使えない。");
+            } else if (Tokenizer.Check(TokenType.DOLLAR)) {
+                // トークンが '$' の場合は続く即値を解析する
+                Tokenizer.Next();
+                return ParseImmediate();
+            } else if (Tokenizer.Check(TokenType.NAME)) {
+                // ラベル名?
+                return new Label(Tokenizer.Next().Text);
+            } else if (Tokenizer.Check(TokenType.LEFT_PAREN)) {
+                var item = DirectiveItem();
+                if (Tokenizer.Check(TokenType.RIGHT_PAREN)) {
+                    throw new Exception("丸閉じ括弧がありません。");
+                }
+                return item;
+            } else {
+                throw new Exception("不明なオペランドです。");
+            }
+
+        }
+
+        /// <summary>
+        /// ディレクティブの構文解析
+        /// </summary>
+        /// <param name="program"></param>
+        private void ParseDirective(Program program) {
+            // ディレクティブを取得
+            string directive = Tokenizer.Next().Text;
+
+            // ディレクティブのパラメータを取得
+            IList<IOperand> operands = new List<IOperand>();
+            bool expectComma = false;
+            while (!Tokenizer.Check(TokenType.NEWLINE)) {
+                // オペランド区切りのコンマをチェック
+                if (!expectComma) {
+                    if (Tokenizer.Check(TokenType.COMMA)) {
+                        throw new Exception("オペランドがあるべき場所にコンマがありました。");
+                    }
+                } else {
+                    if (!Tokenizer.Check(TokenType.COMMA)) {
+                        throw new Exception("コンマがありません。");
+                    }
+                    Tokenizer.Next();
+                }
+                operands.Add(DirectiveItem());
+                // 一つでも要素を読み込んだらコンマの出現を求める
+                expectComma = true;
+            }
+
+            // ニーモニックとオペランドから命令文を作ってプログラムに追加
+            program.AddStatement(new DirectiveStatement(directive, operands));
         }
 
 
