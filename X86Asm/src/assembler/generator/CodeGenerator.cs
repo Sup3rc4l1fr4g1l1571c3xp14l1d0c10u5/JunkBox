@@ -123,7 +123,7 @@ namespace X86Asm.generator {
         /// <param name="labelOffsets"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Tuple<Section,uint>> labelOffsets, Section section, uint offset) {
+        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets, Section section, uint offset) {
             // 命令パターンを得る
             InstructionPattern pat = table.match(mnemonic, operands);
 
@@ -151,7 +151,7 @@ namespace X86Asm.generator {
             // ModR/MとSIBが指定されている場合はModR/Mバイトを生成して追加する
             // Append ModR/M and SIB bytes if necessary
             if (pat.options.Count == 1 && pat.options[0] is ModRM) {
-                var modRMBytes = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets, section, offset);
+                var modRMBytes = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets);
                 result.AddRange(modRMBytes);
             }
 
@@ -166,10 +166,24 @@ namespace X86Asm.generator {
 
                     // 命令が受理する引数の形式が即値オペランドのREL8, REL16,REL32形式の場合、
                     if (slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
+                        var ivalue = value.GetValue(labelOffsets);
+                        if (section != ivalue.Section) {
+                            throw new Exception("セクションが違うため命令相対アドレスを求められない。");
+                        }
                         // 即値表現の値をセクション内絶対アドレス値から命令相対アドレス値に変換する
-                        value = new ImmediateValue(value.GetValue(labelOffsets).Value - (int)(offset - getMachineCodeLength(table, mnemonic, operands)));
+                        value = new ImmediateValue(ivalue.Value - (int)(offset - getMachineCodeLength(table, mnemonic, operands)));
                     }
-
+                    if (value.Section != null) {
+                        if (slot == OperandPattern.IMM32 || slot == OperandPattern.REL32) {
+                            section.relocations.Add(new Section.Relocation() {
+                                section = value.Section,
+                                appliedTo = (uint)value.Value,
+                                offset = (uint)(result.Count + offset)
+                            });
+                        } else {
+                            throw new Exception("再配置できない値");
+                        }
+                    }
                     if (slot == OperandPattern.IMM8) {
                         // 符号なし8ビット即値を命令列に追加
                         result.AddRange(value.To1Byte());
@@ -203,7 +217,7 @@ namespace X86Asm.generator {
         }
 
 
-        private static byte[] makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, uint> labelOffsets) {
+        private static byte[] makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets) {
             IOperand rm = operands[option.rmOperandIndex];
             uint mod;
             uint rmvalue;

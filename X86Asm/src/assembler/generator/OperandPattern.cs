@@ -64,7 +64,7 @@ namespace X86Asm.generator {
         public static OperandPattern IMM8S = new OperandPatternIMM8S();
 
         /// <summary>
-        /// REL8(即値オペランドのみ)パターンクラス
+        /// REL8(8ビットの相対オフセット)パターン
         /// </summary>
         private class OperandPatternREL8 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -73,12 +73,12 @@ namespace X86Asm.generator {
             public OperandPatternREL8() : base("rel8") { }
         }
         /// <summary>
-        /// REL8(即値オペランドのみ)パターン
+        /// REL8(8ビットの相対オフセット)パターン
         /// </summary>
         public static OperandPattern REL8 = new OperandPatternREL8();
 
         /// <summary>
-        /// REL16(即値オペランドのみ)パターンクラス
+        /// REL16(16ビットの相対オフセット)パターンクラス
         /// </summary>
         private class OperandPatternREL16 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -87,12 +87,12 @@ namespace X86Asm.generator {
             public OperandPatternREL16() : base("rel16") { }
         }
         /// <summary>
-        /// REL16(即値オペランドのみ)パターン
+        /// REL16(16ビットの相対オフセット)パターン
         /// </summary>
         public static OperandPattern REL16 = new OperandPatternREL16();
 
         /// <summary>
-        /// REL32(即値オペランドのみ)パターンクラス
+        /// REL32(32ビットの相対オフセット)パターンクラス
         /// </summary>
         private class OperandPatternREL32 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -101,7 +101,7 @@ namespace X86Asm.generator {
             public OperandPatternREL32() : base("rel32") { }
         }
         /// <summary>
-        /// REL32(即値オペランドのみ)パターン
+        /// REL32(32ビットの相対オフセット)パターン
         /// </summary>
         public static OperandPattern REL32 = new OperandPatternREL32();
 

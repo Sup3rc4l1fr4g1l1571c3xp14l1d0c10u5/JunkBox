@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using X86Asm.generator;
 
 namespace X86Asm.ast.operand {
 
@@ -30,8 +31,9 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <param name="labelOffsets"> ラベルオフセット表 </param>
         /// <returns>ラベルに対応するオフセットを値として持つ即値</returns>
-        public ImmediateValue GetValue(IDictionary<string, uint> labelOffsets) {
-            return new ImmediateValue(unchecked((int)labelOffsets[Name]));
+        public ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets) {
+            // ToDo: 今のセクションを反映させること
+            return new ImmediateValue(unchecked((int)labelOffsets[Name].offset));
         }
 
         /// <summary>

@@ -140,12 +140,15 @@ namespace X86Asm.libcoff {
                 // ロングシンボル名テーブルはシンボルテーブルの直後に続きます
                 // そして、最初の4バイトにテーブルサイズを持ち、続いて '\0' で終わる文字列が連なります。
                 br.BaseStream.Seek(fileHeader.PointerToSymbolTable + fileHeader.NumberOfSymbols * _IMAGE_SYMBOL.Size, SeekOrigin.Begin);
-                var tableSize = br.ReadUInt32() - 4;
+                var tableSize = br.ReadUInt32() - 4U;
                 var buf = new StringBuilder();
+                var start = 4U;
+                Console.WriteLine($"LongSymbolTable:");
                 for (UInt32 offset = 0; offset < tableSize; offset++) {
                     char ch = br.ReadChar();
                     if (ch == '\0') {
-                        Console.WriteLine($"[{offset:X8}] {buf.ToString()}");
+                        Console.WriteLine($"  [{start:X8}] {buf.ToString()}");
+                        start = offset+1U;
                         buf.Clear();
                     } else {
                         buf.Append(ch);

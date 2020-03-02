@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using X86Asm.generator;
 
 namespace X86Asm.ast.operand {
 
@@ -11,7 +13,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <param name="labelOffsets"> ラベルオフセット表 </param>
         /// <returns>即値オペランドの値</returns>
-        ImmediateValue GetValue(IDictionary<string, uint> labelOffsets);
+        ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets);
     }
 
 }

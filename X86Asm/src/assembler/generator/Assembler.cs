@@ -28,12 +28,27 @@ namespace X86Asm.generator
         public class Relocation {
             public uint offset;
             public uint appliedTo;
-            public string sectionName;
+            public Section section;
             // 意味
             // このセクションのoffsetから始まる4バイト(i386などsizeof(ptr_t)==4の環境の場合。x64なら8バイト)を
-            // （リンカ/ローダが解決する際には）セクション名sectionNameのオフセットappliedToを示すアドレスに書き換えてほしい
+            // （リンカ/ローダが解決する際には）セクションsectionのオフセットappliedToを示すアドレスに書き換えてほしい
         }
         public List<Relocation> relocations;
+        public List<Symbol> symbols;
+
+        public override string ToString() {
+            return name;
+        }
+    }
+
+    public class Symbol {
+        public bool global;
+        public string name;
+        public Section section;
+        public uint offset;
+        public override string ToString() {
+            return name;
+        }
     }
 
     public static class Assembler {
@@ -45,19 +60,22 @@ namespace X86Asm.generator
         /// </summary>
         /// <param name="program">構文木</param>
         /// <param name="outputfile">出力ストリーム</param>
-        public static byte[] assemble(Program program, uint offset) {
+        public static bool assemble(Program program, uint offset, out byte[] code, out Section[] section) {
             if (program == null) {
                 throw new ArgumentNullException();
             }
 
             List<Section> sections = new List<Section>();
-            Dictionary<string, Tuple<Section, uint>> labelOffsets = new Dictionary<string, Tuple<Section, uint>>();
+            Dictionary<string, Symbol> labelOffsets = new Dictionary<string, Symbol>();
 
             // ラベルオフセット表を生成
             computeLabelOffsets(program, sections, labelOffsets);
 
             // 構文木を翻訳して機械語を生成
-            return assembleToBytes(program, sections, labelOffsets);
+            code = assembleToBytes(program, sections, labelOffsets);
+            section = sections.ToArray();
+            
+            return true;
         }
 
         /// <summary>
@@ -65,9 +83,10 @@ namespace X86Asm.generator
         /// </summary>
         /// <param name="program">構文木</param>
         /// <returns></returns>
-        private static void computeLabelOffsets(Program program, List<Section> sections, IDictionary<string, Tuple<Section, uint>> labelOffsets) {
+        private static void computeLabelOffsets(Program program, List<Section> sections, IDictionary<string, Symbol> labelOffsets) {
             int sectionIndex = -1;
             uint offset = 0;
+            var globalLabels = new List<string>();
             foreach (IStatement st in program.Statements) {
                 if (st is DirectiveStatement) {
                     DirectiveStatement directive = (DirectiveStatement)st;
@@ -78,9 +97,11 @@ namespace X86Asm.generator
                         sectionIndex = sections.FindIndex(x => x.name == ".text");
                         if (sectionIndex == -1) {
                             sectionIndex = sections.Count();
-                            sections.Add(new Section() { name = ".text", size = 0, index = (uint)sectionIndex, relocations = new List<Section.Relocation>() });
+                            sections.Add(new Section() { name = ".text", size = 0, index = (uint)sectionIndex, relocations = new List<Section.Relocation>(), symbols = new List<Symbol>() });
                         }
                         offset = sections[sectionIndex].size;
+                    } else if (directive.Name == ".globl" && directive.Arguments.Count == 1 && directive.Arguments[0] is ast.operand.Label) {
+                        globalLabels.Add(((ast.operand.Label)directive.Arguments[0]).Name);
                     } else {
                         throw new Exception("不明なディレクティブです。");
                     }
@@ -100,11 +121,15 @@ namespace X86Asm.generator
                     }
                     // 現在位置とラベル名の対を表に記録する
                     string name = ((LabelStatement)st).Name;
-                    labelOffsets[name] = Tuple.Create(sections[sectionIndex],offset);
+                    labelOffsets[name] = new Symbol() { section = sections[sectionIndex], offset = offset, name = name };
+                    sections[sectionIndex].symbols.Add(labelOffsets[name]);
                 }
             }
             if (sectionIndex != -1) {
                 sections[sectionIndex].size = offset;
+            }
+            foreach (var label in globalLabels) {
+                labelOffsets[label].global = true;
             }
         }
 
@@ -114,7 +139,7 @@ namespace X86Asm.generator
         /// <param name="program"></param>
         /// <param name="labelOffsets"></param>
         /// <returns></returns>
-        private static byte[] assembleToBytes(Program program, List<Section> sections, IDictionary<string, Tuple<Section, uint>> labelOffsets) {
+        private static byte[] assembleToBytes(Program program, List<Section> sections, IDictionary<string, Symbol> labelOffsets) {
             using (var ms = new System.IO.MemoryStream()) {
                 List<Section> workSections = new List<Section>();
                 int sectionIndex = -1;
@@ -135,6 +160,8 @@ namespace X86Asm.generator
                                 workSections.Add(new Section() { name = ".text", size = 0, index = (uint)sectionIndex, relocations = new List<Section.Relocation>() });
                             }
                             offset = workSections[sectionIndex].size;
+                        } else if (directive.Name == ".globl" && directive.Arguments.Count == 1 && directive.Arguments[0] is ast.operand.Label) {
+                            // skip
                         } else {
                             throw new Exception("不明なディレクティブです。");
                         }
@@ -149,7 +176,7 @@ namespace X86Asm.generator
                     } else if (st is LabelStatement) {
                         // ラベル文の場合、ラベルオフセット表と現在位置がずれていないかチェック
                         string name = ((LabelStatement)st).Name;
-                        if (sections[sectionIndex] != labelOffsets[name].Item1 || offset != labelOffsets[name].Item2) {
+                        if (sections[sectionIndex] != labelOffsets[name].section || offset != labelOffsets[name].offset || name != labelOffsets[name].name) {
                             throw new InvalidOperationException("ラベルのオフセット情報が一致しません");
                         }
                     }

@@ -32,23 +32,33 @@ namespace X86Asm {
 
                 {
                     uint ENTRY_POINT = 0x00100000 + 0x54;
-                    var code = generator.Assembler.assemble(program, ENTRY_POINT);
+                    generator.Section[] sections;
+                    byte[] code;
+                    var longSymbolTable = new List<byte>();
+                    generator.Assembler.assemble(program, ENTRY_POINT, out code, out sections);
+
                     var data = new byte[0];
-                    var bssSIze = 0;
-                    var symbols = new List<_IMAGE_SYMBOL>() {
-                        new _IMAGE_SYMBOL() {
-                            N = new _SYMBOL_NAME() { ShortName = new byte[8] { (byte)'_', (byte)'m', (byte)'a', (byte)'g', (byte)'i', (byte)'c', 0,0 } },
-                            Value = 0,
-                            SectionNumber = 1,  // .textセクションの番号を１起点で
-                            Type = _IMAGE_SYMBOL._SYMBOL_TYPE.DT_FCN,   // 型は関数
-                            StorageClass = _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_EXT,   // 外部結合
-                            NumberOfAuxSymbols = 0
+                    var bssSIze = sections.FirstOrDefault(x => x.name == ".bss")?.size ?? 0;
+                    var symbols = sections.SelectMany(x => x.symbols).Select(x => {
+                        var n = new _SYMBOL_NAME();
+                        if (x.name.Length > 8) {
+                            n.Long = (uint)(longSymbolTable.Count + 4);
+                            longSymbolTable.AddRange(x.name.Select(y => (byte)y));
+                        } else {
+                            n.ShortName = x.name.Select(y => (byte)y).Concat(Enumerable.Repeat((byte)0, 8)).Take(8).ToArray();
                         }
-                    };
+                        return new _IMAGE_SYMBOL() {
+                            N = n,
+                            Value = x.offset,
+                            Type = 0,
+                            StorageClass = 0,
+                            SectionNumber = (short)x.section.index,
+                            NumberOfAuxSymbols = 0
+                        };
+                    }).ToArray();
 
                     var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length + (uint)data.Length + (uint)bssSIze;
-                    var relocationTablePos = symbolTablePos + (uint)(symbols.Count * _IMAGE_SYMBOL.Size);
-                    var longSymbolTable = new List<byte>();
+                    var relocationTablePos = symbolTablePos + (uint)(symbols.Length * _IMAGE_SYMBOL.Size);
                     
                     /* pe-i386形式のオブジェクトファイルを生成 */
                     libcoff._IMAGE_FILE_HEADER fileHeader = new _IMAGE_FILE_HEADER() {
@@ -56,7 +66,7 @@ namespace X86Asm {
                         NumberOfSections = 3,   // .text, .bss, .data で決め打ちにしている
                         TimeDateStamp = 0,
                         PointerToSymbolTable = symbolTablePos,
-                        NumberOfSymbols = (uint)(symbols.Count),
+                        NumberOfSymbols = (uint)(symbols.Length),
                         SizeOfOptionalHeader = 0,   // オブジェクトファイルでは0固定
                         Characteristics = IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_32BIT_MACHINE
                     };
@@ -137,7 +147,9 @@ namespace X86Asm {
                     /// よってエントリポイントは0x00100000(ベースアドレス) + 0x54 (ELFファイルヘッダサイズ+プログラムセクションヘッダサイズ=データセグメント開始アドレスまでのオフセット)になる
                     uint ENTRY_POINT = 0x00100000 + 0x54;
 
-                    var code = generator.Assembler.assemble(program, ENTRY_POINT);
+                    generator.Section[] sections;
+                    byte[] code;
+                    generator.Assembler.assemble(program, ENTRY_POINT, out code, out sections);
 
 
                     // ELFファイルヘッダを作る
@@ -174,7 +186,7 @@ namespace X86Asm {
         }
 
         private static void DebugMain(string[] args) {
-            CoffDump.Dump(@"C:\Users\whelp\Desktop\X86Asm\test\test.o");
+            CoffDump.Dump(@"C:\Users\whelp\Desktop\X86Asm\test\test2.o");
             NormalMain(new[] { @"C:\Users\whelp\Desktop\X86Asm\test\magic.s", @"C:\Users\whelp\Desktop\X86Asm\test\magic.obj" });
             System.Diagnostics.Debug.Assert(FileDiff(@"C:\Users\whelp\Desktop\X86Asm\test\count.elf", @"C:\Users\whelp\Desktop\X86Asm\test\count.elf.org"));
         }

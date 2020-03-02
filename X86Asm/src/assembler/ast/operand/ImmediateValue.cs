@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using X86Asm.generator;
 
 namespace X86Asm.ast.operand {
     /// <summary>
@@ -18,10 +19,20 @@ namespace X86Asm.ast.operand {
         public int Value { get; }
 
         /// <summary>
+        /// リテラルが再配置が必要なアドレスの場合に属するセクション
+        /// </summary>
+        public Section Section { get; }
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="value">リテラルの値</param>
         public ImmediateValue(int value) {
+            Section = null;
+            Value = value;
+        }
+        public ImmediateValue(Section section, int value) {
+            Section = section;
             Value = value;
         }
 
@@ -37,7 +48,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号付き8ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsInt8() {
-                return ((byte)Value) == Value;
+            return Section == null && ((byte)Value) == Value;
         }
 
         /// <summary>
@@ -45,7 +56,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号付き16ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsInt16() {
-                return ((short)Value) == Value;
+                return Section == null && ((short)Value) == Value;
         }
 
         /// <summary>
@@ -53,7 +64,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号無し8ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsUInt8() {
-            return Value >= -0x80 && Value < 0x100;
+            return Section == null && Value >= -0x80 && Value < 0x100;
         }
 
         /// <summary>
@@ -61,7 +72,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号無し16ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsUInt16() {
-            return Value >= -0x8000 && Value < 0x10000;
+            return Section == null && Value >= -0x8000 && Value < 0x10000;
         }
 
         /// <summary>
@@ -70,7 +81,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <param name="labelOffsets"> ラベルオフセット表 </param>
         /// <returns>即値オペランドの値</returns>
-        public ImmediateValue GetValue(IDictionary<string, uint> labelOffsets) {
+        public ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets) {
             return this;
         }
 
@@ -83,7 +94,7 @@ namespace X86Asm.ast.operand {
             if (!(other is ImmediateValue)) {
                 return false;
             } else {
-                return Value == ((ImmediateValue)other).Value;
+                return Section == ((ImmediateValue)other).Section && Value == ((ImmediateValue)other).Value;
             }
         }
 
