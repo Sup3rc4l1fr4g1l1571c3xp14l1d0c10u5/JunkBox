@@ -5,13 +5,12 @@ using System.Linq;
 
 namespace KKC3 {
     /// <summary>
-    /// ファイルに格納されたTrie木。読み取り専用。
+    /// ファイルに格納されたTrie木。読み取り専用だが非常に省メモリな実装。
     /// </summary>
     /// <typeparam name="TKey"></typeparam>
     /// <typeparam name="TValue"></typeparam>
     public class StaticTrie<TKey, TValue> {
         private readonly Stream _stream;
-
         
         private readonly int _acceptBitVectorByteLength;
         private readonly int _acceptBitVectorHead;
@@ -152,6 +151,7 @@ namespace KKC3 {
             }
             return node;
         }
+
         public TValue Search(IEnumerable<TKey> query) {
             int? node = 1;
             foreach (var c in query) {

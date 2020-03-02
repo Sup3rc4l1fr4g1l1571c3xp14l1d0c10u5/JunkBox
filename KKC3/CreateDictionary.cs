@@ -34,6 +34,7 @@ namespace KKC3 {
                     }
                 }
             );
+            args = op.Parse(args);
 
             if (inputFiles.Count == 0) {
                 Console.Error.WriteLine("Input file is not setted.");

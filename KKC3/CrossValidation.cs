@@ -7,8 +7,23 @@ using System.Threading.Tasks;
 namespace KKC3 {
     public static class CrossValidation {
         public static void Run(string[] args) {
+            string dictName = "dict.tsv";
+            List<string> teatureFiles = new List<string>();
+
+            OptionParser op = new OptionParser();
+            op.Regist(
+                "-dic", 1,
+                (xs) => { dictName = xs[0]; },
+                (xs) => { return System.IO.File.Exists(xs[0]); }
+            );
+            op.Regist(
+                "-i", 1,
+                (xs) => { teatureFiles.Add(xs[0]); }
+            );
+            args = op.Parse(args);
+
             Dict dict;
-            using (var sw = new System.IO.StreamReader("dict.tsv")) {
+            using (var sw = new System.IO.StreamReader(dictName)) {
                 dict = Dict.Load(sw);
             }
             Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch = (str, i, len) => {
@@ -26,7 +41,7 @@ namespace KKC3 {
             var featureFuncs = KKCFeatureFunc.Create();
             var svm = new StructuredSupportVectorMachine(featureFuncs, false);
 
-            var files = System.IO.Directory.EnumerateFiles(@"..\..\data\Corpus", "*.txt").OrderBy(_ => Guid.NewGuid()).ToList();
+            var files = teatureFiles.SelectMany(inputFile => System.IO.Directory.EnumerateFiles(System.IO.Path.GetDirectoryName(inputFile), System.IO.Path.GetFileName(inputFile))).OrderBy(_ => Guid.NewGuid()).ToList();
             var fileCount = files.Count;
 
             var gradews = new Gradews();

@@ -79,17 +79,39 @@ namespace KKC3 {
             // StaticTrie辞書でかな漢字変換
             if (true) {
 
-                // Trie辞書を用意
+                string dictName = "dict.trie";
+                string userDictName = "userdic.tsv";
+                string modelName = "learn.model";
+
+                OptionParser op = new OptionParser();
+                op.Regist(
+                    "-dic", 1,
+                    (xs) => { dictName = xs[0]; },
+                    (xs) => { return System.IO.File.Exists(xs[0]); }
+                );
+                op.Regist(
+                    "-userdic", 1,
+                    (xs) => { dictName = xs[0]; },
+                    (xs) => { return System.IO.File.Exists(xs[0]); }
+                );
+                op.Regist(
+                    "-model", 1,
+                    (xs) => { modelName = xs[0]; }
+                );
+                args = op.Parse(args);
+
+                // ユーザー辞書を準備
                 Dict dict;
-                if (System.IO.File.Exists("userdic.tsv")) {
-                    using (var sw = new System.IO.StreamReader("userdic.tsv")) {
+                if (System.IO.File.Exists(userDictName)) {
+                    using (var sw = new System.IO.StreamReader(userDictName)) {
                         dict = Dict.Load(sw);
                     }
                 } else {
                     dict = new Dict();
                 }
 
-                var s = new System.IO.FileStream("dict.trie", System.IO.FileMode.Open);
+                // Trie辞書を用意
+                var s = new System.IO.FileStream(dictName, System.IO.FileMode.Open);
                 var trie = StaticTrie<char, string>.Load(s, (k) => Encoding.UTF8.GetChars(k).FirstOrDefault(), (v) => Encoding.UTF8.GetString(v));
 
                 var featureFuncs = KKCFeatureFunc.Create();
@@ -116,7 +138,7 @@ namespace KKC3 {
                     return ret;
                 };
 
-                var svm = StructuredSupportVectorMachine.Load("learn.model", featureFuncs, true);
+                var svm = StructuredSupportVectorMachine.Load(modelName, featureFuncs, true);
 
                 for (;;) {
                     Console.Write("kana?>");

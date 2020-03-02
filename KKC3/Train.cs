@@ -7,8 +7,35 @@ using System.Threading.Tasks;
 namespace KKC3 {
     public static class Train {
         public static void Run(string [] args) {
+            string dictName = "dict.tsv";
+            string modelName = "learn.model";
+            string teaturePath = @"..\..\data\Corpus\*.txt";
+            List<string> teatureFiles = new List<string>();
+
+            OptionParser op = new OptionParser();
+            op.Regist(
+                "-dic", 1,
+                (xs) => { dictName = xs[0]; },
+                (xs) => { return System.IO.File.Exists(xs[0]); }
+            );
+            op.Regist(
+                "-i", 1,
+                (xs) => { teatureFiles.Add(xs[0]); }
+            );
+            op.Regist(
+                "-o", 1,
+                (xs) => { modelName = xs[0]; }
+            );
+
+            args = op.Parse(args);
+
+            if (teatureFiles.Count == 0) {
+                Console.Error.WriteLine("Input file is not setted.");
+                return;
+            }
+
             Dict dict;
-            using (var sw = new System.IO.StreamReader("dict.tsv")) {
+            using (var sw = new System.IO.StreamReader(dictName)) {
                 dict = Dict.Load(sw);
             }
             Func<string, int, int, IEnumerable<Entry>> commonPrefixSearch = (str, i, len) => {
@@ -23,6 +50,9 @@ namespace KKC3 {
                 return ret;
             };
 
+            var dirPart = System.IO.Path.GetDirectoryName(teaturePath);
+            var filePart = System.IO.Path.GetFileName(teaturePath);
+
             var featureFuncs = KKCFeatureFunc.Create();
             var svm = new StructuredSupportVectorMachine(featureFuncs, false);
 
@@ -30,7 +60,7 @@ namespace KKC3 {
                 var words = new List<Entry>();
                 Console.WriteLine($"Train Epoc={i+1}");
                 var n = 0;
-                foreach (var file in System.IO.Directory.EnumerateFiles(@"..\..\data\Corpus", "*.txt")) {
+                foreach (var file in System.IO.Directory.EnumerateFiles(dirPart, filePart)) {
                     foreach (var line in System.IO.File.ReadLines(file)) {
                         var items = line.Split('\t');
                         if (String.IsNullOrWhiteSpace(line)) {
@@ -50,7 +80,7 @@ namespace KKC3 {
                 svm.RegularizeAll();
             }
 
-            svm.Save("learn.model");
+            svm.Save(modelName);
             Console.Write($"  Finish.\r");
         }
     }
