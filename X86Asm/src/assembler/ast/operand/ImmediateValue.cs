@@ -19,20 +19,20 @@ namespace X86Asm.ast.operand {
         public int Value { get; }
 
         /// <summary>
-        /// リテラルが再配置が必要なアドレスの場合に属するセクション
+        /// リテラルがシンボルの場合
         /// </summary>
-        public Section Section { get; }
+        public Symbol Symbol { get; }
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="value">リテラルの値</param>
         public ImmediateValue(int value) {
-            Section = null;
+            Symbol = null;
             Value = value;
         }
-        public ImmediateValue(Section section, int value) {
-            Section = section;
+        public ImmediateValue(Symbol symbol, int value) {
+            Symbol = symbol;
             Value = value;
         }
 
@@ -48,7 +48,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号付き8ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsInt8() {
-            return Section == null && ((byte)Value) == Value;
+            return Symbol == null && ((byte)Value) == Value;
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号付き16ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsInt16() {
-                return Section == null && ((short)Value) == Value;
+                return Symbol == null && ((short)Value) == Value;
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号無し8ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsUInt8() {
-            return Section == null && Value >= -0x80 && Value < 0x100;
+            return Symbol == null && Value >= -0x80 && Value < 0x100;
         }
 
         /// <summary>
@@ -72,7 +72,7 @@ namespace X86Asm.ast.operand {
         /// </summary>
         /// <returns>値が符号無し16ビット整数で表現できる範囲ならばならば真</returns>
         public bool IsUInt16() {
-            return Section == null && Value >= -0x8000 && Value < 0x10000;
+            return Symbol == null && Value >= -0x8000 && Value < 0x10000;
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace X86Asm.ast.operand {
             if (!(other is ImmediateValue)) {
                 return false;
             } else {
-                return Section == ((ImmediateValue)other).Section && Value == ((ImmediateValue)other).Value;
+                return Symbol == ((ImmediateValue)other).Symbol && Value == ((ImmediateValue)other).Value;
             }
         }
 

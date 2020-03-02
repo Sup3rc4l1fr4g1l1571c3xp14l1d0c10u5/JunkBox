@@ -7,7 +7,7 @@ namespace X86Asm.libelf {
 
 
     /// <summary>
-    /// ELFƒwƒbƒ_
+    /// ELFãƒ˜ãƒƒãƒ€
     /// </summary>
     public sealed class ElfHeader {
         public const int Size = 52;
@@ -28,42 +28,42 @@ namespace X86Asm.libelf {
         };
 
         /// <summary>
-        /// ƒIƒuƒWƒFƒNƒgƒtƒ@ƒCƒ‹‚Ìí—Ş
+        /// ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆãƒ•ã‚¡ã‚¤ãƒ«ã®ç¨®é¡
         /// </summary>
         public ObjectType type { get; set; }
 
         /// <summary>
-        /// ƒA[ƒLƒeƒNƒ`ƒƒ
+        /// ã‚¢ãƒ¼ã‚­ãƒ†ã‚¯ãƒãƒ£
         /// </summary>
         public ElfMachine machine  { get; set; } = ElfMachine.EM_386;
 
         /// <summary>
-        /// ƒo[ƒWƒ‡ƒ“
+        /// ãƒãƒ¼ã‚¸ãƒ§ãƒ³
         /// </summary>
         public ElfVersion version  { get; set; } = ElfVersion.EV_CURRENT;
 
         /// <summary>
-        /// ƒGƒ“ƒgƒŠƒ|ƒCƒ“ƒgi‰¼‘zƒAƒhƒŒƒXj
+        /// ã‚¨ãƒ³ãƒˆãƒªãƒã‚¤ãƒ³ãƒˆï¼ˆä»®æƒ³ã‚¢ãƒ‰ãƒ¬ã‚¹ï¼‰
         /// </summary>
         public uint entry { get; set; } 
 
         /// <summary>
-        /// ƒtƒ‰ƒOix86‚âX64‚Å‚Íg‚í‚ê‚Ä‚¢‚È‚¢j
+        /// ãƒ•ãƒ©ã‚°ï¼ˆx86ã‚„X64ã§ã¯ä½¿ã‚ã‚Œã¦ã„ãªã„ï¼‰
         /// </summary>
         public uint flags { get; set; } = 0;
 
         /// <summary>
-        /// ELFƒwƒbƒ_‚ÌƒTƒCƒY
+        /// ELFãƒ˜ãƒƒãƒ€ã®ã‚µã‚¤ã‚º
         /// </summary>
         public short ehsize { get; set; } = Size;
 
         /// <summary>
-        /// ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_‚Ì–¼‘O‚ª‚ ‚é•¶š—ñƒe[ƒuƒ‹‚ÌƒCƒ“ƒfƒNƒX
+        /// ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã®åå‰ãŒã‚ã‚‹æ–‡å­—åˆ—ãƒ†ãƒ¼ãƒ–ãƒ«ã®ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹
         /// </summary>
         public short shstrndx { get; set; } 
 
         /// <summary>
-        /// ƒoƒCƒiƒŠƒXƒgƒŠ[ƒ€‚Ö‚Ì‘‚«‚İ
+        /// ãƒã‚¤ãƒŠãƒªã‚¹ãƒˆãƒªãƒ¼ãƒ ã¸ã®æ›¸ãè¾¼ã¿
         /// </summary>
         /// <param name="bw"></param>
         /// <param name="phnum"></param>
@@ -72,37 +72,37 @@ namespace X86Asm.libelf {
             uint phoff = Size;
             uint shoff = phoff + phnum * (uint)ProgramHeader.TypeSize;
 
-            // e_ident ‚Ì‘‚«‚İ
+            // e_ident ã®æ›¸ãè¾¼ã¿
             ident.WriteTo(bw);
             bw.Write((UInt16)type);
             bw.Write((UInt16)machine);
             bw.Write((UInt32)version);
             bw.Write((UInt32)entry);
-            // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_ƒe[ƒuƒ‹‚Ö‚ÌƒIƒtƒZƒbƒg
+            // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ãƒ†ãƒ¼ãƒ–ãƒ«ã¸ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
             if (phnum != 0) {
                 bw.Write((UInt32)phoff);
             } else {
                 bw.Write((UInt32)0);
             }
-            // ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_ƒe[ƒuƒ‹‚Ö‚ÌƒIƒtƒZƒbƒg
+            // ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ãƒ†ãƒ¼ãƒ–ãƒ«ã¸ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
             if (shnum != 0) {
                 bw.Write((UInt32)shoff);
             } else {
                 bw.Write((UInt32)0);
             }
-            // ƒtƒ‰ƒOiƒvƒƒZƒbƒT’è‹`j
+            // ãƒ•ãƒ©ã‚°ï¼ˆãƒ—ãƒ­ã‚»ãƒƒã‚µå®šç¾©ï¼‰
             bw.Write((UInt32)flags);
-            // ELFƒwƒbƒ_‚ÌƒTƒCƒY
+            // ELFãƒ˜ãƒƒãƒ€ã®ã‚µã‚¤ã‚º
             bw.Write((UInt16)ehsize);
-            // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚ÌƒTƒCƒY
+            // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã®ã‚µã‚¤ã‚º
             bw.Write((UInt16)ProgramHeader.TypeSize);
-            // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚ÌŒÂ”
+            // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã®å€‹æ•°
             bw.Write((UInt16)phnum);
-            // ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_‚ÌƒTƒCƒY
+            // ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã®ã‚µã‚¤ã‚º
             bw.Write((UInt16)SectionHeader.TypeSize);
-            // ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_‚ÌŒÂ”
+            // ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã®å€‹æ•°
             bw.Write((UInt16)shnum);
-            // ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_‚Ì–¼‘O‚ª‚ ‚é•¶š—ñƒe[ƒuƒ‹‚ÌƒCƒ“ƒfƒNƒX
+            // ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã®åå‰ãŒã‚ã‚‹æ–‡å­—åˆ—ãƒ†ãƒ¼ãƒ–ãƒ«ã®ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹
             bw.Write((UInt16)shstrndx);
         }
 

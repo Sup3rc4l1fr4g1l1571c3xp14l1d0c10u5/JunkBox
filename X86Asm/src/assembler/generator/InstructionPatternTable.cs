@@ -6,12 +6,12 @@ namespace X86Asm.generator {
 
 
     /// <summary>
-    /// –½—ßƒpƒ^[ƒ“•\
+    /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³è¡¨
     /// </summary>
     public class InstructionPatternTable {
 
         /// <summary>
-        /// x86, 32-bit ƒ‚[ƒh‚Ì–½—ßƒpƒ^[ƒ“•\ 
+        /// x86, 32-bit ãƒ¢ãƒ¼ãƒ‰ã®å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³è¡¨ 
         /// </summary>
         public static readonly InstructionPatternTable MODE32_TABLE;
 
@@ -497,17 +497,17 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“W‡
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³é›†åˆ
         /// </summary>
         private HashSet<InstructionPattern> patterns;
 
         /// <summary>
-        /// ƒj[ƒ‚ƒjƒbƒN‚Æ‘Î‰‚·‚é–½—ßƒpƒ^[ƒ“W‡‚Ì•\
+        /// ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã¨å¯¾å¿œã™ã‚‹å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³é›†åˆã®è¡¨
         /// </summary>
         private IDictionary<string, HashSet<InstructionPattern>> patternsByMnemonic;
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
         /// </summary>
         private InstructionPatternTable() {
             patterns = new HashSet<InstructionPattern>();
@@ -515,9 +515,9 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“‚ğ’Ç‰Á 
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’è¿½åŠ  
         /// </summary>
-        /// <param name="pat">’Ç‰Á‚µ‚½‚¢–½—ßƒpƒ^[ƒ“</param>
+        /// <param name="pat">è¿½åŠ ã—ãŸã„å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³</param>
         private void add(InstructionPattern pat) {
             if (pat == null) {
                 throw new ArgumentNullException();
@@ -532,13 +532,13 @@ namespace X86Asm.generator {
 
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“‚ğ’Ç‰Á
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’è¿½åŠ 
         /// </summary>
-        /// <param name="mnemonics"> ƒj[ƒ‚ƒjƒbƒNi|‚Åƒj[ƒ‚ƒjƒbƒN–¼‚ğ‹æØ‚Á‚Ä•¡”ƒpƒ^[ƒ““¯“o˜^‚Å‚«‚éj </param>
-        /// <param name="operands"> ƒIƒyƒ‰ƒ“ƒh‚Ìƒpƒ^[ƒ“ </param>
-        /// <param name="operandSizeMode"> ƒIƒyƒ‰ƒ“ƒh‚ÌƒTƒCƒYƒ‚[ƒh </param>
-        /// <param name="opcodes"> ¶¬‚³‚ê‚é‹@ŠBŒêƒeƒ“ƒvƒŒ[ƒg </param>
-        /// <param name="options"> –½—ßƒpƒ^[ƒ“‚É•t‘®‚·‚éƒIƒvƒVƒ‡ƒ“ </param>
+        /// <param name="mnemonics"> ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ï¼ˆ|ã§ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯åã‚’åŒºåˆ‡ã£ã¦è¤‡æ•°ãƒ‘ã‚¿ãƒ¼ãƒ³åŒæ™‚ç™»éŒ²ã§ãã‚‹ï¼‰ </param>
+        /// <param name="operands"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ </param>
+        /// <param name="operandSizeMode"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ã‚µã‚¤ã‚ºãƒ¢ãƒ¼ãƒ‰ </param>
+        /// <param name="opcodes"> ç”Ÿæˆã•ã‚Œã‚‹æ©Ÿæ¢°èªãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆ </param>
+        /// <param name="options"> å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã«ä»˜å±ã™ã‚‹ã‚ªãƒ—ã‚·ãƒ§ãƒ³ </param>
         private void add(string mnemonics, OperandPattern[] operands, OperandSizeMode operandSizeMode, byte[] opcodes, params InstructionOption[] options) {
             foreach (string mnemonic in mnemonics.Split('|')) {
                 add(new InstructionPattern(mnemonic, operands, operandSizeMode, opcodes, options));
@@ -546,17 +546,17 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// w’è‚³‚ê‚½ƒj[ƒ‚ƒjƒbƒN‚ÆƒIƒyƒ‰ƒ“ƒh—ñ‚Éƒ}ƒbƒ`‚·‚é–½—ßƒpƒ^[ƒ“‚ğ•Ô‚·
+        /// æŒ‡å®šã•ã‚ŒãŸãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã¨ã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ—ã«ãƒãƒƒãƒã™ã‚‹å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’è¿”ã™
         /// </summary>
-        /// <param name="mnemonic"> ƒj[ƒ‚ƒjƒbƒN </param>
-        /// <param name="operands"> ƒIƒyƒ‰ƒ“ƒh—ñ </param>
+        /// <param name="mnemonic"> ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ </param>
+        /// <param name="operands"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ— </param>
         /// <returns></returns>
         public InstructionPattern match(string mnemonic, IList<IOperand> operands) {
             if (mnemonic == null || operands == null) {
                 throw new ArgumentNullException();
             }
             if (!patternsByMnemonic.ContainsKey(mnemonic)) {
-                throw new System.ArgumentException("–¢“o˜^‚Ìƒj[ƒ‚ƒjƒbƒN‚Å‚·: " + mnemonic);
+                throw new System.ArgumentException("æœªç™»éŒ²ã®ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã§ã™: " + mnemonic);
             }
 
             InstructionPattern bestmatch = null;
@@ -569,15 +569,15 @@ namespace X86Asm.generator {
             if (bestmatch != null) {
                 return bestmatch;
             } else {
-                throw new System.ArgumentException("‚Ç‚Ìƒpƒ^[ƒ“‚Æ‚àˆê’v‚µ‚Ü‚¹‚ñ: " + mnemonic);
+                throw new System.ArgumentException("ã©ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ã¨ã‚‚ä¸€è‡´ã—ã¾ã›ã‚“: " + mnemonic);
             }
         }
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“‚ÌƒIƒyƒ‰ƒ“ƒh—ñ‚Æw’è‚µ‚½ƒIƒyƒ‰ƒ“ƒh—ñ‚ªƒ}ƒbƒ`‚·‚é‚©’²‚×‚é
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã®ã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ—ã¨æŒ‡å®šã—ãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ—ãŒãƒãƒƒãƒã™ã‚‹ã‹èª¿ã¹ã‚‹
         /// </summary>
-        /// <param name="pat"> –½—ßƒpƒ^[ƒ“ </param>
-        /// <param name="operands"> ƒIƒyƒ‰ƒ“ƒh—ñ </param>
+        /// <param name="pat"> å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ </param>
+        /// <param name="operands"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ— </param>
         /// <returns></returns>
         private static bool matches(InstructionPattern pat, IList<IOperand> operands) {
             if (pat.operands.Count != operands.Count) {
@@ -592,7 +592,7 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// w’è‚µ‚½ƒIƒyƒ‰ƒ“ƒh—ñ‚É‘Î‚µ‚ÄA–½—ßƒpƒ^[ƒ“x‚ªy‚æ‚è“KØ‚©’²‚×‚é
+        /// æŒ‡å®šã—ãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰åˆ—ã«å¯¾ã—ã¦ã€å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³xãŒyã‚ˆã‚Šé©åˆ‡ã‹èª¿ã¹ã‚‹
         /// </summary>
         /// <param name="x"></param>
         /// <param name="y"></param>
@@ -604,19 +604,19 @@ namespace X86Asm.generator {
 
             for (int i = 0; i < operands.Count; i++) {
                 if (x.operands[i] == OperandPattern.REL8 || x.operands[i] == OperandPattern.REL16 || x.operands[i] == OperandPattern.REL32) {
-                    // ƒIƒyƒ‰ƒ“ƒh•‚ªx>y‚È‚çbetter‚ğ—§‚Ä‚é
+                    // ã‚ªãƒšãƒ©ãƒ³ãƒ‰å¹…ãŒx>yãªã‚‰betterã‚’ç«‹ã¦ã‚‹
                     isbetter |= isWider(x.operands[i], y.operands[i]);
-                    // ƒIƒyƒ‰ƒ“ƒh•‚ªx<y‚È‚çworse‚ğ—§‚Ä‚é
+                    // ã‚ªãƒšãƒ©ãƒ³ãƒ‰å¹…ãŒx<yãªã‚‰worseã‚’ç«‹ã¦ã‚‹
                     isworse |= isWider(y.operands[i], x.operands[i]);
                 }
             }
-            // worse‚ª—§‚Á‚Ä‚¨‚ç‚¸Abetter‚ª—§‚Á‚Ä‚¢‚é‚Æ‚«‚Ì‚İ x ‚ª y ‚æ‚è—Ç‚¢ƒ}ƒbƒ`Œ‹‰Ê‚Æ”»’f‚·‚é
+            // worseãŒç«‹ã£ã¦ãŠã‚‰ãšã€betterãŒç«‹ã£ã¦ã„ã‚‹ã¨ãã®ã¿ x ãŒ y ã‚ˆã‚Šè‰¯ã„ãƒãƒƒãƒçµæœã¨åˆ¤æ–­ã™ã‚‹
             return !isworse && isbetter;
         }
 
 
         /// <summary>
-        /// ‘¦’lƒIƒyƒ‰ƒ“ƒhx‚Ìƒrƒbƒg•‚ªy‚æ‚è‚à‘å‚«‚¢‚È‚ç^
+        /// å³å€¤ã‚ªãƒšãƒ©ãƒ³ãƒ‰xã®ãƒ“ãƒƒãƒˆå¹…ãŒyã‚ˆã‚Šã‚‚å¤§ãã„ãªã‚‰çœŸ
         /// </summary>
         /// <param name="op"></param>
         /// <returns></returns>
@@ -625,7 +625,7 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// ‘¦’lƒIƒyƒ‰ƒ“ƒh‚Ìƒrƒbƒg•‚ğ•Ô‚·
+        /// å³å€¤ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ“ãƒƒãƒˆå¹…ã‚’è¿”ã™
         /// </summary>
         /// <param name="op"></param>
         /// <returns></returns>

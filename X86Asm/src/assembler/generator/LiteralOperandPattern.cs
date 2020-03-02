@@ -5,17 +5,17 @@ namespace X86Asm.generator {
     using IOperand = X86Asm.ast.operand.IOperand;
 
     /// <summary>
-    /// ƒŠƒeƒ‰ƒ‹ƒIƒyƒ‰ƒ“ƒhƒpƒ^[ƒ“
+    /// ãƒªãƒ†ãƒ©ãƒ«ã‚ªãƒšãƒ©ãƒ³ãƒ‰ãƒ‘ã‚¿ãƒ¼ãƒ³
     /// </summary>
     public sealed class LiteralOperandPattern : OperandPattern {
 
         /// <summary>
-        /// ƒ}ƒbƒ`‚·‚éƒŠƒeƒ‰ƒ‹ƒIƒyƒ‰ƒ“ƒh
+        /// ãƒãƒƒãƒã™ã‚‹ãƒªãƒ†ãƒ©ãƒ«ã‚ªãƒšãƒ©ãƒ³ãƒ‰
         /// </summary>
         private IOperand literal;
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
         /// </summary>
         /// <param name="literal"></param>
         public LiteralOperandPattern(IOperand literal) : base(literal.ToString()) {
@@ -23,7 +23,7 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// ƒ}ƒbƒ`”»’è
+        /// ãƒãƒƒãƒåˆ¤å®š
         /// </summary>
         /// <param name="operand"></param>
         /// <returns></returns>

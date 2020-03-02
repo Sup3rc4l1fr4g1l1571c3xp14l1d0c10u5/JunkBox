@@ -12,7 +12,7 @@ namespace X86Asm {
     public sealed class Assembler {
         public static void Main(string[] args) {
             if (System.Diagnostics.Debugger.IsAttached) {
-                args = new[] { @"C:\Users\whelp\Desktop\X86Asm\test\magic.s", @"C:\Users\whelp\Desktop\X86Asm\test\magic.obj" };
+                args = new[] { @"..\..\test\test002\magic.s", @"..\..\test\test002\magic.obj" };
                 DebugMain(args);
             } else {
                 NormalMain(args);
@@ -32,14 +32,20 @@ namespace X86Asm {
 
                 {
                     uint ENTRY_POINT = 0x00100000 + 0x54;
-                    generator.Section[] sections;
-                    byte[] code;
+                    List<generator.Section> sections = new List<generator.Section>() {
+                        new generator.Section() { name = ".text", index =0},
+                        new generator.Section() { name = ".data", index =1},
+                        new generator.Section() { name = ".bss", index =2},
+                    };
                     var longSymbolTable = new List<byte>();
-                    generator.Assembler.assemble(program, ENTRY_POINT, out code, out sections);
+                    generator.Assembler.assemble(program, ENTRY_POINT, sections);
 
-                    var data = new byte[0];
-                    var bssSIze = sections.FirstOrDefault(x => x.name == ".bss")?.size ?? 0;
-                    var symbols = sections.SelectMany(x => x.symbols).Select(x => {
+                    var textSection = sections.FirstOrDefault(x => x.name == ".text");
+                    var dataSection = sections.FirstOrDefault(x => x.name == ".data");
+                    var bssSection = sections.FirstOrDefault(x => x.name == ".bss");
+
+                    var sectionSymbols = sections.SelectMany(x => x.symbols).ToList();
+                    var symbols = sectionSymbols.Select(x => {
                         var n = new _SYMBOL_NAME();
                         if (x.name.Length > 8) {
                             n.Long = (uint)(longSymbolTable.Count + 4);
@@ -51,37 +57,35 @@ namespace X86Asm {
                             N = n,
                             Value = x.offset,
                             Type = 0,
-                            StorageClass = 0,
-                            SectionNumber = (short)x.section.index,
+                            StorageClass = (x.global) ? _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_EXT: _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_STAT,
+                            SectionNumber = (short)(x.section.index+1),
                             NumberOfAuxSymbols = 0
                         };
                     }).ToArray();
 
-                    var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length + (uint)data.Length + (uint)bssSIze;
+                    var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size + (uint)dataSection.size + (uint)bssSection.size;
                     var relocationTablePos = symbolTablePos + (uint)(symbols.Length * _IMAGE_SYMBOL.Size);
                     
-                    /* pe-i386Œ`®‚ÌƒIƒuƒWƒFƒNƒgƒtƒ@ƒCƒ‹‚ğ¶¬ */
+                    /* pe-i386å½¢å¼ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆãƒ•ã‚¡ã‚¤ãƒ«ã‚’ç”Ÿæˆ */
                     libcoff._IMAGE_FILE_HEADER fileHeader = new _IMAGE_FILE_HEADER() {
                         Machine = IMAGE_FILE_MACHINE.IMAGE_FILE_MACHINE_I386,
-                        NumberOfSections = 3,   // .text, .bss, .data ‚ÅŒˆ‚ß‘Å‚¿‚É‚µ‚Ä‚¢‚é
+                        NumberOfSections = 3,   // .text, .data, .bss ã§æ±ºã‚æ‰“ã¡ã«ã—ã¦ã„ã‚‹
                         TimeDateStamp = 0,
                         PointerToSymbolTable = symbolTablePos,
                         NumberOfSymbols = (uint)(symbols.Length),
-                        SizeOfOptionalHeader = 0,   // ƒIƒuƒWƒFƒNƒgƒtƒ@ƒCƒ‹‚Å‚Í0ŒÅ’è
+                        SizeOfOptionalHeader = 0,   // ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆãƒ•ã‚¡ã‚¤ãƒ«ã§ã¯0å›ºå®š
                         Characteristics = IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_CHARACTERISTICS.IMAGE_FILE_32BIT_MACHINE
-                    };
-                    List<libcoff._IMAGE_RELOCATION> textSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
                     };
                     libcoff._IMAGE_SECTION_HEADER textSectionHeader = new _IMAGE_SECTION_HEADER() {
                         Name = new char[8] { '.', 't', 'e', 'x', 't', '\0', '\0', '\0' },
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)code.Length,
+                        SizeOfRawData = (uint)textSection.size,
                         PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3,
                         PointerToRelocations = relocationTablePos,
-                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
-                        NumberOfRelocations = (UInt16)textSectionRelocations.Count,
-                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
+                        NumberOfRelocations = (UInt16)textSection.relocations.Count,
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
                         Characteristics = DataSectionFlags.MemoryExecute | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentCode
                     };
                     List<libcoff._IMAGE_RELOCATION> dataSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
@@ -90,12 +94,12 @@ namespace X86Asm {
                         Name = new char[8] { '.', 'd', 'a', 't', 'a', '\0', '\0', '\0' },
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)data.Length,  // ƒf[ƒ^ƒZƒNƒVƒ‡ƒ“‚Ì‘å‚«‚³
-                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length,
-                        PointerToRelocations = (uint)(relocationTablePos + textSectionRelocations.Count() * _IMAGE_RELOCATION.Size),
-                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
+                        SizeOfRawData = (uint)dataSection.size,  // ãƒ‡ãƒ¼ã‚¿ã‚»ã‚¯ã‚·ãƒ§ãƒ³ã®å¤§ãã•
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size,
+                        PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size),
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
                         NumberOfRelocations = (UInt16)dataSectionRelocations.Count(),
-                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
                         Characteristics = DataSectionFlags.MemoryWrite | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentInitializedData
                     };
                     List<libcoff._IMAGE_RELOCATION> bssSectionRelocations = new List<libcoff._IMAGE_RELOCATION> {
@@ -104,13 +108,13 @@ namespace X86Asm {
                         Name = new char[8] { '.', 'b', 's', 's', '\0', '\0', '\0', '\0' },
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)bssSIze,  // BSSƒZƒNƒVƒ‡ƒ“‚Ì‘å‚«‚³
-                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)code.Length + (uint)data.Length,
-                        PointerToRelocations = (uint)(relocationTablePos + textSectionRelocations.Count() * _IMAGE_RELOCATION.Size + dataSectionRelocations.Count() * _IMAGE_RELOCATION.Size),
-                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
+                        SizeOfRawData = (uint)bssSection.size,  // BSSã‚»ã‚¯ã‚·ãƒ§ãƒ³ã®å¤§ãã•
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size + (uint)dataSection.size,
+                        PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size + dataSectionRelocations.Count() * _IMAGE_RELOCATION.Size),
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
                         NumberOfRelocations = (UInt16)bssSectionRelocations.Count(),
-                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPED‚È‚Ì‚Å0‚Æ‚·‚é
-                        Characteristics = DataSectionFlags.MemoryExecute | DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentUninitializedData
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDãªã®ã§0ã¨ã™ã‚‹
+                        Characteristics = DataSectionFlags.MemoryRead | DataSectionFlags.MemoryWrite | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentUninitializedData
                     };
 
                     using (var bw = new BinaryWriter(outputFile)) {
@@ -118,11 +122,19 @@ namespace X86Asm {
                         bw.WriteTo(textSectionHeader);
                         bw.WriteTo(dataSectionHeader);
                         bw.WriteTo(bssSectionHeader);
-                        bw.Write(code.ToArray());
+                        bw.Write(textSection.data.ToArray());
+                        bw.Write(dataSection.data.ToArray());
+                        bw.Write(bssSection.data.ToArray());
                         foreach (var symbol in symbols) {
                             symbol.WriteTo(bw);
                         }
-                        foreach (var rel in textSectionRelocations) {
+                        foreach (var r in textSection.relocations) {
+                            var rel = new _IMAGE_RELOCATION() {
+                                SymbolTableIndex = (uint)sectionSymbols.IndexOf(r.SymbolTableIndex),
+                                VirtualAddress = r.VirtualAddress,
+                                Type = 0x0006, // IMAGE_REL_I386_DIR32
+                                
+                            };
                             rel.WriteTo(bw);
                         }
                         foreach (var rel in dataSectionRelocations) {
@@ -131,20 +143,21 @@ namespace X86Asm {
                         foreach (var rel in bssSectionRelocations) {
                             rel.WriteTo(bw);
                         }
-                        bw.Write((UInt32)longSymbolTable.Count());
+                        bw.Write((UInt32)longSymbolTable.Count()+4);
                         bw.Write(longSymbolTable.ToArray());
                         
                     }
                     return;
                 }
+#if false
                 {
-                    /* elfŒ`®‚ÌÀsƒtƒ@ƒCƒ‹‚ğ¶¬ */
+                    /* elfå½¢å¼ã®å®Ÿè¡Œãƒ•ã‚¡ã‚¤ãƒ«ã‚’ç”Ÿæˆ */
 
-                    /// ƒvƒƒOƒ‰ƒ€‚ÌƒGƒ“ƒgƒŠƒ|ƒCƒ“ƒg
-                    /// ¡‰ñ‚ÍˆÈ‰º‚Ì‘O’ñ‚ÅELF‚ğ¶¬‚µ‚Ä‚¢‚éB
-                    /// Eelfƒtƒ@ƒCƒ‹©‘Ì‚ªƒx[ƒXƒAƒhƒŒƒX0x00100000‚Éƒ[ƒh‚³‚ê‚é‚Æ‘z’è
-                    /// E¶¬‚·‚éelfƒtƒ@ƒCƒ‹‚Ì\‘¢‚Í [ELFƒtƒ@ƒCƒ‹ƒwƒbƒ_; ƒvƒƒOƒ‰ƒ€ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_; ƒf[ƒ^ƒZƒOƒƒ“ƒg] ‚É‚È‚Á‚Ä‚¢‚é
-                    /// ‚æ‚Á‚ÄƒGƒ“ƒgƒŠƒ|ƒCƒ“ƒg‚Í0x00100000(ƒx[ƒXƒAƒhƒŒƒX) + 0x54 (ELFƒtƒ@ƒCƒ‹ƒwƒbƒ_ƒTƒCƒY+ƒvƒƒOƒ‰ƒ€ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_ƒTƒCƒY=ƒf[ƒ^ƒZƒOƒƒ“ƒgŠJnƒAƒhƒŒƒX‚Ü‚Å‚ÌƒIƒtƒZƒbƒg)‚É‚È‚é
+                    /// ãƒ—ãƒ­ã‚°ãƒ©ãƒ ã®ã‚¨ãƒ³ãƒˆãƒªãƒã‚¤ãƒ³ãƒˆ
+                    /// ä»Šå›ã¯ä»¥ä¸‹ã®å‰æã§ELFã‚’ç”Ÿæˆã—ã¦ã„ã‚‹ã€‚
+                    /// ãƒ»elfãƒ•ã‚¡ã‚¤ãƒ«è‡ªä½“ãŒãƒ™ãƒ¼ã‚¹ã‚¢ãƒ‰ãƒ¬ã‚¹0x00100000ã«ãƒ­ãƒ¼ãƒ‰ã•ã‚Œã‚‹ã¨æƒ³å®š
+                    /// ãƒ»ç”Ÿæˆã™ã‚‹elfãƒ•ã‚¡ã‚¤ãƒ«ã®æ§‹é€ ã¯ [ELFãƒ•ã‚¡ã‚¤ãƒ«ãƒ˜ãƒƒãƒ€; ãƒ—ãƒ­ã‚°ãƒ©ãƒ ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€; ãƒ‡ãƒ¼ã‚¿ã‚»ã‚°ãƒ¡ãƒ³ãƒˆ] ã«ãªã£ã¦ã„ã‚‹
+                    /// ã‚ˆã£ã¦ã‚¨ãƒ³ãƒˆãƒªãƒã‚¤ãƒ³ãƒˆã¯0x00100000(ãƒ™ãƒ¼ã‚¹ã‚¢ãƒ‰ãƒ¬ã‚¹) + 0x54 (ELFãƒ•ã‚¡ã‚¤ãƒ«ãƒ˜ãƒƒãƒ€ã‚µã‚¤ã‚º+ãƒ—ãƒ­ã‚°ãƒ©ãƒ ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã‚µã‚¤ã‚º=ãƒ‡ãƒ¼ã‚¿ã‚»ã‚°ãƒ¡ãƒ³ãƒˆé–‹å§‹ã‚¢ãƒ‰ãƒ¬ã‚¹ã¾ã§ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ã«ãªã‚‹
                     uint ENTRY_POINT = 0x00100000 + 0x54;
 
                     generator.Section[] sections;
@@ -152,7 +165,7 @@ namespace X86Asm {
                     generator.Assembler.assemble(program, ENTRY_POINT, out code, out sections);
 
 
-                    // ELFƒtƒ@ƒCƒ‹ƒwƒbƒ_‚ğì‚é
+                    // ELFãƒ•ã‚¡ã‚¤ãƒ«ãƒ˜ãƒƒãƒ€ã‚’ä½œã‚‹
                     ElfFile elf = new ElfFile() {
                         elfHeader = new ElfHeader() {
                             type = ObjectType.ET_EXEC,
@@ -161,7 +174,7 @@ namespace X86Asm {
                         }
                     };
 
-                    // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚ğ¶¬
+                    // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã‚’ç”Ÿæˆ
                     ProgramHeader ph = new ProgramHeader() {
                         Type = SegmentType.PT_LOAD,
                         VAddr = ENTRY_POINT,
@@ -170,25 +183,26 @@ namespace X86Asm {
                         Flags = SegmentFlag.PF_X | SegmentFlag.PF_R | SegmentFlag.PF_W,
                         Align = 0x1000,
                     };
-                    // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚ğ’Ç‰Á‚µAƒIƒtƒZƒbƒg‚ğXV
+                    // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã‚’è¿½åŠ ã—ã€ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚’æ›´æ–°
                     elf.programHeaders.Add(ph);
                     ph.Offset = (UInt32)elf.DataOffset;
 
-                    // ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚É‘Î‰‚·‚éƒZƒOƒƒ“ƒg‚É¶¬‚µ‚½‹@ŠBŒê‚ğİ’è
+                    // ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã«å¯¾å¿œã™ã‚‹ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã«ç”Ÿæˆã—ãŸæ©Ÿæ¢°èªã‚’è¨­å®š
                     elf.data = code;
 
-                    // ‘‚«‚İ‚ğs‚¤
+                    // æ›¸ãè¾¼ã¿ã‚’è¡Œã†
                     var bytes = elf.toBytes();
                     outputFile.Write(bytes, 0, bytes.Length);
 
                 }
+#endif
             }
         }
 
         private static void DebugMain(string[] args) {
-            CoffDump.Dump(@"C:\Users\whelp\Desktop\X86Asm\test\test2.o");
-            NormalMain(new[] { @"C:\Users\whelp\Desktop\X86Asm\test\magic.s", @"C:\Users\whelp\Desktop\X86Asm\test\magic.obj" });
-            System.Diagnostics.Debug.Assert(FileDiff(@"C:\Users\whelp\Desktop\X86Asm\test\count.elf", @"C:\Users\whelp\Desktop\X86Asm\test\count.elf.org"));
+            //CoffDump.Dump(@"..\..\\test\magic.obj");
+            NormalMain(args);
+            //System.Diagnostics.Debug.Assert(FileDiff(@"C:\Users\whelp\Desktop\X86Asm\test\count.elf", @"C:\Users\whelp\Desktop\X86Asm\test\count.elf.org"));
         }
 
         public static bool FileDiff(string file1, string file2) {

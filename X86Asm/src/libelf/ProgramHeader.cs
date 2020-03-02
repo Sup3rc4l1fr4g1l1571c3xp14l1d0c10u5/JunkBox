@@ -7,48 +7,48 @@ using X86Asm.util;
 namespace X86Asm.libelf {
 
     /// <summary>
-    /// ELFƒvƒƒOƒ‰ƒ€ƒwƒbƒ_
+    /// ELFãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€
     /// </summary>
 	public class ProgramHeader {
         public const int TypeSize = 32;
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ìí•Ê
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ç¨®åˆ¥
         /// </summary>
         public SegmentType Type { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ìƒtƒ@ƒCƒ‹ƒIƒtƒZƒbƒg
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ•ã‚»ãƒƒãƒˆ
         /// </summary>
         public UInt32 Offset { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ì‰¼‘zƒAƒhƒŒƒX
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ä»®æƒ³ã‚¢ãƒ‰ãƒ¬ã‚¹
         /// </summary>
         public UInt32 VAddr { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ì•¨—ƒAƒhƒŒƒX(x86/x64‚Å‚Íg‚í‚ê‚È‚¢)
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ç‰©ç†ã‚¢ãƒ‰ãƒ¬ã‚¹(x86/x64ã§ã¯ä½¿ã‚ã‚Œãªã„)
         /// </summary>
         public UInt32 PAddr { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ìƒtƒ@ƒCƒ‹ƒTƒCƒYiƒ[ƒ‚Ìê‡‚à‚ ‚èj
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ãƒ•ã‚¡ã‚¤ãƒ«ã‚µã‚¤ã‚ºï¼ˆã‚¼ãƒ­ã®å ´åˆã‚‚ã‚ã‚Šï¼‰
         /// </summary>
         public UInt32 FileSz{ get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ìƒƒ‚ƒŠƒTƒCƒYiƒ[ƒ‚Ìê‡‚à‚ ‚èj
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ãƒ¡ãƒ¢ãƒªã‚µã‚¤ã‚ºï¼ˆã‚¼ãƒ­ã®å ´åˆã‚‚ã‚ã‚Šï¼‰
         /// </summary>
         public UInt32 MemSz { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚Ì‘®«
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®å±æ€§
         /// </summary>
         public SegmentFlag Flags { get; set; }
 
         /// <summary>
-        /// ƒZƒOƒƒ“ƒg‚ÌƒAƒ‰ƒCƒƒ“ƒgiƒtƒ@ƒCƒ‹Aƒƒ‚ƒŠ—¼•ûj
+        /// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ã‚¢ãƒ©ã‚¤ãƒ¡ãƒ³ãƒˆï¼ˆãƒ•ã‚¡ã‚¤ãƒ«ã€ãƒ¡ãƒ¢ãƒªä¸¡æ–¹ï¼‰
         /// </summary>
         public UInt32 Align { get; set; }
 

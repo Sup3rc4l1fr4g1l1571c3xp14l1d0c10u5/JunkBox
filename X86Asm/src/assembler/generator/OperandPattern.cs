@@ -7,7 +7,7 @@ namespace X86Asm.generator {
     public abstract class OperandPattern {
 
         /// <summary>
-        /// imm8(8bit‘¦’l)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// imm8(8bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternIMM8 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -17,12 +17,12 @@ namespace X86Asm.generator {
             public OperandPatternIMM8() : base("imm8") { }
         }
         /// <summary>
-        /// imm8(8bit‘¦’l)ƒpƒ^[ƒ“
+        /// imm8(8bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM8 = new OperandPatternIMM8();
 
         /// <summary>
-        /// imm16(16bit‘¦’l)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// imm16(16bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternIMM16 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -31,12 +31,12 @@ namespace X86Asm.generator {
             public OperandPatternIMM16() : base("imm16") { }
         }
         /// <summary>
-        /// imm16(16bit‘¦’l)ƒpƒ^[ƒ“
+        /// imm16(16bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM16 = new OperandPatternIMM16();
 
         /// <summary>
-        /// imm32(32bit‘¦’l)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// imm32(32bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternIMM32 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -45,12 +45,12 @@ namespace X86Asm.generator {
             public OperandPatternIMM32() : base("imm32") { }
         }
         /// <summary>
-        /// imm32(32bit‘¦’l)ƒpƒ^[ƒ“
+        /// imm32(32bitå³å€¤)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM32 = new OperandPatternIMM32();
 
         /// <summary>
-        /// imm8S(8bit‘¦’lAimm8‚Æˆá‚¢Aƒ‰ƒxƒ‹w’è‚Íƒ_ƒ)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// imm8S(8bitå³å€¤ã€imm8ã¨é•ã„ã€ãƒ©ãƒ™ãƒ«æŒ‡å®šã¯ãƒ€ãƒ¡)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternIMM8S : OperandPattern {
             public override bool matches(IOperand op) {
@@ -59,12 +59,12 @@ namespace X86Asm.generator {
             public OperandPatternIMM8S() : base("imm8s") { }
         }
         /// <summary>
-        /// imm8S(8bit‘¦’lAimm8‚Æˆá‚¢Aƒ‰ƒxƒ‹w’è‚Íƒ_ƒ)ƒpƒ^[ƒ“
+        /// imm8S(8bitå³å€¤ã€imm8ã¨é•ã„ã€ãƒ©ãƒ™ãƒ«æŒ‡å®šã¯ãƒ€ãƒ¡)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM8S = new OperandPatternIMM8S();
 
         /// <summary>
-        /// REL8(8ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“
+        /// REL8(8ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         private class OperandPatternREL8 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -73,12 +73,12 @@ namespace X86Asm.generator {
             public OperandPatternREL8() : base("rel8") { }
         }
         /// <summary>
-        /// REL8(8ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“
+        /// REL8(8ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REL8 = new OperandPatternREL8();
 
         /// <summary>
-        /// REL16(16ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// REL16(16ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternREL16 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -87,12 +87,12 @@ namespace X86Asm.generator {
             public OperandPatternREL16() : base("rel16") { }
         }
         /// <summary>
-        /// REL16(16ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“
+        /// REL16(16ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REL16 = new OperandPatternREL16();
 
         /// <summary>
-        /// REL32(32ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// REL32(32ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternREL32 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -101,22 +101,22 @@ namespace X86Asm.generator {
             public OperandPatternREL32() : base("rel32") { }
         }
         /// <summary>
-        /// REL32(32ƒrƒbƒg‚Ì‘Š‘ÎƒIƒtƒZƒbƒg)ƒpƒ^[ƒ“
+        /// REL32(32ãƒ“ãƒƒãƒˆã®ç›¸å¯¾ã‚ªãƒ•ã‚»ãƒƒãƒˆ)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REL32 = new OperandPatternREL32();
 
         /// <summary>
-        /// immVal1(‘¦’l1ƒIƒyƒ‰ƒ“ƒh)ƒpƒ^[ƒ“
+        /// immVal1(å³å€¤1ã‚ªãƒšãƒ©ãƒ³ãƒ‰)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM_VAL_1 = new LiteralOperandPattern(new ImmediateValue(1));
 
         /// <summary>
-        /// immVal3(‘¦’l3ƒIƒyƒ‰ƒ“ƒh)ƒpƒ^[ƒ“
+        /// immVal3(å³å€¤3ã‚ªãƒšãƒ©ãƒ³ãƒ‰)ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern IMM_VAL_3 = new LiteralOperandPattern(new ImmediateValue(3));
 
         /// <summary>
-        /// memiƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒhjƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// memï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternMEM : OperandPattern {
             public override bool matches(IOperand op) {
@@ -125,12 +125,12 @@ namespace X86Asm.generator {
             public OperandPatternMEM() : base("mem") { }
         }
         /// <summary>
-        /// memiƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒhjƒpƒ^[ƒ“
+        /// memï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern MEM = new OperandPatternMEM();
 
         /// <summary>
-        /// RM8iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í8bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// RM8ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯8bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternRM8 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -141,12 +141,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// RM8iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í8bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// RM8ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯8bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern RM8 = new OperandPatternRM8();
 
         /// <summary>
-        /// RM16iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í16bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// RM16ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯16bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternRM16 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -157,12 +157,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// RM16iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í16bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// RM16ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯16bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern RM16 = new OperandPatternRM16();
 
         /// <summary>
-        /// RM32iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í32bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// RM32ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯32bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternRM32 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -173,12 +173,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// RM32iƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í32bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// RM32ï¼ˆãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯32bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern RM32 = new OperandPatternRM32();
 
         /// <summary>
-        /// Reg8i8bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// Reg8ï¼ˆ8bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternREG8 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -189,12 +189,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// Reg8i8bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// Reg8ï¼ˆ8bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REG8 = new OperandPatternREG8();
 
         /// <summary>
-        /// Reg16i16bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// Reg16ï¼ˆ16bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternREG16 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -205,12 +205,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// Reg16i16bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// Reg16ï¼ˆ16bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REG16 = new OperandPatternREG16();
 
         /// <summary>
-        /// Reg32i32bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// Reg32ï¼ˆ32bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternREG32 : OperandPattern {
             public override bool matches(IOperand op) {
@@ -221,12 +221,12 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// Reg32i32bitƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// Reg32ï¼ˆ32bitãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern REG32 = new OperandPatternREG32();
 
         /// <summary>
-        /// SREGiƒZƒOƒƒ“ƒgƒŒƒWƒXƒ^jƒpƒ^[ƒ“ƒNƒ‰ƒX
+        /// SREGï¼ˆã‚»ã‚°ãƒ¡ãƒ³ãƒˆãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
         /// </summary>
         private class OperandPatternSREG : OperandPattern {
             public override bool matches(IOperand op) {
@@ -237,157 +237,157 @@ namespace X86Asm.generator {
             }
         }
         /// <summary>
-        /// SREGiƒZƒOƒƒ“ƒgƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// SREGï¼ˆã‚»ã‚°ãƒ¡ãƒ³ãƒˆãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern SREG = new OperandPatternSREG();
 
         /// <summary>
-        /// ALiALƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// ALï¼ˆALãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern AL = new LiteralOperandPattern(Register8.AL);
 
         /// <summary>
-        /// AHiAHƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// AHï¼ˆAHãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern AH = new LiteralOperandPattern(Register8.AH);
 
         /// <summary>
-        /// BLiBLƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// BLï¼ˆBLãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern BL = new LiteralOperandPattern(Register8.BL);
 
         /// <summary>
-        /// BHiBHƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// BHï¼ˆBHãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern BH = new LiteralOperandPattern(Register8.BH);
 
         /// <summary>
-        /// CLiCLƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// CLï¼ˆCLãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern CL = new LiteralOperandPattern(Register8.CL);
 
         /// <summary>
-        /// CHiCHƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// CHï¼ˆCHãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern CH = new LiteralOperandPattern(Register8.CH);
 
         /// <summary>
-        /// DLiDLƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// DLï¼ˆDLãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern DL = new LiteralOperandPattern(Register8.DL);
 
         /// <summary>
-        /// DHiDHƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// DHï¼ˆDHãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern DH = new LiteralOperandPattern(Register8.DH);
 
         /// <summary>
-        /// AXiAXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// AXï¼ˆAXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern AX = new LiteralOperandPattern(Register16.AX);
 
         /// <summary>
-        /// BXiBXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// BXï¼ˆBXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern BX = new LiteralOperandPattern(Register16.BX);
 
         /// <summary>
-        /// CXiCXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// CXï¼ˆCXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern CX = new LiteralOperandPattern(Register16.CX);
 
         /// <summary>
-        /// DXiDXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// DXï¼ˆDXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern DX = new LiteralOperandPattern(Register16.DX);
 
         /// <summary>
-        /// SPiSPƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// SPï¼ˆSPãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern SP = new LiteralOperandPattern(Register16.SP);
 
         /// <summary>
-        /// BPiBPƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// BPï¼ˆBPãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern BP = new LiteralOperandPattern(Register16.BP);
 
         /// <summary>
-        /// SIiSIƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// SIï¼ˆSIãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern SI = new LiteralOperandPattern(Register16.SI);
 
         /// <summary>
-        /// DIiDIƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// DIï¼ˆDIãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern DI = new LiteralOperandPattern(Register16.DI);
 
         /// <summary>
-        /// EAXiEAXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// EAXï¼ˆEAXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern EAX = new LiteralOperandPattern(Register32.EAX);
 
         /// <summary>
-        /// EBXiEBXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// EBXï¼ˆEBXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern EBX = new LiteralOperandPattern(Register32.EBX);
 
         /// <summary>
-        /// ECXiECXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// ECXï¼ˆECXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern ECX = new LiteralOperandPattern(Register32.ECX);
 
         /// <summary>
-        /// EDXiEDXƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// EDXï¼ˆEDXãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern EDX = new LiteralOperandPattern(Register32.EDX);
 
         /// <summary>
-        /// ESPiESPƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// ESPï¼ˆESPãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern ESP = new LiteralOperandPattern(Register32.ESP);
 
         /// <summary>
-        /// EBPiEBPƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// EBPï¼ˆEBPãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern EBP = new LiteralOperandPattern(Register32.EBP);
 
         /// <summary>
-        /// ESIiESIƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// ESIï¼ˆESIãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern ESI = new LiteralOperandPattern(Register32.ESI);
 
         /// <summary>
-        /// EDIiEDIƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// EDIï¼ˆEDIãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern EDI = new LiteralOperandPattern(Register32.EDI);
 
         /// <summary>
-        /// CSiCSƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// CSï¼ˆCSãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern CS = new LiteralOperandPattern(SegmentRegister.CS);
 
         /// <summary>
-        /// DSiDSƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// DSï¼ˆDSãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern DS = new LiteralOperandPattern(SegmentRegister.DS);
 
         /// <summary>
-        /// ESiESƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// ESï¼ˆESãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern ES = new LiteralOperandPattern(SegmentRegister.ES);
 
         /// <summary>
-        /// FSiFSƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// FSï¼ˆFSãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern FS = new LiteralOperandPattern(SegmentRegister.FS);
 
         /// <summary>
-        /// GSiGSƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// GSï¼ˆGSãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern GS = new LiteralOperandPattern(SegmentRegister.GS);
 
         /// <summary>
-        /// SSiSSƒŒƒWƒXƒ^jƒpƒ^[ƒ“
+        /// SSï¼ˆSSãƒ¬ã‚¸ã‚¹ã‚¿ï¼‰ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public static OperandPattern SS = new LiteralOperandPattern(SegmentRegister.SS);
 

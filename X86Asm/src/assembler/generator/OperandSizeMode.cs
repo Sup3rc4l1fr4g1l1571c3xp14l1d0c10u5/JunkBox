@@ -1,22 +1,22 @@
 namespace X86Asm.generator {
 
     /// <summary>
-    /// ƒIƒyƒ‰ƒ“ƒh‚ÌƒTƒCƒYimovw‚È‚çMODE16,movl‚È‚çMODE32, jmp‚È‚çMODELESSj
+    /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ã‚µã‚¤ã‚ºï¼ˆmovwãªã‚‰MODE16,movlãªã‚‰MODE32, jmpãªã‚‰MODELESSï¼‰
     /// </summary>
     public enum OperandSizeMode {
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Í16bit
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã¯16bit
         /// </summary>
         MODE16,
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Í32bit
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã¯32bit
         /// </summary>
         MODE32,
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Í8bit‚à‚µ‚­‚ÍƒTƒCƒY–³ŠÖŒW
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã¯8bitã‚‚ã—ãã¯ã‚µã‚¤ã‚ºç„¡é–¢ä¿‚
         /// </summary>
         MODELESS
 

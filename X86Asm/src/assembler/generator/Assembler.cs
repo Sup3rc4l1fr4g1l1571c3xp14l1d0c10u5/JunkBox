@@ -4,10 +4,7 @@ using System.IO;
 using System.Linq;
 using X86Asm.libelf;
 
-namespace X86Asm.generator
-{
-
-
+namespace X86Asm.generator {
     using InstructionStatement = X86Asm.ast.statement.InstructionStatement;
     using LabelStatement = X86Asm.ast.statement.LabelStatement;
     using DirectiveStatement = X86Asm.ast.statement.DirectiveStatement;
@@ -19,22 +16,24 @@ namespace X86Asm.generator
     using ObjectType = X86Asm.libelf.ObjectType;
     using ProgramHeader = X86Asm.libelf.ProgramHeader;
     using SegmentType = X86Asm.libelf.SegmentType;
+    using ast.operand;
 
     public class Section {
-        public string name; //  ƒZƒNƒVƒ‡ƒ“–¼
-        public uint index; //  ƒZƒNƒVƒ‡ƒ“”Ô†iƒZƒNƒVƒ‡ƒ“ƒe[ƒuƒ‹‚ÌƒCƒ“ƒfƒNƒX”Ô†‚Æ“™‚µ‚¢j
-        public uint size;   // ƒZƒNƒVƒ‡ƒ“‚ÌƒTƒCƒY
-                            // ƒZƒNƒVƒ‡ƒ““à‚ÌÄ”z’uî•ñ
+        public string name; //  ã‚»ã‚¯ã‚·ãƒ§ãƒ³å
+        public uint index; //  ã‚»ã‚¯ã‚·ãƒ§ãƒ³ç•ªå·ï¼ˆã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ†ãƒ¼ãƒ–ãƒ«ã®ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ç•ªå·ã¨ç­‰ã—ã„ï¼‰
+        public uint size;   // ã‚»ã‚¯ã‚·ãƒ§ãƒ³ã®ã‚µã‚¤ã‚º
+                            // ã‚»ã‚¯ã‚·ãƒ§ãƒ³å†…ã®å†é…ç½®æƒ…å ±
         public class Relocation {
-            public uint offset;
-            public uint appliedTo;
-            public Section section;
-            // ˆÓ–¡
-            // ‚±‚ÌƒZƒNƒVƒ‡ƒ“‚Ìoffset‚©‚çn‚Ü‚é4ƒoƒCƒg(i386‚È‚Çsizeof(ptr_t)==4‚ÌŠÂ‹«‚Ìê‡Bx64‚È‚ç8ƒoƒCƒg)‚ğ
-            // iƒŠƒ“ƒJ/ƒ[ƒ_‚ª‰ğŒˆ‚·‚éÛ‚É‚ÍjƒZƒNƒVƒ‡ƒ“section‚ÌƒIƒtƒZƒbƒgappliedTo‚ğ¦‚·ƒAƒhƒŒƒX‚É‘‚«Š·‚¦‚Ä‚Ù‚µ‚¢
+            public uint VirtualAddress;
+            public Symbol SymbolTableIndex;
+            //public Section section;
+            // æ„å‘³
+            // ã“ã®ã‚»ã‚¯ã‚·ãƒ§ãƒ³ã®VirtualAddressã‹ã‚‰å§‹ã¾ã‚‹4ãƒã‚¤ãƒˆ(i386ãªã©sizeof(ptr_t)==4ã®ç’°å¢ƒã®å ´åˆã€‚x64ãªã‚‰8ãƒã‚¤ãƒˆ)ã‚’
+            // ï¼ˆãƒªãƒ³ã‚«/ãƒ­ãƒ¼ãƒ€ãŒè§£æ±ºã™ã‚‹éš›ã«ã¯ï¼‰ã‚·ãƒ³ãƒœãƒ«SymbolTableIndexãŒç¤ºã™ã‚¢ãƒ‰ãƒ¬ã‚¹ã«æ›¸ãæ›ãˆã¦ã»ã—ã„ã€‚
         }
-        public List<Relocation> relocations;
-        public List<Symbol> symbols;
+        public List<Relocation> relocations = new List<Section.Relocation>();
+        public List<Symbol> symbols = new List<Symbol>();
+        public MemoryStream data = new MemoryStream();
 
         public override string ToString() {
             return name;
@@ -56,32 +55,31 @@ namespace X86Asm.generator
         private static InstructionPatternTable patterntable = InstructionPatternTable.MODE32_TABLE;
 
         /// <summary>
-        /// \•¶–Ø‚É‘Î‚·‚éƒAƒZƒ“ƒuƒ‹ˆ—‚ğs‚¢AŒ‹‰Ê‚ğStream‚É‘‚«‚Ş
+        /// æ§‹æ–‡æœ¨ã«å¯¾ã™ã‚‹ã‚¢ã‚»ãƒ³ãƒ–ãƒ«å‡¦ç†ã‚’è¡Œã„ã€çµæœã‚’Streamã«æ›¸ãè¾¼ã‚€
         /// </summary>
-        /// <param name="program">\•¶–Ø</param>
-        /// <param name="outputfile">o—ÍƒXƒgƒŠ[ƒ€</param>
-        public static bool assemble(Program program, uint offset, out byte[] code, out Section[] section) {
+        /// <param name="program">æ§‹æ–‡æœ¨</param>
+        /// <param name="outputfile">å‡ºåŠ›ã‚¹ãƒˆãƒªãƒ¼ãƒ </param>
+        public static bool assemble(Program program, uint offset, List<Section> sections) {
             if (program == null) {
                 throw new ArgumentNullException();
             }
 
-            List<Section> sections = new List<Section>();
+            //List<Section> sections = new List<Section>();
             Dictionary<string, Symbol> labelOffsets = new Dictionary<string, Symbol>();
 
-            // ƒ‰ƒxƒ‹ƒIƒtƒZƒbƒg•\‚ğ¶¬
+            // ãƒ©ãƒ™ãƒ«ã‚ªãƒ•ã‚»ãƒƒãƒˆè¡¨ã‚’ç”Ÿæˆ
             computeLabelOffsets(program, sections, labelOffsets);
 
-            // \•¶–Ø‚ğ–|–ó‚µ‚Ä‹@ŠBŒê‚ğ¶¬
-            code = assembleToBytes(program, sections, labelOffsets);
-            section = sections.ToArray();
-            
+            // æ§‹æ–‡æœ¨ã‚’ç¿»è¨³ã—ã¦æ©Ÿæ¢°èªã‚’ç”Ÿæˆ
+            assembleToBytes(program, sections, labelOffsets);
+
             return true;
         }
 
         /// <summary>
-        /// ƒ‰ƒxƒ‹‚ÌƒIƒtƒZƒbƒgƒAƒhƒŒƒX‚ğZo‚µAƒ‰ƒxƒ‹ƒIƒtƒZƒbƒg•\‚ğ¶¬‚·‚é
+        /// ãƒ©ãƒ™ãƒ«ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’ç®—å‡ºã—ã€ãƒ©ãƒ™ãƒ«ã‚ªãƒ•ã‚»ãƒƒãƒˆè¡¨ã‚’ç”Ÿæˆã™ã‚‹
         /// </summary>
-        /// <param name="program">\•¶–Ø</param>
+        /// <param name="program">æ§‹æ–‡æœ¨</param>
         /// <returns></returns>
         private static void computeLabelOffsets(Program program, List<Section> sections, IDictionary<string, Symbol> labelOffsets) {
             int sectionIndex = -1;
@@ -90,26 +88,32 @@ namespace X86Asm.generator
             foreach (IStatement st in program.Statements) {
                 if (st is DirectiveStatement) {
                     DirectiveStatement directive = (DirectiveStatement)st;
-                    if (directive.Name == ".text" && directive.Arguments.Count == 0) {
+                    if ((directive.Name == ".text" || directive.Name == ".data") && directive.Arguments.Count == 0) {
                         if (sectionIndex != -1) {
                             sections[sectionIndex].size = offset;
                         }
-                        sectionIndex = sections.FindIndex(x => x.name == ".text");
+                        sectionIndex = sections.FindIndex(x => x.name == directive.Name);
                         if (sectionIndex == -1) {
                             sectionIndex = sections.Count();
-                            sections.Add(new Section() { name = ".text", size = 0, index = (uint)sectionIndex, relocations = new List<Section.Relocation>(), symbols = new List<Symbol>() });
+                            sections.Add(new Section() { name = directive.Name, size = 0, index = (uint)sectionIndex });
                         }
                         offset = sections[sectionIndex].size;
                     } else if (directive.Name == ".globl" && directive.Arguments.Count == 1 && directive.Arguments[0] is ast.operand.Label) {
                         globalLabels.Add(((ast.operand.Label)directive.Arguments[0]).Name);
+                    } else if (directive.Name == ".db") {
+                        offset += (uint)directive.Arguments.Count * 1;
+                    } else if (directive.Name == ".dw") {
+                        offset += (uint)directive.Arguments.Count * 2;
+                    } else if (directive.Name == ".dd") {
+                        offset += (uint)directive.Arguments.Count * 4;
                     } else {
-                        throw new Exception("•s–¾‚ÈƒfƒBƒŒƒNƒeƒBƒu‚Å‚·B");
+                        throw new Exception("ä¸æ˜ãªãƒ‡ã‚£ãƒ¬ã‚¯ãƒ†ã‚£ãƒ–ã§ã™ã€‚");
                     }
                 } else if (st is InstructionStatement) {
                     if (sectionIndex == -1) {
-                        throw new Exception("”z’uƒZƒNƒVƒ‡ƒ“‚ªw’è‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB");
+                        throw new Exception("é…ç½®ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãŒæŒ‡å®šã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚");
                     }
-                    // –½—ßŒê‚Ìê‡‚Í–½—ßŒê‚Ì’·‚³‚ğZo‚µ‚ÄŒ»İˆÊ’u‚É‰ÁZ
+                    // å‘½ä»¤èªã®å ´åˆã¯å‘½ä»¤èªã®é•·ã•ã‚’ç®—å‡ºã—ã¦ç¾åœ¨ä½ç½®ã«åŠ ç®—
                     InstructionStatement ist = (InstructionStatement)st;
                     string mnemonic = ist.Mnemonic;
                     IList<IOperand> operands = ist.Operands.ToList();
@@ -117,9 +121,9 @@ namespace X86Asm.generator
                     offset += (uint)length;
                 } else if (st is LabelStatement) {
                     if (sectionIndex == -1) {
-                        throw new Exception("”z’uƒZƒNƒVƒ‡ƒ“‚ªw’è‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB");
+                        throw new Exception("é…ç½®ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãŒæŒ‡å®šã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚");
                     }
-                    // Œ»İˆÊ’u‚Æƒ‰ƒxƒ‹–¼‚Ì‘Î‚ğ•\‚É‹L˜^‚·‚é
+                    // ç¾åœ¨ä½ç½®ã¨ãƒ©ãƒ™ãƒ«åã®å¯¾ã‚’è¡¨ã«è¨˜éŒ²ã™ã‚‹
                     string name = ((LabelStatement)st).Name;
                     labelOffsets[name] = new Symbol() { section = sections[sectionIndex], offset = offset, name = name };
                     sections[sectionIndex].symbols.Add(labelOffsets[name]);
@@ -134,54 +138,69 @@ namespace X86Asm.generator
         }
 
         /// <summary>
-        /// \•¶–Ø‚©‚ç‹@ŠBŒê‚ğ¶¬
+        /// æ§‹æ–‡æœ¨ã‹ã‚‰æ©Ÿæ¢°èªã‚’ç”Ÿæˆ
         /// </summary>
         /// <param name="program"></param>
         /// <param name="labelOffsets"></param>
         /// <returns></returns>
-        private static byte[] assembleToBytes(Program program, List<Section> sections, IDictionary<string, Symbol> labelOffsets) {
-            using (var ms = new System.IO.MemoryStream()) {
-                List<Section> workSections = new List<Section>();
-                int sectionIndex = -1;
-                uint offset = 0;
-                foreach (IStatement st in program.Statements) {
-                    if (st is DirectiveStatement) {
-                        DirectiveStatement directive = (DirectiveStatement)st;
-                        if (directive.Name == ".text" && directive.Arguments.Count == 0) {
-                            if (sectionIndex != -1) {
-                                if (sections[sectionIndex].name != workSections[sectionIndex].name) {
-                                    throw new Exception("ƒ‰ƒxƒ‹ŒvZ‚ÆƒR[ƒh¶¬‚ÅƒZƒNƒVƒ‡ƒ“–¼‚Ì‘Î‰‚ª‚Æ‚ê‚Ä‚¢‚È‚¢");
-                                }
-                                workSections[sectionIndex].size = offset;
-                            }
-                            sectionIndex = workSections.FindIndex(x => x.name == ".text");
-                            if (sectionIndex == -1) {
-                                sectionIndex = workSections.Count();
-                                workSections.Add(new Section() { name = ".text", size = 0, index = (uint)sectionIndex, relocations = new List<Section.Relocation>() });
-                            }
-                            offset = workSections[sectionIndex].size;
-                        } else if (directive.Name == ".globl" && directive.Arguments.Count == 1 && directive.Arguments[0] is ast.operand.Label) {
-                            // skip
-                        } else {
-                            throw new Exception("•s–¾‚ÈƒfƒBƒŒƒNƒeƒBƒu‚Å‚·B");
+        private static void assembleToBytes(Program program, List<Section> sections, IDictionary<string, Symbol> labelOffsets) {
+            var workSectionSize = Enumerable.Repeat(0U, sections.Count).ToArray();
+            int sectionIndex = -1;
+            uint offset = 0;
+            foreach (IStatement st in program.Statements) {
+                if (st is DirectiveStatement) {
+                    DirectiveStatement directive = (DirectiveStatement)st;
+                    if ((directive.Name == ".text" || directive.Name == ".data") && directive.Arguments.Count == 0) {
+                        if (sectionIndex != -1) {
+                            workSectionSize[sectionIndex] = offset;
                         }
-                    } else if (st is InstructionStatement) {
-                        // –½—ß•¶‚È‚ç‚ÎƒR[ƒh‚ğ¶¬
-                        InstructionStatement ist = (InstructionStatement)st;
-                        string mnemonic = ist.Mnemonic;
-                        IList<IOperand> operands = ist.Operands.ToList();
-                        byte[] machinecode = CodeGenerator.makeMachineCode(patterntable, mnemonic, operands, program, labelOffsets, sections[sectionIndex], offset);
-                        ms.Write(machinecode, 0, machinecode.Length);
-                        offset += (uint)machinecode.Length;
-                    } else if (st is LabelStatement) {
-                        // ƒ‰ƒxƒ‹•¶‚Ìê‡Aƒ‰ƒxƒ‹ƒIƒtƒZƒbƒg•\‚ÆŒ»İˆÊ’u‚ª‚¸‚ê‚Ä‚¢‚È‚¢‚©ƒ`ƒFƒbƒN
-                        string name = ((LabelStatement)st).Name;
-                        if (sections[sectionIndex] != labelOffsets[name].section || offset != labelOffsets[name].offset || name != labelOffsets[name].name) {
-                            throw new InvalidOperationException("ƒ‰ƒxƒ‹‚ÌƒIƒtƒZƒbƒgî•ñ‚ªˆê’v‚µ‚Ü‚¹‚ñ");
+                        sectionIndex = sections.FindIndex(x => x.name == directive.Name);
+                        if (sectionIndex == -1) {
+                            throw new Exception("è¾»è¤„ãŒåˆã‚ãªã„");
                         }
+                        offset = workSectionSize[sectionIndex];
+                    } else if (directive.Name == ".globl" && directive.Arguments.Count == 1 && directive.Arguments[0] is ast.operand.Label) {
+                        // skip
+                    } else if (directive.Name == ".db") {
+                        sections[sectionIndex].data.Write(directive.Arguments.SelectMany(x => ((IImmediate)x).GetValue(labelOffsets).To1Byte()).ToArray(), 0, directive.Arguments.Count * 1);
+                        offset += (uint)directive.Arguments.Count * 1;
+                    } else if (directive.Name == ".dw") {
+                        sections[sectionIndex].data.Write(directive.Arguments.SelectMany(x => ((IImmediate)x).GetValue(labelOffsets).To2Bytes()).ToArray(), 0, directive.Arguments.Count * 2);
+                        offset += (uint)directive.Arguments.Count * 2;
+                    } else if (directive.Name == ".dd") {
+                        sections[sectionIndex].data.Write(directive.Arguments.SelectMany(x => ((IImmediate)x).GetValue(labelOffsets).To4Bytes()).ToArray(), 0, directive.Arguments.Count * 4);
+                        offset += (uint)directive.Arguments.Count * 4;
+                    } else {
+                        throw new Exception("ä¸æ˜ãªãƒ‡ã‚£ãƒ¬ã‚¯ãƒ†ã‚£ãƒ–ã§ã™ã€‚");
                     }
+                } else if (st is InstructionStatement) {
+                    // å‘½ä»¤æ–‡ãªã‚‰ã°ã‚³ãƒ¼ãƒ‰ã‚’ç”Ÿæˆ
+                    InstructionStatement ist = (InstructionStatement)st;
+                    string mnemonic = ist.Mnemonic;
+                    IList<IOperand> operands = ist.Operands.ToList();
+                    var ret = CodeGenerator.makeMachineCode(patterntable, mnemonic, operands, program, labelOffsets, sections[sectionIndex], offset);
+                    var relocations = ret.Item1;
+                    byte[] machinecode = ret.Item2;
+                    foreach (var rel in relocations) {
+                        sections[sectionIndex].relocations.Add(new Section.Relocation() {
+                            VirtualAddress = rel.Item2,
+                            SymbolTableIndex = rel.Item1,
+                        });
+                    }
+                    sections[sectionIndex].data.Write(machinecode, 0, machinecode.Length);
+                    offset += (uint)machinecode.Length;
+                } else if (st is LabelStatement) {
+                    // ãƒ©ãƒ™ãƒ«æ–‡ã®å ´åˆã€ãƒ©ãƒ™ãƒ«ã‚ªãƒ•ã‚»ãƒƒãƒˆè¡¨ã¨ç¾åœ¨ä½ç½®ãŒãšã‚Œã¦ã„ãªã„ã‹ãƒã‚§ãƒƒã‚¯
+                    string name = ((LabelStatement)st).Name;
+                    if (sections[sectionIndex] != labelOffsets[name].section || offset != labelOffsets[name].offset || name != labelOffsets[name].name) {
+                        throw new InvalidOperationException("ãƒ©ãƒ™ãƒ«ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆæƒ…å ±ãŒä¸€è‡´ã—ã¾ã›ã‚“");
+                    }
+                    //sections[sectionIndex].relocations.Add(new Section.Relocation() {
+                    //    VirtualAddress = offset,
+                    //    SymbolTableIndex = labelOffsets[name],
+                    //});
+
                 }
-                return ms.ToArray();
             }
         }
     }

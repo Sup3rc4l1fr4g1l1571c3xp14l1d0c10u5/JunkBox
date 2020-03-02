@@ -10,54 +10,54 @@ namespace X86Asm.libelf
         public const int TypeSize = 40;
 
         /// <summary>
-        /// �Z�N�V�������i�Z�N�V�����w�b�_�e�[�u���̃C���f�b�N�X�j
+        /// セクション名（セクションヘッダテーブルのインデックス）
         /// </summary>
 		public UInt32 name { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̎��
+        /// セクションの種別
         /// </summary>
         public SectionType Type { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̃t���O
+        /// セクションのフラグ
         /// </summary>
         public UInt32 Flags { get; set; }
 
         /// <summary>
-        /// �Z�N�V��������������ɔz�u�����ꍇ�̃A�h���X
+        /// セクションがメモリ上に配置される場合のアドレス
         /// </summary>
         public UInt32 Addr { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̃t�@�C���擪����̃o�C�g�I�t�Z�b�g
-        /// �iSHT_NOBITS ���Z�b�g����Ă���ꍇ�̓t�@�C����Ɏ��̂������Ȃ��j
+        /// セクションのファイル先頭からのバイトオフセット
+        /// （SHT_NOBITS がセットされている場合はファイル上に実体を持たない）
         /// </summary>
         public UInt32 Offset  { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̃T�C�Y
-        /// �iSHT_NOBITS ���Z�b�g����Ă���ꍇ�̓t�@�C����Ɏ��̂������Ȃ��j
+        /// セクションのサイズ
+        /// （SHT_NOBITS がセットされている場合はファイル上に実体を持たない）
         /// </summary>
         public UInt32 Size  { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����w�b�_�e�[�u���C���f�b�N�X�����N�i�Ӗ��̓Z�N�V�����^�C�v�Ɉˑ�����j
+        /// セクションヘッダテーブルインデックスリンク（意味はセクションタイプに依存する）
         /// </summary>
         public UInt32 Link  { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̒ǉ����i�Ӗ��̓Z�N�V�����^�C�v�Ɉˑ�����j
+        /// セクションの追加情報（意味はセクションタイプに依存する）
         /// </summary>
         public UInt32 Info  { get; set; }
 
         /// <summary>
-        /// �Z�N�V�����̃A���C�����g
+        /// セクションのアライメント
         /// </summary>
         public UInt32 AddrAlign { get; set; }
 
         /// <summary>
-        /// �Z�N�V�������Œ�T�C�Y�̃G���g���̃e�[�u�������ꍇ�̃T�C�Y
+        /// セクションが固定サイズのエントリのテーブルを持つ場合のサイズ
         /// </summary>
         public UInt32 EntSize  { get; set; }
 

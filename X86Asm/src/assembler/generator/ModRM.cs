@@ -8,28 +8,28 @@ namespace X86Asm.generator {
     public sealed class ModRM : InstructionOption {
 
         /// <summary>
-        /// R/MƒtƒB[ƒ‹ƒh‚Æ‚È‚éƒIƒyƒ‰ƒ“ƒh‚ÌƒCƒ“ƒfƒNƒX”Ô†
+        /// R/Mãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã¨ãªã‚‹ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ç•ªå·
         /// </summary>
         public readonly int rmOperandIndex;
 
         /// <summary>
-        /// reg / opcodeƒtƒB[ƒ‹ƒhB
-        /// ’l‚ª[ 0, 10j‚Ì”ÍˆÍ‚Ìê‡A’l‚ÍA”ÍˆÍ[0A10j‚ÌƒIƒyƒ‰ƒ“ƒhƒCƒ“ƒfƒbƒNƒX‚Æ‚µ‚Ä‰ğß
-        /// ’l‚ª[10, 18j‚Ì”ÍˆÍ‚Ìê‡A’l‚ÍA”ÍˆÍ[0A 8j‚ÌƒIƒyƒR[ƒh’è”‚Æ‚µ‚Ä‰ğß
+        /// reg / opcodeãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã€‚
+        /// å€¤ãŒ[ 0, 10ï¼‰ã®ç¯„å›²ã®å ´åˆã€å€¤ã¯ã€ç¯„å›²[0ã€10ï¼‰ã®ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã¨ã—ã¦è§£é‡ˆ
+        /// å€¤ãŒ[10, 18ï¼‰ã®ç¯„å›²ã®å ´åˆã€å€¤ã¯ã€ç¯„å›²[0ã€ 8ï¼‰ã®ã‚ªãƒšã‚³ãƒ¼ãƒ‰å®šæ•°ã¨ã—ã¦è§£é‡ˆ
         /// </summary>
         public readonly int regOpcodeOperandIndex;
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
         /// </summary>
-        /// <param name="rmOperandIndex"> R/MƒtƒB[ƒ‹ƒh‚Æ‚È‚éƒIƒyƒ‰ƒ“ƒh‚ÌƒCƒ“ƒfƒNƒX”Ô† </param>
-        /// <param name="regOpOperandIndex"> reg/opcode ƒtƒB[ƒ‹ƒh’l </param>
+        /// <param name="rmOperandIndex"> R/Mãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã¨ãªã‚‹ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ç•ªå· </param>
+        /// <param name="regOpOperandIndex"> reg/opcode ãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰å€¤ </param>
         public ModRM(int rmOperandIndex, int regOpOperandIndex) {
             if (rmOperandIndex < 0 || rmOperandIndex >= 10) {
-                throw new System.ArgumentException("•s³‚ÈƒIƒyƒ‰ƒ“ƒhƒCƒ“ƒfƒbƒNƒX‚Å‚·");
+                throw new System.ArgumentException("ä¸æ­£ãªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã§ã™");
             }
             if (regOpOperandIndex < 0 || regOpOperandIndex >= 18) {
-                throw new System.ArgumentException("•s³‚Èreg/opcode’l‚Å‚·");
+                throw new System.ArgumentException("ä¸æ­£ãªreg/opcodeå€¤ã§ã™");
             }
             this.rmOperandIndex = rmOperandIndex;
             this.regOpcodeOperandIndex = regOpOperandIndex;

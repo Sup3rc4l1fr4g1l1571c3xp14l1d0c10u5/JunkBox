@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace X86Asm.libelf {
     [Flags]

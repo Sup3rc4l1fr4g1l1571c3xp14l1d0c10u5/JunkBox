@@ -1,7 +1,7 @@
 namespace X86Asm.generator {
 
     /// <summary>
-    /// 命令パターンに付与するオプション情報を示すインタフェース 
+    /// 蜻ｽ莉､繝代ち繝ｼ繝ｳ縺ｫ莉倅ｸ弱☆繧九が繝励す繝ｧ繝ｳ諠�蝣ｱ繧堤､ｺ縺吶う繝ｳ繧ｿ繝輔ぉ繝ｼ繧ｹ 
     /// </summary>
     public interface InstructionOption { }
 

@@ -8,51 +8,51 @@ namespace X86Asm.generator {
 
 
     /// <summary>
-    /// –½—ßƒpƒ^[ƒ“ƒNƒ‰ƒX
+    /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚¯ãƒ©ã‚¹
     /// </summary>
     public sealed class InstructionPattern {
 
         /// <summary>
-        /// ƒj[ƒ‚ƒjƒbƒN‚Æ‡’v‚·‚é³‹K•\Œ»ƒpƒ^[ƒ“B
+        /// ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã¨åˆè‡´ã™ã‚‹æ­£è¦è¡¨ç¾ãƒ‘ã‚¿ãƒ¼ãƒ³ã€‚
         /// </summary>
         private static Regex MNEMONIC_PATTERN { get; } = new Regex("[a-z][a-z0-9]*");
 
         /// <summary>
-        /// ƒj[ƒ‚ƒjƒbƒN
+        /// ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯
         /// </summary>
         public string mnemonic { get; }
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Ìƒpƒ^[ƒ“
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ‘ã‚¿ãƒ¼ãƒ³
         /// </summary>
         public IReadOnlyList<OperandPattern> operands { get; }
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒhƒTƒCƒYƒ‚[ƒh
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚µã‚¤ã‚ºãƒ¢ãƒ¼ãƒ‰
         /// </summary>
         public OperandSizeMode operandSizeMode { get; }
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“‚É•t—^‚³‚ê‚½ƒIƒvƒVƒ‡ƒ“î•ñ
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã«ä»˜ä¸ã•ã‚ŒãŸã‚ªãƒ—ã‚·ãƒ§ãƒ³æƒ…å ±
         /// </summary>
         public IReadOnlyList<InstructionOption> options { get; }
 
 
         /// <summary>
-        /// –½—ßƒpƒ^[ƒ“‚É‘Î‰‚·‚é–½—ßƒR[ƒh‚Ìƒeƒ“ƒvƒŒ[ƒgiˆê•”–½—ß‚Í‚±‚ÌƒoƒCƒg—ñ‚ğƒx[ƒX‚É­‚µè‚ğ“ü‚ê‚½ƒR[ƒh‚ğ¶¬‚·‚éj
+        /// å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã«å¯¾å¿œã™ã‚‹å‘½ä»¤ã‚³ãƒ¼ãƒ‰ã®ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆï¼ˆä¸€éƒ¨å‘½ä»¤ã¯ã“ã®ãƒã‚¤ãƒˆåˆ—ã‚’ãƒ™ãƒ¼ã‚¹ã«å°‘ã—æ‰‹ã‚’å…¥ã‚ŒãŸã‚³ãƒ¼ãƒ‰ã‚’ç”Ÿæˆã™ã‚‹ï¼‰
         /// </summary>
         public byte[] opcodes { get; }
 
 
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
         /// </summary>
-        /// <param name="mnemonic"> ƒj[ƒ‚ƒjƒbƒN</param>
-        /// <param name="operands"> ƒIƒyƒ‰ƒ“ƒh‚Ìƒpƒ^[ƒ“ </param>
-        /// <param name="operandSizeMode"> ƒIƒyƒ‰ƒ“ƒhƒTƒCƒYƒ‚[ƒh </param>
-        /// <param name="opcodes"> –½—ßƒR[ƒhƒeƒ“ƒvƒŒ[ƒg </param>
-        /// <param name="options"> –½—ßƒpƒ^[ƒ“‚É•t—^‚³‚ê‚½ƒIƒvƒVƒ‡ƒ“î•ñ </param>
+        /// <param name="mnemonic"> ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯</param>
+        /// <param name="operands"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ </param>
+        /// <param name="operandSizeMode"> ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚µã‚¤ã‚ºãƒ¢ãƒ¼ãƒ‰ </param>
+        /// <param name="opcodes"> å‘½ä»¤ã‚³ãƒ¼ãƒ‰ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆ </param>
+        /// <param name="options"> å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã«ä»˜ä¸ã•ã‚ŒãŸã‚ªãƒ—ã‚·ãƒ§ãƒ³æƒ…å ± </param>
         /// <exception cref="ArgumentNullException"> if any argument is {@code null} </exception>
         public InstructionPattern(string mnemonic, OperandPattern[] operands, OperandSizeMode operandSizeMode, byte[] opcodes, params InstructionOption[] options) {
             if (mnemonic == null || operands == null /*|| operandSizeMode == null */|| opcodes == null || options == null) {
@@ -60,25 +60,25 @@ namespace X86Asm.generator {
             }
 
             if (!MNEMONIC_PATTERN.IsMatch(mnemonic)) {
-                throw new System.ArgumentException("–¢’è‹`‚Ìƒj[ƒ‚ƒjƒbƒN‚Å‚·");
+                throw new System.ArgumentException("æœªå®šç¾©ã®ãƒ‹ãƒ¼ãƒ¢ãƒ‹ãƒƒã‚¯ã§ã™");
             }
 
             if (operands.Length > 10) {
-                throw new System.ArgumentException("ƒIƒyƒ‰ƒ“ƒh‚Ì”‚ª‘½‚·‚¬‚Ü‚·");
+                throw new System.ArgumentException("ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®æ•°ãŒå¤šã™ãã¾ã™");
             }
 
             if (options.Length > 1) {
-                throw new System.ArgumentException("ƒIƒvƒVƒ‡ƒ“‚Í2ŒÂˆÈãw’è‚Å‚«‚Ü‚¹‚ñ");
+                throw new System.ArgumentException("ã‚ªãƒ—ã‚·ãƒ§ãƒ³ã¯2å€‹ä»¥ä¸ŠæŒ‡å®šã§ãã¾ã›ã‚“");
             }
             if (options.Length == 1) {
-                // ƒIƒvƒVƒ‡ƒ“‚ªw’è‚³‚ê‚Ä‚¢‚éê‡‚ÍAƒIƒvƒVƒ‡ƒ“‚Æˆø”‚Ì‘Ã“–«ƒ`ƒFƒbƒN‚ğs‚¤
+                // ã‚ªãƒ—ã‚·ãƒ§ãƒ³ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€ã‚ªãƒ—ã‚·ãƒ§ãƒ³ã¨å¼•æ•°ã®å¦¥å½“æ€§ãƒã‚§ãƒƒã‚¯ã‚’è¡Œã†
                 InstructionOption option = options[0];
                 if (option is RegisterInOpcode) {
                     checkOption((RegisterInOpcode)option, operands);
                 } else if (option is ModRM) {
                     checkOption((ModRM)option, operands);
                 } else {
-                    throw new Exception("‘Î‰‚µ‚Ä‚¢‚È‚¢–½—ßƒIƒvƒVƒ‡ƒ“‚Å‚·");
+                    throw new Exception("å¯¾å¿œã—ã¦ã„ãªã„å‘½ä»¤ã‚ªãƒ—ã‚·ãƒ§ãƒ³ã§ã™");
                 }
             }
 
@@ -90,9 +90,9 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// ‚±‚ÌƒIƒuƒWƒFƒNƒg‚Ì•¶š—ñ•\Œ»‚ğ•Ô‚·
+        /// ã“ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®æ–‡å­—åˆ—è¡¨ç¾ã‚’è¿”ã™
         /// </summary>
-        /// <returns>•¶š—ñ•\Œ»</returns>
+        /// <returns>æ–‡å­—åˆ—è¡¨ç¾</returns>
         public override string ToString() {
             StringBuilder sb = new StringBuilder();
 
@@ -116,45 +116,45 @@ namespace X86Asm.generator {
 
 
         /// <summary>
-        /// RegisterInOpcodeƒIƒvƒVƒ‡ƒ“‚ªw’è‚³‚ê‚Ä‚¢‚éê‡‚Ìˆø”ƒ`ƒFƒbƒN‚ğs‚¤
+        /// RegisterInOpcodeã‚ªãƒ—ã‚·ãƒ§ãƒ³ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã®å¼•æ•°ãƒã‚§ãƒƒã‚¯ã‚’è¡Œã†
         /// </summary>
         /// <param name="option"></param>
         /// <param name="operands"></param>
         private static void checkOption(RegisterInOpcode option, OperandPattern[] operands) {
             if (option.operandIndex >= operands.Length) {
-                throw new System.IndexOutOfRangeException("ƒIƒyƒ‰ƒ“ƒh‚ÌŒÂ”‚ªARegisterInOpcode.operandIndexˆÈ‰º‚Å‚·B");
+                throw new System.IndexOutOfRangeException("ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å€‹æ•°ãŒã€RegisterInOpcode.operandIndexä»¥ä¸‹ã§ã™ã€‚");
             }
             if (!isRegisterPattern(operands[option.operandIndex])) {
-                throw new System.ArgumentException("RegisterInOpcode.operandIndex‚Åw’è‚³‚ê‚½ƒIƒyƒ‰ƒ“ƒh‚ªƒŒƒWƒXƒ^‚Å‚Í‚ ‚è‚Ü‚¹‚ñB");
+                throw new System.ArgumentException("RegisterInOpcode.operandIndexã§æŒ‡å®šã•ã‚ŒãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¬ã‚¸ã‚¹ã‚¿ã§ã¯ã‚ã‚Šã¾ã›ã‚“ã€‚");
             }
         }
 
         /// <summary>
-        /// ModRMƒIƒvƒVƒ‡ƒ“‚ªw’è‚³‚ê‚Ä‚¢‚éê‡‚Ìˆø”ƒ`ƒFƒbƒN‚ğs‚¤
+        /// ModRMã‚ªãƒ—ã‚·ãƒ§ãƒ³ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã®å¼•æ•°ãƒã‚§ãƒƒã‚¯ã‚’è¡Œã†
         /// </summary>
         /// <param name="option"></param>
         /// <param name="operands"></param>
         private static void checkOption(ModRM option, OperandPattern[] operands) {
             if (option.rmOperandIndex >= operands.Length) {
-                throw new System.IndexOutOfRangeException("ƒIƒyƒ‰ƒ“ƒh‚ÌŒÂ”‚ªAModRM.rmOperandIndexˆÈ‰º‚Å‚·B");
+                throw new System.IndexOutOfRangeException("ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å€‹æ•°ãŒã€ModRM.rmOperandIndexä»¥ä¸‹ã§ã™ã€‚");
             }
             if (!isRegisterMemoryPattern(operands[option.rmOperandIndex])) {
-                throw new System.ArgumentException("ModRM.rmOperandIndex‚Åw’è‚³‚ê‚½ƒIƒyƒ‰ƒ“ƒh‚ªƒŒƒWƒXƒ^‚à‚µ‚­‚Íƒƒ‚ƒŠ‚Å‚Í‚ ‚è‚Ü‚¹‚ñB");
+                throw new System.ArgumentException("ModRM.rmOperandIndexã§æŒ‡å®šã•ã‚ŒãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¬ã‚¸ã‚¹ã‚¿ã‚‚ã—ãã¯ãƒ¡ãƒ¢ãƒªã§ã¯ã‚ã‚Šã¾ã›ã‚“ã€‚");
             }
 
             if (option.regOpcodeOperandIndex >= 10 && option.regOpcodeOperandIndex < 18) {
-                // 10`17‚Í0`7‚ÌƒIƒyƒR[ƒh’è”‚Æ‚µ‚Ä‰ğß‚³‚ê‚é‚Ì‚Å–â‘è‚È‚µB
+                // 10ï½17ã¯0ï½7ã®ã‚ªãƒšã‚³ãƒ¼ãƒ‰å®šæ•°ã¨ã—ã¦è§£é‡ˆã•ã‚Œã‚‹ã®ã§å•é¡Œãªã—ã€‚
             } else if (option.regOpcodeOperandIndex >= 18) {
-                throw new System.ArgumentException("ModRM.regOpcodeOperandIndex‚É•s³‚È’l‚ªw’è‚³‚ê‚Ä‚¢‚Ü‚·");
+                throw new System.ArgumentException("ModRM.regOpcodeOperandIndexã«ä¸æ­£ãªå€¤ãŒæŒ‡å®šã•ã‚Œã¦ã„ã¾ã™");
             } else if (option.regOpcodeOperandIndex >= operands.Length) {
-                throw new System.IndexOutOfRangeException("ƒIƒyƒ‰ƒ“ƒh‚ÌŒÂ”‚ªAModRM.regOpcodeOperandIndexˆÈ‰º‚Å‚·B");
+                throw new System.IndexOutOfRangeException("ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å€‹æ•°ãŒã€ModRM.regOpcodeOperandIndexä»¥ä¸‹ã§ã™ã€‚");
             } else if (!isRegisterPattern(operands[option.regOpcodeOperandIndex])) {
-                throw new System.ArgumentException("ModRM.regOpcodeOperandIndex‚Åw’è‚³‚ê‚½ƒIƒyƒ‰ƒ“ƒh‚ªƒŒƒWƒXƒ^‚Å‚Í‚ ‚è‚Ü‚¹‚ñB");
+                throw new System.ArgumentException("ModRM.regOpcodeOperandIndexã§æŒ‡å®šã•ã‚ŒãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¬ã‚¸ã‚¹ã‚¿ã§ã¯ã‚ã‚Šã¾ã›ã‚“ã€‚");
             }
         }
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Ìƒpƒ^[ƒ“‚ªƒƒ‚ƒŠƒIƒyƒ‰ƒ“ƒh‚à‚µ‚­‚Í8/16/32bitƒŒƒWƒXƒ^ƒpƒ^[ƒ“‚È‚ç‚Î^
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ãŒãƒ¡ãƒ¢ãƒªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚‚ã—ãã¯8/16/32bitãƒ¬ã‚¸ã‚¹ã‚¿ãƒ‘ã‚¿ãƒ¼ãƒ³ãªã‚‰ã°çœŸ
         /// </summary>
         /// <param name="pat"></param>
         /// <returns></returns>
@@ -163,7 +163,7 @@ namespace X86Asm.generator {
         }
 
         /// <summary>
-        /// ƒIƒyƒ‰ƒ“ƒh‚Ìƒpƒ^[ƒ“‚ª8/16/32bitƒŒƒWƒXƒ^ƒpƒ^[ƒ“‚à‚µ‚­‚ÍƒZƒOƒƒ“ƒgƒŒƒWƒXƒ^ƒpƒ^[ƒ“‚È‚ç‚Î^
+        /// ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒ‘ã‚¿ãƒ¼ãƒ³ãŒ8/16/32bitãƒ¬ã‚¸ã‚¹ã‚¿ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚‚ã—ãã¯ã‚»ã‚°ãƒ¡ãƒ³ãƒˆãƒ¬ã‚¸ã‚¹ã‚¿ãƒ‘ã‚¿ãƒ¼ãƒ³ãªã‚‰ã°çœŸ
         /// </summary>
         /// <param name="pat"></param>
         /// <returns></returns>

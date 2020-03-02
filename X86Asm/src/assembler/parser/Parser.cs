@@ -132,9 +132,7 @@ namespace X86Asm.parser {
         private IOperand DirectiveItem() {
             if (Tokenizer.Check(TokenType.REGISTER)) {
                 throw new Exception("ディレクティブの引数にレジスタは使えない。");
-            } else if (Tokenizer.Check(TokenType.DOLLAR)) {
-                // トークンが '$' の場合は続く即値を解析する
-                Tokenizer.Next();
+            } else if (CanParseImmediate()) {
                 return ParseImmediate();
             } else if (Tokenizer.Check(TokenType.NAME)) {
                 // ラベル名?

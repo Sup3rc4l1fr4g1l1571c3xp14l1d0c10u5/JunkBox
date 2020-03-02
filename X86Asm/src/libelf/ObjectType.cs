@@ -1,27 +1,27 @@
 namespace X86Asm.libelf {
 
     /// <summary>
-    /// �I�u�W�F�N�g�t�@�C���^�C�v
+    /// オブジェクトファイルタイプ
     /// </summary>
     public enum ObjectType : ushort {
         /// <summary>
-        /// ���m�̃^�C�v
+        /// 未知のタイプ
         /// </summary>
         ET_NONE = 0,
         /// <summary>
-        /// �Ĕz�u�\�ȃt�@�C��
+        /// 再配置可能なファイル
         /// </summary>
         ET_REL = 1,
         /// <summary>
-        /// ���s�\�t�@�C��
+        /// 実行可能ファイル
         /// </summary>
         ET_EXEC = 2,
         /// <summary>
-        /// ���L�I�u�W�F�N�g
+        /// 共有オブジェクト
         /// </summary>
         ET_DYN = 3,
         /// <summary>
-        /// �R�A�t�@�C��
+        /// コアファイル
         /// </summary>
         ET_CORE = 4
     }

@@ -6,32 +6,32 @@ using X86Asm.util;
 namespace X86Asm.libelf {
 
     /// <summary>
-    /// ELFƒtƒ@ƒCƒ‹
+    /// ELFãƒ•ã‚¡ã‚¤ãƒ«
     /// </summary>
     public sealed class ElfFile {
 
         /// <summary>
-        /// ELFƒtƒ@ƒCƒ‹ƒwƒbƒ_
+        /// ELFãƒ•ã‚¡ã‚¤ãƒ«ãƒ˜ãƒƒãƒ€
         /// </summary>
         public ElfHeader elfHeader { get; set; }
 
         /// <summary>
-        /// ƒvƒƒOƒ‰ƒ€ƒwƒbƒ_
+        /// ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€
         /// </summary>
         public IList<ProgramHeader> programHeaders { get; }
 
         /// <summary>
-        /// ƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_
+        /// ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€
         /// </summary>
         public IList<SectionHeader> sectionHeaders { get; }
 
         /// <summary>
-        /// ƒf[ƒ^ƒZƒOƒƒ“ƒgi¡‰ñ‚ÌŒ`®‚Å‚ÍƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚ÆƒZƒNƒVƒ‡ƒ“ƒwƒbƒ_‚Ì’¼Œã‚ÉƒvƒƒOƒ‰ƒ€ƒwƒbƒ_‚É‘Î‰‚·‚éƒf[ƒ^ƒZƒOƒƒ“ƒg‚ğ”z’u‚µ‚Ä‚¢‚éj
+        /// ãƒ‡ãƒ¼ã‚¿ã‚»ã‚°ãƒ¡ãƒ³ãƒˆï¼ˆä»Šå›ã®å½¢å¼ã§ã¯ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã¨ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ˜ãƒƒãƒ€ã®ç›´å¾Œã«ãƒ—ãƒ­ã‚°ãƒ©ãƒ ãƒ˜ãƒƒãƒ€ã«å¯¾å¿œã™ã‚‹ãƒ‡ãƒ¼ã‚¿ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã‚’é…ç½®ã—ã¦ã„ã‚‹ï¼‰
         /// </summary>
         public byte[] data { get; set; }
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
         /// </summary>
         public ElfFile() {
             programHeaders = new List<ProgramHeader>();
@@ -39,7 +39,7 @@ namespace X86Asm.libelf {
         }
 
         /// <summary>
-        /// ƒf[ƒ^‚Ü‚Å‚ÌƒIƒtƒZƒbƒg
+        /// ãƒ‡ãƒ¼ã‚¿ã¾ã§ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
         /// </summary>
         public int DataOffset {
             get {
@@ -52,7 +52,7 @@ namespace X86Asm.libelf {
         }
 
         /// <summary>
-        /// ƒoƒCƒg—ñæ“¾
+        /// ãƒã‚¤ãƒˆåˆ—å–å¾—
         /// </summary>
         /// <returns></returns>
         public byte[] toBytes() {

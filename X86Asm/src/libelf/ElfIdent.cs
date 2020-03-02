@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace X86Asm.libelf {
 
     /// <summary>
-    /// ELFƒwƒbƒ_‚Ì ident 
+    /// ELFãƒ˜ãƒƒãƒ€ã® ident 
     /// </summary>
     public class ElfIdent {
         public const int Size = 16;

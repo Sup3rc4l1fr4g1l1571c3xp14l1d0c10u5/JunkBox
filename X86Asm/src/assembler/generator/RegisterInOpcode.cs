@@ -1,20 +1,20 @@
 namespace X86Asm.generator {
     /// <summary>
-    /// ƒŒƒWƒXƒ^ƒIƒyƒ‰ƒ“ƒh‚ğ–½—ß’†‚ÌiÅŒã‚ÌjƒIƒyƒ‰ƒ“ƒh‚ÌƒoƒCƒg’†‚ÉƒGƒ“ƒR[ƒh‚·‚é‚±‚Æ‚ğw’è‚·‚éƒIƒvƒVƒ‡ƒ“
+    /// ãƒ¬ã‚¸ã‚¹ã‚¿ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚’å‘½ä»¤ä¸­ã®ï¼ˆæœ€å¾Œã®ï¼‰ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ãƒã‚¤ãƒˆä¸­ã«ã‚¨ãƒ³ã‚³ãƒ¼ãƒ‰ã™ã‚‹ã“ã¨ã‚’æŒ‡å®šã™ã‚‹ã‚ªãƒ—ã‚·ãƒ§ãƒ³
     /// </summary>
     public sealed class RegisterInOpcode : InstructionOption {
 
         /// <summary>
-        /// ƒGƒ“ƒR[ƒh‘ÎÛ‚ÌƒIƒyƒ‰ƒ“ƒhƒCƒ“ƒfƒNƒX”Ô†
-        /// </summary>e
+        /// ã‚¨ãƒ³ã‚³ãƒ¼ãƒ‰å¯¾è±¡ã®ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ç•ªå·
+        /// </summary>â€˜
         public readonly int operandIndex;
 
         /// <summary>
-        /// ƒRƒ“ƒXƒgƒ‰ƒNƒ^ 
+        /// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ 
         /// </summary>
         public RegisterInOpcode(int operandIndex) {
             if (operandIndex < 0) {
-                throw new System.ArgumentException("•s³‚ÈƒIƒyƒ‰ƒ“ƒhƒCƒ“ƒfƒNƒX”Ô†‚Å‚·B");
+                throw new System.ArgumentException("ä¸æ­£ãªã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ç•ªå·ã§ã™ã€‚");
             }
             this.operandIndex = operandIndex;
         }

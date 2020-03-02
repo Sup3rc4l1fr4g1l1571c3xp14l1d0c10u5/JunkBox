@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,7 +9,7 @@ namespace X86Asm.libcoff {
     public enum IMAGE_FILE_CHARACTERISTICS : UInt16 {
 
         /// <summary>
-        /// Image only, Windows CE, and Microsoft Windows NT and later. This indicates that the file does not contain base relocations and must therefore be loaded at its preferred base address. If the base address is not available, the loader reports an error. The default behavior of the linker is to strip base relocations from executable (EXE) files.
+        /// Image only, Windows CE, and Microsoft WindowsﾂNT and later. This indicates that the file does not contain base relocations and must therefore be loaded at its preferred base address. If the base address is not available, the loader reports an error. The default behavior of the linker is to strip base relocations from executable (EXE) files.
         /// </summary>
         IMAGE_FILE_RELOCS_STRIPPED = 0x0001,
 

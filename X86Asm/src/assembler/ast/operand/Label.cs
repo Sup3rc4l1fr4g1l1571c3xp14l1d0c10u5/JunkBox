@@ -32,8 +32,7 @@ namespace X86Asm.ast.operand {
         /// <param name="labelOffsets"> ラベルオフセット表 </param>
         /// <returns>ラベルに対応するオフセットを値として持つ即値</returns>
         public ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets) {
-            // ToDo: 今のセクションを反映させること
-            return new ImmediateValue(unchecked((int)labelOffsets[Name].offset));
+            return new ImmediateValue(labelOffsets[Name], 0);
         }
 
         /// <summary>

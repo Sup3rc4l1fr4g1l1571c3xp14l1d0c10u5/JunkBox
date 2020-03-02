@@ -14,28 +14,28 @@ namespace X86Asm.generator {
     public sealed class CodeGenerator {
 
         /// <summary>
-        /// ƒAƒZƒ“ƒuƒŠŒ¾Œê‚Å‹Lq‚³‚ê‚½–½—ß—ñ‚©‚ç‹@ŠBŒê—ñ‚ÌƒoƒCƒg’·‚ğ“¾‚é
+        /// ã‚¢ã‚»ãƒ³ãƒ–ãƒªè¨€èªã§è¨˜è¿°ã•ã‚ŒãŸå‘½ä»¤åˆ—ã‹ã‚‰æ©Ÿæ¢°èªåˆ—ã®ãƒã‚¤ãƒˆé•·ã‚’å¾—ã‚‹
         /// </summary>
-        /// <param name="table">–½—ßƒpƒ^[ƒ“•\</param>
+        /// <param name="table">å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³è¡¨</param>
         /// <param name="mnemonic"></param>
         /// <param name="operands"></param>
         /// <returns></returns>
         public static int getMachineCodeLength(InstructionPatternTable table, string mnemonic, IList<IOperand> operands) {
-            // –½—ßƒpƒ^[ƒ“‚ğ“¾‚é
+            // å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’å¾—ã‚‹
             InstructionPattern pat = table.match(mnemonic, operands);
 
-            // ƒIƒyƒ‰ƒ“ƒh‚ÌƒTƒCƒY‚ğ‹‚ß‚Ä–½—ß’·‚Éİ’è
+            // ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®ã‚µã‚¤ã‚ºã‚’æ±‚ã‚ã¦å‘½ä»¤é•·ã«è¨­å®š
             int length = pat.opcodes.Length;
             if (pat.operandSizeMode == OperandSizeMode.MODE16) {
                 length++;
             }
 
-            // –½—ß‚ªModRM‚ğ‚ÂŒ`®‚Ìê‡AModRM•”‚ÌƒoƒCƒg’·‚ğZo‚µ‚ÄA–½—ß’·‚É‰ÁZ‚·‚é
+            // å‘½ä»¤ãŒModRMã‚’æŒã¤å½¢å¼ã®å ´åˆã€ModRMéƒ¨ã®ãƒã‚¤ãƒˆé•·ã‚’ç®—å‡ºã—ã¦ã€å‘½ä»¤é•·ã«åŠ ç®—ã™ã‚‹
             if (pat.options.Count == 1 && pat.options[0] is ModRM) {
                 length += getModRMBytesLength((ModRM)pat.options[0], operands);
             }
 
-            // ƒIƒyƒ‰ƒ“ƒh‚ÌŒ`®‚É‰‚¶‚Ä–½—ß’·‚ÉƒTƒCƒY‚ğ‰ÁZ
+            // ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å½¢å¼ã«å¿œã˜ã¦å‘½ä»¤é•·ã«ã‚µã‚¤ã‚ºã‚’åŠ ç®—
             for (int i = 0; i < pat.operands.Count; i++) {
                 OperandPattern slot = pat.operands[i];
                 if (slot == OperandPattern.IMM8 || slot == OperandPattern.IMM8S || slot == OperandPattern.REL8) {
@@ -52,69 +52,69 @@ namespace X86Asm.generator {
 
 
         /// <summary>
-        /// ModR/M‚ª‘ÎÛ‚Æ‚·‚éƒIƒyƒ‰ƒ“ƒh‚Ì‘®‚©‚çModRMƒoƒCƒg’·‚ğ‹‚ß‚é
+        /// ModR/MãŒå¯¾è±¡ã¨ã™ã‚‹ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®æ›¸å¼ã‹ã‚‰ModRMãƒã‚¤ãƒˆé•·ã‚’æ±‚ã‚ã‚‹
         /// </summary>
-        /// <param name="option">ModR/Mî•ñ</param>
-        /// <param name="operands">ƒIƒyƒ‰ƒ“ƒh</param>
+        /// <param name="option">ModR/Mæƒ…å ±</param>
+        /// <param name="operands">ã‚ªãƒšãƒ©ãƒ³ãƒ‰</param>
         /// <returns></returns>
         private static int getModRMBytesLength(ModRM option, IList<IOperand> operands) {
-            // ModR/M‚ª‘ÎÛ‚Æ‚·‚éƒI‚Øƒ‰ƒ“ƒh‚ğæ‚èo‚·
+            // ModR/MãŒå¯¾è±¡ã¨ã™ã‚‹ã‚ªãºãƒ©ãƒ³ãƒ‰ã‚’å–ã‚Šå‡ºã™
             IOperand rm = operands[option.rmOperandIndex];
 
             if (rm is Register) {
-                // ƒIƒyƒ‰ƒ“ƒh‚ªƒŒƒWƒXƒ^‚Ìê‡AModRMƒoƒCƒg’·‚Í‚PƒoƒCƒg
+                // ã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¬ã‚¸ã‚¹ã‚¿ã®å ´åˆã€ModRMãƒã‚¤ãƒˆé•·ã¯ï¼‘ãƒã‚¤ãƒˆ
                 return 1;
             } else if (rm is Memory) {
-                // ƒIƒyƒ‰ƒ“ƒh‚ªƒƒ‚ƒŠ‚Ìê‡A
+                // ã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¡ãƒ¢ãƒªã®å ´åˆã€
                 Memory m = (Memory)rm;
                 IImmediate disp = m.Displacement;
 
                 if (m.Base == null && m.Index == null) {
-                    // ƒx[ƒX‚ÆƒCƒ“ƒfƒNƒX‚ğ‚½‚È‚¢ê‡AModRMƒoƒCƒg’·‚Í‚TƒoƒCƒg
-                    // ‚Â‚Ü‚è disp32 Œ`®
+                    // ãƒ™ãƒ¼ã‚¹ã¨ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ã‚’æŒãŸãªã„å ´åˆã€ModRMãƒã‚¤ãƒˆé•·ã¯ï¼•ãƒã‚¤ãƒˆ
+                    // ã¤ã¾ã‚Š disp32 å½¢å¼
                     return 5;
                 } else if (m.Base != Register32.ESP && m.Base != Register32.EBP && m.Index == null && disp is ImmediateValue && ((ImmediateValue)disp).IsZero()) {
-                    // ƒx[ƒX‚ªESP/EBPƒŒƒWƒXƒ^ˆÈŠO‚©‚ÂAƒCƒ“ƒfƒNƒX‚ğ‚½‚¸AƒfƒBƒXƒvƒŒƒCƒƒ“ƒg‚ª‘¦’l‚O‚Ìê‡
-                    // ‚Â‚Ü‚èA (eax, ecx, edx, ebx, esi, edi) + 0 Œ`®
+                    // ãƒ™ãƒ¼ã‚¹ãŒESP/EBPãƒ¬ã‚¸ã‚¹ã‚¿ä»¥å¤–ã‹ã¤ã€ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ã‚’æŒãŸãšã€ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆãŒå³å€¤ï¼ã®å ´åˆ
+                    // ã¤ã¾ã‚Šã€ (eax, ecx, edx, ebx, esi, edi) + 0 å½¢å¼
                     return 1;
                 } else if (m.Base != Register32.ESP && m.Index == null && disp is ImmediateValue && ((ImmediateValue)disp).IsInt8()) {
-                    // ƒx[ƒX‚ªESPƒŒƒWƒXƒ^ˆÈŠO‚©‚ÂAƒCƒ“ƒfƒNƒX‚ğ‚½‚¸AƒfƒBƒXƒvƒŒƒCƒƒ“ƒg‚ª8bit‘¦’l‚Ìê‡
-                    // ‚Â‚Ü‚èA(eax, ecx, edx, ebx, ebp, esi, edi) + disp8 Œ`®
+                    // ãƒ™ãƒ¼ã‚¹ãŒESPãƒ¬ã‚¸ã‚¹ã‚¿ä»¥å¤–ã‹ã¤ã€ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ã‚’æŒãŸãšã€ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆãŒ8bitå³å€¤ã®å ´åˆ
+                    // ã¤ã¾ã‚Šã€(eax, ecx, edx, ebx, ebp, esi, edi) + disp8 å½¢å¼
                     return 2;
                 } else if (m.Base != Register32.ESP && m.Index == null) {
-                    // ƒx[ƒX‚ªESPƒŒƒWƒXƒ^ˆÈŠO‚©‚ÂAƒCƒ“ƒfƒNƒX‚ğ‚½‚È‚¢ê‡‚ÅAƒfƒBƒXƒvƒŒƒCƒƒ“ƒg‚ª8bit‘¦’l‚â‘¦’l‚Oo‚È‚¢ê‡
-                    // ‚Â‚Ü‚èA(eax, ecx, edx, ebx, ebp, esi, edi) + disp32 Œ`®
+                    // ãƒ™ãƒ¼ã‚¹ãŒESPãƒ¬ã‚¸ã‚¹ã‚¿ä»¥å¤–ã‹ã¤ã€ã‚¤ãƒ³ãƒ‡ã‚¯ã‚¹ã‚’æŒãŸãªã„å ´åˆã§ã€ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ³ãƒˆãŒ8bitå³å€¤ã‚„å³å€¤ï¼å‡ºãªã„å ´åˆ
+                    // ã¤ã¾ã‚Šã€(eax, ecx, edx, ebx, ebp, esi, edi) + disp32 å½¢å¼
                     return 5;
                 } else {
-                    // ModR/M‚ÍSIB (Scale Index Base)‚ğw’è‚µ‚Ä‚¢‚é‚½‚ßA
-                    // SIB‚ÌŒ`®‚É‰‚¶‚ÄModRMƒoƒCƒg’·‚ğ‹‚ß‚é
+                    // ModR/Mã¯SIB (Scale Index Base)ã‚’æŒ‡å®šã—ã¦ã„ã‚‹ãŸã‚ã€
+                    // SIBã®å½¢å¼ã«å¿œã˜ã¦ModRMãƒã‚¤ãƒˆé•·ã‚’æ±‚ã‚ã‚‹
 
                     if (m.Base == null) {
-                        // ƒCƒ“ƒfƒbƒNƒXƒŒƒWƒXƒ^ * ƒXƒP[ƒ‹ + 32bit’è” ‚ÌŒ`®
+                        // ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ * ã‚¹ã‚±ãƒ¼ãƒ« + 32bitå®šæ•° ã®å½¢å¼
                         // index * scale + disp32
                         return 6;
                     } else if (m.Base != Register32.EBP && disp is ImmediateValue && ((ImmediateValue)disp).IsZero()) {
-                        // ƒx[ƒXƒŒƒWƒXƒ^ + ƒCƒ“ƒfƒbƒNƒXƒŒƒWƒXƒ^ * ƒXƒP[ƒ‹ ‚ÌŒ`®
+                        // ãƒ™ãƒ¼ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ + ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ * ã‚¹ã‚±ãƒ¼ãƒ« ã®å½¢å¼
                         // (eax, ecx, edx, ebx, esp, esi, edi) + index * scale
                         return 2;
                     } else if (disp is ImmediateValue && ((ImmediateValue)disp).IsInt8()) {
-                        // ƒx[ƒXƒŒƒWƒXƒ^ + ƒCƒ“ƒfƒbƒNƒXƒŒƒWƒXƒ^ * ƒXƒP[ƒ‹ + 8bit’è” ‚ÌŒ`®
+                        // ãƒ™ãƒ¼ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ + ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ * ã‚¹ã‚±ãƒ¼ãƒ« + 8bitå®šæ•° ã®å½¢å¼
                         // base + index * scale + disp8
                         return 3;
                     } else {
-                        // ƒx[ƒXƒŒƒWƒXƒ^ + ƒCƒ“ƒfƒbƒNƒXƒŒƒWƒXƒ^ * ƒXƒP[ƒ‹ + 32bit’è” ‚ÌŒ`®
+                        // ãƒ™ãƒ¼ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ + ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ¬ã‚¸ã‚¹ã‚¿ * ã‚¹ã‚±ãƒ¼ãƒ« + 32bitå®šæ•° ã®å½¢å¼
                         // base + index * scale + disp32
                         return 6;
                     }
                 }
 
             } else {
-                throw new Exception("ModR/M‚Ì‘ÎÛƒIƒyƒ‰ƒ“ƒh‚ªƒŒƒWƒXƒ^‚Å‚àƒƒ‚ƒŠ‚Å‚à‚ ‚è‚Ü‚¹‚ñB");
+                throw new Exception("ModR/Mã®å¯¾è±¡ã‚ªãƒšãƒ©ãƒ³ãƒ‰ãŒãƒ¬ã‚¸ã‚¹ã‚¿ã§ã‚‚ãƒ¡ãƒ¢ãƒªã§ã‚‚ã‚ã‚Šã¾ã›ã‚“ã€‚");
             }
         }
 
         /// <summary>
-        /// ƒAƒZƒ“ƒuƒŠŒ¾Œê‚Å‹Lq‚³‚ê‚½–½—ß—ñ‚©‚ç‹@ŠBŒê—ñ‚ÌƒoƒCƒg—ñ‚ğ“¾‚é
+        /// ã‚¢ã‚»ãƒ³ãƒ–ãƒªè¨€èªã§è¨˜è¿°ã•ã‚ŒãŸå‘½ä»¤åˆ—ã‹ã‚‰æ©Ÿæ¢°èªåˆ—ã®ãƒã‚¤ãƒˆåˆ—ã‚’å¾—ã‚‹
         /// </summary>
         /// <param name="table"></param>
         /// <param name="mnemonic"></param>
@@ -123,105 +123,105 @@ namespace X86Asm.generator {
         /// <param name="labelOffsets"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets, Section section, uint offset) {
-            // –½—ßƒpƒ^[ƒ“‚ğ“¾‚é
+        public static Tuple<Tuple<Symbol,uint>[],byte[]> makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets, Section section, uint offset) {
+            // å‘½ä»¤ãƒ‘ã‚¿ãƒ¼ãƒ³ã‚’å¾—ã‚‹
             InstructionPattern pat = table.match(mnemonic, operands);
 
-            // ‹@ŠBŒê—ñƒoƒbƒtƒ@‚ğ¶¬
+            // æ©Ÿæ¢°èªåˆ—ãƒãƒƒãƒ•ã‚¡ã‚’ç”Ÿæˆ
             List<byte> result = new List<byte>();
 
-            // –½—ß‚ÌƒIƒyƒ‰ƒ“ƒhƒTƒCƒYƒ‚[ƒh‚ªMODE16‚Ìê‡AƒIƒyƒ‰ƒ“ƒhƒTƒCƒY‚Ìã‘‚«ƒvƒŒƒtƒBƒbƒNƒX‚ğ’Ç‰Á
+            // å‘½ä»¤ã®ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚µã‚¤ã‚ºãƒ¢ãƒ¼ãƒ‰ãŒMODE16ã®å ´åˆã€ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã‚µã‚¤ã‚ºã®ä¸Šæ›¸ããƒ—ãƒ¬ãƒ•ã‚£ãƒƒã‚¯ã‚¹ã‚’è¿½åŠ 
             if (pat.operandSizeMode == OperandSizeMode.MODE16) {
                 result.Add(0x66);
             }
 
             byte[] opcodes = pat.opcodes;
-
-            // OPCode’†‚ÉRegisterInOpCode‚ªw’è‚³‚ê‚Ä‚¢‚éê‡ARegisterInOpCode‚ğˆ—
+            var relocates = new List<Tuple<Symbol, uint>>();
+            // OPCodeä¸­ã«RegisterInOpCodeãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã€RegisterInOpCodeã‚’å‡¦ç†
             if (pat.options.Count == 1 && pat.options[0] is RegisterInOpcode) {
-                // w’è‚³‚ê‚½ƒIƒyƒ‰ƒ“ƒh‚É‹LÚ‚³‚ê‚Ä‚¢‚éƒŒƒWƒXƒ^”Ô†‚ğ¶¬‚·‚é–½—ß‚Ì––”öƒoƒCƒg‚É‰ÁZi˜_—˜aj‚µ‚½‚à‚Ì‚É‚·‚é
+                // æŒ‡å®šã•ã‚ŒãŸã‚ªãƒšãƒ©ãƒ³ãƒ‰ã«è¨˜è¼‰ã•ã‚Œã¦ã„ã‚‹ãƒ¬ã‚¸ã‚¹ã‚¿ç•ªå·ã‚’ç”Ÿæˆã™ã‚‹å‘½ä»¤ã®æœ«å°¾ãƒã‚¤ãƒˆã«åŠ ç®—ï¼ˆè«–ç†å’Œï¼‰ã—ãŸã‚‚ã®ã«ã™ã‚‹
                 RegisterInOpcode option = (RegisterInOpcode)pat.options[0];
                 opcodes = opcodes.ToArray();
                 opcodes[opcodes.Length - 1] += (byte)((Register)operands[option.operandIndex]).RegisterNumber;
             }
 
-            // ƒoƒbƒtƒ@‚ÉOPƒR[ƒh‚ğ’Ç‰Á
+            // ãƒãƒƒãƒ•ã‚¡ã«OPã‚³ãƒ¼ãƒ‰ã‚’è¿½åŠ 
             result.AddRange(opcodes);
 
-            // ModR/M‚ÆSIB‚ªw’è‚³‚ê‚Ä‚¢‚éê‡‚ÍModR/MƒoƒCƒg‚ğ¶¬‚µ‚Ä’Ç‰Á‚·‚é
+            // ModR/Mã¨SIBãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ModR/Mãƒã‚¤ãƒˆã‚’ç”Ÿæˆã—ã¦è¿½åŠ ã™ã‚‹
             // Append ModR/M and SIB bytes if necessary
             if (pat.options.Count == 1 && pat.options[0] is ModRM) {
-                var modRMBytes = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets);
+                var ret = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets);
+                var symbol = ret.Item1;
+                var vaddress = ret.Item2;
+                var modRMBytes = ret.Item3;
+                if (symbol != null) {
+                    relocates.Add(Tuple.Create(symbol, vaddress + (uint)result.Count + offset));
+                }
                 result.AddRange(modRMBytes);
             }
 
             for (int i = 0; i < pat.operands.Count; i++) {
                 OperandPattern slot = pat.operands[i];
 
-                // –½—ß‚ªó—‚·‚éˆø”[i]‚ÌŒ`®‚ª‘¦’lƒIƒyƒ‰ƒ“ƒh‚Ìê‡
+                // å‘½ä»¤ãŒå—ç†ã™ã‚‹å¼•æ•°[i]ã®å½¢å¼ãŒå³å€¤ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å ´åˆ
                 if (slot == OperandPattern.IMM8 || slot == OperandPattern.IMM8S || slot == OperandPattern.IMM16 || slot == OperandPattern.IMM32 || slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
 
-                    // ƒ‰ƒxƒ‹ƒIƒtƒZƒbƒg‚ğl—¶‚µ‚ÄƒIƒyƒ‰ƒ“ƒh‚Ì‘¦’l•\Œ»‚ğ“¾‚é
+                    // ãƒ©ãƒ™ãƒ«ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚’è€ƒæ…®ã—ã¦ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®å³å€¤è¡¨ç¾ã‚’å¾—ã‚‹
                     ImmediateValue value = ((IImmediate)operands[i]).GetValue(labelOffsets);
 
-                    // –½—ß‚ªó—‚·‚éˆø”‚ÌŒ`®‚ª‘¦’lƒIƒyƒ‰ƒ“ƒh‚ÌREL8, REL16,REL32Œ`®‚Ìê‡A
+                    // å‘½ä»¤ãŒå—ç†ã™ã‚‹å¼•æ•°ã®å½¢å¼ãŒå³å€¤ã‚ªãƒšãƒ©ãƒ³ãƒ‰ã®REL8, REL16,REL32å½¢å¼ã®å ´åˆã€
                     if (slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
                         var ivalue = value.GetValue(labelOffsets);
-                        if (section != ivalue.Section) {
-                            throw new Exception("ƒZƒNƒVƒ‡ƒ“‚ªˆá‚¤‚½‚ß–½—ß‘Š‘ÎƒAƒhƒŒƒX‚ğ‹‚ß‚ç‚ê‚È‚¢B");
+                        if (section != ivalue.Symbol.section) {
+                            throw new Exception("ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãŒé•ã†ãŸã‚å‘½ä»¤ç›¸å¯¾ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’æ±‚ã‚ã‚‰ã‚Œãªã„ã€‚");
                         }
-                        // ‘¦’l•\Œ»‚Ì’l‚ğƒZƒNƒVƒ‡ƒ““àâ‘ÎƒAƒhƒŒƒX’l‚©‚ç–½—ß‘Š‘ÎƒAƒhƒŒƒX’l‚É•ÏŠ·‚·‚é
+                        // å³å€¤è¡¨ç¾ã®å€¤ã‚’ã‚»ã‚¯ã‚·ãƒ§ãƒ³å†…çµ¶å¯¾ã‚¢ãƒ‰ãƒ¬ã‚¹å€¤ã‹ã‚‰å‘½ä»¤ç›¸å¯¾ã‚¢ãƒ‰ãƒ¬ã‚¹å€¤ã«å¤‰æ›ã™ã‚‹
                         value = new ImmediateValue(ivalue.Value - (int)(offset - getMachineCodeLength(table, mnemonic, operands)));
                     }
-                    if (value.Section != null) {
-                        if (slot == OperandPattern.IMM32 || slot == OperandPattern.REL32) {
-                            section.relocations.Add(new Section.Relocation() {
-                                section = value.Section,
-                                appliedTo = (uint)value.Value,
-                                offset = (uint)(result.Count + offset)
-                            });
-                        } else {
-                            throw new Exception("Ä”z’u‚Å‚«‚È‚¢’l");
-                        }
-                    }
                     if (slot == OperandPattern.IMM8) {
-                        // •„†‚È‚µ8ƒrƒbƒg‘¦’l‚ğ–½—ß—ñ‚É’Ç‰Á
+                        // ç¬¦å·ãªã—8ãƒ“ãƒƒãƒˆå³å€¤ã‚’å‘½ä»¤åˆ—ã«è¿½åŠ 
                         result.AddRange(value.To1Byte());
                     } else if (slot == OperandPattern.IMM16) {
-                        // •„†‚È‚µ16ƒrƒbƒg‘¦’l‚ğ–½—ß—ñ‚É’Ç‰Á
+                        // ç¬¦å·ãªã—16ãƒ“ãƒƒãƒˆå³å€¤ã‚’å‘½ä»¤åˆ—ã«è¿½åŠ 
                         result.AddRange(value.To2Bytes());
                     } else if (slot == OperandPattern.IMM32 || slot == OperandPattern.REL32) {
-                        // •„†‚È‚µ32ƒrƒbƒg‘¦’l‚ğ–½—ß—ñ‚É’Ç‰Á
+                        // ç¬¦å·ãªã—32ãƒ“ãƒƒãƒˆå³å€¤ã‚’å‘½ä»¤åˆ—ã«è¿½åŠ 
+                        if (value.Symbol != null) {
+                            relocates.Add(Tuple.Create(value.Symbol, (uint)result.Count + offset));
+                        }
                         result.AddRange(value.To4Bytes());
                     } else if (slot == OperandPattern.IMM8S || slot == OperandPattern.REL8) {
-                        // •„†‚ ‚è8ƒrƒbƒg‘¦’l‚ğ–½—ß—ñ‚É’Ç‰Á
+                        // ç¬¦å·ã‚ã‚Š8ãƒ“ãƒƒãƒˆå³å€¤ã‚’å‘½ä»¤åˆ—ã«è¿½åŠ 
                         if (!value.IsInt8()) {
                             throw new Exception("Not a signed 8-bit immediate operand");
                         }
                         result.AddRange(value.To1Byte());
                     } else if (slot == OperandPattern.REL16) {
-                        // •„†‚ ‚è16ƒrƒbƒg‘¦’l‚ğ–½—ß—ñ‚É’Ç‰Á
+                        // ç¬¦å·ã‚ã‚Š16ãƒ“ãƒƒãƒˆå³å€¤ã‚’å‘½ä»¤åˆ—ã«è¿½åŠ 
                         if (!value.IsInt16()) {
                             throw new Exception("Not a signed 16-bit immediate operand");
                         }
                         result.AddRange(value.To2Bytes());
                     } else {
-                        // •„†‚ ‚è32ƒrƒbƒg‘¦’l‚È‚Ç‚Í‘Š‘ÎƒAƒhƒŒƒX’l‚Æ‚µ‚Äg‚¦‚È‚¢‚Ì‚ÅƒGƒ‰[
-                        throw new Exception("w’è‚³‚ê‚½’l‚Í‘¦’l‚Æ‚µ‚Ä—˜—p‚Å‚«‚Ü‚¹‚ñB");
+                        // ç¬¦å·ã‚ã‚Š32ãƒ“ãƒƒãƒˆå³å€¤ãªã©ã¯ç›¸å¯¾ã‚¢ãƒ‰ãƒ¬ã‚¹å€¤ã¨ã—ã¦ä½¿ãˆãªã„ã®ã§ã‚¨ãƒ©ãƒ¼
+                        throw new Exception("æŒ‡å®šã•ã‚ŒãŸå€¤ã¯å³å€¤ã¨ã—ã¦åˆ©ç”¨ã§ãã¾ã›ã‚“ã€‚");
                     }
                 }
             }
 
-            // ¶¬‚³‚ê‚½‹@ŠBŒê‚ğ•Ô‚·
-            return result.ToArray();
+            // ç”Ÿæˆã•ã‚ŒãŸæ©Ÿæ¢°èªã‚’è¿”ã™
+            return Tuple.Create(relocates.ToArray(),result.ToArray());
         }
 
 
-        private static byte[] makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets) {
+        private static Tuple<Symbol,uint,byte[]> makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets) {
             IOperand rm = operands[option.rmOperandIndex];
             uint mod;
             uint rmvalue;
             byte[] rest;
+            Symbol symbol = null;
+            uint symbolOffset = 0;
 
             if (rm is Register) {
                 mod = 3;
@@ -237,7 +237,10 @@ namespace X86Asm.generator {
                     mod = 0;
                     rmvalue = 5;
                     rest = disp.To4Bytes();
-
+                    if (disp.Symbol != null) {
+                        symbol = disp.Symbol;
+                        symbolOffset = 0;
+                    }
                 } // eax, ecx, edx, ebx, esi, edi
                 else if (m.Base != Register32.ESP && m.Base != Register32.EBP && m.Index == null && m.Displacement is ImmediateValue && disp.IsZero()) {
                     mod = 0;
@@ -255,7 +258,10 @@ namespace X86Asm.generator {
                     mod = 2;
                     rmvalue = m.Base.RegisterNumber;
                     rest = disp.To4Bytes();
-
+                    if (disp.Symbol != null) {
+                        symbol = disp.Symbol;
+                        symbolOffset = 0;
+                    }
                 } // SIB
                 else {
                     rmvalue = 4;
@@ -264,6 +270,10 @@ namespace X86Asm.generator {
                     {
                         mod = 0;
                         rest = disp.To4Bytes();
+                        if (disp.Symbol != null) {
+                            symbol = disp.Symbol;
+                            symbolOffset = 0;
+                        }
 
                     } // (eax, ecx, edx, ebx, esp, esi, edi) + index*scale
                     else if (m.Base != Register32.EBP && m.Displacement is ImmediateValue && disp.IsZero()) {
@@ -279,10 +289,17 @@ namespace X86Asm.generator {
                     else {
                         mod = 2;
                         rest = disp.To4Bytes();
+                        if (disp.Symbol != null) {
+                            symbol = disp.Symbol;
+                            symbolOffset = 0;
+                        }
                     }
 
                     byte[] sib = makeSIBByte(m);
-                    rest = concatenate(sib, rest);
+                    rest = sib.Concat(rest).ToArray();
+                    if (symbol != null) {
+                        symbolOffset = symbolOffset + (uint)sib.Length;
+                    }
                 }
 
             } else {
@@ -301,8 +318,11 @@ namespace X86Asm.generator {
             // Make ModR/M byte
             byte[] modrm = makeModRMByte(mod, regopvalue, rmvalue);
 
+            if (symbol != null) {
+                symbolOffset = symbolOffset + (uint)modrm.Length;
+            }
             // Concatenate and return
-            return concatenate(modrm, rest);
+            return Tuple.Create(symbol, symbolOffset, modrm.Concat(rest).ToArray());
         }
 
 
@@ -358,21 +378,6 @@ namespace X86Asm.generator {
             }
         }
 
-
-        private static byte[] concatenate(params byte[][] arrays) {
-            int totalLength = 0;
-            foreach (byte[] b in arrays) {
-                totalLength += b.Length;
-            }
-
-            byte[] result = new byte[totalLength];
-            int offset = 0;
-            foreach (byte[] b in arrays) {
-                Array.Copy(b, 0, result, offset, b.Length);
-                offset += b.Length;
-            }
-            return result;
-        }
 
 
 

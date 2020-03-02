@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,7 +12,7 @@ namespace X86Asm.libcoff {
     /// </summary>
     public class _IMAGE_RELOCATION {
         /// <summary>
-        /// 再配置しなければいけない位置のセクションデータの先頭からのオフセット
+        /// 再配置が適用される項目のアドレスをセクションの先頭からのオフセットで示す
         /// </summary>
         public UInt32 VirtualAddress { get { return VirtualAddressOrRelocCount; } set { VirtualAddressOrRelocCount = value; } }
 
@@ -38,7 +38,7 @@ namespace X86Asm.libcoff {
         public static _IMAGE_RELOCATION ReadFrom(BinaryReader br) {
             return new _IMAGE_RELOCATION() {
                 VirtualAddress = br.ReadUInt32(),
-                SymbolTableIndex = br.ReadUInt16(),
+                SymbolTableIndex = br.ReadUInt32(),
                 Type = br.ReadUInt16(),
             };
         }
