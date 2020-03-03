@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using X86Asm.generator;
 
 namespace X86Asm.ast.operand {
+    using X86Asm.model;
+
     /// <summary>
-    /// 即値リテラル（内部表現は32bit符号付き整数）
+    /// 即値リテラル
     /// </summary>
     public class ImmediateValue : IImmediate {
 
@@ -79,9 +80,9 @@ namespace X86Asm.ast.operand {
         /// ラベルオフセットを考慮した即値オペランドの値を返す
         /// ImmediateValueクラスはそれ自身が即値なので自身を返す。
         /// </summary>
-        /// <param name="labelOffsets"> ラベルオフセット表 </param>
+        /// <param name="symbolTable"> シンボル表 </param>
         /// <returns>即値オペランドの値</returns>
-        public ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets) {
+        public ImmediateValue GetValue(IDictionary<string, Symbol> symbolTable) {
             return this;
         }
 

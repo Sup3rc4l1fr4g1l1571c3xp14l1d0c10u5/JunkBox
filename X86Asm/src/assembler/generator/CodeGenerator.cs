@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace X86Asm.generator {
-    using Program = X86Asm.ast.Program;
-    using IImmediate = X86Asm.ast.operand.IImmediate;
-    using ImmediateValue = X86Asm.ast.operand.ImmediateValue;
-    using Memory = X86Asm.ast.operand.Memory;
-    using IOperand = X86Asm.ast.operand.IOperand;
-    using Register = X86Asm.ast.operand.Register;
-    using Register32 = X86Asm.ast.operand.Register32;
+    using X86Asm.ast;
+    using X86Asm.ast.statement;
+    using X86Asm.ast.operand;
+    using X86Asm.model;
 
     public sealed class CodeGenerator {
 
@@ -17,8 +14,8 @@ namespace X86Asm.generator {
         /// アセンブリ言語で記述された命令列から機械語列のバイト長を得る
         /// </summary>
         /// <param name="table">命令パターン表</param>
-        /// <param name="mnemonic"></param>
-        /// <param name="operands"></param>
+        /// <param name="mnemonic">命令列のニーモニック</param>
+        /// <param name="operands">命令列の引数</param>
         /// <returns></returns>
         public static int getMachineCodeLength(InstructionPatternTable table, string mnemonic, IList<IOperand> operands) {
             // 命令パターンを得る
@@ -120,10 +117,10 @@ namespace X86Asm.generator {
         /// <param name="mnemonic"></param>
         /// <param name="operands"></param>
         /// <param name="program"></param>
-        /// <param name="labelOffsets"></param>
+        /// <param name="symbolTable"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        public static Tuple<Tuple<Symbol,uint>[],byte[]> makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets, Section section, uint offset) {
+        public static byte[] makeMachineCode(InstructionPatternTable table, string mnemonic, IList<IOperand> operands, Program program, IDictionary<string, Symbol> symbolTable, Section section, uint offset) {
             // 命令パターンを得る
             InstructionPattern pat = table.match(mnemonic, operands);
 
@@ -136,7 +133,6 @@ namespace X86Asm.generator {
             }
 
             byte[] opcodes = pat.opcodes;
-            var relocates = new List<Tuple<Symbol, uint>>();
             // OPCode中にRegisterInOpCodeが指定されている場合、RegisterInOpCodeを処理
             if (pat.options.Count == 1 && pat.options[0] is RegisterInOpcode) {
                 // 指定されたオペランドに記載されているレジスタ番号を生成する命令の末尾バイトに加算（論理和）したものにする
@@ -151,12 +147,19 @@ namespace X86Asm.generator {
             // ModR/MとSIBが指定されている場合はModR/Mバイトを生成して追加する
             // Append ModR/M and SIB bytes if necessary
             if (pat.options.Count == 1 && pat.options[0] is ModRM) {
-                var ret = makeModRMBytes((ModRM)pat.options[0], operands, program, labelOffsets);
+                var ret = makeModRMBytes((ModRM)pat.options[0], operands, program, symbolTable);
                 var symbol = ret.Item1;
                 var vaddress = ret.Item2;
                 var modRMBytes = ret.Item3;
                 if (symbol != null) {
-                    relocates.Add(Tuple.Create(symbol, vaddress + (uint)result.Count + offset));
+                    // セクションに再配置情報を追加
+                    section.relocations.Add(
+                        new Relocation(
+                            section: section,
+                            offset: vaddress + (uint)result.Count + offset,
+                            symbol: symbol
+                        )
+                    );
                 }
                 result.AddRange(modRMBytes);
             }
@@ -168,11 +171,11 @@ namespace X86Asm.generator {
                 if (slot == OperandPattern.IMM8 || slot == OperandPattern.IMM8S || slot == OperandPattern.IMM16 || slot == OperandPattern.IMM32 || slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
 
                     // ラベルオフセットを考慮してオペランドの即値表現を得る
-                    ImmediateValue value = ((IImmediate)operands[i]).GetValue(labelOffsets);
+                    ImmediateValue value = ((IImmediate)operands[i]).GetValue(symbolTable);
 
                     // 命令が受理する引数の形式が即値オペランドのREL8, REL16,REL32形式の場合、
                     if (slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
-                        var ivalue = value.GetValue(labelOffsets);
+                        var ivalue = value.GetValue(symbolTable);
                         if (section != ivalue.Symbol.section) {
                             throw new Exception("セクションが違うため命令相対アドレスを求められない。");
                         }
@@ -188,7 +191,14 @@ namespace X86Asm.generator {
                     } else if (slot == OperandPattern.IMM32 || slot == OperandPattern.REL32) {
                         // 符号なし32ビット即値を命令列に追加
                         if (value.Symbol != null) {
-                            relocates.Add(Tuple.Create(value.Symbol, (uint)result.Count + offset));
+                            // セクションに再配置情報を追加
+                            section.relocations.Add(
+                                new Relocation(
+                                    section: section,
+                                    offset: (uint)result.Count + offset,
+                                    symbol: value.Symbol
+                                )
+                            );
                         }
                         result.AddRange(value.To4Bytes());
                     } else if (slot == OperandPattern.IMM8S || slot == OperandPattern.REL8) {
@@ -211,11 +221,11 @@ namespace X86Asm.generator {
             }
 
             // 生成された機械語を返す
-            return Tuple.Create(relocates.ToArray(),result.ToArray());
+            return result.ToArray();
         }
 
 
-        private static Tuple<Symbol,uint,byte[]> makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, Symbol> labelOffsets) {
+        private static Tuple<Symbol, uint, byte[]> makeModRMBytes(ModRM option, IList<IOperand> operands, Program program, IDictionary<string, Symbol> symbolTable) {
             IOperand rm = operands[option.rmOperandIndex];
             uint mod;
             uint rmvalue;
@@ -230,7 +240,7 @@ namespace X86Asm.generator {
 
             } else if (rm is Memory) {
                 Memory m = (Memory)rm;
-                ImmediateValue disp = m.Displacement.GetValue(labelOffsets);
+                ImmediateValue disp = m.Displacement.GetValue(symbolTable);
 
                 if (m.Base == null && m.Index == null) // disp32
                 {

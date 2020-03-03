@@ -46,7 +46,7 @@ namespace X86Asm.parser {
         /// <returns></returns>
         private Program ParseFile() {
             Program program = new Program();
-            //EOFに出会うまで行の解析を続ける
+            // EOFに出会うまで行の解析を続ける
             while (!Tokenizer.Check(TokenType.END_OF_FILE)) {
                 ParseLine(program);
             }

@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 
 namespace X86Asm.generator {
-    using IOperand = X86Asm.ast.operand.IOperand;
-
+    using X86Asm.ast.operand;
 
     /// <summary>
     /// 命令パターン表
@@ -17,9 +16,9 @@ namespace X86Asm.generator {
 
         static InstructionPatternTable() {
             MODE32_TABLE = new InstructionPatternTable();
-            MODE32_TABLE.add("byte", new[] { OperandPattern.IMM8 }, OperandSizeMode.MODELESS, new byte[] { });
-            MODE32_TABLE.add("word", new[] { OperandPattern.IMM16 }, OperandSizeMode.MODELESS, new byte[] { });
-            MODE32_TABLE.add("dword", new[] { OperandPattern.IMM32 }, OperandSizeMode.MODELESS, new byte[] { });
+            //MODE32_TABLE.add("byte", new[] { OperandPattern.IMM8 }, OperandSizeMode.MODELESS, new byte[] { });
+            //MODE32_TABLE.add("word", new[] { OperandPattern.IMM16 }, OperandSizeMode.MODELESS, new byte[] { });
+            //MODE32_TABLE.add("dword", new[] { OperandPattern.IMM32 }, OperandSizeMode.MODELESS, new byte[] { });
             MODE32_TABLE.add("addb", new[] { OperandPattern.RM8, OperandPattern.REG8 }, OperandSizeMode.MODELESS, new byte[] { 0x00 }, new ModRM(0, 1));
             MODE32_TABLE.add("addw", new[] { OperandPattern.RM16, OperandPattern.REG16 }, OperandSizeMode.MODE16, new byte[] { 0x01 }, new ModRM(0, 1));
             MODE32_TABLE.add("addl", new[] { OperandPattern.RM32, OperandPattern.REG32 }, OperandSizeMode.MODE32, new byte[] { 0x01 }, new ModRM(0, 1));

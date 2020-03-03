@@ -55,11 +55,14 @@
     <Compile Include="src\assembler\ast\operand\Register8.cs" />
     <Compile Include="src\assembler\ast\operand\SegmentRegister.cs" />
     <Compile Include="src\assembler\ast\Program.cs" />
+    <Compile Include="src\assembler\ast\statement\DirectiveStatement.cs" />
     <Compile Include="src\assembler\ast\statement\InstructionStatement.cs" />
     <Compile Include="src\assembler\ast\statement\IStatement.cs" />
     <Compile Include="src\assembler\ast\statement\LabelStatement.cs" />
     <Compile Include="src\assembler\generator\Assembler.cs" />
     <Compile Include="src\assembler\generator\CodeGenerator.cs" />
+    <Compile Include="src\assembler\generator\DirectivePattern.cs" />
+    <Compile Include="src\assembler\generator\DirectivePatternTable.cs" />
     <Compile Include="src\assembler\generator\InstructionOption.cs" />
     <Compile Include="src\assembler\generator\InstructionPattern.cs" />
     <Compile Include="src\assembler\generator\InstructionPatternTable.cs" />
@@ -68,6 +71,9 @@
     <Compile Include="src\assembler\generator\OperandPattern.cs" />
     <Compile Include="src\assembler\generator\OperandSizeMode.cs" />
     <Compile Include="src\assembler\generator\RegisterInOpcode.cs" />
+    <Compile Include="src\assembler\model\Symbol.cs" />
+    <Compile Include="src\assembler\model\Section.cs" />
+    <Compile Include="src\assembler\model\Relocation.cs" />
     <Compile Include="src\assembler\Main.cs" />
     <Compile Include="src\assembler\parser\BufferedTokenizer.cs" />
     <Compile Include="src\assembler\parser\ITokenizer.cs" />
@@ -80,6 +86,7 @@
     <Compile Include="src\libcoff\IMAGE_FILE_MACHINE.cs" />
     <Compile Include="src\libcoff\DataSectionFlags.cs" />
     <Compile Include="src\libcoff\_IMAGE_RELOCATION.cs" />
+    <Compile Include="src\libcoff\_IMAGE_REL_I386.cs" />
     <Compile Include="src\libcoff\_SYMBOL_NAME.cs" />
     <Compile Include="src\libcoff\_IMAGE_SYMBOL.cs" />
     <Compile Include="src\libcoff\_IMAGE_SECTION_HEADER.cs" />
@@ -99,7 +106,6 @@
     <Compile Include="src\libelf\SectionType.cs" />
     <Compile Include="src\libelf\SegmentFlag.cs" />
     <Compile Include="src\libelf\SegmentType.cs" />
-    <Compile Include="src\util\ByteBuffer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

@@ -1,8 +1,7 @@
 using System;
 
 namespace X86Asm.generator {
-
-    using IOperand = X86Asm.ast.operand.IOperand;
+    using X86Asm.ast.operand;
 
     /// <summary>
     /// リテラルオペランドパターン

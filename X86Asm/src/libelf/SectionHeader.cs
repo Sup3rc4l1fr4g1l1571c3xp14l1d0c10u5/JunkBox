@@ -1,8 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using X86Asm.util;
 
 namespace X86Asm.libelf
 {

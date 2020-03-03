@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
-using X86Asm.util;
 
 namespace X86Asm.libelf {
 
@@ -56,7 +54,7 @@ namespace X86Asm.libelf {
         /// </summary>
         /// <returns></returns>
         public byte[] toBytes() {
-            using (var ms = new MemoryStream()) 
+            var ms = new MemoryStream();
             using (var bw = new BinaryWriter(ms)) {
                 elfHeader.WriteTo(bw, (ushort)programHeaders.Count, (ushort)sectionHeaders.Count);
                 foreach (ProgramHeader ph in programHeaders) {

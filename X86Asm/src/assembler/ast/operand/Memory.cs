@@ -3,7 +3,6 @@ using System.Text;
 
 namespace X86Asm.ast.operand {
 
-
     /// <summary>
     /// メモリオペランド
     /// 表現形式は Base + Index * Scale + Displacement 

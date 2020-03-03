@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using X86Asm.generator;
 
 namespace X86Asm.ast.operand {
+    using X86Asm.model;
 
     /// <summary>
     /// ラベルオペランド
@@ -26,13 +26,13 @@ namespace X86Asm.ast.operand {
         }
 
         /// <summary>
-        /// ラベルオフセットを考慮した即値オペランドの値を返す
-        /// Labelクラスはラベルオフセット表が示すオフセット値に変換
+        /// 即値オペランドの値を返す
+        /// Labelクラスの値は再配置可能なシンボルである。
         /// </summary>
-        /// <param name="labelOffsets"> ラベルオフセット表 </param>
+        /// <param name="symbolTable"> シンボル表 </param>
         /// <returns>ラベルに対応するオフセットを値として持つ即値</returns>
-        public ImmediateValue GetValue(IDictionary<string, Symbol> labelOffsets) {
-            return new ImmediateValue(labelOffsets[Name], 0);
+        public ImmediateValue GetValue(IDictionary<string, Symbol> symbolTable) {
+            return new ImmediateValue(symbolTable[Name], 0);
         }
 
         /// <summary>

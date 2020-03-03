@@ -1,3 +1,5 @@
+using System;
+
 namespace X86Asm.generator {
     /// <summary>
     /// レジスタオペランドを命令中の（最後の）オペランドのバイト中にエンコードすることを指定するオプション
@@ -14,7 +16,7 @@ namespace X86Asm.generator {
         /// </summary>
         public RegisterInOpcode(int operandIndex) {
             if (operandIndex < 0) {
-                throw new System.ArgumentException("不正なオペランドインデクス番号です。");
+                throw new ArgumentException(nameof(operandIndex),"不正なオペランドインデクス番号です。");
             }
             this.operandIndex = operandIndex;
         }

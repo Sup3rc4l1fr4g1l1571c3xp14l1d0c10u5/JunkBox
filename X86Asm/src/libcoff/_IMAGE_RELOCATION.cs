@@ -11,6 +11,7 @@ namespace X86Asm.libcoff {
     /// 再配置情報
     /// </summary>
     public class _IMAGE_RELOCATION {
+
         /// <summary>
         /// 再配置が適用される項目のアドレスをセクションの先頭からのオフセットで示す
         /// </summary>
@@ -31,7 +32,7 @@ namespace X86Asm.libcoff {
         /// <summary>
         /// 再配置情報のタイプ
         /// </summary>
-        public UInt16 Type { get; set; }
+        public _IMAGE_REL_I386 Type { get; set; }
 
         public const int Size = 8;
 
@@ -39,7 +40,7 @@ namespace X86Asm.libcoff {
             return new _IMAGE_RELOCATION() {
                 VirtualAddress = br.ReadUInt32(),
                 SymbolTableIndex = br.ReadUInt32(),
-                Type = br.ReadUInt16(),
+                Type = (_IMAGE_REL_I386)br.ReadUInt16(),
             };
         }
 

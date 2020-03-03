@@ -36,7 +36,7 @@ namespace X86Asm.ast {
         /// <param name="statement"></param>
         public void AddStatement(IStatement statement) {
             if (statement == null) {
-                throw new ArgumentNullException();
+                throw new ArgumentNullException(nameof(statement));
             }
             statements.Add(statement);
         }

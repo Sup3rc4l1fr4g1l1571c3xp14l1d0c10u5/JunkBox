@@ -1,19 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using X86Asm.ast.operand;
 
 namespace X86Asm.ast.statement {
+    using X86Asm.ast.operand;
 
     /// <summary>
-    /// ディレクティブ指定分
+    /// ディレクティブ文
     /// </summary>
     public class DirectiveStatement : IStatement {
 
         /// <summary>
-        /// ラベル名
+        /// ディレクティブ名
         /// </summary>
         public string Name { get; }
+
+        /// <summary>
+        /// 引数リスト
+        /// </summary>
         public IList<IOperand> Arguments { get; }
 
         /// <summary>

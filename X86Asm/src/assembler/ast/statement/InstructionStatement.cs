@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 
 namespace X86Asm.ast.statement {
-    using operand;
+    using X86Asm.ast.operand;
 
     /// <summary>
     /// アセンブリ言語命令文

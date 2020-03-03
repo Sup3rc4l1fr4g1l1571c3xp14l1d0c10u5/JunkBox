@@ -24,7 +24,7 @@ namespace X86Asm.libcoff {
         public UInt16 NumberOfSections { get; set; }
 
         /// <summary>
-        /// ファイルのタイムスタンプ
+        /// ファイルのタイムスタンプ(32bit time_t)
         /// </summary>
         public UInt32 TimeDateStamp { get; set; }
 
@@ -49,6 +49,9 @@ namespace X86Asm.libcoff {
         /// </summary>
         public IMAGE_FILE_CHARACTERISTICS Characteristics { get; set; }
 
+        /// <summary>
+        /// _IMAGE_FILE_HEADER構造体のバイトサイズ
+        /// </summary>
         public const int Size = 20;
 
         public static _IMAGE_FILE_HEADER ReadFrom(BinaryReader br) {
