@@ -12,7 +12,7 @@ namespace X86Asm {
     public sealed class Assembler {
         public static void Main(string[] args) {
             if (System.Diagnostics.Debugger.IsAttached) {
-                args = new[] { @"..\..\test\magic2.s", @"..\..\test\magic2.obj" };
+                args = new[] { @"..\..\test\hello.s", @"..\..\test\hello.obj" };
                 DebugMain(args);
             } else {
                 NormalMain(args);
@@ -35,6 +35,7 @@ namespace X86Asm {
                         new Section() { name = ".text", index =0},
                         new Section() { name = ".data", index =1},
                         new Section() { name = ".bss", index =2},
+                        new Section() { name = ".rdata", index =3},
                     };
                     var longSymbolTable = new List<byte>();
                     generator.Assembler.assemble(program, sections);
@@ -42,6 +43,7 @@ namespace X86Asm {
                     var textSection = sections.FirstOrDefault(x => x.name == ".text");
                     var dataSection = sections.FirstOrDefault(x => x.name == ".data");
                     var bssSection = sections.FirstOrDefault(x => x.name == ".bss");
+                    var rdataSection = sections.FirstOrDefault(x => x.name == ".rdata");
 
                     var sectionSymbols = sections.SelectMany(x => x.symbols).ToList();
                     var symbols = sectionSymbols.Select(x => {
@@ -57,19 +59,19 @@ namespace X86Asm {
                             Value = x.offset,
                             Type = 0,
                             StorageClass = (x.global) ? _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_EXT : _IMAGE_SYMBOL._SYMBOL_STORAGE_CLASS.C_STAT,
-                            SectionNumber = (short)(x.section.index + 1),
+                            SectionNumber = (short)(x.section == null ? 0 : (x.section.index + 1)),
                             NumberOfAuxSymbols = 0
                         };
                     }).ToArray();
 
-                    var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size + (uint)dataSection.size + (uint)bssSection.size;
+                    var symbolTablePos = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 4 + (uint)textSection.size + (uint)dataSection.size + (uint)bssSection.size + (uint)rdataSection.size;
                     var relocationTablePos = symbolTablePos + (uint)(symbols.Length * _IMAGE_SYMBOL.Size);
 
                     /* pe-i386形式のオブジェクトファイルを生成 */
 
                     libcoff._IMAGE_FILE_HEADER fileHeader = new _IMAGE_FILE_HEADER() {
                         Machine = IMAGE_FILE_MACHINE.IMAGE_FILE_MACHINE_I386,
-                        NumberOfSections = 3,   // .text, .data, .bss で決め打ちにしている
+                        NumberOfSections = 4,   // .text, .data, .bss .rdata で決め打ちにしている
                         TimeDateStamp = 0,
                         PointerToSymbolTable = symbolTablePos,
                         NumberOfSymbols = (uint)(symbols.Length),
@@ -80,8 +82,8 @@ namespace X86Asm {
                         Name = new char[8] { '.', 't', 'e', 'x', 't', '\0', '\0', '\0' }.Select(x => (byte)x).ToArray(),
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)textSection.size,
-                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3,
+                        SizeOfRawData = (uint)textSection.size,  //textセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize *4,
                         PointerToRelocations = relocationTablePos,
                         PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
                         NumberOfRelocations = (UInt16)textSection.relocations.Count,
@@ -92,8 +94,8 @@ namespace X86Asm {
                         Name = new char[8] { '.', 'd', 'a', 't', 'a', '\0', '\0', '\0' }.Select(x => (byte)x).ToArray(),
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)dataSection.size,  // データセクションの大きさ
-                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size,
+                        SizeOfRawData = (uint)dataSection.size,  // dataセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 4 + (uint)textSection.size,
                         PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size),
                         PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
                         NumberOfRelocations = (UInt16)dataSection.relocations.Count,
@@ -104,13 +106,26 @@ namespace X86Asm {
                         Name = new char[8] { '.', 'b', 's', 's', '\0', '\0', '\0', '\0' }.Select(x => (byte)x).ToArray(),
                         VirtualSize = 0,
                         VirtualAddress = 0,
-                        SizeOfRawData = (uint)bssSection.size,  // BSSセクションの大きさ
-                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 3 + (uint)textSection.size + (uint)dataSection.size,
-                        PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size + bssSection.relocations.Count * _IMAGE_RELOCATION.Size),
+                        SizeOfRawData = (uint)bssSection.size,  // bssセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 4 + (uint)textSection.size + (uint)dataSection.size,
+                        PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size + dataSection.relocations.Count * _IMAGE_RELOCATION.Size),
                         PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
                         NumberOfRelocations = (UInt16)bssSection.relocations.Count,
                         NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
                         Characteristics = DataSectionFlags.MemoryRead | DataSectionFlags.MemoryWrite | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentUninitializedData
+                    };
+
+                    libcoff._IMAGE_SECTION_HEADER rdataSectionHeader = new _IMAGE_SECTION_HEADER() {
+                        Name = new char[8] { '.', 'r', 'd', 'a', 't', 'a', '\0', '\0' }.Select(x => (byte)x).ToArray(),
+                        VirtualSize = 0,
+                        VirtualAddress = 0,
+                        SizeOfRawData = (uint)rdataSection.size,  // rdataセクションの大きさ
+                        PointerToRawData = _IMAGE_FILE_HEADER.Size + SectionHeader.TypeSize * 4 + (uint)textSection.size + (uint)dataSection.size + (uint)bssSection.size,
+                        PointerToRelocations = (uint)(relocationTablePos + textSection.relocations.Count() * _IMAGE_RELOCATION.Size + dataSection.relocations.Count * _IMAGE_RELOCATION.Size + bssSection.relocations.Count * _IMAGE_RELOCATION.Size),
+                        PointerToLinenumbers = 0, // IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        NumberOfRelocations = (UInt16)rdataSection.relocations.Count,
+                        NumberOfLinenumbers = 0,// IMAGE_FILE_LINE_NUMS_STRIPPEDなので0とする
+                        Characteristics = DataSectionFlags.MemoryRead | DataSectionFlags.Align4Bytes | DataSectionFlags.ContentUninitializedData
                     };
 
                     using (var bw = new BinaryWriter(outputFile, System.Text.Encoding.ASCII, true)) {
@@ -118,33 +133,51 @@ namespace X86Asm {
                         textSectionHeader.WriteTo(bw);
                         dataSectionHeader.WriteTo(bw);
                         bssSectionHeader.WriteTo(bw);
+                        rdataSectionHeader.WriteTo(bw);
                         bw.Write(textSection.data.ToArray());
                         bw.Write(dataSection.data.ToArray());
                         bw.Write(bssSection.data.ToArray());
+                        bw.Write(rdataSection.data.ToArray());
                         foreach (var symbol in symbols) {
                             symbol.WriteTo(bw);
                         }
                         foreach (var r in textSection.relocations) {
+                            var symIndex = sectionSymbols.IndexOf(r.Symbol);
+                            if (symIndex == -1) { throw new KeyNotFoundException(); }
                             var rel = new _IMAGE_RELOCATION() {
-                                SymbolTableIndex = (uint)sectionSymbols.IndexOf(r.Symbol),
+                                SymbolTableIndex = (uint)symIndex,
                                 VirtualAddress = r.Offset,
-                                Type = _IMAGE_REL_I386.IMAGE_REL_I386_DIR32,
+                                Type = (r.Symbol.section == null ? _IMAGE_REL_I386.IMAGE_REL_I386_REL32: _IMAGE_REL_I386.IMAGE_REL_I386_DIR32),
                             };
                             rel.WriteTo(bw);
                         }
                         foreach (var r in dataSection.relocations) {
+                            var symIndex = sectionSymbols.IndexOf(r.Symbol);
+                            if (symIndex == -1) { throw new KeyNotFoundException(); }
                             var rel = new _IMAGE_RELOCATION() {
-                                SymbolTableIndex = (uint)sectionSymbols.IndexOf(r.Symbol),
+                                SymbolTableIndex = (uint)symIndex,
                                 VirtualAddress = r.Offset,
-                                Type = _IMAGE_REL_I386.IMAGE_REL_I386_DIR32,
+                                Type = (r.Symbol.section == null ? _IMAGE_REL_I386.IMAGE_REL_I386_REL32 : _IMAGE_REL_I386.IMAGE_REL_I386_DIR32),
                             };
                             rel.WriteTo(bw);
                         }
                         foreach (var r in bssSection.relocations) {
+                            var symIndex = sectionSymbols.IndexOf(r.Symbol);
+                            if (symIndex == -1) { throw new KeyNotFoundException(); }
                             var rel = new _IMAGE_RELOCATION() {
-                                SymbolTableIndex = (uint)sectionSymbols.IndexOf(r.Symbol),
+                                SymbolTableIndex = (uint)symIndex,
                                 VirtualAddress = r.Offset,
-                                Type = _IMAGE_REL_I386.IMAGE_REL_I386_DIR32,
+                                Type = (r.Symbol.section == null ? _IMAGE_REL_I386.IMAGE_REL_I386_REL32 : _IMAGE_REL_I386.IMAGE_REL_I386_DIR32),
+                            };
+                            rel.WriteTo(bw);
+                        }
+                        foreach (var r in rdataSection.relocations) {
+                            var symIndex = sectionSymbols.IndexOf(r.Symbol);
+                            if (symIndex == -1) { throw new KeyNotFoundException(); }
+                            var rel = new _IMAGE_RELOCATION() {
+                                SymbolTableIndex = (uint)symIndex,
+                                VirtualAddress = r.Offset,
+                                Type = (r.Symbol.section == null ? _IMAGE_REL_I386.IMAGE_REL_I386_REL32 : _IMAGE_REL_I386.IMAGE_REL_I386_DIR32),
                             };
                             rel.WriteTo(bw);
                         }

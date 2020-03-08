@@ -45,7 +45,7 @@ namespace X86Asm.generator {
         private static void computeLabelOffsets(Program program, List<Section> sections, IDictionary<string, Symbol> symbolTable) {
             int currentSectionIndex = -1;
             uint offset = 0;
-            var globalLabels = new List<string>();
+            var globalLabels = new List<Tuple<Section,string>>();
             var sectionSizeTable = new Dictionary<int, uint>();
             foreach (IStatement st in program.Statements) {
                 if (st is DirectiveStatement) {
@@ -77,7 +77,11 @@ namespace X86Asm.generator {
                 }
             }
             foreach (var label in globalLabels) {
-                symbolTable[label].global = true;
+                if (symbolTable.ContainsKey(label.Item2)) {
+                    symbolTable[label.Item2].global = true;
+                } else {
+                    symbolTable[label.Item2] = new Symbol() { section = null, offset = 0, name = label.Item2, global = true };
+                }
             }
         }
 

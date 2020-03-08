@@ -54,6 +54,7 @@
     <Compile Include="src\assembler\ast\operand\Register32.cs" />
     <Compile Include="src\assembler\ast\operand\Register8.cs" />
     <Compile Include="src\assembler\ast\operand\SegmentRegister.cs" />
+    <Compile Include="src\assembler\ast\operand\StringLiteral.cs" />
     <Compile Include="src\assembler\ast\Program.cs" />
     <Compile Include="src\assembler\ast\statement\DirectiveStatement.cs" />
     <Compile Include="src\assembler\ast\statement\InstructionStatement.cs" />

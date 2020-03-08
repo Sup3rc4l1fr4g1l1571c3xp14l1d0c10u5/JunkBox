@@ -53,21 +53,22 @@ namespace X86Asm.parser {
         /// トークンパターン表
         /// </summary>
         private static TokenPattern[] Patterns = new TokenPattern[] {
-            new TokenPattern("[ \t]+", TokenType.WHITESPACE), // Whitespace
-            new TokenPattern("[A-Za-z_][A-Za-z0-9_]*:", TokenType.LABEL),
-            new TokenPattern("[A-Za-z_][A-Za-z0-9_]*", TokenType.NAME),
-            new TokenPattern("\\.[A-Za-z_][A-Za-z0-9_]*", TokenType.DIRECTIVE),
-            new TokenPattern("%[A-Za-z][A-Za-z0-9_]*", TokenType.REGISTER),
-            new TokenPattern("0[xX][0-9a-fA-F]+", TokenType.HEXADECIMAL),
-            new TokenPattern("-?[0-9]+", TokenType.DECIMAL),
-            new TokenPattern("\\$", TokenType.DOLLAR),
-            new TokenPattern(",", TokenType.COMMA),
-            new TokenPattern("\\+", TokenType.PLUS),
-            new TokenPattern("-", TokenType.MINUS),
-            new TokenPattern("\\(", TokenType.LEFT_PAREN),
-            new TokenPattern("\\)", TokenType.RIGHT_PAREN),
-            new TokenPattern("[\n\r]+", TokenType.NEWLINE),
-            new TokenPattern("#[^\n\r]*", TokenType.WHITESPACE), // Comment
+            new TokenPattern(@"[ \t]+", TokenType.WHITESPACE), // Whitespace
+            new TokenPattern(@"[A-Za-z_][A-Za-z0-9_]*:", TokenType.LABEL),
+            new TokenPattern(@"[A-Za-z_][A-Za-z0-9_]*", TokenType.NAME),
+            new TokenPattern(@"\.[A-Za-z_][A-Za-z0-9_]*", TokenType.DIRECTIVE),
+            new TokenPattern(@"%[A-Za-z][A-Za-z0-9_]*", TokenType.REGISTER),
+            new TokenPattern(@"0[xX][0-9a-fA-F]+", TokenType.HEXADECIMAL),
+            new TokenPattern(@"-?[0-9]+", TokenType.DECIMAL),
+            new TokenPattern(@"\$", TokenType.DOLLAR),
+            new TokenPattern(@",", TokenType.COMMA),
+            new TokenPattern(@"\+", TokenType.PLUS),
+            new TokenPattern(@"-", TokenType.MINUS),
+            new TokenPattern(@"\(", TokenType.LEFT_PAREN),
+            new TokenPattern(@"\)", TokenType.RIGHT_PAREN),
+            new TokenPattern(@"[\n\r]+", TokenType.NEWLINE),
+            new TokenPattern(@"#[^\n\r]*", TokenType.WHITESPACE), // Comment
+            new TokenPattern(@"""([^""\\]|\\.)*""", TokenType.STRING),
             new TokenPattern("$", TokenType.END_OF_FILE),
         };
 

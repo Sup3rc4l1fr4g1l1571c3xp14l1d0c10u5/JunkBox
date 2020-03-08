@@ -153,6 +153,9 @@ namespace X86Asm.generator {
                 var modRMBytes = ret.Item3;
                 if (symbol != null) {
                     // セクションに再配置情報を追加
+                    if (section.symbols.Any(x => x.name == symbol.name) == false) {
+                        section.symbols.Add(symbol);
+                    }
                     section.relocations.Add(
                         new Relocation(
                             section: section,
@@ -177,10 +180,12 @@ namespace X86Asm.generator {
                     if (slot == OperandPattern.REL8 || slot == OperandPattern.REL16 || slot == OperandPattern.REL32) {
                         var ivalue = value.GetValue(symbolTable);
                         if (section != ivalue.Symbol.section) {
-                            throw new Exception("セクションが違うため命令相対アドレスを求められない。");
+                            //throw new Exception("セクションが違うため命令相対アドレスを求められない。");
+                            value = ivalue;
+                        } else {
+                            // 即値表現の値をセクション内絶対アドレス値から命令相対アドレス値に変換する
+                            value = new ImmediateValue(ivalue.Value - (int)(offset - getMachineCodeLength(table, mnemonic, operands)));
                         }
-                        // 即値表現の値をセクション内絶対アドレス値から命令相対アドレス値に変換する
-                        value = new ImmediateValue(ivalue.Value - (int)(offset - getMachineCodeLength(table, mnemonic, operands)));
                     }
                     if (slot == OperandPattern.IMM8) {
                         // 符号なし8ビット即値を命令列に追加
@@ -192,6 +197,9 @@ namespace X86Asm.generator {
                         // 符号なし32ビット即値を命令列に追加
                         if (value.Symbol != null) {
                             // セクションに再配置情報を追加
+                            if (section.symbols.Any(x => x.name == value.Symbol.name) == false) {
+                                section.symbols.Add(value.Symbol);
+                            }
                             section.relocations.Add(
                                 new Relocation(
                                     section: section,

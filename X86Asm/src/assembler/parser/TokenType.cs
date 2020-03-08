@@ -17,6 +17,7 @@ namespace X86Asm.parser {
         MINUS,
         DECIMAL,
         HEXADECIMAL,
+        STRING,
         DOLLAR,
         END_OF_FILE
     }

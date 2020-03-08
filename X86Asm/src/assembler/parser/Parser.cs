@@ -135,8 +135,12 @@ namespace X86Asm.parser {
             } else if (CanParseImmediate()) {
                 return ParseImmediate();
             } else if (Tokenizer.Check(TokenType.NAME)) {
-                // ラベル名?
+                // ラベル名
                 return new Label(Tokenizer.Next().Text);
+            } else if (Tokenizer.Check(TokenType.STRING)) {
+                // 文字列
+                var body = Tokenizer.Next().Text;
+                return new StringLiteral(body.Substring(1,body.Length-2));
             } else if (Tokenizer.Check(TokenType.LEFT_PAREN)) {
                 var item = DirectiveItem();
                 if (Tokenizer.Check(TokenType.RIGHT_PAREN)) {

@@ -20,7 +20,7 @@ namespace X86Asm.generator {
             ref int currentSectionIndex,
             ref uint offset,
             Dictionary<int, uint> sectionSizeTable,
-            List<string> globalLabels
+            List<Tuple<Section,string>> globalLabels
             );
         public abstract void OnAssembleBytes(
             DirectiveStatement directive,
@@ -44,7 +44,7 @@ namespace X86Asm.generator {
             ref int currentSectionIndex,
             ref uint offset,
             Dictionary<int, uint> sectionSizeTable,
-            List<string> globalLabels
+            List<Tuple<Section, string>> globalLabels
         ) {
             if (currentSectionIndex != -1) {
                 sectionSizeTable[currentSectionIndex] = offset;
@@ -89,9 +89,9 @@ namespace X86Asm.generator {
             ref int currentSectionIndex,
             ref uint offset,
             Dictionary<int, uint> sectionSizeTable,
-            List<string> globalLabels
+            List<Tuple<Section, string>> globalLabels
             ) {
-            globalLabels.Add(((ast.operand.Label)directive.Arguments[0]).Name);
+            globalLabels.Add(Tuple.Create(sections[currentSectionIndex],((ast.operand.Label)directive.Arguments[0]).Name));
         }
         public override void OnAssembleBytes(
             DirectiveStatement directive,
@@ -119,7 +119,7 @@ namespace X86Asm.generator {
             ref int currentSectionIndex,
             ref uint offset,
             Dictionary<int, uint> sectionSizeTable,
-            List<string> globalLabels
+            List<Tuple<Section, string>> globalLabels
             ) {
             offset += (uint)directive.Arguments.Count * Size;
         }
@@ -147,6 +147,32 @@ namespace X86Asm.generator {
                 default:
                     throw new Exception("サイズが不正。");
             }
+        }
+    }
+    public class AsciiDirectivePattern : DirectivePattern {
+        public AsciiDirectivePattern(string name) : base(name) { }
+        public override bool IsMatch(DirectiveStatement statement) {
+            return statement.Name == this.Name && statement.Arguments.Count == 1 && statement.Arguments[0] is StringLiteral;
+        }
+        public override void OnComputeLabelOffsets(
+            DirectiveStatement directive,
+            List<Section> sections,
+            ref int currentSectionIndex,
+            ref uint offset,
+            Dictionary<int, uint> sectionSizeTable,
+            List<Tuple<Section, string>> globalLabels
+            ) {
+            offset += (uint)(directive.Arguments[0] as StringLiteral).Bytes.Length;
+        }
+        public override void OnAssembleBytes(
+            DirectiveStatement directive,
+            List<Section> sections,
+            ref int currentSectionIndex,
+            ref uint offset,
+           uint[] sectionSizeTable,
+            IDictionary<string, Symbol> symbolTable
+        ) {
+            sections[currentSectionIndex].data.Write((directive.Arguments[0] as StringLiteral).Bytes, 0, (directive.Arguments[0] as StringLiteral).Bytes.Length);
         }
     }
 

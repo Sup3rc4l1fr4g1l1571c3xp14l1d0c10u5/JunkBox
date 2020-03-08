@@ -7,10 +7,12 @@ namespace X86Asm.generator {
             new SectionDirectivePattern(".text"),
             new SectionDirectivePattern(".data"),
             new SectionDirectivePattern(".bss" ),
+            new SectionDirectivePattern(".rdata" ),
             new GlobalDirectivePattern(".globl" ),
             new ConstantDirectivePattern(".db", 1 ),
             new ConstantDirectivePattern(".dw", 2 ),
             new ConstantDirectivePattern(".dd", 4 ),
+            new AsciiDirectivePattern(".ascii" ),
         };
 
     }
